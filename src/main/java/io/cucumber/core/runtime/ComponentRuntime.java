@@ -1,0 +1,100 @@
+package io.cucumber.core.runtime;
+
+import io.cucumber.core.filter.Filters;
+import io.cucumber.core.gherkin.Feature;
+import io.cucumber.core.gherkin.Pickle;
+import io.cucumber.core.options.CommandlineOptionsParser;
+import io.cucumber.core.options.RuntimeOptions;
+import io.cucumber.core.order.PickleOrder;
+import io.cucumber.core.runner.ScenarioContext;
+import io.cucumber.core.runner.TestCase;
+
+import java.net.URI;
+import java.util.List;
+
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+
+import static io.cucumber.core.runtime.GlobalCache.getFeaturePathFeatureSupplier;
+import static io.cucumber.core.runtime.GlobalCache.getGlobalRunner;
+
+public final class ComponentRuntime {
+
+    public static  List<TestCase> createTestcases(String[] args, ScenarioContext scenarioContext) {
+        RuntimeOptions runtimeOptions = ComponentRuntime.buildOptions(args);
+        System.out.println("@@runtimeOptions: " + runtimeOptions);
+        System.out.println("@@runtimeOptions: " + runtimeOptions.getTagExpressions());
+        List<Feature> features = getFeaturePathFeatureSupplier().get(runtimeOptions);
+        System.out.println("@@features: " + features.size());
+
+        List<Pickle> pickles = filterPicklesFromFeatures(features, runtimeOptions);
+        System.out.println("@@pickles: " + pickles.size());
+
+        return pickles.stream().map(pickle -> getGlobalRunner().createTestCaseForPickle(pickle)).toList();
+
+
+    }
+
+
+
+
+    public static RuntimeOptions buildOptions(String[] argv) {
+        CommandlineOptionsParser commandlineOptionsParser = new CommandlineOptionsParser(System.out);
+        return commandlineOptionsParser.parse(argv).build();
+    }
+
+    public static Arguments createFilterArguments(RuntimeOptions runtimeOptions) {
+        // Create filter from RuntimeOptions
+        Predicate<Pickle> filter = new Filters(runtimeOptions);
+
+        // Get PickleOrder from RuntimeOptions
+        PickleOrder pickleOrder = runtimeOptions.getPickleOrder();
+
+        // Get limit from RuntimeOptions
+        int limit = runtimeOptions.getLimitCount();
+
+        // Get feature paths from RuntimeOptions
+        List<URI> featurePaths = runtimeOptions.getFeaturePaths();
+
+        return new Arguments(filter, pickleOrder, limit, featurePaths);
+    }
+
+    public static List<Pickle> filterPicklesFromFeatures(
+            List<Feature> features,
+            RuntimeOptions runtimeOptions
+    ) {
+        Arguments args = createFilterArguments(runtimeOptions);
+        System.out.println("@@args.filter: " + args.filter);
+        Predicate<Pickle> filter = args.filter;
+        PickleOrder pickleOrder = args.pickleOrder;
+        int limit = args.limit;
+        System.out.println("@@stream()) "+ features.stream()
+                .flatMap(feature -> feature.getPickles().stream()).getClass());
+        return features.stream()
+                .flatMap(feature -> feature.getPickles().stream())
+                .filter(filter)
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toList(),
+                        list -> pickleOrder.orderPickles(list).stream()
+                ))
+                .limit(limit > 0 ? limit : Integer.MAX_VALUE)
+                .collect(Collectors.toList());
+    }
+
+    public static class Arguments {
+        public final Predicate<Pickle> filter;
+        public final PickleOrder pickleOrder;
+        public final int limit;
+        public final List<URI> featurePaths;
+
+        public Arguments(Predicate<Pickle> filter, PickleOrder pickleOrder, int limit, List<URI> featurePaths) {
+            this.filter = filter;
+            this.pickleOrder = pickleOrder;
+            this.limit = limit;
+            this.featurePaths = featurePaths;
+        }
+    }
+
+
+
+}
