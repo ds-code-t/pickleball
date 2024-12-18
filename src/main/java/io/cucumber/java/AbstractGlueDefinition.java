@@ -41,10 +41,6 @@ abstract class AbstractGlueDefinition implements Located {
     }
 
     public final Object invokeMethod(Object... args) {
-//        System.out.println("@@invokeMethod1 " + getClass() +" :: " + method.getName());
-//        new Exception().printStackTrace();
-
-
         if (Modifier.isStatic(method.getModifiers())) {
             return Invoker.invokeStatic(this, method, args);
         }

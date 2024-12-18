@@ -19,9 +19,26 @@ public final class GherkinMessagesExamples implements Node.Examples {
         return children.stream().map(e -> (GherkinMessagesExample) e).toList();
     }
 
+    public GherkinMessagesExample getExample(int lineNum) {
+        return (GherkinMessagesExample) children.stream().filter(example -> example.getLocation().getLine() == lineNum ).findFirst().orElse(null);
+    }
+
     public io.cucumber.messages.types.Examples getExamples() {
         return examples;
     }
+
+//    public Node getAncestor() {
+//        Node parent = getParent().orElse(null);
+//        if (parent == null || parent instanceof GherkinMessagesScenario) {
+//            return (GherkinMessagesScenario) parent;
+//        } else if(parent instanceof GherkinMessagesExamples ){
+//
+//        }
+//        return parent.getAncestor();
+//    }
+//
+
+
 
     private final List<Example> children;
     private final Location location;

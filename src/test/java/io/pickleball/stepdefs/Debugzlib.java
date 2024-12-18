@@ -5,8 +5,8 @@ package io.pickleball.stepdefs;
 //import io.cucumber.java.en.Then;
 //import io.cucumber.java.en.When;
 
-import io.cucumber.core.runtime.GlobalCache;
 import io.cucumber.datatable.DataTable;
+import io.cucumber.docstring.DocString;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.If;
 import io.cucumber.java.en.Then;
@@ -14,6 +14,7 @@ import io.cucumber.java.en.When;
 //import io.cucumber.messages.types.DataTable;
 
 import static io.cucumber.utilities.GeneralUtilities.getStringTimeStamp;
+import static io.cucumber.utilities.GeneralUtilities.waitTime;
 
 public class Debugzlib {
 
@@ -37,6 +38,12 @@ public class Debugzlib {
     }
 
 
+    @Given("^DocString Test$")
+    public void DDDqqa(DocString dt) {
+        System.out.println("DocString: " + dt);
+    }
+
+
 //    @Given("^DDD (.*) and (.*)$")
 //    public void DDD2(String t1, String t2) {
 //        System.out.println("WITHOUT DATATABLE");
@@ -49,20 +56,9 @@ public class Debugzlib {
 //    }
 
 
-
-
-
-
-
-
-
-
-
-
-
     @Given("^I am running a testlzz (.*) and (.*)$")
     public void iAmRunningATestlzz(String t1, String t2) {
-        System.out.println("DEBUG: Given step executed " + t1 + "  --- " + t2);
+//        System.out.println("DEBUG: Given step executed " + t1 + "  --- " + t2);
 //        GlobalCache.teamCityPlugin.printRemotely("", "A");
     }
 
@@ -73,8 +69,8 @@ public class Debugzlib {
 
     @If("I should see debug outputlzz")
     public void iShouldSeeDebugOutputlzz() {
-//        waitTime(1000L);
-        System.out.println("DEBUG: Then step executed"  + getStringTimeStamp() ) ;
+//        waitTime(3000L);
+//        System.out.println("DEBUG: Then step executed" + getStringTimeStamp());
     }
 
 

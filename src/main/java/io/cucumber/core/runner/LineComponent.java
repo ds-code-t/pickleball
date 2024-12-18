@@ -29,32 +29,9 @@ public interface LineComponent {
     }
 
 
-//
-//    enum LineType {
-//        PICKLE_STEP_DEFINITION,
-//        TEST_CASE,
-//        UNKNOWN
-//    }
-//
 
 
 
-//    default LineType returnType() {
-//        if (this instanceof PickleStepTestStep) {
-//            PickleStepTestStep step = (PickleStepTestStep) this;
-//            System.out.println("@@ code location:: "+ step.getCodeLocation());
-//            System.out.println("@@ code getUri:: "+ step.getUri());
-////            step.getDefinitionMatch()
-//
-//            return LineType.PICKLE_STEP_DEFINITION;
-//        } else if (this instanceof io.cucumber.core.runner.TestCase) {
-//            io.cucumber.core.runner.TestCase test = (io.cucumber.core.runner.TestCase) this;
-//
-//            return LineType.TEST_CASE;
-//        } else {
-//            return LineType.UNKNOWN;
-//        }
-//    }
 
 
 

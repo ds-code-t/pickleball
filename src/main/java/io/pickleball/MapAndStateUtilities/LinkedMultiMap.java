@@ -7,19 +7,19 @@ import java.util.Objects;
 /**
  * A custom data structure that behaves like a linked multimap.
  * Entries maintain insertion order. Duplicate keys and values are allowed.
- *
+ * <p>
  * Internally it stores keys and values in parallel ArrayLists.
  * The position in both lists represents the entry association.
- *
+ * <p>
  * This structure provides:
- *  - put(key, value)
- *  - getValues(key): all values associated with a given key in insertion order
- *  - getKeys(value): all keys associated with a given value in insertion order
- *  - getValueByKeyIndex(key, index): get the Nth value for a given key
- *  - getKeyByValueIndex(value, index): get the Nth key for a given value
- *  - Safe versions of these index-based getters that return null if out of range
- *  - Versions of these index-based getters that accept strings like "key #2" meaning
- *    "the second occurrence of that key".
+ * - put(key, value)
+ * - getValues(key): all values associated with a given key in insertion order
+ * - getKeys(value): all keys associated with a given value in insertion order
+ * - getValueByKeyIndex(key, index): get the Nth value for a given key
+ * - getKeyByValueIndex(value, index): get the Nth key for a given value
+ * - Safe versions of these index-based getters that return null if out of range
+ * - Versions of these index-based getters that accept strings like "key #2" meaning
+ * "the second occurrence of that key".
  */
 public class LinkedMultiMap<K, V> {
     private final List<K> keys;
@@ -28,6 +28,15 @@ public class LinkedMultiMap<K, V> {
     public LinkedMultiMap() {
         this.keys = new ArrayList<>();
         this.values = new ArrayList<>();
+    }
+
+    // New constructor to initialize from lists directly
+    public LinkedMultiMap(List<K> keys, List<V> values) {
+        if (keys.size() != values.size()) {
+            throw new IllegalArgumentException("Keys and values lists must have the same size.");
+        }
+        this.keys = new ArrayList<>(keys);
+        this.values = new ArrayList<>(values);
     }
 
     public void put(K key, V value) {
@@ -70,11 +79,63 @@ public class LinkedMultiMap<K, V> {
      */
     public V getValueByKeyIndexSafe(K key, int index) {
         List<V> vals = getValues(key);
+        if (index < 0)
+            index = vals.size() + index;
         if (index < 0 || index >= vals.size()) {
             return null;
         }
         return vals.get(index);
     }
+
+    public K getLastKeyOrDefault(V value, Object obj) {
+        List<K> ks = getKeys(value);
+        if (ks.size() == 0)
+            return (K) obj;
+        return ks.get(ks.size() - 1);
+    }
+
+    public K getLastKey(V value) {
+        List<K> ks = getKeys(value);
+        return ks.get(ks.size() - 1);
+    }
+
+    public V getLastValueOrDefault(K key, Object obj) {
+        List<V> vs = getValues(key);
+        if (vs.size() == 0)
+            return (V) obj;
+        return vs.get(vs.size() - 1);
+    }
+
+
+    public V getLastValue(K key) {
+        List<V> vs = getValues(key);
+        return vs.get(vs.size() - 1);
+    }
+
+    public K getFirstKeyOrDefault(V value, Object obj) {
+        List<K> ks = getKeys(value);
+        if (ks.size() == 0)
+            return (K) obj;
+        return ks.get(0);
+    }
+
+    public K getFirstKey(V value) {
+        List<K> ks = getKeys(value);
+        return ks.get(0);
+    }
+
+    public V getFirstValueOrDefault(K key, Object obj) {
+        List<V> vs = getValues(key);
+        if (vs.size() == 0)
+            return (V) obj;
+        return vs.get(0);
+    }
+
+    public V getFirstValue(K key) {
+        List<V> vs = getValues(key);
+        return vs.get(0);
+    }
+
 
     /**
      * Returns the Nth key associated with the given value (0-based index).
@@ -91,6 +152,8 @@ public class LinkedMultiMap<K, V> {
      */
     public K getKeyByValueIndexSafe(V value, int index) {
         List<K> ks = getKeys(value);
+        if (index < 0)
+            index = ks.size() + index;
         if (index < 0 || index >= ks.size()) {
             return null;
         }
@@ -105,6 +168,7 @@ public class LinkedMultiMap<K, V> {
     private static class ParsedString {
         String base;
         int index;
+
         ParsedString(String base, int index) {
             this.base = base;
             this.index = index;
@@ -115,7 +179,7 @@ public class LinkedMultiMap<K, V> {
         if (input == null) return null;
         int hashPos = input.lastIndexOf('#');
         if (hashPos == -1) {
-            return null;
+            return new ParsedString(input, -1);
         }
         String base = input.substring(0, hashPos).trim();
         String numberPart = input.substring(hashPos + 1).trim();
@@ -124,7 +188,8 @@ public class LinkedMultiMap<K, V> {
         }
         try {
             int oneBasedIndex = Integer.parseInt(numberPart);
-            if (oneBasedIndex < 1) return null;
+            if (oneBasedIndex < 1)
+                oneBasedIndex += 1;
             int zeroBasedIndex = oneBasedIndex - 1;
             return new ParsedString(base, zeroBasedIndex);
         } catch (NumberFormatException e) {
@@ -145,6 +210,16 @@ public class LinkedMultiMap<K, V> {
         return getValueByKeyIndexSafe(key, parsed.index);
     }
 
+    public V getValueByStringOrDefault(String keyWithIndex, Object obj) {
+        ParsedString parsed = parseIndexedString(keyWithIndex);
+        if (parsed == null) return null;
+        K key = (K) parsed.base; // Assuming keys are strings or can be cast safely.
+        V returnObj = getValueByKeyIndexSafe(key, parsed.index);
+        if (returnObj == null)
+            return (V) obj;
+        return returnObj;
+    }
+
     /**
      * Given a string like "someValue #3", return the corresponding key.
      * This uses getKeyByValueIndexSafe internally.
@@ -156,5 +231,16 @@ public class LinkedMultiMap<K, V> {
         @SuppressWarnings("unchecked")
         V value = (V) parsed.base; // Assuming values are strings or can be cast safely.
         return getKeyByValueIndexSafe(value, parsed.index);
+    }
+
+    public K getKeyByStringOrDefault(String valueWithIndex, Object obj) {
+        ParsedString parsed = parseIndexedString(valueWithIndex);
+        if (parsed == null) return null;
+        @SuppressWarnings("unchecked")
+        V value = (V) parsed.base; // Assuming values are strings or can be cast safely.
+        K returnObj = getKeyByValueIndexSafe(value, parsed.index);
+        if (returnObj == null)
+            return (K) obj;
+        return returnObj;
     }
 }

@@ -9,19 +9,20 @@ import static java.util.Objects.requireNonNull;
 
 /**
  * Represents the Pickle message in Cucumber's message protocol
+ *
  * @see <a href=https://github.com/cucumber/messages>Github - Cucumber - Messages</a>
- *
+ * <p>
  * //// Pickles
- *
+ * <p>
  * A `Pickle` represents a template for a `TestCase`. It is typically derived
  * from another format, such as [GherkinDocument](#io.cucumber.messages.GherkinDocument).
  * In the future a `Pickle` may be derived from other formats such as Markdown or
  * Excel files.
- *
+ * <p>
  * By making `Pickle` the main data structure Cucumber uses for execution, the
  * implementation of Cucumber itself becomes simpler, as it doesn't have to deal
  * with the complex structure of a [GherkinDocument](#io.cucumber.messages.GherkinDocument).
- *
+ * <p>
  * Each `PickleStep` of a `Pickle` is matched with a `StepDefinition` to create a `TestCase`
  */
 // Generated code
@@ -34,15 +35,30 @@ public final class Pickle {
     private final java.util.List<PickleStep> steps;
     private final java.util.List<PickleTag> tags;
     private final java.util.List<String> astNodeIds;
+    public final Scenario scenario;
 
     public Pickle(
-        String id,
-        String uri,
-        String name,
-        String language,
-        java.util.List<PickleStep> steps,
-        java.util.List<PickleTag> tags,
-        java.util.List<String> astNodeIds
+            String id,
+            String uri,
+            String name,
+            String language,
+            java.util.List<PickleStep> steps,
+            java.util.List<PickleTag> tags,
+            java.util.List<String> astNodeIds
+    ) {
+        this(id, uri, name, language, steps, tags, astNodeIds, null);
+    }
+
+
+    public Pickle(
+            String id,
+            String uri,
+            String name,
+            String language,
+            java.util.List<PickleStep> steps,
+            java.util.List<PickleTag> tags,
+            java.util.List<String> astNodeIds,
+            Scenario scenario
     ) {
         this.id = requireNonNull(id, "Pickle.id cannot be null");
         this.uri = requireNonNull(uri, "Pickle.uri cannot be null");
@@ -51,7 +67,7 @@ public final class Pickle {
         this.steps = unmodifiableList(new ArrayList<>(requireNonNull(steps, "Pickle.steps cannot be null")));
         this.tags = unmodifiableList(new ArrayList<>(requireNonNull(tags, "Pickle.tags cannot be null")));
         this.astNodeIds = unmodifiableList(new ArrayList<>(requireNonNull(astNodeIds, "Pickle.astNodeIds cannot be null")));
-//        System.out.println("@@pickle name:: " + name);
+        this.scenario = scenario;
     }
 
     /**
@@ -111,39 +127,39 @@ public final class Pickle {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Pickle that = (Pickle) o;
-        return 
-            id.equals(that.id) &&         
-            uri.equals(that.uri) &&         
-            name.equals(that.name) &&         
-            language.equals(that.language) &&         
-            steps.equals(that.steps) &&         
-            tags.equals(that.tags) &&         
-            astNodeIds.equals(that.astNodeIds);        
+        return
+                id.equals(that.id) &&
+                        uri.equals(that.uri) &&
+                        name.equals(that.name) &&
+                        language.equals(that.language) &&
+                        steps.equals(that.steps) &&
+                        tags.equals(that.tags) &&
+                        astNodeIds.equals(that.astNodeIds);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(
-            id,
-            uri,
-            name,
-            language,
-            steps,
-            tags,
-            astNodeIds
+                id,
+                uri,
+                name,
+                language,
+                steps,
+                tags,
+                astNodeIds
         );
     }
 
     @Override
     public String toString() {
         return "Pickle{" +
-            "id=" + id +
-            ", uri=" + uri +
-            ", name=" + name +
-            ", language=" + language +
-            ", steps=" + steps +
-            ", tags=" + tags +
-            ", astNodeIds=" + astNodeIds +
-            '}';
+                "id=" + id +
+                ", uri=" + uri +
+                ", name=" + name +
+                ", language=" + language +
+                ", steps=" + steps +
+                ", tags=" + tags +
+                ", astNodeIds=" + astNodeIds +
+                '}';
     }
 }

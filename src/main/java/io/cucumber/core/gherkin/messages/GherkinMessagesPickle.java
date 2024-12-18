@@ -24,9 +24,20 @@ import java.util.stream.Collectors;
 public final class GherkinMessagesPickle implements Pickle {
 
     private final io.cucumber.messages.types.Pickle pickle;
+
+    public CucumberQuery getCucumberQuery() {
+        return cucumberQuery;
+    }
+
     private final List<Step> steps;
     private final URI uri;
     private final CucumberQuery cucumberQuery;
+
+    public GherkinDialect getDialect() {
+        return dialect;
+    }
+
+    private final GherkinDialect dialect;
 
     public io.cucumber.messages.types.Pickle getPickle() {
         return pickle;
@@ -35,6 +46,7 @@ public final class GherkinMessagesPickle implements Pickle {
     public GherkinMessagesPickle(
             io.cucumber.messages.types.Pickle pickle, URI uri, GherkinDialect dialect, CucumberQuery cucumberQuery
     ) {
+        this.dialect = dialect;
         this.pickle = pickle;
         this.uri = uri;
         this.cucumberQuery = cucumberQuery;

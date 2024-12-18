@@ -10,7 +10,7 @@ public final class DocStringArgument implements Argument {
     private final String content;
     private final String contentType;
 
-    DocStringArgument(DocStringTransformer<?> docStringType, String content, String contentType) {
+    public DocStringArgument(DocStringTransformer<?> docStringType, String content, String contentType) {
         this.docStringType = requireNonNull(docStringType);
         this.content = requireNonNull(content);
         this.contentType = contentType;

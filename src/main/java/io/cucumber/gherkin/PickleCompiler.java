@@ -29,14 +29,15 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static io.pickleball.configs.Constants.COMPONENT_TAG;
 import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
-import static java.util.Collections.unmodifiableList;
 
-class PickleCompiler {
+public class PickleCompiler {
 
     private final IdGenerator idGenerator;
     private final boolean extractData;
+    private boolean componentCompile;
 
     public PickleCompiler(IdGenerator idGenerator) {
             this(idGenerator, false);
@@ -53,15 +54,14 @@ class PickleCompiler {
             return pickles;
         }
         Feature feature = gherkinDocument.getFeature().get();
-
         String language = feature.getLanguage();
-
         compileFeature(pickles, feature, language, uri);
         return pickles;
     }
 
     private void compileFeature(List<Pickle> pickles, Feature feature, String language, String uri) {
         List<Tag> tags = feature.getTags();
+//        componentCompile = tags.removeIf(tag -> COMPONENT_TAG.equals(tag.getName()));
         List<Step> featureBackgroundSteps = new ArrayList<>();
         for (FeatureChild featureChild : feature.getChildren()) {
             if (featureChild.getBackground().isPresent()) {
@@ -129,22 +129,22 @@ class PickleCompiler {
                 language,
                 steps,
                 pickleTags(scenarioTags),
-                sourceIds
+                sourceIds,
+                (componentCompile ? scenario : null)
         );
         pickles.add(pickle);
     }
 
     private void compileScenarioOutline(List<Pickle> pickles, Scenario scenario, List<Tag> featureTags, List<Step> backgroundSteps, String language, String uri) {
-        int exampleNum = 0;
+//        int exampleNum = 0;
         for (final Examples examples : scenario.getExamples()) {
-
             if (!examples.getTableHeader().isPresent()) continue;
             List<TableCell> variableCells = examples.getTableHeader().get().getCells();
-            int rowNum = 0;
+//            int rowNum = 0;
             for (final TableRow valuesRow : examples.getTableBody()) {
-                Map<String, Object> scenarioData = new HashMap<>();
-                scenarioData.put("exampleNum", exampleNum++);
-                scenarioData.put("rowNum", rowNum++);
+//                Map<String, Object> scenarioData = new HashMap<>();
+//                scenarioData.put("exampleNum", exampleNum++);
+//                scenarioData.put("rowNum", rowNum++);
                 List<TableCell> valueCells = valuesRow.getCells();
 
                 List<PickleStep> steps = new ArrayList<>();
@@ -185,9 +185,9 @@ class PickleCompiler {
                         language,
                         steps,
                         pickleTags(tags),
-                        sourceIds
+                        sourceIds,
+                        (componentCompile ? scenario : null)
                 );
-
                 pickles.add(pickle);
             }
         }

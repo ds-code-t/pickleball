@@ -28,8 +28,6 @@ import java.util.Optional;
 public class Main {
 
     public static void main(String... argv) {
-        System.out.println("@@main1 " + Arrays.toString(argv));
-
         byte exitStatus = run(argv, Thread.currentThread().getContextClassLoader());
         System.exit(exitStatus);
     }
@@ -43,7 +41,6 @@ public class Main {
      *              failures)
      */
     public static byte run(String... argv) {
-        System.out.println("@@run1 " + Arrays.toString(argv));
         return run(argv, Thread.currentThread().getContextClassLoader());
     }
 
@@ -57,8 +54,6 @@ public class Main {
      *                     failures)
      */
     public static byte run(String[] argv, ClassLoader classLoader) {
-        System.out.println("@@run2 " + Arrays.toString(argv));
-
         RuntimeOptions propertiesFileOptions = new CucumberPropertiesParser()
                 .parse(CucumberProperties.fromPropertiesFile())
                 .build();

@@ -183,7 +183,6 @@ class TokenMatcher implements ITokenMatcher {
     @Override
     public boolean match_StepLine(Token token) {
         List<String> keywords = currentDialect.getStepKeywords();
-//        System.out.println("@@keywords: "+ keywords);
         for (String keyword : keywords) {
             if (token.line.startsWith(keyword)) {
                 String stepText = token.line.getRestTrimmed(keyword.length());

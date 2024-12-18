@@ -8,24 +8,22 @@ import io.cucumber.core.backend.TestCaseState;
 import io.cucumber.core.exception.CucumberException;
 import io.cucumber.core.gherkin.Step;
 import io.cucumber.core.stepexpression.Argument;
-import io.cucumber.core.stepexpression.DataTableArgument;
+import io.cucumber.core.stepexpression.DocStringArgument;
 import io.cucumber.cucumberexpressions.CucumberExpressionException;
 import io.cucumber.datatable.CucumberDataTableException;
+import io.cucumber.datatable.DataTable;
 import io.cucumber.datatable.UndefinedDataTableTypeException;
 import io.cucumber.docstring.CucumberDocStringException;
+import io.cucumber.docstring.DocString;
 import io.cucumber.java.JavaStepDefinition;
-import io.cucumber.messages.types.DataTable;
-import io.pickleball.cucumberutilities.CucumberObjectFactory;
 
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.StackManipulation.removeFrameworkFramesAndAppendStepLocation;
-import static io.cucumber.datatable.DataTable.emptyDataTable;
 import static io.cucumber.utilities.AccessFunctions.safeCallMethod;
 import static io.pickleball.cucumberutilities.DataTableUtilities.createStepExpressionDataTableArgument;
 
@@ -49,25 +47,17 @@ public class PickleStepDefinitionMatch extends Match implements StepDefinitionMa
         List<Argument> arguments = getArguments();
         List<ParameterInfo> parameterInfos = stepDefinition.parameterInfos();
         //pmod
-
-
         if (parameterInfos != null && arguments.size() != parameterInfos.size()) {
             int mismatchCount = parameterInfos.size() - arguments.size();
-            System.out.println("@@mismatchCount== " + mismatchCount);
-            System.out.println("@@parameterInfos:: " + parameterInfos);
-            parameterInfos.forEach(p -> System.out.println("@@p.getType()):: " + p.getType()));
-            arguments.forEach(p -> System.out.println("@@argument):: " + p));
             if (mismatchCount > 0) {
                 for (int i = arguments.size(); i < parameterInfos.size(); i++) {
                     ParameterInfo p = parameterInfos.get(i);
-                    System.out.println("@@p.getType().getTypeName():  " + p.getType().getTypeName());
                     if (p.getType().getTypeName().equals("io.cucumber.datatable.DataTable")) {
-                        System.out.println("@@io.cucumber.datatable.DataTable!!");
-                        arguments.add(createStepExpressionDataTableArgument("|a|\n|a|"));
-//                        arguments.add(emptyDataTable());
+                        arguments.add(DataTable.from("").toDataTableArgument());
+                    } else if (p.getType().getTypeName().equals("io.cucumber.docstring.DocString")) {
+                        arguments.add( DocString.fromString("ss" ).toDocStringArgument());
                     }
                 }
-//                arguments.addAll(Collections.nCopies(mismatchCount, null));
             } else {
                 throw arityMismatch(parameterInfos.size());
             }
@@ -76,10 +66,6 @@ public class PickleStepDefinitionMatch extends Match implements StepDefinitionMa
         List<Object> result = new ArrayList<>();
         try {
             for (Argument argument : arguments) {
-                System.out.println("@@@Args--argument: " + argument);
-                System.out.println("@@@Args--argument.getClass(): " + argument.getClass());
-                System.out.println("@@@Args--getValue(): " + argument.getValue());
-                System.out.println("@@@Args--getValue().getClass(): " + argument.getValue().getClass());
                 result.add(argument.getValue());
             }
         } catch (UndefinedDataTableTypeException e) {
@@ -223,7 +209,7 @@ public class PickleStepDefinitionMatch extends Match implements StepDefinitionMa
         return stepDefinition.getPattern();
     }
 
-    StepDefinition getStepDefinition() {
+    public StepDefinition getStepDefinition() {
         return stepDefinition;
     }
 

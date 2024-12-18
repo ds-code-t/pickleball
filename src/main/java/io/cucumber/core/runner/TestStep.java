@@ -4,8 +4,6 @@ package io.cucumber.core.runner;
 
 import io.cucumber.core.backend.Pending;
 import io.cucumber.core.eventbus.EventBus;
-import io.cucumber.core.predefinedsteps.metasteps.ScenarioSteps;
-import io.cucumber.java.JavaStepDefinition;
 import io.cucumber.messages.types.Envelope;
 import io.cucumber.messages.types.TestStepResult;
 import io.cucumber.plugin.event.Result;
@@ -13,6 +11,7 @@ import io.cucumber.plugin.event.Status;
 import io.cucumber.plugin.event.TestCase;
 import io.cucumber.plugin.event.TestStepFinished;
 import io.cucumber.plugin.event.TestStepStarted;
+import io.pickleball.cacheandstate.StepContext;
 
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -67,7 +66,7 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
     public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
         Instant startTime = bus.getInstant();
 
-        if (!stepContext.isMetaStep())
+//        if (!stepContext.isMetaStep())
             emitTestStepStarted(testCase, bus, state.getTestExecutionId(), startTime);
 
         Status status;
@@ -84,7 +83,7 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
         Result result = mapStatusToResult(status, error, duration);
         state.add(result);
 
-        if (!stepContext.isMetaStep())
+//        if (!stepContext.isMetaStep())
             emitTestStepFinished(testCase, bus, state.getTestExecutionId(), stopTime, duration, result);
 
         return result.getStatus().is(Status.PASSED) ? executionMode : SKIP;

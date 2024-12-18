@@ -7,7 +7,6 @@ public enum ExecutionMode {
     RUN {
         @Override
         Status execute(StepDefinitionMatch stepDefinitionMatch, TestCaseState state) throws Throwable {
-//            System.out.println("@@run execute");
             stepDefinitionMatch.runStep(state);
             return Status.PASSED;
         }

@@ -44,12 +44,10 @@ public final class Examples {
         this.tableHeader = tableHeader;
         this.tableBody = unmodifiableList(new ArrayList<>(requireNonNull(tableBody, "Examples.tableBody cannot be null")));
         this.id = requireNonNull(id, "Examples.id cannot be null");
-//        tableHeader.getCells().forEach(s -> System.out.println("@@header: " +s.getValue()));
         this.scenarioTagsIndex =  IntStream.range(0, tableHeader.getCells().size())
                 .filter(i -> tableHeader.getCells().get(i).getValue().trim().equals(SCENARIO_TAGS))
                 .findFirst()
                 .orElse(-1);
-//        System.out.println("@@scenarioTagsIndex " + scenarioTagsIndex);
     }
 
     /**

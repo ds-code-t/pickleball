@@ -9,6 +9,7 @@ import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.core.exception.CucumberException;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.gherkin.Step;
+import io.cucumber.core.gherkin.messages.GherkinMessagesPickle;
 import io.cucumber.core.logging.Logger;
 import io.cucumber.core.logging.LoggerFactory;
 import io.cucumber.core.snippets.SnippetGenerator;
@@ -17,7 +18,10 @@ import io.cucumber.plugin.event.HookType;
 import io.cucumber.plugin.event.Location;
 import io.cucumber.plugin.event.SnippetsSuggestedEvent;
 import io.cucumber.plugin.event.SnippetsSuggestedEvent.Suggestion;
+import io.pickleball.MapAndStateUtilities.LinkedMultiMap;
+//import io.pickleball.cucumberutilities.ComponentScenarioWrapper;
 
+import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,8 +32,10 @@ import java.util.stream.Collectors;
 
 import static io.cucumber.core.exception.ExceptionUtils.throwAsUncheckedException;
 import static io.cucumber.core.runner.StackManipulation.removeFrameworkFrames;
-import static io.cucumber.core.runtime.GlobalCache.setGlobalRunner;
-//import static io.cucumber.core.runtime.PrimaryScenarioData.setPrimaryScenario;
+import static io.pickleball.cacheandstate.GlobalCache.setScenarioThreadState;
+//import static io.pickleball.cacheandstate.PrimaryScenarioData.setPrimaryScenario;
+import static io.pickleball.cacheandstate.PrimaryScenarioData.setPrimaryScenario;
+import static io.pickleball.cucumberutilities.SourceParser.getComponentScenarioWrapper;
 import static java.util.Collections.emptyList;
 
 public final class Runner {
@@ -57,7 +63,6 @@ public final class Runner {
             log.debug(() -> "Loading glue for backend " + backend.getClass().getName());
             backend.loadGlue(this.glue, gluePaths);
         }
-        setGlobalRunner(this);
     }
 
     public EventBus getBus() {
@@ -66,8 +71,6 @@ public final class Runner {
 
     public void runPickle(Pickle pickle) {
         try {
-            System.out.println("@@pickle " + pickle.getId());
-            System.out.println("@@pickle hashCode: " + pickle.hashCode());
             StepTypeRegistry stepTypeRegistry = createTypeRegistryForPickle(pickle);
             snippetGenerators = createSnippetGeneratorsForPickle(stepTypeRegistry);
 
@@ -76,9 +79,10 @@ public final class Runner {
 
             glue.prepareGlue(stepTypeRegistry);
 
+
             TestCase testCase = createTestCaseForPickle(pickle);
-
-
+            setScenarioThreadState(this, testCase);
+            setPrimaryScenario(testCase.scenarioContext);
             testCase.run(bus);
         } finally {
             glue.removeScenarioScopedGlue();

@@ -1,14 +1,22 @@
 package io.pickleball.cucumberutilities;
 
 import io.cucumber.core.gherkin.messages.*;
+import io.cucumber.gherkin.GherkinParser;
+import io.cucumber.gherkin.PickleCompiler;
+import io.cucumber.messages.types.Envelope;
+import io.cucumber.messages.types.GherkinDocument;
+import io.cucumber.messages.types.Pickle;
+import io.cucumber.plugin.event.Node;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 import java.util.stream.Collectors;
+
+import static io.pickleball.cucumberutilities.SourceParser.getScenarioSourceByLine;
 
 public class FeatureFileUtilities {
 
@@ -21,6 +29,121 @@ public class FeatureFileUtilities {
         } catch (java.io.IOException e) {
             throw new RuntimeException("Failed to read feature file at URI: " + uri, e);
         }
+    }
+
+    public static void main(String[] args) throws IOException {
+//        GherkinDocument g =  pickleCompiler(URI.create("file:///C:/Users/Admin/IdeaProjects/pickleball3/src/test/resources/features/debugindep1.feature"));
+        String featureSource = readFeatureFile(URI.create("file:///C:/Users/Admin/IdeaProjects/pickleball3/src/test/resources/features/debugindep1.feature"));
+
+        String newSource = getScenarioSourceByLine(featureSource, 81).get();
+    }
+
+    public static List<Node> collectNodesByLineNumbers(URI uri, Set<Integer> lineNumbers) {
+        if (lineNumbers == null || lineNumbers.isEmpty()) {
+            return Collections.emptyList();
+        }
+        io.cucumber.core.gherkin.messages.GherkinMessagesFeature feature = parseFeature(uri);
+        // Sort the line numbers in ascending order for efficiency
+        List<Integer> lineList = lineNumbers.stream().toList();
+        List<Node> matchingNodes = new ArrayList<>();
+
+        // Traverse feature children and match nodes with sorted line numbers
+        feature.getChildren().forEach(node -> {
+            if (lineList.contains(node.getLocation().getLine()))
+                matchingNodes.add(node);
+
+            if (node instanceof Node.ScenarioOutline) {
+                ((GherkinMessagesScenarioOutline) node).getExamples().forEach(examples -> {
+                    GherkinMessagesExamples gherkinMessagesExamples = (GherkinMessagesExamples) examples;
+                    if (lineList.contains(gherkinMessagesExamples.getLocation().getLine()))
+                        matchingNodes.add(gherkinMessagesExamples);
+                  gherkinMessagesExamples.getChildren().forEach(example ->{
+                      if (lineList.contains(example.getLocation().getLine()))
+                          matchingNodes.add(example);
+                  } );
+
+                });
+            }
+
+
+        });
+
+        return matchingNodes;
+    }
+
+
+    public static GherkinMessagesPickle getModifiedPickle(String scenarioSource, GherkinMessagesPickle gherkinMessagesPickle) throws IOException {
+        if (scenarioSource == null || scenarioSource.isBlank()) {
+            throw new IllegalArgumentException("Feature source cannot be null or blank");
+        }
+        String featureSource = "Feature: Test feature" + "\n".repeat(gherkinMessagesPickle.getScenarioLocation().getLine()) + (gherkinMessagesPickle.getKeyword().equals("Scenario Outline:") ? scenarioSource.replaceFirst("Scenario Outline:", "Scenario:") : scenarioSource);
+
+
+        // Parse the feature source into Gherkin Envelopes
+        List<Envelope> envelopes = GherkinParser.builder()
+                .idGenerator(() -> java.util.UUID.randomUUID().toString())
+                .build()
+                .parse("feature", new ByteArrayInputStream(featureSource.getBytes(StandardCharsets.UTF_8)))
+                .collect(Collectors.toList());
+
+        // Extract the GherkinDocument from the envelopes
+        GherkinDocument gherkinDocument = envelopes.stream()
+                .map(Envelope::getGherkinDocument)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No GherkinDocument found in feature source"));
+
+        // Extract the Pickle (Scenario) from the envelopes
+        Pickle pickle = envelopes.stream()
+                .map(Envelope::getPickle)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("No Pickle found for Scenario in feature source"));
+
+        CucumberQuery cucumberQuery = new CucumberQuery();
+        cucumberQuery.update(gherkinDocument.getFeature().get());
+        return new GherkinMessagesPickle(pickle, gherkinMessagesPickle.getUri() , gherkinMessagesPickle.getDialect(), cucumberQuery);
+    }
+
+
+    public static GherkinDocument pickleCompiler(URI uri) throws IOException {
+        String featureSource = readFeatureFile(uri);
+        PickleCompiler pickleCompiler = new PickleCompiler(new SimpleIdGenerator());
+
+        return createGherkinDocument(featureSource).get();
+
+    }
+
+    public static Optional<GherkinDocument> createGherkinDocument(String source) throws IOException {
+        if (source == null || source.isBlank()) {
+            throw new IllegalArgumentException("Feature source cannot be null or blank");
+        }
+
+        // Convert the feature source string into an InputStream
+        InputStream sourceStream = new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8));
+
+        // Use GherkinParser to parse the feature content
+        List<Envelope> envelopes = GherkinParser.builder()
+                .idGenerator(() -> java.util.UUID.randomUUID().toString())
+                .build()
+                .parse("feature", sourceStream)
+                .collect(Collectors.toList());
+
+        // Extract and return the GherkinDocument from the envelopes
+        return envelopes.stream()
+                .map(Envelope::getGherkinDocument)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst();
+    }
+
+    public static io.cucumber.core.gherkin.messages.GherkinMessagesFeature parseComponentFeature(URI uri) {
+        String featureSource = readFeatureFile(uri);
+        io.cucumber.core.gherkin.messages.GherkinMessagesFeatureParser parser = new io.cucumber.core.gherkin.messages.GherkinMessagesFeatureParser();
+        return (io.cucumber.core.gherkin.messages.GherkinMessagesFeature) parser.parseComponent(uri, featureSource)
+                .orElseThrow(() -> new RuntimeException("Failed to parse feature file at URI: " + uri));
     }
 
     /**
@@ -73,14 +196,23 @@ public class FeatureFileUtilities {
     /**
      * Retrieves any Gherkin component (Scenario, ScenarioOutline, Examples, etc.) by line number.
      */
-    public static Object getComponentByLine(URI uri, int lineNumber) {
+    public static Node getComponentByLine(URI uri, int lineNumber) {
         io.cucumber.core.gherkin.messages.GherkinMessagesFeature feature = parseFeature(uri);
         Map<Integer, Object> componentMap = new HashMap<>();
         collectComponentsByLine(feature, componentMap);
 
-        return Optional.ofNullable(componentMap.get(lineNumber))
+        return (Node) Optional.ofNullable(componentMap.get(lineNumber))
                 .orElseThrow(() -> new RuntimeException("No component found at line " + lineNumber + " in the feature file."));
     }
+
+    public static Node getComponentByLine(GherkinMessagesFeature feature, int lineNumber) {
+        Map<Integer, Object> componentMap = new HashMap<>();
+        collectComponentsByLine(feature, componentMap);
+
+        return (Node) Optional.ofNullable(componentMap.get(lineNumber))
+                .orElseThrow(() -> new RuntimeException("No component found at line " + lineNumber + " in the feature file."));
+    }
+
 
     /**
      * Retrieves a list of all scenarios in the feature file.

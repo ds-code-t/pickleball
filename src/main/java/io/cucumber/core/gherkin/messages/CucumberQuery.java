@@ -27,7 +27,7 @@ public final class CucumberQuery {
     private final Map<String, Scenario> gherkinScenarioById = new HashMap<>();
     private final Map<String, Location> locationBySourceId = new HashMap<>();
 
-    void update(Feature feature) {
+    public void update(Feature feature) {
         feature.getChildren().forEach(featureChild -> {
             featureChild.getBackground().ifPresent(this::updateBackground);
             featureChild.getScenario().ifPresent(scenario -> updateScenario(feature, null, scenario));

@@ -29,8 +29,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
-import static io.cucumber.core.runtime.GlobalCache.setGlobalRuntime;
+import static io.pickleball.cacheandstate.GlobalCache.setGlobalRuntime;
 import static io.cucumber.core.runtime.SynchronizedEventBus.synchronize;
+//import static io.pickleball.executions.ParallelismControls.shouldRunInSeparateThread;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.collectingAndThen;
 import static java.util.stream.Collectors.toList;
@@ -90,6 +91,7 @@ public final class Runtime {
                         list -> pickleOrder.orderPickles(list).stream()))
                 .limit(limit > 0 ? limit : Integer.MAX_VALUE)
                 .map(pickle -> executor.submit(executePickle(pickle)))
+//                .map(this::executePickleBasedOnDecision)
                 .collect(toList());
 
         executor.shutdown();
@@ -106,9 +108,21 @@ public final class Runtime {
         }
     }
 
+//    private Future<?> executePickleBasedOnDecision(Pickle pickle) {
+//        if (shouldRunInSeparateThread(pickle)) {
+//            // Run in its own thread
+//            ExecutorService separateExecutor = Executors.newSingleThreadExecutor();
+//            Future<?> future = separateExecutor.submit(executePickle(pickle));
+//            separateExecutor.shutdown();
+//            return future;
+//        } else {
+//            // Use the default executor
+//            return executor.submit(executePickle(pickle));
+//        }
+//    }
+
+
     private Runnable executePickle(Pickle pickle) {
-        System.out.println("@@pickle: " + pickle.getName());
-        System.out.println("@@Thread==: " + Thread.currentThread().getName() + Thread.currentThread().getId());
         return () -> context.runTestCase(runner -> runner.runPickle(pickle));
     }
 

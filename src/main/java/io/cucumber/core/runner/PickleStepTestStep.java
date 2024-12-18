@@ -5,6 +5,7 @@ import io.cucumber.core.gherkin.Step;
 import io.cucumber.plugin.event.Argument;
 import io.cucumber.plugin.event.StepArgument;
 import io.cucumber.plugin.event.TestCase;
+import io.pickleball.cacheandstate.StepContext;
 
 import java.net.URI;
 import java.util.Collections;

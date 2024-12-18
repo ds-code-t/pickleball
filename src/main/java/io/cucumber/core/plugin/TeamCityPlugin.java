@@ -1,6 +1,6 @@
 package io.cucumber.core.plugin;
 
-import io.cucumber.core.runtime.GlobalCache;
+import io.pickleball.cacheandstate.GlobalCache;
 import io.cucumber.plugin.EventListener;
 import io.cucumber.plugin.event.EmbedEvent;
 import io.cucumber.plugin.event.Event;
@@ -40,7 +40,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.exception.ExceptionUtils.printStackTrace;
-import static io.cucumber.utilities.GeneralUtilities.getStringTimeStamp;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
@@ -175,8 +174,6 @@ public class TeamCityPlugin implements EventListener {
 
     private void printTestCaseStarted(TestCaseStarted event) {
         TestCase testCase = event.getTestCase();
-        System.out.println("@@testCase$$$$$$$$$:: " + testCase.getName());
-
         URI uri = testCase.getUri();
         String timestamp = extractTimeStamp(event);
 
@@ -197,9 +194,6 @@ public class TeamCityPlugin implements EventListener {
     }
 
     private void startNode(URI uri, String timestamp, Node node) {
-        System.out.println("@@uri:: " + uri);
-        System.out.println("@@startNode:: " + node.getClass() + " : " + node.getName());
-
         Supplier<String> keyword = () -> node.getKeyword().orElse("Unknown");
         String name = node.getName().orElseGet(keyword);
         String location = uri + ":" + node.getLocation().getLine();
@@ -451,8 +445,6 @@ public class TeamCityPlugin implements EventListener {
     }
 
     private void handleEmbedEvent(EmbedEvent event) {
-        System.out.println("@@handleEmbedEvent:: " + event);
-
         String name = event.getName() == null ? "" : event.getName() + " ";
         print(TEMPLATE_ATTACH_WRITE_EVENT,
                 "Embed event: " + name + "[" + event.getMediaType() + " " + event.getData().length + " bytes]\n");
@@ -465,8 +457,6 @@ public class TeamCityPlugin implements EventListener {
 
 
     private void print(String command, Object... args) {
-        System.out.println("@@command: " + command);
-        System.out.println("@@args: " + Arrays.toString(args));
         if(args.length == 3 && args[2].toString().startsWith("Scenario:")) {
             if (command.startsWith("##teamcity[testStarted ")) {
                 out.println(formatCommand( "##teamcity[testSuiteStarted timestamp = '%s' locationHint = '%s' name = '%s']", args[0] , "", args[2]));

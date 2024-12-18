@@ -1,24 +1,17 @@
-package io.cucumber.core.runner;
+package io.pickleball.cacheandstate;
 
-import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.core.gherkin.Pickle;
-import io.cucumber.core.runtime.TimeServiceEventBus;
-import io.cucumber.core.runtime.UuidGeneratorServiceLoader;
-import io.cucumber.messages.types.Envelope;
-import io.cucumber.messages.types.TestStepResult;
-import io.cucumber.plugin.event.*;
+import io.cucumber.core.runner.TestCase;
+import io.cucumber.core.runner.TestCaseState;
 
-import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static io.cucumber.core.runner.TestStepResultStatusMapper.from;
-import static io.cucumber.core.runtime.ComponentRuntime.createTestcases;
-import static io.cucumber.core.runtime.GlobalCache.getGlobalRunner;
+import static io.pickleball.cacheandstate.PrimaryScenarioData.getRunner;
+import static io.pickleball.executions.ComponentRuntime.createTestcases;
+//import static io.pickleball.cacheandstate.GlobalCache.getGlobalRunner;
 import static io.cucumber.messages.Convertor.toMessage;
 import static io.cucumber.utilities.ArgumentParsing.convertCommandLineToArgv;
 import static io.cucumber.utilities.ArgumentParsing.convertHashMapToArgv;
@@ -81,10 +74,9 @@ public class ScenarioContext implements io.cucumber.plugin.event.TestStep {
 
     public void createComponentScenario(String[] args) {
         List<TestCase> testCases = createTestcases(args, this);
-        System.out.println("@@testCases: " + testCases.size());
         for (TestCase testCase : testCases) {
             addChildScenarioContext(testCase.scenarioContext);
-            testCase.runComponent(getGlobalRunner().bus);
+            testCase.runComponent(getRunner().bus);
         }
     }
     public ScenarioContext getRootScenarioContext() {

@@ -12,7 +12,6 @@ public class Main {
     private static final Logger log = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] argv) {
-        System.out.println("@@main old1");
         byte exitStatus = run(argv, Thread.currentThread().getContextClassLoader());
         System.exit(exitStatus);
     }
@@ -27,8 +26,6 @@ public class Main {
      *                     failures)
      */
     public static byte run(String[] argv, ClassLoader classLoader) {
-        System.out.println("@@run old1");
-
         log.warn(() -> "You are using deprecated Main class. Please use io.cucumber.core.cli.Main");
         return io.cucumber.core.cli.Main.run(argv, classLoader);
     }

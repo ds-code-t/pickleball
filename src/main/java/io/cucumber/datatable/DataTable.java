@@ -1,16 +1,14 @@
 package io.cucumber.datatable;
 
+import io.cucumber.core.gherkin.messages.GherkinMessagesDataTableArgument;
+import io.cucumber.core.stepexpression.DataTableArgument;
+import io.cucumber.messages.types.*;
+import io.pickleball.MapAndStateUtilities.LinkedMultiMap;
 import org.apiguardian.api.API;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
-import java.util.AbstractList;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.RandomAccess;
+import java.util.*;
 
 import static io.cucumber.datatable.CucumberDataTableException.duplicateKeyException;
 import static java.util.Collections.emptyList;
@@ -41,7 +39,7 @@ import static java.util.Collections.unmodifiableMap;
  * provided data table converter. A DataTable is immutable and thread safe.
  */
 @API(status = API.Status.STABLE)
-public final class DataTable {
+public class DataTable {
 
     private final List<List<String>> raw;
     private final TableConverter tableConverter;
@@ -56,7 +54,7 @@ public final class DataTable {
      * @param  tableConverter       to transform the table
      * @throws NullPointerException if either raw or tableConverter is null
      */
-    private DataTable(List<List<String>> raw, TableConverter tableConverter) {
+    protected DataTable(List<List<String>> raw, TableConverter tableConverter) {
         if (raw == null)
             throw new NullPointerException("cells can not be null");
         if (tableConverter == null)
@@ -64,6 +62,7 @@ public final class DataTable {
         this.raw = raw;
         this.tableConverter = tableConverter;
     }
+
 
     /**
      * Creates a new DataTable.
@@ -608,7 +607,7 @@ public final class DataTable {
 
     /**
      * Prints a string representation of this table to the {@code appendable}.
-     * 
+     *
      * @deprecated             superseded by
      *                         {@link DataTableFormatter#formatTo(DataTable, Appendable)}
      * @param      appendable  to append the string representation of this table
@@ -648,7 +647,7 @@ public final class DataTable {
      * </pre>
      * <p>
      * becomes:
-     * 
+     *
      * <pre>
      * | a | b |
      * | 7 | 9 |
@@ -726,15 +725,15 @@ public final class DataTable {
          *
          * convert.toList(table, String.class);
          * </pre>
-         * 
+         *
          * can become
-         * 
+         *
          * <pre>
          *  [ "Annie M. G. Schmidt", "1911-03-20", "Roald Dahl", "1916-09-13" ]
          * </pre>
          * <p>
          * While:
-         * 
+         *
          * <pre>
          * convert.toList(table, Author.class);
          * </pre>
@@ -757,9 +756,9 @@ public final class DataTable {
          *
          * convert.toList(table, Authors.class);
          * </pre>
-         * 
+         *
          * can become:
-         * 
+         *
          * <pre>
          *  [
          *   Author[ firstName: Annie M. G., lastName: Schmidt,  birthDate: 1911-03-20 ],
@@ -787,9 +786,9 @@ public final class DataTable {
          *
          * convert.toLists(table, String.class);
          * </pre>
-         * 
+         *
          * can become
-         * 
+         *
          * <pre>
          *  [
          *    [ "Annie M. G. Schmidt", "1911-03-20" ],
@@ -819,9 +818,9 @@ public final class DataTable {
          *
          * convert.toMap(table, Id.class, Authors.class);
          * </pre>
-         * 
+         *
          * can become:
-         * 
+         *
          * <pre>
          *  {
          *   Id[ 4a1 ]: Author[ name: Annie M. G. Schmidt, birthDate: 1911-03-20 ],
@@ -841,9 +840,9 @@ public final class DataTable {
          *
          * convert.toMap(table, Id.class, Authors.class);
          * </pre>
-         * 
+         *
          * can becomes:
-         * 
+         *
          * <pre>
          *  {
          *   Id[ 4a1 ]: Author[ firstName: Annie M. G., lastName: Schmidt, birthDate: 1911-03-20 ],
@@ -875,9 +874,9 @@ public final class DataTable {
          * | Annie M. G. | Schmidt  | 1911-03-20 |
          * | Roald       | Dahl     | 1916-09-13 |
          * </pre>
-         * 
+         *
          * can become:
-         * 
+         *
          * <pre>
          *  [
          *   {firstName: Annie M. G., lastName: Schmidt, birthDate: 1911-03-20 }
@@ -897,9 +896,9 @@ public final class DataTable {
 
     }
 
-    static final class NoConverterDefined implements TableConverter {
+    public static final class NoConverterDefined implements TableConverter {
 
-        NoConverterDefined() {
+        public NoConverterDefined() {
 
         }
 
@@ -1057,4 +1056,200 @@ public final class DataTable {
             return width();
         }
     }
+    /** Factory method: Create DataTable from GherkinMessagesDataTableArgument.
+            */
+    public static DataTable from(GherkinMessagesDataTableArgument gherkinTable) {
+        return new DataTable(gherkinTable.cells(), new NoConverterDefined());
+    }
+
+    /**
+     * Factory method: Create DataTable from DataTableArgument.
+     */
+    public static DataTable from(DataTableArgument dataTableArgument) {
+        List<List<String>> raw = ((DataTable) dataTableArgument.getValue()).cells();
+        return new DataTable(raw, new NoConverterDefined());
+    }
+
+    /**
+     * Factory method: Create DataTable from PickleTable.
+     */
+    public static DataTable from(PickleTable pickleTable) {
+        List<List<String>> raw = new ArrayList<>();
+        pickleTable.getRows().forEach(row -> {
+            List<String> rowValues = new ArrayList<>();
+            row.getCells().forEach(cell -> rowValues.add(cell.getValue()));
+            raw.add(rowValues);
+        });
+        return new DataTable(raw, new NoConverterDefined());
+    }
+
+    /**
+     * Factory method: Create DataTable from a string representation of a table.
+     */
+    public static DataTable from(String tableSource) {
+        List<List<String>> raw = parseTableSource(tableSource);
+        return new DataTable(raw, new NoConverterDefined());
+    }
+
+    /**
+     * Factory method: Create DataTable from Examples.
+     */
+    public static DataTable from(Examples examples) {
+        List<List<String>> raw = new ArrayList<>();
+        examples.getTableHeader().ifPresent(header -> raw.add(getRowValues(header)));
+        examples.getTableBody().forEach(body -> raw.add(getRowValues(body)));
+        return new DataTable(raw, new NoConverterDefined());
+    }
+
+    /**
+     * Convert to GherkinMessagesDataTableArgument.
+     */
+    public GherkinMessagesDataTableArgument toGherkinMessagesDataTableArgument() {
+        PickleTable pickleTable = toPickleTable();
+        return new GherkinMessagesDataTableArgument(pickleTable, 1); // Mocked line number
+    }
+
+    /**
+     * Convert to DataTableArgument.
+     */
+    public DataTableArgument toDataTableArgument() {
+        return new DataTableArgument(argument -> this, this.cells());
+    }
+
+    /**
+     * Convert to PickleTable.
+     */
+    public PickleTable toPickleTable() {
+        List<PickleTableRow> pickleRows = new ArrayList<>();
+        this.cells().forEach(row -> {
+            List<PickleTableCell> cells = new ArrayList<>();
+            row.forEach(value -> cells.add(new PickleTableCell(value))); // Use PickleTableCell for PickleTable
+            pickleRows.add(new PickleTableRow(cells));
+        });
+        return new PickleTable(pickleRows);
+    }
+
+    /**
+     * Convert to Examples.
+     */
+    public Examples toExamples(String keyword, String name, String description) {
+        List<TableRow> tableRows = new ArrayList<>();
+        if (!this.cells().isEmpty()) {
+            tableRows.add(toTableRow(this.cells().get(0))); // Header
+        }
+        for (int i = 1; i < this.cells().size(); i++) {
+            tableRows.add(toTableRow(this.cells().get(i))); // Body rows
+        }
+        return new Examples(
+                new Location(1L, 1L),
+                new ArrayList<>(),
+                keyword,
+                name,
+                description,
+                tableRows.get(0),
+                tableRows.subList(1, tableRows.size()),
+                UUID.randomUUID().toString()
+        );
+    }
+
+    // SECTION: HELPER METHODS
+    // =======================
+
+    /**
+     * Parse a table source string into a raw 2D list of strings.
+     */
+    private static List<List<String>> parseTableSource(String tableSource) {
+        String[] rows = tableSource.split("\n");
+        List<List<String>> table = new ArrayList<>();
+        for (String row : rows) {
+            String[] cells = row.split("\\|");
+            List<String> rowList = new ArrayList<>();
+            for (String cell : cells) {
+                String trimmed = cell.trim();
+                if (!trimmed.isEmpty()) {
+                    rowList.add(trimmed);
+                }
+            }
+            if (!rowList.isEmpty()) {
+                table.add(rowList);
+            }
+        }
+        return table;
+    }
+
+    /**
+     * Helper: Convert a row into a TableRow.
+     */
+    private static TableRow toTableRow(List<String> rowValues) {
+        List<TableCell> cells = new ArrayList<>();
+        rowValues.forEach(value -> cells.add(new TableCell(new Location(1L, 1L), value))); // Provide Location instance
+        return new TableRow(new Location(1L, 1L), cells, UUID.randomUUID().toString());
+    }
+
+    /**
+     * Helper: Extract cell values from TableRow.
+     */
+    private static List<String> getRowValues(TableRow row) {
+        List<String> values = new ArrayList<>();
+        row.getCells().forEach(cell -> values.add(cell.getValue()));
+        return values;
+    }
+
+    public <K, V> LinkedMultiMap<K, V> asLinkedMultiMap(Class<K> keyType, Class<V> valueType) {
+        List<List<String>> rows = this.cells(); // Use existing cells() method
+        if (rows.isEmpty() || rows.get(0).isEmpty()) {
+            return new LinkedMultiMap<>(); // Return an empty LinkedMultiMap for empty data
+        }
+
+        List<K> keys = new ArrayList<>();
+        List<V> values = new ArrayList<>();
+        for (List<String> row : rows) {
+            K key = convertValue(row.get(0), keyType); // Convert the first column to keys
+            V value = row.size() > 1 ? convertValue(row.get(1), valueType) : null; // Convert the second column to values
+            keys.add(key);
+            values.add(value);
+        }
+
+        return new LinkedMultiMap<>(keys, values);
+    }
+
+
+    public <K, V> List<LinkedMultiMap<K, V>> asLinkedMultiMaps(Class<K> keyType, Class<V> valueType) {
+        List<List<String>> rows = this.cells(); // Use existing cells() method
+        if (rows.isEmpty()) {
+            return Collections.emptyList(); // Return an empty list for empty data
+        }
+
+        List<LinkedMultiMap<K, V>> linkedMultiMaps = new ArrayList<>();
+        for (List<String> row : rows) {
+            List<K> keys = new ArrayList<>();
+            List<V> values = new ArrayList<>();
+            for (int i = 0; i < row.size(); i++) {
+                if (i % 2 == 0) {
+                    keys.add(convertValue(row.get(i), keyType));
+                } else {
+                    values.add(convertValue(row.get(i), valueType));
+                }
+            }
+            linkedMultiMaps.add(new LinkedMultiMap<>(keys, values));
+        }
+
+        return linkedMultiMaps;
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T convertValue(String value, Class<T> targetType) {
+        if (targetType == String.class) {
+            return (T) value;
+        } else if (targetType == Integer.class) {
+            return (T) Integer.valueOf(value);
+        } else if (targetType == Double.class) {
+            return (T) Double.valueOf(value);
+        } else if (targetType == Boolean.class) {
+            return (T) Boolean.valueOf(value);
+        } else {
+            throw new IllegalArgumentException("Unsupported conversion to type: " + targetType);
+        }
+    }
+
 }

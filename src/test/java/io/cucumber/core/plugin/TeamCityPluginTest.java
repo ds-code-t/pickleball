@@ -109,7 +109,6 @@ class TeamCityPluginTest {
                 "##teamcity[testSuiteFinished timestamp = '1970-01-01T12:00:00.000+0000' name = 'feature name']\n" +
                 "##teamcity[testSuiteFinished timestamp = '1970-01-01T12:00:00.000+0000' name = 'Cucumber']\n";
 
-        System.out.println("@@out: "+ out);
 //        assertThat(out, bytes(containsString(expected)));
     }
 
