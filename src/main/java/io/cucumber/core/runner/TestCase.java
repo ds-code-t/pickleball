@@ -12,8 +12,9 @@ import io.cucumber.plugin.event.TestCaseFinished;
 import io.cucumber.plugin.event.TestCaseStarted;
 import io.cucumber.plugin.event.TestStep;
 import io.cucumber.plugin.event.TestStepFinished;
-import io.pickleball.MapAndStateUtilities.LinkedMultiMap;
+import io.pickleball.mapandStateutilities.LinkedMultiMap;
 import io.pickleball.cacheandstate.ScenarioContext;
+import io.pickleball.executions.ExecutionConfig;
 //import io.pickleball.cucumberutilities.ComponentScenarioWrapper;
 
 import java.net.URI;
@@ -30,7 +31,6 @@ import static io.cucumber.core.runner.ExecutionMode.RUN;
 import static io.cucumber.messages.Convertor.toMessage;
 import static io.pickleball.cacheandstate.GlobalCache.getParsedFeature;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.setCurrentScenario;
-import static io.pickleball.cacheandstate.PrimaryScenarioData.setPrimaryScenario;
 import static io.pickleball.cucumberutilities.FeatureFileUtilities.getComponentByLine;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
@@ -138,6 +138,7 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, TestSt
             }
 
             for (PickleStepTestStep step : testSteps) {
+                System.out.println("@@step '"+ step.getStepText() + "'");
                 nextExecutionMode = step
                         .run(this, bus, state, nextExecutionMode)
                         .next(nextExecutionMode);
@@ -195,6 +196,11 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, TestSt
             return pickle.getTags();
         }
 
+
+    public int getPriority () {
+        return ExecutionConfig.getPriority(pickle.getTags(), String.valueOf(getUri()) + " Line: " + getLine());
+    }
+
         @Override
         public List<TestStep> getTestSteps () {
             List<TestStep> testSteps = new ArrayList<>(beforeHooks);
@@ -208,7 +214,7 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, TestSt
         }
 
         @Override
-        public URI getUri () {
+        public URI getUri() {
             return pickle.getUri();
         }
 

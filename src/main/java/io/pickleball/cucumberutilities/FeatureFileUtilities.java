@@ -16,9 +16,27 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static io.pickleball.cucumberutilities.SourceParser.getScenarioSourceByLine;
 
 public class FeatureFileUtilities {
+
+    public static void main(String[] args) throws IOException {
+        String testFeatureSource = "Feature: Test feature\n" +
+                "\n" +
+                "  Scenario: Test scenario\n" +
+                "    Given I am running a testlzz z and \n";
+
+        List<Envelope> envelopes = GherkinParser.builder()
+                .idGenerator(() -> java.util.UUID.randomUUID().toString())
+                .build()
+                .parse("feature", new ByteArrayInputStream(testFeatureSource.getBytes(StandardCharsets.UTF_8)))
+                .toList();
+
+        for (Envelope envelope : envelopes) {
+            System.out.println(envelope.toString());
+        }
+
+    }
+
 
     /**
      * Reads the feature file content from a URI.
@@ -31,12 +49,12 @@ public class FeatureFileUtilities {
         }
     }
 
-    public static void main(String[] args) throws IOException {
-//        GherkinDocument g =  pickleCompiler(URI.create("file:///C:/Users/Admin/IdeaProjects/pickleball3/src/test/resources/features/debugindep1.feature"));
-        String featureSource = readFeatureFile(URI.create("file:///C:/Users/Admin/IdeaProjects/pickleball3/src/test/resources/features/debugindep1.feature"));
-
-        String newSource = getScenarioSourceByLine(featureSource, 81).get();
-    }
+//    public static void main(String[] args) throws IOException {
+////        GherkinDocument g =  pickleCompiler(URI.create("file:///C:/Users/Admin/IdeaProjects/pickleball3/src/test/resources/features/debugindep1.feature"));
+//        String featureSource = readFeatureFile(URI.create("file:///C:/Users/Admin/IdeaProjects/pickleball3/src/test/resources/features/debugindep1.feature"));
+//
+//        String newSource = getScenarioSourceByLine(featureSource, 81).get();
+//    }
 
     public static List<Node> collectNodesByLineNumbers(URI uri, Set<Integer> lineNumbers) {
         if (lineNumbers == null || lineNumbers.isEmpty()) {
@@ -76,7 +94,13 @@ public class FeatureFileUtilities {
         if (scenarioSource == null || scenarioSource.isBlank()) {
             throw new IllegalArgumentException("Feature source cannot be null or blank");
         }
-        String featureSource = "Feature: Test feature" + "\n".repeat(gherkinMessagesPickle.getScenarioLocation().getLine()) + (gherkinMessagesPickle.getKeyword().equals("Scenario Outline:") ? scenarioSource.replaceFirst("Scenario Outline:", "Scenario:") : scenarioSource);
+
+
+
+
+        String featureSource = "Feature: Test feature" + "\n".repeat(gherkinMessagesPickle.getScenarioLocation().getLine()-1) + (gherkinMessagesPickle.getKeyword().equals("Scenario Outline") ? scenarioSource.replaceFirst("Scenario Outline:", "Scenario:") : scenarioSource) ;
+        featureSource = featureSource + "\n".repeat(10);
+//
 
 
         // Parse the feature source into Gherkin Envelopes
@@ -84,7 +108,19 @@ public class FeatureFileUtilities {
                 .idGenerator(() -> java.util.UUID.randomUUID().toString())
                 .build()
                 .parse("feature", new ByteArrayInputStream(featureSource.getBytes(StandardCharsets.UTF_8)))
-                .collect(Collectors.toList());
+                .toList();
+
+//
+//        byte[] featureSourceBytes = featureSource.getBytes(StandardCharsets.UTF_8);
+//        System.out.println("@@Encoded featureSource bytes:");
+//        for (byte b : featureSourceBytes) {
+//            System.out.printf("Byte: %02x Char: %c%n", b, (char) b);
+//        }
+
+
+
+//        System.out.println("@@Parsed Gherkin Envelopes:");
+//        envelopes.forEach(envelope -> System.out.println(envelope.toString()));
 
         // Extract the GherkinDocument from the envelopes
         GherkinDocument gherkinDocument = envelopes.stream()
@@ -102,9 +138,15 @@ public class FeatureFileUtilities {
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("No Pickle found for Scenario in feature source"));
 
+//        System.out.println("@@Extracted GherkinDocument:");
+//        System.out.println(gherkinDocument.toString());
+
+
         CucumberQuery cucumberQuery = new CucumberQuery();
         cucumberQuery.update(gherkinDocument.getFeature().get());
-        return new GherkinMessagesPickle(pickle, gherkinMessagesPickle.getUri() , gherkinMessagesPickle.getDialect(), cucumberQuery);
+//        System.out.println("@@@GherkinMessagesPickle2");
+
+        return new GherkinMessagesPickle(pickle, gherkinMessagesPickle.getUri() , gherkinMessagesPickle.getDialect(), cucumberQuery, gherkinMessagesPickle.getTags());
     }
 
 
@@ -139,12 +181,12 @@ public class FeatureFileUtilities {
                 .findFirst();
     }
 
-    public static io.cucumber.core.gherkin.messages.GherkinMessagesFeature parseComponentFeature(URI uri) {
-        String featureSource = readFeatureFile(uri);
-        io.cucumber.core.gherkin.messages.GherkinMessagesFeatureParser parser = new io.cucumber.core.gherkin.messages.GherkinMessagesFeatureParser();
-        return (io.cucumber.core.gherkin.messages.GherkinMessagesFeature) parser.parseComponent(uri, featureSource)
-                .orElseThrow(() -> new RuntimeException("Failed to parse feature file at URI: " + uri));
-    }
+//    public static io.cucumber.core.gherkin.messages.GherkinMessagesFeature parseComponentFeature(URI uri) {
+//        String featureSource = readFeatureFile(uri);
+//        io.cucumber.core.gherkin.messages.GherkinMessagesFeatureParser parser = new io.cucumber.core.gherkin.messages.GherkinMessagesFeatureParser();
+//        return (io.cucumber.core.gherkin.messages.GherkinMessagesFeature) parser.parseComponent(uri, featureSource)
+//                .orElseThrow(() -> new RuntimeException("Failed to parse feature file at URI: " + uri));
+//    }
 
     /**
      * Parses a feature file source into a GherkinMessagesFeature.

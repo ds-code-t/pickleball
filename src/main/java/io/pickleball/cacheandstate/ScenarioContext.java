@@ -3,11 +3,9 @@ package io.pickleball.cacheandstate;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.runner.TestCase;
 import io.cucumber.core.runner.TestCaseState;
+import io.pickleball.mapandStateutilities.LinkedMultiMap;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 import static io.pickleball.cacheandstate.PrimaryScenarioData.getRunner;
 import static io.pickleball.executions.ComponentRuntime.createTestcases;
@@ -15,6 +13,8 @@ import static io.pickleball.executions.ComponentRuntime.createTestcases;
 import static io.cucumber.messages.Convertor.toMessage;
 import static io.cucumber.utilities.ArgumentParsing.convertCommandLineToArgv;
 import static io.cucumber.utilities.ArgumentParsing.convertHashMapToArgv;
+import static java.util.Comparator.comparing;
+import static java.util.Comparator.comparingInt;
 
 public class ScenarioContext implements io.cucumber.plugin.event.TestStep {
     private final Pickle pickle;             // The static scenario definition
@@ -64,23 +64,38 @@ public class ScenarioContext implements io.cucumber.plugin.event.TestStep {
         this.pickle = pickle;
     }
 
-    public void createComponentScenario(String argString) {
-        createComponentScenario(convertCommandLineToArgv(argString));
+    public void createComponentScenario(String argString,  LinkedMultiMap<String, String>... maps) {
+        createComponentScenario(convertCommandLineToArgv(argString),maps);
     }
 
-    public void createComponentScenario(Map<String, Object> map) {
-        createComponentScenario(convertHashMapToArgv(map));
+    public void createComponentScenario(Map<String, Object> map, LinkedMultiMap<String, String>... maps) {
+        createComponentScenario(convertHashMapToArgv(map), maps);
     }
 
-    public void createComponentScenario(String[] args) {
-        List<TestCase> testCases = createTestcases(args, this);
-        for (TestCase testCase : testCases) {
+    public List<TestCase> getAndSortTestcases(String[] args, LinkedMultiMap<String, String>... maps) {
+        List<TestCase> tests = createTestcases(args, maps);
+        List<TestCase> testCases = new ArrayList<>(tests);
+        testCases.sort(
+                comparingInt(TestCase::getPriority)
+                        .thenComparing(TestCase::getName)
+                        .thenComparingInt(TestCase::getLine));
+        return testCases;
+    }
+
+    public void executeTestCases(List<TestCase> testCases) {
+        for (TestCase testCase :  testCases) {
             addChildScenarioContext(testCase.scenarioContext);
             testCase.runComponent(getRunner().bus);
         }
     }
-    public ScenarioContext getRootScenarioContext() {
-        if(parent == null)
+
+    public void createComponentScenario(String[] args, LinkedMultiMap<String, String>... maps) {
+        executeTestCases(getAndSortTestcases(args, maps));
+    }
+
+
+        public ScenarioContext getRootScenarioContext() {
+        if (parent == null)
             return this;
         return getRootScenarioContext();
     }
@@ -123,8 +138,6 @@ public class ScenarioContext implements io.cucumber.plugin.event.TestStep {
     public void setTestCaseState(TestCaseState testCaseState) {
         this.testCaseState = testCaseState;
     }
-
-
 
 
 }

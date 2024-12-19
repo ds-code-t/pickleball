@@ -130,6 +130,7 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
     private Status executeStep(TestCaseState state, ExecutionMode executionMode) throws Throwable {
         state.setCurrentTestStepId(id);
         try {
+            System.out.println("@@stepDefinitionMatch "+ stepDefinitionMatch);
             return executionMode.execute(stepDefinitionMatch, state);
         } finally {
             state.clearCurrentTestStepId();

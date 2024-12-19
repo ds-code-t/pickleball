@@ -43,6 +43,14 @@ public final class StepExpression {
 
     public List<Argument> match(String text, Type... types) {
         List<io.cucumber.cucumberexpressions.Argument<?>> match = expression.match(text, types);
+
+        if(text.contains("I am running a testlzz") && expression.getRegexp().toString().contains("I am running a testlzz")){
+            System.out.println("@@expression: '" +text  +"' getSource: '" + expression.getSource() + "' '"+ expression.getRegexp() + "' getRegexp: '"  + expression.getClass());
+            System.out.println("@@match: " + match);
+        }
+
+
+
         if (match == null) {
             return null;
         }

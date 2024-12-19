@@ -3,7 +3,7 @@ package io.cucumber.datatable;
 import io.cucumber.core.gherkin.messages.GherkinMessagesDataTableArgument;
 import io.cucumber.core.stepexpression.DataTableArgument;
 import io.cucumber.messages.types.*;
-import io.pickleball.MapAndStateUtilities.LinkedMultiMap;
+import io.pickleball.mapandStateutilities.LinkedMultiMap;
 import org.apiguardian.api.API;
 
 import java.io.IOException;
@@ -1213,23 +1213,25 @@ public class DataTable {
         return new LinkedMultiMap<>(keys, values);
     }
 
+    public List<LinkedMultiMap<String , Object>> asLinkedMultiMaps() {
+        return asLinkedMultiMaps(String.class, Object.class);
+    }
 
     public <K, V> List<LinkedMultiMap<K, V>> asLinkedMultiMaps(Class<K> keyType, Class<V> valueType) {
         List<List<String>> rows = this.cells(); // Use existing cells() method
-        if (rows.isEmpty()) {
+
+        if (rows.size()<2) {
             return Collections.emptyList(); // Return an empty list for empty data
         }
 
+        List<K> keys = (List<K>) rows.get(0);
+
         List<LinkedMultiMap<K, V>> linkedMultiMaps = new ArrayList<>();
-        for (List<String> row : rows) {
-            List<K> keys = new ArrayList<>();
+        for (int r = 1; r < rows.size(); r++) {
+            List<String> row =  rows.get(r);
             List<V> values = new ArrayList<>();
             for (int i = 0; i < row.size(); i++) {
-                if (i % 2 == 0) {
-                    keys.add(convertValue(row.get(i), keyType));
-                } else {
-                    values.add(convertValue(row.get(i), valueType));
-                }
+                values.add(convertValue((String) row.get(i), valueType));
             }
             linkedMultiMaps.add(new LinkedMultiMap<>(keys, values));
         }

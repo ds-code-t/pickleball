@@ -1,9 +1,12 @@
 package io.cucumber.testng;
 
+import io.pickleball.executions.ExecutionConfig;
 import org.apiguardian.api.API;
 
 import java.net.URI;
 import java.util.List;
+
+import static io.pickleball.configs.Constants.PRIORITY_TAG;
 
 /**
  * Wraps CucumberPickle to avoid exposing it as part of the public api.
@@ -17,7 +20,7 @@ public final class Pickle {
         this.pickle = pickle;
     }
 
-    io.cucumber.core.gherkin.Pickle getPickle() {
+    public io.cucumber.core.gherkin.Pickle getPickle() {
         return pickle;
     }
 
@@ -36,6 +39,11 @@ public final class Pickle {
     public List<String> getTags() {
         return pickle.getTags();
     }
+
+    public int getPriority () {
+        return ExecutionConfig.getPriority(pickle.getTags(), String.valueOf(getUri()) + " Line: " + getLine());
+    }
+
 
     public URI getUri() {
         return pickle.getUri();

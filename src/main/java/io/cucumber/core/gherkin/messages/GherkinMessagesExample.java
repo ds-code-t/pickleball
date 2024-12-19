@@ -3,7 +3,7 @@ package io.cucumber.core.gherkin.messages;
 import io.cucumber.messages.types.TableRow;
 import io.cucumber.plugin.event.Location;
 import io.cucumber.plugin.event.Node;
-import io.pickleball.MapAndStateUtilities.LinkedMultiMap;
+import io.pickleball.mapandStateutilities.LinkedMultiMap;
 
 import java.util.Optional;
 

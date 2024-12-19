@@ -1,4 +1,4 @@
-package io.pickleball.MapAndStateUtilities;
+package io.pickleball.mapandStateutilities;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +29,22 @@ public class LinkedMultiMap<K, V> {
         this.keys = new ArrayList<>();
         this.values = new ArrayList<>();
     }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder("{");
+        for (int i = 0; i < keys.size(); i++) {
+            if (i > 0) {
+                sb.append(", ");
+            }
+            sb.append(keys.get(i))
+                    .append("=")
+                    .append(values.get(i) != null ? values.get(i) : "null");
+        }
+        sb.append("}");
+        return sb.toString();
+    }
+
 
     // New constructor to initialize from lists directly
     public LinkedMultiMap(List<K> keys, List<V> values) {

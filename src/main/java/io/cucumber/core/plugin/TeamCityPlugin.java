@@ -308,6 +308,7 @@ public class TeamCityPlugin implements EventListener {
             }
             case UNDEFINED: {
                 String snippets = getSnippets(currentTestCase);
+//                new Exception().printStackTrace();
                 print(TEMPLATE_TEST_FAILED, timeStamp, duration, "Step undefined", snippets, name);
                 break;
             }

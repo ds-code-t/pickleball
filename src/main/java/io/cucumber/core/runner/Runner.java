@@ -9,7 +9,6 @@ import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.core.exception.CucumberException;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.gherkin.Step;
-import io.cucumber.core.gherkin.messages.GherkinMessagesPickle;
 import io.cucumber.core.logging.Logger;
 import io.cucumber.core.logging.LoggerFactory;
 import io.cucumber.core.snippets.SnippetGenerator;
@@ -18,10 +17,8 @@ import io.cucumber.plugin.event.HookType;
 import io.cucumber.plugin.event.Location;
 import io.cucumber.plugin.event.SnippetsSuggestedEvent;
 import io.cucumber.plugin.event.SnippetsSuggestedEvent.Suggestion;
-import io.pickleball.MapAndStateUtilities.LinkedMultiMap;
 //import io.pickleball.cucumberutilities.ComponentScenarioWrapper;
 
-import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -196,7 +193,9 @@ public final class Runner {
             if (match != null) {
                 return match;
             }
+            System.out.println("@@emitSnippetSuggestedEvent1");
             emitSnippetSuggestedEvent(pickle, step);
+            System.out.println("@@emitSnippetSuggestedEvent2");
             return new UndefinedPickleStepDefinitionMatch(pickle.getUri(), step);
         } catch (AmbiguousStepDefinitionsException e) {
             return new AmbiguousPickleStepDefinitionsMatch(pickle.getUri(), step, e);

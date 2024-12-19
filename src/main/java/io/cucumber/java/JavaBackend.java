@@ -34,7 +34,7 @@ final class JavaBackend implements Backend {
     public void loadGlue(Glue glue, List<URI> gluePathsArgs) {
         List<URI> gluePaths = new ArrayList<>(gluePathsArgs);
         try {
-            gluePaths.add(new URI("classpath:/io/cucumber/core/predefinedsteps/metasteps"));
+            gluePaths.add(new URI("classpath:/io/pickleball/metafunctionalities"));
         } catch (Exception e)
         {
             e.printStackTrace();

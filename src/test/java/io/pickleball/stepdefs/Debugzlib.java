@@ -11,6 +11,7 @@ import io.cucumber.java.en.Given;
 import io.cucumber.java.en.If;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
+import io.pickleball.registry.Coordinates;
 //import io.cucumber.messages.types.DataTable;
 
 import static io.cucumber.utilities.GeneralUtilities.getStringTimeStamp;
@@ -78,4 +79,10 @@ public class Debugzlib {
     public void errorthrowlzz() throws Exception {
         new Exception("errorthrowlzz").printStackTrace();
     }
+
+    @Given("the user is at coordinates {coordinates}")
+    public void userAtCoordinates(Coordinates coordinates) {
+        System.out.println("User is at: " + coordinates);
+    }
+
 }

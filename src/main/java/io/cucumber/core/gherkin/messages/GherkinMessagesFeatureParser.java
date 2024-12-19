@@ -21,8 +21,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 
-import static io.pickleball.configs.Constants.COMPONENT_EXAMPLES;
-import static io.pickleball.configs.Constants.COMPONENT_TAG;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
 
@@ -43,15 +41,15 @@ public final class GherkinMessagesFeatureParser implements FeatureParser {
 //     }
 //    }
 
-public Optional<Feature> parseComponent(URI path, String source) {
-//    String updatedSource = COMPONENT_TAG + "\n" + source;
-    String updatedSource = COMPONENT_TAG + "\n" + source.replaceAll("(?m)^\\s*Examples:\\s*.*$", COMPONENT_EXAMPLES).replaceAll("(?m)^\\s*Examples:\\s*.*$", COMPONENT_EXAMPLES);
-    try (InputStream is = new ByteArrayInputStream(updatedSource.getBytes(UTF_8))) {
-        return parse(path, is, UUID::randomUUID);
-    } catch (IOException e) {
-        throw new FeatureParserException("Failed to parse resource at: " + path, e);
-    }
-}
+//public Optional<Feature> parseComponent(URI path, String source) {
+////    String updatedSource = COMPONENT_TAG + "\n" + source;
+//    String updatedSource = COMPONENT_TAG + "\n" + source.replaceAll("(?m)^\\s*Examples:\\s*.*$", COMPONENT_EXAMPLES).replaceAll("(?m)^\\s*Examples:\\s*.*$", COMPONENT_EXAMPLES);
+//    try (InputStream is = new ByteArrayInputStream(updatedSource.getBytes(UTF_8))) {
+//        return parse(path, is, UUID::randomUUID);
+//    } catch (IOException e) {
+//        throw new FeatureParserException("Failed to parse resource at: " + path, e);
+//    }
+//}
 
 
     @Deprecated

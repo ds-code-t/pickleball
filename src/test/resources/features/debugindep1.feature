@@ -73,44 +73,63 @@ Feature: Using Plugin Steps333 indep
 #
 #
 #
-#
+#@zzs 5
   Scenario: sds
+#    Then I should see debug outputlzz
     Then I should see debug outputlzz
-    Then I should see debug outputlzz
-    *  Scenario: aa
+    *  Scenario:
+      | Scenario Tags | A   | B |
+      | @zzs9         | z |  s   |
+#      | @zzs9         | zzzzzzzzzz |
+#    Given I am running a testlzz <A> and <B>
+#    Given I am running a testlzz fff and gggg
+
+#  @zzs9
+#  Scenario: zzzzz 11
+#    Then I should see debug outputlzz
+#
+#  @zzs9
+#  Scenario: cccc 11
+#    Then I should see debug outputlzz
+  @zzs9 @priority-500
+#  Scenario: qqqqqq <Scenario Tags>
+#    Given I am running a testlzz <A> and <B>
+
+#  @zzs9 @Priority-1
+  @zzs9 @priority-500
+  Scenario Outline: qqqqqq <Scenario Tags>
+#    Then I should see debug outputlzz
+#    Then I should see debug outputlzz
     Given I am running a testlzz <A> and <B>
-    Given I am running a testlzz fff and gggg
-
-  @zzs9
-  Scenario Outline: aaaas <Scenario Tags>
-    Then I should see debug outputlzz
-    Then I should see debug outputlzz
-    Given I am running a testlzz <A> and <B>
-    Given I am running a testlzz fff and gggg
+#    Given I am running a testlzz fff and gggg
 
     Examples:
-      | Scenario Tags | A  | B  |
-      | @zzs  1       | 22 | 33 |
-      | @zzs  2       | 44 | 55 |
+      | Scenario Tags         | A  | B  |
+      | @zzs  1   @priority-3 | a  |   |
+#      | @ww  2                | 44 | 55 |
 
-    Examples:
-      | Scenario Tags | A  | B  |
-      | @zzs  1       | 22 | 33 |
-      | @zzs  2       | 44 | 55 |
+#    Examples:
+#      | Scenario Tags                | A  | B  |
+#      | @zzs  3          @priority-5 | 22 | 33 |
+#      | @zzs  4 @priority-1          | 44 | 55 |
+#
+##      | @zzs  3       | 44 | 55 |
+##      | @zzs  4       | 44 | 55 |
+##      | @zzs  5       | 44 | 55 |
+##      | @zzs  6  @priority-1    | 44 | 55 |
+##      | @zzs  7       | 44 | 55 |
+#
+#
+#    Examples:
+#
+#      | Scenario Tags           | A    | B     |
+#
+#      | @zzs 5                  | qq22 | zzz33 |
+#
+#      | @zzs  6   @priority-300 | 44   | 55    |
+#      | @zzs  7                 | 44   | 55    |
 
-#      | @zzs  3       | 44 | 55 |
-#      | @zzs  4       | 44 | 55 |
-#      | @zzs  5       | 44 | 55 |
-#      | @zzs  6       | 44 | 55 |
-#      | @zzs  7       | 44 | 55 |
 
-
-    Examples:
-
-      | Scenario Tags2 | A2 | 2  |
-
-      | @zzs 1         | 22 | 33 |
-
-      | @zzs  2        | 44 | 55 |
-      | @zzs  2        | 44 | 55 |
+  Scenario: coord1
+    Given the user is at coordinates (10,20)
 

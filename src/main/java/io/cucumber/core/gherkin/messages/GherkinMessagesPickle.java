@@ -32,6 +32,8 @@ public final class GherkinMessagesPickle implements Pickle {
     private final List<Step> steps;
     private final URI uri;
     private final CucumberQuery cucumberQuery;
+    public final List<String> tagsOverride;
+
 
     public GherkinDialect getDialect() {
         return dialect;
@@ -44,13 +46,20 @@ public final class GherkinMessagesPickle implements Pickle {
     }
 
     public GherkinMessagesPickle(
-            io.cucumber.messages.types.Pickle pickle, URI uri, GherkinDialect dialect, CucumberQuery cucumberQuery
+            io.cucumber.messages.types.Pickle pickle, URI uri, GherkinDialect dialect, CucumberQuery cucumberQuery, List<String> tagsOverride
     ) {
         this.dialect = dialect;
         this.pickle = pickle;
         this.uri = uri;
         this.cucumberQuery = cucumberQuery;
         this.steps = createCucumberSteps(pickle, dialect, this.cucumberQuery);
+        this.tagsOverride = tagsOverride;
+    }
+
+    public GherkinMessagesPickle(
+            io.cucumber.messages.types.Pickle pickle, URI uri, GherkinDialect dialect, CucumberQuery cucumberQuery
+    ) {
+        this(pickle, uri, dialect, cucumberQuery, null);
     }
 
     private static List<Step> createCucumberSteps(
@@ -133,7 +142,9 @@ public final class GherkinMessagesPickle implements Pickle {
 
     @Override
     public List<String> getTags() {
-        return pickle.getTags().stream().map(PickleTag::getName).collect(Collectors.toList());
+        if (tagsOverride == null)
+            return pickle.getTags().stream().map(PickleTag::getName).collect(Collectors.toList());
+        return tagsOverride;
     }
 
     @Override
@@ -146,7 +157,7 @@ public final class GherkinMessagesPickle implements Pickle {
         return pickle.getId();
     }
 
-   // pmod
+    // pmod
     public io.cucumber.messages.types.Pickle getMessagePickle() {
         return this.pickle;
     }

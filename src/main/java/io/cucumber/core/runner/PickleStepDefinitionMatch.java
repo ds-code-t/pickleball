@@ -100,7 +100,9 @@ public class PickleStepDefinitionMatch extends Match implements StepDefinitionMa
     public void runStep(TestCaseState state) throws Throwable {
         List<Object> result = getArgs();
         try {
+            System.out.println("@@runStep1");
             stepDefinition.execute(result.toArray(new Object[0]));
+            System.out.println("@@runStep2");
         } catch (CucumberBackendException e) {
             throw couldNotInvokeStep(e, result);
         } catch (CucumberInvocationTargetException e) {

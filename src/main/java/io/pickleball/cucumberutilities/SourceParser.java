@@ -17,11 +17,12 @@ import java.util.stream.Collectors;
 import io.cucumber.messages.types.Scenario;
 import io.cucumber.messages.types.Step;
 import io.cucumber.plugin.event.Node;
-import io.pickleball.MapAndStateUtilities.LinkedMultiMap;
+import io.pickleball.mapandStateutilities.LinkedMultiMap;
 
-import static io.pickleball.MapAndStateUtilities.MappingFunctions.replaceNestedBrackets;
+import static io.pickleball.mapandStateutilities.MappingFunctions.replaceNestedBrackets;
 import static io.pickleball.cucumberutilities.FeatureFileUtilities.collectNodesByLineNumbers;
 import static io.pickleball.cucumberutilities.FeatureFileUtilities.getModifiedPickle;
+import static io.pickleball.cucumberutilities.SourceParsing.pretrim;
 
 
 public class SourceParser {
@@ -53,7 +54,6 @@ public class SourceParser {
         String source = reconstructScenarioSource(scenario);
 
         String modified = replaceNestedBrackets(source, listOfMaps);
-
         return getModifiedPickle(modified, pickle);
 //        modified = "Feature: Test feature" + "\n".repeat(startLine) + (isOutline ? modified.replaceFirst("Scenario Outline:", "Scenario:") : modified);
 
@@ -121,7 +121,7 @@ public class SourceParser {
 
         // Append each step
         for (Step step : scenario.getSteps()) {
-            builder.append("    ").append(step.getKeyword()).append(step.getText()).append("\n");
+            builder.append("    ").append(step.getKeyword()).append(pretrim(step.getText())).append("\n");
         }
 
         return builder.toString();

@@ -7,8 +7,7 @@ import io.cucumber.core.gherkin.messages.GherkinMessagesPickle;
 import io.cucumber.core.options.CommandlineOptionsParser;
 import io.cucumber.core.options.RuntimeOptions;
 import io.cucumber.core.order.PickleOrder;
-import io.pickleball.MapAndStateUtilities.LinkedMultiMap;
-import io.pickleball.cacheandstate.ScenarioContext;
+import io.pickleball.mapandStateutilities.LinkedMultiMap;
 import io.cucumber.core.runner.TestCase;
 
 import java.io.IOException;
@@ -25,15 +24,13 @@ import static io.pickleball.cucumberutilities.SourceParser.getComponentScenarioW
 
 public final class ComponentRuntime {
 
-    public static  List<TestCase> createTestcases(String[] args, ScenarioContext scenarioContext) {
+    public static  List<TestCase> createTestcases(String[] args, LinkedMultiMap<String, String>... maps) {
         RuntimeOptions runtimeOptions = ComponentRuntime.buildOptions(args);
         List<Feature> features = getFeaturePathFeatureSupplier().get(runtimeOptions);
         List<Pickle> pickles = filterPicklesFromFeatures(features, runtimeOptions);
-        pickles.forEach(pickle -> System.out.println("@@pickle::: "+ pickle.getName()));
-        LinkedMultiMap<String, String> map = new LinkedMultiMap<>();
         List<GherkinMessagesPickle> modifiedPickles =  pickles.stream().map( pickle -> {
             try {
-                return getComponentScenarioWrapper((GherkinMessagesPickle) pickle, map);
+                return getComponentScenarioWrapper((GherkinMessagesPickle) pickle, maps);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }

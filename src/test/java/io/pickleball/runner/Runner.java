@@ -12,6 +12,7 @@ import org.testng.annotations.Parameters;
 import java.util.Arrays;
 import java.util.Comparator;
 
+
 @CucumberOptions(
         features = {"src/test/resources/features"},
         glue = {"io.pickleball.stepdefs"},
@@ -42,20 +43,17 @@ public class Runner extends AbstractTestNGCucumberTests {
         String order = System.getProperty("execution.order", "default");
         System.out.println("Execution order: " + order);
 
-//        // Apply sorting logic based on the system property
-//        if ("reverse".equalsIgnoreCase(order)) {
-//            Arrays.sort(scenarios, Comparator.comparingInt(
-//                    o -> -((PickleWrapper) o[0]).getPickle().getLocation().getLine()));
-//            System.out.println("Scenarios sorted in reverse order.");
-//        } else {
-//            Arrays.sort(scenarios, Comparator.comparingInt(
-//                    o -> ((PickleWrapper) o[0]).getPickle().getLocation().getLine()));
-//            System.out.println("Scenarios sorted in sequential order.");
-//        }
+
+        Arrays.sort(scenarios, Comparator.comparing(
+                        o -> ((PickleWrapper) ((Object[]) o)[0]).getPickle().getPriority())
+                .thenComparing(o -> ((PickleWrapper) ((Object[]) o)[0]).getPickle().getName()) // Sort alphabetically by name
+                .thenComparingInt(o -> ((PickleWrapper) ((Object[]) o)[0]).getPickle().getLine())); // Secondary sort by line number
+
 
         System.out.println("@@super.scenarios().length: " + scenarios.length);
         return scenarios;
     }
+
 
     @Override
     public void runScenario(PickleWrapper pickleWrapper, FeatureWrapper featureWrapper) {
