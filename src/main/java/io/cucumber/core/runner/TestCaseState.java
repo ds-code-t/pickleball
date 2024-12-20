@@ -39,10 +39,9 @@ public class TestCaseState implements io.cucumber.core.backend.TestCaseState {
         if (this.testCase instanceof io.cucumber.core.runner.TestCase) {
             ((io.cucumber.core.runner.TestCase) this.testCase).scenarioContext.setTestCaseState(this);
         }
-
     }
 
-    void add(Result result) {
+    public void add(Result result) {
         stepResults.add(result);
     }
 

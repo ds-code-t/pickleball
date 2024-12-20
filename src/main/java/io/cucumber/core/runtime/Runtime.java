@@ -29,9 +29,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+import static io.cucumber.utilities.GeneralUtilities.waitTime;
 import static io.pickleball.cacheandstate.GlobalCache.setGlobalRuntime;
 import static io.cucumber.core.runtime.SynchronizedEventBus.synchronize;
-//import static io.pickleball.executions.ParallelismControls.shouldRunInSeparateThread;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.collectingAndThen;
 import static java.util.stream.Collectors.toList;
@@ -69,7 +69,10 @@ public final class Runtime {
         this.executor = executor;
         this.exitStatus = exitStatus;
         this.pickleOrder = pickleOrder;
-        setGlobalRuntime(this);
+//        System.out.println("@@setGlobalRuntime");
+//        new Exception().printStackTrace();
+//        setGlobalRuntime(this);
+
     }
 
     public static Builder builder() {

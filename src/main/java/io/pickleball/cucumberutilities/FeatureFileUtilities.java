@@ -95,7 +95,7 @@ public class FeatureFileUtilities {
             throw new IllegalArgumentException("Feature source cannot be null or blank");
         }
 
-
+        System.out.println("@@__scenarioSource " + scenarioSource + "\n\n");
 
 
         String featureSource = "Feature: Test feature" + "\n".repeat(gherkinMessagesPickle.getScenarioLocation().getLine()-1) + (gherkinMessagesPickle.getKeyword().equals("Scenario Outline") ? scenarioSource.replaceFirst("Scenario Outline:", "Scenario:") : scenarioSource) ;
@@ -119,8 +119,8 @@ public class FeatureFileUtilities {
 
 
 
-//        System.out.println("@@Parsed Gherkin Envelopes:");
-//        envelopes.forEach(envelope -> System.out.println(envelope.toString()));
+        System.out.println("@@Parsed Gherkin Envelopes:");
+        envelopes.forEach(envelope -> System.out.println(envelope.toString()));
 
         // Extract the GherkinDocument from the envelopes
         GherkinDocument gherkinDocument = envelopes.stream()
@@ -138,13 +138,13 @@ public class FeatureFileUtilities {
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("No Pickle found for Scenario in feature source"));
 
-//        System.out.println("@@Extracted GherkinDocument:");
-//        System.out.println(gherkinDocument.toString());
+        System.out.println("@@Extracted GherkinDocument:");
+        System.out.println(gherkinDocument.toString());
 
 
         CucumberQuery cucumberQuery = new CucumberQuery();
         cucumberQuery.update(gherkinDocument.getFeature().get());
-//        System.out.println("@@@GherkinMessagesPickle2");
+//        System.out.println("@@@GherkinMessagesPickle2");fi
 
         return new GherkinMessagesPickle(pickle, gherkinMessagesPickle.getUri() , gherkinMessagesPickle.getDialect(), cucumberQuery, gherkinMessagesPickle.getTags());
     }

@@ -15,7 +15,7 @@ import static io.cucumber.messages.types.TestStepResultStatus.SKIPPED;
 import static io.cucumber.messages.types.TestStepResultStatus.UNDEFINED;
 import static io.cucumber.messages.types.TestStepResultStatus.UNKNOWN;
 
-class TestStepResultStatusMapper {
+public class TestStepResultStatusMapper {
 
     private static final Map<Status, TestStepResultStatus> STATUS;
 
@@ -33,7 +33,7 @@ class TestStepResultStatusMapper {
     private TestStepResultStatusMapper() {
     }
 
-    static TestStepResultStatus from(Status status) {
+    public static TestStepResultStatus from(Status status) {
         return STATUS.getOrDefault(status, UNKNOWN);
     }
 

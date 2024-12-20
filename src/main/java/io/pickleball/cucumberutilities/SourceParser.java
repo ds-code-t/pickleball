@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
+
 import io.cucumber.messages.types.Scenario;
 import io.cucumber.messages.types.Step;
 import io.cucumber.plugin.event.Node;
@@ -31,7 +32,7 @@ public class SourceParser {
         return getComponentScenarioWrapper(pickle, Arrays.stream(listOfMaps).toList());
     }
 
-    public static GherkinMessagesPickle  getComponentScenarioWrapper(GherkinMessagesPickle pickle, List<LinkedMultiMap<String, String>> maps) throws IOException {
+    public static GherkinMessagesPickle getComponentScenarioWrapper(GherkinMessagesPickle pickle, List<LinkedMultiMap<String, String>> maps) throws IOException {
         List<LinkedMultiMap<String, String>> listOfMaps = new ArrayList<>(maps);
         Set<Integer> lines = new HashSet<>();
         int startLine = pickle.getScenarioLocation().getLine();
@@ -59,6 +60,7 @@ public class SourceParser {
 
 
     }
+
     /**
      * Extracts the raw source string of a Scenario or Scenario Outline by its line number.
      *
@@ -113,25 +115,46 @@ public class SourceParser {
     }
 
     /**
-     * Reconstructs the raw Scenario or Scenario Outline source string from its components.
+     * Reconstructs the raw Scenario or Scenario Outline source string from its components,
+     * using blank lines to retain the original step positions.
      */
-    public static String reconstructScenarioSource(Scenario scenario) {
+    public static String reconstructScenarioSource(io.cucumber.messages.types.Scenario scenario) {
         StringBuilder builder = new StringBuilder();
         builder.append("  ").append(scenario.getKeyword()).append(": ").append(scenario.getName()).append("\n");
 
-        // Append each step
-        for (Step step : scenario.getSteps()) {
+        int currentLine = Math.toIntExact(scenario.getLocation().getLine() + 1); // Start from the next line after the Scenario line
+
+        for (io.cucumber.messages.types.Step step : scenario.getSteps()) {
+            int stepLine = Math.toIntExact(step.getLocation().getLine());
+
+            // Insert blank lines to align steps correctly
+            while (currentLine < stepLine) {
+                builder.append("\n");
+                currentLine++;
+            }
+
+            // Add the step line
             builder.append("    ").append(step.getKeyword()).append(pretrim(step.getText())).append("\n");
+            currentLine++;
         }
 
         return builder.toString();
     }
 
-
-
-
-
-
+//    /**
+//     * Reconstructs the raw Scenario or Scenario Outline source string from its components.
+//     */
+//    public static String reconstructScenarioSource(io.cucumber.messages.types.Scenario scenario) {
+//        StringBuilder builder = new StringBuilder();
+//        builder.append("  ").append(scenario.getKeyword()).append(": ").append(scenario.getName()).append("\n");
+//
+//        // Append each step
+//        for (Step step : scenario.getSteps()) {
+//            builder.append("    ").append(step.getKeyword()).append(pretrim(step.getText())).append("\n");
+//        }
+//
+//        return builder.toString();
+//    }
 
 
 //    ///
@@ -196,4 +219,4 @@ public class SourceParser {
 //        }
 
 
-    }
+}

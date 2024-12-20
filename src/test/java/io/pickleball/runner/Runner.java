@@ -4,10 +4,7 @@ import io.cucumber.testng.AbstractTestNGCucumberTests;
 import io.cucumber.testng.CucumberOptions;
 import io.cucumber.testng.FeatureWrapper;
 import io.cucumber.testng.PickleWrapper;
-import org.testng.annotations.BeforeTest;
-import org.testng.annotations.DataProvider;
-import org.testng.annotations.Optional;
-import org.testng.annotations.Parameters;
+import org.testng.annotations.*;
 
 import java.util.Arrays;
 import java.util.Comparator;
@@ -61,5 +58,14 @@ public class Runner extends AbstractTestNGCucumberTests {
         super.runScenario(pickleWrapper, featureWrapper);
         System.out.println("@@End Scenario " + pickleWrapper.getPickle().getName());
     }
+
+//    @Override
+//    @BeforeClass(alwaysRun = true)
+//    public void setUpClass(ITestContext context) {
+//        XmlTest currentXmlTest = context.getCurrentXmlTest();
+//        CucumberPropertiesProvider properties = currentXmlTest::getParameter;
+//        testNGCucumberRunner = new CustomTestNGCucumberRunner(this.getClass(), properties);
+//    }
+
 
 }

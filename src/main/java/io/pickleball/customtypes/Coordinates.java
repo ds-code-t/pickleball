@@ -1,4 +1,4 @@
-package io.pickleball.registry;
+package io.pickleball.customtypes;
 
 public class Coordinates {
     private final int x;

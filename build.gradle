@@ -84,7 +84,7 @@ dependencies {
     implementation "io.cucumber:tag-expressions:${cucumberVersions.tagExpressions}"
     implementation "io.cucumber:cucumber-expressions:${cucumberVersions.expressions}"
 //    implementation "io.cucumber:datatable:${cucumberVersions.core}"
-    implementation "io.cucumber:cucumber-plugin:${cucumberVersions.core}"
+//    implementation "io.cucumber:cucumber-plugin:${cucumberVersions.core}"
 //    implementation "io.cucumber:docstring:${cucumberVersions.core}"
     implementation "io.cucumber:html-formatter:${cucumberVersions.htmlFormatter}"
     implementation "io.cucumber:junit-xml-formatter:${cucumberVersions.junitXmlFormatter}"

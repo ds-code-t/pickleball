@@ -7,6 +7,7 @@ public enum Status {
     PASSED,
     SKIPPED,
     PENDING,
+    SOFT_FAILED,
     UNDEFINED,
     AMBIGUOUS,
     FAILED,

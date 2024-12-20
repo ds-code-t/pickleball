@@ -15,7 +15,7 @@ import static java.util.Objects.requireNonNull;
  */
 // Generated code
 @SuppressWarnings("unused")
-public final class Step {
+public class Step {
     private final Location location;
     private final String keyword;
     private final StepKeywordType keywordType;

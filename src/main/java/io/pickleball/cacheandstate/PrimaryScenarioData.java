@@ -3,6 +3,8 @@ package io.pickleball.cacheandstate;
 import io.cucumber.core.runner.Runner;
 import io.cucumber.core.runner.TestCase;
 
+import java.util.Stack;
+
 import static io.pickleball.cacheandstate.GlobalCache.getState;
 
 public class PrimaryScenarioData {
@@ -10,9 +12,29 @@ public class PrimaryScenarioData {
     private ScenarioContext primaryScenario;
     private ScenarioContext currentScenario;
 
+    private Stack<ScenarioContext> scenarioStack = new Stack<>();
+
     private final Runner runner;
     private final ScenarioContext scenarioContext;
 
+
+
+    public static void startEvent() {
+        getCurrentScenario().currentStep.sendStartEvent();
+    }
+
+    public static void endEvent() {
+        getCurrentScenario().currentStep.sendEndEvent();
+    }
+
+
+    public static StepContext getCurrentStep() {
+        return getCurrentScenario().currentStep;
+    }
+
+    public static void setCurrentStep(StepContext currentStep) {
+        getCurrentScenario().currentStep = currentStep;
+    }
 
     public PrimaryScenarioData(Runner runner, TestCase testCase) {
         this.runner = runner;
@@ -30,22 +52,20 @@ public class PrimaryScenarioData {
     }
 
     public static void setPrimaryScenario(ScenarioContext primaryScenario) {
-
-//        if (getState().primaryScenario != null)
-//            throw new RuntimeException("primaryScenario value already set2");
         getState().primaryScenario = primaryScenario;
-//        getState().currentScenario = primaryScenario;
     }
 
+    public static ScenarioContext popCurrentScenario() {
+        return getState().scenarioStack.pop();
+    }
 
     public static ScenarioContext getCurrentScenario() {
-        return getState().currentScenario;
+        return getState().scenarioStack.peek();
     }
 
     public static void setCurrentScenario(ScenarioContext currentScenario) {
-        getState().currentScenario = currentScenario;
+        getState().scenarioStack.add(currentScenario);
     }
-
 
     public static Runner getRunner() {
         return  getState().runner;

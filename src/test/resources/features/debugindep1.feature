@@ -1,5 +1,35 @@
 Feature: Using Plugin Steps333 indep
 
+  @zzs1
+  Scenario: Main AAA
+#    Then I should see debug outputlzz
+    Then I should see debug outputlzz
+    *  Scenario:
+      | Scenario Tags | A     | B |
+      | @zzs9         | ERRsOR | s |
+      | @zzs9         | z     | 3 |
+    Given I am running a testlzz xxx<A> and <B>
+#    Given I am running a testlzz fff and gggg
+
+  @zzs9
+  Scenario: Component BBB
+
+    Given I am running a testlzz aa3 and 4
+#    Given I am running a testlzz 5 and 6
+#    Given I am running a testlzz 3 and 4
+#    Given I am running a testlzz 5 and 6
+    Given I am running a testlzz bbb<A> and <B>
+#    Given I am running a testlzz <A> and <B>
+#    Given I am running a testlzz <A> and <B>
+#    Given I am running a testlzz 3 and 4
+    Given I am running a testlzz ccc5 and 6
+
+
+
+
+
+
+
 
 #  Scenario: aaaaasdve4
 #    * DocString Test
@@ -74,62 +104,62 @@ Feature: Using Plugin Steps333 indep
 #
 #
 #@zzs 5
-  Scenario: sds
+#  Scenario: sds
+##    Then I should see debug outputlzz
 #    Then I should see debug outputlzz
-    Then I should see debug outputlzz
-    *  Scenario:
-      | Scenario Tags | A   | B |
-      | @zzs9         | z |  s   |
-#      | @zzs9         | zzzzzzzzzz |
-#    Given I am running a testlzz <A> and <B>
-#    Given I am running a testlzz fff and gggg
+#    *  Scenario:
+#      | Scenario Tags | A | B |
+#      | @zzs9         | z | s |
+##      | @zzs9         | zzzzzzzzzz |
+##    Given I am running a testlzz <A> and <B>
+##    Given I am running a testlzz fff and gggg
 
 #  @zzs9
 #  Scenario: zzzzz 11
 #    Then I should see debug outputlzz
+##
+##  @zzs9
+##  Scenario: cccc 11
+##    Then I should see debug outputlzz
+#  @zzs9 @priority-500
+##  Scenario: qqqqqq <Scenario Tags>
+##    Given I am running a testlzz <A> and <B>
 #
-#  @zzs9
-#  Scenario: cccc 11
-#    Then I should see debug outputlzz
-  @zzs9 @priority-500
-#  Scenario: qqqqqq <Scenario Tags>
+##  @zzs9 @Priority-1
+#    @zzs9 @priority-500
+#  Scenario Outline: qqqqqq <Scenario Tags>
+##    Then I should see debug outputlzz
+##    Then I should see debug outputlzz
 #    Given I am running a testlzz <A> and <B>
-
-#  @zzs9 @Priority-1
-  @zzs9 @priority-500
-  Scenario Outline: qqqqqq <Scenario Tags>
-#    Then I should see debug outputlzz
-#    Then I should see debug outputlzz
-    Given I am running a testlzz <A> and <B>
-#    Given I am running a testlzz fff and gggg
-
-    Examples:
-      | Scenario Tags         | A  | B  |
-      | @zzs  1   @priority-3 | a  |   |
-#      | @ww  2                | 44 | 55 |
-
-#    Examples:
-#      | Scenario Tags                | A  | B  |
-#      | @zzs  3          @priority-5 | 22 | 33 |
-#      | @zzs  4 @priority-1          | 44 | 55 |
-#
-##      | @zzs  3       | 44 | 55 |
-##      | @zzs  4       | 44 | 55 |
-##      | @zzs  5       | 44 | 55 |
-##      | @zzs  6  @priority-1    | 44 | 55 |
-##      | @zzs  7       | 44 | 55 |
-#
+##    Given I am running a testlzz fff and gggg
 #
 #    Examples:
+#      | Scenario Tags         | A | B |
+#      | @zzs  1   @priority-3 | a |   |
+##      | @ww  2                | 44 | 55 |
 #
-#      | Scenario Tags           | A    | B     |
+##    Examples:
+##      | Scenario Tags                | A  | B  |
+##      | @zzs  3          @priority-5 | 22 | 33 |
+##      | @zzs  4 @priority-1          | 44 | 55 |
+##
+###      | @zzs  3       | 44 | 55 |
+###      | @zzs  4       | 44 | 55 |
+###      | @zzs  5       | 44 | 55 |
+###      | @zzs  6  @priority-1    | 44 | 55 |
+###      | @zzs  7       | 44 | 55 |
+##
+##
+##    Examples:
+##
+##      | Scenario Tags           | A    | B     |
+##
+##      | @zzs 5                  | qq22 | zzz33 |
+##
+##      | @zzs  6   @priority-300 | 44   | 55    |
+##      | @zzs  7                 | 44   | 55    |
 #
-#      | @zzs 5                  | qq22 | zzz33 |
 #
-#      | @zzs  6   @priority-300 | 44   | 55    |
-#      | @zzs  7                 | 44   | 55    |
-
-
-  Scenario: coord1
-    Given the user is at coordinates (10,20)
+#  Scenario: coord1
+#    Given the user is at coordinates (10,20)
 

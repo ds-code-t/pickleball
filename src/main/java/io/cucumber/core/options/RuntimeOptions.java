@@ -186,7 +186,7 @@ public final class RuntimeOptions implements
         this.dryRun = dryRun;
     }
 
-    void setGlue(List<URI> parsedGlue) {
+    public void setGlue(List<URI> parsedGlue) {
         glue.clear();
         glue.addAll(parsedGlue);
     }
@@ -200,7 +200,7 @@ public final class RuntimeOptions implements
                 .collect(Collectors.toList()));
     }
 
-    void setFeaturePaths(List<FeatureWithLines> featurePaths) {
+    public void setFeaturePaths(List<FeatureWithLines> featurePaths) {
         this.featurePaths.clear();
         this.featurePaths.addAll(featurePaths);
     }

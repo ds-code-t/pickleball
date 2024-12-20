@@ -3,10 +3,14 @@ package io.pickleball.cacheandstate;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.runner.TestCase;
 import io.cucumber.core.runner.TestCaseState;
+import io.cucumber.plugin.event.Result;
+import io.pickleball.logging.EventContainer;
 import io.pickleball.mapandStateutilities.LinkedMultiMap;
+//import io.pickleball.mapandStateutilities.LinkedMultiMap;
 
 import java.util.*;
 
+import static io.pickleball.cacheandstate.PrimaryScenarioData.getCurrentStep;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.getRunner;
 import static io.pickleball.executions.ComponentRuntime.createTestcases;
 //import static io.pickleball.cacheandstate.GlobalCache.getGlobalRunner;
@@ -28,19 +32,19 @@ public class ScenarioContext implements io.cucumber.plugin.event.TestStep {
     private List<ScenarioContext> children = new ArrayList<>();
     private List<StepContext> stepChildren = new ArrayList<>();
 
-    private StepContext currentStep;
+//    private StepContext currentStep;
 
     public boolean isTopLevel() {
         return nestingLevel == 0;
     }
 
-    public StepContext getCurrentStep() {
-        return currentStep;
-    }
+//    public void addResult(Result result) {
+//        testCaseState.add(result);
+//        if(parentStep != null)
+//            parentStep.addResults(result);
+//    }
+    public StepContext currentStep;
 
-    public void setCurrentStep(StepContext currentStep) {
-        this.currentStep = currentStep;
-    }
 
     public StepContext parentStep;
 
@@ -49,7 +53,7 @@ public class ScenarioContext implements io.cucumber.plugin.event.TestStep {
         child.nestingLevel = (nestingLevel + 1);
         child.position = children.size();
         children.add(child);
-        child.parentStep = currentStep;
+        child.parentStep = getCurrentStep();
     }
 
     public void addChildStepContext(StepContext child) {
@@ -64,8 +68,8 @@ public class ScenarioContext implements io.cucumber.plugin.event.TestStep {
         this.pickle = pickle;
     }
 
-    public void createComponentScenario(String argString,  LinkedMultiMap<String, String>... maps) {
-        createComponentScenario(convertCommandLineToArgv(argString),maps);
+    public void createComponentScenario(String argString, LinkedMultiMap<String, String>... maps) {
+        createComponentScenario(convertCommandLineToArgv(argString), maps);
     }
 
     public void createComponentScenario(Map<String, Object> map, LinkedMultiMap<String, String>... maps) {
@@ -83,9 +87,16 @@ public class ScenarioContext implements io.cucumber.plugin.event.TestStep {
     }
 
     public void executeTestCases(List<TestCase> testCases) {
-        for (TestCase testCase :  testCases) {
+        for (TestCase testCase : testCases) {
+            System.out.println("@@start run");
             addChildScenarioContext(testCase.scenarioContext);
             testCase.runComponent(getRunner().bus);
+            System.out.println("@@getTestCaseState().isFailed():: " + getTestCaseState().isFailed());
+            if (getTestCaseState().isFailed()) {
+                System.out.println("@@Break");
+//                break;
+            }
+            System.out.println("@@end testcase run");
         }
     }
 
@@ -94,7 +105,7 @@ public class ScenarioContext implements io.cucumber.plugin.event.TestStep {
     }
 
 
-        public ScenarioContext getRootScenarioContext() {
+    public ScenarioContext getRootScenarioContext() {
         if (parent == null)
             return this;
         return getRootScenarioContext();

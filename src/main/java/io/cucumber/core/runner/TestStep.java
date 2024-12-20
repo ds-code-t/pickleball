@@ -12,6 +12,8 @@ import io.cucumber.plugin.event.TestCase;
 import io.cucumber.plugin.event.TestStepFinished;
 import io.cucumber.plugin.event.TestStepStarted;
 import io.pickleball.cacheandstate.StepContext;
+import io.pickleball.exceptions.SoftFailureException;
+import io.pickleball.logging.EventContainer;
 
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -20,6 +22,7 @@ import java.util.UUID;
 import java.util.function.Predicate;
 
 import static io.cucumber.core.exception.UnrecoverableExceptions.rethrowIfUnrecoverable;
+import static io.cucumber.core.runner.ExecutionMode.RUN;
 import static io.cucumber.core.runner.ExecutionMode.SKIP;
 import static io.cucumber.core.runner.TestAbortedExceptions.createIsTestAbortedExceptionPredicate;
 import static io.cucumber.core.runner.TestStepResultStatusMapper.from;
@@ -35,22 +38,19 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
     private final UUID id;
     public Method method;
 
-    int nestingLevel = 0;
-    int position = 0;
-    Object parent = null;
+
+
+//    int nestingLevel = 0;
+//    int position = 0;
+//    Object parent = null;
+
 
 
     TestStep(UUID id, StepDefinitionMatch stepDefinitionMatch) {
         this.id = id;
         this.stepDefinitionMatch = stepDefinitionMatch;
-//        String location = stepDefinitionMatch.getCodeLocation();
-
     }
 
-
-//    public String returnStepText(){
-//        this.stepDefinitionMatch
-//    }
 
 
     @Override
@@ -67,7 +67,7 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
         Instant startTime = bus.getInstant();
 
 //        if (!stepContext.isMetaStep())
-            emitTestStepStarted(testCase, bus, state.getTestExecutionId(), startTime);
+        emitTestStepStarted(testCase, bus, state.getTestExecutionId(), startTime);
 
         Status status;
         Throwable error = null;
@@ -82,11 +82,20 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
         Duration duration = Duration.between(startTime, stopTime);
         Result result = mapStatusToResult(status, error, duration);
         state.add(result);
+//        stepContext.getScenarioContext().addResult(result);
 
-//        if (!stepContext.isMetaStep())
-            emitTestStepFinished(testCase, bus, state.getTestExecutionId(), stopTime, duration, result);
+//        Result maxResult = stepContext.getMaxResults(result);
+//        Status maxStatus = io.cucumber.plugin.event.Status.valueOf(maxResult.getStatus().name());;
+//        emitTestStepFinished(testCase, bus, state.getTestExecutionId(), stopTime, duration, maxResult);
+        emitTestStepFinished(testCase, bus, state.getTestExecutionId(), stopTime, duration, result);
 
-        return result.getStatus().is(Status.PASSED) ? executionMode : SKIP;
+//        Status returnStatus = result.getStatus();
+//        return result.getStatus().is(Status.PASSED) ? executionMode : SKIP;
+        stepContext.addStatus(result.getStatus());
+        Status returnStatus = stepContext.getHighestStatus();
+
+        return returnStatus.is(Status.PASSED) || returnStatus.is(Status.SOFT_FAILED) ? executionMode : SKIP;
+//        return result.getStatus().is(Status.PASSED) ? executionMode : SKIP;
     }
 
     public ExecutionMode runDynamically(io.cucumber.plugin.event.TestCase testCase, EventBus bus, TestCaseState currentState, ExecutionMode executionMode) {
@@ -94,43 +103,20 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
     }
 
 
-//    public ExecutionMode originalRun(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
-//        Instant startTime = bus.getInstant();
-//        emitTestStepStarted(testCase, bus, state.getTestExecutionId(), startTime);
-//
-//        Status status;
-//        Throwable error = null;
-//        try {
-//            status = executeStep(state, executionMode);
-//        } catch (Throwable t) {
-//            rethrowIfUnrecoverable(t);
-//            error = t;
-//            status = mapThrowableToStatus(t);
-//        }
-//        Instant stopTime = bus.getInstant();
-//        Duration duration = Duration.between(startTime, stopTime);
-//        Result result = mapStatusToResult(status, error, duration);
-//        state.add(result);
-//
-//        emitTestStepFinished(testCase, bus, state.getTestExecutionId(), stopTime, duration, result);
-//
-//        return result.getStatus().is(Status.PASSED) ? executionMode : SKIP;
-//    }
-
-
     private void emitTestStepStarted(TestCase testCase, EventBus bus, UUID textExecutionId, Instant startTime) {
-        bus.send(new TestStepStarted(startTime, testCase, this));
-        Envelope envelope = Envelope.of(new io.cucumber.messages.types.TestStepStarted(
-                textExecutionId.toString(),
-                id.toString(),
-                toMessage(startTime)));
-        bus.send(envelope);
+        stepContext.startEvent = new EventContainer(  testCase,  bus,  textExecutionId,  startTime,  id, this);
+//        stepContext.startEvent = new EventContainer(new TestStepStarted(startTime, testCase, this), Envelope.of(new io.cucumber.messages.types.TestStepStarted(
+//                textExecutionId.toString(),
+//                id.toString(),
+//                toMessage(startTime))), bus);
+        if (stepContext.shouldSendStart())
+            stepContext.sendStartEvent();
     }
 
     private Status executeStep(TestCaseState state, ExecutionMode executionMode) throws Throwable {
         state.setCurrentTestStepId(id);
         try {
-            System.out.println("@@stepDefinitionMatch "+ stepDefinitionMatch);
+            System.out.println("@@stepDefinitionMatch " + stepDefinitionMatch);
             return executionMode.execute(stepDefinitionMatch, state);
         } finally {
             state.clearCurrentTestStepId();
@@ -150,6 +136,9 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
         if (t.getClass() == AmbiguousStepDefinitionsException.class) {
             return Status.AMBIGUOUS;
         }
+        if (t.getClass() == SoftFailureException.class) {
+            return Status.SOFT_FAILED;
+        }
         return Status.FAILED;
     }
 
@@ -163,19 +152,16 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
     private void emitTestStepFinished(
             TestCase testCase, EventBus bus, UUID textExecutionId, Instant stopTime, Duration duration, Result result
     ) {
-        bus.send(new TestStepFinished(stopTime, testCase, this, result));
+//        Result result = new Result(passedResult.getStatus(), duration ,passedResult.getError());
+//        TestStepResult testStepResult = new TestStepResult(
+//                toMessage(duration),
+//                result.getError() != null ? result.getError().getMessage() : null,
+//                from(result.getStatus()),
+//                result.getError() != null ? toMessage(result.getError()) : null);
 
-        TestStepResult testStepResult = new TestStepResult(
-                toMessage(duration),
-                result.getError() != null ? result.getError().getMessage() : null,
-                from(result.getStatus()),
-                result.getError() != null ? toMessage(result.getError()) : null);
+        stepContext.endEvent = new EventContainer(  testCase,  bus,  textExecutionId,  stopTime,  duration,  result,  id, this);
+        if (result.getStatus().equals(Status.FAILED) || stepContext.shouldSendEnd())
+            stepContext.sendEndEvent();
 
-        Envelope envelope = Envelope.of(new io.cucumber.messages.types.TestStepFinished(
-                textExecutionId.toString(),
-                id.toString(),
-                testStepResult,
-                toMessage(stopTime)));
-        bus.send(envelope);
     }
 }

@@ -27,6 +27,7 @@ import static io.cucumber.cienvironment.DetectCiEnvironment.detectCiEnvironment;
 import static io.cucumber.core.exception.ExceptionUtils.throwAsUncheckedException;
 import static io.cucumber.core.exception.UnrecoverableExceptions.rethrowIfUnrecoverable;
 import static io.cucumber.messages.Convertor.toMessage;
+import static io.pickleball.cacheandstate.GlobalCache.setGlobalRuntime;
 import static java.util.Collections.singletonList;
 
 public final class CucumberExecutionContext {
@@ -133,6 +134,7 @@ public final class CucumberExecutionContext {
 
     public void runTestCase(Consumer<Runner> execution) {
         Runner runner = getRunner();
+        setGlobalRuntime(runner);
         collector.executeAndThrow(() -> execution.accept(runner));
     }
 

@@ -1,8 +1,8 @@
 package io.cucumber.messages.types;
 
+
 import java.util.ArrayList;
 import java.util.Objects;
-import java.util.Optional;
 
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
@@ -13,7 +13,7 @@ import static java.util.Objects.requireNonNull;
  */
 // Generated code
 @SuppressWarnings("unused")
-public final class Scenario {
+public final class Scenario extends Step {
     private final Location location;
     private final java.util.List<Tag> tags;
     private final String keyword;
@@ -33,6 +33,13 @@ public final class Scenario {
         java.util.List<Examples> examples,
         String id
     ) {
+        super(location,
+                keyword,
+                null,
+                name,
+                null,
+                null,
+                id);
         this.location = requireNonNull(location, "Scenario.location cannot be null");
         this.tags = unmodifiableList(new ArrayList<>(requireNonNull(tags, "Scenario.tags cannot be null")));
         this.keyword = requireNonNull(keyword, "Scenario.keyword cannot be null");

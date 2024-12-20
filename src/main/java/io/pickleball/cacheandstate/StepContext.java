@@ -1,19 +1,29 @@
 package io.pickleball.cacheandstate;
 
 
+import io.cucumber.core.backend.Status;
 import io.cucumber.core.backend.StepDefinition;
 import io.cucumber.core.gherkin.Step;
-import io.pickleball.metafunctionalities.MetaStepData;
+import io.cucumber.messages.types.Duration;
+import io.cucumber.plugin.event.Result;
+import io.pickleball.annotations.Metastep;
 import io.cucumber.core.runner.ExecutionMode;
 import io.cucumber.core.runner.PickleStepDefinitionMatch;
 import io.cucumber.core.runner.PickleStepTestStep;
 import io.cucumber.java.JavaStepDefinition;
 import io.cucumber.plugin.event.TestCase;
 import io.cucumber.plugin.event.TestStep;
+import io.pickleball.logging.EventContainer;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+
+import static io.pickleball.cacheandstate.PrimaryScenarioData.setCurrentStep;
+import static java.time.Duration.ZERO;
+import static java.util.Collections.max;
+import static java.util.Comparator.comparing;
 
 
 public class StepContext {
@@ -44,9 +54,101 @@ public class StepContext {
 
     private final List<ExecutionMode> executionModeList = new ArrayList<>();
 
+    public EventContainer startEvent;
+    public EventContainer endEvent;
+
+    public boolean sendEvents = true;
+    public boolean sendStart = false;
+    public boolean sendEnd = false;
+    public boolean startEventSent = false;
+    public boolean endEventSent = false;
+
+
+    List<io.cucumber.plugin.event.Status> statuses = new ArrayList<>();
+
+    public void addStatus(io.cucumber.plugin.event.Status status) {
+        statuses.add(status);
+    }
+    public void addStatus(Status status) {
+        statuses.add(io.cucumber.plugin.event.Status.valueOf(status.name()));
+    }
+
+    public io.cucumber.plugin.event.Status getHighestStatus() {
+        if(statuses.isEmpty())
+            return io.cucumber.plugin.event.Status.PASSED;
+        return statuses.stream()
+                .max(Enum::compareTo) // Compare by ordinal implicitly
+                .orElseThrow(() -> new IllegalArgumentException("Status list is empty!"));
+    }
+
+
+
+//    private final List<io.cucumber.plugin.event.Result> stepResults = new ArrayList<>();
+
+//    public io.cucumber.plugin.event.Status getStatus(Result... results) {
+//        stepResults.addAll(Arrays.asList(results));
+//        if (stepResults.isEmpty()) {
+//            return io.cucumber.plugin.event.Status.valueOf(Status.PASSED.name());
+//        }
+//        Result mostSevereResult = max(stepResults, comparing(Result::getStatus));
+//        return io.cucumber.plugin.event.Status.valueOf(mostSevereResult.getStatus().name());
+//    }
+//
+////    public void addResults(Result... results) {
+////        for(Result result: results)
+////        {
+////            stepResults.add(new Result(result.getStatus(), ZERO, null));
+////        }
+//////        stepResults.addAll(Arrays.asList(results));
+////    }
+//
+//    public Result getMaxResults(Result... results) {
+//        stepResults.addAll(Arrays.asList(results));
+//        return max(stepResults, comparing(Result::getStatus));
+//    }
+
+    public void sendStartEvent() {
+        if (startEvent == null)
+            sendStart = true;
+        else {
+            String testCaseName = testCase == null ? "NULL" : testCase.getName();
+            System.out.println("@@emitTestStepStarted11: " + testCaseName + "  : " + testStep.getStepText());
+            startEvent.sendStart();
+            startEventSent = true;
+            sendEnd = true;
+            startEvent = null;
+        }
+    }
+
+    public void sendEndEvent() {
+        if(endEventSent)
+            return;
+        sendStartEvent();
+        if (endEvent == null)
+            sendEnd = true;
+        else {
+            String testCaseName = testCase == null ? "NULL" : testCase.getName();
+            System.out.println("@@emitTestStepFinished22: " + testCaseName + "  : " + testStep.getStepText());
+            if (startEventSent) {
+                endEvent.sendEnd();
+                endEventSent = true;
+                endEvent = null;
+            }
+        }
+    }
+
+    public boolean shouldSendStart() {
+        return startEvent != null && (sendEvents || sendStart);
+    }
+
+    public boolean shouldSendEnd() {
+        return endEvent != null && (sendEvents || sendEnd);
+    }
+
+
     public ExecutionMode addExecutionMode(ExecutionMode executionMode) {
         if (executionMode.equals(ExecutionMode.RUN) && executionModeList.isEmpty())
-            scenarioContext.setCurrentStep(this);
+            setCurrentStep(this);
         executionModeList.add(executionMode);
         return executionMode;
     }
@@ -57,8 +159,10 @@ public class StepContext {
     }
 
     public void setMethod(Method method) {
-        isMetaStep = method != null && method.getReturnType().equals(MetaStepData.class);
+//        isMetaStep = method != null && method.getReturnType().equals(MetaStepData.class);
+        isMetaStep = method != null && method.isAnnotationPresent(Metastep.class);
         this.method = method;
+        this.sendEvents = !isMetaStep;
     }
 
 
@@ -72,7 +176,6 @@ public class StepContext {
         this.pickleStepDefinitionMatch = pickleStepDefinitionMatch;
         this.stepDefinition = pickleStepDefinitionMatch.getStepDefinition();
         setMethod(pickleStepDefinitionMatch.method);
-
     }
 //
 //    public Object executeStepMethod() throws Throwable {

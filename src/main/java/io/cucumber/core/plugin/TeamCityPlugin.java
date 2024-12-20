@@ -40,6 +40,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.exception.ExceptionUtils.printStackTrace;
+import static io.cucumber.utilities.GeneralUtilities.waitTime;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
@@ -52,7 +53,6 @@ import static java.util.stream.Collectors.joining;
  * - Service Messages</a>
  */
 public class TeamCityPlugin implements EventListener {
-
 
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'hh:mm:ss.SSSZ");
@@ -186,7 +186,7 @@ public class TeamCityPlugin implements EventListener {
                 .map(Optional::get)
                 .findFirst()
                 .orElse(emptyList());
-           poppedNodes(path).forEach(node -> finishNode(timestamp, node));
+        poppedNodes(path).forEach(node -> finishNode(timestamp, node));
         pushedNodes(path).forEach(node -> startNode(uri, timestamp, node));
         this.currentStack = path;
         this.currentTestCase = testCase;
@@ -312,6 +312,7 @@ public class TeamCityPlugin implements EventListener {
                 print(TEMPLATE_TEST_FAILED, timeStamp, duration, "Step undefined", snippets, name);
                 break;
             }
+            case SOFT_FAILED:
             case AMBIGUOUS:
             case FAILED: {
                 String details = printStackTrace(error);
@@ -456,19 +457,39 @@ public class TeamCityPlugin implements EventListener {
     }
 
 
-
     private void print(String command, Object... args) {
-        if(args.length == 3 && args[2].toString().startsWith("Scenario:")) {
-            if (command.startsWith("##teamcity[testStarted ")) {
-                out.println(formatCommand( "##teamcity[testSuiteStarted timestamp = '%s' locationHint = '%s' name = '%s']", args[0] , "", args[2]));
+//        System.out.println("@@command: " + command);
+//        System.out.println("@@args: " + Arrays.toString(args));
+//        if (Arrays.toString(args).contains("Component BBB")) {
+//            waitTime(300L);
+//            new Exception().printStackTrace();
+//            waitTime(300L);
+//
+//        }
+//        if (Arrays.toString(args).contains("Component BBB")) {
+//            waitTime(300L);
+//            new Exception().printStackTrace();
+//            waitTime(300L);
+//        }
+//       if(Arrays.toString(args).contains("Scenario:")) {
+//            System.out.println("@@command: " + command);
+//            System.out.println("@@args: " + Arrays.toString(args));
+//        }
+
+        if (args.length > 2 && args[args.length - 1].toString().startsWith("Scenario:")) {
+            if (command.startsWith("##teamcity[testFailed ")) {
+
+                return;
+            } else if (command.startsWith("##teamcity[testStarted ")) {
+                out.println(formatCommand("##teamcity[testSuiteStarted timestamp = '%s' locationHint = '%s' name = '%s']", args[0], "", args[2]));
                 return;
             } else if (command.startsWith("##teamcity[testFinished ")) {
-                out.println(formatCommand( "##teamcity[testSuiteFinished timestamp = '%s' name = '%s']", args[0] , args[2]));
+                out.println(formatCommand("##teamcity[testSuiteFinished timestamp = '%s' name = '%s']", args[0], args[2]));
                 return;
             }
         }
 
-        out.println(formatCommand( command,  args));
+        out.println(formatCommand(command, args));
     }
 
     private String formatCommand(String command, Object... parameters) {

@@ -49,7 +49,7 @@ import static java.util.stream.Collectors.toList;
  * For available properties see {@link Constants}.
  */
 @API(status = API.Status.STABLE)
-public final class TestNGCucumberRunner {
+public class TestNGCucumberRunner {
 
     private final Predicate<Pickle> filters;
     private final List<Feature> features;

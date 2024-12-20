@@ -2,7 +2,7 @@
 //
 //import io.cucumber.core.stepexpression.StepTypeRegistry;
 //import io.cucumber.cucumberexpressions.ParameterType; // For defining custom parameter types
-//import io.pickleball.registry.Coordinates;
+//import io.pickleball.customtypes.Coordinates;
 //
 //import java.util.Locale;
 //

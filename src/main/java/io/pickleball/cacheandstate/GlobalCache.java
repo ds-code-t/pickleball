@@ -3,11 +3,13 @@ package io.pickleball.cacheandstate;
 import io.cucumber.core.gherkin.Feature;
 import io.cucumber.core.gherkin.messages.GherkinMessagesFeature;
 import io.cucumber.core.plugin.TeamCityPlugin;
-import  io.cucumber.core.runner.Runner;
+import io.cucumber.core.runner.Runner;
 import io.cucumber.core.runner.TestCase;
 import io.cucumber.core.runtime.FeaturePathFeatureSupplier;
 import io.cucumber.core.runtime.Runtime;
 import io.pickleball.cucumberutilities.FeatureFileUtilities;
+import io.pickleball.executions.RuntimeUtils;
+import org.testng.TestRunner;
 
 import java.io.PrintStream;
 import java.net.URI;
@@ -26,8 +28,8 @@ public class GlobalCache {
         return parsedFeature.computeIfAbsent(uri, FeatureFileUtilities::parseFeature
         );
     }
-    private static final ConcurrentHashMap<URI, GherkinMessagesFeature> parsedFeature = new ConcurrentHashMap<>();
 
+    private static final ConcurrentHashMap<URI, GherkinMessagesFeature> parsedFeature = new ConcurrentHashMap<>();
 
 
     private static final ThreadLocal<PrimaryScenarioData> ThreadContext = new ThreadLocal<>();
@@ -51,22 +53,28 @@ public class GlobalCache {
 //    }
 
 
-
-
     private static Runtime globalRuntime;
 
     public static FeaturePathFeatureSupplier getFeaturePathFeatureSupplier() {
-        return  (FeaturePathFeatureSupplier) getGlobalRuntime().featureSupplier;
+        return (FeaturePathFeatureSupplier) getGlobalRuntime().featureSupplier;
     }
 
     public static Runtime getGlobalRuntime() {
+//        if(globalRuntime == null)
+//            globalRuntime  = RuntimeUtils.createRuntimeFromRunner(runner, TestRunner.class.getClassLoader());
         return globalRuntime;
     }
 
-    public static void setGlobalRuntime(Runtime globalRuntime) {
-        if(GlobalCache.globalRuntime != null)
-            throw new RuntimeException("globalRuntime value already set");
-        GlobalCache.globalRuntime = globalRuntime;
+//    public static synchronized void setGlobalRuntime(Runtime globalRuntime) {
+//        System.out.println("@@setGlobalRuntime !!!");
+//        if(GlobalCache.globalRuntime != null)
+//            throw new RuntimeException("globalRuntime value already set");
+//        GlobalCache.globalRuntime = globalRuntime;
+//    }
+
+    public static synchronized void setGlobalRuntime(Runner runner) {
+        if (globalRuntime == null)
+            globalRuntime = RuntimeUtils.createRuntimeFromRunner(runner, TestRunner.class.getClassLoader());
     }
 
 

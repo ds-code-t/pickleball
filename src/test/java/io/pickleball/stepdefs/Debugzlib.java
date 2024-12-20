@@ -11,10 +11,10 @@ import io.cucumber.java.en.Given;
 import io.cucumber.java.en.If;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
-import io.pickleball.registry.Coordinates;
+import io.pickleball.exceptions.SoftFailureException;
+import io.pickleball.customtypes.Coordinates;
 //import io.cucumber.messages.types.DataTable;
 
-import static io.cucumber.utilities.GeneralUtilities.getStringTimeStamp;
 import static io.cucumber.utilities.GeneralUtilities.waitTime;
 
 public class Debugzlib {
@@ -59,8 +59,13 @@ public class Debugzlib {
 
     @Given("^I am running a testlzz (.*) and (.*)$")
     public void iAmRunningATestlzz(String t1, String t2) {
-//        System.out.println("DEBUG: Given step executed " + t1 + "  --- " + t2);
-//        GlobalCache.teamCityPlugin.printRemotely("", "A");
+        System.out.print("DEBUG: start " + t1 + "  --- " + t2);
+        waitTime(800L);
+        if(t1.contains("ERROR"))
+            throw new RuntimeException("ERROR step-DEBUG: start " + t1 + "  --- " + t2);
+        if(t1.contains("SOFT"))
+            throw new SoftFailureException("ERROR step-DEBUG: start " + t1 + "  --- " + t2);
+        System.out.println(" end");
     }
 
     @When("I execute a steplzz")
@@ -80,7 +85,7 @@ public class Debugzlib {
         new Exception("errorthrowlzz").printStackTrace();
     }
 
-    @Given("the user is at coordinates {coordinates}")
+    @Given("the user is at coordinates {stepText}")
     public void userAtCoordinates(Coordinates coordinates) {
         System.out.println("User is at: " + coordinates);
     }
