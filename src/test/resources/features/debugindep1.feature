@@ -13,7 +13,6 @@ Feature: Using Plugin Steps333 indep
 
   @zzs9
   Scenario: Component BBB
-
     Given I am running a testlzz aa3 and 4
 #    Given I am running a testlzz 5 and 6
 #    Given I am running a testlzz 3 and 4
@@ -27,6 +26,10 @@ Feature: Using Plugin Steps333 indep
 
 
 
+  Scenario: coord1
+    Given I am running a testlzz 11ERRsORs and 6
+    Given the user is at coordinates I am running a testlzz SOFT and 6
+    Given I am running a testlzz 33ERRsORs and 6
 
 
 
@@ -160,6 +163,5 @@ Feature: Using Plugin Steps333 indep
 ##      | @zzs  7                 | 44   | 55    |
 #
 #
-#  Scenario: coord1
-#    Given the user is at coordinates (10,20)
+
 

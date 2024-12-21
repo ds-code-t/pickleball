@@ -12,7 +12,7 @@ import io.cucumber.java.en.If;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import io.pickleball.exceptions.SoftFailureException;
-import io.pickleball.customtypes.Coordinates;
+import io.pickleball.customtypes.MetaStep;
 //import io.cucumber.messages.types.DataTable;
 
 import static io.cucumber.utilities.GeneralUtilities.waitTime;
@@ -85,9 +85,11 @@ public class Debugzlib {
         new Exception("errorthrowlzz").printStackTrace();
     }
 
-    @Given("the user is at coordinates {stepText}")
-    public void userAtCoordinates(Coordinates coordinates) {
-        System.out.println("User is at: " + coordinates);
+
+
+    @Given("I perform an action")
+    public void Test3(DataTable dataTable) {
+        System.out.println("I perform an action: " + dataTable);
     }
 
 }

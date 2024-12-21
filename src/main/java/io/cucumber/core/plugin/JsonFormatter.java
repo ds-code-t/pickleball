@@ -102,9 +102,6 @@ public final class JsonFormatter implements EventListener {
 
     @SuppressWarnings("unchecked")
     private void handleTestStepStarted(TestStepStarted event) {
-        System.out.println("@@event getClass: "+ event.getTestStep().getClass());
-        System.out.println("@@event getId: "+ event.getTestStep().getId());
-        System.out.println("@@event getCodeLocation: "+ event.getTestStep().getCodeLocation());
         if (event.getTestStep() instanceof PickleStepTestStep) {
             PickleStepTestStep testStep = (PickleStepTestStep) event.getTestStep();
             if (isFirstStepAfterBackground(testStep)) {
@@ -251,7 +248,6 @@ public final class JsonFormatter implements EventListener {
                 stepMap.put("rows", createDataTableList(dataTableArgument));
             }
         }
-        System.out.println("@@stepMAp: "+ stepMap);
         if (astNode != null) {
             Step step = (Step) astNode.node;
             stepMap.put("keyword", step.getKeyword());

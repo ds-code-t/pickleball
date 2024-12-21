@@ -17,7 +17,7 @@ import java.util.UUID;
 
 import static java.util.Objects.requireNonNull;
 
-final class CoreStepDefinition implements StepDefinition {
+public final class CoreStepDefinition implements StepDefinition {
 
     private final UUID id;
     private final StepExpression expression;

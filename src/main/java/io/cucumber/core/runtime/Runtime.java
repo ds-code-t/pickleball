@@ -69,10 +69,6 @@ public final class Runtime {
         this.executor = executor;
         this.exitStatus = exitStatus;
         this.pickleOrder = pickleOrder;
-//        System.out.println("@@setGlobalRuntime");
-//        new Exception().printStackTrace();
-//        setGlobalRuntime(this);
-
     }
 
     public static Builder builder() {

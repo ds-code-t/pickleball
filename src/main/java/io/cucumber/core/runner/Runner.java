@@ -39,6 +39,10 @@ public final class Runner {
 
     private static final Logger log = LoggerFactory.getLogger(Runner.class);
 
+    public CachingGlue getGlue() {
+        return glue;
+    }
+
     private final CachingGlue glue;
     public final EventBus bus;
     private final Collection<? extends Backend> backends;
@@ -193,9 +197,7 @@ public final class Runner {
             if (match != null) {
                 return match;
             }
-            System.out.println("@@emitSnippetSuggestedEvent1");
             emitSnippetSuggestedEvent(pickle, step);
-            System.out.println("@@emitSnippetSuggestedEvent2");
             return new UndefinedPickleStepDefinitionMatch(pickle.getUri(), step);
         } catch (AmbiguousStepDefinitionsException e) {
             return new AmbiguousPickleStepDefinitionsMatch(pickle.getUri(), step, e);

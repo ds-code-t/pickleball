@@ -31,9 +31,6 @@ public class FeatureFileUtilities {
                 .parse("feature", new ByteArrayInputStream(testFeatureSource.getBytes(StandardCharsets.UTF_8)))
                 .toList();
 
-        for (Envelope envelope : envelopes) {
-            System.out.println(envelope.toString());
-        }
 
     }
 
@@ -95,13 +92,8 @@ public class FeatureFileUtilities {
             throw new IllegalArgumentException("Feature source cannot be null or blank");
         }
 
-        System.out.println("@@__scenarioSource " + scenarioSource + "\n\n");
-
-
         String featureSource = "Feature: Test feature" + "\n".repeat(gherkinMessagesPickle.getScenarioLocation().getLine()-1) + (gherkinMessagesPickle.getKeyword().equals("Scenario Outline") ? scenarioSource.replaceFirst("Scenario Outline:", "Scenario:") : scenarioSource) ;
         featureSource = featureSource + "\n".repeat(10);
-//
-
 
         // Parse the feature source into Gherkin Envelopes
         List<Envelope> envelopes = GherkinParser.builder()
@@ -110,17 +102,6 @@ public class FeatureFileUtilities {
                 .parse("feature", new ByteArrayInputStream(featureSource.getBytes(StandardCharsets.UTF_8)))
                 .toList();
 
-//
-//        byte[] featureSourceBytes = featureSource.getBytes(StandardCharsets.UTF_8);
-//        System.out.println("@@Encoded featureSource bytes:");
-//        for (byte b : featureSourceBytes) {
-//            System.out.printf("Byte: %02x Char: %c%n", b, (char) b);
-//        }
-
-
-
-        System.out.println("@@Parsed Gherkin Envelopes:");
-        envelopes.forEach(envelope -> System.out.println(envelope.toString()));
 
         // Extract the GherkinDocument from the envelopes
         GherkinDocument gherkinDocument = envelopes.stream()
@@ -138,13 +119,9 @@ public class FeatureFileUtilities {
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("No Pickle found for Scenario in feature source"));
 
-        System.out.println("@@Extracted GherkinDocument:");
-        System.out.println(gherkinDocument.toString());
-
 
         CucumberQuery cucumberQuery = new CucumberQuery();
         cucumberQuery.update(gherkinDocument.getFeature().get());
-//        System.out.println("@@@GherkinMessagesPickle2");fi
 
         return new GherkinMessagesPickle(pickle, gherkinMessagesPickle.getUri() , gherkinMessagesPickle.getDialect(), cucumberQuery, gherkinMessagesPickle.getTags());
     }

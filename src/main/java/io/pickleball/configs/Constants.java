@@ -20,4 +20,6 @@ public class Constants {
     public static final String PRIORITY_TAG =  "@priority-";
 
 
+    public static final List<String> PREFIXES = List.of("given", "when", "then" , "and", "but");
+
 }

@@ -13,22 +13,22 @@ import io.cucumber.plugin.event.TestCaseStarted;
 import io.cucumber.plugin.event.TestStep;
 import io.cucumber.plugin.event.TestStepFinished;
 import io.cucumber.plugin.event.TestStepStarted;
+import io.pickleball.dynamicstepinvocation.DynamicSteps;
 import io.pickleball.mapandStateutilities.LinkedMultiMap;
 import io.pickleball.cacheandstate.ScenarioContext;
 import io.pickleball.executions.ExecutionConfig;
-//import io.pickleball.cucumberutilities.ComponentScenarioWrapper;
 
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Stack;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.ExecutionMode.DRY_RUN;
 import static io.cucumber.core.runner.ExecutionMode.RUN;
-//import static io.pickleball.cacheandstate.PrimaryScenarioData.setPrimaryScenario;
 import static io.cucumber.messages.Convertor.toMessage;
 import static io.pickleball.cacheandstate.GlobalCache.getParsedFeature;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.popCurrentScenario;
@@ -37,7 +37,7 @@ import static io.pickleball.cucumberutilities.FeatureFileUtilities.getComponentB
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
-public final class TestCase implements io.cucumber.plugin.event.TestCase, TestStep {
+public final class TestCase implements io.cucumber.plugin.event.TestCase, DynamicSteps {
 
     private final Pickle pickle;
     private final List<PickleStepTestStep> testSteps;
@@ -50,8 +50,12 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, TestSt
     public Scenario scenario;
     public LinkedMultiMap constantMap;
     public final boolean componentScenario;
-//    public final ComponentScenarioWrapper componentScenarioWrapper;
 
+    private final Stack<PickleStepTestStep> stepStack = new Stack<>();
+
+    public void addStepsToStack(PickleStepTestStep... pickleStepTestSteps) {
+        stepStack.addAll(List.of(pickleStepTestSteps));
+    }
 
     public TestCase(
             UUID id, List<PickleStepTestStep> testSteps,
@@ -78,7 +82,6 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, TestSt
         this.pickle = pickle;
         this.executionMode = dryRun ? DRY_RUN : RUN;
         this.componentScenario = componentScenario;
-//        this.componentScenarioWrapper = new ComponentScenarioWrapper((GherkinMessagesPickle) pickle);
 
         this.scenarioContext = new ScenarioContext(pickle);
         this.scenarioContext.setTestCase(this);
@@ -116,8 +119,19 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, TestSt
         runComponent(bus);
     }
 
+    @Override
+    public ExecutionMode runStackSteps(io.cucumber.plugin.event.TestCase testCase, TestCaseState state, EventBus bus, ExecutionMode nextExecutionMode) {
+        while (nextExecutionMode.equals(ExecutionMode.RUN) && !stepStack.empty()) {
+            PickleStepTestStep stackStep = stepStack.pop();
+            nextExecutionMode = stackStep
+                    .run(testCase, bus, state, nextExecutionMode)
+                    .next(nextExecutionMode);
+        }
+        return nextExecutionMode;
+    }
+
+
     public void runComponent(EventBus bus) {
-        System.out.println("@@runComponent");
         setCurrentScenario(scenarioContext);
         ExecutionMode nextExecutionMode = this.executionMode;
         if (scenarioContext.isTopLevel())
@@ -131,7 +145,6 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, TestSt
         else
             emitComponentCaseStarted(bus, start, executionId);
 
-
         TestCaseState state = new TestCaseState(bus, executionId, this);
 
         for (HookTestStep before : beforeHooks) {
@@ -141,14 +154,11 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, TestSt
         }
 
         for (PickleStepTestStep step : testSteps) {
-
+            nextExecutionMode = runStackSteps(this, state, bus, nextExecutionMode);
             nextExecutionMode = step
                     .run(this, bus, state, nextExecutionMode)
                     .next(nextExecutionMode);
-            if (step.getStepText().contains("Scenario:")) {
-                System.out.println("@@step '" + step.getStepText() + "'");
-                System.out.println("@@nextExecutionMode:: " + nextExecutionMode);
-            }
+            nextExecutionMode = runStackSteps(this, state, bus, nextExecutionMode);
         }
 
         for (HookTestStep after : afterHooks) {
@@ -284,7 +294,6 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, TestSt
     }
 
     private void emitTestCaseStarted(EventBus bus, Instant start, UUID executionId) {
-        System.out.println("@@emitTestCaseStarted11: " + getName());
         bus.send(new TestCaseStarted(start, this));
         Envelope envelope = Envelope.of(new io.cucumber.messages.types.TestCaseStarted(
                 0L,
@@ -298,7 +307,6 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, TestSt
     private void emitTestCaseFinished(
             EventBus bus, UUID executionId, Instant stop, Result result
     ) {
-        System.out.println("@@emitTestCaseFinished22: " + getName());
         bus.send(new TestCaseFinished(stop, this, result));
         Envelope envelope = Envelope.of(new io.cucumber.messages.types.TestCaseFinished(executionId.toString(),
                 toMessage(stop), false));
@@ -307,7 +315,6 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, TestSt
 
 
     private void emitComponentCaseStarted(EventBus bus, Instant start, UUID executionId) {
-        System.out.println("@@emitComponentCaseStarted 11 CCCC: " + getName());
 //        bus.send(new ComponentScenarioStarted(start, scenarioContext.parent.getTestCase(), this));
         bus.send(new TestStepStarted(start, scenarioContext.parent.getTestCase(), this));
     }
@@ -315,9 +322,6 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, TestSt
     private void emitComponentCaseFinished(
             EventBus bus, UUID executionId, Instant stop, Result result
     ) {
-        System.out.println("@@emitComponentCaseFinished 22 CCCC: " + getName());
-//        if(result.getError() == null)
-//        bus.send(new ComponentScenarioFinished(stop, scenarioContext.parent.getTestCase(), this, result));
         bus.send(new TestStepFinished(stop, scenarioContext.parent.getTestCase(), this, result));
         popCurrentScenario();
     }

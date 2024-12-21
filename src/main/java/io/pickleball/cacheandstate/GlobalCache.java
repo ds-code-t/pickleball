@@ -65,12 +65,7 @@ public class GlobalCache {
         return globalRuntime;
     }
 
-//    public static synchronized void setGlobalRuntime(Runtime globalRuntime) {
-//        System.out.println("@@setGlobalRuntime !!!");
-//        if(GlobalCache.globalRuntime != null)
-//            throw new RuntimeException("globalRuntime value already set");
-//        GlobalCache.globalRuntime = globalRuntime;
-//    }
+
 
     public static synchronized void setGlobalRuntime(Runner runner) {
         if (globalRuntime == null)

@@ -10,7 +10,12 @@ import io.pickleball.cacheandstate.StepContext;
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
+import java.util.Stack;
 import java.util.UUID;
+
+import static io.pickleball.cacheandstate.PrimaryScenarioData.getRunner;
+import static io.pickleball.cacheandstate.ScenarioContext.popCurrentStep;
+import static io.pickleball.cacheandstate.ScenarioContext.setCurrentStep;
 
 public final class PickleStepTestStep extends TestStep implements io.cucumber.plugin.event.PickleStepTestStep {
 
@@ -49,22 +54,36 @@ public final class PickleStepTestStep extends TestStep implements io.cucumber.pl
 
     @Override
     public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
-         ExecutionMode nextExecutionMode = stepContext.addExecutionMode(executionMode);
 
+        System.out.println("@@@QQQ:: "+ getStepText());
+//         ExecutionMode nextExecutionMode = stepContext.addExecutionMode(executionMode);
+        ExecutionMode nextExecutionMode = executionMode;
+
+        setCurrentStep(stepContext);
         for (HookTestStep before : beforeStepHookSteps) {
             nextExecutionMode = before
                     .run(testCase, bus, state, executionMode)
                     .next(nextExecutionMode);
         }
 
+        System.out.println("@@Regular teststep:: " + this.getStepText());
+        System.out.println("@@testCase: " + testCase.getName());
+        System.out.println("@@state: " + state);
+        System.out.println("@@bus: " + bus);
+        System.out.println("@@nextExecutionMode aaaa:: " + nextExecutionMode);
         nextExecutionMode = super.run(testCase, bus, state, nextExecutionMode)
                 .next(nextExecutionMode);
+        System.out.println("@@nextExecutionMode bbbb:: " + nextExecutionMode);
 
         for (HookTestStep after : afterStepHookSteps) {
             nextExecutionMode = after
                     .run(testCase, bus, state, executionMode)
                     .next(nextExecutionMode);
         }
+        popCurrentStep();
+
+
+        nextExecutionMode = runStackSteps(testCase, state, bus, nextExecutionMode);
 
         return nextExecutionMode;
     }
@@ -116,4 +135,29 @@ public final class PickleStepTestStep extends TestStep implements io.cucumber.pl
         return step.getText();
     }
 
+
+    private final Stack<PickleStepTestStep> stepStack = new Stack<>();
+
+    @Override
+    public void addStepsToStack(PickleStepTestStep... pickleStepTestSteps) {
+        stepStack.addAll(List.of(pickleStepTestSteps));
+    }
+
+    @Override
+    public ExecutionMode runStackSteps(TestCase testCase, TestCaseState state, EventBus bus, ExecutionMode nextExecutionMode) {
+        while (nextExecutionMode.equals(ExecutionMode.RUN) && !stepStack.empty()) {
+            PickleStepTestStep stackStep = stepStack.pop();
+            System.out.println("@@runStackSteps stackStep:: " + stackStep.getStepText());
+            System.out.println("@@nextExecutionMode:: " + nextExecutionMode);
+            System.out.println("@@testCase: " + testCase.getName());
+            System.out.println("@@state: " + state);
+            System.out.println("@@bus: " + bus);
+            nextExecutionMode = stackStep
+                    .run(testCase, bus, state, nextExecutionMode)
+                    .next(nextExecutionMode);
+
+            System.out.println("@@nextExecutionMode2222:: " + nextExecutionMode);
+        }
+        return nextExecutionMode;
+    }
 }

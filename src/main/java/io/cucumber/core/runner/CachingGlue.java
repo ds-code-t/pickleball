@@ -47,7 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
-final class CachingGlue implements Glue {
+public final class CachingGlue implements Glue {
 
     private static final Comparator<CoreHookDefinition> HOOK_ORDER_ASCENDING = Comparator
             .comparingInt(CoreHookDefinition::getOrder)
@@ -285,7 +285,7 @@ final class CachingGlue implements Glue {
         afterHooks.forEach(this::emitHook);
     }
 
-    private void emitParameterTypeDefined(ParameterTypeDefinition parameterTypeDefinition) {
+    public void emitParameterTypeDefined(ParameterTypeDefinition parameterTypeDefinition) {
         ParameterType<?> parameterType = parameterTypeDefinition.parameterType();
         io.cucumber.messages.types.ParameterType messagesParameterType = new io.cucumber.messages.types.ParameterType(
             parameterType.getName(),
@@ -299,7 +299,7 @@ final class CachingGlue implements Glue {
         bus.send(Envelope.of(messagesParameterType));
     }
 
-    private void emitHook(CoreHookDefinition coreHook) {
+    public void emitHook(CoreHookDefinition coreHook) {
         Hook messagesHook = new Hook(
             coreHook.getId().toString(),
             null,
@@ -310,7 +310,7 @@ final class CachingGlue implements Glue {
         bus.send(Envelope.of(messagesHook));
     }
 
-    private void emitStepDefined(CoreStepDefinition coreStepDefinition) {
+    public void emitStepDefined(CoreStepDefinition coreStepDefinition) {
         bus.send(new StepDefinedEvent(
             bus.getInstant(),
             new io.cucumber.plugin.event.StepDefinition(
@@ -328,7 +328,7 @@ final class CachingGlue implements Glue {
         bus.send(Envelope.of(messagesStepDefinition));
     }
 
-    private SourceReference createSourceReference(io.cucumber.core.backend.SourceReference reference) {
+    public SourceReference createSourceReference(io.cucumber.core.backend.SourceReference reference) {
         if (reference instanceof JavaMethodReference) {
             JavaMethodReference methodReference = (JavaMethodReference) reference;
             return SourceReference.of(new JavaMethod(
@@ -351,11 +351,11 @@ final class CachingGlue implements Glue {
         return emptySourceReference();
     }
 
-    private SourceReference emptySourceReference() {
+    public SourceReference emptySourceReference() {
         return new SourceReference(null, null, null, null);
     }
 
-    private StepDefinitionPatternType getExpressionType(CoreStepDefinition stepDefinition) {
+    public StepDefinitionPatternType getExpressionType(CoreStepDefinition stepDefinition) {
         Class<? extends Expression> expressionType = stepDefinition.getExpression().getExpressionType();
         if (expressionType.isAssignableFrom(RegularExpression.class)) {
             return StepDefinitionPatternType.REGULAR_EXPRESSION;
@@ -374,7 +374,7 @@ final class CachingGlue implements Glue {
         return findStepDefinitionMatch(uri, step);
     }
 
-    private PickleStepDefinitionMatch cachedStepDefinitionMatch(URI uri, Step step) {
+    public PickleStepDefinitionMatch cachedStepDefinitionMatch(URI uri, Step step) {
         String stepDefinitionPattern = stepPatternByStepText.get(step.getText());
         if (stepDefinitionPattern == null) {
             return null;
@@ -396,7 +396,7 @@ final class CachingGlue implements Glue {
         return new PickleStepDefinitionMatch(arguments, coreStepDefinition, uri, step);
     }
 
-    private PickleStepDefinitionMatch findStepDefinitionMatch(URI uri, Step step)
+    public PickleStepDefinitionMatch findStepDefinitionMatch(URI uri, Step step)
             throws AmbiguousStepDefinitionsException {
         List<PickleStepDefinitionMatch> matches = stepDefinitionMatches(uri, step);
         if (matches.isEmpty()) {
@@ -413,7 +413,7 @@ final class CachingGlue implements Glue {
         return match;
     }
 
-    private List<PickleStepDefinitionMatch> stepDefinitionMatches(URI uri, Step step) {
+    public List<PickleStepDefinitionMatch> stepDefinitionMatches(URI uri, Step step) {
         List<PickleStepDefinitionMatch> result = new ArrayList<>();
         for (CoreStepDefinition coreStepDefinition : stepDefinitionsByPattern.values()) {
             List<Argument> arguments = coreStepDefinition.matchedArguments(step);

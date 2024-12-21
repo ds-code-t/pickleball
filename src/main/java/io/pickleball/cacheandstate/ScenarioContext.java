@@ -3,15 +3,12 @@ package io.pickleball.cacheandstate;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.runner.TestCase;
 import io.cucumber.core.runner.TestCaseState;
-import io.cucumber.plugin.event.Result;
-import io.pickleball.logging.EventContainer;
 import io.pickleball.mapandStateutilities.LinkedMultiMap;
 //import io.pickleball.mapandStateutilities.LinkedMultiMap;
 
 import java.util.*;
 
-import static io.pickleball.cacheandstate.PrimaryScenarioData.getCurrentStep;
-import static io.pickleball.cacheandstate.PrimaryScenarioData.getRunner;
+import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
 import static io.pickleball.executions.ComponentRuntime.createTestcases;
 //import static io.pickleball.cacheandstate.GlobalCache.getGlobalRunner;
 import static io.cucumber.messages.Convertor.toMessage;
@@ -43,8 +40,19 @@ public class ScenarioContext implements io.cucumber.plugin.event.TestStep {
 //        if(parentStep != null)
 //            parentStep.addResults(result);
 //    }
-    public StepContext currentStep;
+//    private StepContext currentStep;
+    private final Stack<StepContext> executingStepStack = new Stack<>();
 
+    public static StepContext getCurrentStep() {
+        return getCurrentScenario().executingStepStack.peek();
+    }
+
+    public static void setCurrentStep(StepContext currentStep) {
+        getCurrentScenario().executingStepStack.add(currentStep);
+    }
+    public static StepContext popCurrentStep() {
+        return getCurrentScenario().executingStepStack.pop();
+    }
 
     public StepContext parentStep;
 
@@ -88,15 +96,8 @@ public class ScenarioContext implements io.cucumber.plugin.event.TestStep {
 
     public void executeTestCases(List<TestCase> testCases) {
         for (TestCase testCase : testCases) {
-            System.out.println("@@start run");
             addChildScenarioContext(testCase.scenarioContext);
             testCase.runComponent(getRunner().bus);
-            System.out.println("@@getTestCaseState().isFailed():: " + getTestCaseState().isFailed());
-            if (getTestCaseState().isFailed()) {
-                System.out.println("@@Break");
-//                break;
-            }
-            System.out.println("@@end testcase run");
         }
     }
 

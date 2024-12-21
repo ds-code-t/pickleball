@@ -7,6 +7,7 @@ import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
@@ -35,10 +36,9 @@ public final class JavaStepDefinition extends AbstractGlueDefinition implements 
 
     @Override
     public void execute(Object[] args) {
-        System.out.println("@@invokeMethod1");
+        System.out.println("@@@args11: " + Arrays.toString(args));
         invokeMethod(args);
-        System.out.println("@@invokeMethod2");
-
+        System.out.println("@@@args22: " + Arrays.toString(args));
     }
 
     @Override

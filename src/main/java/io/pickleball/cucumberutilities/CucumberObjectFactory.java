@@ -1,37 +1,151 @@
 package io.pickleball.cucumberutilities;
 
-import io.cucumber.core.backend.ParameterInfo;
+import io.cucumber.core.gherkin.messages.GherkinMessagesDataTableArgument;
+import io.cucumber.core.gherkin.messages.GherkinMessagesDocStringArgument;
+import io.cucumber.core.runner.AmbiguousStepDefinitionsException;
+import io.pickleball.cacheandstate.StepContext;
 
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import static io.pickleball.cacheandstate.PrimaryScenarioData.getRunner;
+import static io.pickleball.cacheandstate.ScenarioContext.getCurrentStep;
+import static io.pickleball.configs.Constants.PREFIXES;
+
 public class CucumberObjectFactory {
 
+
+    ///
+
     private static final String MINIMAL_FEATURE_TEMPLATE = """
-        Feature: Minimal Feature Template
-        
-          Scenario: Minimal Scenario Template
-            {stepText}
-        """;
+            Feature: Minimal Feature Template            
+              Scenario: Minimal Scenario Template
+                {metaStep}
+            """;
 
     public static io.cucumber.core.runner.PickleStepTestStep createPickleStepTestStep(
-            String stepText) {
-        return createPickleStepTestStep(stepText, null, null);
+            String metaStep)  {
+        StepContext currentStep =  getCurrentStep();
+        System.out.println("@@Line2 : " + currentStep.getTestStep().getStepLine());
+        return createPickleStepTestStep(metaStep,  currentStep.getGherkinMessagesDataTableArgument(),  currentStep.getGherkinMessagesDocStringArgument(), currentStep.getTestStep().getUri(), currentStep.getTestStep().getStepLine());
     }
 
+    public static io.cucumber.core.runner.PickleStepTestStep createPickleStepTestStepWithArgs(
+            String metaStep,
+            GherkinMessagesDataTableArgument dataTableArg,
+            GherkinMessagesDocStringArgument docStringArg,
+            URI overrideUri,
+            int overrideLineNumber)  {
+        return createPickleStepTestStep(metaStep, dataTableArg, docStringArg, overrideUri, overrideLineNumber);
+
+//        DataTable dataTable = dataTableArg == null ? null : DataTableUtilities.convertToDataTable(dataTableArg);
+//        DocString docString = docStringArg == null ? null : DocString.create(docStringArg.getContent());
+//        return createPickleStepTestStep(metaStep, dataTable, docString, overrideUri, overrideLineNumber);
+    }
+
+
     public static io.cucumber.core.runner.PickleStepTestStep createPickleStepTestStep(
-            String stepText,
+            String metaStep,
             io.cucumber.core.gherkin.messages.GherkinMessagesDataTableArgument dataTable,
-            io.cucumber.core.gherkin.messages.GherkinMessagesDocStringArgument docString) {
-        String featureSource = MINIMAL_FEATURE_TEMPLATE.replace("{stepText}", "Given " + stepText);
-        URI dummyUri = URI.create("file://minimal.feature");
+            io.cucumber.core.gherkin.messages.GherkinMessagesDocStringArgument docString,
+            URI overrideUri,
+            int overrideLineNumber
+    )  {
+        System.out.println("@@overrideLineNumber3 : " + overrideLineNumber);
+
+        io.cucumber.core.runner.Runner runner = getRunner();
+        // Use the provided URI and line number, or defaults
+        URI uriToUse = overrideUri != null ? overrideUri : URI.create("file://minimal.feature");
+        int lineToUse = overrideLineNumber > 2 ? overrideLineNumber : 3;
+        System.out.println("@@lineToUse : " + lineToUse);
+
+        // Build the Gherkin step with DataTable or DocString arguments
+        StringBuilder stepBuilder = new StringBuilder("Given " + metaStep);
+        if (dataTable != null) {
+            stepBuilder.append("\n").append(dataTable.cells().stream()
+                    .map(row -> "| " + String.join(" | ", row) + " |")
+                    .reduce("", (rows, currentRow) -> rows + "\n" + currentRow));
+        }
+        if (docString != null) {
+            stepBuilder.append("\n\"\"\"\n")
+                    .append(docString.getContent())
+                    .append("\n\"\"\"");
+        }
+
+        // Adjust the minimal feature template to ensure the line numbers match
+        StringBuilder minimalFeatureBuilder = new StringBuilder();
+        for (int i = 1; i < lineToUse-3; i++) {
+            minimalFeatureBuilder.append("\n");
+        }
+        minimalFeatureBuilder.append("Feature: Minimal Feature Template\n\n  Scenario: Minimal Scenario Template\n    ");
+        minimalFeatureBuilder.append(stepBuilder);
+
+        String featureSource = minimalFeatureBuilder.toString();
 
         // Parse the minimal feature
         io.cucumber.core.gherkin.messages.GherkinMessagesFeatureParser parser =
                 new io.cucumber.core.gherkin.messages.GherkinMessagesFeatureParser();
-        io.cucumber.core.gherkin.Feature feature = parser.parse(dummyUri, featureSource, UUID::randomUUID)
+        io.cucumber.core.gherkin.Feature feature = parser.parse(uriToUse, featureSource, UUID::randomUUID)
+                .orElseThrow(() -> new RuntimeException("Failed to parse feature"));
+
+        // Get the first pickle and step
+        io.cucumber.core.gherkin.Pickle pickle = feature.getPickles().get(0);
+        io.cucumber.core.gherkin.Step step = pickle.getSteps().get(0);
+
+        // Resolve the step definition from the glue
+        io.cucumber.core.runner.CachingGlue glue = runner.getGlue();
+        io.cucumber.core.runner.PickleStepDefinitionMatch definitionMatch = null;
+        try {
+            definitionMatch = glue.stepDefinitionMatch(uriToUse, step);
+        } catch (AmbiguousStepDefinitionsException e) {
+            throw new RuntimeException(e);
+        }
+        if (definitionMatch == null) {
+            throw new RuntimeException("No step definition found for: " + metaStep);
+        }
+
+        // Create the PickleStepTestStep
+        return new io.cucumber.core.runner.PickleStepTestStep(
+                UUID.randomUUID(),
+                uriToUse,
+                step,
+                Collections.emptyList(), // HookTestSteps before
+                Collections.emptyList(), // HookTestSteps after
+                definitionMatch
+        );
+    }
+
+
+
+
+    public static io.cucumber.core.runner.PickleStepTestStep createPickleStepTestStep2(
+            String metaStep,
+            io.cucumber.datatable.DataTable dataTable,
+            io.cucumber.docstring.DocString docString,
+            URI overrideUri,
+            int overrideLineNumber) {
+
+        // Use the provided URI and line number, or defaults
+        URI uriToUse = overrideUri != null ? overrideUri : URI.create("file://minimal.feature");
+        int lineToUse = overrideLineNumber > 0 ? overrideLineNumber : 3;
+
+        // Adjust the minimal feature template to ensure the line numbers match
+        StringBuilder minimalFeatureBuilder = new StringBuilder();
+        for (int i = 1; i < lineToUse; i++) {
+            minimalFeatureBuilder.append("\n");
+        }
+        minimalFeatureBuilder.append("Feature: Minimal Feature Template\n\n  Scenario: Minimal Scenario Template\n    ");
+        String stepText = PREFIXES.stream().anyMatch(metaStep.toLowerCase()::startsWith) ? metaStep : "* " + metaStep;
+        minimalFeatureBuilder.append(stepText);
+
+        String featureSource = minimalFeatureBuilder.toString();
+        System.out.println("@@featureSource: " + featureSource);
+        // Parse the minimal feature
+        io.cucumber.core.gherkin.messages.GherkinMessagesFeatureParser parser =
+                new io.cucumber.core.gherkin.messages.GherkinMessagesFeatureParser();
+        io.cucumber.core.gherkin.Feature feature = parser.parse(uriToUse, featureSource, UUID::randomUUID)
                 .orElseThrow(() -> new RuntimeException("Failed to parse feature"));
 
         // Get the first pickle and step
@@ -42,21 +156,20 @@ public class CucumberObjectFactory {
         io.cucumber.core.backend.StepDefinition dummyStepDefinition = new io.cucumber.core.backend.StepDefinition() {
             @Override
             public String getPattern() {
-                return stepText;
+                return metaStep;
             }
 
-//            @Override
-            public List<String> matchedArguments(String stepText) {
+            //            @Override
+            public List<String> matchedArguments(String metaStep) {
                 return Collections.emptyList();
             }
 
             @Override
             public void execute(Object[] args) {
-//                return null;
             }
 
             @Override
-            public List<ParameterInfo> parameterInfos() {
+            public List<io.cucumber.core.backend.ParameterInfo> parameterInfos() {
                 return List.of();
             }
 
@@ -76,20 +189,27 @@ public class CucumberObjectFactory {
                 new io.cucumber.core.runner.PickleStepDefinitionMatch(
                         Collections.emptyList(), // No arguments
                         dummyStepDefinition,     // Dummy step definition
-                        dummyUri,
+                        uriToUse,
                         step
                 );
+
+        if (dataTable != null)
+            definitionMatch.setDefaultDataTableArg(dataTable.toDataTableArgument());
+
+        if (docString != null)
+            definitionMatch.setDefaultDocStringArg(docString.toDocStringArgument());
 
         // Create the PickleStepTestStep
         return new io.cucumber.core.runner.PickleStepTestStep(
                 UUID.randomUUID(),
-                dummyUri,
+                uriToUse,
                 step,
                 Collections.emptyList(), // HookTestSteps before
                 Collections.emptyList(), // HookTestSteps after
                 definitionMatch
         );
     }
+
 
     public static io.cucumber.core.gherkin.messages.GherkinMessagesDataTableArgument createDataTableArgument(
             String tableSource) {

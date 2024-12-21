@@ -4,8 +4,14 @@ package io.pickleball.cacheandstate;
 import io.cucumber.core.backend.Status;
 import io.cucumber.core.backend.StepDefinition;
 import io.cucumber.core.gherkin.Step;
-import io.cucumber.messages.types.Duration;
-import io.cucumber.plugin.event.Result;
+import io.cucumber.core.gherkin.messages.GherkinMessagesDataTableArgument;
+import io.cucumber.core.gherkin.messages.GherkinMessagesDocStringArgument;
+import io.cucumber.core.runner.CoreStepDefinition;
+import io.cucumber.core.stepexpression.Argument;
+import io.cucumber.core.stepexpression.DataTableArgument;
+import io.cucumber.core.stepexpression.DocStringArgument;
+import io.cucumber.datatable.DataTable;
+import io.cucumber.docstring.DocString;
 import io.pickleball.annotations.Metastep;
 import io.cucumber.core.runner.ExecutionMode;
 import io.cucumber.core.runner.PickleStepDefinitionMatch;
@@ -17,13 +23,9 @@ import io.pickleball.logging.EventContainer;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
-import static io.pickleball.cacheandstate.PrimaryScenarioData.setCurrentStep;
-import static java.time.Duration.ZERO;
-import static java.util.Collections.max;
-import static java.util.Comparator.comparing;
+import static io.pickleball.cacheandstate.PrimaryScenarioData.shouldSendEvent;
 
 
 public class StepContext {
@@ -62,6 +64,23 @@ public class StepContext {
     public boolean sendEnd = false;
     public boolean startEventSent = false;
     public boolean endEventSent = false;
+
+
+    public List<Argument> getArguments(){
+        try {
+            return testStep.definitionMatch.getArguments();
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public GherkinMessagesDataTableArgument getGherkinMessagesDataTableArgument(){
+        return getArguments().stream().filter(arg -> arg instanceof DataTableArgument).map(arg -> ((DataTable)arg.getValue()).toGherkinMessagesDataTableArgument()).findFirst().orElse(null);
+    }
+
+    public GherkinMessagesDocStringArgument getGherkinMessagesDocStringArgument(){
+        return  getArguments().stream().filter(arg -> arg instanceof DocStringArgument).map(arg -> ((DocString)arg.getValue()).toGherkinMessagesDocString()).findFirst().orElse(null);
+    }
 
 
     List<io.cucumber.plugin.event.Status> statuses = new ArrayList<>();
@@ -112,7 +131,6 @@ public class StepContext {
             sendStart = true;
         else {
             String testCaseName = testCase == null ? "NULL" : testCase.getName();
-            System.out.println("@@emitTestStepStarted11: " + testCaseName + "  : " + testStep.getStepText());
             startEvent.sendStart();
             startEventSent = true;
             sendEnd = true;
@@ -120,7 +138,15 @@ public class StepContext {
         }
     }
 
-    public void sendEndEvent() {
+    public void sendEndEvent(Throwable... throwables) {
+        if(shouldSendEvent(throwables)){
+            sendStartEvent();
+            endEvent.sendEnd();
+            endEventSent = true;
+            endEvent = null;
+            return;
+        }
+
         if(endEventSent)
             return;
         sendStartEvent();
@@ -128,7 +154,6 @@ public class StepContext {
             sendEnd = true;
         else {
             String testCaseName = testCase == null ? "NULL" : testCase.getName();
-            System.out.println("@@emitTestStepFinished22: " + testCaseName + "  : " + testStep.getStepText());
             if (startEventSent) {
                 endEvent.sendEnd();
                 endEventSent = true;
@@ -146,12 +171,12 @@ public class StepContext {
     }
 
 
-    public ExecutionMode addExecutionMode(ExecutionMode executionMode) {
-        if (executionMode.equals(ExecutionMode.RUN) && executionModeList.isEmpty())
-            setCurrentStep(this);
-        executionModeList.add(executionMode);
-        return executionMode;
-    }
+//    public ExecutionMode addExecutionMode(ExecutionMode executionMode) {
+//        if (executionMode.equals(ExecutionMode.RUN) && executionModeList.isEmpty())
+//            setCurrentStep(this);
+//        executionModeList.add(executionMode);
+//        return executionMode;
+//    }
 
 
     public Method getMethod() {
@@ -212,7 +237,7 @@ public class StepContext {
      * Returns the runtime TestStep object. This may be a PickleStepTestStep or HookTestStep.
      * Useful for attaching runtime step results, logging, or accessing IDs associated with the step execution.
      */
-    public TestStep getTestStep() {
+    public PickleStepTestStep getTestStep() {
         return testStep;
     }
 

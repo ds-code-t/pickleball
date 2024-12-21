@@ -22,7 +22,6 @@ public class MappingFunctions {
         // [^<>]+ matches one or more characters that are not angle brackets
         Pattern pattern = Pattern.compile("<([^<>]+)>");
         for (LinkedMultiMap<String, String> map : maps) {
-            System.out.println("@@map: " + map);
             while (true) {
                 Matcher matcher = pattern.matcher(result);
                 boolean found = false;
@@ -36,8 +35,6 @@ public class MappingFunctions {
                     if(value.isEmpty() && matchKey.startsWith("?"))
                         continue;
                     String replacement = value.isEmpty() ? "<"+ flag1  + key + ">" : value;
-                    if(value.isEmpty())
-                        System.out.println("@@key: "+ key + " , value: "+ value + " ,replacement: " + replacement);
                     matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
                 }
 

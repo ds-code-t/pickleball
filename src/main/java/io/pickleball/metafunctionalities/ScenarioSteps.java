@@ -13,6 +13,7 @@ import java.util.*;
 
 import static io.pickleball.cacheandstate.GlobalCache.getState;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
+import static io.pickleball.cacheandstate.ScenarioContext.getCurrentStep;
 import static io.pickleball.configs.Constants.COMPONENT_PATH;
 import static io.pickleball.configs.Constants.SCENARIO_TAGS;
 import static io.pickleball.cucumberutilities.LoggingUtilities.getHighestStatus;
@@ -23,7 +24,7 @@ public class ScenarioSteps {
     @Metastep
     @Given("^Scenario:(.*)$")
     public void ScenarioRun(String scenarioName, DataTable dataTable) {
-        startEvent();
+//        startEvent();
 
         StepContext originalStep = getCurrentStep();
 
@@ -46,30 +47,23 @@ public class ScenarioSteps {
             String[] argv = argvList.toArray(new String[0]);
 
             List<TestCase> testCases = getCurrentScenario().getAndSortTestcases(argv, map);
-            System.out.println("@@testCases:::  : " + testCases.size());
-//            getCurrentScenario().executeTestCases(testCases);
-
 
             TestCase lastTestCase = null;
             for (TestCase testCase : testCases) {
                 lastTestCase = testCase;
-                System.out.println("@@start run");
                 testCase.scenarioContext.addChildScenarioContext(testCase.scenarioContext);
                 testCase.runComponent(getRunner().bus);
-                System.out.println("@@getTestCaseState().isFailed():: " + testCase.scenarioContext.getTestCaseState().isFailed());
                 if (testCase.scenarioContext.getTestCaseState().isFailed()) {
                     Status status = testCase.scenarioContext.getTestCaseState().getStatus();
                     originalStep.addStatus(status);
-                    System.out.println("@@Break");
                     break;
                 }
-                System.out.println("@@end testcase run");
             }
             if (lastTestCase != null && lastTestCase.scenarioContext.getTestCaseState().isFailed()) {
                 break;
             }
         }
 
-        endEvent();
+//        endEvent();
     }
 }

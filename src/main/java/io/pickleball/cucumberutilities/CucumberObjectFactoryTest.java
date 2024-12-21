@@ -12,7 +12,7 @@ public class CucumberObjectFactoryTest {
         io.cucumber.core.gherkin.messages.GherkinMessagesDataTableArgument dataTable =
                 CucumberObjectFactory.createDataTableArgument(tableSource);
         io.cucumber.core.runner.PickleStepTestStep step2 =
-                CucumberObjectFactory.createPickleStepTestStep("I have a data table", dataTable, null);
+                CucumberObjectFactory.createPickleStepTestStepWithArgs("I have a data table", dataTable, null, null, 0);
         System.out.println("Step Text: " + step2.getStep().getText());
 
         // Test creating a PickleStepTestStep with a DocStringArgument
@@ -20,7 +20,7 @@ public class CucumberObjectFactoryTest {
         io.cucumber.core.gherkin.messages.GherkinMessagesDocStringArgument docString =
                 CucumberObjectFactory.createDocStringArgument(docStringContent);
         io.cucumber.core.runner.PickleStepTestStep step3 =
-                CucumberObjectFactory.createPickleStepTestStep("I have a docstring", null, docString);
+                CucumberObjectFactory.createPickleStepTestStepWithArgs("I have a docstring", null, docString, null, 0 );
         System.out.println("Step Text: " + step3.getStep().getText());
     }
 }

@@ -7,7 +7,7 @@ import java.util.List;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 
-final class AmbiguousStepDefinitionsException extends Exception {
+public final class AmbiguousStepDefinitionsException extends Exception {
 
     private final List<PickleStepDefinitionMatch> matches;
 

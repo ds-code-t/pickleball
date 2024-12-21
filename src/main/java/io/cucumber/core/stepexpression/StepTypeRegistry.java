@@ -9,7 +9,7 @@ import io.cucumber.datatable.TableCellByTypeTransformer;
 import io.cucumber.datatable.TableEntryByTypeTransformer;
 import io.cucumber.docstring.DocStringType;
 import io.cucumber.docstring.DocStringTypeRegistry;
-import io.pickleball.customtypes.Coordinates;
+import io.pickleball.customtypes.MetaStep;
 
 import java.util.Locale;
 
@@ -24,14 +24,13 @@ public final class StepTypeRegistry implements io.cucumber.core.api.TypeRegistry
         dataTableTypeRegistry = new DataTableTypeRegistry(locale);
         docStringTypeRegistry = new DocStringTypeRegistry();
 
-        // Register custom ParameterType for coordinates
+        // Register custom ParameterType for StepText
         parameterTypeRegistry.defineParameterType(new ParameterType<>(
-                "stepText",                // Name of the parameter type
+                "metaStep",                // Name of the parameter type
                 ".*",        // Regex to match "(x,y)"
-                Coordinates.class,            // Target class
-                (String[] args) -> new Coordinates(
-                        Integer.parseInt(args[0]),
-                        Integer.parseInt(args[1])
+                MetaStep.class,            // Target class
+                (String[] args) -> new MetaStep(
+                        args[0]
                 )
         ));
     }
