@@ -13,7 +13,6 @@ import java.util.*;
 
 import static io.pickleball.cacheandstate.GlobalCache.getState;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
-import static io.pickleball.cacheandstate.ScenarioContext.getCurrentStep;
 import static io.pickleball.configs.Constants.COMPONENT_PATH;
 import static io.pickleball.configs.Constants.SCENARIO_TAGS;
 import static io.pickleball.cucumberutilities.LoggingUtilities.getHighestStatus;

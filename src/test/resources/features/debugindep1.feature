@@ -6,7 +6,7 @@ Feature: Using Plugin Steps333 indep
     Then I should see debug outputlzz
     *  Scenario:
       | Scenario Tags | A     | B |
-      | @zzs9         | ERRsOR | s |
+      | @zzs9         | SOFT | s |
       | @zzs9         | z     | 3 |
     Given I am running a testlzz xxx<A> and <B>
 #    Given I am running a testlzz fff and gggg

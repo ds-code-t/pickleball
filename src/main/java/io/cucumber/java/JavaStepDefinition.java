@@ -36,9 +36,7 @@ public final class JavaStepDefinition extends AbstractGlueDefinition implements 
 
     @Override
     public void execute(Object[] args) {
-        System.out.println("@@@args11: " + Arrays.toString(args));
         invokeMethod(args);
-        System.out.println("@@@args22: " + Arrays.toString(args));
     }
 
     @Override

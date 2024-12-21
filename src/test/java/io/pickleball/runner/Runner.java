@@ -45,18 +45,13 @@ public class Runner extends AbstractTestNGCucumberTests {
                         o -> ((PickleWrapper) ((Object[]) o)[0]).getPickle().getPriority())
                 .thenComparing(o -> ((PickleWrapper) ((Object[]) o)[0]).getPickle().getName()) // Sort alphabetically by name
                 .thenComparingInt(o -> ((PickleWrapper) ((Object[]) o)[0]).getPickle().getLine())); // Secondary sort by line number
-
-
-        System.out.println("@@super.scenarios().length: " + scenarios.length);
         return scenarios;
     }
 
 
     @Override
     public void runScenario(PickleWrapper pickleWrapper, FeatureWrapper featureWrapper) {
-        System.out.println("@@Start Scenario " + pickleWrapper.getPickle().getName());
         super.runScenario(pickleWrapper, featureWrapper);
-        System.out.println("@@End Scenario " + pickleWrapper.getPickle().getName());
     }
 
 //    @Override

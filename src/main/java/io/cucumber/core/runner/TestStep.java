@@ -69,9 +69,7 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
         Status status;
         Throwable error = null;
         try {
-            System.out.println("@@executeStep aa" + stepContext.getTestStep().getStepText());
             status = executeStep(state, executionMode);
-            System.out.println("@@executeStep bb" + stepContext.getTestStep().getStepText());
         } catch (Throwable t) {
             t.printStackTrace();
             rethrowIfUnrecoverable(t);

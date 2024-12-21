@@ -35,17 +35,12 @@ public class ScenarioContext implements io.cucumber.plugin.event.TestStep {
         return nestingLevel == 0;
     }
 
-//    public void addResult(Result result) {
-//        testCaseState.add(result);
-//        if(parentStep != null)
-//            parentStep.addResults(result);
-//    }
-//    private StepContext currentStep;
+    public Stack<StepContext> getExecutingStepStack() {
+        return executingStepStack;
+    }
+
     private final Stack<StepContext> executingStepStack = new Stack<>();
 
-    public static StepContext getCurrentStep() {
-        return getCurrentScenario().executingStepStack.peek();
-    }
 
     public static void setCurrentStep(StepContext currentStep) {
         getCurrentScenario().executingStepStack.add(currentStep);

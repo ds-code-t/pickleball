@@ -458,24 +458,6 @@ public class TeamCityPlugin implements EventListener {
 
 
     private void print(String command, Object... args) {
-//        System.out.println("@@command: " + command);
-//        System.out.println("@@args: " + Arrays.toString(args));
-//        if (Arrays.toString(args).contains("Component BBB")) {
-//            waitTime(300L);
-//            new Exception().printStackTrace();
-//            waitTime(300L);
-//
-//        }
-//        if (Arrays.toString(args).contains("Component BBB")) {
-//            waitTime(300L);
-//            new Exception().printStackTrace();
-//            waitTime(300L);
-//        }
-//       if(Arrays.toString(args).contains("Scenario:")) {
-//            System.out.println("@@command: " + command);
-//            System.out.println("@@args: " + Arrays.toString(args));
-//        }
-
         if (args.length > 2 && args[args.length - 1].toString().startsWith("Scenario:")) {
             if (command.startsWith("##teamcity[testFailed ")) {
 

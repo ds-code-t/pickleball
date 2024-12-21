@@ -10,8 +10,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+import static io.pickleball.cacheandstate.PrimaryScenarioData.getCurrentStep;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.getRunner;
-import static io.pickleball.cacheandstate.ScenarioContext.getCurrentStep;
 import static io.pickleball.configs.Constants.PREFIXES;
 
 public class CucumberObjectFactory {
@@ -28,7 +28,6 @@ public class CucumberObjectFactory {
     public static io.cucumber.core.runner.PickleStepTestStep createPickleStepTestStep(
             String metaStep)  {
         StepContext currentStep =  getCurrentStep();
-        System.out.println("@@Line2 : " + currentStep.getTestStep().getStepLine());
         return createPickleStepTestStep(metaStep,  currentStep.getGherkinMessagesDataTableArgument(),  currentStep.getGherkinMessagesDocStringArgument(), currentStep.getTestStep().getUri(), currentStep.getTestStep().getStepLine());
     }
 
@@ -53,14 +52,10 @@ public class CucumberObjectFactory {
             URI overrideUri,
             int overrideLineNumber
     )  {
-        System.out.println("@@overrideLineNumber3 : " + overrideLineNumber);
-
         io.cucumber.core.runner.Runner runner = getRunner();
         // Use the provided URI and line number, or defaults
         URI uriToUse = overrideUri != null ? overrideUri : URI.create("file://minimal.feature");
         int lineToUse = overrideLineNumber > 2 ? overrideLineNumber : 3;
-        System.out.println("@@lineToUse : " + lineToUse);
-
         // Build the Gherkin step with DataTable or DocString arguments
         StringBuilder stepBuilder = new StringBuilder("Given " + metaStep);
         if (dataTable != null) {
@@ -141,7 +136,6 @@ public class CucumberObjectFactory {
         minimalFeatureBuilder.append(stepText);
 
         String featureSource = minimalFeatureBuilder.toString();
-        System.out.println("@@featureSource: " + featureSource);
         // Parse the minimal feature
         io.cucumber.core.gherkin.messages.GherkinMessagesFeatureParser parser =
                 new io.cucumber.core.gherkin.messages.GherkinMessagesFeatureParser();

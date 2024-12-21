@@ -54,9 +54,6 @@ public final class PickleStepTestStep extends TestStep implements io.cucumber.pl
 
     @Override
     public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
-
-        System.out.println("@@@QQQ:: "+ getStepText());
-//         ExecutionMode nextExecutionMode = stepContext.addExecutionMode(executionMode);
         ExecutionMode nextExecutionMode = executionMode;
 
         setCurrentStep(stepContext);
@@ -65,16 +62,8 @@ public final class PickleStepTestStep extends TestStep implements io.cucumber.pl
                     .run(testCase, bus, state, executionMode)
                     .next(nextExecutionMode);
         }
-
-        System.out.println("@@Regular teststep:: " + this.getStepText());
-        System.out.println("@@testCase: " + testCase.getName());
-        System.out.println("@@state: " + state);
-        System.out.println("@@bus: " + bus);
-        System.out.println("@@nextExecutionMode aaaa:: " + nextExecutionMode);
         nextExecutionMode = super.run(testCase, bus, state, nextExecutionMode)
                 .next(nextExecutionMode);
-        System.out.println("@@nextExecutionMode bbbb:: " + nextExecutionMode);
-
         for (HookTestStep after : afterStepHookSteps) {
             nextExecutionMode = after
                     .run(testCase, bus, state, executionMode)
@@ -147,16 +136,9 @@ public final class PickleStepTestStep extends TestStep implements io.cucumber.pl
     public ExecutionMode runStackSteps(TestCase testCase, TestCaseState state, EventBus bus, ExecutionMode nextExecutionMode) {
         while (nextExecutionMode.equals(ExecutionMode.RUN) && !stepStack.empty()) {
             PickleStepTestStep stackStep = stepStack.pop();
-            System.out.println("@@runStackSteps stackStep:: " + stackStep.getStepText());
-            System.out.println("@@nextExecutionMode:: " + nextExecutionMode);
-            System.out.println("@@testCase: " + testCase.getName());
-            System.out.println("@@state: " + state);
-            System.out.println("@@bus: " + bus);
             nextExecutionMode = stackStep
                     .run(testCase, bus, state, nextExecutionMode)
                     .next(nextExecutionMode);
-
-            System.out.println("@@nextExecutionMode2222:: " + nextExecutionMode);
         }
         return nextExecutionMode;
     }

@@ -101,6 +101,15 @@ public class PrimaryScenarioData {
         return getState().scenarioStack.peek();
     }
 
+    public static StepContext getCurrentStep() {
+        Stack<ScenarioContext> scenarioContextStack = getState().scenarioStack;
+        for (ScenarioContext scenarioContext1 : scenarioContextStack) {
+            if (!scenarioContext1.getExecutingStepStack().isEmpty())
+                return scenarioContext1.getExecutingStepStack().peek();
+        }
+        return null;
+    }
+
     public static void setCurrentScenario(ScenarioContext currentScenario) {
         getState().scenarioStack.add(currentScenario);
     }

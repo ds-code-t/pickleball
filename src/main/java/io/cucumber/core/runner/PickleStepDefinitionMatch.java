@@ -78,33 +78,18 @@ public class PickleStepDefinitionMatch extends Match implements StepDefinitionMa
                 for (int i = arguments.size(); i < parameterInfos.size(); i++) {
                     ParameterInfo p = parameterInfos.get(i);
                     if (p.getType().getTypeName().equals("io.cucumber.datatable.DataTable")) {
-                        System.out.println("@@arguments a " + arguments.size());
                         arguments.add(getDefaultDataTableArg());
-                        System.out.println("@@arguments b " + arguments.size());
                     } else if (p.getType().getTypeName().equals("io.cucumber.docstring.DocString")) {
-                        System.out.println("@@arguments c " + arguments.size());
                         arguments.add(getDefaultDocStringArg());
-                        System.out.println("@@arguments d " + arguments.size());
-
                     }
                 }
             } else {
-
-                arguments.forEach(a -> System.out.println("@@a1 " + a.getClass()));
-
                 if (parameterInfos.stream().noneMatch(p -> p.getType().getTypeName().equals("io.cucumber.datatable.DataTable"))) {
-                    System.out.println("@@arguments 111 " + arguments.size());
                     arguments = arguments.stream().filter(argument -> !(argument instanceof DataTableArgument)).toList();
-                    System.out.println("@@arguments 222 " + arguments.size());
                 }
                 if (parameterInfos.stream().noneMatch(p -> p.getType().getTypeName().equals("io.cucumber.docstring.DocString"))) {
-                    System.out.println("@@arguments 333 " + arguments.size());
                     arguments = arguments.stream().filter(argument -> !(argument instanceof DocStringArgument)).toList();
-                    System.out.println("@@arguments 444 " + arguments.size());
                 }
-                arguments.forEach(a -> System.out.println("@@a2 " + a.getClass()));
-
-                parameterInfos.forEach(a -> System.out.println("@@p1 " + a + " " + a.getType()));
                 if (arguments.size() != parameterInfos.size())
                     throw arityMismatch(parameterInfos.size());
             }
@@ -134,14 +119,10 @@ public class PickleStepDefinitionMatch extends Match implements StepDefinitionMa
     public void runStep() throws Throwable {
         List<Object> result = getArgs();
         try {
-            System.out.println("@@ stepDefinition.execute 11");
             stepDefinition.execute(result.toArray(new Object[0]));
-            System.out.println("@@ stepDefinition.execute 22");
         } catch (CucumberBackendException e) {
-            System.out.println("@@ e 1111 " + result);
             throw couldNotInvokeStep(e, result);
         } catch (CucumberInvocationTargetException e) {
-            System.out.println("@@ e 2222 " + result);
             throw removeFrameworkFramesAndAppendStepLocation(e, getStepLocation());
         }
     }
