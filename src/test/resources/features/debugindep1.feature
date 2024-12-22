@@ -1,12 +1,12 @@
 Feature: Using Plugin Steps333 indep
 
-  @zzs1
+  @zzs1 @dfs
   Scenario: Main AAA
 #    Then I should see debug outputlzz
     Then I should see debug outputlzz
     *  Scenario:
       | Scenario Tags | A     | B |
-      | @zzs9         | SOFT | s |
+      | @zzs9         | SOsFT | s |
       | @zzs9         | z     | 3 |
     Given I am running a testlzz xxx<A> and <B>
 #    Given I am running a testlzz fff and gggg
@@ -25,10 +25,10 @@ Feature: Using Plugin Steps333 indep
 
 
 
-
+ @dfs
   Scenario: coord1
-    Given I am running a testlzz 11ERRsORs and 6
-    Given the user is at coordinates I am running a testlzz SOFT and 6
+    Given I am running a testlzz 11ERRsORszzzzzzzzzzzzzzzzzzzzz and 6
+    Given the user is at coordinates I am running a testlzz SOFsT and 6
     Given I am running a testlzz 33ERRsORs and 6
 
 

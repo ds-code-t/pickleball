@@ -54,6 +54,8 @@ interface Formats {
                 put("executing_arg", color(AnsiEscapes.GREY, AnsiEscapes.INTENSITY_BOLD));
                 put("failed", color(AnsiEscapes.RED));
                 put("failed_arg", color(AnsiEscapes.RED, AnsiEscapes.INTENSITY_BOLD));
+                put("soft_failed", color(AnsiEscapes.RED));
+                put("soft_failed_arg", color(AnsiEscapes.RED, AnsiEscapes.INTENSITY_BOLD));
                 put("ambiguous", color(AnsiEscapes.RED));
                 put("ambiguous_arg", color(AnsiEscapes.RED, AnsiEscapes.INTENSITY_BOLD));
                 put("passed", color(AnsiEscapes.GREEN));
