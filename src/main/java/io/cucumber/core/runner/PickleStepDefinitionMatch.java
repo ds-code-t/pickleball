@@ -25,8 +25,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.StackManipulation.removeFrameworkFramesAndAppendStepLocation;
-import static io.cucumber.utilities.AccessFunctions.safeCallMethod;
-import static io.pickleball.cucumberutilities.DataTableUtilities.createStepExpressionDataTableArgument;
+import static io.pickleball.cucumberutilities.AccessFunctions.safeCallMethod;
 
 public class PickleStepDefinitionMatch extends Match implements StepDefinitionMatch {
 
