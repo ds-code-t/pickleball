@@ -27,18 +27,6 @@ public final class GherkinMessagesExamples implements Node.Examples {
         return examples;
     }
 
-//    public Node getAncestor() {
-//        Node parent = getParent().orElse(null);
-//        if (parent == null || parent instanceof GherkinMessagesScenario) {
-//            return (GherkinMessagesScenario) parent;
-//        } else if(parent instanceof GherkinMessagesExamples ){
-//
-//        }
-//        return parent.getAncestor();
-//    }
-//
-
-
 
     private final List<Example> children;
     private final Location location;
@@ -79,6 +67,5 @@ public final class GherkinMessagesExamples implements Node.Examples {
     public Optional<Node> getParent() {
         return Optional.of(parent);
     }
-
 
 }

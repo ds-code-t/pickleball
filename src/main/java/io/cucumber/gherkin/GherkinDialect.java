@@ -24,11 +24,10 @@ public final class GherkinDialect {
     private final List<String> thenKeywords;
     private final List<String> andKeywords;
     private final List<String> butKeywords;
-    private final List<String> pickleballKeywords;
     private final List<String> stepKeywords;
     private final Map<String, List<StepKeywordType>> stepKeywordsTypes;
 
-    GherkinDialect(String language, String name, String nativeName, List<String> featureKeywords, List<String> ruleKeywords, List<String> scenarioKeywords, List<String> scenarioOutlineKeywords, List<String> backgroundKeywords, List<String> examplesKeywords, List<String> givenKeywords, List<String> whenKeywords, List<String> thenKeywords, List<String> andKeywords, List<String> butKeywords, List<String> pickleballKeywords) {
+    GherkinDialect(String language, String name, String nativeName, List<String> featureKeywords, List<String> ruleKeywords, List<String> scenarioKeywords, List<String> scenarioOutlineKeywords, List<String> backgroundKeywords, List<String> examplesKeywords, List<String> givenKeywords, List<String> whenKeywords, List<String> thenKeywords, List<String> andKeywords, List<String> butKeywords) {
         this.language = language;
         this.name = name;
         this.nativeName = nativeName;
@@ -43,7 +42,6 @@ public final class GherkinDialect {
         this.thenKeywords = thenKeywords;
         this.andKeywords = andKeywords;
         this.butKeywords = butKeywords;
-        this.pickleballKeywords = pickleballKeywords;
 
         List<String> stepKeywords = new ArrayList<>();
         stepKeywords.addAll(givenKeywords);
@@ -51,14 +49,12 @@ public final class GherkinDialect {
         stepKeywords.addAll(thenKeywords);
         stepKeywords.addAll(andKeywords);
         stepKeywords.addAll(butKeywords);
-        stepKeywords.addAll(pickleballKeywords);
         this.stepKeywords = unmodifiableList(stepKeywords);
 
         Map<String, List<StepKeywordType>> stepKeywordsTypes = new HashMap<>();
         addStepKeywordsTypes(stepKeywordsTypes, getGivenKeywords(), StepKeywordType.CONTEXT);
         addStepKeywordsTypes(stepKeywordsTypes, getWhenKeywords(), StepKeywordType.ACTION);
         addStepKeywordsTypes(stepKeywordsTypes, getThenKeywords(), StepKeywordType.OUTCOME);
-        addStepKeywordsTypes(stepKeywordsTypes, getPickleballKeywords(), StepKeywordType.PICKLEBALL);
 
         List<String> conjunctionKeywords = new ArrayList<>();
         conjunctionKeywords.addAll(getAndKeywords());
@@ -135,9 +131,6 @@ public final class GherkinDialect {
         return butKeywords;
     }
 
-    public List<String> getPickleballKeywords() {
-        return pickleballKeywords;
-    }
 
     public String getLanguage() {
         return language;

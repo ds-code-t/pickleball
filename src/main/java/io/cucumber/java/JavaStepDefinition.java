@@ -28,10 +28,6 @@ public final class JavaStepDefinition extends AbstractGlueDefinition implements 
         this.parameterInfos = JavaParameterInfo.fromMethod(method);
         this.expression = requireNonNull(expression, "cucumber-expression may not be null");
 
-//        if(method.getReturnType().equals(MetaStepData.class))
-//        {
-//
-//        }
     }
 
     @Override

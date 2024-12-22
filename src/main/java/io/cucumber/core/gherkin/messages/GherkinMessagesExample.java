@@ -35,12 +35,6 @@ public final class GherkinMessagesExample implements Node.Example {
         this.tableRow = tableRow;
         this.examplesIndex = examplesIndex;
         this.rowIndex = rowIndex;
-//        try {
-//            scenarioOutlineLine1 = ( (GherkinMessagesScenarioOutline) parent.getParent().get().getParent().get()).getLocation().getLine();;
-//        } catch (Exception e) {
-//            scenarioOutlineLine1 = 0;
-//        }
-//        scenarioOutlineLine = scenarioOutlineLine1;
     }
 
     public GherkinMessagesScenarioOutline getGherkinMessagesScenarioOutline(GherkinMessagesFeature feature){

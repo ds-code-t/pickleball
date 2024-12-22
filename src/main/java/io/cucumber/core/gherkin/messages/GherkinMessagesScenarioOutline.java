@@ -60,4 +60,5 @@ public final class GherkinMessagesScenarioOutline implements Node.ScenarioOutlin
         String name = scenario.getName();
         return name.isEmpty() ? Optional.empty() : Optional.of(name);
     }
+
 }

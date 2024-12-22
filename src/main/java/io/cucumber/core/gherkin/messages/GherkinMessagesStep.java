@@ -68,9 +68,6 @@ public final class GherkinMessagesStep implements Step {
         if (dialect.getButKeywords().contains(keyWord)) {
             return StepType.BUT;
         }
-        if (dialect.getPickleballKeywords().contains(keyWord)) {
-            return StepType.IF;
-        }
         throw new IllegalStateException("Keyword " + keyWord + " was neither given, when, then, and, but nor *");
     }
 

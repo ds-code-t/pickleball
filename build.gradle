@@ -31,12 +31,15 @@ dependencies {
 
     //    implementation "io.cucumber:cucumber-gherkin:${cucumberVersions.core}"
 //    implementation "io.cucumber:cucumber-gherkin-messages:${cucumberVersions.core}"
-//    implementation "io.cucumber:messages:${cucumberVersions.messages}"
-    //    implementation "io.cucumber:datatable:${cucumberVersions.core}"
 //    implementation "io.cucumber:cucumber-plugin:${cucumberVersions.core}"
-//    implementation "io.cucumber:docstring:${cucumberVersions.core}"
     //  api "io.cucumber:cucumber-java:${cucumberVersions.core}"
 //    api "io.cucumber:cucumber-testng:${cucumberVersions.core}"
+    //    implementation "io.cucumber:datatable:${cucumberVersions.core}"
+    //    implementation "io.cucumber:docstring:${cucumberVersions.core}"
+
+
+//    implementation "io.cucumber:messages:${cucumberVersions.messages}"
+
 
     implementation platform('org.junit:junit-bom:5.11.2')
     implementation platform('com.fasterxml.jackson:jackson-bom:2.18.2')

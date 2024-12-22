@@ -1,7 +1,7 @@
 package io.cucumber.core.gherkin;
 
 public enum StepType {
-    GIVEN, WHEN, THEN, AND, BUT, OTHER, IF;
+    GIVEN, WHEN, THEN, AND, BUT, OTHER;
 
     private static final String ASTRIX_KEY_WORD = "* ";
 

@@ -26,32 +26,6 @@ import static java.util.stream.Collectors.toList;
 
 public final class GherkinMessagesFeatureParser implements FeatureParser {
 
-//    public GherkinMessagesFeatureParser(){
-//        this(false);
-//    }
-//
-//    public GherkinMessagesFeatureParser(boolean componentScenario){
-//     if(componentScenario)
-//     {
-//
-//     }
-//     else
-//     {
-//
-//     }
-//    }
-
-//public Optional<Feature> parseComponent(URI path, String source) {
-////    String updatedSource = COMPONENT_TAG + "\n" + source;
-//    String updatedSource = COMPONENT_TAG + "\n" + source.replaceAll("(?m)^\\s*Examples:\\s*.*$", COMPONENT_EXAMPLES).replaceAll("(?m)^\\s*Examples:\\s*.*$", COMPONENT_EXAMPLES);
-//    try (InputStream is = new ByteArrayInputStream(updatedSource.getBytes(UTF_8))) {
-//        return parse(path, is, UUID::randomUUID);
-//    } catch (IOException e) {
-//        throw new FeatureParserException("Failed to parse resource at: " + path, e);
-//    }
-//}
-
-
     @Deprecated
     @Override
     public Optional<Feature> parse(URI path, String source, Supplier<UUID> idGenerator) {
