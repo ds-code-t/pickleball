@@ -1,6 +1,7 @@
 package io.pickleball.cacheandstate;
 
 import io.cucumber.core.eventbus.EventBus;
+import io.cucumber.core.runner.PickleStepTestStep;
 import io.cucumber.core.runner.Runner;
 import io.cucumber.core.runner.TestCase;
 import io.cucumber.core.runner.TestCaseState;
@@ -76,7 +77,7 @@ public class PrimaryScenarioData {
 
     public PrimaryScenarioData(Runner runner, TestCase testCase) {
         this.runner = runner;
-        this.scenarioContext = testCase.scenarioContext;
+        this.scenarioContext = testCase;
         this.bus = runner.getBus();
     }
 
@@ -101,7 +102,7 @@ public class PrimaryScenarioData {
         return getState().scenarioStack.peek();
     }
 
-    public static StepContext getCurrentStep() {
+    public static PickleStepTestStep getCurrentStep() {
         Stack<ScenarioContext> scenarioContextStack = getState().scenarioStack;
         for (ScenarioContext scenarioContext1 : scenarioContextStack) {
             if (!scenarioContext1.getExecutingStepStack().isEmpty())

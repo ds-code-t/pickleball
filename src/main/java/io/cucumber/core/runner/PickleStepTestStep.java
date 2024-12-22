@@ -17,7 +17,7 @@ import static io.pickleball.cacheandstate.PrimaryScenarioData.getRunner;
 import static io.pickleball.cacheandstate.ScenarioContext.popCurrentStep;
 import static io.pickleball.cacheandstate.ScenarioContext.setCurrentStep;
 
-public final class PickleStepTestStep extends TestStep implements io.cucumber.plugin.event.PickleStepTestStep {
+public final class PickleStepTestStep extends TestStep  implements io.cucumber.plugin.event.PickleStepTestStep {
 
     public final URI uri;
     public final Step step;
@@ -45,18 +45,18 @@ public final class PickleStepTestStep extends TestStep implements io.cucumber.pl
         this.afterStepHookSteps = afterStepHookSteps;
         this.beforeStepHookSteps = beforeStepHookSteps;
         this.definitionMatch = definitionMatch;
-        this.stepContext = new StepContext(
-                this,               // the current test step instance
-                step,               // the Gherkin step
-                definitionMatch
-        );
+//        this.stepContext = new StepContext(
+//                this,               // the current test step instance
+//                step,               // the Gherkin step
+//                definitionMatch
+//        );
     }
 
     @Override
     public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
         ExecutionMode nextExecutionMode = executionMode;
 
-        setCurrentStep(stepContext);
+        setCurrentStep(this);
         for (HookTestStep before : beforeStepHookSteps) {
             nextExecutionMode = before
                     .run(testCase, bus, state, executionMode)
@@ -125,21 +125,21 @@ public final class PickleStepTestStep extends TestStep implements io.cucumber.pl
     }
 
 
-    private final Stack<PickleStepTestStep> stepStack = new Stack<>();
-
-    @Override
-    public void addStepsToStack(PickleStepTestStep... pickleStepTestSteps) {
-        stepStack.addAll(List.of(pickleStepTestSteps));
-    }
-
-    @Override
-    public ExecutionMode runStackSteps(TestCase testCase, TestCaseState state, EventBus bus, ExecutionMode nextExecutionMode) {
-        while (nextExecutionMode.equals(ExecutionMode.RUN) && !stepStack.empty()) {
-            PickleStepTestStep stackStep = stepStack.pop();
-            nextExecutionMode = stackStep
-                    .run(testCase, bus, state, nextExecutionMode)
-                    .next(nextExecutionMode);
-        }
-        return nextExecutionMode;
-    }
+//    private final Stack<PickleStepTestStep> stepStack = new Stack<>();
+//
+//    @Override
+//    public void addStepsToStack(PickleStepTestStep... pickleStepTestSteps) {
+//        stepStack.addAll(List.of(pickleStepTestSteps));
+//    }
+//
+//    @Override
+//    public ExecutionMode runStackSteps(TestCase testCase, TestCaseState state, EventBus bus, ExecutionMode nextExecutionMode) {
+//        while (nextExecutionMode.equals(ExecutionMode.RUN) && !stepStack.empty()) {
+//            PickleStepTestStep stackStep = stepStack.pop();
+//            nextExecutionMode = stackStep
+//                    .run(testCase, bus, state, nextExecutionMode)
+//                    .next(nextExecutionMode);
+//        }
+//        return nextExecutionMode;
+//    }
 }

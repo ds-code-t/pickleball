@@ -37,7 +37,7 @@ import static io.pickleball.cucumberutilities.FeatureFileUtilities.getComponentB
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
-public final class TestCase implements io.cucumber.plugin.event.TestCase, DynamicSteps {
+public final class TestCase extends ScenarioContext implements io.cucumber.plugin.event.TestCase {
 
     private final Pickle pickle;
     private final List<PickleStepTestStep> testSteps;
@@ -45,17 +45,17 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, Dynami
     private final List<HookTestStep> beforeHooks;
     private final List<HookTestStep> afterHooks;
     public final UUID id;
-    public final ScenarioContext scenarioContext;
+//    public final ScenarioContext scenarioContext;
     public GherkinMessagesFeature gherkinMessagesFeature;
     public Scenario scenario;
     public LinkedMultiMap constantMap;
     public final boolean componentScenario;
 
-    private final Stack<PickleStepTestStep> stepStack = new Stack<>();
-
-    public void addStepsToStack(PickleStepTestStep... pickleStepTestSteps) {
-        stepStack.addAll(List.of(pickleStepTestSteps));
-    }
+//    private final Stack<PickleStepTestStep> stepStack = new Stack<>();
+//
+//    public void addStepsToStack(PickleStepTestStep... pickleStepTestSteps) {
+//        stepStack.addAll(List.of(pickleStepTestSteps));
+//    }
 
     public TestCase(
             UUID id, List<PickleStepTestStep> testSteps,
@@ -75,6 +75,7 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, Dynami
             boolean dryRun,
             boolean componentScenario
     ) {
+        super(id, pickle);
         this.id = id;
         this.testSteps = testSteps;
         this.beforeHooks = beforeHooks;
@@ -83,10 +84,10 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, Dynami
         this.executionMode = dryRun ? DRY_RUN : RUN;
         this.componentScenario = componentScenario;
 
-        this.scenarioContext = new ScenarioContext(pickle);
-        this.scenarioContext.setTestCase(this);
+//        this.scenarioContext = new ScenarioContext(pickle);
+//        this.scenarioContext.setTestCase(this);
         for (PickleStepTestStep testStep : testSteps) {
-            testStep.stepContext.setScenarioContext(this.scenarioContext);
+            testStep.setScenarioContext(this);
         }
 
         if (componentScenario) {
@@ -119,28 +120,28 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, Dynami
         runComponent(bus);
     }
 
-    @Override
-    public ExecutionMode runStackSteps(io.cucumber.plugin.event.TestCase testCase, TestCaseState state, EventBus bus, ExecutionMode nextExecutionMode) {
-        while (nextExecutionMode.equals(ExecutionMode.RUN) && !stepStack.empty()) {
-            PickleStepTestStep stackStep = stepStack.pop();
-            nextExecutionMode = stackStep
-                    .run(testCase, bus, state, nextExecutionMode)
-                    .next(nextExecutionMode);
-        }
-        return nextExecutionMode;
-    }
+//    @Override
+//    public ExecutionMode runStackSteps(io.cucumber.plugin.event.TestCase testCase, TestCaseState state, EventBus bus, ExecutionMode nextExecutionMode) {
+//        while (nextExecutionMode.equals(ExecutionMode.RUN) && !stepStack.empty()) {
+//            PickleStepTestStep stackStep = stepStack.pop();
+//            nextExecutionMode = stackStep
+//                    .run(testCase, bus, state, nextExecutionMode)
+//                    .next(nextExecutionMode);
+//        }
+//        return nextExecutionMode;
+//    }
 
 
     public void runComponent(EventBus bus) {
-        setCurrentScenario(scenarioContext);
+        setCurrentScenario(this);
         ExecutionMode nextExecutionMode = this.executionMode;
-        if (scenarioContext.isTopLevel())
+        if (isTopLevel())
             emitTestCaseMessage(bus);
 
         Instant start = bus.getInstant();
         UUID executionId = bus.generateId();
 
-        if (scenarioContext.isTopLevel())
+        if (isTopLevel())
             emitTestCaseStarted(bus, start, executionId);
         else
             emitComponentCaseStarted(bus, start, executionId);
@@ -171,7 +172,7 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, Dynami
         Duration duration = Duration.between(start, stop);
         Status status = Status.valueOf(state.getStatus().name());
         Result result = new Result(status, duration, state.getError());
-        if (scenarioContext.isTopLevel())
+        if (isTopLevel())
             emitTestCaseFinished(bus, executionId, stop, result);
         else
             emitComponentCaseFinished(bus, executionId, stop, result);
@@ -315,14 +316,13 @@ public final class TestCase implements io.cucumber.plugin.event.TestCase, Dynami
 
 
     private void emitComponentCaseStarted(EventBus bus, Instant start, UUID executionId) {
-//        bus.send(new ComponentScenarioStarted(start, scenarioContext.parent.getTestCase(), this));
-        bus.send(new TestStepStarted(start, scenarioContext.parent.getTestCase(), this));
+        bus.send(new TestStepStarted(start, parent, this));
     }
 
     private void emitComponentCaseFinished(
             EventBus bus, UUID executionId, Instant stop, Result result
     ) {
-        bus.send(new TestStepFinished(stop, scenarioContext.parent.getTestCase(), this, result));
+        bus.send(new TestStepFinished(stop, parent, this, result));
         popCurrentScenario();
     }
 

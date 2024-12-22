@@ -50,15 +50,15 @@ public class ScenarioSteps {
             TestCase lastTestCase = null;
             for (TestCase testCase : testCases) {
                 lastTestCase = testCase;
-                testCase.scenarioContext.addChildScenarioContext(testCase.scenarioContext);
+                testCase.addChildScenarioContext(testCase);
                 testCase.runComponent(getRunner().bus);
-                if (testCase.scenarioContext.getTestCaseState().isFailed()) {
-                    Status status = testCase.scenarioContext.getTestCaseState().getStatus();
+                if (testCase.getTestCaseState().isFailed()) {
+                    Status status = testCase.getTestCaseState().getStatus();
                     originalStep.addStatus(status);
                     break;
                 }
             }
-            if (lastTestCase != null && lastTestCase.scenarioContext.getTestCaseState().isFailed()) {
+            if (lastTestCase != null && lastTestCase.getTestCaseState().isFailed()) {
                 break;
             }
         }

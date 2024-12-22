@@ -3,6 +3,7 @@ package io.pickleball.cucumberutilities;
 import io.cucumber.core.gherkin.messages.GherkinMessagesDataTableArgument;
 import io.cucumber.core.gherkin.messages.GherkinMessagesDocStringArgument;
 import io.cucumber.core.runner.AmbiguousStepDefinitionsException;
+import io.cucumber.core.runner.PickleStepTestStep;
 import io.pickleball.cacheandstate.StepContext;
 
 import java.net.URI;
@@ -27,8 +28,8 @@ public class CucumberObjectFactory {
 
     public static io.cucumber.core.runner.PickleStepTestStep createPickleStepTestStep(
             String metaStep)  {
-        StepContext currentStep =  getCurrentStep();
-        return createPickleStepTestStep(metaStep,  currentStep.getGherkinMessagesDataTableArgument(),  currentStep.getGherkinMessagesDocStringArgument(), currentStep.getTestStep().getUri(), currentStep.getTestStep().getStepLine());
+        PickleStepTestStep currentStep =  getCurrentStep();
+        return createPickleStepTestStep(metaStep,  currentStep.getGherkinMessagesDataTableArgument(),  currentStep.getGherkinMessagesDocStringArgument(), currentStep.getUri(), currentStep.getStepLine());
     }
 
     public static io.cucumber.core.runner.PickleStepTestStep createPickleStepTestStepWithArgs(

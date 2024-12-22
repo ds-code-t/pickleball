@@ -16,7 +16,7 @@ public class ConditionalSteps {
     @Given("the user is at coordinates {metaStep}")
     public void userAtCoordinates(MetaStep metaStep, DataTable dataTable, DocString docString) {
         PickleStepTestStep pickleStepTestStep = createPickleStepTestStep(metaStep.getStepText());
-        getCurrentStep().getTestStep().addStepsToStack(pickleStepTestStep);
+        getCurrentStep().addStepsToStack(pickleStepTestStep);
     }
 
 }

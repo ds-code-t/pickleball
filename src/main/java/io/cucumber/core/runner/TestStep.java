@@ -26,9 +26,8 @@ import static io.cucumber.core.runner.ExecutionMode.SKIP;
 import static io.cucumber.core.runner.TestAbortedExceptions.createIsTestAbortedExceptionPredicate;
 import static java.time.Duration.ZERO;
 
-public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
+public abstract class TestStep extends StepContext implements io.cucumber.plugin.event.TestStep {
 
-    public StepContext stepContext;
 
     private final Predicate<Throwable> isTestAbortedException = createIsTestAbortedExceptionPredicate();
     private final StepDefinitionMatch stepDefinitionMatch;
@@ -37,17 +36,11 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
 
 
 
-//    int nestingLevel = 0;
-//    int position = 0;
-//    Object parent = null;
-
-
-
     TestStep(UUID id, StepDefinitionMatch stepDefinitionMatch) {
+        super(id, (PickleStepDefinitionMatch) stepDefinitionMatch);
         this.id = id;
         this.stepDefinitionMatch = stepDefinitionMatch;
     }
-
 
 
     @Override
@@ -84,22 +77,22 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
         emitTestStepFinished(testCase, bus, state.getTestExecutionId(), stopTime, duration, result, error);
 
 
-        stepContext.addStatus(result.getStatus());
-        Status returnStatus = stepContext.getHighestStatus();
+        addStatus(result.getStatus());
+        Status returnStatus = getHighestStatus();
 
         return returnStatus.is(Status.PASSED) || returnStatus.is(Status.SOFT_FAILED) ? executionMode : SKIP;
 //
     }
-
-    public ExecutionMode runDynamically(io.cucumber.plugin.event.TestCase testCase, EventBus bus, TestCaseState currentState, ExecutionMode executionMode) {
-        return executionMode;
-    }
+//
+//    public ExecutionMode runDynamically(io.cucumber.plugin.event.TestCase testCase, EventBus bus, TestCaseState currentState, ExecutionMode executionMode) {
+//        return executionMode;
+//    }
 
 
     private void emitTestStepStarted(TestCase testCase, EventBus bus, UUID textExecutionId, Instant startTime) {
-        stepContext.startEvent = new EventContainer(  testCase,  bus,  textExecutionId,  startTime,  id, this);
-        if (stepContext.shouldSendStart())
-            stepContext.sendStartEvent();
+        startEvent = new EventContainer(  testCase,  bus,  textExecutionId,  startTime,  id, this);
+        if (shouldSendStart())
+            sendStartEvent();
     }
 
     private Status executeStep(TestCaseState state, ExecutionMode executionMode) throws Throwable {
@@ -141,9 +134,9 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
             TestCase testCase, EventBus bus, UUID textExecutionId, Instant stopTime, Duration duration, Result result , Throwable... throwables
     ) {
 
-        stepContext.endEvent = new EventContainer(  testCase,  bus,  textExecutionId,  stopTime,  duration,  result,  id, this);
-        if (result.getStatus().equals(Status.FAILED) || stepContext.shouldSendEnd())
-            stepContext.sendEndEvent(throwables);
+        endEvent = new EventContainer(  testCase,  bus,  textExecutionId,  stopTime,  duration,  result,  id, this);
+        if (result.getStatus().equals(Status.FAILED) || shouldSendEnd())
+            sendEndEvent(throwables);
 
     }
 }

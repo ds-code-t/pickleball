@@ -17,7 +17,6 @@ import io.cucumber.plugin.event.HookType;
 import io.cucumber.plugin.event.Location;
 import io.cucumber.plugin.event.SnippetsSuggestedEvent;
 import io.cucumber.plugin.event.SnippetsSuggestedEvent.Suggestion;
-//import io.pickleball.cucumberutilities.ComponentScenarioWrapper;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -30,9 +29,7 @@ import java.util.stream.Collectors;
 import static io.cucumber.core.exception.ExceptionUtils.throwAsUncheckedException;
 import static io.cucumber.core.runner.StackManipulation.removeFrameworkFrames;
 import static io.pickleball.cacheandstate.GlobalCache.setScenarioThreadState;
-//import static io.pickleball.cacheandstate.PrimaryScenarioData.setPrimaryScenario;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.setPrimaryScenario;
-import static io.pickleball.cucumberutilities.SourceParser.getComponentScenarioWrapper;
 import static java.util.Collections.emptyList;
 
 public final class Runner {
@@ -77,13 +74,10 @@ public final class Runner {
 
             // Java8 step definitions will be added to the glue here
             buildBackendWorlds();
-
             glue.prepareGlue(stepTypeRegistry);
-
-
             TestCase testCase = createTestCaseForPickle(pickle);
             setScenarioThreadState(this, testCase);
-            setPrimaryScenario(testCase.scenarioContext);
+            setPrimaryScenario(testCase);
             testCase.run(bus);
         } finally {
             glue.removeScenarioScopedGlue();

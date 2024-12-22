@@ -29,7 +29,7 @@ public enum ExecutionMode {
 
     abstract Status execute(StepDefinitionMatch stepDefinitionMatch, TestCaseState state) throws Throwable;
 
-    ExecutionMode next(ExecutionMode current) {
+    public ExecutionMode next(ExecutionMode current) {
         return current == SKIP ? current : this;
     }
 }

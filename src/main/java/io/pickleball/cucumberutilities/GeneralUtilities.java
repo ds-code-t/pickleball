@@ -6,7 +6,6 @@ import java.time.format.DateTimeFormatter;
 
 public class GeneralUtilities {
 
-
     public static void waitTime(Long time)
     {
         try {
@@ -21,9 +20,5 @@ public class GeneralUtilities {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSZ");
         return now.format(formatter);
     }
-
-
-
-
 
 }

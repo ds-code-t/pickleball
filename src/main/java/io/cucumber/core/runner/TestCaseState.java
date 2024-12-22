@@ -37,7 +37,7 @@ public class TestCaseState implements io.cucumber.core.backend.TestCaseState {
         this.testCase = requireNonNull(testCase);
 
         if (this.testCase instanceof io.cucumber.core.runner.TestCase) {
-            ((io.cucumber.core.runner.TestCase) this.testCase).scenarioContext.setTestCaseState(this);
+            ((io.cucumber.core.runner.TestCase) this.testCase).setTestCaseState(this);
         }
     }
 
