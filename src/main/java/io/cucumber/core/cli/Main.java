@@ -8,7 +8,6 @@ import io.cucumber.core.options.RuntimeOptions;
 import io.cucumber.core.runtime.Runtime;
 import org.apiguardian.api.API;
 
-import java.util.Arrays;
 import java.util.Optional;
 
 /**
