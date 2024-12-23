@@ -51,6 +51,8 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
     public LinkedMultiMap constantMap;
     public final boolean componentScenario;
 
+//    public LinkedMultiMap<> stepMap =
+
 //    private final Stack<PickleStepTestStep> stepStack = new Stack<>();
 //
 //    public void addStepsToStack(PickleStepTestStep... pickleStepTestSteps) {
@@ -84,8 +86,6 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
         this.executionMode = dryRun ? DRY_RUN : RUN;
         this.componentScenario = componentScenario;
 
-//        this.scenarioContext = new ScenarioContext(pickle);
-//        this.scenarioContext.setTestCase(this);
         for (PickleStepTestStep testStep : testSteps) {
             testStep.setScenarioContext(this);
         }
@@ -119,18 +119,6 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
     void run(EventBus bus) {
         runComponent(bus);
     }
-
-//    @Override
-//    public ExecutionMode runStackSteps(io.cucumber.plugin.event.TestCase testCase, TestCaseState state, EventBus bus, ExecutionMode nextExecutionMode) {
-//        while (nextExecutionMode.equals(ExecutionMode.RUN) && !stepStack.empty()) {
-//            PickleStepTestStep stackStep = stepStack.pop();
-//            nextExecutionMode = stackStep
-//                    .run(testCase, bus, state, nextExecutionMode)
-//                    .next(nextExecutionMode);
-//        }
-//        return nextExecutionMode;
-//    }
-
 
     public void runComponent(EventBus bus) {
         setCurrentScenario(this);
@@ -314,7 +302,6 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
         bus.send(envelope);
     }
 
-
     private void emitComponentCaseStarted(EventBus bus, Instant start, UUID executionId) {
         bus.send(new TestStepStarted(start, parent, this));
     }
@@ -325,6 +312,4 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
         bus.send(new TestStepFinished(stop, parent, this, result));
         popCurrentScenario();
     }
-
-
 }

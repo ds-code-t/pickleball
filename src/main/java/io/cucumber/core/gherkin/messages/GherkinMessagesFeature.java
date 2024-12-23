@@ -2,17 +2,15 @@ package io.cucumber.core.gherkin.messages;
 
 import io.cucumber.core.gherkin.Feature;
 import io.cucumber.core.gherkin.Pickle;
+import io.cucumber.messages.types.Comment;
 import io.cucumber.messages.types.Envelope;
 import io.cucumber.messages.types.FeatureChild;
+import io.cucumber.messages.types.GherkinDocument;
 import io.cucumber.plugin.event.Location;
 import io.cucumber.plugin.event.Node;
 
 import java.net.URI;
-import java.util.Collection;
-import java.util.List;
-import java.util.NoSuchElementException;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
@@ -25,6 +23,7 @@ public final class GherkinMessagesFeature implements Feature {
     private final List<Envelope> envelopes;
     private final String gherkinSource;
     private final List<Node> children;
+
 
     public GherkinMessagesFeature(
             io.cucumber.messages.types.Feature feature,
@@ -42,7 +41,106 @@ public final class GherkinMessagesFeature implements Feature {
                 .filter(this::hasRuleOrScenario)
                 .map(this::mapRuleOrScenario)
                 .collect(Collectors.toList());
+//           this.envelopes.forEach(e -> System.out.println("\n\n=========\n@@envelop:: " + e + "\n---\n"));
+
+
+        System.out.println("@@getDescriptionLinesWithLineNumbers:: " + getDescriptionLinesWithLineNumbers());
+        System.out.println("========= ");
     }
+
+
+    public TreeMap<Integer, String> getDescriptionLinesWithLineNumbers() {
+        Optional<GherkinDocument> gherkinDocumentOpt = envelopes.stream()
+                .map(Envelope::getGherkinDocument)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst();
+
+        if (gherkinDocumentOpt.isEmpty()) {
+            throw new IllegalStateException("No GherkinDocument found in the envelopes.");
+        }
+
+        GherkinDocument gherkinDocument = gherkinDocumentOpt.get();
+        io.cucumber.messages.types.Feature feature = gherkinDocument.getFeature().orElseThrow(
+                () -> new IllegalStateException("Feature not found in GherkinDocument"));
+
+        TreeMap<Integer, String> descriptionLines = new TreeMap<>();
+
+        // Collect feature-level description
+        if (!feature.getDescription().isEmpty()) {
+            int currentLine = (int) (feature.getLocation().getLine() + 1);
+            for (String line : feature.getDescription().split("\n")) {
+                descriptionLines.put(currentLine++, line.trim());
+            }
+        }
+
+        // Collect scenario-level descriptions
+        feature.getChildren().forEach(child -> {
+            if (child.getScenario().isPresent()) {
+                io.cucumber.messages.types.Scenario scenario = child.getScenario().get();
+                System.out.println("@@scenario.getDescription()L:: " + scenario.getDescription());
+                if (!scenario.getDescription().isEmpty()) {
+                    int currentLine = (int) (scenario.getLocation().getLine() + 1);
+                    for (String line : scenario.getDescription().split("\n")) {
+                        descriptionLines.put(currentLine++, line.trim());
+                    }
+                }
+            }
+        });
+
+        return descriptionLines;
+    }
+
+
+
+
+
+
+
+
+    public String getScenarioMetadataByLineNumber(int lineNumber) {
+        Optional<GherkinDocument> gherkinDocumentOpt = envelopes.stream()
+                .map(Envelope::getGherkinDocument)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst();
+
+        if (gherkinDocumentOpt.isEmpty()) {
+            throw new IllegalStateException("No GherkinDocument found in the envelopes.");
+        }
+
+        GherkinDocument gherkinDocument = gherkinDocumentOpt.get();
+        io.cucumber.messages.types.Feature feature = gherkinDocument.getFeature().orElseThrow(
+                () -> new IllegalStateException("Feature not found in GherkinDocument"));
+
+        StringBuilder metadata = new StringBuilder();
+
+        // Add feature-level comments and description
+        metadata.append("Feature: ").append(feature.getName()).append("\n");
+        metadata.append( feature.getDescription()).append("\n");
+
+        feature.getChildren().forEach(child -> {
+            if (child.getScenario().isPresent()) {
+                io.cucumber.messages.types.Scenario scenario = child.getScenario().get();
+
+                // Match by line number
+                if (scenario.getLocation().getLine() == lineNumber) {
+                    metadata.append("Scenario: ").append(scenario.getName()).append("\n");
+                    metadata.append( scenario.getDescription()).append("\n");
+                    // Append associated comments
+                    List<Comment> comments = gherkinDocument.getComments();
+                    comments.stream()
+                            .filter(comment -> comment.getLocation().getLine() < lineNumber)
+                            .forEach(comment -> metadata.append("Comment: ").append(comment.getText()).append("\n"));
+                }
+            }
+        });
+
+        return metadata.toString().trim();
+    }
+
+
+
 
     private Node mapRuleOrScenario(FeatureChild featureChild) {
         if (featureChild.getRule().isPresent()) {

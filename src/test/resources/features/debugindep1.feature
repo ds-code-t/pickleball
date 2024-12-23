@@ -1,6 +1,13 @@
 Feature: Using Plugin Steps333 indep
 
   @zzs1 @dfs
+  Scenario: Mai22
+    Then I should see debug outputlzz
+    Given I am running a testlzz xxx<A> and <B>
+
+    Then I should see debug outputlzz
+
+  @zzs1 @dfs
   Scenario: Main AAA
 #    Then I should see debug outputlzz
     Then I should see debug outputlzz
@@ -23,15 +30,21 @@ Feature: Using Plugin Steps333 indep
 #    Given I am running a testlzz 3 and 4
     Given I am running a testlzz ccc5 and 6
 
-
-
- @dfs
-  Scenario: coord1
-    Given I am running a testlzz 11ERRsORszzzzzzzzzzzzzzzzzzzzz and 6
-    Given the user is at coordinates I am running a testlzz SOFsT and 6
-    Given I am running a testlzz 33ERRsORs and 6
-
-
+#
+#  @dfs
+#  Scenario: coord1
+#  dss
+#   Given I am running a testlzz 11ERRsORszzzzzzzzzzzzzzzzzzzzz and 6
+#  Given the user is at coordinates I am running a testlzz SOFsT and 6
+#  Given I am running a testlzz 33ERRsORs and 6
+#
+#  Given I am running a testlzz aa3 and s
+#  Given I am running a testlzz bbb<A> and <B>
+#  Verify I am running a testlzz ccc5 and 6
+#
+#  Given I am running a testlzz ccc5 and 6
+##    Verify I am running a testlzz ccc5 and 6
+#  Given I am running a testlzz ccc5 and 6
 
 
 #  Scenario: aaaaasdve4

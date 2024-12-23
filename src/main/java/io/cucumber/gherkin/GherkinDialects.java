@@ -11,7 +11,7 @@ final class GherkinDialects {
     static final Map<String, GherkinDialect> DIALECTS;
 
     static {
-        Map<String, GherkinDialect> dialects  = new LinkedHashMap<>();
+        Map<String, GherkinDialect> dialects = new LinkedHashMap<>();
 
         dialects.put("af", new GherkinDialect(
             "af",

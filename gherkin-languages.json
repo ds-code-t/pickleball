@@ -1,0 +1,50 @@
+{
+  "en": {
+    "and": [
+      "* ",
+      "And ",
+      "ZZ "
+    ],
+    "background": [
+      "Background"
+    ],
+    "but": [
+      "* ",
+      "But "
+    ],
+    "examples": [
+      "Examples",
+      "Scenarios"
+    ],
+    "feature": [
+      "Feature",
+      "Business Need",
+      "Ability"
+    ],
+    "given": [
+      "* ",
+      "Given "
+    ],
+    "name": "English",
+    "native": "English",
+    "rule": [
+      "Rule"
+    ],
+    "scenario": [
+      "Example",
+      "Scenario"
+    ],
+    "scenarioOutline": [
+      "Scenario Outline",
+      "Scenario Template"
+    ],
+    "then": [
+      "* ",
+      "Then "
+    ],
+    "when": [
+      "* ",
+      "When "
+    ]
+  }
+}

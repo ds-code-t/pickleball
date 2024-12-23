@@ -59,7 +59,7 @@ public class Debugzlib {
     @Given("^I am running a testlzz (.*) and (.*)$")
     public void iAmRunningATestlzz(String t1, String t2) {
         System.out.print("DEBUG: start " + t1 + "  --- " + t2);
-        waitTime(800L);
+//        waitTime(800L);
         if(t1.contains("ERROR"))
             throw new RuntimeException("ERROR step-DEBUG: start " + t1 + "  --- " + t2);
         if(t1.contains("SOFT"))
