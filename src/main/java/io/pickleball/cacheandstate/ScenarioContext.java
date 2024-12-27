@@ -16,6 +16,7 @@ import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
 import static io.pickleball.cucumberutilities.ArgumentParsing.convertCommandLineToArgv;
 import static io.pickleball.cucumberutilities.ArgumentParsing.convertHashMapToArgv;
 import static io.pickleball.executions.ComponentRuntime.createTestcases;
+import static io.pickleball.mapandStateutilities.MappingFunctions.replaceNestedBrackets;
 import static java.util.Comparator.comparingInt;
 
 public abstract class ScenarioContext extends BaseContext implements io.cucumber.plugin.event.TestStep {

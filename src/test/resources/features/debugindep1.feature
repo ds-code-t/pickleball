@@ -1,17 +1,76 @@
 Feature:
 
+
+  Scenario Outline: SO A , <Scenario>  - <arg1>
+#    Then I should see debug outputlzz
+    Then I should see debug outputlzz
+    *  Scenario:
+      | Scenario Tags  | A     | B |
+      | @sob<Scenario> | ERROR | s |
+#      | @zzs9          | z     | 3 |
+    Given I am running a testlzz <arg1> and <Scenario>
+    Examples:
+      | Scenario | arg1  |
+      | 1        | val1a |
+      | 2        | val2a |
+      | 3        | val3a |
+
+
+  Scenario Outline: SO B <arg1> <Scenario Tags>
+#    Then I should see debug outputlzz
+    Then I should see debug outputlzz
+    *  Scenario:
+      | Scenario Tags | A     | B |
+      | @zzs8         | ERROR | s |
+      | @zzs9         | z     | 3 |
+    Given I am running a testlzz <arg1> and <Scenario Tags>
+    Examples:
+      | Scenario Tags | arg1 |
+      | @sob1         | val1 |
+      | @sob2         | val2 |
+
+
+  @zzs8
+  Scenario Outline: Component CCC 8 <Scenario> <arg1> <A> <B>
+    Given I am running a testlzz EwRROR and <arg1>
+#    Given I am running a testlzz 5 and 6
+#    Given I am running a testlzz 3 and 4
+#    Given I am running a testlzz 5 and 6
+    Given I am running a testlzz bbb<A> and <B>
+#    Given I am running a testlzz <A> and <B>
+#    Given I am running a testlzz <A> and <B>
+#    Given I am running a testlzz 3 and 4
+    Given I am running a testlzz ccc5 and 6
+    Examples:
+      | Scenario | arg1 |
+      | s1       | val1 |
+      | s2       | val2 |
+
+
+  @zzs9
+  Scenario: Component BBB
+    Given I am running a testlzz EwRROR and 4
+#    Given I am running a testlzz 5 and 6
+#    Given I am running a testlzz 3 and 4
+#    Given I am running a testlzz 5 and 6
+    Given I am running a testlzz bbb<A> and <B>
+#    Given I am running a testlzz <A> and <B>
+#    Given I am running a testlzz <A> and <B>
+#    Given I am running a testlzz 3 and 4
+    Given I am running a testlzz ccc5 and 6
+
+
   Scenario Outline: aawdqq <Scenario>
     Given I see colour
     Given I see <C>
     Given I see color
     Given Do you like cucumber?
     Examples:
-      | Scenario | C |
-      | 1        | colour  |
+      | Scenario | C      |
+      | 1        | colour |
       | 1        | color  |
-      | 1        | colors  |
+      | 1        | colors |
       | 1        | color  |
-
 
 
   Scenario: qq
@@ -25,7 +84,7 @@ Feature:
     Given I have the following string: `<(aaa)>`
     Examples:
       | Scenario | (aaa) |
-      | 1        | B   |
+      | 1        | B     |
 
   Scenario: ss3423
     Given I have the following string: `This i\"s \'a "quoted" string`
@@ -67,17 +126,6 @@ Feature:
     Given I am running a testlzz xxx<A> and <B>
 #    Given I am running a testlzz fff and gggg
 
-  @zzs9
-  Scenario: Component BBB
-    Given I am running a testlzz aa3 and 4
-#    Given I am running a testlzz 5 and 6
-#    Given I am running a testlzz 3 and 4
-#    Given I am running a testlzz 5 and 6
-    Given I am running a testlzz bbb<A> and <B>
-#    Given I am running a testlzz <A> and <B>
-#    Given I am running a testlzz <A> and <B>
-#    Given I am running a testlzz 3 and 4
-    Given I am running a testlzz ccc5 and 6
 
 #
 #  @dfs

@@ -10,11 +10,14 @@ import io.cucumber.core.stepexpression.DataTableArgument;
 import io.cucumber.core.stepexpression.DocStringArgument;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
+import io.cucumber.java.StepDefinitionAnnotations;
 import io.cucumber.messages.types.*;
 import io.cucumber.plugin.event.PickleStepTestStep;
 import io.cucumber.core.runner.PickleStepDefinitionMatch;
+import io.pickleball.annotations.NoEventEmission;
 import io.pickleball.logging.EventContainer;
 
+import java.lang.annotation.Annotation;
 import java.util.*;
 
 import static io.cucumber.gherkin.PickleCompiler.pickleStepTypeFromKeywordType;
@@ -42,8 +45,21 @@ public class StepContext extends BaseContext {
 
 
     private ScenarioContext scenarioContext;
-    private PickleStepDefinitionMatch pickleStepDefinitionMatch; // The underlying step definition (stable, unchanging)
+    private final PickleStepDefinitionMatch pickleStepDefinitionMatch;
     public UUID id;
+
+
+    public boolean shouldEmitEvent() {
+        return !pickleStepDefinitionMatch.method.isAnnotationPresent(NoEventEmission.class);
+    }
+
+    public StepContext(
+            UUID id,
+            PickleStepDefinitionMatch pickleStepDefinitionMatch
+    ) {
+        this.id = id;
+        this.pickleStepDefinitionMatch = pickleStepDefinitionMatch;
+    }
 
 
     public io.cucumber.core.runner.PickleStepTestStep modifyPickleStepTestStep() {
@@ -70,7 +86,7 @@ public class StepContext extends BaseContext {
                 List<TableCell> cells = row.getCells();
                 List<PickleTableCell> newCells = new ArrayList<>();
                 for (TableCell cell : cells) {
-                    String cellText = cell.getValue();
+                    String cellText = replaceNestedBrackets(cell.getValue(), parent.getPassedMap(), parent.getExamplesMap(), parent.getStateMap());
                     newCells.add(new PickleTableCell(cellText));
                 }
                 newRows.add(new PickleTableRow(newCells));
@@ -102,17 +118,6 @@ public class StepContext extends BaseContext {
                 stepText
         );
 
-    }
-
-
-
-
-    public StepContext(
-            UUID id,
-            PickleStepDefinitionMatch pickleStepDefinitionMatch
-    ) {
-        this.id = id;
-        this.pickleStepDefinitionMatch = pickleStepDefinitionMatch;
     }
 
 

@@ -1,9 +1,12 @@
 package io.cucumber.messages.types;
 
+import io.pickleball.cacheandstate.ScenarioContext;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import static io.pickleball.mapandStateutilities.MappingFunctions.replaceNestedBrackets;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
@@ -30,7 +33,13 @@ import static java.util.Objects.requireNonNull;
 public final class Pickle {
     private final String id;
     private final String uri;
-    private final String name;
+
+    public void setName(ScenarioContext parent) {
+        this.name = replaceNestedBrackets(originalName, parent.getPassedMap(), parent.getExamplesMap(), parent.getStateMap());
+    }
+
+    private String name;
+    private final String originalName;
     private final String language;
     private final java.util.List<PickleStep> steps;
     private final java.util.List<PickleTag> tags;
@@ -75,6 +84,7 @@ public final class Pickle {
             java.util.List<PickleTag> tags,
             java.util.List<String> astNodeIds,
             int backgroundStepsCount,
+            String originalName,
             List<TableCell> headerRow,
             TableRow valueRow
     ) {
@@ -86,6 +96,7 @@ public final class Pickle {
         this.tags = unmodifiableList(new ArrayList<>(requireNonNull(tags, "Pickle.tags cannot be null")));
         this.astNodeIds = unmodifiableList(new ArrayList<>(requireNonNull(astNodeIds, "Pickle.astNodeIds cannot be null")));
         this.backgroundStepsCount = backgroundStepsCount;
+        this.originalName = originalName;
         this.headerRow = headerRow;
         this.valueRow = valueRow;
     }

@@ -4,25 +4,28 @@ import io.cucumber.core.backend.Status;
 import io.cucumber.core.runner.TestCase;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Given;
-import io.pickleball.annotations.Metastep;
-import io.pickleball.cacheandstate.ScenarioContext;
+import io.pickleball.annotations.NoEventEmission;
 import io.pickleball.cacheandstate.StepContext;
 import io.pickleball.mapandStateutilities.LinkedMultiMap;
 
 import java.util.*;
 
-import static io.pickleball.cacheandstate.GlobalCache.getState;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
 import static io.pickleball.configs.Constants.COMPONENT_PATH;
 import static io.pickleball.configs.Constants.SCENARIO_TAGS;
-import static io.pickleball.cucumberutilities.LoggingUtilities.getHighestStatus;
 
 
 public class ScenarioSteps {
 
-    @Metastep
+//    @Metastep
+//    @Given("^Scenario:(.*)$")
+//    public void scenarioRunLoggingPlaceHolder(String scenarioName) {
+//
+//    }
+
+    @NoEventEmission
     @Given("^Scenario:(.*)$")
-    public void ScenarioRun(String scenarioName, DataTable dataTable) {
+    public void scenarioRun(String scenarioName, DataTable dataTable) {
 //        startEvent();
 
         StepContext originalStep = getCurrentStep();
@@ -31,7 +34,6 @@ public class ScenarioSteps {
         for (LinkedMultiMap<String, String> map : dataTable.asLinkedMultiMaps(String.class, String.class)) {
             String tags = map.getValueByStringOrDefault(SCENARIO_TAGS, "");
             map.put("_calling tags", tags);
-
 
             String componentPaths = map.getValueByStringOrDefault(COMPONENT_PATH, "src/test/resources/features");
             List<String> argvList = new ArrayList<>();

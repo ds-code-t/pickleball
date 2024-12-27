@@ -122,6 +122,7 @@ public class PickleCompiler {
                 pickleTags(scenarioTags),
                 sourceIds,
                 backgroundSteps.size(),
+                scenario.getName(),
                 null,
                 null
         );
@@ -174,6 +175,7 @@ public class PickleCompiler {
                         pickleTags(tags),
                         sourceIds,
                         backgroundSteps.size(),
+                        scenario.getName(),
                         variableCells,
                         valuesRow
                 );

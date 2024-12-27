@@ -35,7 +35,7 @@ import static java.util.stream.Collectors.toList;
 
 public final class TestCase extends ScenarioContext implements io.cucumber.plugin.event.TestCase {
 
-    private final Pickle pickle;
+    private final GherkinMessagesPickle pickle;
     private final List<PickleStepTestStep> testSteps;
     private final ExecutionMode executionMode;
     private final List<HookTestStep> beforeHooks;
@@ -45,25 +45,22 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
     public Scenario scenario;
 
 
-
     public TestCase(
             UUID id, List<PickleStepTestStep> testSteps,
             List<HookTestStep> beforeHooks,
             List<HookTestStep> afterHooks,
-            Pickle pickle,
+            GherkinMessagesPickle pickle,
             boolean dryRun,
             Runner runner,
             LinkedMultiMap<String, String> passMap
     ) {
-        super(id, (GherkinMessagesPickle) pickle, runner, passMap);
+        super(id, pickle, runner, passMap);
         this.id = id;
         this.testSteps = testSteps;
         this.beforeHooks = beforeHooks;
         this.afterHooks = afterHooks;
         this.pickle = pickle;
         this.executionMode = dryRun ? DRY_RUN : RUN;
-
-
 
         for (PickleStepTestStep testStep : testSteps) {
             testStep.setScenarioContext(this);
@@ -87,10 +84,12 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
     }
 
     public void runComponent(EventBus bus) {
+        (pickle).getMessagePickle().setName(this);
         setCurrentScenario(this);
         ExecutionMode nextExecutionMode = this.executionMode;
         if (isTopLevel())
             emitTestCaseMessage(bus);
+
 
         Instant start = bus.getInstant();
         UUID executionId = bus.generateId();
@@ -109,11 +108,9 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
         }
 
 
-
-
         for (PickleStepTestStep dummyStep : testSteps) {
             nextExecutionMode = runStackSteps(this, state, bus, nextExecutionMode);
-            PickleStepTestStep step  = dummyStep.modifyPickleStepTestStep();
+            PickleStepTestStep step = dummyStep.modifyPickleStepTestStep();
             nextExecutionMode = step
                     .run(this, bus, state, nextExecutionMode)
                     .next(nextExecutionMode);

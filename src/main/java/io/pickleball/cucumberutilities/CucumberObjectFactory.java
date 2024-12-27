@@ -26,6 +26,12 @@ public class CucumberObjectFactory {
                 {dynamicStep}
             """;
 
+    public static io.cucumber.core.runner.PickleStepTestStep createDummuPickleStepTestStep(
+            String dynamicStep)  {
+        PickleStepTestStep currentStep =  getCurrentStep();
+        return createPickleStepTestStep(dynamicStep,  null,  null, currentStep.getUri(), currentStep.getStepLine());
+    }
+
     public static io.cucumber.core.runner.PickleStepTestStep createPickleStepTestStep(
             String dynamicStep)  {
         PickleStepTestStep currentStep =  getCurrentStep();

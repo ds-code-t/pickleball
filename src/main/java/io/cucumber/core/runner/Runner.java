@@ -9,6 +9,7 @@ import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.core.exception.CucumberException;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.gherkin.Step;
+import io.cucumber.core.gherkin.messages.GherkinMessagesPickle;
 import io.cucumber.core.logging.Logger;
 import io.cucumber.core.logging.LoggerFactory;
 import io.cucumber.core.snippets.SnippetGenerator;
@@ -155,13 +156,13 @@ public final class Runner {
     }
     public TestCase createTestCaseForPickle(Pickle pickle, LinkedMultiMap<String, String> map) {
         if (pickle.getSteps().isEmpty()) {
-            return new TestCase(bus.generateId(), emptyList(), emptyList(), emptyList(), pickle,
-                    runnerOptions.isDryRun(), this, null);
+            return new TestCase(bus.generateId(), emptyList(), emptyList(), emptyList(), (GherkinMessagesPickle) pickle,
+                    runnerOptions.isDryRun(), this, map);
         }
         List<PickleStepTestStep> testSteps = createDummyTestStepsForPickleSteps(pickle);
         List<HookTestStep> beforeHooks = createTestStepsForBeforeHooks(pickle.getTags());
         List<HookTestStep> afterHooks = createTestStepsForAfterHooks(pickle.getTags());
-        return new TestCase(bus.generateId(), testSteps, beforeHooks, afterHooks, pickle, runnerOptions.isDryRun(), this, null);
+        return new TestCase(bus.generateId(), testSteps, beforeHooks, afterHooks, (GherkinMessagesPickle) pickle, runnerOptions.isDryRun(), this, map);
     }
 
     private void disposeBackendWorlds() {

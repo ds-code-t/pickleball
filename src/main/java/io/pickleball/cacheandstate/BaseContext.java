@@ -33,7 +33,6 @@ public class BaseContext  implements io.cucumber.plugin.event.TestStep{
         return nextExecutionMode;
     }
 
-
     @Override
     public String getCodeLocation() {
         return "";

@@ -33,8 +33,7 @@ public abstract class TestStep extends StepContext implements io.cucumber.plugin
     private final Predicate<Throwable> isTestAbortedException = createIsTestAbortedExceptionPredicate();
     private final StepDefinitionMatch stepDefinitionMatch;
     private final UUID id;
-    public Method method;
-
+//    public Method method;
 
 
     TestStep(UUID id, StepDefinitionMatch stepDefinitionMatch) {
@@ -57,8 +56,10 @@ public abstract class TestStep extends StepContext implements io.cucumber.plugin
     public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
         Instant startTime = bus.getInstant();
 
-//        if (!stepContext.isMetaStep())
-        emitTestStepStarted(testCase, bus, state.getTestExecutionId(), startTime);
+        boolean shouldEmit = shouldEmitEvent();
+
+        if (shouldEmit)
+            emitTestStepStarted(testCase, bus, state.getTestExecutionId(), startTime);
 
         Status status;
         Throwable error = null;
@@ -75,7 +76,8 @@ public abstract class TestStep extends StepContext implements io.cucumber.plugin
         Result result = mapStatusToResult(status, error, duration);
         state.add(result);
 
-        emitTestStepFinished(testCase, bus, state.getTestExecutionId(), stopTime, duration, result, error);
+        if (shouldEmit)
+            emitTestStepFinished(testCase, bus, state.getTestExecutionId(), stopTime, duration, result, error);
 
 
         addStatus(result.getStatus());
@@ -91,7 +93,7 @@ public abstract class TestStep extends StepContext implements io.cucumber.plugin
 
 
     private void emitTestStepStarted(TestCase testCase, EventBus bus, UUID textExecutionId, Instant startTime) {
-        startEvent = new EventContainer(  testCase,  bus,  textExecutionId,  startTime,  id, this);
+        startEvent = new EventContainer(testCase, bus, textExecutionId, startTime, id, this);
         if (shouldSendStart())
             sendStartEvent();
     }
@@ -132,10 +134,10 @@ public abstract class TestStep extends StepContext implements io.cucumber.plugin
     }
 
     private void emitTestStepFinished(
-            TestCase testCase, EventBus bus, UUID textExecutionId, Instant stopTime, Duration duration, Result result , Throwable... throwables
+            TestCase testCase, EventBus bus, UUID textExecutionId, Instant stopTime, Duration duration, Result result, Throwable... throwables
     ) {
 
-        endEvent = new EventContainer(  testCase,  bus,  textExecutionId,  stopTime,  duration,  result,  id, this);
+        endEvent = new EventContainer(testCase, bus, textExecutionId, stopTime, duration, result, id, this);
         if (result.getStatus().equals(Status.FAILED) || shouldSendEnd())
             sendEndEvent(throwables);
 
