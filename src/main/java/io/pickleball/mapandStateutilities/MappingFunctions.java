@@ -9,19 +9,19 @@ import static io.pickleball.configs.Constants.flag1;
 
 public class MappingFunctions {
 
+    @SafeVarargs
     public static String replaceNestedBrackets(String input, LinkedMultiMap<String, String>... maps) {
       return replaceNestedBrackets(input, Arrays.stream(maps).toList());
 
     }
     public static String replaceNestedBrackets(String input, List<LinkedMultiMap<String, String>> maps) {
         String result = input;
-
-
-
         // Simplified pattern that matches text between angle brackets
         // [^<>]+ matches one or more characters that are not angle brackets
         Pattern pattern = Pattern.compile("<([^<>]+)>");
         for (LinkedMultiMap<String, String> map : maps) {
+            if(map == null)
+                continue;
             while (true) {
                 Matcher matcher = pattern.matcher(result);
                 boolean found = false;

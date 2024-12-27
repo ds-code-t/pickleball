@@ -1,26 +1,71 @@
 package io.pickleball.cacheandstate;
 
 import io.cucumber.core.gherkin.Pickle;
+import io.cucumber.core.gherkin.messages.GherkinMessagesPickle;
 import io.cucumber.core.runner.PickleStepTestStep;
+import io.cucumber.core.runner.Runner;
 import io.cucumber.core.runner.TestCase;
 import io.cucumber.core.runner.TestCaseState;
+import io.cucumber.messages.types.TableCell;
+import io.cucumber.messages.types.TableRow;
 import io.pickleball.mapandStateutilities.LinkedMultiMap;
 
 import java.util.*;
 
 import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
+import static io.pickleball.cucumberutilities.ArgumentParsing.convertCommandLineToArgv;
+import static io.pickleball.cucumberutilities.ArgumentParsing.convertHashMapToArgv;
 import static io.pickleball.executions.ComponentRuntime.createTestcases;
 import static java.util.Comparator.comparingInt;
 
-public abstract class ScenarioContext extends  BaseContext implements io.cucumber.plugin.event.TestStep {
+public abstract class ScenarioContext extends BaseContext implements io.cucumber.plugin.event.TestStep {
     private final Pickle pickle;             // The static scenario definition
     private TestCaseState testCaseState;    // The mutable scenario state
 
-    public int nestingLevel = 0;
-    public int position = 0;
-    public TestCase parent = null;
+
+    private final Runner runner;
+
     private List<ScenarioContext> children = new ArrayList<>();
     private List<StepContext> stepChildren = new ArrayList<>();
+
+    private final UUID id;
+
+    public LinkedMultiMap<String, String> getPassedMap() {
+        return passedMap;
+    }
+
+    public LinkedMultiMap<String, String> getExamplesMap() {
+        return examplesMap;
+    }
+
+    public LinkedMultiMap<String, String> getStateMap() {
+        return stateMap;
+    }
+
+    private final LinkedMultiMap<String, String> passedMap;
+    private final LinkedMultiMap<String, String> examplesMap;
+
+    public final LinkedMultiMap<String, String> stateMap = new LinkedMultiMap<>();
+
+
+    public ScenarioContext(UUID id, GherkinMessagesPickle pickle, Runner runner, LinkedMultiMap<String, String> passedMap) {
+        this.id = id;
+        this.pickle = pickle;
+        this.passedMap = passedMap;
+        this.runner = runner;
+
+
+        TableRow valuesRow = pickle.getMessagePickle().getValueRow();
+
+        if (valuesRow != null) {
+            List<String> headers = pickle.getMessagePickle().getHeaderRow().stream().map(TableCell::getValue).toList();
+            List<String> values = valuesRow.getCells().stream().map(TableCell::getValue).toList();
+            examplesMap = new LinkedMultiMap<>(headers, values);
+        } else {
+            examplesMap = null;
+        }
+    }
+
 
     public boolean isTopLevel() {
         return nestingLevel == 0;
@@ -50,27 +95,25 @@ public abstract class ScenarioContext extends  BaseContext implements io.cucumbe
     }
 
     public void addChildStepContext(StepContext child) {
-        child.parent = this;
+        child.parent = (TestCase) this;
         child.nestingLevel = (nestingLevel + 1);
         child.position = stepChildren.size();
         stepChildren.add(child);
     }
 
 
-    public ScenarioContext(UUID id, Pickle pickle) {
-        this.pickle = pickle;
+    public final void createComponentScenario(String argString, LinkedMultiMap<String, String> map) {
+        createComponentScenario(convertCommandLineToArgv(argString), map);
+    }
+//
+
+    public final void createComponentScenario(Map<String, Object> argMap, LinkedMultiMap<String, String> map) {
+        createComponentScenario(convertHashMapToArgv(argMap), map);
     }
 
-//    public void createComponentScenario(String argString, LinkedMultiMap<String, String>... maps) {
-//        createComponentScenario(convertCommandLineToArgv(argString), maps);
-//    }
-//
-//    public void createComponentScenario(Map<String, Object> map, LinkedMultiMap<String, String>... maps) {
-//        createComponentScenario(convertHashMapToArgv(map), maps);
-//    }
 
-    public List<TestCase> getAndSortTestcases(String[] args, LinkedMultiMap<String, String>... maps) {
-        List<TestCase> tests = createTestcases(args, maps);
+    public final List<TestCase> getAndSortTestcases(String[] args, LinkedMultiMap<String, String> map) {
+        List<TestCase> tests = createTestcases(args, map);
         List<TestCase> testCases = new ArrayList<>(tests);
         testCases.sort(
                 comparingInt(TestCase::getPriority)
@@ -86,8 +129,8 @@ public abstract class ScenarioContext extends  BaseContext implements io.cucumbe
         }
     }
 
-    public void createComponentScenario(String[] args, LinkedMultiMap<String, String>... maps) {
-        executeTestCases(getAndSortTestcases(args, maps));
+    public final void createComponentScenario(String[] args, LinkedMultiMap<String, String> map) {
+        executeTestCases(getAndSortTestcases(args, map));
     }
 
 
@@ -109,8 +152,8 @@ public abstract class ScenarioContext extends  BaseContext implements io.cucumbe
     }
 
 
-    public Pickle getPickle() {
-        return pickle;
+    public GherkinMessagesPickle getPickle() {
+        return (GherkinMessagesPickle) pickle;
     }
 
 
@@ -122,5 +165,25 @@ public abstract class ScenarioContext extends  BaseContext implements io.cucumbe
         this.testCaseState = testCaseState;
     }
 
+    public Runner getRunner() {
+        return runner;
+    }
+
+    public List<ScenarioContext> getChildren() {
+        return children;
+    }
+
+    public List<StepContext> getStepChildren() {
+        return stepChildren;
+    }
+
+    @Override
+    public UUID getId() {
+        return id;
+    }
+
+    public PickleStepTestStep getParentStep() {
+        return parentStep;
+    }
 
 }

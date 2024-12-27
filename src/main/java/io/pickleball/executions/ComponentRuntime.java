@@ -24,18 +24,11 @@ import static io.pickleball.cucumberutilities.SourceParser.getComponentScenarioW
 
 public final class ComponentRuntime {
 
-    public static  List<TestCase> createTestcases(String[] args, LinkedMultiMap<String, String>... maps) {
+    public static  List<TestCase> createTestcases(String[] args,  LinkedMultiMap<String, String> map) {
         RuntimeOptions runtimeOptions = ComponentRuntime.buildOptions(args);
         List<Feature> features = getFeaturePathFeatureSupplier().get(runtimeOptions);
         List<Pickle> pickles = filterPicklesFromFeatures(features, runtimeOptions);
-        List<GherkinMessagesPickle> modifiedPickles =  pickles.stream().map( pickle -> {
-            try {
-                return getComponentScenarioWrapper((GherkinMessagesPickle) pickle, maps);
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }).toList();
-        return modifiedPickles.stream().map(pickle -> getRunner().createTestCaseForPickle(pickle)).toList();
+        return pickles.stream().map(pickle -> getRunner().createTestCaseForPickle(pickle, map)).toList();
     }
 
     public static RuntimeOptions buildOptions(String[] argv) {

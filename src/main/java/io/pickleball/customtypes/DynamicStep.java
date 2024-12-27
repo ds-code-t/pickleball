@@ -1,9 +1,9 @@
 package io.pickleball.customtypes;
 
-public class MetaStep {
+public class DynamicStep {
     private final String stepText;
 
-    public MetaStep(String stepText) {
+    public DynamicStep(String stepText) {
         this.stepText = stepText;
     }
 

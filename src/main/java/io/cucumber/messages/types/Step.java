@@ -63,8 +63,11 @@ public class Step {
         return Optional.ofNullable(keywordType);
     }
 
+
+    // pmode keyword getText() @IF
     public String getText() {
-        return text;
+        return (keyword.startsWith("@") ? keyword  + text.substring(1) : text);
+//        return text;
     }
 
     public Optional<DocString> getDocString() {
@@ -87,14 +90,14 @@ public class Step {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Step that = (Step) o;
-        return 
-            location.equals(that.location) &&         
-            keyword.equals(that.keyword) &&         
-            Objects.equals(keywordType, that.keywordType) &&         
-            text.equals(that.text) &&         
-            Objects.equals(docString, that.docString) &&         
-            Objects.equals(dataTable, that.dataTable) &&         
-            id.equals(that.id);        
+        return
+            location.equals(that.location) &&
+            keyword.equals(that.keyword) &&
+            Objects.equals(keywordType, that.keywordType) &&
+            text.equals(that.text) &&
+            Objects.equals(docString, that.docString) &&
+            Objects.equals(dataTable, that.dataTable) &&
+            id.equals(that.id);
     }
 
     @Override

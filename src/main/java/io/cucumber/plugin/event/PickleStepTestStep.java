@@ -1,6 +1,5 @@
 package io.cucumber.plugin.event;
 
-import io.pickleball.dynamicstepinvocation.DynamicSteps;
 import org.apiguardian.api.API;
 
 import java.net.URI;
@@ -10,7 +9,7 @@ import java.util.List;
  * A pickle test step matches a line in a Gherkin scenario or background.
  */
 @API(status = API.Status.STABLE)
-public interface PickleStepTestStep extends DynamicSteps {
+public interface PickleStepTestStep {
 
     /**
      * The pattern or expression used to match the glue code to the Gherkin
@@ -73,4 +72,5 @@ public interface PickleStepTestStep extends DynamicSteps {
     @Deprecated
     String getStepText();
 
+    String getCodeLocation();
 }

@@ -41,12 +41,7 @@ public final class GherkinMessagesFeature implements Feature {
                 .filter(this::hasRuleOrScenario)
                 .map(this::mapRuleOrScenario)
                 .collect(Collectors.toList());
-//           this.envelopes.forEach(e -> System.out.println("\n\n=========\n@@envelop:: " + e + "\n---\n"));
-
-
-        System.out.println("@@getDescriptionLinesWithLineNumbers:: " + getDescriptionLinesWithLineNumbers());
-        System.out.println("========= ");
-    }
+  }
 
 
     public TreeMap<Integer, String> getDescriptionLinesWithLineNumbers() {
@@ -78,7 +73,6 @@ public final class GherkinMessagesFeature implements Feature {
         feature.getChildren().forEach(child -> {
             if (child.getScenario().isPresent()) {
                 io.cucumber.messages.types.Scenario scenario = child.getScenario().get();
-                System.out.println("@@scenario.getDescription()L:: " + scenario.getDescription());
                 if (!scenario.getDescription().isEmpty()) {
                     int currentLine = (int) (scenario.getLocation().getLine() + 1);
                     for (String line : scenario.getDescription().split("\n")) {

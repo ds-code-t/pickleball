@@ -18,6 +18,23 @@ public final class GherkinMessagesStep implements Step {
     private final String previousGwtKeyWord;
     private final Location location;
 
+    public PickleStep getPickleStep() {
+        return pickleStep;
+    }
+
+    @Override
+    public String getKeyWord() {
+        return keyWord;
+    }
+
+    public StepType getStepType() {
+        return stepType;
+    }
+
+    public String getPreviousGwtKeyWord() {
+        return previousGwtKeyWord;
+    }
+
     public GherkinMessagesStep(
             PickleStep pickleStep,
             GherkinDialect dialect,

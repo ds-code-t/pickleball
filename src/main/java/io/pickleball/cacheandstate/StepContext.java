@@ -2,61 +2,34 @@ package io.pickleball.cacheandstate;
 
 
 import io.cucumber.core.backend.Status;
-import io.cucumber.core.backend.StepDefinition;
 import io.cucumber.core.gherkin.messages.GherkinMessagesDataTableArgument;
 import io.cucumber.core.gherkin.messages.GherkinMessagesDocStringArgument;
+import io.cucumber.core.gherkin.messages.GherkinMessagesStep;
 import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.core.stepexpression.DataTableArgument;
 import io.cucumber.core.stepexpression.DocStringArgument;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
-import io.pickleball.annotations.Metastep;
-import io.cucumber.core.runner.ExecutionMode;
+import io.cucumber.messages.types.*;
+import io.cucumber.plugin.event.PickleStepTestStep;
 import io.cucumber.core.runner.PickleStepDefinitionMatch;
-import io.cucumber.core.runner.PickleStepTestStep;
-import io.cucumber.java.JavaStepDefinition;
-import io.cucumber.plugin.event.TestCase;
-import io.cucumber.plugin.event.TestStep;
 import io.pickleball.logging.EventContainer;
 
-import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
+import static io.cucumber.gherkin.PickleCompiler.pickleStepTypeFromKeywordType;
+import static io.pickleball.StepFactory.createPickleStepTestStep;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.shouldSendEvent;
+import static io.pickleball.mapandStateutilities.MappingFunctions.replaceNestedBrackets;
 
 
 public class StepContext extends BaseContext {
 
 
-//    private ScenarioContext scenarioContext;
-    //    private final PickleStepTestStep testStep;      // The runtime step object (e.g., PickleStepTestStep)
-//    private final Step gherkinStep;       // The static Gherkin step data
-//    private final StepDefinition stepDefinition; // The underlying step definition (stable, unchanging)
-//    private final PickleStepDefinitionMatch pickleStepDefinitionMatch; // The underlying step definition (stable, unchanging)
+//    public int nestingLevel = 0;
+//    public int position = 0;
+//    public ScenarioContext parent = null;
 
-
-//    private TestCase testCase;      // The scenario-level test case object for this step run
-
-//    private JavaStepDefinition javaStepDefinition;
-//    private Method method;
-
-    private boolean isMetaStep;
-
-
-    public boolean isMetaStep() {
-        return isMetaStep;
-    }
-
-    private Method method;
-
-    public int nestingLevel = 0;
-    public int position = 0;
-    public ScenarioContext parent = null;
-
-
-//    private final List<ExecutionMode> executionModeList = new ArrayList<>();
 
     public EventContainer startEvent;
     public EventContainer endEvent;
@@ -69,9 +42,70 @@ public class StepContext extends BaseContext {
 
 
     private ScenarioContext scenarioContext;
-    private StepDefinition stepDefinition; // The underlying step definition (stable, unchanging)
     private PickleStepDefinitionMatch pickleStepDefinitionMatch; // The underlying step definition (stable, unchanging)
     public UUID id;
+
+
+    public io.cucumber.core.runner.PickleStepTestStep modifyPickleStepTestStep() {
+        return createPickleStepTestStep(parent.getRunner(), createPickleStep(), parent.getPickle());
+    }
+
+    public PickleStep createPickleStep() {
+        PickleStepTestStep pickleStepTestStep = (PickleStepTestStep) this;
+        GherkinMessagesStep gherkinMessagesStep = (GherkinMessagesStep) pickleStepTestStep.getStep();
+        PickleStep pickleStep = gherkinMessagesStep.getPickleStep();
+        Step step = pickleStep.getStepTemplate();
+
+
+        String stepText = replaceNestedBrackets(pickleStepTestStep.getStep().getText(), parent.getPassedMap(), parent.getExamplesMap(), parent.getStateMap());
+
+        PickleStepArgument argument = null;
+
+        io.cucumber.messages.types.DataTable dataTable = step.getDataTable().orElse(null);
+
+        if (dataTable != null) {
+            List<TableRow> rows = dataTable.getRows();
+            List<PickleTableRow> newRows = new ArrayList<>(rows.size());
+            for (TableRow row : rows) {
+                List<TableCell> cells = row.getCells();
+                List<PickleTableCell> newCells = new ArrayList<>();
+                for (TableCell cell : cells) {
+                    String cellText = cell.getValue();
+                    newCells.add(new PickleTableCell(cellText));
+                }
+                newRows.add(new PickleTableRow(newCells));
+            }
+            argument = new PickleStepArgument(null, new PickleTable(newRows));
+        } else {
+            io.cucumber.messages.types.DocString docString = step.getDocString().orElse(null);
+            if (docString != null) {
+
+                String media = docString.getMediaType().orElse(null);
+                if (media != null)
+                    media = replaceNestedBrackets(media, parent.getPassedMap(), parent.getExamplesMap(), parent.getStateMap());
+                String content = docString.getContent();
+
+                PickleDocString pickleDocString = new PickleDocString(media, content);
+                argument = new PickleStepArgument(pickleDocString, null);
+
+
+            }
+        }
+
+
+        return new PickleStep(
+                step,
+                argument,
+                pickleStep.getAstNodeIds(),
+                pickleStep.getId(),
+                pickleStepTypeFromKeywordType.get(gherkinMessagesStep.getPickleStep().getStepTemplate()),
+                stepText
+        );
+
+    }
+
+
+
 
     public StepContext(
             UUID id,
@@ -79,11 +113,7 @@ public class StepContext extends BaseContext {
     ) {
         this.id = id;
         this.pickleStepDefinitionMatch = pickleStepDefinitionMatch;
-        this.stepDefinition = pickleStepDefinitionMatch.getStepDefinition();
-        setMethod(pickleStepDefinitionMatch.method);
     }
-
-
 
 
     public List<Argument> getArguments() {
@@ -167,26 +197,6 @@ public class StepContext extends BaseContext {
     }
 
 
-//    public ExecutionMode addExecutionMode(ExecutionMode executionMode) {
-//        if (executionMode.equals(ExecutionMode.RUN) && executionModeList.isEmpty())
-//            setCurrentStep(this);
-//        executionModeList.add(executionMode);
-//        return executionMode;
-//    }
-
-
-    public Method getMethod() {
-        return method;
-    }
-
-    public void setMethod(Method method) {
-//        isMetaStep = method != null && method.getReturnType().equals(MetaStepData.class);
-        isMetaStep = method != null && method.isAnnotationPresent(Metastep.class);
-        this.method = method;
-        this.sendEvents = !isMetaStep;
-    }
-
-
     /**
      * Returns the scenario-level context. Steps can access scenario-level data through this.
      */
@@ -200,13 +210,12 @@ public class StepContext extends BaseContext {
     }
 
 
-    /**
-     * Returns the runtime TestCase for this step, which provides context about the scenario execution.
-     */
+/**
+ * Returns the runtime TestCase for this step, which provides context about the scenario execution.
+ */
 //    public TestCase getTestCase() {
 //        return testCase;
 //    }
-
 
 
 }

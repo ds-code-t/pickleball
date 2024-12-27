@@ -24,6 +24,17 @@ public abstract class AbstractMultiMap<K, V> extends HashMap<K, V> implements Mu
         this.values = new ArrayList<>(values);
     }
 
+    public void addAll(K key, List<V> newValues) {
+        Objects.requireNonNull(key, "Key cannot be null");
+        Objects.requireNonNull(newValues, "Values list cannot be null");
+
+        // Append the new values to the existing list or create a new list if it doesn't exist
+        for (V value : newValues) {
+            keys.add(key);
+            values.add(value);
+        }
+    }
+
     @Override
     public V put(K key, V value) {
         List<V> vs = getValues(key);
@@ -109,5 +120,46 @@ public abstract class AbstractMultiMap<K, V> extends HashMap<K, V> implements Mu
                         .mapToObj(i -> keys.get(i) + "=" + (values.get(i) != null ? values.get(i) : "null"))
                         .collect(Collectors.joining(", "))
                 + "}";
+    }
+
+
+    /**
+     * Merges multiple AbstractMultiMap<K, V> instances of the same key/value types into a new instance.
+     * The entries are appended in the order of the varargs.
+     */
+    @SafeVarargs
+    public static <K, V> AbstractMultiMap<K, V> merge(AbstractMultiMap<K, V>... multiMaps) {
+        Objects.requireNonNull(multiMaps, "multiMaps array cannot be null");
+        // Anonymous subclass to instantiate an AbstractMultiMap
+        AbstractMultiMap<K, V> merged = new AbstractMultiMap<K, V>() { };
+        for (AbstractMultiMap<K, V> map : multiMaps) {
+            if (map == null) {
+                continue;
+            }
+            for (int i = 0; i < map.keys.size(); i++) {
+                merged.keys.add(map.keys.get(i));
+                merged.values.add(map.values.get(i));
+            }
+        }
+        return merged;
+    }
+
+    /**
+     * Merges multiple AbstractMultiMap<?, ?> instances of potentially different key/value types into
+     * a new AbstractMultiMap<String, String> by converting all keys and values to strings.
+     */
+    public static AbstractMultiMap<String, String> mergeToString(AbstractMultiMap<?, ?>... multiMaps) {
+        Objects.requireNonNull(multiMaps, "multiMaps array cannot be null");
+        AbstractMultiMap<String, String> merged = new AbstractMultiMap<String, String>() { };
+        for (AbstractMultiMap<?, ?> map : multiMaps) {
+            if (map == null) {
+                continue;
+            }
+            for (int i = 0; i < map.keys.size(); i++) {
+                merged.keys.add(String.valueOf(map.keys.get(i)));
+                merged.values.add(String.valueOf(map.values.get(i)));
+            }
+        }
+        return merged;
     }
 }

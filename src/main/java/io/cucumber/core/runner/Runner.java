@@ -17,6 +17,7 @@ import io.cucumber.plugin.event.HookType;
 import io.cucumber.plugin.event.Location;
 import io.cucumber.plugin.event.SnippetsSuggestedEvent;
 import io.cucumber.plugin.event.SnippetsSuggestedEvent.Suggestion;
+import io.pickleball.mapandStateutilities.LinkedMultiMap;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -79,6 +80,11 @@ public final class Runner {
             setScenarioThreadState(this, testCase);
             setPrimaryScenario(testCase);
             testCase.run(bus);
+        } catch (Throwable t) {
+            // Log the exception with its full stack trace
+            System.err.println("Exception during pickle execution: " + t.getMessage());
+            t.printStackTrace();
+            throw t; // Re-throw to ensure the exception propagates as expected
         } finally {
             glue.removeScenarioScopedGlue();
             disposeBackendWorlds();
@@ -119,9 +125,9 @@ public final class Runner {
             hookDefinition.execute();
         } catch (CucumberBackendException e) {
             CucumberException exception = new CucumberException(String.format("" +
-                    "Could not invoke hook defined at '%s'.\n" +
-                    "It appears there was a problem with the hook definition.",
-                hookDefinition.getLocation()), e);
+                            "Could not invoke hook defined at '%s'.\n" +
+                            "It appears there was a problem with the hook definition.",
+                    hookDefinition.getLocation()), e);
             throwAsUncheckedException(exception);
         } catch (CucumberInvocationTargetException e) {
             Throwable throwable = removeFrameworkFrames(e);
@@ -145,15 +151,17 @@ public final class Runner {
     }
 
     public TestCase createTestCaseForPickle(Pickle pickle) {
+        return createTestCaseForPickle(pickle, null);
+    }
+    public TestCase createTestCaseForPickle(Pickle pickle, LinkedMultiMap<String, String> map) {
         if (pickle.getSteps().isEmpty()) {
             return new TestCase(bus.generateId(), emptyList(), emptyList(), emptyList(), pickle,
-                runnerOptions.isDryRun());
+                    runnerOptions.isDryRun(), this, null);
         }
-
-        List<PickleStepTestStep> testSteps = createTestStepsForPickleSteps(pickle);
+        List<PickleStepTestStep> testSteps = createDummyTestStepsForPickleSteps(pickle);
         List<HookTestStep> beforeHooks = createTestStepsForBeforeHooks(pickle.getTags());
         List<HookTestStep> afterHooks = createTestStepsForAfterHooks(pickle.getTags());
-        return new TestCase(bus.generateId(), testSteps, beforeHooks, afterHooks, pickle, runnerOptions.isDryRun());
+        return new TestCase(bus.generateId(), testSteps, beforeHooks, afterHooks, pickle, runnerOptions.isDryRun(), this, null);
     }
 
     private void disposeBackendWorlds() {
@@ -177,6 +185,19 @@ public final class Runner {
         return testSteps;
     }
 
+    private List<PickleStepTestStep> createDummyTestStepsForPickleSteps(Pickle pickle) {
+        List<PickleStepTestStep> testSteps = new ArrayList<>();
+
+        for (Step step : pickle.getSteps()) {
+            List<HookTestStep> afterStepHookSteps = createAfterStepHooks(pickle.getTags());
+            List<HookTestStep> beforeStepHookSteps = createBeforeStepHooks(pickle.getTags());
+            testSteps.add(new PickleStepTestStep(bus.generateId(), pickle.getUri(), step, beforeStepHookSteps,
+                    afterStepHookSteps, pickle, this));
+        }
+
+        return testSteps;
+    }
+
     private List<HookTestStep> createTestStepsForBeforeHooks(List<String> tags) {
         return createTestStepsForHooks(tags, glue.getBeforeHooks(), HookType.BEFORE);
     }
@@ -185,7 +206,7 @@ public final class Runner {
         return createTestStepsForHooks(tags, glue.getAfterHooks(), HookType.AFTER);
     }
 
-    private PickleStepDefinitionMatch matchStepToStepDefinition(Pickle pickle, Step step) {
+    public PickleStepDefinitionMatch matchStepToStepDefinition(Pickle pickle, Step step) {
         try {
             PickleStepDefinitionMatch match = glue.stepDefinitionMatch(pickle.getUri(), step);
             if (match != null) {
@@ -211,11 +232,11 @@ public final class Runner {
         bus.send(event);
     }
 
-    private List<HookTestStep> createAfterStepHooks(List<String> tags) {
+    public List<HookTestStep> createAfterStepHooks(List<String> tags) {
         return createTestStepsForHooks(tags, glue.getAfterStepHooks(), HookType.AFTER_STEP);
     }
 
-    private List<HookTestStep> createBeforeStepHooks(List<String> tags) {
+    public List<HookTestStep> createBeforeStepHooks(List<String> tags) {
         return createTestStepsForHooks(tags, glue.getBeforeStepHooks(), HookType.BEFORE_STEP);
     }
 

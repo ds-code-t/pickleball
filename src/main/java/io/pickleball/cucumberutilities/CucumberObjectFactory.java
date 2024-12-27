@@ -23,31 +23,31 @@ public class CucumberObjectFactory {
     private static final String MINIMAL_FEATURE_TEMPLATE = """
             Feature: Minimal Feature Template            
               Scenario: Minimal Scenario Template
-                {metaStep}
+                {dynamicStep}
             """;
 
     public static io.cucumber.core.runner.PickleStepTestStep createPickleStepTestStep(
-            String metaStep)  {
+            String dynamicStep)  {
         PickleStepTestStep currentStep =  getCurrentStep();
-        return createPickleStepTestStep(metaStep,  currentStep.getGherkinMessagesDataTableArgument(),  currentStep.getGherkinMessagesDocStringArgument(), currentStep.getUri(), currentStep.getStepLine());
+        return createPickleStepTestStep(dynamicStep,  currentStep.getGherkinMessagesDataTableArgument(),  currentStep.getGherkinMessagesDocStringArgument(), currentStep.getUri(), currentStep.getStepLine());
     }
 
     public static io.cucumber.core.runner.PickleStepTestStep createPickleStepTestStepWithArgs(
-            String metaStep,
+            String dynamicStep,
             GherkinMessagesDataTableArgument dataTableArg,
             GherkinMessagesDocStringArgument docStringArg,
             URI overrideUri,
             int overrideLineNumber)  {
-        return createPickleStepTestStep(metaStep, dataTableArg, docStringArg, overrideUri, overrideLineNumber);
+        return createPickleStepTestStep(dynamicStep, dataTableArg, docStringArg, overrideUri, overrideLineNumber);
 
 //        DataTable dataTable = dataTableArg == null ? null : DataTableUtilities.convertToDataTable(dataTableArg);
 //        DocString docString = docStringArg == null ? null : DocString.create(docStringArg.getContent());
-//        return createPickleStepTestStep(metaStep, dataTable, docString, overrideUri, overrideLineNumber);
+//        return createPickleStepTestStep(dynamicStep, dataTable, docString, overrideUri, overrideLineNumber);
     }
 
 
     public static io.cucumber.core.runner.PickleStepTestStep createPickleStepTestStep(
-            String metaStep,
+            String dynamicStep,
             io.cucumber.core.gherkin.messages.GherkinMessagesDataTableArgument dataTable,
             io.cucumber.core.gherkin.messages.GherkinMessagesDocStringArgument docString,
             URI overrideUri,
@@ -58,7 +58,7 @@ public class CucumberObjectFactory {
         URI uriToUse = overrideUri != null ? overrideUri : URI.create("file://minimal.feature");
         int lineToUse = overrideLineNumber > 2 ? overrideLineNumber : 3;
         // Build the Gherkin step with DataTable or DocString arguments
-        StringBuilder stepBuilder = new StringBuilder("Given " + metaStep);
+        StringBuilder stepBuilder = new StringBuilder("Given " + dynamicStep);
         if (dataTable != null) {
             stepBuilder.append("\n").append(dataTable.cells().stream()
                     .map(row -> "| " + String.join(" | ", row) + " |")
@@ -99,7 +99,7 @@ public class CucumberObjectFactory {
             throw new RuntimeException(e);
         }
         if (definitionMatch == null) {
-            throw new RuntimeException("No step definition found for: " + metaStep);
+            throw new RuntimeException("No step definition found for: " + dynamicStep);
         }
 
         // Create the PickleStepTestStep
@@ -117,7 +117,7 @@ public class CucumberObjectFactory {
 
 
     public static io.cucumber.core.runner.PickleStepTestStep createPickleStepTestStep2(
-            String metaStep,
+            String dynamicStep,
             io.cucumber.datatable.DataTable dataTable,
             io.cucumber.docstring.DocString docString,
             URI overrideUri,
@@ -133,7 +133,7 @@ public class CucumberObjectFactory {
             minimalFeatureBuilder.append("\n");
         }
         minimalFeatureBuilder.append("Feature: Minimal Feature Template\n\n  Scenario: Minimal Scenario Template\n    ");
-        String stepText = PREFIXES.stream().anyMatch(metaStep.toLowerCase()::startsWith) ? metaStep : "* " + metaStep;
+        String stepText = PREFIXES.stream().anyMatch(dynamicStep.toLowerCase()::startsWith) ? dynamicStep : "* " + dynamicStep;
         minimalFeatureBuilder.append(stepText);
 
         String featureSource = minimalFeatureBuilder.toString();
@@ -151,11 +151,11 @@ public class CucumberObjectFactory {
         io.cucumber.core.backend.StepDefinition dummyStepDefinition = new io.cucumber.core.backend.StepDefinition() {
             @Override
             public String getPattern() {
-                return metaStep;
+                return dynamicStep;
             }
 
             //            @Override
-            public List<String> matchedArguments(String metaStep) {
+            public List<String> matchedArguments(String dynamicStep) {
                 return Collections.emptyList();
             }
 

@@ -1,10 +1,59 @@
-Feature: Using Plugin Steps333 indep
+Feature:
 
-  @zzs1 @dfs
+  Scenario Outline: aawdqq <Scenario>
+    Given I see colour
+    Given I see <C>
+    Given I see color
+    Given Do you like cucumber?
+    Examples:
+      | Scenario | C |
+      | 1        | colour  |
+      | 1        | color  |
+      | 1        | colors  |
+      | 1        | color  |
+
+
+
+  Scenario: qq
+    Given I see colour
+    Given I see color
+    Given Do you like cucumber?
+
+
+  Scenario Outline: dsdf
+    When I am running a testlzz xxx<A> and <B>
+    Given I have the following string: `<(aaa)>`
+    Examples:
+      | Scenario | (aaa) |
+      | 1        | B   |
+
+  Scenario: ss3423
+    Given I have the following string: `This i\"s \'a "quoted" string`
+  @IF:          *    | I am running a testlzz META and <B>
+    When I am running a testlzz xxx<A> and <B>
+
+
+  Scenario: ss
+    Given I have the following string list: ["item \"one\"", 'item \'t"wo\'', `item \`thr"ee\``]
+    Given I have the following string list: ["item \"one\"", 'item \'t\"wo\'', `item \`thr"ee\``]
+#    When I am running a testlzz xxx<A> and <B>
+    Given I have the following string: "This i\`s\' a \"quoted\" string"
+    Given I have the following string: 'This i\"s\` a \'quoted\' string'
+
+#    Given I have the following string list: ["item one", 'item two', `item three`]
+#    Given I have the following string list: ["item \"one\"", 'item \'two\'', `item \`three\``]
+#    Given I have the following string list: ["item, one", 'item, two', `item, three`]
+#    Given I have the following string list: ["item, one", "item \"two\"", "item three", "" ]
+#    Given I have the following string list: []
+
+
+
+
   Scenario: Mai22
     Then I should see debug outputlzz
     Given I am running a testlzz xxx<A> and <B>
-
+      | a | b |
+      | 1 | 2 |
     Then I should see debug outputlzz
 
   @zzs1 @dfs

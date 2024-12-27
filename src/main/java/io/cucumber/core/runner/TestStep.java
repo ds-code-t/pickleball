@@ -6,6 +6,7 @@ import io.cucumber.core.backend.Pending;
 import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.messages.types.Envelope;
 import io.cucumber.messages.types.TestStepResult;
+import io.cucumber.plugin.event.PickleStepTestStep;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import io.cucumber.plugin.event.TestCase;

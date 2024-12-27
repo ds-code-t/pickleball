@@ -21,14 +21,31 @@ public final class PickleStep {
     private final String id;
     private final PickleStepType type;
     private final String text;
+    private final io.cucumber.messages.types.Step stepTemplate;
 
     public PickleStep(
-        PickleStepArgument argument,
-        java.util.List<String> astNodeIds,
-        String id,
-        PickleStepType type,
-        String text
+            PickleStepArgument argument,
+            java.util.List<String> astNodeIds,
+            String id,
+            PickleStepType type,
+            String text
     ) {
+        this(null, argument, astNodeIds, id, type, text);
+    }
+
+    public Step getStepTemplate() {
+        return stepTemplate;
+    }
+
+    public PickleStep(
+            io.cucumber.messages.types.Step stepTemplate,
+            PickleStepArgument argument,
+            java.util.List<String> astNodeIds,
+            String id,
+            PickleStepType type,
+            String text
+    ) {
+        this.stepTemplate = stepTemplate;
         this.argument = argument;
         this.astNodeIds = unmodifiableList(new ArrayList<>(requireNonNull(astNodeIds, "PickleStep.astNodeIds cannot be null")));
         this.id = requireNonNull(id, "PickleStep.id cannot be null");

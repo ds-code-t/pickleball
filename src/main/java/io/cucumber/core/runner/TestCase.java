@@ -13,7 +13,6 @@ import io.cucumber.plugin.event.TestCaseStarted;
 import io.cucumber.plugin.event.TestStep;
 import io.cucumber.plugin.event.TestStepFinished;
 import io.cucumber.plugin.event.TestStepStarted;
-import io.pickleball.dynamicstepinvocation.DynamicSteps;
 import io.pickleball.mapandStateutilities.LinkedMultiMap;
 import io.pickleball.cacheandstate.ScenarioContext;
 import io.pickleball.executions.ExecutionConfig;
@@ -23,17 +22,14 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Stack;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.ExecutionMode.DRY_RUN;
 import static io.cucumber.core.runner.ExecutionMode.RUN;
 import static io.cucumber.messages.Convertor.toMessage;
-import static io.pickleball.cacheandstate.GlobalCache.getParsedFeature;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.popCurrentScenario;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.setCurrentScenario;
-import static io.pickleball.cucumberutilities.FeatureFileUtilities.getComponentByLine;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
@@ -45,29 +41,10 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
     private final List<HookTestStep> beforeHooks;
     private final List<HookTestStep> afterHooks;
     public final UUID id;
-//    public final ScenarioContext scenarioContext;
     public GherkinMessagesFeature gherkinMessagesFeature;
     public Scenario scenario;
-    public LinkedMultiMap constantMap;
-    public final boolean componentScenario;
 
-//    public LinkedMultiMap<> stepMap =
 
-//    private final Stack<PickleStepTestStep> stepStack = new Stack<>();
-//
-//    public void addStepsToStack(PickleStepTestStep... pickleStepTestSteps) {
-//        stepStack.addAll(List.of(pickleStepTestSteps));
-//    }
-
-    public TestCase(
-            UUID id, List<PickleStepTestStep> testSteps,
-            List<HookTestStep> beforeHooks,
-            List<HookTestStep> afterHooks,
-            Pickle pickle,
-            boolean dryRun
-    ) {
-        this(id, testSteps, beforeHooks, afterHooks, pickle, dryRun, false);
-    }
 
     public TestCase(
             UUID id, List<PickleStepTestStep> testSteps,
@@ -75,34 +52,23 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
             List<HookTestStep> afterHooks,
             Pickle pickle,
             boolean dryRun,
-            boolean componentScenario
+            Runner runner,
+            LinkedMultiMap<String, String> passMap
     ) {
-        super(id, pickle);
+        super(id, (GherkinMessagesPickle) pickle, runner, passMap);
         this.id = id;
         this.testSteps = testSteps;
         this.beforeHooks = beforeHooks;
         this.afterHooks = afterHooks;
         this.pickle = pickle;
         this.executionMode = dryRun ? DRY_RUN : RUN;
-        this.componentScenario = componentScenario;
+
+
 
         for (PickleStepTestStep testStep : testSteps) {
             testStep.setScenarioContext(this);
         }
 
-        if (componentScenario) {
-            this.gherkinMessagesFeature = getParsedFeature(getUri());
-
-            Node node = getComponentByLine(this.gherkinMessagesFeature, getLine());
-            if (node instanceof GherkinMessagesExample) {
-                GherkinMessagesScenarioOutline gherkinMessagesScenarioOutline = ((GherkinMessagesExample) node).getGherkinMessagesScenarioOutline(this.gherkinMessagesFeature);
-                this.constantMap = ((GherkinMessagesExample) node).getLinkedMultiMap();
-                scenario = gherkinMessagesScenarioOutline.getScenario();
-            } else {
-                scenario = ((GherkinMessagesScenario) node).getScenario();
-                this.constantMap = new LinkedMultiMap<>();
-            }
-        }
     }
 
     private static io.cucumber.messages.types.Group makeMessageGroup(
@@ -142,8 +108,12 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
                     .next(nextExecutionMode);
         }
 
-        for (PickleStepTestStep step : testSteps) {
+
+
+
+        for (PickleStepTestStep dummyStep : testSteps) {
             nextExecutionMode = runStackSteps(this, state, bus, nextExecutionMode);
+            PickleStepTestStep step  = dummyStep.modifyPickleStepTestStep();
             nextExecutionMode = step
                     .run(this, bus, state, nextExecutionMode)
                     .next(nextExecutionMode);
@@ -238,10 +208,11 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
         Envelope envelope = Envelope.of(new io.cucumber.messages.types.TestCase(
                 id.toString(),
                 pickle.getId(),
-                getTestSteps()
-                        .stream()
-                        .map(this::createTestStep)
-                        .collect(toList())));
+                new ArrayList<>()));
+//                getTestSteps()
+//                        .stream()
+//                        .map(this::createTestStep)
+//                        .collect(toList())));
         bus.send(envelope);
     }
 

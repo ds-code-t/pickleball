@@ -1,8 +1,8 @@
 package io.cucumber.messages.types;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
@@ -35,19 +35,35 @@ public final class Pickle {
     private final java.util.List<PickleStep> steps;
     private final java.util.List<PickleTag> tags;
     private final java.util.List<String> astNodeIds;
-    public final Scenario scenario;
 
-    public Pickle(
-            String id,
-            String uri,
-            String name,
-            String language,
-            java.util.List<PickleStep> steps,
-            java.util.List<PickleTag> tags,
-            java.util.List<String> astNodeIds
-    ) {
-        this(id, uri, name, language, steps, tags, astNodeIds, null);
+    public int getBackgroundStepsCount() {
+        return backgroundStepsCount;
     }
+
+    public List<TableCell> getHeaderRow() {
+        return headerRow;
+    }
+
+    public TableRow getValueRow() {
+        return valueRow;
+    }
+
+    private final int backgroundStepsCount;
+    private final List<TableCell> headerRow;
+    private final TableRow valueRow;
+
+//    public Pickle(
+//            String id,
+//            String uri,
+//            String name,
+//            String language,
+//            java.util.List<PickleStep> steps,
+//            java.util.List<PickleTag> tags,
+//            java.util.List<String> astNodeIds,
+//            int backgroundStepsCount
+//    ) {
+//        this(id, uri, name, language, steps, tags, astNodeIds, backgroundStepsCount,  null, null);
+//    }
 
 
     public Pickle(
@@ -58,7 +74,9 @@ public final class Pickle {
             java.util.List<PickleStep> steps,
             java.util.List<PickleTag> tags,
             java.util.List<String> astNodeIds,
-            Scenario scenario
+            int backgroundStepsCount,
+            List<TableCell> headerRow,
+            TableRow valueRow
     ) {
         this.id = requireNonNull(id, "Pickle.id cannot be null");
         this.uri = requireNonNull(uri, "Pickle.uri cannot be null");
@@ -67,7 +85,9 @@ public final class Pickle {
         this.steps = unmodifiableList(new ArrayList<>(requireNonNull(steps, "Pickle.steps cannot be null")));
         this.tags = unmodifiableList(new ArrayList<>(requireNonNull(tags, "Pickle.tags cannot be null")));
         this.astNodeIds = unmodifiableList(new ArrayList<>(requireNonNull(astNodeIds, "Pickle.astNodeIds cannot be null")));
-        this.scenario = scenario;
+        this.backgroundStepsCount = backgroundStepsCount;
+        this.headerRow = headerRow;
+        this.valueRow = valueRow;
     }
 
     /**
