@@ -1,12 +1,10 @@
 package io.pickleball;
 
+import io.cucumber.core.exception.CucumberException;
 import io.cucumber.core.gherkin.StepType;
 import io.cucumber.core.gherkin.messages.GherkinMessagesPickle;
 import io.cucumber.core.gherkin.messages.GherkinMessagesStep;
-import io.cucumber.core.runner.HookTestStep;
-import io.cucumber.core.runner.PickleStepDefinitionMatch;
-import io.cucumber.core.runner.PickleStepTestStep;
-import io.cucumber.core.runner.Runner;
+import io.cucumber.core.runner.*;
 import io.cucumber.messages.IdGenerator;
 import io.cucumber.messages.types.*;
 import io.pickleball.cucumberutilities.SimpleIdGenerator;
@@ -17,7 +15,6 @@ import java.util.stream.Stream;
 
 import static io.cucumber.gherkin.PickleCompiler.pickleStepTypeFromKeywordType;
 import static java.util.Collections.singletonList;
-import static java.util.Objects.requireNonNull;
 
 public class StepFactory {
 
@@ -60,6 +57,8 @@ public class StepFactory {
         GherkinMessagesStep gherkinMessagesStep = createGherkinMessagesStep(pickleStep, pickle);
 
         PickleStepDefinitionMatch match = runner.matchStepToStepDefinition(pickle, gherkinMessagesStep);
+        if(match.method == null)
+            throw new CucumberException("No matching method found for step '" + pickleStep.getText() + "'");
 
         List<HookTestStep> afterStepHookSteps = runner.createAfterStepHooks(pickle.getTags());
         List<HookTestStep> beforeStepHookSteps = runner.createBeforeStepHooks(pickle.getTags());

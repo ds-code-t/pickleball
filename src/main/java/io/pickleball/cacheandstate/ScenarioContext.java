@@ -1,5 +1,6 @@
 package io.pickleball.cacheandstate;
 
+import io.cucumber.core.backend.Status;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.gherkin.messages.GherkinMessagesPickle;
 import io.cucumber.core.runner.PickleStepTestStep;
@@ -9,6 +10,7 @@ import io.cucumber.core.runner.TestCaseState;
 import io.cucumber.messages.types.TableCell;
 import io.cucumber.messages.types.TableRow;
 import io.pickleball.mapandStateutilities.LinkedMultiMap;
+import io.pickleball.mapandStateutilities.MapsWrapper;
 
 import java.util.*;
 
@@ -26,8 +28,8 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
 
     private final Runner runner;
 
-    private List<ScenarioContext> children = new ArrayList<>();
-    private List<StepContext> stepChildren = new ArrayList<>();
+    private final List<ScenarioContext> children = new ArrayList<>();
+    private final List<StepContext> stepChildren = new ArrayList<>();
 
     private final UUID id;
 
@@ -48,6 +50,7 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
 
     public final LinkedMultiMap<String, String> stateMap = new LinkedMultiMap<>();
 
+    public final MapsWrapper mapsWrapper;
 
     public ScenarioContext(UUID id, GherkinMessagesPickle pickle, Runner runner, LinkedMultiMap<String, String> passedMap) {
         this.id = id;
@@ -65,8 +68,12 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         } else {
             examplesMap = null;
         }
+        mapsWrapper = new MapsWrapper(this.passedMap, this.examplesMap, this.stateMap);
     }
 
+    public String replaceAndEval(String inputString) {
+        return replaceNestedBrackets(inputString,  mapsWrapper);
+    }
 
     public boolean isTopLevel() {
         return nestingLevel == 0;
@@ -187,4 +194,11 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         return parentStep;
     }
 
+    public void setScenarioStatus(Status status){
+        getTestCaseState().setCompletionStatus(status);
+    }
+    public void setTestStatus(Status status){
+        getPrimaryState().setCompletionStatus(status);
+        getTestCaseState().setCompletionStatus(status);
+    }
 }

@@ -1,10 +1,12 @@
 package io.pickleball.cacheandstate;
 
+import io.cucumber.core.backend.Status;
 import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.core.runner.PickleStepTestStep;
 import io.cucumber.core.runner.Runner;
 import io.cucumber.core.runner.TestCase;
 import io.cucumber.core.runner.TestCaseState;
+import io.pickleball.valueresolution.MVELWrapper;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.HashSet;
@@ -23,6 +25,9 @@ public class PrimaryScenarioData {
     private final ScenarioContext scenarioContext;
     private final EventBus bus;
     private final Set<Throwable> loggedExceptions = new HashSet<>();
+    private final MVELWrapper mvelWrapper = new MVELWrapper();
+
+
 
     public static boolean shouldSendEvent(Throwable... throwables) {
         Set<Throwable> loggedExceptions = getState().loggedExceptions;
@@ -95,7 +100,9 @@ public class PrimaryScenarioData {
     }
 
     public static ScenarioContext popCurrentScenario() {
-        return getState().scenarioStack.pop();
+        ScenarioContext poppedScenario = getState().scenarioStack.pop();
+        poppedScenario.getTestCaseState().completeScenario();
+        return poppedScenario;
     }
 
     public static ScenarioContext getCurrentScenario() {
@@ -118,10 +125,38 @@ public class PrimaryScenarioData {
     public static TestCaseState getCurrentState() {
         return getState().scenarioStack.peek().getTestCaseState();
     }
+    public static TestCaseState getPrimaryState() {
+        return getPrimaryScenario().getTestCaseState();
+    }
 
+    public static Status[] getCurrentScenarioCompletionStatus() {
+        return getCurrentState().getCompletionStatus();
+    }
 
+    public static Status[] getPrimaryScenarioCompletionStatus(){
+        return getPrimaryState().getCompletionStatus();
+    }
+
+    public static Status getCurrentScenarioStatus(){
+        return getCurrentState().getStatus();
+    }
+
+    public static Status getPrimaryScenarioStatus(){
+        return getPrimaryState().getStatus();
+    }
 
     public static Runner getRunner() {
         return  getState().runner;
     }
+
+    public static MVELWrapper getMvelWrapper() {
+        return getState().mvelWrapper;
+    }
+
+
+//    public static boolean assertScenarioExecutionStatus(String scenarioType, String status) {
+//
+//    }
+
+
 }

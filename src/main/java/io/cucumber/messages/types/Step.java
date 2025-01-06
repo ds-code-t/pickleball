@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.Objects;
 import java.util.Optional;
 
+import static io.pickleball.configs.Constants.*;
+import static io.pickleball.stringutilities.StringComponents.extractPrefix;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
@@ -24,14 +26,15 @@ public class Step {
     private final DataTable dataTable;
     private final String id;
 
+
     public Step(
-        Location location,
-        String keyword,
-        StepKeywordType keywordType,
-        String text,
-        DocString docString,
-        DataTable dataTable,
-        String id
+            Location location,
+            String keyword,
+            StepKeywordType keywordType,
+            String text,
+            DocString docString,
+            DataTable dataTable,
+            String id
     ) {
         this.location = requireNonNull(location, "Step.location cannot be null");
         this.keyword = requireNonNull(keyword, "Step.keyword cannot be null");
@@ -57,17 +60,16 @@ public class Step {
     }
 
     /**
-      * The test phase signalled by the keyword: Context definition (Given), Action performance (When), Outcome assertion (Then). Other keywords signal Continuation (And and But) from a prior keyword. Please note that all translations which a dialect maps to multiple keywords (`*` is in this category for all dialects), map to 'Unknown'.
+     * The test phase signalled by the keyword: Context definition (Given), Action performance (When), Outcome assertion (Then). Other keywords signal Continuation (And and But) from a prior keyword. Please note that all translations which a dialect maps to multiple keywords (`*` is in this category for all dialects), map to 'Unknown'.
      */
     public Optional<StepKeywordType> getKeywordType() {
         return Optional.ofNullable(keywordType);
     }
 
 
-    // pmode keyword getText() @IF
     public String getText() {
-        return (keyword.startsWith("@") ? keyword  + text.substring(1) : text);
-//        return text;
+
+        return text;
     }
 
     public Optional<DocString> getDocString() {
@@ -91,38 +93,38 @@ public class Step {
         if (o == null || getClass() != o.getClass()) return false;
         Step that = (Step) o;
         return
-            location.equals(that.location) &&
-            keyword.equals(that.keyword) &&
-            Objects.equals(keywordType, that.keywordType) &&
-            text.equals(that.text) &&
-            Objects.equals(docString, that.docString) &&
-            Objects.equals(dataTable, that.dataTable) &&
-            id.equals(that.id);
+                location.equals(that.location) &&
+                        keyword.equals(that.keyword) &&
+                        Objects.equals(keywordType, that.keywordType) &&
+                        text.equals(that.text) &&
+                        Objects.equals(docString, that.docString) &&
+                        Objects.equals(dataTable, that.dataTable) &&
+                        id.equals(that.id);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(
-            location,
-            keyword,
-            keywordType,
-            text,
-            docString,
-            dataTable,
-            id
+                location,
+                keyword,
+                keywordType,
+                text,
+                docString,
+                dataTable,
+                id
         );
     }
 
     @Override
     public String toString() {
         return "Step{" +
-            "location=" + location +
-            ", keyword=" + keyword +
-            ", keywordType=" + keywordType +
-            ", text=" + text +
-            ", docString=" + docString +
-            ", dataTable=" + dataTable +
-            ", id=" + id +
-            '}';
+                "location=" + location +
+                ", keyword=" + keyword +
+                ", keywordType=" + keywordType +
+                ", text=" + text +
+                ", docString=" + docString +
+                ", dataTable=" + dataTable +
+                ", id=" + id +
+                '}';
     }
 }

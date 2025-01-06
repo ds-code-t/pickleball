@@ -115,16 +115,16 @@ public class PickleStepDefinitionMatch extends Match implements StepDefinitionMa
         return result;
     }
 
-    public void runStep() throws Throwable {
-        List<Object> result = getArgs();
-        try {
-            stepDefinition.execute(result.toArray(new Object[0]));
-        } catch (CucumberBackendException e) {
-            throw couldNotInvokeStep(e, result);
-        } catch (CucumberInvocationTargetException e) {
-            throw removeFrameworkFramesAndAppendStepLocation(e, getStepLocation());
-        }
-    }
+//    public void runStep() throws Throwable {
+//        List<Object> result = getArgs();
+//        try {
+//            stepDefinition.execute(result.toArray(new Object[0]));
+//        } catch (CucumberBackendException e) {
+//            throw couldNotInvokeStep(e, result);
+//        } catch (CucumberInvocationTargetException e) {
+//            throw removeFrameworkFramesAndAppendStepLocation(e, getStepLocation());
+//        }
+//    }
 
 
     @Override

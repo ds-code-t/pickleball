@@ -17,6 +17,8 @@ final class Ast {
     private static final char beginOptionalCharacter = '(';
     private static final char endOptionalCharacter = ')';
 
+//    private static final char pipeCharacter = '|';
+
     interface Located {
         int start();
 
@@ -168,6 +170,7 @@ final class Ast {
                 case (int) endParameterCharacter:
                 case (int) beginOptionalCharacter:
                 case (int) endOptionalCharacter:
+//                case (int) pipeCharacter:
                     return true;
 
 //                case (int) '\\': // Escape character itself

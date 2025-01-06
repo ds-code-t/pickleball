@@ -13,10 +13,8 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import io.cucumber.messages.types.Scenario;
-import io.cucumber.messages.types.Step;
 import io.cucumber.plugin.event.Node;
 import io.pickleball.mapandStateutilities.LinkedMultiMap;
 
@@ -28,6 +26,7 @@ import static io.pickleball.cucumberutilities.SourceParsing.pretrim;
 
 public class SourceParser {
 
+    @SafeVarargs
     public static GherkinMessagesPickle getComponentScenarioWrapper(GherkinMessagesPickle pickle, LinkedMultiMap<String, String>... listOfMaps) throws IOException {
         return getComponentScenarioWrapper(pickle, Arrays.stream(listOfMaps).toList());
     }
@@ -51,7 +50,8 @@ public class SourceParser {
                 listOfMaps.add(map);
             }
         }
-        ;
+
+        assert scenario != null;
         String source = reconstructScenarioSource(scenario);
 
         String modified = replaceNestedBrackets(source, listOfMaps);
@@ -95,7 +95,7 @@ public class SourceParser {
                 .idGenerator(() -> java.util.UUID.randomUUID().toString())
                 .build()
                 .parse("feature", new ByteArrayInputStream(featureSource.getBytes(StandardCharsets.UTF_8)))
-                .collect(Collectors.toList());
+                .toList();
 
         return envelopes.stream()
                 .map(Envelope::getGherkinDocument)
@@ -141,82 +141,6 @@ public class SourceParser {
         return builder.toString();
     }
 
-//    /**
-//     * Reconstructs the raw Scenario or Scenario Outline source string from its components.
-//     */
-//    public static String reconstructScenarioSource(io.cucumber.messages.types.Scenario scenario) {
-//        StringBuilder builder = new StringBuilder();
-//        builder.append("  ").append(scenario.getKeyword()).append(": ").append(scenario.getName()).append("\n");
-//
-//        // Append each step
-//        for (Step step : scenario.getSteps()) {
-//            builder.append("    ").append(step.getKeyword()).append(pretrim(step.getText())).append("\n");
-//        }
-//
-//        return builder.toString();
-//    }
-
-
-//    ///
-//        /**
-//         * Extracts the raw source string of a Scenario by its name from a feature file source.
-//         *
-//         * @param featureSource The feature file source as a string.
-//         * @param scenarioName  The name of the scenario to extract.
-//         * @return The reconstructed Scenario source string.
-//         */
-//        public static Optional<String> getScenarioSource(String featureSource, String scenarioName) throws IOException {
-//            // Parse the feature source into a GherkinDocument
-//            GherkinDocument gherkinDocument = parseGherkinDocument(featureSource);
-//            if (gherkinDocument == null || gherkinDocument.getFeature().isEmpty()) {
-//                return Optional.empty();
-//            }
-//
-//            // Traverse the feature to find the scenario by name
-//            return gherkinDocument.getFeature().get()
-//                    .getChildren()
-//                    .stream()
-//                    .filter(featureChild -> featureChild.getScenario().isPresent())
-//                    .map(FeatureChild::getScenario)
-//                    .filter(Optional::isPresent)
-//                    .map(Optional::get)
-//                    .filter(scenario -> scenario.getName().equals(scenarioName))
-//                    .map(SourceParser::reconstructScenarioSource)
-//                    .findFirst();
-//        }
-
-//        /**
-//         * Parses the feature source string into a GherkinDocument.
-//         */
-//        private static GherkinDocument parseGherkinDocument(String featureSource) throws IOException {
-//            List<Envelope> envelopes = GherkinParser.builder()
-//                    .idGenerator(() -> java.util.UUID.randomUUID().toString())
-//                    .build()
-//                    .parse("feature", new ByteArrayInputStream(featureSource.getBytes(StandardCharsets.UTF_8)))
-//                    .collect(Collectors.toList());
-//
-//            return envelopes.stream()
-//                    .map(Envelope::getGherkinDocument)
-//                    .filter(Optional::isPresent)
-//                    .map(Optional::get)
-//                    .findFirst()
-//                    .orElse(null);
-//        }
-//
-//        /**
-//         * Reconstructs the raw Scenario source string from its components.
-//         */
-//        private static String reconstructScenarioSource(Scenario scenario) {
-//            StringBuilder builder = new StringBuilder();
-//            builder.append("  ").append(scenario.getKeyword()).append(": ").append(scenario.getName()).append("\n");
-//
-//            // Append each step
-//            for (Step step : scenario.getSteps()) {
-//                builder.append("    ").append(step.getKeyword()).append(step.getText()).append("\n");
-//            }
-//
-//            return builder.toString();
-//        }
 
 
 }

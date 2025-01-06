@@ -11,11 +11,7 @@ import io.cucumber.plugin.event.TestCase;
 import io.cucumber.plugin.event.WriteEvent;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.Collection;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.max;
@@ -30,6 +26,11 @@ public class TestCaseState implements io.cucumber.core.backend.TestCaseState {
     private final UUID testExecutionId;
 
     private UUID currentTestStepId;
+    private Status completionStatus = Status.RUNNING; // pmod Added field to track completion status
+    private Status resultStatus; // pmod Added field to track completion status
+
+
+
 
     TestCaseState(EventBus bus, UUID testExecutionId, TestCase testCase) {
         this.bus = requireNonNull(bus);
@@ -40,6 +41,23 @@ public class TestCaseState implements io.cucumber.core.backend.TestCaseState {
             ((io.cucumber.core.runner.TestCase) this.testCase).setTestCaseState(this);
         }
     }
+
+
+
+    public void completeScenario() {
+        completionStatus = Status.COMPLETED;  // pmod  Added method to mark scenario as completed
+    }
+
+    public Status[] getCompletionStatus() {
+        return new Status[] {completionStatus, getStatus()};
+    }
+
+    // pmod
+    public  void setCompletionStatus(Status status) {
+        completionStatus = Status.COMPLETED;
+        resultStatus = status;
+    }
+
 
     public void add(Result result) {
         stepResults.add(result);
@@ -56,6 +74,8 @@ public class TestCaseState implements io.cucumber.core.backend.TestCaseState {
 
     @Override
     public Status getStatus() {
+        if(resultStatus != null)
+            return resultStatus;
         if (stepResults.isEmpty()) {
             return Status.PASSED;
         }

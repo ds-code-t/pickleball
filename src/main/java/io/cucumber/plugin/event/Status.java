@@ -11,7 +11,9 @@ public enum Status {
     UNDEFINED,
     AMBIGUOUS,
     FAILED,
-    UNUSED;
+    UNUSED,
+    RUNNING,
+    COMPLETED;
 
     /**
      * Does this state allow the build to pass

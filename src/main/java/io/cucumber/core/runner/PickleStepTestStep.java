@@ -3,20 +3,19 @@ package io.cucumber.core.runner;
 import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.gherkin.Step;
+import io.cucumber.core.gherkin.messages.GherkinMessagesStep;
 import io.cucumber.plugin.event.Argument;
 import io.cucumber.plugin.event.StepArgument;
 import io.cucumber.plugin.event.TestCase;
-import io.pickleball.cacheandstate.StepContext;
 
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
-import java.util.Stack;
 import java.util.UUID;
 
-import static io.pickleball.cacheandstate.PrimaryScenarioData.getRunner;
 import static io.pickleball.cacheandstate.ScenarioContext.popCurrentStep;
 import static io.pickleball.cacheandstate.ScenarioContext.setCurrentStep;
+import static io.pickleball.debugtools.TimeUtils.getCurrentTimestamp;
 
 public final class PickleStepTestStep extends TestStep  implements io.cucumber.plugin.event.PickleStepTestStep {
 
@@ -27,13 +26,10 @@ public final class PickleStepTestStep extends TestStep  implements io.cucumber.p
     private PickleStepDefinitionMatch definitionMatch;
     private  io. cucumber. core. gherkin.Pickle pickle;
     public Runner runner;
-//    public PickleStepTestStep createNewMappedStep(){
-//        return null;
-//    }
 
-
-
-//    public final StepContext stepContext;
+    GherkinMessagesStep getGherkinMessagesStep(){
+        return (GherkinMessagesStep) getStep();
+    }
 
     PickleStepTestStep(UUID id, URI uri, Step step, PickleStepDefinitionMatch definitionMatch) {
         this(id, uri, step, Collections.emptyList(), Collections.emptyList(), definitionMatch);
@@ -54,7 +50,6 @@ public final class PickleStepTestStep extends TestStep  implements io.cucumber.p
         this.beforeStepHookSteps = beforeStepHookSteps;
         this.pickle = pickle;
         this.runner = runner;
-
     }
 
 
@@ -84,12 +79,15 @@ public final class PickleStepTestStep extends TestStep  implements io.cucumber.p
     public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
         ExecutionMode nextExecutionMode = executionMode;
 
+        nextExecutionMode = runPreStepsStack(testCase, state, bus, nextExecutionMode);
+
         setCurrentStep(this);
         for (HookTestStep before : beforeStepHookSteps) {
             nextExecutionMode = before
                     .run(testCase, bus, state, executionMode)
                     .next(nextExecutionMode);
         }
+
         nextExecutionMode = super.run(testCase, bus, state, nextExecutionMode)
                 .next(nextExecutionMode);
         for (HookTestStep after : afterStepHookSteps) {
@@ -100,7 +98,7 @@ public final class PickleStepTestStep extends TestStep  implements io.cucumber.p
         popCurrentStep();
 
 
-        nextExecutionMode = runStackSteps(testCase, state, bus, nextExecutionMode);
+        nextExecutionMode = runPostStepsStack(testCase, state, bus, nextExecutionMode);
 
         return nextExecutionMode;
     }

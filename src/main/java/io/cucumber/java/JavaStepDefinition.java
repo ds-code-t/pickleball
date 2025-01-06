@@ -10,6 +10,7 @@ import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 
+import static io.pickleball.cacheandstate.StepContext.currentExecutionMapPut;
 import static java.util.Objects.requireNonNull;
 
 public final class JavaStepDefinition extends AbstractGlueDefinition implements StepDefinition {
@@ -32,7 +33,7 @@ public final class JavaStepDefinition extends AbstractGlueDefinition implements 
 
     @Override
     public void execute(Object[] args) {
-        invokeMethod(args);
+        currentExecutionMapPut("returnValue" , invokeMethod(args));
     }
 
     @Override

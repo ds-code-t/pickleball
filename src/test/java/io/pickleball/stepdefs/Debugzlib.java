@@ -64,6 +64,7 @@ public void handleQuotedString(String quotedString) {
 }
 
 
+
     @Given("^I am running a testlzz (.*) and (.*)$")
     public void iAmRunningATestlzz(String t1, String t2, DataTable dataTable) {
         System.out.print("DdataTable " + dataTable);
@@ -76,10 +77,10 @@ public void handleQuotedString(String quotedString) {
         System.out.println(" end");
     }
 
-    @Given("^\\|I am running a testlzz (.*) and (.*)$")
-    public void biAmRunningATestlzz(String t1, String t2, DataTable dataTable) {
-        System.out.println(" BBBBBBB , t1:" + t1 + " , t2:" + t2);
-    }
+//    @Given("^\\|I am running a testlzz (.*) and (.*)$")
+//    public void biAmRunningATestlzz(String t1, String t2, DataTable dataTable) {
+//        System.out.println(" BBBBBBB , t1:" + t1 + " , t2:" + t2);
+//    }
 
     @Given("I have the following string list: {stringList}")
     public void handleStringList(List<String> stringList) {

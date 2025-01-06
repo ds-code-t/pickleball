@@ -25,6 +25,7 @@ import java.util.function.Predicate;
 import static io.cucumber.core.exception.UnrecoverableExceptions.rethrowIfUnrecoverable;
 import static io.cucumber.core.runner.ExecutionMode.SKIP;
 import static io.cucumber.core.runner.TestAbortedExceptions.createIsTestAbortedExceptionPredicate;
+import static io.pickleball.debugtools.TimeUtils.getCurrentTimestamp;
 import static java.time.Duration.ZERO;
 
 public abstract class TestStep extends StepContext implements io.cucumber.plugin.event.TestStep {
@@ -55,6 +56,7 @@ public abstract class TestStep extends StepContext implements io.cucumber.plugin
 
     public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
         Instant startTime = bus.getInstant();
+        newExecutionMapPut("startTime" ,startTime);
 
         boolean shouldEmit = shouldEmitEvent();
 
@@ -67,6 +69,7 @@ public abstract class TestStep extends StepContext implements io.cucumber.plugin
             status = executeStep(state, executionMode);
         } catch (Throwable t) {
             t.printStackTrace();
+            currentExecutionMapPut("error", t);
             rethrowIfUnrecoverable(t);
             error = t;
             status = mapThrowableToStatus(t);
@@ -74,6 +77,9 @@ public abstract class TestStep extends StepContext implements io.cucumber.plugin
         Instant stopTime = bus.getInstant();
         Duration duration = Duration.between(startTime, stopTime);
         Result result = mapStatusToResult(status, error, duration);
+        currentExecutionMapPut("stopTime", stopTime);
+        currentExecutionMapPut("duration", duration);
+        currentExecutionMapPut("result", result);
         state.add(result);
 
         if (shouldEmit)

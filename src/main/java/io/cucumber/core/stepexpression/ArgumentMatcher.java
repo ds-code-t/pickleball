@@ -3,6 +3,7 @@ package io.cucumber.core.stepexpression;
 import io.cucumber.core.gherkin.DataTableArgument;
 import io.cucumber.core.gherkin.DocStringArgument;
 import io.cucumber.core.gherkin.Step;
+import io.cucumber.core.gherkin.messages.GherkinMessagesStep;
 
 import java.lang.reflect.Type;
 import java.util.List;
@@ -17,22 +18,23 @@ public final class ArgumentMatcher {
     }
 
     public List<Argument> argumentsFrom(Step step, Type... types) {
+        GherkinMessagesStep gStep = (GherkinMessagesStep) step;
         io.cucumber.core.gherkin.Argument arg = step.getArgument();
         if (arg == null) {
-            return expression.match(step.getText(), types);
+            return expression.match(gStep.getRunTimeText(), types);
         }
 
         if (arg instanceof io.cucumber.core.gherkin.DocStringArgument) {
             DocStringArgument docString = (DocStringArgument) arg;
             String content = docString.getContent();
             String contentType = docString.getMediaType();
-            return expression.match(step.getText(), content, contentType, types);
+            return expression.match(gStep.getRunTimeText(), content, contentType, types);
         }
 
         if (arg instanceof io.cucumber.core.gherkin.DataTableArgument) {
             DataTableArgument table = (DataTableArgument) arg;
             List<List<String>> cells = emptyCellsToNull(table.cells());
-            return expression.match(step.getText(), cells, types);
+            return expression.match(gStep.getRunTimeText(), cells, types);
         }
 
         throw new IllegalStateException("Argument was neither PickleString nor PickleTable");

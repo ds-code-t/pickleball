@@ -354,7 +354,7 @@ public class TeamCityPlugin implements EventListener {
     private String extractName(TestStep testStep) {
         if (testStep instanceof PickleStepTestStep) {
             PickleStepTestStep pickleStepTestStep = (PickleStepTestStep) testStep;
-            return pickleStepTestStep.getStep().getText();
+            return pickleStepTestStep.getStep().getKeyword() +" " + pickleStepTestStep.getStep().getText();
         }
         if (testStep instanceof HookTestStep) {
             HookTestStep hookTestStep = (HookTestStep) testStep;

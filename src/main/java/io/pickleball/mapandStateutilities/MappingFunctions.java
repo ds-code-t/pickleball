@@ -5,58 +5,62 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static io.pickleball.cacheandstate.PrimaryScenarioData.getMvelWrapper;
 import static io.pickleball.configs.Constants.flag1;
+//import static io.pickleball.valueresolution.MVELWrapper.evaluateExpression;
 
 public class MappingFunctions {
 
     @SafeVarargs
     public static String replaceNestedBrackets(String input, LinkedMultiMap<String, String>... maps) {
-      return replaceNestedBrackets(input, Arrays.stream(maps).toList());
+        return replaceNestedBrackets(input, Arrays.stream(maps).toList());
 
     }
+
     public static String replaceNestedBrackets(String input, List<LinkedMultiMap<String, String>> maps) {
+        MapsWrapper mapsWrapper = new MapsWrapper(maps);
+        return replaceNestedBrackets(input, mapsWrapper);
+    }
+
+    public static String replaceNestedBrackets(String input, MapsWrapper mapsWrapper) {
+
+
+        Pattern pattern = Pattern.compile("<(?<angled>[^<>]+)>|\\{(?<curly>[^{}]+)\\}");
         String result = input;
-        // Simplified pattern that matches text between angle brackets
-        // [^<>]+ matches one or more characters that are not angle brackets
-        Pattern pattern = Pattern.compile("<([^<>]+)>");
-        for (LinkedMultiMap<String, String> map : maps) {
-            if(map == null)
-                continue;
-            while (true) {
-                Matcher matcher = pattern.matcher(result);
-                boolean found = false;
-                StringBuffer sb = new StringBuffer();
 
-                while (matcher.find()) {
-                    found = true;
-                    String key = matcher.group(1);
-                    String matchKey = key.trim().replace(flag1, '?');
-                    String value = map.getValueByStringOrDefault(matchKey, "");
-                    if(value.isEmpty() && matchKey.startsWith("?"))
-                        continue;
-                    String replacement = value.isEmpty() ? "<"+ flag1  + key + ">" : value;
-                    matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+
+        while (true) {
+            Matcher matcher = pattern.matcher(result);
+
+            StringBuffer sb = new StringBuffer();
+
+            while (matcher.find()) {
+                String key = matcher.group("angled");
+                if (key != null) {
+                    String value = String.valueOf(mapsWrapper.getOrDefault(key, "<" + key + ">"));
+                    matcher.appendReplacement(sb, Matcher.quoteReplacement(value));
+                    continue;
                 }
 
-                if (!found) {
-                    break;
+                String expression = matcher.group("curly");
+                if (expression != null) {
+                    Object expressionReturn = getMvelWrapper().evaluate(expression, mapsWrapper);
+                    matcher.appendReplacement(sb, Matcher.quoteReplacement(String.valueOf(expressionReturn)));
                 }
-
-                matcher.appendTail(sb);
-                String newResult = sb.toString();
-
-                // If no changes were made in this iteration, break
-                if (newResult.equals(result)) {
-                    break;
-                }
-
-                result = newResult;
             }
+
+
+            matcher.appendTail(sb);
+            String newResult = sb.toString();
+
+            // If no changes were made in this iteration, break
+            if (newResult.equals(result)) {
+                break;
+            }
+
+            result = newResult;
         }
-        return result.replaceAll("<"+flag1+"[^<>]+>","");
-//        return result;
-
-
+        return result.replaceAll("<" + flag1 + "[^<>]+>", "");
     }
 
 }

@@ -329,8 +329,8 @@ final class GherkinDialects {
             unmodifiableList(asList("Scenario Outline", "Scenario Template")),
             unmodifiableList(asList("Background")),
             unmodifiableList(asList("Examples", "Scenarios")),
-            unmodifiableList(asList("* ", "Given ", "@IF:")),
-            unmodifiableList(asList("* ", "When ")),
+            unmodifiableList(asList("* ", "Given ", ":", "@IF:",  "@RUN-ON-FAIL:" , "@RUN-ON-PASS:" , "@ALWAYS-RUN:" , "@RUN-IF:", "@RUN-NEXT-STEPS-IF:" , "@RUN-NEXT-STEPS-WHEN:" , "@POST-SCENARIO-STEPS:"  )),
+            unmodifiableList(asList("* ", "When "  )),
             unmodifiableList(asList("* ", "Then ")),
             unmodifiableList(asList("* ", "And ")),
             unmodifiableList(asList("* ", "But "))

@@ -2,7 +2,6 @@ package io.cucumber.core.runner;
 
 import io.cucumber.core.backend.StepDefinition;
 import io.cucumber.core.eventbus.EventBus;
-import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.gherkin.messages.*;
 import io.cucumber.messages.types.*;
 import io.cucumber.plugin.event.*;
@@ -25,8 +24,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static io.cucumber.core.runner.ExecutionMode.DRY_RUN;
-import static io.cucumber.core.runner.ExecutionMode.RUN;
+import static io.cucumber.core.runner.ExecutionMode.*;
 import static io.cucumber.messages.Convertor.toMessage;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.popCurrentScenario;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.setCurrentScenario;
@@ -43,6 +41,7 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
     public final UUID id;
     public GherkinMessagesFeature gherkinMessagesFeature;
     public Scenario scenario;
+
 
 
     public TestCase(
@@ -109,12 +108,61 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
 
 
         for (PickleStepTestStep dummyStep : testSteps) {
-            nextExecutionMode = runStackSteps(this, state, bus, nextExecutionMode);
+//            dummyStep.setParent(this);
+//            if (!dummyStep.shouldRun())
+//                continue;
+
+
+            nextExecutionMode = runPreStepsStack(this, state, bus, nextExecutionMode);
             PickleStepTestStep step = dummyStep.modifyPickleStepTestStep();
             nextExecutionMode = step
                     .run(this, bus, state, nextExecutionMode)
                     .next(nextExecutionMode);
-            nextExecutionMode = runStackSteps(this, state, bus, nextExecutionMode);
+            nextExecutionMode = runPostStepsStack(this, state, bus, nextExecutionMode);
+
+//            GherkinMessagesStep gherkinMessagesStep =  step.getGherkinMessagesStep();
+
+
+
+//            System.out.println("\n===\n@@gherkinMessagesStep:  "+ gherkinMessagesStep.getRunFlag() + " : " + gherkinMessagesStep.getRunTimeKeyWord() + " " + gherkinMessagesStep.getRunTimeText());
+//            System.out.println("shouldRun?  " + step.shouldRun());
+//            if (dummyStep.shouldRun() && nextExecutionMode.equals(RUN)) {
+//                nextExecutionMode = step
+//                        .run(this, bus, state, nextExecutionMode)
+//                        .next(nextExecutionMode);
+//            } else if (step.getGherkinMessagesStep().getRunTimeKeyWord().startsWith("@")) {
+//                RunCondition runCondition = step.getGherkinMessagesStep().getRunFlag();
+//                System.out.println("@@runCondition: " + runCondition);
+//                io.cucumber.core.backend.Status status = getTestCaseState().getStatus();
+//                if (runCondition.equals(RunCondition.ALWAYS_RUN))
+//                    step.run(this, bus, state, nextExecutionMode);
+//                else if (runCondition.equals(RunCondition.RUN_ON_FAIL) && status.equals(io.cucumber.core.backend.Status.FAILED)) {
+//                    step.run(this, bus, state, nextExecutionMode);
+//                } else if (runCondition.equals(RunCondition.RUN_ON_PASS) && status.equals(io.cucumber.core.backend.Status.PASSED)) {
+//                    step.run(this, bus, state, nextExecutionMode);
+//                }
+//
+//            }
+
+
+//            if (nextExecutionMode.equals(SKIP) && step.getGherkinMessagesStep().getRunTimeKeyWord().startsWith("@")) {
+//                RunCondition runCondition = step.getGherkinMessagesStep().getRunFlag();
+//                io.cucumber.core.backend.Status status = getTestCaseState().getStatus();
+//                if (runCondition.equals(RunCondition.ALWAYS_RUN))
+//                    step.run(this, bus, state, nextExecutionMode);
+//                else if (runCondition.equals(RunCondition.RUN_ON_FAIL) && status.equals(io.cucumber.core.backend.Status.FAILED)) {
+//                    step.run(this, bus, state, nextExecutionMode);
+//                } else if (runCondition.equals(RunCondition.RUN_ON_PASS) && status.equals(io.cucumber.core.backend.Status.PASSED)) {
+//                    step.run(this, bus, state, nextExecutionMode);
+//                }
+//            } else {
+//                nextExecutionMode = step
+//                        .run(this, bus, state, nextExecutionMode)
+//                        .next(nextExecutionMode);
+//            }
+
+
+
         }
 
         for (HookTestStep after : afterHooks) {
