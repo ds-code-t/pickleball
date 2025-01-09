@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'io.pickleball'
-version = '1.0.0'
+version = '1.1.0'
 
 repositories {
     mavenCentral()
@@ -81,14 +81,11 @@ test {
 }
 
 jar {
-    // Include test outputs (classes and resources)
-    from sourceSets.test.output
-}
-
-configurations {
-    // Extend the runtimeClasspath to include test dependencies
-    runtimeClasspath {
-        extendsFrom testImplementation
+    from(rootProject.projectDir) {
+        include 'LICENSE'
+        include 'NOTICE'
+        include 'THIRD-PARTY-NOTICES.txt'
+        into 'META-INF/'
     }
 }
 

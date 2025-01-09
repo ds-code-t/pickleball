@@ -2,7 +2,7 @@ Feature: sdf
 
 
   Scenario: ASD2
-    Given I am running a testlzz ERROR and 2
+#    Given I am running a testlzz ERROR and 2
   @RUN_ON_FAIL: Then I am running a testlzz after fail and RUN_ON_FAIL
 
   Scenario: ASD
@@ -43,7 +43,7 @@ Feature: sdf
 #   * IF: 6>11 THEN: When I am running a testlzz %runif and s
 #  @RUN-ALWAYS: When 66>112 THEN: When I am running a testlzz %runif and s
   @RUN_ON_FAIL: Then I am running a testlzz after fail and beforeE
-    Given I am running a testlzz ERROR and 2
+#    Given I am running a testlzz ERROR and 2
   :  Given I am running a testlzz afterER and 1
   @RUN: When true
   :  Given I am running a testlzz z and 1
@@ -96,7 +96,7 @@ Feature: sdf
     Then I should see debug outputlzz
     *  Scenario:
       | Scenario Tags  | A     | B |
-      | @sob<Scenario> | ERROR | s |
+#      | @sob<Scenario> | ERROR | s |
 #      | @zzs9          | z     | 3 |
     Given I am running a testlzz <arg1> and <Scenario>
     Examples:
