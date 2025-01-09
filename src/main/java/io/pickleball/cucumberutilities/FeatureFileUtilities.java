@@ -46,13 +46,6 @@ public class FeatureFileUtilities {
         }
     }
 
-//    public static void main(String[] args) throws IOException {
-////        GherkinDocument g =  pickleCompiler(URI.create("file:///C:/Users/Admin/IdeaProjects/pickleball3/src/test/resources/features/debugindep1.feature"));
-//        String featureSource = readFeatureFile(URI.create("file:///C:/Users/Admin/IdeaProjects/pickleball3/src/test/resources/features/debugindep1.feature"));
-//
-//        String newSource = getScenarioSourceByLine(featureSource, 81).get();
-//    }
-
     public static List<Node> collectNodesByLineNumbers(URI uri, Set<Integer> lineNumbers) {
         if (lineNumbers == null || lineNumbers.isEmpty()) {
             return Collections.emptyList();
@@ -158,12 +151,6 @@ public class FeatureFileUtilities {
                 .findFirst();
     }
 
-//    public static io.cucumber.core.gherkin.messages.GherkinMessagesFeature parseComponentFeature(URI uri) {
-//        String featureSource = readFeatureFile(uri);
-//        io.cucumber.core.gherkin.messages.GherkinMessagesFeatureParser parser = new io.cucumber.core.gherkin.messages.GherkinMessagesFeatureParser();
-//        return (io.cucumber.core.gherkin.messages.GherkinMessagesFeature) parser.parseComponent(uri, featureSource)
-//                .orElseThrow(() -> new RuntimeException("Failed to parse feature file at URI: " + uri));
-//    }
 
     /**
      * Parses a feature file source into a GherkinMessagesFeature.

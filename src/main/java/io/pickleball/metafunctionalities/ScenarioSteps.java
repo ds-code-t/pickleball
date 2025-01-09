@@ -17,16 +17,9 @@ import static io.pickleball.configs.Constants.SCENARIO_TAGS;
 
 public class ScenarioSteps {
 
-//    @Metastep
-//    @Given("^Scenario:(.*)$")
-//    public void scenarioRunLoggingPlaceHolder(String scenarioName) {
-//
-//    }
-
     @NoEventEmission
     @Given("^Scenario:(.*)$")
     public void scenarioRun(String scenarioName, DataTable dataTable) {
-//        startEvent();
 
         StepContext originalStep = getCurrentStep();
 
@@ -68,6 +61,5 @@ public class ScenarioSteps {
             }
         }
 
-//        endEvent();
     }
 }

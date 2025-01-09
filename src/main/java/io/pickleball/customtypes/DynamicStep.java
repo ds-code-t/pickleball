@@ -26,9 +26,40 @@ public class DynamicStep {
         this.additionalData = additionalData;
     }
 
+    public static final String[] KEYWORDS = {
+            "Given ", "When ", "Then ", "And ", "But ", "* "
+    };
 
     public String getStepText() {
         return stepText;
+    }
+
+    public static String stripPrefixIfMatch(String input, String[] possiblePrefixes) {
+        String strippedLeadingString = input.stripLeading();
+        for (String prefix : possiblePrefixes) {
+            if (strippedLeadingString.startsWith(prefix)) {
+                return strippedLeadingString.substring(prefix.length());
+            }
+        }
+        return input;
+    }
+
+    private static boolean isNoStepDefinitionFound(RuntimeException e) {
+        return e.getMessage() != null &&
+                e.getMessage().contains("No step definition found");
+    }
+
+    public static PickleStepTestStep stripAndCreatePickleStepTestStep(String originalStepText) {
+        String stripped = stripPrefixIfMatch(originalStepText, KEYWORDS);
+        try {
+            return createPickleStepTestStep(stripped);
+        } catch (RuntimeException e) {
+            if (isNoStepDefinitionFound(e)) {
+                return createPickleStepTestStep(originalStepText);
+            } else {
+                throw e;
+            }
+        }
     }
 
     public Object runStep() {
@@ -37,9 +68,8 @@ public class DynamicStep {
         return pickleStepTestStep.run((TestCase) scenarioContext, scenarioContext.getRunner().bus, scenarioContext.getTestCaseState(), ExecutionMode.RUN);
     }
 
-    public static Object runStep(String inputText) {
-        System.out.println("@@runStep: " + inputText);
-        PickleStepTestStep pickleStepTestStep = createPickleStepTestStep(inputText);
+    public static Object runStep(String originalStepText) {
+        PickleStepTestStep pickleStepTestStep = stripAndCreatePickleStepTestStep(originalStepText);
         ScenarioContext scenarioContext = getCurrentScenario();
         pickleStepTestStep.run((TestCase) scenarioContext, scenarioContext.getRunner().bus, scenarioContext.getTestCaseState(), ExecutionMode.RUN);
         return pickleStepTestStep.getLastExecutionReturnValue();

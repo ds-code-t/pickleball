@@ -20,9 +20,6 @@ public class Constants {
 
     public static final String SCENARIO_TAGS = "Scenario Tags";
     public static final String COMPONENT_PATH = "Component Path";
-//    public static final String COMPONENT_EXAMPLES = "* COMPONENT_EXAMPLES" + stepFlag;
-//    public static final String PASSED_EXAMPLES = stepFlag + "PASSED_EXAMPLES";
-//    public static final String COMPONENT_TAG =  "@_cOmponent-q8437qasd";
 
 
     public static final String PRIORITY_TAG = "@priority-";

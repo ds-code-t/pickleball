@@ -54,13 +54,4 @@ public class Runner extends AbstractTestNGCucumberTests {
         super.runScenario(pickleWrapper, featureWrapper);
     }
 
-//    @Override
-//    @BeforeClass(alwaysRun = true)
-//    public void setUpClass(ITestContext context) {
-//        XmlTest currentXmlTest = context.getCurrentXmlTest();
-//        CucumberPropertiesProvider properties = currentXmlTest::getParameter;
-//        testNGCucumberRunner = new CustomTestNGCucumberRunner(this.getClass(), properties);
-//    }
-
-
 }

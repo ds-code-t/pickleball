@@ -5,11 +5,14 @@ import org.mvel2.MVEL;
 import org.mvel2.ParserContext;
 
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.Set;
 
-import static io.pickleball.cacheandstate.PrimaryScenarioData.getCurrentScenarioCompletionStatus;
-import static io.pickleball.cacheandstate.PrimaryScenarioData.getPrimaryScenarioCompletionStatus;
+//import static io.pickleball.cacheandstate.PrimaryScenarioData.getCurrentScenarioCompletionStatus;
+//import static io.pickleball.cacheandstate.PrimaryScenarioData.getPrimaryScenarioCompletionStatus;
+import static io.pickleball.cacheandstate.PrimaryScenarioData.getCurrentScenarioStatus;
+import static io.pickleball.cacheandstate.PrimaryScenarioData.getPrimaryScenarioStatus;
 import static io.pickleball.configs.Constants.*;
 import static io.pickleball.stringutilities.ObjectTransformer.transformUntilStable;
 
@@ -17,34 +20,29 @@ import static io.pickleball.stringutilities.ObjectTransformer.transformUntilStab
 public class MVELWrapper extends ParseTransformer {
 
     static {
-        String stateRegex = "(?<scenarioState>(?:(?:(?:HARD|SOFT)\\s+)?FAIL)|END|PASS)[EDSING]*";
+        String stateRegex = "(?<scenarioState>(?:(?:(?:HARD|SOFT)\\s+)?FAIL)|PASS)[EDSING]*";
         addGlobalTransformation(
                 "\\b(?<scenarioType>" + SCENARIO + "|" + TEST + ")\\s+(?:(?<currently>CURRENTLY)\\s+)?" + stateRegex,
                 match -> {
                     String scenarioType = match.group("scenarioType");
-                    String scenarioState = match.group("scenarioState");
-                    String currently = match.group("currently");
-                    Status[] completionStatus = scenarioType.equals(TEST) ? getPrimaryScenarioCompletionStatus() : getCurrentScenarioCompletionStatus();
-                    boolean isCompleted = completionStatus[0].equals(Status.COMPLETED);
+                    String scenarioState = match.group("scenarioState").replaceAll("\\s+", " ");
+                    Status status = scenarioType.equals(TEST) ? getPrimaryScenarioStatus() : getCurrentScenarioStatus();
 
-                    if (currently == null && !isCompleted)
-                        return "false";
+                    boolean returnVal = switch (scenarioState) {
+                        case "FAIL" -> (status.equals(Status.FAILED) || status.equals(Status.SOFT_FAILED));
 
-                    else if (scenarioState.equals("END"))
-                        return String.valueOf(isCompleted);
+                        case "SOFT FAIL" -> status.equals(Status.SOFT_FAILED);
 
+                        case "HARD FAIL" -> status.equals(Status.FAILED);
 
-                    if (scenarioState.equals("PASS"))
-                        return String.valueOf(completionStatus[1].equals(Status.PASSED));
-                    if (scenarioState.contains("FAIL")) {
-                        if (scenarioState.contains("SOFT"))
-                            return String.valueOf(completionStatus[1].equals(Status.SOFT_FAILED));
-                        return String.valueOf(completionStatus[1].equals(Status.FAILED));
-                    }
+                        case "PASS" -> (status.equals(Status.PASSED));
 
-                    throw new RuntimeException("Failed to parse Scenario completion status");
+                        default -> throw new IllegalStateException("Unexpected value: " + scenarioState);
+                    };
 
+                     return String.valueOf(returnVal);
                 }
+
         );
     }
 
@@ -58,8 +56,6 @@ public class MVELWrapper extends ParseTransformer {
 
 
     public Object evaluate(String expression, Map<String, Object> variables) {
-        System.out.println("@@:evaluate -expression " + expression);
-//        printCallStack();
         return transformUntilStable(expression, exp -> evaluateOnce(String.valueOf(exp), variables));
     }
 
@@ -73,9 +69,7 @@ public class MVELWrapper extends ParseTransformer {
 
         try {
             return MVEL.eval(preprocess(expression), context, variables);
-        }
-        catch (Exception e)
-        {
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
     }

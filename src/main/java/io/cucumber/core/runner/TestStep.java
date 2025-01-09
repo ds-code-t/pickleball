@@ -1,22 +1,38 @@
-package io.cucumber.core.runner;
+/*
+ * This file incorporates work covered by the following copyright and permission notice:
+ *
+ * Copyright (c) Cucumber Ltd
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
 
-//import io.cucumber.core.metasteps.ScenarioSteps;
+package io.cucumber.core.runner;
 
 import io.cucumber.core.backend.Pending;
 import io.cucumber.core.eventbus.EventBus;
-import io.cucumber.messages.types.Envelope;
-import io.cucumber.messages.types.TestStepResult;
-import io.cucumber.plugin.event.PickleStepTestStep;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import io.cucumber.plugin.event.TestCase;
-import io.cucumber.plugin.event.TestStepFinished;
-import io.cucumber.plugin.event.TestStepStarted;
 import io.pickleball.cacheandstate.StepContext;
 import io.pickleball.exceptions.SoftFailureException;
 import io.pickleball.logging.EventContainer;
 
-import java.lang.reflect.Method;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -25,7 +41,6 @@ import java.util.function.Predicate;
 import static io.cucumber.core.exception.UnrecoverableExceptions.rethrowIfUnrecoverable;
 import static io.cucumber.core.runner.ExecutionMode.SKIP;
 import static io.cucumber.core.runner.TestAbortedExceptions.createIsTestAbortedExceptionPredicate;
-import static io.pickleball.debugtools.TimeUtils.getCurrentTimestamp;
 import static java.time.Duration.ZERO;
 
 public abstract class TestStep extends StepContext implements io.cucumber.plugin.event.TestStep {
@@ -34,8 +49,6 @@ public abstract class TestStep extends StepContext implements io.cucumber.plugin
     private final Predicate<Throwable> isTestAbortedException = createIsTestAbortedExceptionPredicate();
     private final StepDefinitionMatch stepDefinitionMatch;
     private final UUID id;
-//    public Method method;
-
 
     TestStep(UUID id, StepDefinitionMatch stepDefinitionMatch) {
         super(id, (PickleStepDefinitionMatch) stepDefinitionMatch);
@@ -68,7 +81,6 @@ public abstract class TestStep extends StepContext implements io.cucumber.plugin
         try {
             status = executeStep(state, executionMode);
         } catch (Throwable t) {
-            t.printStackTrace();
             currentExecutionMapPut("error", t);
             rethrowIfUnrecoverable(t);
             error = t;
@@ -90,12 +102,8 @@ public abstract class TestStep extends StepContext implements io.cucumber.plugin
         Status returnStatus = getHighestStatus();
 
         return returnStatus.is(Status.PASSED) || returnStatus.is(Status.SOFT_FAILED) ? executionMode : SKIP;
-//
+
     }
-//
-//    public ExecutionMode runDynamically(io.cucumber.plugin.event.TestCase testCase, EventBus bus, TestCaseState currentState, ExecutionMode executionMode) {
-//        return executionMode;
-//    }
 
 
     private void emitTestStepStarted(TestCase testCase, EventBus bus, UUID textExecutionId, Instant startTime) {

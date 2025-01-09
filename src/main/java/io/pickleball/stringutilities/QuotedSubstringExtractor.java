@@ -116,8 +116,6 @@
 //        Map<String, String> extracted = extractParenthesizedSubstrings(input);
 //        String modified = extracted.get("modifiedText");
 //// ... do something with the modified text ...
-//        System.out.println("@@input: " + input);
-//        System.out.println("@@modified: " + input);
 //
 //        String restored = restoreParenthesizedSubstrings(modified, extracted);
 //

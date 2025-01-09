@@ -18,7 +18,7 @@ public class TracingTools {
                         new StringBuilder(),
                         (sb, frame) -> {
                             StringBuilder result = new StringBuilder();
-                            if (sb.length() > 0) {
+                            if (!sb.isEmpty()) {
                                 result.append(sb);
                             }
 
@@ -27,7 +27,7 @@ public class TracingTools {
                             className = className.substring(className.lastIndexOf('.') + 1);
                             String method = frame.getMethodName();
 
-                            if (result.length() > 0) {
+                            if (!result.isEmpty()) {
                                 String lastContent = result.toString();
                                 String lastClass = lastContent.substring(lastContent.lastIndexOf('\n') + 1);
                                 if (lastClass.isEmpty()) {

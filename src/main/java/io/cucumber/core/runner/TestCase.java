@@ -1,3 +1,27 @@
+/*
+ * This file incorporates work covered by the following copyright and permission notice:
+ *
+ * Copyright (c) Cucumber Ltd
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
 package io.cucumber.core.runner;
 
 import io.cucumber.core.backend.StepDefinition;
@@ -12,6 +36,7 @@ import io.cucumber.plugin.event.TestCaseStarted;
 import io.cucumber.plugin.event.TestStep;
 import io.cucumber.plugin.event.TestStepFinished;
 import io.cucumber.plugin.event.TestStepStarted;
+import io.pickleball.cacheandstate.StepWrapper;
 import io.pickleball.mapandStateutilities.LinkedMultiMap;
 import io.pickleball.cacheandstate.ScenarioContext;
 import io.pickleball.executions.ExecutionConfig;
@@ -19,9 +44,7 @@ import io.pickleball.executions.ExecutionConfig;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.ExecutionMode.*;
@@ -41,8 +64,8 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
     public final UUID id;
     public GherkinMessagesFeature gherkinMessagesFeature;
     public Scenario scenario;
-
-
+//    private final List<PickleStepTestStep> dynamicRunList = new ArrayList<>();
+    private final List<StepWrapper> topLevelSteps = new ArrayList<>();
 
     public TestCase(
             UUID id, List<PickleStepTestStep> testSteps,
@@ -61,9 +84,25 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
         this.pickle = pickle;
         this.executionMode = dryRun ? DRY_RUN : RUN;
 
-        for (PickleStepTestStep testStep : testSteps) {
-            testStep.setScenarioContext(this);
+
+        Map<Integer, StepWrapper> nestingMap = new HashMap<>();
+        for (PickleStepTestStep templateStep : testSteps) {
+//            templateStep.setScenarioContext(this);
+            StepWrapper stepWrapper = new StepWrapper(templateStep, this);
+            int nestingLevel = stepWrapper.getGherkinMessagesStep().parseRunTimeParameters();
+            if(nestingLevel == 0)
+                topLevelSteps.add(stepWrapper);
+            else
+            {
+                StepWrapper parentNesting = nestingMap.get(nestingLevel);
+                if(parentNesting == null)
+                    throw new RuntimeException(":".repeat(nestingLevel) + " incorrect nesting level for step '" + templateStep.getStepText() + "' line: " + getLine());
+                nestingMap.get(nestingLevel).addNestedChildStep(stepWrapper);
+
+            }
+            nestingMap.put(nestingLevel + 1, stepWrapper);
         }
+
 
     }
 
@@ -107,69 +146,20 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
         }
 
 
-        for (PickleStepTestStep dummyStep : testSteps) {
-//            dummyStep.setParent(this);
-//            if (!dummyStep.shouldRun())
-//                continue;
+        for (StepWrapper stepWrapper : topLevelSteps) {
 
-
-            nextExecutionMode = runPreStepsStack(this, state, bus, nextExecutionMode);
-            PickleStepTestStep step = dummyStep.modifyPickleStepTestStep();
-            nextExecutionMode = step
-                    .run(this, bus, state, nextExecutionMode)
+            nextExecutionMode = stepWrapper
+                    .run(this, bus, state, nextExecutionMode, null)
                     .next(nextExecutionMode);
-            nextExecutionMode = runPostStepsStack(this, state, bus, nextExecutionMode);
-
-//            GherkinMessagesStep gherkinMessagesStep =  step.getGherkinMessagesStep();
-
-
-
-//            System.out.println("\n===\n@@gherkinMessagesStep:  "+ gherkinMessagesStep.getRunFlag() + " : " + gherkinMessagesStep.getRunTimeKeyWord() + " " + gherkinMessagesStep.getRunTimeText());
-//            System.out.println("shouldRun?  " + step.shouldRun());
-//            if (dummyStep.shouldRun() && nextExecutionMode.equals(RUN)) {
-//                nextExecutionMode = step
-//                        .run(this, bus, state, nextExecutionMode)
-//                        .next(nextExecutionMode);
-//            } else if (step.getGherkinMessagesStep().getRunTimeKeyWord().startsWith("@")) {
-//                RunCondition runCondition = step.getGherkinMessagesStep().getRunFlag();
-//                System.out.println("@@runCondition: " + runCondition);
-//                io.cucumber.core.backend.Status status = getTestCaseState().getStatus();
-//                if (runCondition.equals(RunCondition.ALWAYS_RUN))
-//                    step.run(this, bus, state, nextExecutionMode);
-//                else if (runCondition.equals(RunCondition.RUN_ON_FAIL) && status.equals(io.cucumber.core.backend.Status.FAILED)) {
-//                    step.run(this, bus, state, nextExecutionMode);
-//                } else if (runCondition.equals(RunCondition.RUN_ON_PASS) && status.equals(io.cucumber.core.backend.Status.PASSED)) {
-//                    step.run(this, bus, state, nextExecutionMode);
-//                }
-//
-//            }
-
-
-//            if (nextExecutionMode.equals(SKIP) && step.getGherkinMessagesStep().getRunTimeKeyWord().startsWith("@")) {
-//                RunCondition runCondition = step.getGherkinMessagesStep().getRunFlag();
-//                io.cucumber.core.backend.Status status = getTestCaseState().getStatus();
-//                if (runCondition.equals(RunCondition.ALWAYS_RUN))
-//                    step.run(this, bus, state, nextExecutionMode);
-//                else if (runCondition.equals(RunCondition.RUN_ON_FAIL) && status.equals(io.cucumber.core.backend.Status.FAILED)) {
-//                    step.run(this, bus, state, nextExecutionMode);
-//                } else if (runCondition.equals(RunCondition.RUN_ON_PASS) && status.equals(io.cucumber.core.backend.Status.PASSED)) {
-//                    step.run(this, bus, state, nextExecutionMode);
-//                }
-//            } else {
-//                nextExecutionMode = step
-//                        .run(this, bus, state, nextExecutionMode)
-//                        .next(nextExecutionMode);
-//            }
-
-
-
         }
+
 
         for (HookTestStep after : afterHooks) {
             nextExecutionMode = after
                     .run(this, bus, state, executionMode)
                     .next(nextExecutionMode);
         }
+
 
         Instant stop = bus.getInstant();
         Duration duration = Duration.between(start, stop);
@@ -179,8 +169,6 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
             emitTestCaseFinished(bus, executionId, stop, result);
         else
             emitComponentCaseFinished(bus, executionId, stop, result);
-
-
     }
 
     @Override
@@ -319,13 +307,13 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
     }
 
     private void emitComponentCaseStarted(EventBus bus, Instant start, UUID executionId) {
-        bus.send(new TestStepStarted(start, parent, this));
+        bus.send(new TestStepStarted(start, parentTestCase, this));
     }
 
     private void emitComponentCaseFinished(
             EventBus bus, UUID executionId, Instant stop, Result result
     ) {
-        bus.send(new TestStepFinished(stop, parent, this, result));
+        bus.send(new TestStepFinished(stop, parentTestCase, this, result));
         popCurrentScenario();
     }
 }

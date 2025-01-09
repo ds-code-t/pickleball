@@ -9,12 +9,11 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 
 public class NavigableIteratorTest {
-    private LinkedMultiMap<String, Integer> map;
     private NavigableIterator<String, Integer> iterator;
 
     @BeforeMethod
     public void setUp() {
-        map = new LinkedMultiMap<>();
+        LinkedMultiMap<String, Integer> map = new LinkedMultiMap<>();
         // Create a test dataset with repeated keys and values
         map.put("A", 1);  // index 0
         map.put("B", 2);  // index 1

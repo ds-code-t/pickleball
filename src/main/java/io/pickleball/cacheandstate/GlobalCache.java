@@ -21,9 +21,6 @@ public class GlobalCache {
     public static final PrintStream out = System.out;
     public static TeamCityPlugin teamCityPlugin;
 
-//    public static ConcurrentHashMap<String, Object> gherkinMap = new ConcurrentHashMap<>();
-
-
     public static GherkinMessagesFeature getParsedFeature(URI uri) {
         return parsedFeature.computeIfAbsent(uri, FeatureFileUtilities::parseFeature
         );
@@ -45,14 +42,6 @@ public class GlobalCache {
 
     private static final Map<String, List<Feature>> CACHE = new ConcurrentHashMap<>();
 
-//    private static Runner globalRunner;
-
-
-//    public static Runner getGlobalRunner() {
-//        return globalRunner;
-//    }
-
-
     private static Runtime globalRuntime;
 
     public static FeaturePathFeatureSupplier getFeaturePathFeatureSupplier() {
@@ -60,8 +49,6 @@ public class GlobalCache {
     }
 
     public static Runtime getGlobalRuntime() {
-//        if(globalRuntime == null)
-//            globalRuntime  = RuntimeUtils.createRuntimeFromRunner(runner, TestRunner.class.getClassLoader());
         return globalRuntime;
     }
 

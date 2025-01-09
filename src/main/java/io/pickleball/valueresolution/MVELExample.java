@@ -17,12 +17,6 @@ import static org.mvel2.compiler.AbstractParser.*;
 // Example usage
 public class MVELExample {
     public static void main(String[] args) {
-//        System.out.println("\n@@CLASS_LITERALS");
-//        System.out.println(CLASS_LITERALS);
-//        System.out.println("\n@@OPERATORS");
-//        System.out.println(OPERATORS);
-//        System.out.println("\n@@LITERALS");
-//        System.out.println(LITERALS);
         LinkedMultiMap<String, String> map = new LinkedMultiMap<>();
         map.put("test","AAA");
         map.put("complete","BBB");
@@ -30,17 +24,11 @@ public class MVELExample {
 
         MapsWrapper mapsWrapper = new MapsWrapper(map);
 
-//        String expr =  "Double.MAX_VALUE > '1.0'";
         String expr = " test complete ";
         Serializable compiled = MVEL.compileExpression(expr);
         Object val = MVEL.executeExpression(compiled, mapsWrapper);
         System.out.println("----\n@@expr: " + expr + "  ,eval: " + val);
 
-//        System.out.println("----\n\n");
-////
-//        EvalExpression ex = new EvalExpression(expr);
-//        Object rt = ex.startEval();
-//        System.out.println("Evaluated value: : " + rt);
     }
     public class CustomDslPreProcessor implements PreProcessor {
 

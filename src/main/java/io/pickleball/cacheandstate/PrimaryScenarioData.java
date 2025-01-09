@@ -57,24 +57,6 @@ public class PrimaryScenarioData {
         return allNotLogged;
     }
 
-//
-//    public static void startEvent() {
-//        getCurrentStep().sendStartEvent();
-//    }
-//
-//    public static void endEvent() {
-//        getCurrentStep().sendEndEvent();
-//    }
-
-
-//    public static StepContext getCurrentStep() {
-//        return getCurrentScenario().currentStep;
-//    }
-//
-//    public static void setCurrentStep(StepContext currentStep) {
-//        getCurrentScenario().currentStep = currentStep;
-//    }
-
     public static EventBus getBus() {
         return getState().bus;
     }
@@ -87,10 +69,6 @@ public class PrimaryScenarioData {
     }
 
 
-//    public PrimaryScenarioData(Runner runner, TestCase testCase) {
-//
-//    }
-
     public static ScenarioContext getPrimaryScenario() {
         return getState().primaryScenario;
     }
@@ -101,7 +79,7 @@ public class PrimaryScenarioData {
 
     public static ScenarioContext popCurrentScenario() {
         ScenarioContext poppedScenario = getState().scenarioStack.pop();
-        poppedScenario.getTestCaseState().completeScenario();
+//        poppedScenario.getTestCaseState().completeScenario();
         return poppedScenario;
     }
 
@@ -115,7 +93,7 @@ public class PrimaryScenarioData {
             if (!scenarioContext1.getExecutingStepStack().isEmpty())
                 return scenarioContext1.getExecutingStepStack().peek();
         }
-        return null;
+        throw new RuntimeException("Failed to find CurrentStep");
     }
 
     public static void setCurrentScenario(ScenarioContext currentScenario) {
@@ -127,14 +105,6 @@ public class PrimaryScenarioData {
     }
     public static TestCaseState getPrimaryState() {
         return getPrimaryScenario().getTestCaseState();
-    }
-
-    public static Status[] getCurrentScenarioCompletionStatus() {
-        return getCurrentState().getCompletionStatus();
-    }
-
-    public static Status[] getPrimaryScenarioCompletionStatus(){
-        return getPrimaryState().getCompletionStatus();
     }
 
     public static Status getCurrentScenarioStatus(){
@@ -152,11 +122,4 @@ public class PrimaryScenarioData {
     public static MVELWrapper getMvelWrapper() {
         return getState().mvelWrapper;
     }
-
-
-//    public static boolean assertScenarioExecutionStatus(String scenarioType, String status) {
-//
-//    }
-
-
 }

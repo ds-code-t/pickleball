@@ -1,3 +1,27 @@
+/*
+ * This file incorporates work covered by the following copyright and permission notice:
+ *
+ * Copyright (c) Cucumber Ltd
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
 package io.cucumber.core.runner;
 
 import io.cucumber.core.eventbus.EventBus;
@@ -15,19 +39,19 @@ import java.util.UUID;
 
 import static io.pickleball.cacheandstate.ScenarioContext.popCurrentStep;
 import static io.pickleball.cacheandstate.ScenarioContext.setCurrentStep;
-import static io.pickleball.debugtools.TimeUtils.getCurrentTimestamp;
 
-public final class PickleStepTestStep extends TestStep  implements io.cucumber.plugin.event.PickleStepTestStep {
+public class PickleStepTestStep extends TestStep implements io.cucumber.plugin.event.PickleStepTestStep {
 
     private final URI uri;
     private final Step step;
     private final List<HookTestStep> afterStepHookSteps;
     private final List<HookTestStep> beforeStepHookSteps;
     private PickleStepDefinitionMatch definitionMatch;
-    private  io. cucumber. core. gherkin.Pickle pickle;
+    private io.cucumber.core.gherkin.Pickle pickle;
     public Runner runner;
 
-    GherkinMessagesStep getGherkinMessagesStep(){
+
+    GherkinMessagesStep getGherkinMessagesStep() {
         return (GherkinMessagesStep) getStep();
     }
 
@@ -68,18 +92,10 @@ public final class PickleStepTestStep extends TestStep  implements io.cucumber.p
         this.definitionMatch = definitionMatch;
     }
 
-//    public PickleStepTestStep generateNewStep(){
-//
-//        PickleStepDefinitionMatch match = runner.matchStepToStepDefinition(pickle, step);
-//    return new PickleStepTestStep(runner.bus.generateId(), pickle.getUri(), step, beforeStepHookSteps,
-//    afterStepHookSteps, match);
-//    }
 
     @Override
     public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
         ExecutionMode nextExecutionMode = executionMode;
-
-        nextExecutionMode = runPreStepsStack(testCase, state, bus, nextExecutionMode);
 
         setCurrentStep(this);
         for (HookTestStep before : beforeStepHookSteps) {
@@ -97,8 +113,6 @@ public final class PickleStepTestStep extends TestStep  implements io.cucumber.p
         }
         popCurrentStep();
 
-
-        nextExecutionMode = runPostStepsStack(testCase, state, bus, nextExecutionMode);
 
         return nextExecutionMode;
     }
@@ -150,7 +164,6 @@ public final class PickleStepTestStep extends TestStep  implements io.cucumber.p
         return step.getText();
     }
 
-
     public Pickle getPickle() {
         return pickle;
     }
@@ -158,6 +171,8 @@ public final class PickleStepTestStep extends TestStep  implements io.cucumber.p
     public Runner getRunner() {
         return runner;
     }
+
+
 
 
 }

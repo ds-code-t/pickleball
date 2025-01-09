@@ -1,7 +1,29 @@
+/*
+ * This file incorporates work covered by the following copyright and permission notice:
+ *
+ * Copyright (c) Cucumber Ltd
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
 package io.cucumber.core.stepexpression;
 
-import io.cucumber.core.runner.ExecutionMode;
-import io.cucumber.core.runner.PickleStepTestStep;
 import io.cucumber.cucumberexpressions.ParameterByTypeTransformer;
 import io.cucumber.cucumberexpressions.ParameterType;
 import io.cucumber.cucumberexpressions.ParameterTypeRegistry;
@@ -11,20 +33,13 @@ import io.cucumber.datatable.TableCellByTypeTransformer;
 import io.cucumber.datatable.TableEntryByTypeTransformer;
 import io.cucumber.docstring.DocStringType;
 import io.cucumber.docstring.DocStringTypeRegistry;
-import io.cucumber.plugin.event.TestCase;
-import io.pickleball.cacheandstate.ScenarioContext;
 import io.pickleball.customtypes.DynamicStep;
-//import io.pickleball.customtypes.EvalExpression;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
-
-import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
 import static io.pickleball.configs.Constants.*;
-import static io.pickleball.cucumberutilities.CucumberObjectFactory.createPickleStepTestStep;
 import static io.pickleball.valueresolution.BooleanResolver.resolveObjectToBoolean;
 
 public final class StepTypeRegistry implements io.cucumber.core.api.TypeRegistry {
@@ -93,7 +108,6 @@ public final class StepTypeRegistry implements io.cucumber.core.api.TypeRegistry
                 ifConditionalStepRegex,              // Regex
                 Boolean.class,                 // Target class
                 (String[] groups) -> {             // CaptureGroupTransformer
-                    System.out.println("@@groups[0]: " + groups[0]);
                     return resolveObjectToBoolean(groups[0]);
                 }
         ));
@@ -133,20 +147,6 @@ public final class StepTypeRegistry implements io.cucumber.core.api.TypeRegistry
                 Boolean.class,                      // Input type
                 (String input) -> resolveObjectToBoolean(input) // Transformer returning Boolean
         ));
-
-
-//        // Register custom ParameterType for EvalExpression
-//        parameterTypeRegistry.defineParameterType(new ParameterType<>(
-//                "evalExpression",                // Name of the parameter type
-//                "<\\{.*\\}>",
-//                EvalExpression.class,            // Target class
-//                (String[] args) -> new EvalExpression(
-//                        args[0]
-//                )
-//        ));
-
-
-//        final String QUOTED_STRING_REGEX = "\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|`(?:\\\\.|[^`])*`";
 
         parameterTypeRegistry.defineParameterType(new ParameterType<>(
                 "quotedString",                                      // Name of the parameter type

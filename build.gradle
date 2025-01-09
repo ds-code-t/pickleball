@@ -1,7 +1,7 @@
 plugins {
     id 'java-library'
     id 'maven-publish'
-//    id 'groovy'
+    id 'com.github.jk1.dependency-license-report' version '2.9'
 }
 
 group = 'io.pickleball'
@@ -28,24 +28,10 @@ ext {
 }
 
 dependencies {
-
-    implementation 'org.mvel:mvel2:2.5.2.Final'
-
-    //    implementation "io.cucumber:cucumber-gherkin:${cucumberVersions.core}"
-//    implementation "io.cucumber:cucumber-gherkin-messages:${cucumberVersions.core}"
-//    implementation "io.cucumber:cucumber-plugin:${cucumberVersions.core}"
-    //  api "io.cucumber:cucumber-java:${cucumberVersions.core}"
-//    api "io.cucumber:cucumber-testng:${cucumberVersions.core}"
-    //    implementation "io.cucumber:datatable:${cucumberVersions.core}"
-    //    implementation "io.cucumber:docstring:${cucumberVersions.core}"
-//    implementation "io.cucumber:cucumber-expressions:${cucumberVersions.expressions}"
-
-
-//    implementation "io.cucumber:messages:${cucumberVersions.messages}"
-
-
     implementation platform('org.junit:junit-bom:5.11.2')
     implementation platform('com.fasterxml.jackson:jackson-bom:2.18.2')
+
+    implementation 'org.mvel:mvel2:2.5.2.Final'
     implementation 'org.apiguardian:apiguardian-api:1.1.2'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jdk8'
@@ -69,14 +55,9 @@ dependencies {
     testImplementation 'org.reactivestreams:reactive-streams:1.0.4'
     testImplementation 'org.hamcrest:hamcrest:3.0'
     testImplementation 'org.skyscreamer:jsonassert:1.5.3'
-
     api 'org.testng:testng:7.10.2'
 
-
-
     // Regular Dependencies with explicit versions
-
-
     implementation "io.cucumber:testng-xml-formatter:${cucumberVersions.testngXmlFormatter}"
     implementation "io.cucumber:tag-expressions:${cucumberVersions.tagExpressions}"
 
@@ -119,4 +100,34 @@ test {
 //    reuseForks = true     // Reuse the same JVM for all test classes
     systemProperty "dataproviderthreadcount", "5"
     systemProperties = System.properties
+}
+
+
+licenseReport {
+    renderers = [
+            new com.github.jk1.license.render.JsonReportRenderer(),
+            new com.github.jk1.license.render.InventoryHtmlReportRenderer(),
+            new com.github.jk1.license.render.TextReportRenderer(),
+            new com.github.jk1.license.render.CsvReportRenderer()
+    ]
+    configurations = ['runtimeClasspath', 'testRuntimeClasspath']  // This will include all dependencies
+    filters = [new com.github.jk1.license.filter.LicenseBundleNormalizer()]
+}
+
+
+task listPackages {
+    doLast {
+        def packages = new TreeSet<String>() // TreeSet for automatic sorting
+        sourceSets.main.allJava.each { file ->
+            def content = file.text
+            def matcher = content =~ /package\s+([\w.]+)/
+            if (matcher.find()) {
+                def packageName = matcher.group(1)
+                if (packageName.contains("cucumber")) {
+                    packages.add(packageName)
+                }
+            }
+        }
+        packages.each { println it }
+    }
 }

@@ -8,7 +8,6 @@ package io.pickleball.stepdefs;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.java.en.Given;
-import io.cucumber.java.en.If;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import io.pickleball.exceptions.SoftFailureException;
@@ -46,33 +45,38 @@ public class Debugzlib {
     }
 
 
-//    @Given("^DDD (.*) and (.*)$")
-//    public void DDD2(String t1, String t2) {
-//        System.out.println("WITHOUT DATATABLE");
-//    }
+    @When("baa")
+    public void abiExecuteASteplzz() {
+        System.out.println("baa DEBUG");
+    }
+
+    @When("^bc (.*) a steplzz")
+    public void biExecuteASteplzz(String arg) {
+        System.out.println("DEBUG: bc: " + arg);
+    }
+
+    @Given("bbb (.*)")
+    public static void aRunSteps(String a) {
+        System.out.println("RunSteps " + a);
+    }
 
 
-//    @Given("^.*DDD (.*) and (.*).*$")
-//    public void DDD2(String t1, String t2) {
-//
-//    }
+    @Given("I have the following string: {quotedString}")
+    public void handleQuotedString(String quotedString) {
+        System.out.println(quotedString);
+    }
 
 
-@Given("I have the following string: {quotedString}")
-public void handleQuotedString(String quotedString) {
-    System.out.println(quotedString);
-}
-
-
-
-    @Given("^I am running a testlzz (.*) and (.*)$")
+    @Given("^I am running a testlzz (.*) and ([^\\s]*)$")
     public void iAmRunningATestlzz(String t1, String t2, DataTable dataTable) {
+        if (t1.contains("%"))
+            System.out.println("!%STEP: " + t1);
         System.out.print("DdataTable " + dataTable);
         System.out.print("DEBUG: start " + t1 + "  --- " + t2);
 //        waitTime(800L);
-        if(t1.contains("ERROR"))
+        if (t1.contains("ERROR"))
             throw new RuntimeException("ERROR step-DEBUG: start " + t1 + "  --- " + t2);
-        if(t1.contains("SOFT"))
+        if (t1.contains("SOFT"))
             throw new SoftFailureException("ERROR step-DEBUG: start " + t1 + "  --- " + t2);
         System.out.println(" end");
     }
@@ -86,7 +90,7 @@ public void handleQuotedString(String quotedString) {
     public void handleStringList(List<String> stringList) {
         // stringList will contain: ["item, one", "item \"two\"", "item three", ""]
         System.out.println(stringList.size());
-        stringList.forEach(s -> System.out.println("\n@@item: "+ s)  );
+        stringList.forEach(s -> System.out.println("\n@@item: " + s));
     }
 
     @When("I execute a steplzz")
@@ -94,7 +98,7 @@ public void handleQuotedString(String quotedString) {
         System.out.println("DEBUG: When step executed");
     }
 
-    @If("I should see debug outputlzz")
+    @When("I should see debug outputlzz")
     public void iShouldSeeDebugOutputlzz() {
 //        waitTime(3000L);
 //        System.out.println("DEBUG: Then step executed" + getStringTimeStamp());
@@ -105,7 +109,6 @@ public void handleQuotedString(String quotedString) {
     public void errorthrowlzz() throws Exception {
         new Exception("errorthrowlzz").printStackTrace();
     }
-
 
 
     @Given("I perform an action")
@@ -122,7 +125,6 @@ public void handleQuotedString(String quotedString) {
     public void iSeeColor() {
         System.out.println("The step was matched using '?' as a regex meta-character.");
     }
-
 
 
 }

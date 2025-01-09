@@ -1,6 +1,5 @@
 package io.pickleball.cacheandstate;
 
-import io.cucumber.core.backend.Status;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.gherkin.messages.GherkinMessagesPickle;
 import io.cucumber.core.runner.PickleStepTestStep;
@@ -25,11 +24,20 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
     private final Pickle pickle;             // The static scenario definition
     private TestCaseState testCaseState;    // The mutable scenario state
 
+    public boolean isForceComplete() {
+        return forceComplete;
+    }
+
+    public void forceComplete() {
+        this.forceComplete = true;
+    }
+
+    private boolean forceComplete = false;
 
     private final Runner runner;
 
     private final List<ScenarioContext> children = new ArrayList<>();
-    private final List<StepContext> stepChildren = new ArrayList<>();
+    private final List<StepWrapper> stepChildren = new ArrayList<>();
 
     private final UUID id;
 
@@ -76,7 +84,7 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
     }
 
     public boolean isTopLevel() {
-        return nestingLevel == 0;
+        return descendantLevel == 0;
     }
 
     public Stack<PickleStepTestStep> getExecutingStepStack() {
@@ -95,16 +103,16 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
     public PickleStepTestStep parentStep;
 
     public void addChildScenarioContext(TestCase child) {
-        child.parent = (TestCase) this;
-        child.nestingLevel = (nestingLevel + 1);
+        child.parentTestCase = (TestCase) this;
+        child.descendantLevel = (descendantLevel + 1);
         child.position = children.size();
         children.add(child);
         child.parentStep = getCurrentStep();
     }
 
-    public void addChildStepContext(StepContext child) {
-        child.parent = (TestCase) this;
-        child.nestingLevel = (nestingLevel + 1);
+    public void addChildStepContext(StepWrapper child) {
+        child.parentTestCase = (TestCase) this;
+        child.descendantLevel = (descendantLevel + 1);
         child.position = stepChildren.size();
         stepChildren.add(child);
     }
@@ -143,7 +151,7 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
 
 
     public ScenarioContext getRootScenarioContext() {
-        if (parent == null)
+        if (parentTestCase == null)
             return this;
         return getRootScenarioContext();
     }
@@ -181,7 +189,7 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         return children;
     }
 
-    public List<StepContext> getStepChildren() {
+    public List<StepWrapper> getStepChildren() {
         return stepChildren;
     }
 
@@ -194,11 +202,4 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         return parentStep;
     }
 
-    public void setScenarioStatus(Status status){
-        getTestCaseState().setCompletionStatus(status);
-    }
-    public void setTestStatus(Status status){
-        getPrimaryState().setCompletionStatus(status);
-        getTestCaseState().setCompletionStatus(status);
-    }
 }
