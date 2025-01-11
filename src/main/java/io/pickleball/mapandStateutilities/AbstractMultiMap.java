@@ -124,7 +124,7 @@ public abstract class AbstractMultiMap<K, V> extends HashMap<K, V> implements Mu
 
 
     /**
-     * Merges multiple AbstractMultiMap<K, V> instances of the same key/value types into a new instance.
+     * Merges multiple AbstractMultiMap&lt;K, V&gt; instances of the same key/value types into a new instance.
      * The entries are appended in the order of the varargs.
      */
     @SafeVarargs
@@ -145,8 +145,8 @@ public abstract class AbstractMultiMap<K, V> extends HashMap<K, V> implements Mu
     }
 
     /**
-     * Merges multiple AbstractMultiMap<?, ?> instances of potentially different key/value types into
-     * a new AbstractMultiMap<String, String> by converting all keys and values to strings.
+     * Merges multiple AbstractMultiMap&lt;?, ?&gt; instances instances of potentially different key/value types into
+     * a new AbstractMultiMap&lt;String, String&gt; by converting all keys and values to strings.
      */
     public static AbstractMultiMap<String, String> mergeToString(AbstractMultiMap<?, ?>... multiMaps) {
         Objects.requireNonNull(multiMaps, "multiMaps array cannot be null");
