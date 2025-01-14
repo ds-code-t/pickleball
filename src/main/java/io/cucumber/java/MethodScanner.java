@@ -63,7 +63,7 @@ final class MethodScanner {
             return aClass.getMethods();
         } catch (NoClassDefFoundError e) {
             log.warn(e,
-                () -> "Failed to load methods of class '" + aClass.getName() + "'.\n" + classPathScanningExplanation());
+                    () -> "Failed to load methods of class '" + aClass.getName() + "'.\n" + classPathScanningExplanation());
         }
         return new Method[0];
     }
@@ -128,14 +128,22 @@ final class MethodScanner {
                 || annotationClass.equals(DocStringType.class);
     }
 
+    public static boolean isCucumberAnnotation(Annotation annotation) {
+        String packageName = annotation.annotationType().getPackageName();
+        return (packageName.startsWith("io.cucumber.java.") || packageName.startsWith("cucumber.api.java."));
+    }
+
+    public static boolean isCucumberAnnotation(Class<? extends Annotation>  annotationType) {
+        String packageName = annotationType.getPackageName();
+        return (packageName.startsWith("io.cucumber.java.") || packageName.startsWith("cucumber.api.java."));
+    }
+
     private static boolean isStepDefinitionAnnotation(Annotation annotation) {
-        Class<? extends Annotation> annotationClass = annotation.annotationType();
-        return annotationClass.getAnnotation(StepDefinitionAnnotation.class) != null;
+       return isCucumberAnnotation(annotation);
     }
 
     private static boolean isRepeatedStepDefinitionAnnotation(Annotation annotation) {
-        Class<? extends Annotation> annotationClass = annotation.annotationType();
-        return annotationClass.getAnnotation(StepDefinitionAnnotations.class) != null;
+        return isCucumberAnnotation(annotation);
     }
 
     private static Annotation[] repeatedAnnotations(Annotation annotation) {

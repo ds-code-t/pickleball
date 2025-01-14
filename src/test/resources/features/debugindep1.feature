@@ -4,6 +4,11 @@ Feature: sdf
   Scenario: ASD2
 #    Given I am running a testlzz ERROR and 2
   @RUN_ON_FAIL: Then I am running a testlzz after fail and RUN_ON_FAIL
+#
+#    And WWW 'qqqq1' and 'qqqqq1'
+#      | Scaenario | A |
+#      | 1         | 2 |
+
 
   Scenario: ASD
     * baa

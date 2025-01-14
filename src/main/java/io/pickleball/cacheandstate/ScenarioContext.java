@@ -58,7 +58,8 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
 
     public final LinkedMultiMap<String, String> stateMap = new LinkedMultiMap<>();
 
-    public final MapsWrapper mapsWrapper;
+    public final MapsWrapper runMaps;
+    public MapsWrapper configMaps;
 
     public ScenarioContext(UUID id, GherkinMessagesPickle pickle, Runner runner, LinkedMultiMap<String, String> passedMap) {
         this.id = id;
@@ -76,11 +77,11 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         } else {
             examplesMap = null;
         }
-        mapsWrapper = new MapsWrapper(this.passedMap, this.examplesMap, this.stateMap);
+        runMaps = new MapsWrapper(this.passedMap, this.examplesMap, this.stateMap);
     }
 
     public String replaceAndEval(String inputString) {
-        return replaceNestedBrackets(inputString,  mapsWrapper);
+        return replaceNestedBrackets(inputString, runMaps);
     }
 
     public boolean isTopLevel() {

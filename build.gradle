@@ -8,7 +8,7 @@ plugins {
 
 
 group = 'tools.dscode'
-version = '1.1.1'
+version = '1.1.0'
 
 
 java {
@@ -129,7 +129,6 @@ jreleaser {
                     stagingRepository('target/staging-deploy')
                 }
             }
-
         }
     }
 }
@@ -160,6 +159,7 @@ dependencies {
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jdk8'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.18.2'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.2'
+    implementation("com.jayway.jsonpath:json-path:2.9.0")
 
     implementation 'org.freemarker:freemarker:2.3.33'
     implementation 'com.googlecode.java-diff-utils:diffutils:1.3.0'
@@ -183,6 +183,8 @@ dependencies {
     implementation "io.cucumber:html-formatter:${cucumberVersions.htmlFormatter}"
     implementation "io.cucumber:junit-xml-formatter:${cucumberVersions.junitXmlFormatter}"
     implementation "io.cucumber:ci-environment:${cucumberVersions.ci}"
+//    implementation("info.cukes:cucumber-java:1.2.6")
+//    implementation("info.cukes:cucumber-core:1.2.6")
 }
 
 

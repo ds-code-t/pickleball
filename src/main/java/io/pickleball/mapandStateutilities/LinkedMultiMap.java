@@ -1,6 +1,8 @@
 // LinkedMultiMap.java
 package io.pickleball.mapandStateutilities;
 
+import io.pickleball.datafunctions.MultiFormatDataNode;
+
 import java.util.*;
 
 public class LinkedMultiMap<K, V> extends AbstractMultiMap<K, V> implements StringBasedAccess<K, V> {
@@ -15,6 +17,7 @@ public class LinkedMultiMap<K, V> extends AbstractMultiMap<K, V> implements Stri
         }
     }
 
+
     public LinkedMultiMap() {
         super();
     }
@@ -22,6 +25,78 @@ public class LinkedMultiMap<K, V> extends AbstractMultiMap<K, V> implements Stri
     public LinkedMultiMap(List<K> keys, List<V> values) {
         super(keys, values);
     }
+
+//    public V getByJsonPath(String jsonPath) {
+//        MultiFormatDataNode dataNode = new MultiFormatDataNode(keys, values);
+//        dataNode
+//    }
+//    public static void main(String[] args) {
+//        // Test cases
+//        String[] tests = {
+//                "$.items.name",                     // -> "$.items[-1].name"
+//                "$.items[*].name",                  // unchanged
+//                "$.items[2].name",                  // unchanged
+//                "$.items[-1].name",                 // unchanged
+//                "$..items.name",                    // -> unchanged
+//                "$.*items.name",                    // -> "$.*items[-1].name"
+//                "$.items.deeply.nested.property",   // -> "$.items[-1].deeply.nested.property"
+//                "$..items[*].nested.property",      // unchanged
+//                "$.items[?(@.type=='book')].price"  // unchanged
+//        };
+//
+//        for (String path : tests) {
+//            System.out.println("Original: " + path);
+//            System.out.println("Modified: " + addDefaultLastArraySelector(path));
+//            System.out.println();
+//        }
+//    }
+//
+//    public static String addDefaultLastArraySelector(String jsonPath) {
+//        // Handle edge cases
+//        if (jsonPath == null || !jsonPath.contains(".")) {
+//            return jsonPath;
+//        }
+//
+//        // Don't modify paths that start with $.., return as is
+//        if (jsonPath.startsWith("$..")) {
+//            return jsonPath;
+//        }
+//
+//        // Find the first property after $
+//        int startIndex = 2;  // Skip over "$."
+//
+//        // Find the end of the property name
+//        int endIndex = startIndex;
+//        while (endIndex < jsonPath.length()) {
+//            char c = jsonPath.charAt(endIndex);
+//            if (c == '.' || c == '[') {
+//                break;
+//            }
+//            endIndex++;
+//        }
+//
+//        // If we already have an array selector, return unchanged
+//        if (endIndex < jsonPath.length() && jsonPath.charAt(endIndex) == '[') {
+//            return jsonPath;
+//        }
+//
+//        // Handle property names with * prefix
+//        String propertyPart = jsonPath.substring(startIndex, endIndex);
+//        if (propertyPart.startsWith("*")) {
+//            startIndex++;
+//        }
+//
+//        // Build the modified path
+//        StringBuilder result = new StringBuilder();
+//        result.append(jsonPath.substring(0, endIndex));
+//        result.append("[-1]");
+//        if (endIndex < jsonPath.length()) {
+//            result.append(jsonPath.substring(endIndex));
+//        }
+//
+//        return result.toString();
+//    }
+
 
     @Override
     public V get(Object key) {

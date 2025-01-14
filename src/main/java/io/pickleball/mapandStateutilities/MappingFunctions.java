@@ -2,6 +2,7 @@ package io.pickleball.mapandStateutilities;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -12,12 +13,12 @@ import static io.pickleball.configs.Constants.flag1;
 public class MappingFunctions {
 
     @SafeVarargs
-    public static String replaceNestedBrackets(String input, LinkedMultiMap<String, String>... maps) {
+    public static String replaceNestedBrackets(String input, Map<String, String>... maps) {
         return replaceNestedBrackets(input, Arrays.stream(maps).toList());
 
     }
 
-    public static String replaceNestedBrackets(String input, List<LinkedMultiMap<String, String>> maps) {
+    public static String replaceNestedBrackets(String input, List<Map<String, String>> maps) {
         MapsWrapper mapsWrapper = new MapsWrapper(maps);
         return replaceNestedBrackets(input, mapsWrapper);
     }

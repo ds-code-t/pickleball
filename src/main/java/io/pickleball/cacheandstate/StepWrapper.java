@@ -91,7 +91,7 @@ public class StepWrapper extends BaseContext {
         PickleStep pickleStep = gherkinMessagesStep.getPickleStep();
         Step step = pickleStep.getStepTemplate();
 
-        String stepText = replaceNestedBrackets(templateStep.getStep().getText(), parentTestCase.mapsWrapper);
+        String stepText = replaceNestedBrackets(templateStep.getStep().getText(), parentTestCase.runMaps);
 
         PickleStepArgument argument = null;
 
@@ -104,7 +104,7 @@ public class StepWrapper extends BaseContext {
                 List<TableCell> cells = row.getCells();
                 List<PickleTableCell> newCells = new ArrayList<>();
                 for (TableCell cell : cells) {
-                    String cellText = replaceNestedBrackets(cell.getValue(), parentTestCase.mapsWrapper);
+                    String cellText = replaceNestedBrackets(cell.getValue(), parentTestCase.runMaps);
                     newCells.add(new PickleTableCell(cellText));
                 }
                 newRows.add(new PickleTableRow(newCells));
@@ -115,7 +115,7 @@ public class StepWrapper extends BaseContext {
             if (docString != null) {
                 String media = docString.getMediaType().orElse(null);
                 if (media != null)
-                    media = replaceNestedBrackets(media, parentTestCase.mapsWrapper);
+                    media = replaceNestedBrackets(media, parentTestCase.runMaps);
                 String content = docString.getContent();
                 PickleDocString pickleDocString = new PickleDocString(media, content);
                 argument = new PickleStepArgument(pickleDocString, null);

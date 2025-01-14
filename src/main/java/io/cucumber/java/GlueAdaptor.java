@@ -30,6 +30,8 @@ import io.cucumber.core.backend.Lookup;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 
+import static io.cucumber.java.MethodScanner.isCucumberAnnotation;
+
 final class GlueAdaptor {
 
     private final Lookup lookup;
@@ -42,7 +44,7 @@ final class GlueAdaptor {
 
     void addDefinition(Method method, Annotation annotation) {
         Class<? extends Annotation> annotationType = annotation.annotationType();
-        if (annotationType.getAnnotation(StepDefinitionAnnotation.class) != null) {
+        if (isCucumberAnnotation(annotationType)) {
             String expression = expression(annotation);
             glue.addStepDefinition(new JavaStepDefinition(method, expression, lookup));
         } else if (annotationType.equals(Before.class)) {

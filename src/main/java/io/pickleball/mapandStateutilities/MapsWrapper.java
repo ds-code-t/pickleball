@@ -3,18 +3,17 @@ package io.pickleball.mapandStateutilities;
 import java.util.*;
 
 public class MapsWrapper extends HashMap<String, Object> {
-    final List<LinkedMultiMap<String, String>> mapList;
+    final public List<Map<String, String>> mapList;
 
     @SafeVarargs
-    public MapsWrapper(LinkedMultiMap<String, String>... maps) {
+    public MapsWrapper(Map<String, String>... maps) {
         this(Arrays.stream(maps).toList());
     }
 
-    public MapsWrapper(List<LinkedMultiMap<String, String>> maps) {
+    public MapsWrapper(List<Map<String, String>> maps) {
         mapList = new ArrayList<>(maps);
         mapList.removeIf(Objects::isNull);
     }
-
 
     @Override
     public String get(Object key) {
@@ -24,8 +23,8 @@ public class MapsWrapper extends HashMap<String, Object> {
         if (stringKey.isEmpty())
             return null;
         Object value;
-        for (LinkedMultiMap<?, ?> map : mapList) {
-            value = map.getValueByString(stringKey);
+        for (Map<?, ?> map : mapList) {
+            value = map.get(stringKey);
             if (value != null) {
                 String stringValue = value.toString();
                 if (stringValue.isBlank()) {

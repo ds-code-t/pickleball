@@ -32,7 +32,7 @@ public class SourceParser {
     }
 
     public static GherkinMessagesPickle getComponentScenarioWrapper(GherkinMessagesPickle pickle, List<LinkedMultiMap<String, String>> maps) throws IOException {
-        List<LinkedMultiMap<String, String>> listOfMaps = new ArrayList<>(maps);
+        List<Map<String, String>> listOfMaps = new ArrayList<>(maps);
         Set<Integer> lines = new HashSet<>();
         int startLine = pickle.getScenarioLocation().getLine();
         lines.add(startLine);
