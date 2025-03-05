@@ -19,7 +19,7 @@
 // * A wrapper around a Jackson JsonNode that can be created from JSON, YAML, or XML,
 // * and can be converted back to any of these formats. Uses JsonPathFunctions for querying.
 // */
-//public class MultiFormatDataNode implements Map<String, Object> {
+//public class MultiFormatDataNode2 implements Map<String, Object> {
 ////public class MultiFormatDataNode extends HashMap<String, Object> {
 //
 //
@@ -48,18 +48,18 @@
 ////        this.altResolutionMap = altResolutionMap;
 ////    }
 //
-//    public MultiFormatDataNode() {
+//    public MultiFormatDataNode2() {
 //        this.rootNode = JSON_MAPPER.createObjectNode();
 //    }
 //
-//    public MultiFormatDataNode(List<?> keys, List<?> values) {
+//    public MultiFormatDataNode2(List<?> keys, List<?> values) {
 //        if (keys.size() != values.size()) {
 //            throw new IllegalArgumentException("Number of keys must match number of values.");
 //        }
 //        this.rootNode = JSON_MAPPER.createObjectNode();
 //        for (int i = 0; i < keys.size(); i++) {
 //            Object keyObj = keys.get(i);
-//            if (keyObj instanceof MultiFormatDataNode) {
+//            if (keyObj instanceof MultiFormatDataNode2) {
 //                continue;
 //            }
 //            put(String.valueOf(keyObj), values.get(i));
@@ -67,30 +67,30 @@
 //    }
 //
 //
-//    private MultiFormatDataNode(ObjectNode rootNode) {
+//    private MultiFormatDataNode2(ObjectNode rootNode) {
 //        this.rootNode = rootNode;
 //    }
 //
-//    public static MultiFormatDataNode fromString(String input) {
+//    public static MultiFormatDataNode2 fromString(String input) {
 //        try {
 //            ObjectNode json = (ObjectNode) JSON_MAPPER.readTree(input);
-//            return new MultiFormatDataNode(json);
+//            return new MultiFormatDataNode2(json);
 //        } catch (IOException ignored) {
 //        }
 //        try {
 //            ObjectNode yaml = (ObjectNode) YAML_MAPPER.readTree(input);
-//            return new MultiFormatDataNode(yaml);
+//            return new MultiFormatDataNode2(yaml);
 //        } catch (IOException ignored) {
 //        }
 //        try {
 //            ObjectNode xml = (ObjectNode) XML_MAPPER.readTree(input);
-//            return new MultiFormatDataNode(xml);
+//            return new MultiFormatDataNode2(xml);
 //        } catch (IOException ignored) {
 //        }
 //        throw new IllegalArgumentException("Input data is not valid JSON, YAML, or XML.");
 //    }
 //
-//    public MultiFormatDataNode(String path) {
+//    public MultiFormatDataNode2(String path) {
 //        File fileOrDir = new File(path);
 //        if (!fileOrDir.exists()) {
 //            throw new IllegalArgumentException("Path does not exist: " + path);
@@ -376,7 +376,7 @@
 //                }
 //                """;
 //
-//        MultiFormatDataNode node = MultiFormatDataNode.fromString(jsonData);
+//        MultiFormatDataNode2 node = MultiFormatDataNode2.fromString(jsonData);
 //
 //        // Test getFirstByPath
 //        System.out.println("\nTesting getFirstByPath:");
@@ -415,7 +415,7 @@
 //            System.out.println("\nTesting file reading:");
 //            System.out.println("Input file content: " + testContent);
 //
-//            MultiFormatDataNode node = new MultiFormatDataNode(tempFile.getAbsolutePath());
+//            MultiFormatDataNode2 node = new MultiFormatDataNode2(tempFile.getAbsolutePath());
 //
 //            // Test string value
 //            System.out.println("\nTesting string value reading:");
@@ -442,7 +442,7 @@
 //        System.out.println("\nInput JSON:");
 //        System.out.println(jsonData);
 //
-//        MultiFormatDataNode node = MultiFormatDataNode.fromString(jsonData);
+//        MultiFormatDataNode2 node = MultiFormatDataNode2.fromString(jsonData);
 //
 //        // Test JSON conversion
 //        System.out.println("\nTesting JSON conversion:");
@@ -485,7 +485,7 @@
 //        System.out.println("\nInitial JSON:");
 //        System.out.println(initialJson);
 //
-//        MultiFormatDataNode node = MultiFormatDataNode.fromString(initialJson);
+//        MultiFormatDataNode2 node = MultiFormatDataNode2.fromString(initialJson);
 //
 //        // Test size
 //        System.out.println("\nTesting size:");
@@ -547,7 +547,7 @@
 //
 //        // Test entrySet
 //        System.out.println("\nTesting entrySet:");
-//        Set<Map.Entry<String, Object>> entries = node.entrySet();
+//        Set<Entry<String, Object>> entries = node.entrySet();
 //        System.out.println("Expected entries size: " + node.size());
 //        System.out.println("Actual entries: " + entries);
 //        assert entries.size() == node.size() : "EntrySet size should match map size";
@@ -599,7 +599,7 @@
 //        System.out.println("\nInput complex JSON:");
 //        System.out.println(complexJson);
 //
-//        MultiFormatDataNode node = MultiFormatDataNode.fromString(complexJson);
+//        MultiFormatDataNode2 node = MultiFormatDataNode2.fromString(complexJson);
 //
 //        // Test filtering with multiple conditions
 //        System.out.println("\nTesting complex filtering - fiction books over $20:");

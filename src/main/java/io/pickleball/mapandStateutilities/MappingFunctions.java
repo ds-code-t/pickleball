@@ -26,7 +26,9 @@ public class MappingFunctions {
     public static String replaceNestedBrackets(String input, MapsWrapper mapsWrapper) {
 
 
-        Pattern pattern = Pattern.compile("<(?<angled>[^<>]+)>|\\{(?<curly>[^{}]+)\\}");
+//        Pattern pattern = Pattern.compile("<(?<json>\\$[^<>]+)>|<(?<angled>[^<>]+)>|\\{(?<curly>[^{}]+)\\}");
+//        Pattern pattern = Pattern.compile("<(?<json>\\$[^<>]+)>|<(?<angled>[^<>$=\\s](?:[^<>]*[^<>\\s])?)>|\\{(?<curly>[^{}]+)\\}");
+        Pattern pattern = Pattern.compile("<(?<angled>[^<>=\\s](?:[^<>]*[^<>\\s])?)>|\\{(?<curly>[^{}]+)\\}");
         String result = input;
 
 
@@ -47,6 +49,15 @@ public class MappingFunctions {
                 if (expression != null) {
                     Object expressionReturn = getMvelWrapper().evaluate(expression, mapsWrapper);
                     matcher.appendReplacement(sb, Matcher.quoteReplacement(String.valueOf(expressionReturn)));
+                    continue;
+                }
+
+                String jsonPath = matcher.group("json");
+                if (jsonPath != null) {
+
+//                    Object expressionReturn = getMvelWrapper().evaluate(expression, mapsWrapper);
+//                    matcher.appendReplacement(sb, Matcher.quoteReplacement(String.valueOf(expressionReturn)));
+                    continue;
                 }
             }
 

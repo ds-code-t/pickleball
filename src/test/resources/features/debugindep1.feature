@@ -1,6 +1,6 @@
 Feature: sdf
 
-
+    @qqqq1
   Scenario: ASD2
 #    Given I am running a testlzz ERROR and 2
   @RUN_ON_FAIL: Then I am running a testlzz after fail and RUN_ON_FAIL
@@ -9,7 +9,7 @@ Feature: sdf
 #      | Scaenario | A |
 #      | 1         | 2 |
 
-
+  @qqqq1
   Scenario: ASD
     * baa
 #   * IF: SC THEN: dd ELSE: s

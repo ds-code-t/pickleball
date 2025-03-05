@@ -13,6 +13,7 @@ import io.pickleball.mapandStateutilities.MapsWrapper;
 
 import java.util.*;
 
+import static io.pickleball.cacheandstate.GlobalCache.getGlobalConfigs;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
 import static io.pickleball.cucumberutilities.ArgumentParsing.convertCommandLineToArgv;
 import static io.pickleball.cucumberutilities.ArgumentParsing.convertHashMapToArgv;
@@ -78,6 +79,7 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
             examplesMap = null;
         }
         runMaps = new MapsWrapper(this.passedMap, this.examplesMap, this.stateMap);
+//        runMaps = new MapsWrapper(this.passedMap, this.examplesMap, this.stateMap, getGlobalConfigs());
     }
 
     public String replaceAndEval(String inputString) {

@@ -45,17 +45,15 @@ import io.cucumber.plugin.event.SnippetsSuggestedEvent.Suggestion;
 import io.pickleball.mapandStateutilities.LinkedMultiMap;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.exception.ExceptionUtils.throwAsUncheckedException;
 import static io.cucumber.core.runner.StackManipulation.removeFrameworkFrames;
+import static io.pickleball.cacheandstate.GlobalCache.getGlobalConfigs;
 import static io.pickleball.cacheandstate.GlobalCache.setScenarioThreadState;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.setPrimaryScenario;
+import static io.pickleball.pathrools.ProjectRootUtils.setProjectRoot;
 import static java.util.Collections.emptyList;
 
 public final class Runner {
@@ -76,6 +74,10 @@ public final class Runner {
     public Runner(
             EventBus bus, Collection<? extends Backend> backends, ObjectFactory objectFactory, Options runnerOptions
     ) {
+        System.out.println("@@runner!!!");
+        System.out.println(Arrays.toString(Thread.currentThread().getStackTrace()));
+        setProjectRoot(runnerOptions);
+        System.out.println("@@getGlobalConfigs(): " + getGlobalConfigs());
         this.bus = bus;
         this.runnerOptions = runnerOptions;
         this.backends = backends;

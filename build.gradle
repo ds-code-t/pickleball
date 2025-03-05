@@ -153,6 +153,7 @@ dependencies {
     implementation platform('org.junit:junit-bom:5.11.2')
     implementation platform('com.fasterxml.jackson:jackson-bom:2.18.2')
 
+    implementation 'com.google.guava:guava:33.4.0-jre'
     implementation 'org.mvel:mvel2:2.5.2.Final'
     implementation 'org.apiguardian:apiguardian-api:1.1.2'
     implementation 'com.fasterxml.jackson.core:jackson-databind'

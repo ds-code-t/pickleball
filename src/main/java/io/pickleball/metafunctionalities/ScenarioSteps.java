@@ -25,10 +25,10 @@ public class ScenarioSteps {
 
         // Parse command-line arguments into RuntimeOptions
         for (LinkedMultiMap<String, String> map : dataTable.asLinkedMultiMaps(String.class, String.class)) {
-            String tags = map.getValueByStringOrDefault(SCENARIO_TAGS, "");
+            String tags = map.getOrDefault(SCENARIO_TAGS, "");
             map.put("_calling tags", tags);
 
-            String componentPaths = map.getValueByStringOrDefault(COMPONENT_PATH, "src/test/resources/features");
+            String componentPaths = map.getOrDefault(COMPONENT_PATH, "src/test/resources/features");
             List<String> argvList = new ArrayList<>();
             argvList.add(componentPaths); // Always include the component paths
 
