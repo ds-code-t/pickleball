@@ -17,6 +17,7 @@ public class Constants {
     public static final String START_FLAG = flag3 + "START" + flag3;
     public static final String END_FLAG = flag3 + "END" + flag3;
 
+    public static final String errorFlag = sFlag2 + "ERROR_FLAG" + sFlag2 ;
 
     public static final String SCENARIO_TAGS = "Scenario Tags";
     public static final String COMPONENT_PATH = "Component Path";

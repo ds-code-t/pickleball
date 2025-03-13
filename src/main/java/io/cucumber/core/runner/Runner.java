@@ -74,7 +74,6 @@ public final class Runner {
     public Runner(
             EventBus bus, Collection<? extends Backend> backends, ObjectFactory objectFactory, Options runnerOptions
     ) {
-        System.out.println("@@runner!!!");
         System.out.println(Arrays.toString(Thread.currentThread().getStackTrace()));
         setProjectRoot(runnerOptions);
         System.out.println("@@getGlobalConfigs(): " + getGlobalConfigs());

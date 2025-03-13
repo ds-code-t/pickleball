@@ -2,7 +2,7 @@ package io.pickleball.exceptions;
 
 import io.cucumber.core.exception.CucumberException;
 
-public class SoftFailureException extends CucumberException {
+public class SoftFailureException extends PickleballException {
 
     public SoftFailureException(String message) {
         super(message);

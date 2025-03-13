@@ -1,7 +1,11 @@
 package io.pickleball.stringutilities;
 
+import io.pickleball.exceptions.PickleballException;
+
 import java.util.function.Function;
 import java.util.Objects;
+
+import static io.pickleball.configs.Constants.errorFlag;
 
 public class ObjectTransformer {
 
@@ -39,12 +43,13 @@ public class ObjectTransformer {
                                               Function<Object, Object> transformation,
                                               int maxIterations,
                                               RuntimeException maxIterationsException) {
-
         Object current = input;
         int iterations = 0;
 
         while (iterations < maxIterations) {
+            System.out.println("@@while1");
             Object next = transformation.apply(current);
+            System.out.println("@@next: " + next);
 
             // Handle null cases and use Objects.equals for proper value equality
             if (Objects.equals(next, current)) {

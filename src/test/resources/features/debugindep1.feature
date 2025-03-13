@@ -1,6 +1,10 @@
 Feature: sdf
 
-    @qqqq1
+
+  Scenario: if test 6
+    * IF: false THEN: I am running a testlzz ERROsR and errorstep1 ELSE: Then I am running a testlzz ERROR and errorstep1
+
+  @qqqq1
   Scenario: ASD2
 #    Given I am running a testlzz ERROR and 2
   @RUN_ON_FAIL: Then I am running a testlzz after fail and RUN_ON_FAIL
@@ -8,6 +12,105 @@ Feature: sdf
 #    And WWW 'qqqq1' and 'qqqqq1'
 #      | Scaenario | A |
 #      | 1         | 2 |
+
+
+  Scenario: condsd test5
+    * IF: false
+  :   Then I am running a testlzz ERROsR and errorstep1
+  ::   Then I am running a testlzz ERROsR and errorstep1
+
+
+  Scenario: ss
+    * IF: SC THEN: dd ELSE: s
+    *  SC THEN: dd ELSE: s
+    Given I am running a testlzz <arg1> and aaaaa
+    * IF: SCENARIO PASSING THEN: I am running a testlzz aaaa and s ELSE-IF: 45>7 THEN: I am running a testlzz bbbb and s ELSE: I am running a testlzz ccccc and s
+    * IF: dfs THEN: dd ELSE-IF: bb THEN: c ELSE-IF: bb THEN: c
+
+
+  Scenario: passfao tpass test
+#    Then I am running a testlzz ERRsOR and errorstep1
+#
+#  @RUN_ON_FAIL: Then I am running a testlzz z and RUN_ON_FAIL
+    Then I am running a testlzz noe0 and nested1
+  @RUN_ON_PASS: Then RUN CHILD STEPS
+  : Then I am running a testlzz noe0 and nested1
+  : Then I am running a testlzz 1ERROR and nested1
+  : Then I am running a testlzz 2 and nested2
+    Then I am running a testlzz noe0 and nested1
+    Then I am running a testlzz noe0 and nested1
+
+    Then I am running a testlzz noe0 and nested1
+
+
+  @RUN_ON_PASS: Then I am running a testlzz 1ERROR and nested1
+  : Then I am running a testlzz noe0 and nested1
+  : Then I am running a testlzz 1ERROR and nested1
+  : Then I am running a testlzz 2 and nested2
+
+    Then I am running a testlzz noe0 and nested1
+
+  Scenario: passfao testsdfsd
+  @RUN_ON_PASS:  Then I am running a testlzz 2 and nested2
+
+
+  Scenario: passfao test4
+    Then I am running a testlzz ERROR and errorstep1
+
+  @RUN_ON_FAIL: Then I am running a testlzz z and RUN_ON_FAIL
+
+  @RUN_ON_FAIL: Then RUN CHILD STEPS
+  : Then I am running a testlzz noe0 and nested1
+  : Then I am running a testlzz 1ERROR and nested1
+  : Then I am running a testlzz 2 and nested2
+
+  @RUN_ALWAYS: Then I am running a testlzz 1ERROR and nested1
+  @RUN_ON_PASS: Then RUN CHILD STEPS
+  : Then I am running a testlzz noe0 and nested1
+  :  @RUN_ALWAYS: Then I am running a testlzz 1EsROR and nested1
+  : Then I am running a testlzz 2 and nested2
+
+  @RUN_ON_FAIL: Then RUN CHILD STEPS
+  : Then I am running a testlzz noe0 and nested1
+  : Then I am running a testlzz 1ERROR and nested1
+  : Then I am running a testlzz 2 and nested2
+
+  @RUN_ON_FAIL:   : Then I am running a testlzz 1ERROR and nested1
+  : Then I am running a testlzz noe0 and nested1
+  : Then I am running a testlzz 2 and nested2
+
+#  :: Then I am running a testlzz - and nested2.1
+#
+#    Then I am running a testlzz - and A1
+#  : Then I am running a testlzz - and A1.1
+#  :: Then I am running a testlzz - and A1.1.1
+#  :: @RUN_ON_FAIL: Then I am running a testlzz - and AA1.1.2
+#  ::: Then I am running a testlzz - and nested2.2.1
+#  ::: Then I am running a testlzz - and nested2.2.2
+#  ::: Then I am running a testlzz - and nested2.2.3
+#  ::: Then I am running a testlzz - and nested2.2.3
+#  : Then I am running a testlzz 3 and nested3
+#  : Then I am running a testlzz 4 and nested4
+
+
+  Scenario: passfao test3
+#  @RUN_ALWAYS: Given I am running a testlzz Always and ALWAYS
+#  @RUN_ON_PASS: Then I am running a testlzz z and RUN_ON_PASS
+    Then I am running a testlzz ERROR and errorstep1
+
+  @RUN_ON_PASS: Then I am running a testlzz z and RUN_ON_PASS
+    Then I am running a testlzz ERROR and errorstep2
+  @RUN_ON_PASS: Then I am running a testlzz z and RUN_ON_PASS
+  @RUN_ON_FAIL: Then I am running a testlzz z and RUN_ON_FAIL
+  : Then I am running a testlzz 1 and nested
+  : Then I am running a testlzz 1.1 and nested
+  : Then I am running a testlzz 2 and nested
+  @RUN_ON_PASS: Then I am running a testlzz z and RUN_ON_PASS
+#  @RUN_ON_PASS: Then I am running a testlzz z and RUN_ON_PASS
+#  @RUN_ON_FAIL: Then I am running a testlzz z and RUN_ON_FAIL
+#  @RUN_ON_PASS: Then I am running a testlzz z and RUN_ON_PASS
+#  @RUN_ON_PASS: Then I am running a testlzz z and RUN_ON_PASS
+
 
   @qqqq1
   Scenario: ASD
@@ -46,11 +149,11 @@ Feature: sdf
 
 #  @RUN-IF: * 6>11 THEN: When I am running a testlzz %runif and s
 #   * IF: 6>11 THEN: When I am running a testlzz %runif and s
-#  @RUN-ALWAYS: When 66>112 THEN: When I am running a testlzz %runif and s
+#  @RUN_ALWAYS: When 66>112 THEN: When I am running a testlzz %runif and s
   @RUN_ON_FAIL: Then I am running a testlzz after fail and beforeE
 #    Given I am running a testlzz ERROR and 2
   :  Given I am running a testlzz afterER and 1
-  @RUN: When true
+  @RUN_IF: * false
   :  Given I am running a testlzz z and 1
   ::  Given I am running a testlzz <arg1> and 2
   :::  Given I am running a testlzz <arg1> and 3
@@ -62,7 +165,7 @@ Feature: sdf
 
 
     Given I am running a testlzz a and 9
-  @RUN-ALWAYS: Given I am running a testlzz Always and ALWAYS
+  @RUN_ALWAYS: Given I am running a testlzz Always and ALWAYS
   @RUN_ON_PASS: Then I am running a testlzz after fail and RUN_ON_PASS
   @RUN_ON_FAIL: Then I am running a testlzz after fail and RUN_ON_FAIL
 
@@ -100,7 +203,7 @@ Feature: sdf
 #    Then I should see debug outputlzz
     Then I should see debug outputlzz
     *  Scenario:
-      | Scenario Tags  | A     | B |
+      | Scenario Tags | A | B |
 #      | @sob<Scenario> | ERROR | s |
 #      | @zzs9          | z     | 3 |
     Given I am running a testlzz <arg1> and <Scenario>

@@ -8,6 +8,7 @@ import io.cucumber.core.runner.TestCase;
 import io.cucumber.core.runner.TestCaseState;
 import io.cucumber.messages.types.TableCell;
 import io.cucumber.messages.types.TableRow;
+import io.pickleball.exceptions.PickleballException;
 import io.pickleball.mapandStateutilities.LinkedMultiMap;
 import io.pickleball.mapandStateutilities.MapsWrapper;
 
@@ -15,6 +16,7 @@ import java.util.*;
 
 import static io.pickleball.cacheandstate.GlobalCache.getGlobalConfigs;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
+import static io.pickleball.configs.Constants.errorFlag;
 import static io.pickleball.cucumberutilities.ArgumentParsing.convertCommandLineToArgv;
 import static io.pickleball.cucumberutilities.ArgumentParsing.convertHashMapToArgv;
 import static io.pickleball.executions.ComponentRuntime.createTestcases;
@@ -24,6 +26,17 @@ import static java.util.Comparator.comparingInt;
 public abstract class ScenarioContext extends BaseContext implements io.cucumber.plugin.event.TestStep {
     private final Pickle pickle;             // The static scenario definition
     private TestCaseState testCaseState;    // The mutable scenario state
+
+    public enum RunStatus {
+        RUNNING,
+        CHECKING,
+        ALREADY_RAN
+    }
+
+    Map<String, RunStatus> runStates = new HashMap<>();
+
+
+
 
     public boolean isForceComplete() {
         return forceComplete;
@@ -83,7 +96,27 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
     }
 
     public String replaceAndEval(String inputString) {
-        return replaceNestedBrackets(inputString, runMaps);
+        try {
+            String returnVal = replaceNestedBrackets(inputString, runMaps);
+            System.out.println("@@returnVal::: " + returnVal);
+            return returnVal;
+        }
+        catch (Exception e)
+        {
+            System.out.println("@@returnVal");
+            e.printStackTrace();
+            try {
+                throw new Exception(e);
+            } catch (Exception ex) {
+                throw new RuntimeException(ex);
+            }
+        }
+//        if (returnVal.startsWith(errorFlag)) {
+//            System.out.println("@@returnVal");
+//            new PickleballException("Failed to evaluate expression '" + returnVal + "'").printStackTrace();
+//            throw new PickleballException("Failed to evaluate expression '" + returnVal + "' at ' " + returnVal.replaceAll(errorFlag, ""));
+//        }
+//        return returnVal;
     }
 
     public boolean isTopLevel() {
@@ -99,6 +132,7 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
     public static void setCurrentStep(PickleStepTestStep currentStep) {
         getCurrentScenario().getExecutingStepStack().add(currentStep);
     }
+
     public static StepContext popCurrentStep() {
         return getCurrentScenario().getExecutingStepStack().pop();
     }
@@ -162,7 +196,6 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
     public UUID getRootId() {
         return getRootScenarioContext().getId();
     }
-
 
 
     @Override

@@ -125,6 +125,22 @@ public class PickleStepTestStep extends TestStep implements io.cucumber.plugin.e
         return afterStepHookSteps;
     }
 
+
+    private String endLogText = null;
+
+    public String getEndLogText() {
+        if (endLogText == null) {
+            try {
+                String runFlag = ((GherkinMessagesStep) step).getRunFlag();
+                endLogText = runFlag.isEmpty() ? "" : " - " + runFlag;
+            } catch (Exception e) {
+                endLogText = "";
+            }
+        }
+        return endLogText;
+    }
+
+
     @Override
     public String getPattern() {
         return definitionMatch.getPattern();

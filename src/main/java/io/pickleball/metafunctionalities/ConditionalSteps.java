@@ -25,6 +25,12 @@ public class ConditionalSteps {
         // Placeholder for when steps don't have text
     }
 
+    //    @NoEventEmission
+    @Given("RUN CHILD STEPS")
+    public static void runChildren() {
+        getCurrentStep().setForceRunNestedSteps(true);
+    }
+
 
     @NoEventEmission
     @Given("^((?!IF:).* THEN:.*)$")
@@ -35,7 +41,6 @@ public class ConditionalSteps {
     @NoEventEmission
     @Given("^IF:(.*)$")
     public static Object runConditional(String inputString) {
-        System.out.println("@@runConditional: " + inputString);
         ScenarioContext currentScenario = getCurrentScenario();
         String ifelseString = inputString.contains("THEN:") ? inputString : inputString + " THEN: @MetaStepDefinition ";
         ifelseString = (ifelseString.replaceFirst("(.*) ELSE:", "$1 ELSE-IF: true THEN: "))
@@ -54,10 +59,7 @@ public class ConditionalSteps {
     }
 
 
-
-
-
-    @When("@Terminate:(.*)?(.*)")
+    @When("@Terminate:(.*),,,,(.*)")
     public void terminate(String terminationType, String description) {
         if (terminationType.equals(FAIL_SCENARIO) || terminationType.equals(FAIL_TEST))
             throw new RuntimeException(description);
@@ -68,7 +70,6 @@ public class ConditionalSteps {
             getPrimaryScenario().forceComplete();
         }
     }
-
 
 
 }

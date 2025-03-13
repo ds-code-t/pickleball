@@ -70,8 +70,8 @@ public class Debugzlib {
     public void iAmRunningATestlzz(String t1, String t2, DataTable dataTable) {
         if (t1.contains("%"))
             System.out.println("!%STEP: " + t1);
-        System.out.print("DdataTable " + dataTable);
-        System.out.print("DEBUG: start " + t1 + "  --- " + t2);
+        System.out.println("DdataTable " + dataTable);
+        System.out.println("DEBUG: start " + t1 + "  --- " + t2);
 //        waitTime(800L);
         if (t1.contains("ERROR"))
             throw new RuntimeException("ERROR step-DEBUG: start " + t1 + "  --- " + t2);

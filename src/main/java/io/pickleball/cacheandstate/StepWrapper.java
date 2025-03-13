@@ -9,6 +9,7 @@ import io.cucumber.core.runner.*;
 import io.cucumber.core.runner.TestCase;
 import io.cucumber.messages.types.*;
 import io.cucumber.plugin.event.PickleStepTestStep;
+import io.pickleball.exceptions.PickleballException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,24 +41,38 @@ public class StepWrapper extends BaseContext {
 
     private final List<PickleStepTestStep> clonedSteps = new ArrayList<>();
 
-    public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode startingExecutionMode, io.cucumber.core.runner.PickleStepTestStep parentStep) {
 
+    public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode startingExecutionMode, io.cucumber.core.runner.PickleStepTestStep parentStep) {
         io.cucumber.core.runner.PickleStepTestStep clone = modifyPickleStepTestStep();
         addCloned(clone);
-        ExecutionMode dynamicExecutionMode = isForceRun() || startingExecutionMode.equals(ExecutionMode.RUN) ? ExecutionMode.RUN : ExecutionMode.SKIP;
-        ExecutionMode newExecutionMode = clone.run(testCase, bus, state, dynamicExecutionMode);
-        ExecutionMode returnExecutionMode = ((startingExecutionMode.equals(ExecutionMode.RUN) && (newExecutionMode.equals(ExecutionMode.RUN))) ? ExecutionMode.RUN : ExecutionMode.SKIP);
-        clone.setExecutionMode(returnExecutionMode);
+        GherkinMessagesStep s = ((GherkinMessagesStep) clone.getStep());
+        ExecutionMode runExecutionMode;
 
-        if (nestedChildSteps == null || !clone.shouldRunNestedSteps())
-            return returnExecutionMode;
-        for (StepWrapper nestedStepWrapper : getNestedChildSteps()) {
-            if (clone.isForceRun())
-                returnExecutionMode = nestedStepWrapper.run(testCase, bus, state, ExecutionMode.RUN, clone);
-            else
-                returnExecutionMode = nestedStepWrapper.run(testCase, bus, state, returnExecutionMode, clone);
+        String runFlag = gherkinMessagesStep.getRunFlag();
+        if (parentStep != null) {
+            clone.setShouldUpdateStatus(parentStep.shouldUpdateStatus());
         }
-        return returnExecutionMode;
+
+        if (runFlag.isEmpty()) {
+            runExecutionMode = startingExecutionMode;
+        } else {
+            clone.setShouldUpdateStatus(false);
+            if (parentStep == null || parentStep.getHighestStatus().equals(io.cucumber.plugin.event.Status.PASSED) || parentStep.getHighestStatus().equals(io.cucumber.plugin.event.Status.SOFT_FAILED))
+                runExecutionMode = getRunExecutionMode(startingExecutionMode, runFlag);
+            else
+                runExecutionMode = startingExecutionMode;
+        }
+        ExecutionMode returnExecutionMode = clone.run(testCase, bus, state, runExecutionMode);
+        ExecutionMode passedExecutionMode = runFlag.isEmpty() ? returnExecutionMode : startingExecutionMode;
+        if (nestedChildSteps == null || !clone.shouldRunNestedSteps() || !returnExecutionMode.equals(ExecutionMode.RUN))
+            return passedExecutionMode;
+
+        for (StepWrapper nestedStepWrapper : getNestedChildSteps()) {
+            ExecutionMode nestedStepExecutionMode = clone.shouldForceRunNestedSteps() ? ExecutionMode.RUN : returnExecutionMode;
+            returnExecutionMode = nestedStepWrapper.run(testCase, bus, state, nestedStepExecutionMode, clone);
+        }
+
+        return passedExecutionMode;
     }
 
     public void addCloned(io.cucumber.core.runner.PickleStepTestStep clone) {
@@ -74,14 +89,16 @@ public class StepWrapper extends BaseContext {
     public io.cucumber.core.runner.PickleStepTestStep createPickleStepTestStep(Runner runner, PickleStep pickleStep, GherkinMessagesPickle pickle) {
         GherkinMessagesStep gherkinMessagesStep = createGherkinMessagesStep(pickleStep, pickle);
         gherkinMessagesStep.copyTemplateParameters(getGherkinMessagesStep());
+
         PickleStepDefinitionMatch match = runner.matchStepToStepDefinition(pickle, gherkinMessagesStep);
         if (match.method == null)
             throw new CucumberException("No matching method found for step '" + pickleStep.getText() + "'");
 
         List<HookTestStep> afterStepHookSteps = runner.createAfterStepHooks(pickle.getTags());
         List<HookTestStep> beforeStepHookSteps = runner.createBeforeStepHooks(pickle.getTags());
-        return new io.cucumber.core.runner.PickleStepTestStep(runner.bus.generateId(), pickle.getUri(), gherkinMessagesStep, beforeStepHookSteps,
+        io.cucumber.core.runner.PickleStepTestStep returnPickle = new io.cucumber.core.runner.PickleStepTestStep(runner.bus.generateId(), pickle.getUri(), gherkinMessagesStep, beforeStepHookSteps,
                 afterStepHookSteps, match);
+        return returnPickle;
     }
 
 
@@ -157,35 +174,60 @@ public class StepWrapper extends BaseContext {
         return gherkinMessagesStep.getColonNesting();
     }
 
-    public List<String> getFlagList() {
-        return gherkinMessagesStep.getFlagList();
+//    public List<String> getFlagList() {
+//        return gherkinMessagesStep.getFlagList();
+//    }
+
+
+    public ExecutionMode getRunExecutionMode(ExecutionMode startingExecutionMode, String runFlag) {
+        Status status = getCurrentState().getStatus();
+//        String runFlag = gherkinMessagesStep.getRunFlag();
+//        ExecutionMode defaultReturn = status == Status.PASSED ? ExecutionMode.RUN : ExecutionMode.SKIP;
+        if (runFlag.contains(RUN_ALWAYS) || runFlag.contains(RUN_IF))
+            System.out.println("@@@ALWAYSSSS");
+
+        if (runFlag.contains(RUN_ALWAYS) || runFlag.contains(RUN_IF))
+            return ExecutionMode.RUN;
+
+        if (runFlag.contains(RUN_ON_FAIL))
+            return (status == Status.FAILED || status == Status.SOFT_FAILED) ? ExecutionMode.RUN : ExecutionMode.SKIP;
+
+        if (runFlag.contains(RUN_ON_SOFT_FAIL))
+            return status == Status.SOFT_FAILED ? ExecutionMode.RUN : ExecutionMode.SKIP;
+
+        if (runFlag.contains(RUN_ON_HARD_FAIL))
+            return status == Status.FAILED ? ExecutionMode.RUN : ExecutionMode.SKIP;
+
+        if (runFlag.contains(RUN_ON_PASS))
+            return status == Status.PASSED ? ExecutionMode.RUN : ExecutionMode.SKIP;
+
+        throw new PickleballException("Invalid run flage: '" + runFlag + "'");
     }
 
-
-
-    public boolean isForceRun() {
-        List<String> flagList = getFlagList();
-        if (flagList == null)
-            return false;
-
-        if (flagList.contains(RUN_ALWAYS) || flagList.contains(RUN_IF))
-            return true;
-
-        if (flagList.contains(RUN_ON_FAIL))
-            return (getCurrentState().getStatus() == Status.FAILED || getCurrentState().getStatus() == Status.SOFT_FAILED);
-
-        if (flagList.contains(RUN_ON_SOFT_FAIL))
-            return getCurrentState().getStatus() == Status.SOFT_FAILED;
-
-        if (flagList.contains(RUN_ON_HARD_FAIL))
-            return getCurrentState().getStatus() == Status.FAILED;
-
-        if (flagList.contains(RUN_ON_PASS))
-            return getCurrentState().getStatus() == Status.PASSED;
-
-        return false;
-
-    }
+//
+//    public boolean isForceRun() {
+//        String runFlag = gherkinMessagesStep.getRunFlag();
+//        if (runFlag.isEmpty())
+//            return false;
+//
+//        if (runFlag.contains(RUN_ALWAYS) || runFlag.contains(RUN_IF))
+//            return true;
+//
+//        if (runFlag.contains(RUN_ON_FAIL))
+//            return (getCurrentState().getStatus() == Status.FAILED || getCurrentState().getStatus() == Status.SOFT_FAILED);
+//
+//        if (runFlag.contains(RUN_ON_SOFT_FAIL))
+//            return getCurrentState().getStatus() == Status.SOFT_FAILED;
+//
+//        if (runFlag.contains(RUN_ON_HARD_FAIL))
+//            return getCurrentState().getStatus() == Status.FAILED;
+//
+//        if (runFlag.contains(RUN_ON_PASS))
+//            return getCurrentState().getStatus() == Status.PASSED;
+//
+//        return false;
+//
+//    }
 
 
 }

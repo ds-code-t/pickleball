@@ -2,17 +2,17 @@
  * This file incorporates work covered by the following copyright and permission notice:
  *
  * Copyright (c) Cucumber Ltd
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -26,6 +26,7 @@ package io.cucumber.core.runner;
 
 import io.cucumber.core.backend.Pending;
 import io.cucumber.core.eventbus.EventBus;
+import io.cucumber.core.gherkin.messages.GherkinMessagesStep;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import io.cucumber.plugin.event.TestCase;
@@ -39,8 +40,9 @@ import java.util.UUID;
 import java.util.function.Predicate;
 
 import static io.cucumber.core.exception.UnrecoverableExceptions.rethrowIfUnrecoverable;
-import static io.cucumber.core.runner.ExecutionMode.SKIP;
+import static io.cucumber.core.runner.ExecutionMode.*;
 import static io.cucumber.core.runner.TestAbortedExceptions.createIsTestAbortedExceptionPredicate;
+import static io.pickleball.cacheandstate.PrimaryScenarioData.getCurrentStep;
 import static java.time.Duration.ZERO;
 
 public abstract class TestStep extends StepContext implements io.cucumber.plugin.event.TestStep {
@@ -67,9 +69,10 @@ public abstract class TestStep extends StepContext implements io.cucumber.plugin
         return id;
     }
 
-    public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
+
+    public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode startExecutionMode) {
         Instant startTime = bus.getInstant();
-        newExecutionMapPut("startTime" ,startTime);
+        newExecutionMapPut("startTime", startTime);
 
         boolean shouldEmit = shouldEmitEvent();
 
@@ -79,35 +82,53 @@ public abstract class TestStep extends StepContext implements io.cucumber.plugin
         Status status;
         Throwable error = null;
         try {
-            status = executeStep(state, executionMode);
+            runExecutionMode = startExecutionMode;
+            System.out.println("@@runExecutionMode: " + runExecutionMode);
+            status = executeStep(state, runExecutionMode);
+            System.out.println("@@status: " + status);
         } catch (Throwable t) {
+            System.out.println("@@t: " + t.getMessage());
             currentExecutionMapPut("error", t);
             rethrowIfUnrecoverable(t);
             error = t;
             status = mapThrowableToStatus(t);
         }
+        System.out.println("@@status2: " + status);
         Instant stopTime = bus.getInstant();
         Duration duration = Duration.between(startTime, stopTime);
-        Result result = mapStatusToResult(status, error, duration);
+        Result originalResult = mapStatusToResult(status, error, duration);
         currentExecutionMapPut("stopTime", stopTime);
         currentExecutionMapPut("duration", duration);
-        currentExecutionMapPut("result", result);
-        state.add(result);
-
-        if (shouldEmit)
-            emitTestStepFinished(testCase, bus, state.getTestExecutionId(), stopTime, duration, result, error);
-
-
-        addStatus(result.getStatus());
+        currentExecutionMapPut("result", originalResult);
+        System.out.println("@@originalResult: " + originalResult);
+        addStatus(originalResult.getStatus());
         Status returnStatus = getHighestStatus();
 
-        return returnStatus.is(Status.PASSED) || returnStatus.is(Status.SOFT_FAILED) ? executionMode : SKIP;
+        System.out.println("\n@@(shouldUpdateStatus(): " + (shouldUpdateStatus()));
+        Result returnResult = originalResult;
+        if (shouldUpdateStatus())
+            state.add(originalResult);
+        else if (!status.equals(Status.PASSED))
+            returnResult = new Result(Status.SKIPPED, duration, error);
+
+        System.out.println("@@returnResult: " + returnResult);
+        System.out.println("@@shouldEmit: " + shouldEmit);
+        System.out.println("@@getStepText: " + getCurrentStep().getStepText());
+
+        if (shouldEmit)
+            emitTestStepFinished(testCase, bus, state.getTestExecutionId(), stopTime, duration, returnResult, error);
+        else if (status.equals(Status.FAILED))
+            emitTestStepFinished(testCase, bus, state.getTestExecutionId(), stopTime, duration, originalResult, error);
+
+
+        return returnStatus.is(Status.PASSED) || returnStatus.is(Status.SOFT_FAILED) ? RUN : SKIP;
 
     }
 
 
     private void emitTestStepStarted(TestCase testCase, EventBus bus, UUID textExecutionId, Instant startTime) {
         startEvent = new EventContainer(testCase, bus, textExecutionId, startTime, id, this);
+        GherkinMessagesStep s = ((GherkinMessagesStep) ((PickleStepTestStep) this).getStep());
         if (shouldSendStart())
             sendStartEvent();
     }

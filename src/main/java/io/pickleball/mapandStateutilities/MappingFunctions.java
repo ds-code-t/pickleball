@@ -1,5 +1,7 @@
 package io.pickleball.mapandStateutilities;
 
+import io.pickleball.exceptions.PickleballException;
+
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -7,6 +9,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static io.pickleball.cacheandstate.PrimaryScenarioData.getMvelWrapper;
+import static io.pickleball.configs.Constants.errorFlag;
 import static io.pickleball.configs.Constants.flag1;
 //import static io.pickleball.valueresolution.MVELWrapper.evaluateExpression;
 
@@ -24,8 +27,6 @@ public class MappingFunctions {
     }
 
     public static String replaceNestedBrackets(String input, MapsWrapper mapsWrapper) {
-
-
 //        Pattern pattern = Pattern.compile("<(?<json>\\$[^<>]+)>|<(?<angled>[^<>]+)>|\\{(?<curly>[^{}]+)\\}");
 //        Pattern pattern = Pattern.compile("<(?<json>\\$[^<>]+)>|<(?<angled>[^<>$=\\s](?:[^<>]*[^<>\\s])?)>|\\{(?<curly>[^{}]+)\\}");
         Pattern pattern = Pattern.compile("<(?<angled>[^<>=\\s](?:[^<>]*[^<>\\s])?)>|\\{(?<curly>[^{}]+)\\}");
@@ -46,8 +47,15 @@ public class MappingFunctions {
                 }
 
                 String expression = matcher.group("curly");
+
                 if (expression != null) {
+
                     Object expressionReturn = getMvelWrapper().evaluate(expression, mapsWrapper);
+
+                    System.out.println("@@expressionReturn1: " + expressionReturn);
+
+//                        throw new PickleballException("Failed to evaluate expression '" + expression + "'");
+
                     matcher.appendReplacement(sb, Matcher.quoteReplacement(String.valueOf(expressionReturn)));
                     continue;
                 }
@@ -64,7 +72,6 @@ public class MappingFunctions {
 
             matcher.appendTail(sb);
             String newResult = sb.toString();
-
             // If no changes were made in this iteration, break
             if (newResult.equals(result)) {
                 break;

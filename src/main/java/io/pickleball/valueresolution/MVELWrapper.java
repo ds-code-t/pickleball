@@ -1,16 +1,13 @@
 package io.pickleball.valueresolution;
 
 import io.cucumber.core.backend.Status;
+import io.pickleball.exceptions.PickleballException;
 import org.mvel2.MVEL;
 import org.mvel2.ParserContext;
 
 
-import java.util.Arrays;
 import java.util.Map;
-import java.util.Set;
 
-//import static io.pickleball.cacheandstate.PrimaryScenarioData.getCurrentScenarioCompletionStatus;
-//import static io.pickleball.cacheandstate.PrimaryScenarioData.getPrimaryScenarioCompletionStatus;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.getCurrentScenarioStatus;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.getPrimaryScenarioStatus;
 import static io.pickleball.configs.Constants.*;
@@ -56,7 +53,17 @@ public class MVELWrapper extends ParseTransformer {
 
 
     public Object evaluate(String expression, Map<String, Object> variables) {
-        return transformUntilStable(expression, exp -> evaluateOnce(String.valueOf(exp), variables));
+        try {
+            return transformUntilStable(expression, exp -> evaluateOnce(String.valueOf(exp), variables));
+        }
+        catch (Exception e)
+        {
+            if(e.getMessage().toLowerCase().contains("mvel"))
+            {
+                throw new PickleballException("MVEL2 failed to evaluate expression '" + expression + "'", e);
+            }
+            throw new RuntimeException(e);
+        }
     }
 
     public Object evaluateOnce(String expression, Map<String, Object> variables) {
@@ -67,11 +74,9 @@ public class MVELWrapper extends ParseTransformer {
 
     public Object evaluateExpression(String expression, Map<String, Object> variables) {
 
-        try {
+
             return MVEL.eval(preprocess(expression), context, variables);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+
     }
 
     public String preprocess(String expression) {

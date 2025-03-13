@@ -71,7 +71,6 @@ public class ParseTransformer {
 
         String result = unmaskQuotedStrings(transformed, quoteMappings);
         debug("Final result: " + result);
-
         return result;
     }
 

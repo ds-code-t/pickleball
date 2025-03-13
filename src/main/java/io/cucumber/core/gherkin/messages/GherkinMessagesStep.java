@@ -32,12 +32,15 @@ import io.cucumber.messages.types.PickleDocString;
 import io.cucumber.messages.types.PickleStep;
 import io.cucumber.messages.types.PickleTable;
 import io.cucumber.plugin.event.Location;
+import io.pickleball.exceptions.PickleballException;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 
@@ -182,15 +185,16 @@ public final class GherkinMessagesStep implements Step {
         if (runTimeText == null)
             return pickleStep.getText();
         return runTimeText;
+
 //        return pickleStep.getText();
     }
-
 
 
     // pmode keyword getText() @IF
 
 
     public void copyTemplateParameters(GherkinMessagesStep templateStep) {
+        runFlag = templateStep.runFlag;
         colonNesting = templateStep.colonNesting;
         keyWord = templateStep.keyWord;
         runTimeText = templateStep.runTimeText;
@@ -210,20 +214,39 @@ public final class GherkinMessagesStep implements Step {
     public static final String RUN_ON_HARD_FAIL = "@RUN_ON_HARD_FAIL:";
     public static final String RUN_ON_SOFT_FAIL = "@RUN_ON_SOFT_FAIL:";
 
-    public static final String RUN_ALWAYS = "@RUN-ALWAYS:";
-    public static final String RUN_IF = "@RUN:";
+    public static final String RUN_ALWAYS = "@RUN_ALWAYS:";
+    public static final String RUN_IF = "@RUN_IF:";
+    public static final String IFSuffix = "_IF:";
 
 
-    public static final List<String> givenPrefixes = asList("* ", "Given ", ":", RUN_ALWAYS, RUN_IF, END_SCENARIO, FAIL_SCENARIO, END_TEST, FAIL_TEST,  RUN_ON_PASS, RUN_ON_FAIL, RUN_ON_HARD_FAIL, RUN_ON_SOFT_FAIL);
+    public static final List<String> givenPrefixes = asList("* ", "Given ", ":", RUN_ALWAYS, RUN_IF, END_SCENARIO, FAIL_SCENARIO, END_TEST, FAIL_TEST, RUN_ON_PASS, RUN_ON_FAIL, RUN_ON_HARD_FAIL, RUN_ON_SOFT_FAIL);
     public static final String[] prefixWords = Stream.concat(
             givenPrefixes.stream(),
-            Stream.of( "When ", "Then ", "And ", "But ")
+            Stream.of("When ", "Then ", "And ", "But ")
     ).toArray(String[]::new);
-
 
     public int parseRunTimeParameters() {
         return parseRunTimeParameters(getKeyWord() + " " + getText());
     }
+//    @RUN-ALWAYS:
+    final Pattern runFlagCheck = Pattern.compile("@RUN(?:_[^:]+)?:");
+
+    public String getRunFlag() {
+        return runFlag;
+    }
+
+    private String runFlag = "";
+
+    public String getTextSuffix() {
+        return textSuffix;
+    }
+
+    public void setTextSuffix(String textSuffix) {
+        this.textSuffix = textSuffix;
+    }
+
+    private String textSuffix = "";
+
     public int parseRunTimeParameters(String initialText) {
         Pattern pattern = Pattern.compile("^(?<colons>(?:\\s*:)*)\\s*(?<flags>@\\S*\\s+)*(?:(?<keyWord>[^@]\\S+\\s+)(?<stepText>.*))?$");
         Matcher matcher = pattern.matcher(initialText);
@@ -233,39 +256,55 @@ public final class GherkinMessagesStep implements Step {
                     .map(s -> s.replaceAll("\\s+", "").length())
                     .orElse(0);
             keyWord = matcher.group("keyWord");
-            keyWord = keyWord == null ? "* " : keyWord.strip() + " ";
-            if (Arrays.stream(prefixWords).noneMatch(keyWord::startsWith)) {
-                runTimeText = keyWord + runTimeText;
-                keyWord = "* ";
-            }
-            keyWord = "\u2003".repeat(colonNesting) + keyWord;
+            keyWord = "\u2003".repeat(colonNesting) + keyWord.strip() + " ";
+
             String flagString = matcher.group("flags");
+            if (flagString != null && flagString.contains("@RUN")) {
+                List<String> runFlagMatches = new ArrayList<>();
+                Matcher runFlagMatcher = runFlagCheck.matcher(flagString);
+                while (runFlagMatcher.find()) {
+                    runFlagMatches.add(runFlagMatcher.group());
+                }
+                if (runFlagMatches.size() > 1) {
+                    String matchList = runFlagMatches.stream().collect(Collectors.joining(", "));
+                    throw new PickleballException("Step cannot have more than one RUN flag: " + matchList);
+                } else if (runFlagMatches.size() == 1) {
+                    runFlag = runFlagMatches.get(0);
+                    if (runTimeText.isEmpty()) {
+                        if (runFlag.equals(RUN_ALWAYS))
+                            runTimeText = "IF: true ";
+                        else if (runFlag.contains(RUN_IF))
+                            runTimeText = "IF: false ";
+                    } else if (runFlag.contains(RUN_IF) && !runTimeText.startsWith("IF:")) {
+                        runTimeText = "IF: " + runTimeText;
+                    }
+
+                    if (runFlag.endsWith(IFSuffix)) {
+                        runFlag = runFlag.replace(IFSuffix, ":");
+                        runTimeText = "IF: " + runTimeText;
+                    }
+
+                }
+            }
+
             if (flagString != null)
                 flagList = List.of(flagString.split("\\s+"));
         }
-        if (flagList != null) {
-            if (flagList.contains(RUN_ALWAYS)) {
-                if (runTimeText.isEmpty())
-                    runTimeText = "IF: true ";
-            } else if (flagList.contains(RUN_IF)) {
-                if (runTimeText.isEmpty())
-                    runTimeText = "IF: false ";
-                else if (!runTimeText.startsWith("IF:"))
-                    runTimeText = "IF: " + runTimeText;
-            }
-        }
 
-        if (flagList != null) {
+
+        if (flagList != null && runFlag.isEmpty()) {
             if (flagList.contains(END_SCENARIO))
-                runTimeText = "@Terminate:" + END_SCENARIO + "?" + runTimeText;
+                runTimeText = "@Terminate:" + END_SCENARIO + ",,,," + runTimeText;
             else if (flagList.contains(FAIL_SCENARIO))
-                runTimeText = "@Terminate:" + FAIL_SCENARIO + "?" + runTimeText;
-            else   if (flagList.contains(END_SCENARIO))
-                runTimeText = "@Terminate:" + END_TEST + "?" + runTimeText;
+                runTimeText = "@Terminate:" + FAIL_SCENARIO + ",,,," + runTimeText;
+            else if (flagList.contains(END_SCENARIO))
+                runTimeText = "@Terminate:" + END_TEST + ",,,," + runTimeText;
             else if (flagList.contains(FAIL_SCENARIO))
-                runTimeText = "@Terminate:" + FAIL_TEST + "?" + runTimeText;
+                runTimeText = "@Terminate:" + FAIL_TEST + ",,,," + runTimeText;
         }
 
+        if(!runFlag.isEmpty())
+            setTextSuffix(" - " + runFlag);
 
         return colonNesting;
 

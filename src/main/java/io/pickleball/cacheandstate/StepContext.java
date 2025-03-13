@@ -18,6 +18,19 @@ import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
 
 public class StepContext {
 
+
+
+    public boolean shouldUpdateStatus() {
+        return updateStatus;
+    }
+
+    public void setShouldUpdateStatus(boolean updateStatus) {
+        this.updateStatus = updateStatus;
+    }
+
+    protected boolean updateStatus = true;
+
+
     public final List<Map<String, Object>> executionMapList = new ArrayList<>();
     public EventContainer startEvent;
     public EventContainer endEvent;
@@ -35,8 +48,7 @@ public class StepContext {
 
     private boolean runNestedSteps = true;
 
-
-    public boolean shouldRunNestedSteps() {
+     public boolean shouldRunNestedSteps() {
         return runNestedSteps;
     }
 
@@ -44,16 +56,23 @@ public class StepContext {
         this.runNestedSteps = runNestedSteps;
     }
 
+    private boolean forceRunNestedSteps = false;
 
-    public ExecutionMode getExecutionMode() {
-        return executionMode;
+    public boolean shouldForceRunNestedSteps() {
+        return forceRunNestedSteps;
     }
 
-    public void setExecutionMode(ExecutionMode executionMode) {
-        this.executionMode = executionMode;
+    public void setForceRunNestedSteps(boolean forceRunNestedSteps) {
+        this.forceRunNestedSteps = forceRunNestedSteps;
     }
 
-    private ExecutionMode executionMode;
+
+    protected ExecutionMode runExecutionMode = null;
+
+    protected String runChildrenOverride = "";
+    protected String runOverride = "";
+
+
 
 
     List<io.cucumber.plugin.event.Status> statuses = new ArrayList<>();
@@ -172,12 +191,6 @@ public class StepContext {
         return endEvent != null && (sendEvents || sendEnd);
     }
 
-    public boolean isForceRun() {
-        return stepWrapper.isForceRun();
-    }
 
-    public List<String> getFlagList() {
-        return stepWrapper.getFlagList();
-    }
 
 }

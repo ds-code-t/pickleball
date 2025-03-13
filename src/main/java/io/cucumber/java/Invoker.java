@@ -95,6 +95,9 @@ final class Invoker {
                 throw new CucumberBackendException("Failed to invoke " + targetMethod, e);
             }
             throw new CucumberInvocationTargetException(located, e);
+        } catch (Throwable t) {
+            System.out.println("@@catch");
+            throw new RuntimeException(t);
         } finally {
             targetMethod.setAccessible(accessible);
         }

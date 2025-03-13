@@ -28,9 +28,6 @@ class ParseTransformerTest {
                     String type = match.group("type");
                     String name = match.group("name");
                     String space = match.group("space");
-                    System.out.println("@@type: " + type);
-                    System.out.println("@@name: " + name);
-                    System.out.println("@@space: " + space);
                     String masked = match.group(3);  // The full masked quote section
                     return (type != null ? type + " " : "") +
                             name.toUpperCase() + " = " + masked + space;

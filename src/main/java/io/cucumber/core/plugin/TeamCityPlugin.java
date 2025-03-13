@@ -2,17 +2,17 @@
  * This file incorporates work covered by the following copyright and permission notice:
  *
  * Copyright (c) Cucumber Ltd
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -376,9 +376,9 @@ public class TeamCityPlugin implements EventListener {
     }
 
     private String extractName(TestStep testStep) {
-        if (testStep instanceof PickleStepTestStep) {
-            PickleStepTestStep pickleStepTestStep = (PickleStepTestStep) testStep;
-            return pickleStepTestStep.getStep().getKeyword() +" " + pickleStepTestStep.getStep().getText();
+        if (testStep instanceof io.cucumber.core.runner.PickleStepTestStep) {
+            io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep = (io.cucumber.core.runner.PickleStepTestStep) testStep;
+            return pickleStepTestStep.getStep().getKeyword() + " " + pickleStepTestStep.getStep().getText() + pickleStepTestStep.getEndLogText();
         }
         if (testStep instanceof HookTestStep) {
             HookTestStep hookTestStep = (HookTestStep) testStep;
