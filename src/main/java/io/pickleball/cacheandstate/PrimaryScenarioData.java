@@ -6,7 +6,7 @@ import io.cucumber.core.runner.PickleStepTestStep;
 import io.cucumber.core.runner.Runner;
 import io.cucumber.core.runner.TestCase;
 import io.cucumber.core.runner.TestCaseState;
-import io.pickleball.valueresolution.MVELWrapper;
+import io.pickleball.valueresolution.ExpressionEvaluator;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
@@ -24,7 +24,7 @@ public class PrimaryScenarioData {
     private final ScenarioContext scenarioContext;
     private final EventBus bus;
     private final Set<Throwable> loggedExceptions = new HashSet<>();
-    private final MVELWrapper mvelWrapper = new MVELWrapper();
+    private final ExpressionEvaluator mvelWrapper = new ExpressionEvaluator();
 
 
 
@@ -118,7 +118,7 @@ public class PrimaryScenarioData {
         return  getState().runner;
     }
 
-    public static MVELWrapper getMvelWrapper() {
+    public static ExpressionEvaluator getMvelWrapper() {
         return getState().mvelWrapper;
     }
 }

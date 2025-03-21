@@ -51,8 +51,8 @@ public class Constants {
 
 //    public static final String ALL_STATES = String.join("|", STATE_LIST);
 
-    public static final Pattern QUOTED_STRING_REGEX = Pattern.compile(
-            "\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|`(?:\\\\.|[^`])*`");
+//    public static final Pattern QUOTED_STRING_REGEX = Pattern.compile(
+//            "\"(?:\\\\.|[^\"])*\"|'(?:\\\\.|[^'])*'|`(?:\\\\.|[^`])*`");
 
 
 }

@@ -24,6 +24,7 @@ public class ObjectTransformer {
      */
     public static Object transformUntilStable(Object input,
                                               Function<Object, Object> transformation) {
+
         return transformUntilStable(input, transformation,
                 DEFAULT_MAX_ITERATIONS, DEFAULT_EXCEPTION);
     }
@@ -47,10 +48,9 @@ public class ObjectTransformer {
         int iterations = 0;
 
         while (iterations < maxIterations) {
-            System.out.println("@@while1");
             Object next = transformation.apply(current);
-            System.out.println("@@next: " + next);
-
+            if(!(next instanceof String))
+                return next;
             // Handle null cases and use Objects.equals for proper value equality
             if (Objects.equals(next, current)) {
                 return current;

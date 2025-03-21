@@ -1,8 +1,41 @@
 Feature: sdf
 
+  Scenario: ddd
+  * DDDqq 'sss' and 'vvvv'
 
-  Scenario: if test 6
-    * IF: false THEN: I am running a testlzz ERROsR and errorstep1 ELSE: Then I am running a testlzz ERROR and errorstep1
+  Scenario: content test 6
+#    * IF:  "true" &&  4 > 3 THEN: I am running a testlzz aaaa and s
+    * IF: [0,0,4] THEN: I am running a testlzz zzaa\"aa and s
+#    * IF:  "sadasd" THEN: I am running a testlzz zzzzzzzzzzzz and s
+
+
+  Scenario Outline: if test 6 status: <Status>
+#    * IF:  4   THEN: I am running a testlzz aaaa and s  ELSE: I am running a testlzz bbbb and s
+#    * IF:  0 THEN: I am running a testlzz aaaa and s  ELSE: I am running a testlzz bbbb and s
+#    * IF:  4 > 3 THEN: I am running a testlzz aaaa and s  ELSE: I am running a testlzz bbbb and s
+#    * IF:  4 > 3 || 0 THEN: I am running a testlzz aaaa and s  ELSE: I am running a testlzz bbbb and s
+#    * IF:  4 < 3 || 0 THEN: I am running a testlzz aaaa and s  ELSE: I am running a testlzz bbbb and s
+
+    * IF:  "true" &&  4 < 3 THEN: I am running a testlzz aaaa and s  ELSE: I am running a testlzz bbbb and s
+    * IF:  "false" &&  4 < 3 THEN: I am running a testlzz aaaa and s  ELSE: I am running a testlzz bbbb and s
+    * IF:  "true "||  4 < 3 THEN: I am running a testlzz aaaa and s  ELSE: I am running a testlzz bbbb and s
+    * IF:  "false" ||  4 < 3 THEN: I am running a testlzz aaaa and s  ELSE: I am running a testlzz bbbb and s
+
+    * IF:  "true "&&  4 > 3 THEN: I am running a testlzz aaaa and s  ELSE: I am running a testlzz bbbb and s
+    * IF:  ss &&  4 > 3 THEN: I am running a testlzz aaaa and s  ELSE: I am running a testlzz bbbb and s
+    * IF:  "true "||  4 > 3 THEN: I am running a testlzz aaaa and s  ELSE: I am running a testlzz bbbb and s
+    * IF:  "false" ||  4 > 3 THEN: I am running a testlzz aaaa and s  ELSE: I am running a testlzz bbbb and s
+
+#    * IF: ?d  4 > 3 THEN: I am running a testlzz aaaa and s  ELSE: I am running a testlzz bbbb and s
+#    * IF: "<Status> == B" THEN: I am running a testlzz aaaa and s  ELSE: I am running a testlzz bbbb and s
+#    * IF: "A" == "B" THEN: I am running a testlzz aaaa and s ELSE-IF: 45>7 THEN: I am running a testlzz bbbb and s ELSE: I am running a testlzz ccccc and s
+#    * IF: SCENARIO_<Status> AND "1 > 2" THEN: I am running a testlzz aaaa and s ELSE-IF: 45>7 THEN: I am running a testlzz bbbb and s ELSE: I am running a testlzz ccccc and s
+#    * IF: SCENARIO <Status> AND 1 < 2  THEN: I am running a testlzz aaaa and s ELSE-IF: 45<7 THEN: I am running a testlzz bbbb and s ELSE: I am running a testlzz ccccc and s
+#    * IF: false THEN: I am running a testlzz ERROsR and errorstep1 ELSE: Then I am running a testlzz ERROR and errorstep1
+    Examples:
+      | Status  |
+      | PASSING |
+#     | FAILING |
 
   @qqqq1
   Scenario: ASD2

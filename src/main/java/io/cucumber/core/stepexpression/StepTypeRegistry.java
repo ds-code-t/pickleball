@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.regex.Matcher;
 import static io.pickleball.configs.Constants.*;
+import static io.pickleball.stringutilities.QuoteExtracter.QUOTED_STRING_REGEX;
 import static io.pickleball.valueresolution.BooleanResolver.resolveObjectToBoolean;
 
 public final class StepTypeRegistry implements io.cucumber.core.api.TypeRegistry {
@@ -147,7 +148,6 @@ public final class StepTypeRegistry implements io.cucumber.core.api.TypeRegistry
                 Boolean.class,                      // Input type
                 (String input) -> resolveObjectToBoolean(input) // Transformer returning Boolean
         ));
-
         parameterTypeRegistry.defineParameterType(new ParameterType<>(
                 "quotedString",                                      // Name of the parameter type
                 QUOTED_STRING_REGEX.toString(), // Regex with no capturing groups
@@ -159,6 +159,7 @@ public final class StepTypeRegistry implements io.cucumber.core.api.TypeRegistry
                             .replace("\\\\", "\\");             // Unescape backslashes
                 }
         ));
+
 
         parameterTypeRegistry.defineParameterType(new ParameterType<>(
                 "metaStepAttribute",                                      // Name of the parameter type

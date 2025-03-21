@@ -147,7 +147,8 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
 
 
         for (StepWrapper stepWrapper : topLevelSteps) {
-
+            if(nextExecutionMode.equals(END_SCENARIO))
+                break;
             nextExecutionMode = stepWrapper
                     .run(this, bus, state, nextExecutionMode, null)
                     .next(nextExecutionMode);

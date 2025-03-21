@@ -8,11 +8,11 @@ plugins {
 
 
 group = 'tools.dscode'
-version = '1.1.0'
+version = '1.2.0-alpha'
 
 
 java {
-    withJavadocJar()
+//    withJavadocJar()
     withSourcesJar()
 }
 
@@ -45,6 +45,9 @@ publishing {
             groupId = 'tools.dscode'
             artifactId = 'pickleball'
             from components.java
+            artifact(tasks.jar) {
+                classifier 'tests' // Test JAR
+            }
             pom {
                 name = 'Pickleball'
                 description = 'Dynamic cucumber scenario testing'
@@ -154,7 +157,8 @@ dependencies {
     implementation platform('com.fasterxml.jackson:jackson-bom:2.18.2')
 
     implementation 'com.google.guava:guava:33.4.0-jre'
-    implementation 'org.mvel:mvel2:2.5.2.Final'
+//    implementation 'org.mvel:mvel2:2.5.2.Final'
+    implementation 'com.googlecode.aviator:aviator:5.4.3'
     implementation 'org.apiguardian:apiguardian-api:1.1.2'
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jdk8'

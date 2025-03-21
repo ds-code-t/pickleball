@@ -13,6 +13,7 @@ import io.pickleball.exceptions.PickleballException;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
 
 import static io.cucumber.core.gherkin.messages.GherkinMessagesStep.*;
 import static io.cucumber.gherkin.PickleCompiler.pickleStepTypeFromKeywordType;
@@ -43,9 +44,16 @@ public class StepWrapper extends BaseContext {
 
 
     public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode startingExecutionMode, io.cucumber.core.runner.PickleStepTestStep parentStep) {
+        if(parentTestCase.getGoToNextStepRegex()!=null) {
+            Matcher matcher = parentTestCase.getGoToNextStepRegex().matcher(getRunTimeText());
+            if(!matcher.find())
+                return startingExecutionMode;
+            else
+                parentTestCase.setGoToNextStepRegex(null);
+        }
         io.cucumber.core.runner.PickleStepTestStep clone = modifyPickleStepTestStep();
         addCloned(clone);
-        GherkinMessagesStep s = ((GherkinMessagesStep) clone.getStep());
+
         ExecutionMode runExecutionMode;
 
         String runFlag = gherkinMessagesStep.getRunFlag();
@@ -68,9 +76,14 @@ public class StepWrapper extends BaseContext {
             return passedExecutionMode;
 
         for (StepWrapper nestedStepWrapper : getNestedChildSteps()) {
+            parentTestCase.nestLevel++;
             ExecutionMode nestedStepExecutionMode = clone.shouldForceRunNestedSteps() ? ExecutionMode.RUN : returnExecutionMode;
             returnExecutionMode = nestedStepWrapper.run(testCase, bus, state, nestedStepExecutionMode, clone);
         }
+        parentTestCase.nestLevel--;
+
+        if(parentTestCase.isForceComplete())
+            return ExecutionMode.END_SCENARIO;;
 
         return passedExecutionMode;
     }
@@ -108,7 +121,7 @@ public class StepWrapper extends BaseContext {
         PickleStep pickleStep = gherkinMessagesStep.getPickleStep();
         Step step = pickleStep.getStepTemplate();
 
-        String stepText = replaceNestedBrackets(templateStep.getStep().getText(), parentTestCase.runMaps);
+        String stepText = String.valueOf(replaceNestedBrackets(templateStep.getStep().getText(), parentTestCase.runMaps));
 
         PickleStepArgument argument = null;
 
@@ -121,7 +134,7 @@ public class StepWrapper extends BaseContext {
                 List<TableCell> cells = row.getCells();
                 List<PickleTableCell> newCells = new ArrayList<>();
                 for (TableCell cell : cells) {
-                    String cellText = replaceNestedBrackets(cell.getValue(), parentTestCase.runMaps);
+                    String cellText = String.valueOf(replaceNestedBrackets(cell.getValue(), parentTestCase.runMaps));
                     newCells.add(new PickleTableCell(cellText));
                 }
                 newRows.add(new PickleTableRow(newCells));
@@ -132,7 +145,7 @@ public class StepWrapper extends BaseContext {
             if (docString != null) {
                 String media = docString.getMediaType().orElse(null);
                 if (media != null)
-                    media = replaceNestedBrackets(media, parentTestCase.runMaps);
+                    media = String.valueOf(replaceNestedBrackets(media, parentTestCase.runMaps));
                 String content = docString.getContent();
                 PickleDocString pickleDocString = new PickleDocString(media, content);
                 argument = new PickleStepArgument(pickleDocString, null);
@@ -181,10 +194,6 @@ public class StepWrapper extends BaseContext {
 
     public ExecutionMode getRunExecutionMode(ExecutionMode startingExecutionMode, String runFlag) {
         Status status = getCurrentState().getStatus();
-//        String runFlag = gherkinMessagesStep.getRunFlag();
-//        ExecutionMode defaultReturn = status == Status.PASSED ? ExecutionMode.RUN : ExecutionMode.SKIP;
-        if (runFlag.contains(RUN_ALWAYS) || runFlag.contains(RUN_IF))
-            System.out.println("@@@ALWAYSSSS");
 
         if (runFlag.contains(RUN_ALWAYS) || runFlag.contains(RUN_IF))
             return ExecutionMode.RUN;

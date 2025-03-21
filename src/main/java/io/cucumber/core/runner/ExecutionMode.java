@@ -48,6 +48,12 @@ public enum ExecutionMode {
         Status execute(StepDefinitionMatch stepDefinitionMatch, TestCaseState state) {
             return Status.SKIPPED;
         }
+    },
+    END_SCENARIO {
+        @Override
+        Status execute(StepDefinitionMatch stepDefinitionMatch, TestCaseState state) {
+            return Status.SKIPPED;
+        }
     };
 
     abstract Status execute(StepDefinitionMatch stepDefinitionMatch, TestCaseState state) throws Throwable;

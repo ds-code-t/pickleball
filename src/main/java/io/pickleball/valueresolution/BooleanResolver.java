@@ -1,14 +1,17 @@
 package io.pickleball.valueresolution;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+
+import java.util.*;
 
 import static io.pickleball.configs.Constants.sFlag2;
+import static io.pickleball.datafunctions.EvalList.wrapListItems;
 
 public class BooleanResolver {
     final static Map<String, Boolean> booleanMap = new HashMap<>();
+
     static {
+        booleanMap.put("0", false);
+        booleanMap.put("", false);
         booleanMap.put("FALSE", false);
         booleanMap.put("NO", false);
         booleanMap.put("NULL", false);
@@ -18,38 +21,63 @@ public class BooleanResolver {
 
 
     public static boolean resolveObjectToBoolean(Object value) {
+        System.out.println("@@resolveObjectToBoolean: " + value);
         if (value == null) {
             return false;
         }
+        System.out.println("@@value: " + value);
+        System.out.println("@@value getClass: " + value.getClass());
 
-        // Handle collections
-        if (value instanceof Collection<?>) {
-            Collection<?> collection = (Collection<?>) value;
-            return !collection.isEmpty() &&
-                    collection.stream().anyMatch(item -> resolveObjectToBoolean(item));
+        new Exception().printStackTrace();
+
+        if (!(value instanceof String)) {
+            System.out.println("@@1");
+            System.out.println("@@value instanceof ValueChecker ? " + (value instanceof ValueChecker));
+            if (value instanceof ValueChecker)
+                System.out.println("@@returnVal:  " + ((ValueChecker) value).getBoolValue());
+
+            if (value instanceof ValueChecker)
+                return ((ValueChecker) value).getBoolValue();
+            System.out.println("@@2");
+
+            if (value.getClass().isArray())
+                return resolveObjectToBoolean(wrapListItems(Arrays.asList(value)));
+
+            if (value instanceof List<?>) {
+                return resolveObjectToBoolean(wrapListItems((List) value));
+            }
+
+            // Handle collections
+            if (value instanceof Collection<?>) {
+                Collection<?> collection = (Collection<?>) value;
+                return !collection.isEmpty() &&
+                        collection.stream().anyMatch(item -> resolveObjectToBoolean(item));
+            }
+
+            // Handle arrays
+//            if (value.getClass().isArray()) {
+//                Object[] array = (Object[]) value;
+//                return array.length > 0 &&
+//                        java.util.Arrays.stream(array).anyMatch(item -> resolveObjectToBoolean(item));
+//            }
+
+            // Handle maps
+            if (value instanceof Map<?, ?>) {
+                Map<?, ?> map = (Map<?, ?>) value;
+                return !map.isEmpty() &&
+                        map.values().stream().anyMatch(item -> resolveObjectToBoolean(item));
+            }
+
+            if (value instanceof Boolean) {
+                return (boolean) value;
+            }
+
+            if (value instanceof Number) {
+                double numValue = ((Number) value).doubleValue();
+                return numValue != 0;
+            }
         }
 
-        // Handle arrays
-        if (value.getClass().isArray()) {
-            Object[] array = (Object[]) value;
-            return array.length > 0 &&
-                    java.util.Arrays.stream(array).anyMatch(item -> resolveObjectToBoolean(item));
-        }
-
-        // Handle maps
-        if (value instanceof Map<?, ?>) {
-            Map<?, ?> map = (Map<?, ?>) value;
-            return !map.isEmpty() &&
-                    map.values().stream().anyMatch(item -> resolveObjectToBoolean(item));
-        }
-
-        if (value instanceof Boolean) {
-            return (boolean) value;
-        }
-        if (value instanceof Number) {
-            double numValue = ((Number) value).doubleValue();
-            return numValue != 0;
-        }
 
         String strValue = value.toString().split(sFlag2, 2)[0].replaceAll("`'\"", "").trim().toUpperCase();
         if (strValue.isEmpty()) {
@@ -58,7 +86,7 @@ public class BooleanResolver {
 
         // Handle string representations of empty collections
 //        if (strValue.matches("\\[\\s*\\]|\\{\\s*\\}|\\(\\s*\\)")) {
-        if (strValue.replaceAll("[(){}\\[\\]]","").isBlank()) {
+        if (strValue.replaceAll("[(){}\\[\\]]", "").isBlank()) {
             return false;
         }
 
@@ -70,4 +98,5 @@ public class BooleanResolver {
             return booleanMap.getOrDefault(strValue.trim(), true);
         }
     }
+
 }

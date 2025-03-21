@@ -59,7 +59,7 @@ public final class Pickle {
     private final String uri;
 
     public void setName(ScenarioContext parent) {
-        this.name = replaceNestedBrackets(originalName, parent.getPassedMap(), parent.getExamplesMap(), parent.getStateMap());
+        this.name = String.valueOf(replaceNestedBrackets(originalName, parent.getPassedMap(), parent.getExamplesMap(), parent.getStateMap()));
     }
 
     private String name;

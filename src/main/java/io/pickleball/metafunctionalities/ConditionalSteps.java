@@ -1,12 +1,14 @@
 package io.pickleball.metafunctionalities;
 
 import io.cucumber.core.runner.PickleStepTestStep;
+import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.When;
 import io.pickleball.annotations.NoEventEmission;
 import io.pickleball.cacheandstate.BaseContext;
 import io.pickleball.cacheandstate.ScenarioContext;
 import io.pickleball.customtypes.DynamicStep;
+import io.pickleball.exceptions.PickleballException;
 
 import java.util.*;
 import java.util.regex.Matcher;
@@ -59,10 +61,13 @@ public class ConditionalSteps {
     }
 
 
+
+
+
     @When("@Terminate:(.*),,,,(.*)")
     public void terminate(String terminationType, String description) {
         if (terminationType.equals(FAIL_SCENARIO) || terminationType.equals(FAIL_TEST))
-            throw new RuntimeException(description);
+            throw new PickleballException(description);
         if (terminationType.equals(END_SCENARIO))
             getCurrentScenario().forceComplete();
         else if (terminationType.equals(END_TEST)) {

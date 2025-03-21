@@ -54,7 +54,7 @@ public class SourceParser {
         assert scenario != null;
         String source = reconstructScenarioSource(scenario);
 
-        String modified = replaceNestedBrackets(source, listOfMaps);
+        String modified = String.valueOf(replaceNestedBrackets(source, listOfMaps));
         return getModifiedPickle(modified, pickle);
 //        modified = "Feature: Test feature" + "\n".repeat(startLine) + (isOutline ? modified.replaceFirst("Scenario Outline:", "Scenario:") : modified);
 

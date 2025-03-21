@@ -13,6 +13,7 @@ import io.pickleball.mapandStateutilities.LinkedMultiMap;
 import io.pickleball.mapandStateutilities.MapsWrapper;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 import static io.pickleball.cacheandstate.GlobalCache.getGlobalConfigs;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
@@ -27,15 +28,41 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
     private final Pickle pickle;             // The static scenario definition
     private TestCaseState testCaseState;    // The mutable scenario state
 
-    public enum RunStatus {
-        RUNNING,
-        CHECKING,
-        ALREADY_RAN
+//    public enum RunStatus {
+//        RUNNING,
+//        CHECKING,
+//        ALREADY_RAN
+//    }
+
+    public Pattern getGoToNextStepRegex() {
+        return goToNextStepRegex;
     }
 
-    Map<String, RunStatus> runStates = new HashMap<>();
+    public void setGoToNextStepRegex(String goToNextStepRegex) {
+        if (goToNextStepRegex == null)
+            this.goToNextStepRegex = null;
+        else
+            this.goToNextStepRegex = Pattern.compile(goToNextStepRegex);
+    }
+
+    Pattern goToNextStepRegex = null;
 
 
+//    RunStatus runStatus = RunStatus.CHECKING;
+//    RunStatus lastRunStatus = RunStatus.CHECKING;
+
+
+    public int nestLevel = 0;
+
+//    Map<Integer, RunStatus> runStates = new HashMap<>();
+//
+//    public RunStatus getRunStatus() {
+//        return runStates.getOrDefault(nestLevel, RunStatus.CHECKING);
+//    }
+//
+//    public void setRunStatus(RunStatus runStatus) {
+//        runStates.put(nestLevel, runStatus);
+//    }
 
 
     public boolean isForceComplete() {
@@ -95,28 +122,8 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
 //        runMaps = new MapsWrapper(this.passedMap, this.examplesMap, this.stateMap, getGlobalConfigs());
     }
 
-    public String replaceAndEval(String inputString) {
-        try {
-            String returnVal = replaceNestedBrackets(inputString, runMaps);
-            System.out.println("@@returnVal::: " + returnVal);
-            return returnVal;
-        }
-        catch (Exception e)
-        {
-            System.out.println("@@returnVal");
-            e.printStackTrace();
-            try {
-                throw new Exception(e);
-            } catch (Exception ex) {
-                throw new RuntimeException(ex);
-            }
-        }
-//        if (returnVal.startsWith(errorFlag)) {
-//            System.out.println("@@returnVal");
-//            new PickleballException("Failed to evaluate expression '" + returnVal + "'").printStackTrace();
-//            throw new PickleballException("Failed to evaluate expression '" + returnVal + "' at ' " + returnVal.replaceAll(errorFlag, ""));
-//        }
-//        return returnVal;
+    public Object replaceAndEval(String inputString) {
+        return replaceNestedBrackets(inputString, runMaps);
     }
 
     public boolean isTopLevel() {

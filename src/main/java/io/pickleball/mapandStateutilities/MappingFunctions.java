@@ -16,22 +16,29 @@ import static io.pickleball.configs.Constants.flag1;
 public class MappingFunctions {
 
     @SafeVarargs
-    public static String replaceNestedBrackets(String input, Map<String, String>... maps) {
+    public static Object replaceNestedBrackets(Object input, Map<String, String>... maps) {
+        if(!(input instanceof String))
+            return input;
         return replaceNestedBrackets(input, Arrays.stream(maps).toList());
 
     }
 
-    public static String replaceNestedBrackets(String input, List<Map<String, String>> maps) {
+    public static Object replaceNestedBrackets(Object input, List<Map<String, String>> maps) {
+        if(!(input instanceof String))
+            return input;
         MapsWrapper mapsWrapper = new MapsWrapper(maps);
         return replaceNestedBrackets(input, mapsWrapper);
     }
 
-    public static String replaceNestedBrackets(String input, MapsWrapper mapsWrapper) {
-//        Pattern pattern = Pattern.compile("<(?<json>\\$[^<>]+)>|<(?<angled>[^<>]+)>|\\{(?<curly>[^{}]+)\\}");
-//        Pattern pattern = Pattern.compile("<(?<json>\\$[^<>]+)>|<(?<angled>[^<>$=\\s](?:[^<>]*[^<>\\s])?)>|\\{(?<curly>[^{}]+)\\}");
+    public static Object replaceNestedBrackets(Object input, MapsWrapper mapsWrapper) {
+        if(!(input instanceof String))
+            return input;
+//        Pattern pattern = Pattern.compile("<(?<angled>[^<>=\\s](?:[^<>]*[^<>\\s])?)>|\\{(?<curly>[^{}]+)\\}");
         Pattern pattern = Pattern.compile("<(?<angled>[^<>=\\s](?:[^<>]*[^<>\\s])?)>|\\{(?<curly>[^{}]+)\\}");
-        String result = input;
+        String result = String.valueOf(input);
 
+
+        int replacementOrder = 0;
 
         while (true) {
             Matcher matcher = pattern.matcher(result);
@@ -41,32 +48,33 @@ public class MappingFunctions {
             while (matcher.find()) {
                 String key = matcher.group("angled");
                 if (key != null) {
-                    String value = String.valueOf(mapsWrapper.getOrDefault(key, "<" + key + ">"));
+                    String replacedKey = String.valueOf(replaceNestedBrackets(key,mapsWrapper));
+                    String value = String.valueOf(mapsWrapper.getOrDefault(replacedKey, "<" + replacedKey + ">"));
                     matcher.appendReplacement(sb, Matcher.quoteReplacement(value));
                     continue;
                 }
 
+
+//                String jsonPath = matcher.group("json");
+//                if (jsonPath != null) {
+////                    Object expressionReturn = getMvelWrapper().evaluate(expression, mapsWrapper);
+////                    matcher.appendReplacement(sb, Matcher.quoteReplacement(String.valueOf(expressionReturn)));
+//                    continue;
+//                }
+
                 String expression = matcher.group("curly");
 
                 if (expression != null) {
-
-                    Object expressionReturn = getMvelWrapper().evaluate(expression, mapsWrapper);
-
-                    System.out.println("@@expressionReturn1: " + expressionReturn);
-
+                    String replaceExpressionString = String.valueOf(replaceNestedBrackets(expression,mapsWrapper));
+                    Object expressionReturn = getMvelWrapper().evaluate(replaceExpressionString, mapsWrapper);
+                    if(!(expressionReturn instanceof String))
+                        return expressionReturn;
 //                        throw new PickleballException("Failed to evaluate expression '" + expression + "'");
-
                     matcher.appendReplacement(sb, Matcher.quoteReplacement(String.valueOf(expressionReturn)));
                     continue;
                 }
 
-                String jsonPath = matcher.group("json");
-                if (jsonPath != null) {
 
-//                    Object expressionReturn = getMvelWrapper().evaluate(expression, mapsWrapper);
-//                    matcher.appendReplacement(sb, Matcher.quoteReplacement(String.valueOf(expressionReturn)));
-                    continue;
-                }
             }
 
 

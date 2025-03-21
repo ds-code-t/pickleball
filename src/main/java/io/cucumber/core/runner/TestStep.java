@@ -83,37 +83,28 @@ public abstract class TestStep extends StepContext implements io.cucumber.plugin
         Throwable error = null;
         try {
             runExecutionMode = startExecutionMode;
-            System.out.println("@@runExecutionMode: " + runExecutionMode);
             status = executeStep(state, runExecutionMode);
-            System.out.println("@@status: " + status);
         } catch (Throwable t) {
-            System.out.println("@@t: " + t.getMessage());
             currentExecutionMapPut("error", t);
             rethrowIfUnrecoverable(t);
             error = t;
             status = mapThrowableToStatus(t);
         }
-        System.out.println("@@status2: " + status);
         Instant stopTime = bus.getInstant();
         Duration duration = Duration.between(startTime, stopTime);
         Result originalResult = mapStatusToResult(status, error, duration);
         currentExecutionMapPut("stopTime", stopTime);
         currentExecutionMapPut("duration", duration);
         currentExecutionMapPut("result", originalResult);
-        System.out.println("@@originalResult: " + originalResult);
         addStatus(originalResult.getStatus());
         Status returnStatus = getHighestStatus();
 
-        System.out.println("\n@@(shouldUpdateStatus(): " + (shouldUpdateStatus()));
         Result returnResult = originalResult;
         if (shouldUpdateStatus())
             state.add(originalResult);
         else if (!status.equals(Status.PASSED))
             returnResult = new Result(Status.SKIPPED, duration, error);
 
-        System.out.println("@@returnResult: " + returnResult);
-        System.out.println("@@shouldEmit: " + shouldEmit);
-        System.out.println("@@getStepText: " + getCurrentStep().getStepText());
 
         if (shouldEmit)
             emitTestStepFinished(testCase, bus, state.getTestExecutionId(), stopTime, duration, returnResult, error);
