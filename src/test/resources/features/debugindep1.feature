@@ -1,12 +1,33 @@
 Feature: sdf
 
-  Scenario: ddd
-  * DDDqq 'sss' and 'vvvv'
+  Scenario: prec test 6
+#    * IF: ANY-HAS-VALUE: [0,0,0,0] THEN: I am running a testlzz 222zzaa\"aa and s
+
+    * IF: ANY-HAS-VALUE: [0,0,0,0] THEN: I am running a testlzz 222zzaa\"aa and s
+    * go to previous: ".*\[0,0,0,0\].*"
+
+#
+##    * go to previous: ".*testlzz.*"
+
+
+#  Scenario: ddd
+
 
   Scenario: content test 6
 #    * IF:  "true" &&  4 > 3 THEN: I am running a testlzz aaaa and s
-    * IF: [0,0,4] THEN: I am running a testlzz zzaa\"aa and s
+    * IF: HAVE-VALUE: [6,0,0,0] THEN: I am running a testlzz 1111zzaa\"aa and s
+#    * IF: ALL-HAS-VALUE: [0,0,0,0] THEN: I am running a testlzz zzaa\"aa and s
+    * IF: ANY: [0,0,0,0] THEN: I am running a testlzz 222zzaa\"aa and s
+
+    * go to previous: ".*\[0,0,0,0\].*"
+
+    * IF: ANY: [1] THEN: I am running a testlzz aaa\"aa and s
+    * IF: ANY: [2] THEN: I am running a testlzz bbb\"aa and s
+    * IF: ANY: [3] THEN: I am running a testlzz ccc\"aa and s
+    * IF: ANY: [4] THEN: I am running a testlzz dddd\"aa and s
 #    * IF:  "sadasd" THEN: I am running a testlzz zzzzzzzzzzzz and s
+
+    * I am running a testlzz 3333zzaa\"aa and s
 
 
   Scenario Outline: if test 6 status: <Status>

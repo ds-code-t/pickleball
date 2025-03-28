@@ -37,6 +37,7 @@ import io.cucumber.plugin.event.TestStep;
 import io.cucumber.plugin.event.TestStepFinished;
 import io.cucumber.plugin.event.TestStepStarted;
 import io.pickleball.cacheandstate.StepWrapper;
+import io.pickleball.exceptions.PickleballException;
 import io.pickleball.mapandStateutilities.LinkedMultiMap;
 import io.pickleball.cacheandstate.ScenarioContext;
 import io.pickleball.executions.ExecutionConfig;
@@ -65,7 +66,6 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
     public GherkinMessagesFeature gherkinMessagesFeature;
     public Scenario scenario;
 //    private final List<PickleStepTestStep> dynamicRunList = new ArrayList<>();
-    private final List<StepWrapper> topLevelSteps = new ArrayList<>();
 
     public TestCase(
             UUID id, List<PickleStepTestStep> testSteps,
@@ -86,21 +86,23 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
 
 
         Map<Integer, StepWrapper> nestingMap = new HashMap<>();
+
         for (PickleStepTestStep templateStep : testSteps) {
 //            templateStep.setScenarioContext(this);
-            StepWrapper stepWrapper = new StepWrapper(templateStep, this);
-            int nestingLevel = stepWrapper.getGherkinMessagesStep().parseRunTimeParameters();
-            if(nestingLevel == 0)
+            StepWrapper stepWrapper = new StepWrapper(templateStep, this, allSteps.size());
+//            int nestingLevel = stepWrapper.getGherkinMessagesStep().parseRunTimeParameters();
+            int nestingLevel = stepWrapper.getNestingLevel();
+            if (nestingLevel == 0)
                 topLevelSteps.add(stepWrapper);
-            else
-            {
+            else {
                 StepWrapper parentNesting = nestingMap.get(nestingLevel);
-                if(parentNesting == null)
+                if (parentNesting == null)
                     throw new RuntimeException(":".repeat(nestingLevel) + " incorrect nesting level for step '" + templateStep.getStepText() + "' line: " + getLine());
                 nestingMap.get(nestingLevel).addNestedChildStep(stepWrapper);
 
             }
-            nestingMap.put(nestingLevel + 1, stepWrapper);
+            nestingMap.put(nestingLevel , stepWrapper);
+            allSteps.add(stepWrapper);
         }
 
 
@@ -146,12 +148,61 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
         }
 
 
-        for (StepWrapper stepWrapper : topLevelSteps) {
-            if(nextExecutionMode.equals(END_SCENARIO))
+//        for (StepWrapper stepWrapper : topLevelSteps) {
+//            if(nextExecutionMode.equals(END_SCENARIO))
+//                break;
+//            nextExecutionMode = stepWrapper
+//                    .run(this, bus, state, nextExecutionMode, null)
+//                    .next(nextExecutionMode);
+//        }
+
+        Integer i = -1;
+        while (true) {
+
+            switch (runStatus) {
+                case NORMAL -> i++;
+                case FIND_NEXT -> i = findBoundaryValue(i, true);
+                case FIND_PREVIOUS -> i = findBoundaryValue(i, false);
+                case FIND_ANY -> {
+                    i = findBoundaryValue(i, true);
+                    if (i == null)
+                        i = findBoundaryValue(-1, true);
+                }
+                case FIND_FIRST -> i = findBoundaryValue(-1, true);
+                default -> throw new PickleballException("Run Status not set");
+            }
+
+
+
+            if (i == null)
+                throw new PickleballException("Could not find matching step for: '" + (goToRegex == null? goToBookmarks: goToRegex) + "'");
+
+
+            if (i < 0 || i >= topLevelSteps.size()) {
+                System.out.println("End Of Scenario: " + getName());
+
+
                 break;
+            }
+
+
+            StepWrapper stepWrapper = topLevelSteps.get(i);
+
+            if (runStatus != RunStatus.NORMAL) {
+//                stepWrapper.getGherkinMessagesStep().getFlagList().g
+                runStatus = RunStatus.NORMAL;
+            }
+
+
+            if (nextExecutionMode.equals(END_SCENARIO))
+                break;
+
             nextExecutionMode = stepWrapper
                     .run(this, bus, state, nextExecutionMode, null)
                     .next(nextExecutionMode);
+
+        i = currentWrapperNum;
+
         }
 
 

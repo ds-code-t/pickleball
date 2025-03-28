@@ -33,24 +33,26 @@ public class StepWrapper extends BaseContext {
 
     private List<StepWrapper> nestedChildSteps;
 
+    public int getNestingLevel() {
+        return nestingLevel;
+    }
 
-    public StepWrapper(PickleStepTestStep templateStep, TestCase testCase) {
+    private final int nestingLevel;
+    private final int wrapperNumber;
+
+
+    public StepWrapper(PickleStepTestStep templateStep, TestCase testCase, int wrapperNumber) {
         this.templateStep = templateStep;
         this.gherkinMessagesStep = (GherkinMessagesStep) templateStep.getStep();
         this.parentTestCase = testCase;
+        this.nestingLevel = gherkinMessagesStep.getColonNesting();
+        this.wrapperNumber = wrapperNumber;
     }
 
     private final List<PickleStepTestStep> clonedSteps = new ArrayList<>();
 
 
     public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode startingExecutionMode, io.cucumber.core.runner.PickleStepTestStep parentStep) {
-        if(parentTestCase.getGoToNextStepRegex()!=null) {
-            Matcher matcher = parentTestCase.getGoToNextStepRegex().matcher(getRunTimeText());
-            if(!matcher.find())
-                return startingExecutionMode;
-            else
-                parentTestCase.setGoToNextStepRegex(null);
-        }
         io.cucumber.core.runner.PickleStepTestStep clone = modifyPickleStepTestStep();
         addCloned(clone);
 
@@ -70,20 +72,24 @@ public class StepWrapper extends BaseContext {
             else
                 runExecutionMode = startingExecutionMode;
         }
+        System.out.println("\n\n---\n@@before Run: " + getRunTimeText());
+        testCase.setCurrentWrapperNum(wrapperNumber);
         ExecutionMode returnExecutionMode = clone.run(testCase, bus, state, runExecutionMode);
+        System.out.println("@@after Run: " + getRunTimeText());
+        System.out.println("returnExecutionMode: " + returnExecutionMode + "\n-------------\n\n");
         ExecutionMode passedExecutionMode = runFlag.isEmpty() ? returnExecutionMode : startingExecutionMode;
         if (nestedChildSteps == null || !clone.shouldRunNestedSteps() || !returnExecutionMode.equals(ExecutionMode.RUN))
             return passedExecutionMode;
 
         for (StepWrapper nestedStepWrapper : getNestedChildSteps()) {
-            parentTestCase.nestLevel++;
             ExecutionMode nestedStepExecutionMode = clone.shouldForceRunNestedSteps() ? ExecutionMode.RUN : returnExecutionMode;
             returnExecutionMode = nestedStepWrapper.run(testCase, bus, state, nestedStepExecutionMode, clone);
         }
-        parentTestCase.nestLevel--;
+        testCase.setCurrentWrapperNum(wrapperNumber);
 
-        if(parentTestCase.isForceComplete())
-            return ExecutionMode.END_SCENARIO;;
+
+        if (parentTestCase.isForceComplete())
+            return ExecutionMode.END_SCENARIO;
 
         return passedExecutionMode;
     }

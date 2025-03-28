@@ -13,7 +13,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class ParseTransformer {
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
     private static void debug(String message) {
         if (DEBUG) System.out.println("DEBUG: " + message);
     }

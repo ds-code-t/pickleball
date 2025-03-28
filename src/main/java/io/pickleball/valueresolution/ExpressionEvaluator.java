@@ -1,18 +1,10 @@
 package io.pickleball.valueresolution;
 
 import io.cucumber.core.backend.Status;
-import io.pickleball.datafunctions.EvalList;
 import io.pickleball.exceptions.PickleballException;
 import io.pickleball.mapandStateutilities.MapsWrapper;
 import io.pickleball.stringutilities.QuoteExtracter;
-// import org.mvel2.MVEL; // Removed MVEL import
-// import org.mvel2.ParserContext; // Removed ParserContext import
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static io.pickleball.cacheandstate.PrimaryScenarioData.getCurrentScenarioStatus;
@@ -26,8 +18,16 @@ public class ExpressionEvaluator extends ParseTransformer { // Note: Class name 
     public AviatorWrapper wrapper = new AviatorWrapper();
     public final static String VALUE_PREFIX = "__VAL";
     final static String ARRAY_PREFIX = VALUE_PREFIX + "_ARRAY_";
-    final static Pattern VALUE_KEY_PATTERN = Pattern.compile("(?<value>\\b" + VALUE_PREFIX + "_[A-Z-_0-9]+__\\b)");
-    final static Pattern OP_CHAIN_PATTERN = Pattern.compile("(?<opChain>\\b[A-Z-]+)\\s*:\\s*");
+    final static String OP_PREFIX = VALUE_PREFIX + "OP";
+
+    final static String VALUE_KEY_PATTERN = "(?<value>\\b" + VALUE_PREFIX + "_[A-Z-_0-9]+__\\b)";
+//    final static String OP_CHAIN_PATTERN = "(?<opChain>\\b[A-Z-]+)\\s*:\\s*";
+    final static Pattern OP_CHAIN_PATTERN = Pattern.compile("(?<opChain>\\b[A-Z-]+)\\s*:\\s*" + VALUE_KEY_PATTERN);
+
+
+
+//    final static Pattern VALUE_KEY_PATTERN = Pattern.compile("(?<value>\\b" + VALUE_PREFIX + "_[A-Z-_0-9]+__\\b)");
+//    final static Pattern OP_CHAIN_PATTERN = Pattern.compile("(?<opChain>\\b[A-Z-]+)\\s*:\\s*");
 
 //    final static String ARRAY_KEY_PATTERN = ARRAY_PREFIX +"\\d+__";
 //
@@ -89,12 +89,11 @@ public class ExpressionEvaluator extends ParseTransformer { // Note: Class name 
 //            return returObj;
             return transformUntilStable(expression, exp -> evaluateOnce(String.valueOf(exp), variables));
         } catch (Exception e) {
-            // Updated error message to reflect Aviator instead of MVEL
-            if (e.getMessage().toLowerCase().contains("aviator")) {
+            String message = e.getMessage();
+            if (message != null && message.toLowerCase().contains("aviator")) {
                 e.printStackTrace();
                 throw new PickleballException("Aviator failed to evaluate expression '" + expression + "'", e);
             }
-            e.printStackTrace();
             throw new RuntimeException(e);
         }
     }
@@ -109,65 +108,40 @@ public class ExpressionEvaluator extends ParseTransformer { // Note: Class name 
     final Pattern arrayPattern = Pattern.compile("\\[([^\\[\\]]*)\\]");
 
     public Object evaluateExpression(String expression, Map<String, Object> variables) {
-//        System.out.println("@@obj:::::: " + obj);
-//        System.out.println("@@obj getClass:::::: " + obj.getClass());
-//
-//        String expression = String.valueOf(obj);
+
         MapsWrapper evalMap = new MapsWrapper();
         evalMap.addMaps(variables);
         String preprocessedExpression = preprocess(expression);
-//        try {
-        // Replaced MVEL.eval with AviatorEvaluator.execute
-        // Aviator doesn't need a context object, uses static method instead
+
         QuoteExtracter preEvalMasker = new QuoteExtracter();
         evalMap.addMaps(preEvalMasker);
-
         String preEvalString = preEvalMasker.maskQuotedStrings(preprocessedExpression, true);
-        System.out.println("@@preEvalString111: " + preEvalString);
-//            preEvalString =  preEvalString.replaceAll("\\[([^\\[\\]]*)\\]","seq.list($1)");
-//        MapsWrapper evalMap = new MapsWrapper(preEvalMasker, variables);
 
 
-        String matchReturnString = preEvalString;
-        boolean foundMatches;
-        int keyIncrement = 1; // Starting key
-        Map<String, Object> matchMap = new HashMap<>();
-
-        do {
-            Matcher matcher = arrayPattern.matcher(matchReturnString);
-            StringBuilder result = new StringBuilder();
-            foundMatches = false;
-
-            // Process matches
-            while (matcher.find()) {
-                String key = ARRAY_PREFIX + (keyIncrement++) + "__";
-//                    String key = "aa";
-                String match = matcher.group(1);
-                EvalList evalList = (EvalList) wrapper.evaluate("seq.list(" + match + ")", new HashMap<>(variables));
-                matchMap.put(key, evalList);
-                matcher.appendReplacement(result, " " + key + " ");
-                foundMatches = true;
-            }
-            matcher.appendTail(result);
-            matchReturnString = result.toString();
-        } while (foundMatches);
-
-        evalMap.addMaps(matchMap);
+        MapsWrapper subReplace = new MapsWrapper();
 
 
-        String stringToEvaluate = matchReturnString;
-//        OP_CHAIN_PATTERN
+        String stringToEvaluate = subReplace.matchReplace(preEvalString, arrayPattern, ARRAY_PREFIX + "_%s__" , "seq.list($1)", " %s ");
+
+        stringToEvaluate = subReplace.matchReplace(stringToEvaluate, OP_CHAIN_PATTERN, OP_PREFIX + "_%s__" , "predicateCheck(\"${opChain}\",${value})", " %s ");
 
 
-//            if(stringToEvaluate.contains(ARRAY_PREFIX)){
-//                final Pattern predicatePattern = Pattern.compile("(ANY|NONE|All)-?(?:(HAS|HAVE)-((NO-)?VALUE))?:\\s*" + ARRAY_KEY_PATTERN);
-//
-//            }
+        stringToEvaluate = subReplace.restoreSubstitutedValues(stringToEvaluate);
 
+        return wrapper.evaluate(stringToEvaluate, evalMap);
 
-        Object returnObj = wrapper.evaluate(stringToEvaluate, evalMap);
-        System.out.println("@@returnObj: " + returnObj);
-        return returnObj;
+//        Object returnObj = null;
+//        String originalValue = "";
+//        while(!stringToEvaluate.equals(originalValue)) {
+//            System.out.println("\n---\n@@originalValue== "  +  originalValue);
+//            System.out.println("@@stringToEvaluate== "  +  stringToEvaluate);
+//            originalValue = stringToEvaluate;
+//            returnObj = wrapper.evaluate(stringToEvaluate, evalMap);
+//            System.out.println("@@returnObj: "+ returnObj);
+//            stringToEvaluate = returnObj.toString();
+//        }
+//        System.out.println("@@returnObj: " + returnObj);
+//        return returnObj;
 
     }
 

@@ -35,7 +35,6 @@ import io.cucumber.plugin.event.Location;
 import io.pickleball.exceptions.PickleballException;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -44,7 +43,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 
-import static io.pickleball.cacheandstate.PrimaryScenarioData.getCurrentState;
 import static java.util.Arrays.asList;
 
 public final class GherkinMessagesStep implements Step {
@@ -58,6 +56,12 @@ public final class GherkinMessagesStep implements Step {
     private int colonNesting = 0;
     private String runTimeText;
     private List<String> flagList;
+
+    public List<String> getBookmarksList() {
+        return bookmarksList;
+    }
+
+    private final List<String> bookmarksList = new ArrayList<>();
 //    private boolean forceRun = false;
 
 
@@ -105,6 +109,7 @@ public final class GherkinMessagesStep implements Step {
         this.stepType = extractKeyWordType(keyWord, dialect);
         this.previousGwtKeyWord = previousGwtKeyWord;
         this.location = location;
+        parseRunTimeParameters();
     }
 
     private static Argument extractArgument(PickleStep pickleStep, Location location) {
@@ -219,7 +224,10 @@ public final class GherkinMessagesStep implements Step {
     public static final String IFSuffix = "_IF:";
 
 
-    public static final List<String> givenPrefixes = asList("* ", "Given ", ":", RUN_ALWAYS, RUN_IF, END_SCENARIO, FAIL_SCENARIO, END_TEST, FAIL_TEST, RUN_ON_PASS, RUN_ON_FAIL, RUN_ON_HARD_FAIL, RUN_ON_SOFT_FAIL);
+    public static final String BOOKMARKS = "@BOOKMARKS:";
+
+
+    public static final List<String> givenPrefixes = asList("* ", "Given ", ":", BOOKMARKS, RUN_ALWAYS, RUN_IF, END_SCENARIO, FAIL_SCENARIO, END_TEST, FAIL_TEST, RUN_ON_PASS, RUN_ON_FAIL, RUN_ON_HARD_FAIL, RUN_ON_SOFT_FAIL);
     public static final String[] prefixWords = Stream.concat(
             givenPrefixes.stream(),
             Stream.of("When ", "Then ", "And ", "But ")
@@ -247,16 +255,21 @@ public final class GherkinMessagesStep implements Step {
 
     private String textSuffix = "";
 
+    public static Pattern bookmarksPattern = Pattern.compile("&\\S+\\s");
+
     public int parseRunTimeParameters(String initialText) {
-        Pattern pattern = Pattern.compile("^(?<colons>(?:\\s*:)*)\\s*(?<flags>@\\S*\\s+)*(?:(?<keyWord>[^@]\\S+\\s+)(?<stepText>.*))?$");
+        System.out.println("Parsing Step: " + initialText);
+        Pattern pattern = Pattern.compile("^(?<colons>(?:\\s*:)*)\\s*(?<flags>@\\S*\\s+)*(?:(?<keyWord>[^@\\s]+\\s+)(?<stepText>.*))?$");
+
         Matcher matcher = pattern.matcher(initialText);
+
         if (matcher.find()) {
             runTimeText = matcher.group("stepText");
             colonNesting = Optional.ofNullable(matcher.group("colons"))
                     .map(s -> s.replaceAll("\\s+", "").length())
                     .orElse(0);
             keyWord = matcher.group("keyWord");
-            keyWord = "\u2003".repeat(colonNesting) + keyWord.strip() + " ";
+            keyWord = "\u2003".repeat(colonNesting) + (keyWord == null ? "* " :keyWord.strip()) + " ";
 
             String flagString = matcher.group("flags");
             if (flagString != null && flagString.contains("@RUN")) {
@@ -289,7 +302,17 @@ public final class GherkinMessagesStep implements Step {
 
             if (flagString != null)
                 flagList = List.of(flagString.split("\\s+"));
+
+            if(flagList != null && flagList.contains(BOOKMARKS))
+            {
+                runTimeText = BOOKMARKS + runTimeText.replace("|", " ") + " ";
+                Matcher bookmarksMatcher = bookmarksPattern.matcher(runTimeText);
+                while (bookmarksMatcher.find()) {
+                    bookmarksList.add(bookmarksMatcher.group().strip());
+                }
+            }
         }
+
 
 
         if (flagList != null && runFlag.isEmpty()) {

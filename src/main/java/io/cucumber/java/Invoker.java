@@ -96,7 +96,6 @@ final class Invoker {
             }
             throw new CucumberInvocationTargetException(located, e);
         } catch (Throwable t) {
-            System.out.println("@@catch");
             throw new RuntimeException(t);
         } finally {
             targetMethod.setAccessible(accessible);

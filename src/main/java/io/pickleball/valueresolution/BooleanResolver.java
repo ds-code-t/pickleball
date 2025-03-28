@@ -21,24 +21,16 @@ public class BooleanResolver {
 
 
     public static boolean resolveObjectToBoolean(Object value) {
-        System.out.println("@@resolveObjectToBoolean: " + value);
         if (value == null) {
             return false;
         }
-        System.out.println("@@value: " + value);
-        System.out.println("@@value getClass: " + value.getClass());
 
-        new Exception().printStackTrace();
 
         if (!(value instanceof String)) {
-            System.out.println("@@1");
-            System.out.println("@@value instanceof ValueChecker ? " + (value instanceof ValueChecker));
-            if (value instanceof ValueChecker)
-                System.out.println("@@returnVal:  " + ((ValueChecker) value).getBoolValue());
+
 
             if (value instanceof ValueChecker)
                 return ((ValueChecker) value).getBoolValue();
-            System.out.println("@@2");
 
             if (value.getClass().isArray())
                 return resolveObjectToBoolean(wrapListItems(Arrays.asList(value)));

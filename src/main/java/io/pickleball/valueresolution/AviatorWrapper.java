@@ -3,9 +3,7 @@ package io.pickleball.valueresolution;
 import com.googlecode.aviator.*;
 import com.googlecode.aviator.lexer.token.OperatorType;
 import com.googlecode.aviator.runtime.function.AbstractFunction;
-import com.googlecode.aviator.runtime.function.AbstractVariadicFunction;
 import com.googlecode.aviator.runtime.type.*;
-import io.pickleball.datafunctions.EvalList;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -29,8 +27,6 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 
-import static io.pickleball.datafunctions.EvalList.createEvalList;
-
 public class AviatorWrapper {
 
     public enum Conversion {
@@ -49,7 +45,8 @@ public class AviatorWrapper {
 
     public AviatorWrapper() {
         evaluator = AviatorEvaluator.getInstance(); // Fresh instance
-        evaluator.addFunction(new CustomSeqListFunction());
+        evaluator.addFunction(new EvalFunctions.SeqListFunctionOverride());
+        evaluator.addFunction(new EvalFunctions.predicateCheck());
         evaluator.aliasOperator(OperatorType.AND, "AND");
         evaluator.aliasOperator(OperatorType.OR, "OR");
         Set<Feature> enabledFeatures = new HashSet<>();
@@ -264,26 +261,26 @@ public class AviatorWrapper {
     }
 
 
-    public static class CustomSeqListFunction extends AbstractVariadicFunction {
-        @Override
-        public String getName() {
-            return "seq.list"; // Overrides built-in seq.list
-        }
-
-        @Override
-        public AviatorObject variadicCall(Map<String, Object> env, AviatorObject... args) {
-            // Create instance of custom list
-            EvalList customList = createEvalList();
-
-            // Add all arguments to the list
-            for (AviatorObject arg : args) {
-                customList.addObject(arg.getValue(env));
-            }
-
-            // Return as AviatorRuntimeJavaType, not AviatorJavaType
-            return new AviatorRuntimeJavaType(customList);
-        }
-    }
+//    public static class CustomSeqListFunction extends AbstractVariadicFunction {
+//        @Override
+//        public String getName() {
+//            return "seq.list"; // Overrides built-in seq.list
+//        }
+//
+//        @Override
+//        public AviatorObject variadicCall(Map<String, Object> env, AviatorObject... args) {
+//            // Create instance of custom list
+//            EvalList customList = createEvalList();
+//
+//            // Add all arguments to the list
+//            for (AviatorObject arg : args) {
+//                customList.addObject(arg.getValue(env));
+//            }
+//
+//            // Return as AviatorRuntimeJavaType, not AviatorJavaType
+//            return new AviatorRuntimeJavaType(customList);
+//        }
+//    }
 
 }
 
