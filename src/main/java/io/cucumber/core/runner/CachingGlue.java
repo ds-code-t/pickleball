@@ -298,7 +298,7 @@ public final class CachingGlue implements Glue {
             CoreStepDefinition coreStepDefinition = new CoreStepDefinition(bus.generateId(), stepDefinition,
                 expression);
             CoreStepDefinition previous = stepDefinitionsByPattern.get(stepDefinition.getPattern());
-            if (previous != null) {
+            if (previous != null && !previous.getDefinitionLocation().equals(coreStepDefinition.getDefinitionLocation())) {
                 throw new DuplicateStepDefinitionException(previous, stepDefinition);
             }
             stepDefinitionsByPattern.put(coreStepDefinition.getExpression().getSource(), coreStepDefinition);

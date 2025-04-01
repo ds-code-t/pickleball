@@ -22,7 +22,7 @@ import static io.pickleball.cacheandstate.GlobalCache.getGlobalRuntime;
 
 public final class ProjectRootUtils {
 
-    public static final Path dependencyRoot = findDependencyProjectRoot();
+    //    public static final Path dependencyRoot = findDependencyProjectRoot();
     private static Path projectRoot;
 
     public static Path getMainResources() {
@@ -37,9 +37,9 @@ public final class ProjectRootUtils {
         return configPaths;
     }
 
-    private static Path mainResources ;
-    private static Path testResources ;
-    private static Path configPaths ;
+    private static Path mainResources;
+    private static Path testResources;
+    private static Path configPaths;
 
     public static Path getProjectRoot() {
         return projectRoot;
@@ -48,10 +48,11 @@ public final class ProjectRootUtils {
     public static void setProjectRoot(Options runnerOptions) {
         if (projectRoot == null) {
             List<String> paths = convertGluePathsToAbsoluteStrings(runnerOptions.getGlue());
-            if(runnerOptions instanceof RuntimeOptions) {
+            if (runnerOptions instanceof RuntimeOptions) {
                 paths.addAll(convertGluePathsToAbsoluteStrings(((RuntimeOptions) runnerOptions).getFeaturePaths()));
             }
-            projectRoot = findParentProjectRoot(dependencyRoot.toString(), paths);
+//            projectRoot = findParentProjectRoot(dependencyRoot.toString(), paths);
+            projectRoot = findParentProjectRoot(null, paths);
             mainResources = projectRoot.resolve("src/main/resources");
             configPaths = projectRoot.resolve("src/main/resources/configs");
             testResources = projectRoot.resolve("src/test/resources");
@@ -59,39 +60,38 @@ public final class ProjectRootUtils {
     }
 
 
-
-
     /**
      * Utility class; hide constructor.
      */
-    private ProjectRootUtils() { }
-
-    /**
-     * Find the root directory of the "dependency project"—the one in which this library's
-     * code physically resides. It does this by:
-     * <ol>
-     *   <li>Finding the location of this class via its protection domain code source.</li>
-     *   <li>Recursively walking up from that path until it finds a directory that
-     *       satisfies {@link #isProjectRoot(Path)}.</li>
-     * </ol>
-     *
-     * @return the dependency project root if found; otherwise {@code null}.
-     */
-    public static Path findDependencyProjectRoot() {
-        try {
-            URL location = ProjectRootUtils.class
-                    .getProtectionDomain()
-                    .getCodeSource()
-                    .getLocation();
-            if (location != null) {
-                Path codeLocation = Paths.get(location.toURI()).toAbsolutePath();
-                return findRootRecursively(codeLocation);
-            }
-        } catch (URISyntaxException e) {
-            // log or handle if needed
-        }
-        return null;
+    private ProjectRootUtils() {
     }
+
+//    /**
+//     * Find the root directory of the "dependency project"—the one in which this library's
+//     * code physically resides. It does this by:
+//     * <ol>
+//     *   <li>Finding the location of this class via its protection domain code source.</li>
+//     *   <li>Recursively walking up from that path until it finds a directory that
+//     *       satisfies {@link #isProjectRoot(Path)}.</li>
+//     * </ol>
+//     *
+//     * @return the dependency project root if found; otherwise {@code null}.
+//     */
+//    public static Path findDependencyProjectRoot() {
+//        try {
+//            URL location = ProjectRootUtils.class
+//                    .getProtectionDomain()
+//                    .getCodeSource()
+//                    .getLocation();
+//            if (location != null) {
+//                Path codeLocation = Paths.get(location.toURI()).toAbsolutePath();
+//                return findRootRecursively(codeLocation);
+//            }
+//        } catch (URISyntaxException e) {
+//            // log or handle if needed
+//        }
+//        return null;
+//    }
 
     /**
      * Attempts to find the "parent project root" by first checking a list of candidate paths,
@@ -113,7 +113,8 @@ public final class ProjectRootUtils {
     public static Path findParentProjectRoot(String defaultPath, List<String> candidatePaths) {
         // Keep track of tried paths so we don't attempt the same one multiple times
         Set<Path> triedPaths = new HashSet<>();
-        triedPaths.add(Path.of(defaultPath));
+        if (defaultPath != null)
+            triedPaths.add(Path.of(defaultPath));
         Path found = null;
 
 
@@ -172,7 +173,6 @@ public final class ProjectRootUtils {
     }
 
 
-
     /**
      * Checks if the given directory is considered a project root.
      * For this example, we require that it contains:
@@ -210,8 +210,8 @@ public final class ProjectRootUtils {
      */
     public static void main(String[] args) {
         // 1) Find dependency project root
-        Path dependencyRoot = findDependencyProjectRoot();
-        System.out.println("Dependency Project Root: " + dependencyRoot);
+//        Path dependencyRoot = findDependencyProjectRoot();
+//        System.out.println("Dependency Project Root: " + dependencyRoot);
 
         // 2) Find parent project root
         //    Provide a default path and a few candidate paths.
@@ -235,9 +235,7 @@ public final class ProjectRootUtils {
                     try {
                         absolutePaths.add(Paths.get(ClassLoader.getSystemResource(uri.getSchemeSpecificPart()).toURI())
                                 .toAbsolutePath().toString());
-                    }
-                    catch (Exception e)
-                    {
+                    } catch (Exception e) {
                         // handle null value
                     }
 
