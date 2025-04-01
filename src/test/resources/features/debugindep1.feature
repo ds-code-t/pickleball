@@ -4,7 +4,7 @@ Feature: sdf
 #    * IF: ANY-HAS-VALUE: [0,0,0,0] THEN: I am running a testlzz 222zzaa\"aa and s
 
     * IF: ANY-HAS-VALUE: [0,0,0,0] THEN: I am running a testlzz 222zzaa\"aa and s
-    * go to previous: ".*\[0,0,0,0\].*"
+    * go to: ".*\[0,0,0,0\].*"
 
 #
 ##    * go to previous: ".*testlzz.*"
