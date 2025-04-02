@@ -9,6 +9,8 @@ import cucumber.api.java.en.Then;
 import cucumber.api.java.en.When;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
+import io.cucumber.java.Before;
+import io.cucumber.java.Scenario;
 import io.cucumber.java.en.Given;
 //import io.cucumber.java.en.Then;
 //import io.cucumber.java.en.When;
@@ -37,6 +39,14 @@ public class Debugzlib {
 //        System.out.println("DEBUG: STATIC! Given step executed");
 //    }
 
+//    @Before(order = 0)
+//    public void before() {
+//        System.out.println("@Before Scenario ");
+//    }
+
+//    public void before(Scenario scenario) {
+//        System.out.println("@Before Scenario: " + scenario);
+//    }
 
     @cucumber.api.java.en.Given("^DDDqq '(.*)' and '(.*)'$")
     @Given("^DDDqq '(.*)' and '(.*)'$")

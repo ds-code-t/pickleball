@@ -2,10 +2,8 @@ package io.pickleball.cacheandstate;
 
 import io.cucumber.core.backend.Status;
 import io.cucumber.core.eventbus.EventBus;
-import io.cucumber.core.runner.PickleStepTestStep;
-import io.cucumber.core.runner.Runner;
-import io.cucumber.core.runner.TestCase;
-import io.cucumber.core.runner.TestCaseState;
+import io.cucumber.core.runner.*;
+import io.pickleball.mapandStateutilities.LinkedMultiMap;
 import io.pickleball.valueresolution.ExpressionEvaluator;
 
 import java.lang.reflect.InvocationTargetException;
@@ -120,5 +118,9 @@ public class PrimaryScenarioData {
 
     public static ExpressionEvaluator getMvelWrapper() {
         return getState().mvelWrapper;
+    }
+
+    public static LinkedMultiMap<String, String> getPrimaryScenarioStateMap() {
+        return getPrimaryScenario().getStateMap();
     }
 }

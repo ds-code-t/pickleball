@@ -5,19 +5,20 @@ import io.cucumber.core.backend.Status;
 import io.cucumber.core.gherkin.messages.GherkinMessagesDataTableArgument;
 import io.cucumber.core.gherkin.messages.GherkinMessagesDocStringArgument;
 import io.cucumber.core.runner.ExecutionMode;
+import io.cucumber.core.runner.PickleStepDefinitionMatch;
 import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.core.stepexpression.DataTableArgument;
 import io.cucumber.core.stepexpression.DocStringArgument;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
-import io.cucumber.core.runner.PickleStepDefinitionMatch;
 import io.pickleball.annotations.NoEventEmission;
 import io.pickleball.logging.EventContainer;
+
 import java.util.*;
+
 import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
 
 public class StepContext {
-
 
 
     public boolean shouldUpdateStatus() {
@@ -48,7 +49,7 @@ public class StepContext {
 
     private boolean runNestedSteps = true;
 
-     public boolean shouldRunNestedSteps() {
+    public boolean shouldRunNestedSteps() {
         return runNestedSteps;
     }
 
@@ -71,8 +72,6 @@ public class StepContext {
 
     protected String runChildrenOverride = "";
     protected String runOverride = "";
-
-
 
 
     List<io.cucumber.plugin.event.Status> statuses = new ArrayList<>();
@@ -190,7 +189,6 @@ public class StepContext {
     public boolean shouldSendEnd() {
         return endEvent != null && (sendEvents || sendEnd);
     }
-
 
 
 }

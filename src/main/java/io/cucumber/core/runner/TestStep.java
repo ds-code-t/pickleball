@@ -34,6 +34,7 @@ import io.pickleball.cacheandstate.StepContext;
 import io.pickleball.exceptions.SoftFailureException;
 import io.pickleball.logging.EventContainer;
 
+import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -119,7 +120,7 @@ public abstract class TestStep extends StepContext implements io.cucumber.plugin
 
     private void emitTestStepStarted(TestCase testCase, EventBus bus, UUID textExecutionId, Instant startTime) {
         startEvent = new EventContainer(testCase, bus, textExecutionId, startTime, id, this);
-        GherkinMessagesStep s = ((GherkinMessagesStep) ((PickleStepTestStep) this).getStep());
+//        GherkinMessagesStep s = ((GherkinMessagesStep) ((PickleStepTestStep) this).getStep());
         if (shouldSendStart())
             sendStartEvent();
     }

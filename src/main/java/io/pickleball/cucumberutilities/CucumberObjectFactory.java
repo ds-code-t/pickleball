@@ -4,6 +4,7 @@ import io.cucumber.core.gherkin.messages.GherkinMessagesDataTableArgument;
 import io.cucumber.core.gherkin.messages.GherkinMessagesDocStringArgument;
 import io.cucumber.core.runner.AmbiguousStepDefinitionsException;
 import io.cucumber.core.runner.PickleStepTestStep;
+import io.cucumber.core.runner.TestStep;
 
 import java.net.URI;
 import java.util.Arrays;

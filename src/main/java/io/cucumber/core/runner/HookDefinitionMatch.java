@@ -28,8 +28,11 @@ import io.cucumber.core.backend.CucumberBackendException;
 import io.cucumber.core.backend.CucumberInvocationTargetException;
 import io.cucumber.core.backend.TestCaseState;
 import io.cucumber.core.exception.CucumberException;
+import io.cucumber.java.JavaStepDefinition;
+
 
 import static io.cucumber.core.runner.StackManipulation.removeFrameworkFrames;
+import static io.pickleball.cucumberutilities.AccessFunctions.safeCallMethod;
 
 final class HookDefinitionMatch implements StepDefinitionMatch {
 
