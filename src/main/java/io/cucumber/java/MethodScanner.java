@@ -138,13 +138,24 @@ final class MethodScanner {
         return (packageName.startsWith("io.cucumber.java.") || packageName.startsWith("cucumber.api.java."));
     }
 
+//    private static boolean isStepDefinitionAnnotation(Annotation annotation) {
+//       return isCucumberAnnotation(annotation);
+//    }
+//
+//    private static boolean isRepeatedStepDefinitionAnnotation(Annotation annotation) {
+//        return isCucumberAnnotation(annotation);
+//    }
+
     private static boolean isStepDefinitionAnnotation(Annotation annotation) {
-       return isCucumberAnnotation(annotation);
+        Class<? extends Annotation> annotationClass = annotation.annotationType();
+        return annotationClass.getAnnotation(StepDefinitionAnnotation.class) != null;
     }
 
     private static boolean isRepeatedStepDefinitionAnnotation(Annotation annotation) {
-        return isCucumberAnnotation(annotation);
+        Class<? extends Annotation> annotationClass = annotation.annotationType();
+        return annotationClass.getAnnotation(StepDefinitionAnnotations.class) != null;
     }
+
 
     private static Annotation[] repeatedAnnotations(Annotation annotation) {
         try {

@@ -5,8 +5,6 @@ package io.pickleball.stepdefs;
 //import io.cucumber.java.en.Then;
 //import io.cucumber.java.en.When;
 
-import cucumber.api.java.en.Then;
-import cucumber.api.java.en.When;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.java.Before;
@@ -16,6 +14,8 @@ import io.cucumber.java.en.Given;
 //import io.cucumber.java.en.When;
 
 //import cucumber.api.java.en.Given;
+import io.cucumber.java.en.Then;
+import io.cucumber.java.en.When;
 import io.pickleball.exceptions.SoftFailureException;
 //import io.cucumber.messages.types.DataTable;
 
@@ -48,7 +48,7 @@ public class Debugzlib {
 //        System.out.println("@Before Scenario: " + scenario);
 //    }
 
-    @cucumber.api.java.en.Given("^DDDqq '(.*)' and '(.*)'$")
+    @Given("^DDDqq '(.*)' and '(.*)'$")
     @Given("^DDDqq '(.*)' and '(.*)'$")
     public void DDDqq(String t1, String t2, DataTable dt) {
         System.out.println("With data Table: " + dt);

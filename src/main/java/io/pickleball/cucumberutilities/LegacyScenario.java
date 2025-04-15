@@ -1,15 +1,16 @@
 package io.pickleball.cucumberutilities;
 
 
+import cucumber.api.Result;
 import io.cucumber.java.Scenario;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-public class CustomScenario implements cucumber.api.scenario {
+public class LegacyScenario implements cucumber.api.Scenario {
     private final Scenario delegate;
 
-    public CustomScenario(Scenario scenario) {
+    public LegacyScenario(Scenario scenario) {
         this.delegate = scenario;
     }
 
