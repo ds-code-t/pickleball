@@ -1,7 +1,5 @@
 package io.pickleball.mapandStateutilities;
 
-import com.google.j2objc.annotations.OnDealloc;
-
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
@@ -9,8 +7,19 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static io.pickleball.mapandStateutilities.LinkedMultiMap.configFlag;
+
 public class MapsWrapper extends HashMap<String, Object> {
+    public static final String mapPriority = configFlag + "priority";
     final public List<Map<String, ?>> mapList;
+    private final LinkedMultiMap<String, Object> firstMap = new LinkedMultiMap<>();
+    private final LinkedMultiMap<String, Object> lastMap = new LinkedMultiMap<>();
+    ;
+
+//    private LinkedMultiMap<String, LinkedMultiMap<String, String>> keyedMaps = new LinkedMultiMap<>();
+//    private Map<String, LinkedMultiMap<String, String>> keyedMaps = new HashMap<>();
+//    private Map<String, Integer> keyCount = new HashMap<>();
+
 
     private static final AtomicInteger instanceCounter = new AtomicInteger(0);
 
@@ -18,13 +27,19 @@ public class MapsWrapper extends HashMap<String, Object> {
     public MapsWrapper(Map<String, ?>... maps) {
         mapList = Arrays.stream(maps).filter(Objects::nonNull)
                 .collect(Collectors.toList());
+        mapList.add(0, firstMap);
+        mapList.add(lastMap);
         instanceCounter.incrementAndGet();
+        sortMaps();
     }
 
     public MapsWrapper(List<? extends Map<String, ?>> maps) {
         mapList = maps.stream().filter(Objects::nonNull)
                 .collect(Collectors.toList());
+        mapList.add(0, firstMap);
+        mapList.add(lastMap);
         instanceCounter.incrementAndGet();
+        sortMaps();
     }
 
 
@@ -33,8 +48,52 @@ public class MapsWrapper extends HashMap<String, Object> {
         Arrays.stream(maps)
                 .filter(Objects::nonNull)
                 .forEach(mapList::add);
+        sortMaps();
     }
 
+    public final void addMapList(List<LinkedMultiMap<String, Object>> maps) {
+        maps.stream()
+                .filter(Objects::nonNull)
+                .forEach(mapList::add);
+        sortMaps();
+    }
+
+
+    public void sortMaps(){
+        Collections.sort(mapList, (map1, map2) -> {
+            int p1 = map1.containsKey(mapPriority) ? Integer.parseInt(map1.get(mapPriority).toString()) : 0;
+            int p2 = map2.containsKey(mapPriority) ? Integer.parseInt(map2.get(mapPriority).toString()) : 0;
+            return Integer.compare(p1, p2);
+        });
+    }
+
+    @SafeVarargs
+    public final MapsWrapper createNewMapWrapper(Map<String, ?>... maps) {
+        System.out.println("@@MAPSLIST:: " + Arrays.asList(maps));
+        return new MapsWrapper(Stream.concat(Arrays.stream(maps), mapList.stream()).toList());
+    }
+
+
+    public final List<LinkedMultiMap<String, String>> getMapsWithKey(String key) {
+        try {
+            return (List<LinkedMultiMap<String, String>>) firstMap.get(key);
+        }
+        catch (Exception e)
+        {
+            System.out.println("failed to retrieve map with " + key + ". " +e.getMessage());
+        }
+        return null;
+    }
+
+    public final void addMapsWithKey(String key, List<LinkedMultiMap<String, Object>> maps) {
+        firstMap.removeFromLinkedListMultimap(key);
+        for (LinkedMultiMap<String, Object> map : maps) {
+            {
+                firstMap.addToLinkedListMultimap(key, map);
+            }
+        }
+        sortMaps();
+    }
 
     @Override
     public String get(Object key) {
@@ -51,6 +110,7 @@ public class MapsWrapper extends HashMap<String, Object> {
 
 
         for (Map<?, ?> map : mapList) {
+            System.out.println("@@map: " + map);
             value = map.get(stringKey);
             if (value != null) {
                 String stringValue = value.toString();
@@ -61,21 +121,25 @@ public class MapsWrapper extends HashMap<String, Object> {
                     return stringValue;
             }
         }
+
         if (stringKey.startsWith("?"))
             return "";
         return null;
     }
 
-    @Override
-    public Object getOrDefault(Object key, Object defaultValue) {
+        @Override
+        public Object getOrDefault(Object key, Object defaultValue) {
         String returnString = get(key);
         if (returnString == null)
             return defaultValue;
         return returnString;
-    }
+        }
 
 
-    @Override
+
+
+
+        @Override
     public String toString() {
         // Create a new map to hold the combined results
 //        List<Map<String, Object>> combinedMap = new ArrayList<>();
@@ -100,7 +164,7 @@ public class MapsWrapper extends HashMap<String, Object> {
      * @param value     The value to associate with the modified key
      * @return The modified key that was actually used to store the value
      */
-    public String addWithUniqueKey( String keyString,Object value ) {
+    public String addWithUniqueKey(String keyString, Object value) {
         // Get current counter value for this key or 0 if it doesn't exist
 
 //        System.out.println("## keyString ) : " + keyString);
@@ -156,13 +220,14 @@ public class MapsWrapper extends HashMap<String, Object> {
                 String matchString = matcher.group();
                 matchesFound = true;
 
-                String value = (valuePattern == null) ?  matchString :  matchString.replaceAll(regex.pattern(),valuePattern);
+                String value = (valuePattern == null) ? matchString : matchString.replaceAll(regex.pattern(), valuePattern);
 
                 // Store the match and get the unique key
                 String uniqueKey = addWithUniqueKey(keyTemplate, value);
                 // Use replacementTemplate if provided, otherwise use unique key directly
 
-                String replacementString = replacementTemplate == null ? uniqueKey :  String.format(replacementTemplate, uniqueKey);;
+                String replacementString = replacementTemplate == null ? uniqueKey : String.format(replacementTemplate, uniqueKey);
+                ;
 
                 matcher.appendReplacement(sb, replacementString);
 

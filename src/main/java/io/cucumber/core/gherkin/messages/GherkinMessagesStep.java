@@ -103,6 +103,8 @@ public final class GherkinMessagesStep implements Step {
             Location location,
             String keyword
     ) {
+        System.out.println("@@GherkinMessagesStep:( " + pickleStep.getText());
+        System.out.println("@@GherkinMessagesStep getKeyword: " + pickleStep.getStepTemplate().getKeyword());
         this.pickleStep = pickleStep;
         this.argument = extractArgument(pickleStep, location);
         this.keyWord = keyword;
@@ -187,11 +189,13 @@ public final class GherkinMessagesStep implements Step {
 
     @Override
     public String getText() {
-        if (runTimeText == null)
-            return pickleStep.getText();
-        return runTimeText;
+        System.out.println("@@runTimeText:::: "+ runTimeText);
+        System.out.println("@@pickleStep.getText():::: "+ pickleStep.getText());
+//        if (runTimeText == null)
+//            return pickleStep.getText();
+//        return runTimeText;
 
-//        return pickleStep.getText();
+        return pickleStep.getText();
     }
 
 
@@ -199,19 +203,22 @@ public final class GherkinMessagesStep implements Step {
 
 
     public void copyTemplateParameters(GherkinMessagesStep templateStep) {
+        System.out.println("@@copyTemplateParameters");
         runFlag = templateStep.runFlag;
         colonNesting = templateStep.colonNesting;
         keyWord = templateStep.keyWord;
+        System.out.println("@@runTimeText:& " + runTimeText);
+        System.out.println("@@templateStep.runTimeText:& " + templateStep.runTimeText);
         runTimeText = templateStep.runTimeText;
         flagList = templateStep.flagList;
     }
 
 
     //    public static final String POST_SCENARIO_STEPS = "@POST-SCENARIO-STEPS:";
-    public static final String END_SCENARIO = "@END-SCENARIO:";
-    public static final String FAIL_SCENARIO = "@FAIL-SCENARIO:";
-    public static final String END_TEST = "@END-TEST:";
-    public static final String FAIL_TEST = "@FAIL-TEST:";
+    public static final String END_SCENARIO = "@END_SCENARIO:";
+    public static final String FAIL_SCENARIO = "@FAIL_SCENARIO:";
+    public static final String END_TEST = "@END_TEST:";
+    public static final String FAIL_TEST = "@FAIL_TEST:";
 
 
     public static final String RUN_ON_PASS = "@RUN_ON_PASS:";
@@ -221,6 +228,7 @@ public final class GherkinMessagesStep implements Step {
 
     public static final String RUN_ALWAYS = "@RUN_ALWAYS:";
     public static final String RUN_IF = "@RUN_IF:";
+    public static final String RUN = "@RUN:";
     public static final String IFSuffix = "_IF:";
 
 
@@ -236,7 +244,8 @@ public final class GherkinMessagesStep implements Step {
     public int parseRunTimeParameters() {
         return parseRunTimeParameters(getKeyWord() + " " + getText());
     }
-//    @RUN-ALWAYS:
+
+    //    @RUN-ALWAYS:
     final Pattern runFlagCheck = Pattern.compile("@RUN(?:_[^:]+)?:");
 
     public String getRunFlag() {
@@ -258,19 +267,23 @@ public final class GherkinMessagesStep implements Step {
     public static Pattern bookmarksPattern = Pattern.compile("&\\S+\\s");
 
     public int parseRunTimeParameters(String initialText) {
-        System.out.println("Parsing Step: " + initialText);
+        System.out.println("@@@@Parsing Step: " + initialText);
+        if(initialText.equals(": I am running a testlzz 2-<AA> and 2-<BB>")) {
+            new Exception().printStackTrace();
+        }
         Pattern pattern = Pattern.compile("^(?<colons>(?:\\s*:)*)\\s*(?<flags>@\\S*\\s+)*(?:(?<keyWord>[^@\\s]+\\s+)(?<stepText>.*))?$");
 
         Matcher matcher = pattern.matcher(initialText);
 
         if (matcher.find()) {
             runTimeText = matcher.group("stepText");
+            System.out.println("\n--\n@@runTimeText$$: " + runTimeText);
             colonNesting = Optional.ofNullable(matcher.group("colons"))
                     .map(s -> s.replaceAll("\\s+", "").length())
                     .orElse(0);
             keyWord = matcher.group("keyWord");
-            keyWord = "\u2003".repeat(colonNesting) + (keyWord == null ? "* " :keyWord.strip()) + " ";
-
+            keyWord = "\u2003".repeat(colonNesting) + (keyWord == null ? "* " : keyWord.strip()) + " ";
+            System.out.println("@@keyWord: " + keyWord);
             String flagString = matcher.group("flags");
             if (flagString != null && flagString.contains("@RUN")) {
                 List<String> runFlagMatches = new ArrayList<>();
@@ -278,24 +291,31 @@ public final class GherkinMessagesStep implements Step {
                 while (runFlagMatcher.find()) {
                     runFlagMatches.add(runFlagMatcher.group());
                 }
+                System.out.println("@@runFlagMatches: "+ runFlagMatches);
                 if (runFlagMatches.size() > 1) {
                     String matchList = runFlagMatches.stream().collect(Collectors.joining(", "));
                     throw new PickleballException("Step cannot have more than one RUN flag: " + matchList);
                 } else if (runFlagMatches.size() == 1) {
                     runFlag = runFlagMatches.get(0);
                     if (runTimeText.isEmpty()) {
+                        System.out.println("@@RUN_IF 1 - ");
                         if (runFlag.equals(RUN_ALWAYS))
                             runTimeText = "IF: true ";
                         else if (runFlag.contains(RUN_IF))
                             runTimeText = "IF: false ";
-                    } else if (runFlag.contains(RUN_IF) && !runTimeText.startsWith("IF:")) {
-                        runTimeText = "IF: " + runTimeText;
                     }
-
+//                    else if (runFlag.contains(RUN_IF) && !runTimeText.startsWith("IF:")) {
+//                        System.out.println("@@RUN_IF 2 - ");
+//                        runTimeText = "IF: " + runTimeText;
+//                    }
+                    System.out.println("@@RUN_IF 3 - " + runTimeText);
                     if (runFlag.endsWith(IFSuffix)) {
                         runFlag = runFlag.replace(IFSuffix, ":");
-                        runTimeText = "IF: " + runTimeText;
+                        if (!runTimeText.startsWith("IF:"))
+                            runTimeText = "IF: " + runTimeText;
+                        System.out.println("@@RUN_IF 4 - " + runTimeText);
                     }
+                    System.out.println("@@RUN_IF 5 - " + runTimeText);
 
                 }
             }
@@ -303,16 +323,15 @@ public final class GherkinMessagesStep implements Step {
             if (flagString != null)
                 flagList = List.of(flagString.split("\\s+"));
 
-            if(flagList != null && flagList.contains(BOOKMARKS))
-            {
+            if (flagList != null && flagList.contains(BOOKMARKS)) {
                 runTimeText = BOOKMARKS + runTimeText.replace("|", " ") + " ";
                 Matcher bookmarksMatcher = bookmarksPattern.matcher(runTimeText);
                 while (bookmarksMatcher.find()) {
                     bookmarksList.add(bookmarksMatcher.group().strip());
                 }
             }
-        }
 
+        }
 
 
         if (flagList != null && runFlag.isEmpty()) {
@@ -326,8 +345,10 @@ public final class GherkinMessagesStep implements Step {
                 runTimeText = "@Terminate:" + FAIL_TEST + ",,,," + runTimeText;
         }
 
-        if(!runFlag.isEmpty())
+        if (!runFlag.isEmpty())
             setTextSuffix(" - " + runFlag);
+
+
 
         return colonNesting;
 

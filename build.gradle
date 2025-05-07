@@ -153,6 +153,7 @@ ext {
 }
 
 dependencies {
+    implementation("org.seleniumhq.selenium:selenium-java:4.31.0")
     implementation platform('org.junit:junit-bom:5.11.2')
     implementation platform('com.fasterxml.jackson:jackson-bom:2.18.2')
 

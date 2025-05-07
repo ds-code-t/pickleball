@@ -1083,6 +1083,7 @@ public class DataTable {
     /** Factory method: Create DataTable from GherkinMessagesDataTableArgument.
             */
     public static DataTable from(GherkinMessagesDataTableArgument gherkinTable) {
+        System.out.println("@@gherkinTable.cells(): " + gherkinTable.cells());
         return new DataTable(gherkinTable.cells(), new NoConverterDefined());
     }
 
@@ -1241,6 +1242,10 @@ public class DataTable {
         return asLinkedMultiMaps(String.class, Object.class);
     }
 
+    public List<LinkedMultiMap<String , String>> asLinkedStringMultiMaps() {
+        return asLinkedMultiMaps(String.class, String.class);
+    }
+
     public <K, V> List<LinkedMultiMap<K, V>> asLinkedMultiMaps(Class<K> keyType, Class<V> valueType) {
         List<List<String>> rows = this.cells(); // Use existing cells() method
 
@@ -1257,6 +1262,10 @@ public class DataTable {
             for (int i = 0; i < row.size(); i++) {
                 values.add(convertValue((String) row.get(i), valueType));
             }
+
+            System.out.println("@@keys::: "+ keys);
+            System.out.println("@@values::: "+ values);
+            System.out.println("@@LinkedMultiMap<>(keys, values) "+ (new LinkedMultiMap<>(keys, values)));
             linkedMultiMaps.add(new LinkedMultiMap<>(keys, values));
         }
 
@@ -1273,6 +1282,8 @@ public class DataTable {
             return (T) Double.valueOf(value);
         } else if (targetType == Boolean.class) {
             return (T) Boolean.valueOf(value);
+        } else if (targetType == Object.class) {
+            return (T) value;
         } else {
             throw new IllegalArgumentException("Unsupported conversion to type: " + targetType);
         }

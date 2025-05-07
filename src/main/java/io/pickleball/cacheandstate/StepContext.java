@@ -13,13 +13,69 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.pickleball.annotations.NoEventEmission;
 import io.pickleball.logging.EventContainer;
+import io.pickleball.mapandStateutilities.LinkedMultiMap;
+import io.pickleball.mapandStateutilities.MapsWrapper;
 
 import java.util.*;
+import java.util.stream.Stream;
 
 import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
+import static io.pickleball.mapandStateutilities.MapsWrapper.mapPriority;
 
 public class StepContext {
 
+
+
+//    public int getTableRowCounter() {
+//        return tableRowCounter;
+//    }
+//
+//    public void setTableRowCounter(int tableRowCounter) {
+//        this.tableRowCounter = tableRowCounter;
+//    }
+//
+//    int tableRowCounter = 0;
+
+    public LinkedMultiMap<String, Object> getStepMap() {
+        return stepMap;
+    }
+
+    public void saveToStepMap(String key, Object map) {
+        stepMap.put(key, map);
+    }
+
+//    public void setStepMap(LinkedMultiMap<String, String> stepMap) {
+//        this.stepMap = stepMap;
+//    }
+
+    private final LinkedMultiMap<String, Object> stepMap = new LinkedMultiMap<String, Object>();
+
+    public final MapsWrapper stepMapWrapper = new MapsWrapper();
+
+    private List<LinkedMultiMap<String, Object>> inheritedMaps = new ArrayList<>();
+
+    public List<LinkedMultiMap<String, Object>> getAllStepMaps() {
+        return Stream.concat(Stream.of(stepMap), inheritedMaps.stream()).toList();
+    }
+
+    public List<LinkedMultiMap<String, Object>> getInheritedMaps() {
+        return inheritedMaps;
+    }
+
+    public void setInheritedMaps(List<LinkedMultiMap<String, Object>> inheritedMaps) {
+        stepMapWrapper.addMapList(inheritedMaps);
+        this.inheritedMaps = inheritedMaps;
+    }
+
+
+    public void addInheritedMaps(LinkedMultiMap<String, Object>... inheritedMaps) {
+        for (LinkedMultiMap<String, Object> inheritedMap : inheritedMaps) {
+            if (inheritedMap != null) {
+                this.inheritedMaps.add(inheritedMap);
+                stepMapWrapper.addMaps(inheritedMap);
+            }
+        }
+    }
 
     public boolean shouldUpdateStatus() {
         return updateStatus;
@@ -108,6 +164,8 @@ public class StepContext {
     ) {
         this.id = id;
         this.pickleStepDefinitionMatch = pickleStepDefinitionMatch;
+        this.stepMap.put(mapPriority, -1);
+        this.stepMapWrapper.addMaps(stepMap);
     }
 
     protected StepWrapper stepWrapper;

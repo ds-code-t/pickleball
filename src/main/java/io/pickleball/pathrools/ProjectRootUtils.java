@@ -22,7 +22,6 @@ import static io.pickleball.cacheandstate.GlobalCache.getGlobalRuntime;
 
 public final class ProjectRootUtils {
 
-    //    public static final Path dependencyRoot = findDependencyProjectRoot();
     private static Path projectRoot;
 
     public static Path getMainResources() {
@@ -51,7 +50,6 @@ public final class ProjectRootUtils {
             if (runnerOptions instanceof RuntimeOptions) {
                 paths.addAll(convertGluePathsToAbsoluteStrings(((RuntimeOptions) runnerOptions).getFeaturePaths()));
             }
-//            projectRoot = findParentProjectRoot(dependencyRoot.toString(), paths);
             projectRoot = findParentProjectRoot(null, paths);
             mainResources = projectRoot.resolve("src/main/resources");
             configPaths = projectRoot.resolve("src/main/resources/configs");

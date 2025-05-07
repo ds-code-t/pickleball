@@ -14,7 +14,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static io.cucumber.core.gherkin.messages.GherkinMessagesStep.bookmarksPattern;
+import static io.pickleball.cacheandstate.GlobalCache.getGlobalConfigs;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
+import static io.pickleball.cacheandstate.StepWrapper.TABLE_ROW_LOOP;
 import static io.pickleball.cucumberutilities.ArgumentParsing.convertCommandLineToArgv;
 import static io.pickleball.cucumberutilities.ArgumentParsing.convertHashMapToArgv;
 import static io.pickleball.cucumberutilities.GeneralUtilities.waitTime;
@@ -29,6 +31,9 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
     protected final List<StepWrapper> allSteps = new ArrayList<>();
     protected final Map<Object, List<Integer>> indexMap = new HashMap<>();
     protected List<Integer> indexList;
+
+    public static final Pattern KEYED_TABLE_Regex = Pattern.compile("^\"([A-Za-z0-9_-]+)\"\\s+TABLE$");
+
 
     public void setCurrentWrapperNum(int currentWrapperNum) {
         this.currentWrapperNum = currentWrapperNum;
@@ -143,49 +148,6 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
     }
 
 
-//    public Pattern getGoToNextStepRegex() {
-//        return goToNextStepRegex;
-//    }
-//
-//    public void setGoToNextStepRegex(String goToNextStepRegex) {
-//        if (goToNextStepRegex == null)
-//            this.goToNextStepRegex = null;
-//        else
-//            this.goToNextStepRegex = Pattern.compile(goToNextStepRegex);
-//    }
-//
-//    Pattern goToNextStepRegex = null;
-
-
-//    public Pattern getGoToPreviousStepRegex() {
-//        return goToPreviousStepRegex;
-//    }
-//
-//    public void setGoToPreviousStepRegex(String goToPreviousStepRegex) {
-//        if (goToPreviousStepRegex == null)
-//            this.goToPreviousStepRegex = null;
-//        else
-//            this.goToPreviousStepRegex = Pattern.compile(goToPreviousStepRegex);
-//    }
-//
-//    Pattern goToPreviousStepRegex = null;
-
-//    RunStatus runStatus = RunStatus.CHECKING;
-//    RunStatus lastRunStatus = RunStatus.CHECKING;
-
-
-//    public int nestLevel = 0;
-
-//    Map<Integer, RunStatus> runStates = new HashMap<>();
-//
-//    public RunStatus getRunStatus() {
-//        return runStates.getOrDefault(nestLevel, RunStatus.CHECKING);
-//    }
-//
-//    public void setRunStatus(RunStatus runStatus) {
-//        runStates.put(nestLevel, runStatus);
-//    }
-
 
     public boolean isForceComplete() {
         return forceComplete;
@@ -216,12 +178,20 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         return stateMap;
     }
 
+//    private final LinkedMultiMap<String, String> firstMap;
+//    private final LinkedMultiMap<String, String> lastMap;
+
     private final LinkedMultiMap<String, String> passedMap;
     private final LinkedMultiMap<String, String> examplesMap;
 
     public final LinkedMultiMap<String, String> stateMap = new LinkedMultiMap<>();
 
     public final MapsWrapper runMaps;
+
+    public static MapsWrapper getRunMaps() {
+        return getCurrentScenario().runMaps;
+    }
+
     public MapsWrapper configMaps;
 
     public ScenarioContext(UUID id, GherkinMessagesPickle pickle, Runner runner, LinkedMultiMap<String, String> passedMap) {
@@ -229,6 +199,8 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         this.pickle = pickle;
         this.passedMap = passedMap;
         this.runner = runner;
+//        this.firstMap = new LinkedMultiMap<>();
+//        this.lastMap = new LinkedMultiMap<>();
 
 
         TableRow valuesRow = pickle.getMessagePickle().getValueRow();
@@ -241,7 +213,61 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
             examplesMap = null;
         }
         runMaps = new MapsWrapper(this.passedMap, this.examplesMap, this.stateMap);
-//        runMaps = new MapsWrapper(this.passedMap, this.examplesMap, this.stateMap, getGlobalConfigs());
+//        runMaps = new MapsWrapper(this.firstMap , this.passedMap, this.examplesMap, this.stateMap, getGlobalConfigs(), this.lastMap);
+
+
+    }
+
+
+    public void preprocessSteps(TestCase testCase, List<PickleStepTestStep> testSteps) {
+        Map<Integer, StepWrapper> nestingMap = new HashMap<>();
+
+        for (PickleStepTestStep templateStep : testSteps) {
+//            templateStep.setScenarioContext(this);
+            StepWrapper stepWrapper = new StepWrapper(templateStep, testCase, allSteps.size());
+            System.out.println("\n---\n@@stepWrapper: " + stepWrapper.getRunTimeText());
+//            int nestingLevel = stepWrapper.getGherkinMessagesStep().parseRunTimeParameters();
+            int nestingLevel = stepWrapper.getNestingLevel();
+            StepWrapper previousStepInTheSameLevel = nestingMap.get(nestingLevel);
+            System.out.println("@@nestingLevel: " + nestingLevel);
+
+            String runTimeText = stepWrapper.getRunTimeText();
+
+            if (runTimeText.startsWith(TABLE_ROW_LOOP)) {
+                String tableKey = previousStepInTheSameLevel.stepWrapperKey;
+                List<LinkedMultiMap<String, Object>> maps = stepWrapper.getDataTable().asLinkedMultiMaps();
+                System.out.println("@@@##maps: " + maps);
+//                getRunMaps().addMapsWithKey(tableKey, maps);
+                previousStepInTheSameLevel.tableMaps.addAll(maps);
+                continue;
+            }
+
+            Matcher keyedTableMatcher = KEYED_TABLE_Regex.matcher(runTimeText);
+            if (keyedTableMatcher.find()) {
+                String tableKey = keyedTableMatcher.group(1);
+                List<LinkedMultiMap<String, Object>> maps = stepWrapper.getDataTable().asLinkedMultiMaps();
+//                getRunMaps().addMapsWithKey(tableKey, maps);
+                continue;
+            }
+
+            if (nestingLevel == 0)
+                topLevelSteps.add(stepWrapper);
+            else {
+                StepWrapper parentNesting = nestingMap.get(nestingLevel - 1);
+                System.out.println("@@parentNesting: " + parentNesting);
+                if (parentNesting == null)
+                    throw new RuntimeException(":".repeat(nestingLevel) + " incorrect nesting level for step '" + templateStep.getStepText() + "' line: " + testCase.getLine());
+                System.out.println("@@parentNesting.getRunTimeText: " + parentNesting.getRunTimeText());
+
+                parentNesting.addNestedChildStep(stepWrapper);
+                System.out.println("@@parentNesting.size: " + parentNesting.getNestedChildSteps().size());
+            }
+
+            nestingMap.put(nestingLevel, stepWrapper);
+            allSteps.add(stepWrapper);
+        }
+
+
     }
 
     public Object replaceAndEval(String inputString) {

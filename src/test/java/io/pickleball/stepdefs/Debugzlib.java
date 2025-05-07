@@ -51,6 +51,7 @@ public class Debugzlib {
     @Given("^DDDqq '(.*)' and '(.*)'$")
     @Given("^DDDqq '(.*)' and '(.*)'$")
     public void DDDqq(String t1, String t2, DataTable dt) {
+        waitTime(300L);
         System.out.println("With data Table: " + dt);
     }
 
@@ -88,6 +89,8 @@ public class Debugzlib {
         if (t1.contains("%"))
             System.out.println("!%STEP: " + t1);
         System.out.println("DdataTable " + dataTable);
+//        System.out.println("DdataTable.asMaps: " + dataTable.asMaps());
+        System.out.println("DdataTable.asLinkedMultiMaps: " + dataTable.asLinkedMultiMaps());
         System.out.println("DEBUG: start " + t1 + "  --- " + t2);
 //        waitTime(800L);
         if (t1.contains("ERROR"))

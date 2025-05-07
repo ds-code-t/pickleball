@@ -1,5 +1,65 @@
 Feature: sdf
 
+  Scenario: ssdasdQQss3
+    Given I am running a testlzz 1-<AA> and 1-<BB>
+    : Given I am running a testlzz 2-<AA> and 2-<BB>
+    * -TABLE-ROW-LOOP-
+    | AA | BB |
+    | 11 | 22  |
+
+
+
+
+  Scenario: ssdasdQQdfd
+    Given I am running a testlzz <AA> and <BB>
+      | AA | BB |
+      | 11 | 22  |
+
+
+  @qqqq1
+  Scenario: ASDdddghdf5ssff
+
+
+#  @RUN_IF: * false
+  @RUN_IF: * true
+  :  Given I am running a testlzz z and 1qq
+  ::  Given I am running a testlzz <arg1> and 2
+
+    Given I am running a testlzz a and 9
+
+  @RUN_ALWAYS: Given I am running a testlzz Always and ALWAYS
+
+    Then I am running a testlzz after fail and last
+
+
+
+  @qqqq1
+  Scenario: ASDdddghdf5
+#    * baa
+#  @RUN_ALWAYS: Given I am running a testlzz Always and ALWAYS
+#    Given I am running a testlzz a and 9
+#  @RUN_ON_FAIL: Then I am running a testlzz after fail and beforeE
+#
+#  @RUN_ALWAYS: Given I am running a testlzz Always and ALWAYS
+
+  @RUN_IF: * false
+  :  Given I am running a testlzz z and 1qq
+  ::  Given I am running a testlzz <arg1> and 2
+
+    Given I am running a testlzz a and 9
+
+  @RUN_ALWAYS: Given I am running a testlzz Always and ALWAYS
+
+
+  @RUN_ALWAYS: Given I am running a testlzz Always and ALWAYS
+#  @RUN_ON_PASS: Then I am running a testlzz after fail and RUN_ON_PASS
+#  @RUN_ON_FAIL: Then I am running a testlzz after fail and RUN_ON_FAIL
+
+    Then I am running a testlzz after fail and last
+
+  @RUN_ON_PASS: Then I am running a testlzz after fail and RUN_ON_PASS
+
+
   Scenario: prec test 6
 #    * IF: ANY-HAS-VALUE: [0,0,0,0] THEN: I am running a testlzz 222zzaa\"aa and s
 
@@ -166,9 +226,22 @@ Feature: sdf
 #  @RUN_ON_PASS: Then I am running a testlzz z and RUN_ON_PASS
 
 
+
+  @qqqq1
+  Scenario: ASDaaafg
+    * baa
+  :  Given I am running a testlzz z and 1qq
+  ::  Given I am running a testlzz <arg1> and 2
+  :::  Given I am running a testlzz <arg1> and 3
+  ::::  Given I am running a testlzz <arg1> and 4
+
+
   @qqqq1
   Scenario: ASD
     * baa
+  @RUN_ALWAYS: Given I am running a testlzz Always and ALWAYS
+
+
 #   * IF: SC THEN: dd ELSE: s
 #    Given I am running a testlzz <arg1> and aaaaa
 #    * IF: SCENARIO PASSING THEN: I am running a testlzz aaaa and s ELSE-IF: 45>7 THEN: I am running a testlzz bbbb and s ELSE: I am running a testlzz ccccc and s
@@ -205,10 +278,13 @@ Feature: sdf
 #   * IF: 6>11 THEN: When I am running a testlzz %runif and s
 #  @RUN_ALWAYS: When 66>112 THEN: When I am running a testlzz %runif and s
   @RUN_ON_FAIL: Then I am running a testlzz after fail and beforeE
+
+  @RUN_ALWAYS: Given I am running a testlzz Always and ALWAYS
+
 #    Given I am running a testlzz ERROR and 2
-  :  Given I am running a testlzz afterER and 1
+#  :  Given I am running a testlzz afterER and 1
   @RUN_IF: * false
-  :  Given I am running a testlzz z and 1
+  :  Given I am running a testlzz z and 1qq
   ::  Given I am running a testlzz <arg1> and 2
   :::  Given I am running a testlzz <arg1> and 3
   ::::  Given I am running a testlzz <arg1> and 4
@@ -217,8 +293,13 @@ Feature: sdf
 #  :::::::  Given I am running a testlzz <arg1> and 7
 #  ::::::::  Given I am running a testlzz <arg1> and 8
 
+  @RUN_ALWAYS: Given I am running a testlzz Always and ALWAYS
 
     Given I am running a testlzz a and 9
+
+  @RUN_ALWAYS: Given I am running a testlzz Always and ALWAYS
+
+
   @RUN_ALWAYS: Given I am running a testlzz Always and ALWAYS
   @RUN_ON_PASS: Then I am running a testlzz after fail and RUN_ON_PASS
   @RUN_ON_FAIL: Then I am running a testlzz after fail and RUN_ON_FAIL
