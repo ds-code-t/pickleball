@@ -8,10 +8,7 @@ import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
 
 import java.io.File;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static io.pickleball.configs.Constants.sFlag2;
 import static io.pickleball.datafunctions.FileAndDataParsing.*;
@@ -33,15 +30,12 @@ public class LinkedMultiMap<K, V> extends HashMap<K, V> {
     @SuppressWarnings("unchecked")
     public LinkedMultiMap(File... filesOrDirs) {
         for(File file: filesOrDirs){
-            System.out.println("@@file.getName(): " + file.getName());
             put((K) file.getName(), (V) buildJsonFromPath(file));
         }
     }
 
     public LinkedMultiMap(List<K> keys, List<V> values) {
         for (int n = 0; n < keys.size(); n++) {
-            System.out.println("@@#key#" + n + " : "+ keys.get(n));
-            System.out.println("@@#value#" + n + " : "+ values.get(n));
             put(keys.get(n), values.get(n));
         }
     }
@@ -81,7 +75,6 @@ public class LinkedMultiMap<K, V> extends HashMap<K, V> {
     @SuppressWarnings("unchecked")
     @Override
     public V put(K key, V value) {
-        System.out.println("@@---put :: " +key + " ; " + value);
         String sKey = String.valueOf(key);
         if(sKey.startsWith(configFlag))
         {
@@ -100,38 +93,40 @@ public class LinkedMultiMap<K, V> extends HashMap<K, V> {
             node = JSON_MAPPER.valueToTree(numberedKey);
             arrayNode.add(node);
         }
-        mapNode.set(sKey, node);
-        multimap.put(sKey, value);
-        System.out.println("@@---mapNode :: " +mapNode);
-        System.out.println("@@---multimap :: " +multimap);
+        String nodeKey = sKey.replaceAll("\\s+", "_");
+        mapNode.set(nodeKey, node);
+        multimap.put(nodeKey, value);
         return super.put((K) numberedKey, value);
+    }
+
+    @Override
+    public V getOrDefault(Object key, V defaultValue) {
+        V returnObj = get(key);
+        if(returnObj == null)
+            return defaultValue;
+        return returnObj;
     }
 
 
     @SuppressWarnings("unchecked")
     @Override
     public V get(Object key) {
-        System.out.println("@@---mapNode get: :: " +mapNode);
-        System.out.println("@@---multimap get: :: " +multimap);
+        System.out.println("@@getOverRide: " + key);
         String sKey = String.valueOf(key);
         Object returnVal = super.get(key);
-        System.out.println("@@returnVal: " + returnVal);
         if (returnVal != null)
             return (V) returnVal;
         List<Object> returnList = multimap.get(sKey);
-        System.out.println("@@returnList: " + returnList);
-        if (!returnList.isEmpty())
-            System.out.println("@@returnList.get(returnList.size() - 1): " + returnList.get(returnList.size() - 1));
 
+
+        String nodeKey = sKey.replaceAll("\\s+", "_");
         if (!returnList.isEmpty())
             return (V) returnList.get(returnList.size() - 1);
-        returnVal = getLastVal(multiMapNode, sKey);
-        System.out.println("@@returnVal2: " + returnVal);
+        returnVal = getLastVal(multiMapNode, nodeKey);
 
         if (returnVal != null)
             return (V) returnVal;
-        System.out.println("@@getLastVal(mapNode, sKey): " + getLastVal(mapNode, sKey));
-        return (V) getLastVal(mapNode, sKey);
+        return (V) getLastVal(mapNode, nodeKey);
     }
 
 

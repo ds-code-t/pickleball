@@ -5,18 +5,58 @@ import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import com.jayway.jsonpath.Configuration;
 import com.jayway.jsonpath.Option;
 import com.jayway.jsonpath.spi.json.JacksonJsonNodeJsonProvider;
 import com.jayway.jsonpath.spi.mapper.JacksonMappingProvider;
+import io.pickleball.cacheandstate.GlobalCache;
+import io.pickleball.exceptions.PickleballException;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
 public class FileAndDataParsing {
+
+
+
+    public class FileReader {
+        public static ObjectNode readFile(String path) throws PickleballException {
+            try {
+                ObjectMapper mapper;
+                String lowerPath = path.toLowerCase();
+                if (lowerPath.endsWith(".yaml") || lowerPath.endsWith(".yml")) {
+                    mapper = new ObjectMapper(new YAMLFactory());
+                } else if (lowerPath.endsWith(".json")) {
+                    mapper = new ObjectMapper();
+                } else if (lowerPath.endsWith(".xml")) {
+                    mapper = new XmlMapper();
+                } else {
+                    throw new PickleballException("Unsupported file extension for path: " + path);
+                }
+                return (ObjectNode) mapper.readTree(
+                        FileReader.class.getClassLoader().getResourceAsStream(path)
+                );
+            } catch (IOException e) {
+                throw new PickleballException("Failed to read file at resources path '" + path + "': " + e.getMessage());
+            }
+        }
+    }
+
+    public static File getFile(String path)  {
+        URL resourceUrl = GlobalCache.class.getClassLoader().getResource(path);
+        try {
+            return new File(resourceUrl.toURI());
+        } catch (URISyntaxException e) {
+            throw new PickleballException("Failed to read file at resources path '" +path + "' , " + e.getMessage());
+        }
+    }
+
 
     public static JsonNode buildJsonFromPath(File fileOrDir) {
         if (fileOrDir.isFile()) {

@@ -16,7 +16,15 @@
 //
 //import static io.pickleball.cucumberutilities.GeneralUtilities.waitTime;
 //
-//public class Debugzlib {
+//public class Debugzlibm1 {
+//
+//
+//    @Given("^DDDqq '(.*)' and '(.*)'$")
+//    @Given("^DDDqq '(.*)' and '(.*)'$")
+//    public void DDDqq(String t1, String t2, DataTable dt) {
+//        waitTime(300L);
+//        System.out.println("With data Table: " + dt);
+//    }
 //
 ////    public Debugzlib(){
 ////        System.out.println("@@DebugSteps2");
@@ -32,10 +40,10 @@
 ////        System.out.println("DEBUG: STATIC! Given step executed");
 ////    }
 //
-//    @Given("^DDDqq '(.*)' and '(.*)'$")
-//    public void DDDqq(String t1, String t2, DataTable dt) {
-//        System.out.println("With data Table: " + dt);
-//    }
+////    @Given("^DDDqq '(.*)' and '(.*)'$")
+////    public void DDDqq(String t1, String t2, DataTable dt) {
+////        System.out.println("With data Table: " + dt);
+////    }
 //
 //
 //    @Given("^DocString Test$")

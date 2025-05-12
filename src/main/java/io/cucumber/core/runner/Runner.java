@@ -53,7 +53,7 @@ import static io.cucumber.core.runner.StackManipulation.removeFrameworkFrames;
 import static io.pickleball.cacheandstate.GlobalCache.getGlobalConfigs;
 import static io.pickleball.cacheandstate.GlobalCache.setScenarioThreadState;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.setPrimaryScenario;
-import static io.pickleball.pathrools.ProjectRootUtils.setProjectRoot;
+//import static io.pickleball.pathrools.ProjectRootUtils.setProjectRoot;
 import static java.util.Collections.emptyList;
 
 public final class Runner {
@@ -75,7 +75,7 @@ public final class Runner {
             EventBus bus, Collection<? extends Backend> backends, ObjectFactory objectFactory, Options runnerOptions
     ) {
         System.out.println(Arrays.toString(Thread.currentThread().getStackTrace()));
-        setProjectRoot(runnerOptions);
+//        setProjectRoot(runnerOptions);
 //        System.out.println("@@getGlobalConfigs(): " + getGlobalConfigs());
         this.bus = bus;
         this.runnerOptions = runnerOptions;

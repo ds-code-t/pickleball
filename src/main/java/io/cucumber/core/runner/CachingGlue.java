@@ -391,7 +391,6 @@ public final class CachingGlue implements Glue {
     }
 
     public PickleStepDefinitionMatch stepDefinitionMatch(URI uri, Step step) throws AmbiguousStepDefinitionsException {
-        System.out.println("@@step.getText():::@ :" + step.getText());
         PickleStepDefinitionMatch cachedMatch = cachedStepDefinitionMatch(uri, step);
         if (cachedMatch != null) {
             return cachedMatch;

@@ -32,7 +32,6 @@ public class EvalList extends ArrayList<ValWrapper> implements ValueChecker {
                 matches.add(mode);
             }
         }
-        System.out.println("@@setPredicate: " + matches);
         setPredicate();
     }
 

@@ -10,7 +10,7 @@ public class ArgumentParsing {
         List<String> argv = new ArrayList<>();
 
         arguments.forEach((key, value) -> {
-            if (key.equalsIgnoreCase("features")) {
+            if (key.equalsIgnoreCase("featuresmain")) {
                 // Positional argument for feature paths
                 argv.add(quoteIfNecessary(value.toString()));
             } else {

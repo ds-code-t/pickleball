@@ -120,8 +120,16 @@ public class ExpressionEvaluator extends ParseTransformer { // Note: Class name 
 
         MapsWrapper subReplace = new MapsWrapper();
 
+        System.out.println("@@preEvalString: " + preEvalString);
 
-        String stringToEvaluate = subReplace.matchReplace(preEvalString, arrayPattern, ARRAY_PREFIX + "_%s__" , "seq.list($1)", " %s ");
+        String stringToEvaluate = preEvalString
+                .replaceAll("(\\[|,)(?:<.*>|\\{\\{.*\\}\\})(,)","$1'null'$2")
+                .replaceAll("(,)(?:<.*>|\\{\\{.*\\}\\})(\\])","$1'null'$2");
+
+        System.out.println("@@stringToEvaluate: " + stringToEvaluate);
+
+
+        stringToEvaluate = subReplace.matchReplace(stringToEvaluate, arrayPattern, ARRAY_PREFIX + "_%s__" , "seq.list($1)", " %s ");
 
         stringToEvaluate = subReplace.matchReplace(stringToEvaluate, OP_CHAIN_PATTERN, OP_PREFIX + "_%s__" , "predicateCheck(\"${opChain}\",${value})", " %s ");
 

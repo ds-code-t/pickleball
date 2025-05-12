@@ -35,6 +35,19 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
     public static final Pattern KEYED_TABLE_Regex = Pattern.compile("^\"([A-Za-z0-9_-]+)\"\\s+TABLE$");
 
 
+    public void setPrimary(Boolean primary) {
+        if (isPrimary != null)
+            throw new PickleballException("Primary Scenario status already set");
+        isPrimary = primary;
+    }
+
+    public boolean isPrimary() {
+        return (isPrimary != null && isPrimary == true);
+    }
+
+    private Boolean isPrimary = null;
+
+
     public void setCurrentWrapperNum(int currentWrapperNum) {
         this.currentWrapperNum = currentWrapperNum;
     }
@@ -148,7 +161,6 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
     }
 
 
-
     public boolean isForceComplete() {
         return forceComplete;
     }
@@ -178,9 +190,6 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         return stateMap;
     }
 
-//    private final LinkedMultiMap<String, String> firstMap;
-//    private final LinkedMultiMap<String, String> lastMap;
-
     private final LinkedMultiMap<String, String> passedMap;
     private final LinkedMultiMap<String, String> examplesMap;
 
@@ -199,9 +208,6 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         this.pickle = pickle;
         this.passedMap = passedMap;
         this.runner = runner;
-//        this.firstMap = new LinkedMultiMap<>();
-//        this.lastMap = new LinkedMultiMap<>();
-
 
         TableRow valuesRow = pickle.getMessagePickle().getValueRow();
 
@@ -212,8 +218,11 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         } else {
             examplesMap = null;
         }
-        runMaps = new MapsWrapper(this.passedMap, this.examplesMap, this.stateMap);
-//        runMaps = new MapsWrapper(this.firstMap , this.passedMap, this.examplesMap, this.stateMap, getGlobalConfigs(), this.lastMap);
+
+        if (isPrimary())
+            runMaps = new MapsWrapper(this.passedMap, this.examplesMap, this.stateMap, getGlobalConfigs());
+        else
+            runMaps = new MapsWrapper(this.passedMap, this.examplesMap, this.stateMap, getPrimaryScenarioStateMap(), getGlobalConfigs());
 
 
     }
@@ -225,18 +234,15 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         for (PickleStepTestStep templateStep : testSteps) {
 //            templateStep.setScenarioContext(this);
             StepWrapper stepWrapper = new StepWrapper(templateStep, testCase, allSteps.size());
-            System.out.println("\n---\n@@stepWrapper: " + stepWrapper.getRunTimeText());
 //            int nestingLevel = stepWrapper.getGherkinMessagesStep().parseRunTimeParameters();
             int nestingLevel = stepWrapper.getNestingLevel();
             StepWrapper previousStepInTheSameLevel = nestingMap.get(nestingLevel);
-            System.out.println("@@nestingLevel: " + nestingLevel);
 
             String runTimeText = stepWrapper.getRunTimeText();
 
             if (runTimeText.startsWith(TABLE_ROW_LOOP)) {
                 String tableKey = previousStepInTheSameLevel.stepWrapperKey;
                 List<LinkedMultiMap<String, Object>> maps = stepWrapper.getDataTable().asLinkedMultiMaps();
-                System.out.println("@@@##maps: " + maps);
 //                getRunMaps().addMapsWithKey(tableKey, maps);
                 previousStepInTheSameLevel.tableMaps.addAll(maps);
                 continue;
@@ -254,13 +260,10 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
                 topLevelSteps.add(stepWrapper);
             else {
                 StepWrapper parentNesting = nestingMap.get(nestingLevel - 1);
-                System.out.println("@@parentNesting: " + parentNesting);
                 if (parentNesting == null)
                     throw new RuntimeException(":".repeat(nestingLevel) + " incorrect nesting level for step '" + templateStep.getStepText() + "' line: " + testCase.getLine());
-                System.out.println("@@parentNesting.getRunTimeText: " + parentNesting.getRunTimeText());
 
                 parentNesting.addNestedChildStep(stepWrapper);
-                System.out.println("@@parentNesting.size: " + parentNesting.getNestedChildSteps().size());
             }
 
             nestingMap.put(nestingLevel, stepWrapper);

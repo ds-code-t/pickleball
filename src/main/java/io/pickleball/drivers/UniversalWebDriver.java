@@ -1,6 +1,7 @@
 package io.pickleball.drivers;
 
 import io.pickleball.cacheandstate.MethodCache;
+import io.pickleball.cacheandstate.Registerable;
 import org.openqa.selenium.*;
 import org.openqa.selenium.bidi.BiDi;
 import org.openqa.selenium.chrome.ChromeDriver;
@@ -36,7 +37,7 @@ import java.util.*;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
-public class UniversalWebDriver extends RemoteWebDriver {
+public class UniversalWebDriver extends RemoteWebDriver implements Registerable {
 
 
     protected RemoteWebDriver internalDriver;

@@ -33,7 +33,7 @@ public class MappingFunctions {
         if (!(input instanceof String))
             return input;
 //        Pattern pattern = Pattern.compile("<(?<angled>[^<>=\\s](?:[^<>]*[^<>\\s])?)>|\\{(?<curly>[^{}]+)\\}");
-        Pattern pattern = Pattern.compile("<(?<angled>[^<>=\\s](?:[^<>]*[^<>\\s])?)>|\\{(?<curly>[^{}]+)\\}");
+        Pattern pattern = Pattern.compile("<(?<angled>[^<>=\\s](?:[^<>]*[^<>\\s])?)>|\\{\\{(?<curly>[^{}]+)\\}\\}");
         String result = String.valueOf(input);
 
 
@@ -48,9 +48,7 @@ public class MappingFunctions {
                 String key = matcher.group("angled");
                 if (key != null) {
                     String replacedKey = String.valueOf(replaceNestedBrackets(key, mapsWrapper));
-                    System.out.println("@@%%replacedKey: " + replacedKey);
                     String value = String.valueOf(mapsWrapper.getOrDefault(replacedKey, "<" + replacedKey + ">"));
-                    System.out.println("@@%%value: " + value);
                     matcher.appendReplacement(sb, Matcher.quoteReplacement(value));
                     continue;
                 }
@@ -81,7 +79,6 @@ public class MappingFunctions {
 
             matcher.appendTail(sb);
             String newResult = sb.toString();
-            System.out.println("@@%%newResult: " + newResult);
 
             // If no changes were made in this iteration, break
             if (newResult.equals(result)) {

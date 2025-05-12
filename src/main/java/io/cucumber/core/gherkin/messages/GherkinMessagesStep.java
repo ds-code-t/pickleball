@@ -103,8 +103,6 @@ public final class GherkinMessagesStep implements Step {
             Location location,
             String keyword
     ) {
-        System.out.println("@@GherkinMessagesStep:( " + pickleStep.getText());
-        System.out.println("@@GherkinMessagesStep getKeyword: " + pickleStep.getStepTemplate().getKeyword());
         this.pickleStep = pickleStep;
         this.argument = extractArgument(pickleStep, location);
         this.keyWord = keyword;
@@ -189,8 +187,6 @@ public final class GherkinMessagesStep implements Step {
 
     @Override
     public String getText() {
-        System.out.println("@@runTimeText:::: "+ runTimeText);
-        System.out.println("@@pickleStep.getText():::: "+ pickleStep.getText());
 //        if (runTimeText == null)
 //            return pickleStep.getText();
 //        return runTimeText;
@@ -203,12 +199,9 @@ public final class GherkinMessagesStep implements Step {
 
 
     public void copyTemplateParameters(GherkinMessagesStep templateStep) {
-        System.out.println("@@copyTemplateParameters");
         runFlag = templateStep.runFlag;
         colonNesting = templateStep.colonNesting;
         keyWord = templateStep.keyWord;
-        System.out.println("@@runTimeText:& " + runTimeText);
-        System.out.println("@@templateStep.runTimeText:& " + templateStep.runTimeText);
         runTimeText = templateStep.runTimeText;
         flagList = templateStep.flagList;
     }
@@ -267,23 +260,18 @@ public final class GherkinMessagesStep implements Step {
     public static Pattern bookmarksPattern = Pattern.compile("&\\S+\\s");
 
     public int parseRunTimeParameters(String initialText) {
-        System.out.println("@@@@Parsing Step: " + initialText);
-        if(initialText.equals(": I am running a testlzz 2-<AA> and 2-<BB>")) {
-            new Exception().printStackTrace();
-        }
+
         Pattern pattern = Pattern.compile("^(?<colons>(?:\\s*:)*)\\s*(?<flags>@\\S*\\s+)*(?:(?<keyWord>[^@\\s]+\\s+)(?<stepText>.*))?$");
 
         Matcher matcher = pattern.matcher(initialText);
 
         if (matcher.find()) {
             runTimeText = matcher.group("stepText");
-            System.out.println("\n--\n@@runTimeText$$: " + runTimeText);
             colonNesting = Optional.ofNullable(matcher.group("colons"))
                     .map(s -> s.replaceAll("\\s+", "").length())
                     .orElse(0);
             keyWord = matcher.group("keyWord");
             keyWord = "\u2003".repeat(colonNesting) + (keyWord == null ? "* " : keyWord.strip()) + " ";
-            System.out.println("@@keyWord: " + keyWord);
             String flagString = matcher.group("flags");
             if (flagString != null && flagString.contains("@RUN")) {
                 List<String> runFlagMatches = new ArrayList<>();
@@ -291,14 +279,12 @@ public final class GherkinMessagesStep implements Step {
                 while (runFlagMatcher.find()) {
                     runFlagMatches.add(runFlagMatcher.group());
                 }
-                System.out.println("@@runFlagMatches: "+ runFlagMatches);
                 if (runFlagMatches.size() > 1) {
                     String matchList = runFlagMatches.stream().collect(Collectors.joining(", "));
                     throw new PickleballException("Step cannot have more than one RUN flag: " + matchList);
                 } else if (runFlagMatches.size() == 1) {
                     runFlag = runFlagMatches.get(0);
                     if (runTimeText.isEmpty()) {
-                        System.out.println("@@RUN_IF 1 - ");
                         if (runFlag.equals(RUN_ALWAYS))
                             runTimeText = "IF: true ";
                         else if (runFlag.contains(RUN_IF))
@@ -308,14 +294,11 @@ public final class GherkinMessagesStep implements Step {
 //                        System.out.println("@@RUN_IF 2 - ");
 //                        runTimeText = "IF: " + runTimeText;
 //                    }
-                    System.out.println("@@RUN_IF 3 - " + runTimeText);
                     if (runFlag.endsWith(IFSuffix)) {
                         runFlag = runFlag.replace(IFSuffix, ":");
                         if (!runTimeText.startsWith("IF:"))
                             runTimeText = "IF: " + runTimeText;
-                        System.out.println("@@RUN_IF 4 - " + runTimeText);
                     }
-                    System.out.println("@@RUN_IF 5 - " + runTimeText);
 
                 }
             }

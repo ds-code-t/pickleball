@@ -49,7 +49,7 @@ public class ConditionalSteps {
                 .replaceAll(" ELSE-IF:| THEN:", "\u0001");
         String[] pairs = ifelseString.split("\u0001");
         for (int i = 0; i < pairs.length - 1; i += 2) {
-            String condition = "{" + pairs[i].trim() + "}";
+            String condition = "{{" + pairs[i].trim() + "}}";
             if (resolveObjectToBoolean(currentScenario.replaceAndEval(condition))) {
                 System.out.println("Executed: " + pairs[i + 1]);
                 getCurrentStep().setRunNestedSteps(true);

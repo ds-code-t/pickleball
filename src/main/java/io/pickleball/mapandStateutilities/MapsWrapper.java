@@ -69,7 +69,6 @@ public class MapsWrapper extends HashMap<String, Object> {
 
     @SafeVarargs
     public final MapsWrapper createNewMapWrapper(Map<String, ?>... maps) {
-        System.out.println("@@MAPSLIST:: " + Arrays.asList(maps));
         return new MapsWrapper(Stream.concat(Arrays.stream(maps), mapList.stream()).toList());
     }
 
@@ -110,7 +109,6 @@ public class MapsWrapper extends HashMap<String, Object> {
 
 
         for (Map<?, ?> map : mapList) {
-            System.out.println("@@map: " + map);
             value = map.get(stringKey);
             if (value != null) {
                 String stringValue = value.toString();

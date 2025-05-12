@@ -65,8 +65,6 @@ public class StepWrapper extends BaseContext {
         this.nestingLevel = gherkinMessagesStep.getColonNesting();
         this.wrapperNumber = wrapperNumber;
         this.stepWrapperKey = templateStep.getUri() + ":" + templateStep.getStep().getLine();
-        System.out.println("@@stepWrapperKey:: " + stepWrapperKey);
-
 
 //        io.cucumber.core.gherkin.Argument arg = getGherkinMessagesStep().getArgument();
 //        if (arg != null) {
@@ -87,14 +85,12 @@ public class StepWrapper extends BaseContext {
 //    }
 
     public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode startingExecutionMode, io.cucumber.core.runner.PickleStepTestStep parentStep,   LinkedMultiMap<String, Object>... stepTables) {
-        System.out.println("@@StepWrapper.run: " + getRunTimeText());
 
         LinkedMultiMap<String, Object>[] newStepMaps = parentStep == null ? stepTables : Stream.concat(parentStep.getAllStepMaps().stream() ,Arrays.stream(stepTables))
                 .toArray(LinkedMultiMap[]::new);
 
         io.cucumber.core.runner.PickleStepTestStep clone = modifyPickleStepTestStep(newStepMaps);
         clone.addInheritedMaps(stepTables);
-        System.out.println("@@clone.text:: " + clone.getStepText());
         addCloned(clone);
 
         ExecutionMode runExecutionMode;
@@ -105,10 +101,6 @@ public class StepWrapper extends BaseContext {
             clone.setInheritedMaps(parentStep.getAllStepMaps());
         }
 
-        System.out.println("\n---\n@@getRunTimeText: " + getRunTimeText());
-        System.out.println("@@==runFlag: " + runFlag);
-        System.out.println("@@==parentStep: " + parentStep);
-        System.out.println("@@==startingExecutionMode: " + startingExecutionMode);
         if (runFlag.isEmpty()) {
             runExecutionMode = startingExecutionMode;
         } else {
@@ -118,32 +110,20 @@ public class StepWrapper extends BaseContext {
             else
                 runExecutionMode = startingExecutionMode;
         }
-        System.out.println("\n\n---\n@@before Run: " + getRunTimeText());
-        System.out.println("@@wrapperNumber1: " + wrapperNumber);
+
 
         testCase.setCurrentWrapperNum(wrapperNumber);
         ExecutionMode returnExecutionMode = clone.run(testCase, bus, state, runExecutionMode);
-        System.out.println("@@after Run: " + getRunTimeText());
-        System.out.println("returnExecutionMode: " + returnExecutionMode + "\n-------------\n\n");
         ExecutionMode passedExecutionMode = runFlag.isEmpty() ? returnExecutionMode : startingExecutionMode;
-        System.out.println("@@getNestedChildSteps()::::::::::::::::: " + getNestedChildSteps());
-
-        if (getNestedChildSteps() != null)
-            System.out.println("@@getNestedChildSteps().size(): " + getNestedChildSteps().size());
-
-        System.out.println("@@nestedChildSteps: " + nestedChildSteps);
-        System.out.println("@@!clone.shouldRunNestedSteps(): " + !clone.shouldRunNestedSteps());
-        System.out.println("@@!returnExecutionMode.equals(ExecutionMode.RUN)): " + !returnExecutionMode.equals(ExecutionMode.RUN));
 
 
-        System.out.println("@@@###IF: " + (nestedChildSteps == null || !clone.shouldRunNestedSteps() || !returnExecutionMode.equals(ExecutionMode.RUN)));
+
 
         if (nestedChildSteps == null || !clone.shouldRunNestedSteps() || !returnExecutionMode.equals(ExecutionMode.RUN))
             return passedExecutionMode;
 
 
         for (StepWrapper nestedStepWrapper : getNestedChildSteps()) {
-            System.out.println("@@nestedStepWrapper: " + nestedStepWrapper.getRunTimeText());
             ExecutionMode nestedStepExecutionMode = clone.shouldForceRunNestedSteps() ? ExecutionMode.RUN : returnExecutionMode;
             returnExecutionMode = nestedStepWrapper.run(testCase, bus, state, nestedStepExecutionMode, clone);
         }
@@ -187,18 +167,8 @@ public class StepWrapper extends BaseContext {
 
     public io.cucumber.core.runner.PickleStepTestStep createPickleStepTestStep(Runner runner, PickleStep pickleStep, GherkinMessagesPickle pickle) {
         GherkinMessagesStep gherkinMessagesStep = createGherkinMessagesStep(pickleStep, pickle);
-
-        System.out.println("@@gherkinMessagesStep1: " + gherkinMessagesStep.getText());
-
-
         gherkinMessagesStep.copyTemplateParameters(getGherkinMessagesStep());
-
-        System.out.println("@@gherkinMessagesStep2: " + gherkinMessagesStep.getText());
-
         PickleStepDefinitionMatch match = runner.matchStepToStepDefinition(pickle, gherkinMessagesStep);
-
-        System.out.println("@@pickleStep.getText():-::: " + pickleStep.getText());
-
         if (match.method == null)
             throw new CucumberException("No matching method found for step '" + pickleStep.getText() + "'");
 
@@ -221,11 +191,7 @@ public class StepWrapper extends BaseContext {
         Step step = pickleStep.getStepTemplate();
 
         MapsWrapper stepMapper = parentTestCase.runMaps.createNewMapWrapper(additionalMaps);
-
-        System.out.println("@@stepMapper: " + stepMapper);
-
         String stepText = String.valueOf(replaceNestedBrackets(templateStep.getStep().getText(), stepMapper));
-        System.out.println("@@%%stepText: " + stepText);
         PickleStepArgument argument = null;
 
         io.cucumber.messages.types.DataTable dataTable = step.getDataTable().orElse(null);
@@ -254,8 +220,6 @@ public class StepWrapper extends BaseContext {
                 argument = new PickleStepArgument(pickleDocString, null);
             }
         }
-
-        System.out.println("@@%%stepText2: " + stepText);
         return new PickleStep(
                 step,
                 argument,
@@ -297,7 +261,6 @@ public class StepWrapper extends BaseContext {
 
 
     public ExecutionMode getRunExecutionMode(ExecutionMode startingExecutionMode, String runFlag) {
-        System.out.println("@@runFlag: " + runFlag);
         Status status = getCurrentState().getStatus();
         if (runFlag.contains(RUN_ALWAYS) || runFlag.contains(RUN))
             return ExecutionMode.RUN;

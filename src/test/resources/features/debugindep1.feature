@@ -340,13 +340,13 @@ Feature: sdf
     *  Scenario:
       | Scenario Tags | A | B |
 #      | @sob<Scenario> | ERROR | s |
-#      | @zzs9          | z     | 3 |
+      | @zzs82q          | z     | 3 |
     Given I am running a testlzz <arg1> and <Scenario>
     Examples:
       | Scenario | arg1  |
       | 1        | val1a |
-      | 2        | val2a |
-      | 3        | val3a |
+#      | 2        | val2a |
+#      | 3        | val3a |
 #
 #
 #  Scenario Outline: SO B <arg1> <Scenario Tags>
@@ -363,7 +363,7 @@ Feature: sdf
 #      | @sob2         | val2 |
 #
 #
-#  @zzs8
+  @zzs82q
   Scenario Outline: Component CCC 8 <Scenario> <arg1> <A> <B>
     Given I am running a testlzz EwRROR and <arg1>
     Given I am running a testlzz 5 and 6
@@ -377,7 +377,7 @@ Feature: sdf
     Examples:
       | Scenario | arg1 |
       | s1       | val1 |
-      | s2       | val2 |
+#      | s2       | val2 |
 #
 #
 #  @zzs9

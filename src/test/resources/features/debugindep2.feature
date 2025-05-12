@@ -1,5 +1,10 @@
 Feature: debug2 text3
 
+  Scenario: prec test 7
+    * DDDqq '<appr>' and '<appr.name>'
+    * DDDqq '<configs.driverconfigs>' and '<configs.appr.name>'
+
+
 
   Scenario: prec test 6
     * DDDqq 'a' and '11'

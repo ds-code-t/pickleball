@@ -6,12 +6,14 @@ import io.cucumber.core.gherkin.messages.GherkinMessagesDataTableArgument;
 import io.cucumber.core.gherkin.messages.GherkinMessagesDocStringArgument;
 import io.cucumber.core.runner.ExecutionMode;
 import io.cucumber.core.runner.PickleStepDefinitionMatch;
+import io.cucumber.core.runner.PickleStepTestStep;
 import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.core.stepexpression.DataTableArgument;
 import io.cucumber.core.stepexpression.DocStringArgument;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.pickleball.annotations.NoEventEmission;
+import io.pickleball.exceptions.PickleballException;
 import io.pickleball.logging.EventContainer;
 import io.pickleball.mapandStateutilities.LinkedMultiMap;
 import io.pickleball.mapandStateutilities.MapsWrapper;
@@ -20,9 +22,11 @@ import java.util.*;
 import java.util.stream.Stream;
 
 import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
+import static io.pickleball.configs.Constants.sFlag2;
 import static io.pickleball.mapandStateutilities.MapsWrapper.mapPriority;
 
 public class StepContext {
+
 
 
 
@@ -51,6 +55,17 @@ public class StepContext {
     private final LinkedMultiMap<String, Object> stepMap = new LinkedMultiMap<String, Object>();
 
     public final MapsWrapper stepMapWrapper = new MapsWrapper();
+
+
+    public static final String stepContextPrefix = sFlag2 + "~stepContext~";
+
+    public void setStepContext(String key, Object value) {
+        stepMap.put(stepContextPrefix + key, value);
+    }
+
+    public Object getStepContext(String key) {
+        return stepMap.get(stepContextPrefix + key);
+    }
 
     private List<LinkedMultiMap<String, Object>> inheritedMaps = new ArrayList<>();
 

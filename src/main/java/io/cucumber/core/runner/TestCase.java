@@ -42,6 +42,7 @@ import io.pickleball.mapandStateutilities.LinkedMultiMap;
 import io.pickleball.cacheandstate.ScenarioContext;
 import io.pickleball.executions.ExecutionConfig;
 
+import java.lang.Exception;
 import java.net.URI;
 import java.time.Duration;
 import java.time.Instant;
@@ -90,44 +91,6 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
         this.executionMode = dryRun ? DRY_RUN : RUN;
 
 
-//        Map<Integer, StepWrapper> nestingMap = new HashMap<>();
-//
-//        for (PickleStepTestStep templateStep : testSteps) {
-////            templateStep.setScenarioContext(this);
-//            StepWrapper stepWrapper = new StepWrapper(templateStep, this, allSteps.size());
-//            System.out.println("\n---\n@@stepWrapper: " + stepWrapper.getRunTimeText());
-////            int nestingLevel = stepWrapper.getGherkinMessagesStep().parseRunTimeParameters();
-//            int nestingLevel = stepWrapper.getNestingLevel();
-//            StepWrapper previousStepInTheSameLevel = nestingMap.get(nestingLevel);
-//            System.out.println("@@nestingLevel: " + nestingLevel);
-//
-//            String runTimeText = stepWrapper.getRunTimeText();
-//
-//            if (runTimeText.startsWith(TABLE_ROW_LOOP)) {
-//                String tableKey = previousStepInTheSameLevel.stepWrapperKey;
-//                List<LinkedMultiMap<String, String>> maps = previousStepInTheSameLevel.getDataTable().asLinkedStringMultiMaps();
-//                getRunMaps().addMapsWithKey(tableKey, maps);
-//                previousStepInTheSameLevel.tableRowCount = maps.size();
-//                continue;
-//            }
-//
-//            if (nestingLevel == 0)
-//                topLevelSteps.add(stepWrapper);
-//            else {
-//                StepWrapper parentNesting = nestingMap.get(nestingLevel - 1);
-//                System.out.println("@@parentNesting: " + parentNesting);
-//                if (parentNesting == null)
-//                    throw new RuntimeException(":".repeat(nestingLevel) + " incorrect nesting level for step '" + templateStep.getStepText() + "' line: " + getLine());
-//                System.out.println("@@parentNesting.getRunTimeText: " + parentNesting.getRunTimeText());
-//
-//                parentNesting.addNestedChildStep(stepWrapper);
-//                System.out.println("@@parentNesting.size: " + parentNesting.getNestedChildSteps().size());
-//            }
-//
-//            nestingMap.put(nestingLevel, stepWrapper);
-//            allSteps.add(stepWrapper);
-//        }
-
         preprocessSteps(this, testSteps);
 
 
@@ -150,6 +113,7 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
 
     public void runComponent(EventBus bus) {
         (pickle).getMessagePickle().setName(this);
+//        this.setPrimary(false);
         setCurrentScenario(this);
         ExecutionMode nextExecutionMode = this.executionMode;
         if (isTopLevel())
@@ -183,7 +147,6 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
 
         Integer i = -1;
         while (true) {
-            System.out.println("@@runStatus:[ " + i + "  : " + runStatus);
             switch (runStatus) {
                 case NORMAL -> i++;
                 case FIND_NEXT -> i = findBoundaryValue(i, true);
@@ -201,7 +164,6 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
             if (i == null)
                 throw new PickleballException("Could not find matching step for: '" + (goToRegex == null ? goToBookmarks : goToRegex) + "'");
 
-            System.out.println("@@i:: " + i);
             if (i < 0 || i >= allSteps.size()) {
                 System.out.println("End Of Scenario: " + getName());
 
@@ -211,7 +173,6 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
 
             StepWrapper stepWrapper = allSteps.get(i);
 
-            System.out.println("@@stepWrapper-RUN: " + stepWrapper.getRunTimeText());
 
             if (runStatus != RunStatus.NORMAL) {
 //                stepWrapper.getGherkinMessagesStep().getFlagList().g
@@ -232,7 +193,6 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
             } while (tableRowIterator.hasNext());
 
 
-            System.out.println("@@currentWrapperNum:: " + currentWrapperNum);
             i = currentWrapperNum;
 
         }

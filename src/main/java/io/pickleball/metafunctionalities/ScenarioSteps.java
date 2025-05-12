@@ -13,6 +13,7 @@ import java.util.*;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
 import static io.pickleball.configs.Constants.COMPONENT_PATH;
 import static io.pickleball.configs.Constants.SCENARIO_TAGS;
+import static io.pickleball.cucumberutilities.GeneralUtilities.waitTime;
 
 
 public class ScenarioSteps {
@@ -21,16 +22,22 @@ public class ScenarioSteps {
     @Given("^Scenario:(.*)$")
     public void scenarioRun(String scenarioName, DataTable dataTable) {
 
+
         StepContext originalStep = getCurrentStep();
 
         // Parse command-line arguments into RuntimeOptions
         for (LinkedMultiMap<String, String> map : dataTable.asLinkedMultiMaps(String.class, String.class)) {
-            String tags = map.getOrDefault(SCENARIO_TAGS, "");
+
+//            Object tagsObj = map.getOrDefault(SCENARIO_TAGS, "");
+//            System.out.println("@@tagsObj: " + tagsObj);
+            String tags = String.valueOf(map.getOrDefault(SCENARIO_TAGS, ""));
+//            String tags = map.getOrDefault("Scenario Tags #1", "");
             map.put("_calling tags", tags);
 
             String componentPaths = map.getOrDefault(COMPONENT_PATH, "src/test/resources/features");
             List<String> argvList = new ArrayList<>();
             argvList.add(componentPaths); // Always include the component paths
+
 
             if (tags != null && !tags.isEmpty()) {
                 argvList.add("--tags");
@@ -43,10 +50,13 @@ public class ScenarioSteps {
             }
             String[] argv = argvList.toArray(new String[0]);
 
+
             List<TestCase> testCases = getCurrentScenario().getAndSortTestcases(argv, map);
+
 
             TestCase lastTestCase = null;
             for (TestCase testCase : testCases) {
+                testCase.setPrimary(false);
                 lastTestCase = testCase;
                 testCase.addChildScenarioContext(testCase);
                 testCase.runComponent(getRunner().bus);
