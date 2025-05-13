@@ -24,7 +24,7 @@ import static io.pickleball.cucumberutilities.SourceParser.getComponentScenarioW
 
 public final class ComponentRuntime {
 
-    public static  List<TestCase> createTestcases(String[] args,  LinkedMultiMap<String, String> map) {
+    public static  List<TestCase> createTestcases(String[] args,  LinkedMultiMap map) {
         RuntimeOptions runtimeOptions = ComponentRuntime.buildOptions(args);
         List<Feature> features = getFeaturePathFeatureSupplier().get(runtimeOptions);
         List<Pickle> pickles = filterPicklesFromFeatures(features, runtimeOptions);

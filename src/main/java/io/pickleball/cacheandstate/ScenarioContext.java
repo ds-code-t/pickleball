@@ -14,8 +14,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static io.cucumber.core.gherkin.messages.GherkinMessagesStep.bookmarksPattern;
-import static io.pickleball.cacheandstate.GlobalCache.getGlobalConfigs;
-import static io.pickleball.cacheandstate.GlobalCache.getState;
+import static io.pickleball.cacheandstate.GlobalCache.*;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
 import static io.pickleball.cacheandstate.StepWrapper.TABLE_ROW_LOOP;
 import static io.pickleball.cucumberutilities.ArgumentParsing.convertCommandLineToArgv;
@@ -181,22 +180,22 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
 
     private final UUID id;
 
-    public LinkedMultiMap<String, String> getPassedMap() {
+    public LinkedMultiMap getPassedMap() {
         return passedMap;
     }
 
-    public LinkedMultiMap<String, String> getExamplesMap() {
+    public LinkedMultiMap getExamplesMap() {
         return examplesMap;
     }
 
-    public LinkedMultiMap<String, String> getStateMap() {
+    public LinkedMultiMap getStateMap() {
         return stateMap;
     }
 
-    private final LinkedMultiMap<String, String> passedMap;
-    private final LinkedMultiMap<String, String> examplesMap;
+    private final LinkedMultiMap passedMap;
+    private final LinkedMultiMap examplesMap;
 
-    public final LinkedMultiMap<String, String> stateMap = new LinkedMultiMap<>();
+    public final LinkedMultiMap stateMap = new LinkedMultiMap();
 
     public final MapsWrapper runMaps;
 
@@ -210,7 +209,7 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
 
     public MapsWrapper configMaps;
 
-    public ScenarioContext(UUID id, GherkinMessagesPickle pickle, Runner runner, LinkedMultiMap<String, String> passedMap) {
+    public ScenarioContext(UUID id, GherkinMessagesPickle pickle, Runner runner, LinkedMultiMap passedMap) {
         this.id = id;
         this.pickle = pickle;
         this.passedMap = passedMap;
@@ -221,7 +220,7 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         if (valuesRow != null) {
             List<String> headers = pickle.getMessagePickle().getHeaderRow().stream().map(TableCell::getValue).toList();
             List<String> values = valuesRow.getCells().stream().map(TableCell::getValue).toList();
-            examplesMap = new LinkedMultiMap<>(headers, values);
+            examplesMap = new LinkedMultiMap(headers, values);
         } else {
             examplesMap = null;
         }
@@ -238,9 +237,7 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         Map<Integer, StepWrapper> nestingMap = new HashMap<>();
 
         for (PickleStepTestStep templateStep : testSteps) {
-//            templateStep.setScenarioContext(this);
             StepWrapper stepWrapper = new StepWrapper(templateStep, testCase, allSteps.size());
-//            int nestingLevel = stepWrapper.getGherkinMessagesStep().parseRunTimeParameters();
             int nestingLevel = stepWrapper.getNestingLevel();
             StepWrapper previousStepInTheSameLevel = nestingMap.get(nestingLevel);
 
@@ -248,8 +245,7 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
 
             if (runTimeText.startsWith(TABLE_ROW_LOOP)) {
                 String tableKey = previousStepInTheSameLevel.stepWrapperKey;
-                List<LinkedMultiMap<String, Object>> maps = stepWrapper.getDataTable().asLinkedMultiMaps();
-//                getRunMaps().addMapsWithKey(tableKey, maps);
+                List<LinkedMultiMap> maps = stepWrapper.getDataTable().asLinkedMultiMaps();
                 previousStepInTheSameLevel.tableMaps.addAll(maps);
                 continue;
             }
@@ -257,7 +253,7 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
             Matcher keyedTableMatcher = KEYED_TABLE_Regex.matcher(runTimeText);
             if (keyedTableMatcher.find()) {
                 String tableKey = keyedTableMatcher.group(1);
-                List<LinkedMultiMap<String, Object>> maps = stepWrapper.getDataTable().asLinkedMultiMaps();
+                List<LinkedMultiMap> maps = stepWrapper.getDataTable().asLinkedMultiMaps();
 //                getRunMaps().addMapsWithKey(tableKey, maps);
                 continue;
             }
@@ -268,14 +264,11 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
                 StepWrapper parentNesting = nestingMap.get(nestingLevel - 1);
                 if (parentNesting == null)
                     throw new RuntimeException(":".repeat(nestingLevel) + " incorrect nesting level for step '" + templateStep.getStepText() + "' line: " + testCase.getLine());
-
                 parentNesting.addNestedChildStep(stepWrapper);
             }
-
             nestingMap.put(nestingLevel, stepWrapper);
             allSteps.add(stepWrapper);
         }
-
 
     }
 
@@ -319,17 +312,17 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
     }
 
 
-    public final void createComponentScenario(String argString, LinkedMultiMap<String, String> map) {
+    public final void createComponentScenario(String argString, LinkedMultiMap map) {
         createComponentScenario(convertCommandLineToArgv(argString), map);
     }
 //
 
-    public final void createComponentScenario(Map<String, Object> argMap, LinkedMultiMap<String, String> map) {
+    public final void createComponentScenario(Map<String, Object> argMap, LinkedMultiMap map) {
         createComponentScenario(convertHashMapToArgv(argMap), map);
     }
 
 
-    public final List<TestCase> getAndSortTestcases(String[] args, LinkedMultiMap<String, String> map) {
+    public final List<TestCase> getAndSortTestcases(String[] args, LinkedMultiMap map) {
         List<TestCase> tests = createTestcases(args, map);
         List<TestCase> testCases = new ArrayList<>(tests);
         testCases.sort(
@@ -346,7 +339,7 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         }
     }
 
-    public final void createComponentScenario(String[] args, LinkedMultiMap<String, String> map) {
+    public final void createComponentScenario(String[] args, LinkedMultiMap map) {
         executeTestCases(getAndSortTestcases(args, map));
     }
 

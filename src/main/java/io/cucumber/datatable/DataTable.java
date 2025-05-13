@@ -1219,49 +1219,51 @@ public class DataTable {
         return values;
     }
 
-    public <K, V> LinkedMultiMap<K, V> asLinkedMultiMap(Class<K> keyType, Class<V> valueType) {
+    public  LinkedMultiMap asLinkedMultiMap(Object keyType, Object valueType) {
         List<List<String>> rows = this.cells(); // Use existing cells() method
         if (rows.isEmpty() || rows.get(0).isEmpty()) {
-            return new LinkedMultiMap<>(); // Return an empty LinkedMultiMap for empty data
+            return new LinkedMultiMap(); // Return an empty LinkedMultiMap for empty data
         }
 
-        List<K> keys = new ArrayList<>();
-        List<V> values = new ArrayList<>();
+        List<Object> keys = new ArrayList<>();
+        List<Object> values = new ArrayList<>();
         for (List<String> row : rows) {
-            K key = convertValue(row.get(0), keyType); // Convert the first column to keys
-            V value = row.size() > 1 ? convertValue(row.get(1), valueType) : null; // Convert the second column to values
+//            Object key = convertValue(row.get(0), keyType); // Convert the first column to keys
+//            Object value = row.size() > 1 ? convertValue(row.get(1), valueType) : null; // Convert the second column to values
+            Object key = row.get(0);
+            Object value = row.size() > 1 ? row.get(1) : null; // Convert the second column to values
             keys.add(key);
             values.add(value);
         }
 
-        return new LinkedMultiMap<>(keys, values);
+        return new LinkedMultiMap(keys, values);
     }
 
-    public List<LinkedMultiMap<String , Object>> asLinkedMultiMaps() {
-        return asLinkedMultiMaps(String.class, Object.class);
+    public List<LinkedMultiMap> asLinkedMultiMaps() {
+        return asLinkedMultiMaps(Object.class, Object.class);
     }
 
-    public List<LinkedMultiMap<String , String>> asLinkedStringMultiMaps() {
+    public List<LinkedMultiMap> asLinkedStringMultiMaps() {
         return asLinkedMultiMaps(String.class, String.class);
     }
 
-    public <K, V> List<LinkedMultiMap<K, V>> asLinkedMultiMaps(Class<K> keyType, Class<V> valueType) {
+    public  List<LinkedMultiMap> asLinkedMultiMaps(Object keyType, Object valueType) {
         List<List<String>> rows = this.cells(); // Use existing cells() method
 
         if (rows.size()<2) {
             return Collections.emptyList(); // Return an empty list for empty data
         }
 
-        List<K> keys = (List<K>) rows.get(0);
+        List<String> keys =  rows.get(0);
 
-        List<LinkedMultiMap<K, V>> linkedMultiMaps = new ArrayList<>();
+        List<LinkedMultiMap> linkedMultiMaps = new ArrayList<>();
         for (int r = 1; r < rows.size(); r++) {
             List<String> row =  rows.get(r);
-            List<V> values = new ArrayList<>();
+            List<String> values = new ArrayList<>();
             for (int i = 0; i < row.size(); i++) {
-                values.add(convertValue((String) row.get(i), valueType));
+                values.add(row.get(i));
             }
-            linkedMultiMaps.add(new LinkedMultiMap<>(keys, values));
+            linkedMultiMaps.add(new LinkedMultiMap(keys, values));
         }
 
         return linkedMultiMaps;

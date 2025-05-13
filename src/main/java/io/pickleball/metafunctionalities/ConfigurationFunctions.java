@@ -5,6 +5,7 @@ import io.cucumber.java.en.Given;
 import io.pickleball.mapandStateutilities.LinkedMultiMap;
 
 import static io.pickleball.cacheandstate.GlobalCache.getGlobalConfigs;
+import static io.pickleball.cacheandstate.GlobalCache.getTestStateMap;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
 import static io.pickleball.cacheandstate.ScenarioContext.getRunMaps;
 import static io.pickleball.cacheandstate.StepContext.getCurrentFlagList;
@@ -21,20 +22,26 @@ public class ConfigurationFunctions {
     @Given("^SET (?:\"(.*)\" )?(.*) DATA( " + CONTEXT_TYPE + ")?$")
     public static void useData(String customName, String dataPath, String context, DataTable dataTable) {
         String contextType = context == null ? "" : context.strip();
-        LinkedMultiMap<?, ?> contextMap = switch (contextType) {
+        LinkedMultiMap contextMap = switch (contextType) {
             case NESTED_CONTEXT -> getCurrentStep().getStepMap();
             case CURRENT_SCENARIO -> getCurrentScenarioStateMap();
             default -> getTestStateMap();
         };
 
-        String configKeyName = (customName == null || customName.isBlank()) ? dataPath : customName;
+//        String configKeyName = (customName == null || customName.isBlank()) ? dataPath : customName;
 //
-//        if (customName == null || customName.isBlank())
-//            contextMap.parseDirectoriesContents(dataPath);
-//        else
-//            contextMap.put()
+        System.out.println("@@dataPath: " + dataPath);
+        System.out.println("@@customName: " + customName);
+        if (customName == null || customName.isBlank()) {
+            contextMap.parseDirectoriesContents("data/" + dataPath + ".yaml");
+            System.out.println("@@ChromeDriver: " +    getRunMaps().get("ChromeDriver"));
+            System.out.println("@@ChromeDriver.ChromeDriverService: " + getRunMaps().get("ChromeDriver.ChromeOptions.setLoggingPrefs"));
+        }
+        else {
+            LinkedMultiMap map = new LinkedMultiMap();
+            contextMap.put(customName.trim(), map);
+        }
 
-        contextMap.putConfig(configKeyName, getGlobalConfigs().get("configs.driverconfigs." + dataPath));
 
     }
 

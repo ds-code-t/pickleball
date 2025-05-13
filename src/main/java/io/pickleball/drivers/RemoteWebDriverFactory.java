@@ -39,8 +39,9 @@ import static io.pickleball.cacheandstate.GlobalCache.getGlobalConfigs;
 public class RemoteWebDriverFactory {
 
     public static void main(String[] args) {
-        System.out.println("@@getGlobalConfigs:  " + getGlobalConfigs());
+//        System.out.println("@@getGlobalConfigs:  " + getGlobalConfigs());
         System.out.println("@@driverconfigs:  " + getGlobalConfigs().get("configs.driverconfigs"));
+        System.out.println("@@chrome:  " + getGlobalConfigs().get("configs.driverconfigs.chrome"));
     }
 
     private static final ObjectMapper mapper = new ObjectMapper();

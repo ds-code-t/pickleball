@@ -10,12 +10,12 @@
 //import java.util.Map;
 //
 //public class LinkedMultiMapTest {
-//    private LinkedMultiMap<String, Integer> stringMap;
-//    private LinkedMultiMap<Integer, String> integerMap;
+//    private LinkedMultiMap stringMap;
+//    private LinkedMultiMap integerMap;
 //
 //
 //    public static void main(String[] args) {
-//        LinkedMultiMap<String, Integer> map = new LinkedMultiMap<>();
+//        LinkedMultiMap map = new LinkedMultiMap();
 //        map.put("A", 1);
 //        map.put("B", 2);
 //        map.put("A", 3);
@@ -52,8 +52,8 @@
 //
 //    @BeforeMethod
 //    public void setUp() {
-//        stringMap = new LinkedMultiMap<>();
-//        integerMap = new LinkedMultiMap<>();
+//        stringMap = new LinkedMultiMap();
+//        integerMap = new LinkedMultiMap();
 //
 //        // Setup test data
 //        stringMap.put("A", 1);
@@ -133,7 +133,7 @@
 //
 //    @Test
 //    public void testMapInterfaceIntegration() {
-//        LinkedMultiMap<String, Integer> map = new LinkedMultiMap<>();
+//        LinkedMultiMap map = new LinkedMultiMap();
 //
 //        // Test Map.put
 //        Integer previous = map.put("test", 1);
@@ -142,7 +142,7 @@
 //        assertEquals(previous, (Integer)1, "Subsequent put should return previous value");
 //
 //        // Test Map.get behavior for String keys
-//        map = new LinkedMultiMap<>();
+//        map = new LinkedMultiMap();
 //        map.put("key", 1);
 //        map.put("key", 2);
 //        assertEquals(map.get("key"), (Integer)2, "get() should return last value");
@@ -154,7 +154,7 @@
 //
 //    @Test
 //    public void testBackwardCompatibility() {
-//        LinkedMultiMap<String, Integer> map = new LinkedMultiMap<>();
+//        LinkedMultiMap map = new LinkedMultiMap();
 //
 //        // Test original put behavior
 //        map.put("key", 1);
@@ -180,7 +180,7 @@
 //    public void testListConstructor() {
 //        List<String> keys = Arrays.asList("A", "B", "A");
 //        List<Integer> values = Arrays.asList(1, 2, 3);
-//        LinkedMultiMap<String, Integer> map = new LinkedMultiMap<>(keys, values);
+//        LinkedMultiMap map = new LinkedMultiMap(keys, values);
 //
 //        // Verify original functionality
 //        assertEquals(map.getValues("A"), Arrays.asList(1, 3),
@@ -200,12 +200,12 @@
 //
 //    @Test(expectedExceptions = IllegalArgumentException.class)
 //    public void testInvalidConstructorArgs() {
-//        new LinkedMultiMap<>(Arrays.asList("A"), Arrays.asList(1, 2));
+//        new LinkedMultiMap(Arrays.asList("A"), Arrays.asList(1, 2));
 //    }
 //
 //    @Test
 //    public void testEdgeCases() {
-//        LinkedMultiMap<String, Integer> map = new LinkedMultiMap<>();
+//        LinkedMultiMap map = new LinkedMultiMap();
 //
 //        // Test empty map behavior
 //        assertNull(map.get("any"), "get on empty map should return null");
@@ -217,7 +217,7 @@
 //    @Test
 //    public void testMapConformance() {
 //        // Test that it behaves like a Map when used as one
-//        Map<String, Integer> map = new LinkedMultiMap<>();
+//        Map<String, Integer> map = new LinkedMultiMap();
 //        map.put("A", 1);
 //        map.put("A", 2);
 //
@@ -235,7 +235,7 @@
 //
 //    @Test
 //    public void testStringKeyBehavior() {
-//        LinkedMultiMap<String, String> strMap = new LinkedMultiMap<>();
+//        LinkedMultiMap strMap = new LinkedMultiMap();
 //        strMap.put("test", "value1");
 //        strMap.put("test", "value2");
 //

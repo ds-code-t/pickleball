@@ -3,11 +3,11 @@
 //import java.util.*;
 //
 //public class LinkedMultiMapIterator<K, V> implements NavigableIterator<K, V> {
-//    private final LinkedMultiMap<K, V> map;
+//    private final LinkedMultiMap map;
 //    private int currentIndex;
 //    private final int maxIndex;
 //
-//    public LinkedMultiMapIterator(LinkedMultiMap<K, V> map) {
+//    public LinkedMultiMapIterator(LinkedMultiMap map) {
 //        this.map = Objects.requireNonNull(map, "Map cannot be null");
 //        this.currentIndex = -1;
 //        this.maxIndex = map.size() - 1;

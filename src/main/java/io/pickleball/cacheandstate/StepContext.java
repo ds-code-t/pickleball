@@ -54,7 +54,7 @@ public class StepContext {
 //
 //    int tableRowCounter = 0;
 
-    public LinkedMultiMap<String, Object> getStepMap() {
+    public LinkedMultiMap getStepMap() {
         return stepMap;
     }
 
@@ -62,11 +62,11 @@ public class StepContext {
         stepMap.put(key, map);
     }
 
-//    public void setStepMap(LinkedMultiMap<String, String> stepMap) {
+//    public void setStepMap(LinkedMultiMap stepMap) {
 //        this.stepMap = stepMap;
 //    }
 
-    private final LinkedMultiMap<String, Object> stepMap = new LinkedMultiMap<String, Object>();
+    private final LinkedMultiMap stepMap = new LinkedMultiMap();
 
     public final MapsWrapper stepMapWrapper = new MapsWrapper();
 
@@ -81,24 +81,24 @@ public class StepContext {
         return stepMap.get(stepContextPrefix + key);
     }
 
-    private List<LinkedMultiMap<String, Object>> inheritedMaps = new ArrayList<>();
+    private List<LinkedMultiMap> inheritedMaps = new ArrayList<>();
 
-    public List<LinkedMultiMap<String, Object>> getAllStepMaps() {
+    public List<LinkedMultiMap> getAllStepMaps() {
         return Stream.concat(Stream.of(stepMap), inheritedMaps.stream()).toList();
     }
 
-    public List<LinkedMultiMap<String, Object>> getInheritedMaps() {
+    public List<LinkedMultiMap> getInheritedMaps() {
         return inheritedMaps;
     }
 
-    public void setInheritedMaps(List<LinkedMultiMap<String, Object>> inheritedMaps) {
+    public void setInheritedMaps(List<LinkedMultiMap> inheritedMaps) {
         stepMapWrapper.addMapList(inheritedMaps);
         this.inheritedMaps = inheritedMaps;
     }
 
 
-    public void addInheritedMaps(LinkedMultiMap<String, Object>... inheritedMaps) {
-        for (LinkedMultiMap<String, Object> inheritedMap : inheritedMaps) {
+    public void addInheritedMaps(LinkedMultiMap... inheritedMaps) {
+        for (LinkedMultiMap inheritedMap : inheritedMaps) {
             if (inheritedMap != null) {
                 this.inheritedMaps.add(inheritedMap);
                 stepMapWrapper.addMaps(inheritedMap);

@@ -178,7 +178,7 @@ public final class Runner {
     public TestCase createTestCaseForPickle(Pickle pickle) {
         return createTestCaseForPickle(pickle, null);
     }
-    public TestCase createTestCaseForPickle(Pickle pickle, LinkedMultiMap<String, String> map) {
+    public TestCase createTestCaseForPickle(Pickle pickle, LinkedMultiMap map) {
         if (pickle.getSteps().isEmpty()) {
             return new TestCase(bus.generateId(), emptyList(), emptyList(), emptyList(), (GherkinMessagesPickle) pickle,
                     runnerOptions.isDryRun(), this, map);

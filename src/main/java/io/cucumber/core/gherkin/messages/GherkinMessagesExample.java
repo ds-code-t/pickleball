@@ -69,10 +69,10 @@ public final class GherkinMessagesExample implements Node.Example {
         }
     }
 
-    public LinkedMultiMap<String, String> getLinkedMultiMap() {
+    public LinkedMultiMap getLinkedMultiMap() {
         if (tableRow == null || tableRow.getCells().isEmpty())
-            new LinkedMultiMap<>();
-        return new LinkedMultiMap<>(((GherkinMessagesExamples) parent).getExamples().getTableHeader().get().getCells().stream().map(c -> c.getValue().trim()).toList(), tableRow.getCells().stream().map(c -> c.getValue().trim()).toList());
+            new LinkedMultiMap();
+        return new LinkedMultiMap(((GherkinMessagesExamples) parent).getExamples().getTableHeader().get().getCells().stream().map(c -> c.getValue().trim()).toList(), tableRow.getCells().stream().map(c -> c.getValue().trim()).toList());
     }
 
     @Override

@@ -11,20 +11,20 @@ import static io.pickleball.mapandStateutilities.LinkedMultiMap.configFlag;
 
 public class MapsWrapper extends HashMap<String, Object> {
     public static final String mapPriority = configFlag + "priority";
-    final public List<Map<String, ?>> mapList;
-    private final LinkedMultiMap<String, Object> firstMap = new LinkedMultiMap<>();
-    private final LinkedMultiMap<String, Object> lastMap = new LinkedMultiMap<>();
+    final public List<Map<?, ?>> mapList;
+    private final LinkedMultiMap firstMap = new LinkedMultiMap();
+    private final LinkedMultiMap lastMap = new LinkedMultiMap();
     ;
 
-//    private LinkedMultiMap<String, LinkedMultiMap<String, String>> keyedMaps = new LinkedMultiMap<>();
-//    private Map<String, LinkedMultiMap<String, String>> keyedMaps = new HashMap<>();
+//    private LinkedMultiMap<String, LinkedMultiMap> keyedMaps = new LinkedMultiMap();
+//    private Map<String, LinkedMultiMap> keyedMaps = new HashMap<>();
 //    private Map<String, Integer> keyCount = new HashMap<>();
 
 
     private static final AtomicInteger instanceCounter = new AtomicInteger(0);
 
     @SafeVarargs
-    public MapsWrapper(Map<String, ?>... maps) {
+    public MapsWrapper(Map<?, ?>... maps) {
         mapList = Arrays.stream(maps).filter(Objects::nonNull)
                 .collect(Collectors.toList());
         mapList.add(0, firstMap);
@@ -33,7 +33,7 @@ public class MapsWrapper extends HashMap<String, Object> {
         sortMaps();
     }
 
-    public MapsWrapper(List<? extends Map<String, ?>> maps) {
+    public MapsWrapper(List<? extends Map<?, ?>> maps) {
         mapList = maps.stream().filter(Objects::nonNull)
                 .collect(Collectors.toList());
         mapList.add(0, firstMap);
@@ -44,14 +44,14 @@ public class MapsWrapper extends HashMap<String, Object> {
 
 
     @SafeVarargs
-    public final void addMaps(Map<String, ?>... maps) {
+    public final void addMaps(Map<?, ?>... maps) {
         Arrays.stream(maps)
                 .filter(Objects::nonNull)
                 .forEach(mapList::add);
         sortMaps();
     }
 
-    public final void addMapList(List<LinkedMultiMap<String, Object>> maps) {
+    public final void addMapList(List<LinkedMultiMap> maps) {
         maps.stream()
                 .filter(Objects::nonNull)
                 .forEach(mapList::add);
@@ -68,14 +68,14 @@ public class MapsWrapper extends HashMap<String, Object> {
     }
 
     @SafeVarargs
-    public final MapsWrapper createNewMapWrapper(Map<String, ?>... maps) {
+    public final MapsWrapper createNewMapWrapper(Map<?, ?>... maps) {
         return new MapsWrapper(Stream.concat(Arrays.stream(maps), mapList.stream()).toList());
     }
 
 
-    public final List<LinkedMultiMap<String, String>> getMapsWithKey(String key) {
+    public final List<LinkedMultiMap> getMapsWithKey(String key) {
         try {
-            return (List<LinkedMultiMap<String, String>>) firstMap.get(key);
+            return (List<LinkedMultiMap>) firstMap.get(key);
         }
         catch (Exception e)
         {
@@ -84,9 +84,9 @@ public class MapsWrapper extends HashMap<String, Object> {
         return null;
     }
 
-    public final void addMapsWithKey(String key, List<LinkedMultiMap<String, Object>> maps) {
+    public final void addMapsWithKey(String key, List<LinkedMultiMap> maps) {
         firstMap.removeFromLinkedListMultimap(key);
-        for (LinkedMultiMap<String, Object> map : maps) {
+        for (LinkedMultiMap map : maps) {
             {
                 firstMap.addToLinkedListMultimap(key, map);
             }
@@ -148,7 +148,7 @@ public class MapsWrapper extends HashMap<String, Object> {
 //        combinedMap.add(this);
         StringBuilder returnString = Optional.ofNullable(super.toString()).map(StringBuilder::new).orElse(null);
         // Iterate through all maps in the list
-        for (Map<String, ?> map : mapList) {
+        for (Map<?, ?> map : mapList) {
             returnString = (returnString == null ? new StringBuilder("null") : returnString).append("\n").append(map.toString());
         }
 

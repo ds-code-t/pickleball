@@ -13,7 +13,7 @@
 //
 //    @BeforeMethod
 //    public void setUp() {
-//        LinkedMultiMap<String, Integer> map = new LinkedMultiMap<>();
+//        LinkedMultiMap map = new LinkedMultiMap();
 //        // Create a test dataset with repeated keys and values
 //        map.put("A", 1);  // index 0
 //        map.put("B", 2);  // index 1
@@ -170,7 +170,7 @@
 //
 //    @Test
 //    public void testEdgeCases() {
-//        LinkedMultiMap<String, Integer> emptyMap = new LinkedMultiMap<>();
+//        LinkedMultiMap emptyMap = new LinkedMultiMap();
 //        NavigableIterator<String, Integer> emptyIterator = emptyMap.navigator();
 //
 //        assertFalse(emptyIterator.hasNext());
@@ -178,7 +178,7 @@
 //        assertTrue(emptyIterator.nextList().isEmpty());
 //        assertTrue(emptyIterator.previousList().isEmpty());
 //
-//        LinkedMultiMap<String, Integer> singleMap = new LinkedMultiMap<>();
+//        LinkedMultiMap singleMap = new LinkedMultiMap();
 //        singleMap.put("X", 1);
 //        NavigableIterator<String, Integer> singleIterator = singleMap.navigator();
 //

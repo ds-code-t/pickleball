@@ -30,7 +30,7 @@ public class CoreSteps {
 
 //    @Given("^-TABLE ROW LOOP-$")
 //    public void loopTable(DataTable dataTable) {
-//        for (LinkedMultiMap<String, String> map : dataTable.asLinkedMultiMaps(String.class, String.class)) {
+//        for (LinkedMultiMap map : dataTable.asLinkedMultiMaps(String.class, String.class)) {
 //            {
 //                getRunMaps().addMap(map);
 //            }

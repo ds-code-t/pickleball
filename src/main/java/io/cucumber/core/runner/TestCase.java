@@ -80,7 +80,7 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
             GherkinMessagesPickle pickle,
             boolean dryRun,
             Runner runner,
-            LinkedMultiMap<String, String> passMap
+            LinkedMultiMap passMap
     ) {
         super(id, pickle, runner, passMap);
         this.id = id;
@@ -147,6 +147,8 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
 
         Integer i = -1;
         while (true) {
+            System.out.println("@@@runStatus: " + runStatus);
+            System.out.println("@@@i-1: " + i);
             switch (runStatus) {
                 case NORMAL -> i++;
                 case FIND_NEXT -> i = findBoundaryValue(i, true);
@@ -164,18 +166,19 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
             if (i == null)
                 throw new PickleballException("Could not find matching step for: '" + (goToRegex == null ? goToBookmarks : goToRegex) + "'");
 
+
+            System.out.println("@@@i-2: " + i);
+            System.out.println("@@allSteps: " + allSteps.size());
             if (i < 0 || i >= allSteps.size()) {
                 System.out.println("End Of Scenario: " + getName());
-
-
                 break;
             }
+
 
             StepWrapper stepWrapper = allSteps.get(i);
 
 
             if (runStatus != RunStatus.NORMAL) {
-//                stepWrapper.getGherkinMessagesStep().getFlagList().g
                 runStatus = RunStatus.NORMAL;
             }
 
@@ -183,12 +186,14 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
             if (nextExecutionMode.equals(END_SCENARIO))
                 break;
 
-            Iterator<LinkedMultiMap<String, Object>> tableRowIterator = stepWrapper.tableMaps.iterator();
+            Iterator<LinkedMultiMap> tableRowIterator = stepWrapper.tableMaps.iterator();
             do {
-                LinkedMultiMap<String, Object> rowMap =  tableRowIterator.hasNext() ? tableRowIterator.next() : null;
+                LinkedMultiMap rowMap =  tableRowIterator.hasNext() ? tableRowIterator.next() : null;
+                System.out.println("@@nextExecutionMode11 : "+ nextExecutionMode);
                 nextExecutionMode = stepWrapper
                         .run(this, bus, state, nextExecutionMode, null, rowMap)
                         .next(nextExecutionMode);
+                System.out.println("@@nextExecutionMode22 : "+ nextExecutionMode);
 
             } while (tableRowIterator.hasNext());
 

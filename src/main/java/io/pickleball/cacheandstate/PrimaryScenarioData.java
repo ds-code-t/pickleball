@@ -16,7 +16,6 @@ public class PrimaryScenarioData {
 
     private ScenarioContext primaryScenario;
 
-    private LinkedMultiMap<String, Object> testStateMap = new LinkedMultiMap<>();
 
 
 
@@ -125,15 +124,13 @@ public class PrimaryScenarioData {
         return getState().mvelWrapper;
     }
 
-//    public static LinkedMultiMap<String, String> getPrimaryScenarioStateMap() {
+//    public static LinkedMultiMap getPrimaryScenarioStateMap() {
 //        return getPrimaryScenario().getStateMap();
 //    }
 
-    public static LinkedMultiMap<String, String> getCurrentScenarioStateMap() {
+    public static LinkedMultiMap getCurrentScenarioStateMap() {
         return getCurrentScenario().getStateMap();
     }
 
-    public static LinkedMultiMap<String, Object> getTestStateMap() {
-        return getState().testStateMap;
-    }
+
 }

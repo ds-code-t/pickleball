@@ -38,15 +38,23 @@ import static io.pickleball.datafunctions.FileAndDataParsing.getFile;
 public class GlobalCache {
     public static final PrintStream out = System.out;
     public static TeamCityPlugin teamCityPlugin;
-    private static LinkedMultiMap<String, Object> globalConfigs;
+    private static LinkedMultiMap globalConfigs;
     private static final Object lock = new Object();
 
 
-    public static LinkedMultiMap<String, Object> getGlobalConfigs() {
+    private static final ThreadLocal<LinkedMultiMap> testStateMap = ThreadLocal.withInitial(LinkedMultiMap::new);
+
+
+    public static LinkedMultiMap getTestStateMap() {
+        return testStateMap.get();
+    }
+
+
+    public static LinkedMultiMap getGlobalConfigs() {
         if (globalConfigs == null){
             synchronized (lock) {
                 if (globalConfigs == null){
-                    globalConfigs = new LinkedMultiMap<String, Object>(getFile("configs"));
+                    globalConfigs = new LinkedMultiMap(getFile("configs"));
                 }
             }
         }

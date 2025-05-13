@@ -27,12 +27,12 @@ import static io.pickleball.cucumberutilities.SourceParsing.pretrim;
 public class SourceParser {
 
     @SafeVarargs
-    public static GherkinMessagesPickle getComponentScenarioWrapper(GherkinMessagesPickle pickle, LinkedMultiMap<String, String>... listOfMaps) throws IOException {
+    public static GherkinMessagesPickle getComponentScenarioWrapper(GherkinMessagesPickle pickle, LinkedMultiMap... listOfMaps) throws IOException {
         return getComponentScenarioWrapper(pickle, Arrays.stream(listOfMaps).toList());
     }
 
-    public static GherkinMessagesPickle getComponentScenarioWrapper(GherkinMessagesPickle pickle, List<LinkedMultiMap<String, String>> maps) throws IOException {
-        List<Map<String, String>> listOfMaps = new ArrayList<>(maps);
+    public static GherkinMessagesPickle getComponentScenarioWrapper(GherkinMessagesPickle pickle, List<LinkedMultiMap> maps) throws IOException {
+        List<Map<?, ?>> listOfMaps = new ArrayList(maps);
         Set<Integer> lines = new HashSet<>();
         int startLine = pickle.getScenarioLocation().getLine();
         lines.add(startLine);
@@ -46,7 +46,7 @@ public class SourceParser {
             } else if (node instanceof Node.Scenario) {
                 scenario = ((GherkinMessagesScenario) node).getScenario();
             } else if (node instanceof Node.Example) {
-                LinkedMultiMap<String, String> map = ((GherkinMessagesExample) node).getLinkedMultiMap();
+                LinkedMultiMap map = ((GherkinMessagesExample) node).getLinkedMultiMap();
                 listOfMaps.add(map);
             }
         }
@@ -54,7 +54,7 @@ public class SourceParser {
         assert scenario != null;
         String source = reconstructScenarioSource(scenario);
 
-        String modified = String.valueOf(replaceNestedBrackets(source, listOfMaps));
+        String modified = String.valueOf(replaceNestedBrackets(source, (Map<?, ?>) listOfMaps));
         return getModifiedPickle(modified, pickle);
 //        modified = "Feature: Test feature" + "\n".repeat(startLine) + (isOutline ? modified.replaceFirst("Scenario Outline:", "Scenario:") : modified);
 

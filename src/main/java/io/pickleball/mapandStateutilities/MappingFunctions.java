@@ -16,13 +16,13 @@ import static io.pickleball.configs.Constants.flag1;
 public class MappingFunctions {
 
     @SafeVarargs
-    public static Object replaceNestedBrackets(Object input, Map<String, String>... maps) {
+    public static Object replaceNestedBrackets(Object input, Map<?, ?>... maps) {
         if (!(input instanceof String))
             return input;
         return replaceNestedBrackets(input, Arrays.stream(maps).toList());
     }
 
-    public static Object replaceNestedBrackets(Object input, List<Map<String, String>> maps) {
+    public static Object replaceNestedBrackets(Object input, List<Map<?, ?>> maps) {
         if (!(input instanceof String))
             return input;
         MapsWrapper mapsWrapper = new MapsWrapper(maps);

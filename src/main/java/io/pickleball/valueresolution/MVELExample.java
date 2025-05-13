@@ -17,7 +17,7 @@
 //// Example usage
 //public class MVELExample {
 //    public static void main(String[] args) {
-//        LinkedMultiMap<String, String> map = new LinkedMultiMap<>();
+//        LinkedMultiMap map = new LinkedMultiMap();
 //        map.put("test","AAA");
 //        map.put("complete","BBB");
 //        map.put("test complete","CCC");

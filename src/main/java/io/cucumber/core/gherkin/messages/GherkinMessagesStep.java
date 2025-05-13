@@ -187,11 +187,11 @@ public final class GherkinMessagesStep implements Step {
 
     @Override
     public String getText() {
-//        if (runTimeText == null)
-//            return pickleStep.getText();
-//        return runTimeText;
+        if (runTimeText == null)
+            return pickleStep.getText();
+        return runTimeText;
 
-        return pickleStep.getText();
+//        return pickleStep.getText();
     }
 
 
@@ -202,7 +202,7 @@ public final class GherkinMessagesStep implements Step {
         runFlag = templateStep.runFlag;
         colonNesting = templateStep.colonNesting;
         keyWord = templateStep.keyWord;
-        runTimeText = templateStep.runTimeText;
+        runTimeText =  templateStep.runTimeText;
         flagList = templateStep.flagList;
     }
 

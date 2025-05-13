@@ -49,6 +49,7 @@ public class FileAndDataParsing {
     }
 
     public static File getFile(String path)  {
+        System.out.println("@@getFile: " + path);
         URL resourceUrl = GlobalCache.class.getClassLoader().getResource(path);
         try {
             return new File(resourceUrl.toURI());

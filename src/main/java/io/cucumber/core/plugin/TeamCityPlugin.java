@@ -321,6 +321,11 @@ public class TeamCityPlugin implements EventListener {
         switch (status) {
             case SKIPPED: {
                 String message = error == null ? "Step skipped" : error.getMessage();
+                System.out.println("@@skipped: ");
+                System.out.println("@@timeStamp: " + timeStamp);
+                System.out.println("@@message: " + message);
+                System.out.println("@@name: " + name);
+//                error.printStackTrace();
                 print(TEMPLATE_TEST_IGNORED, timeStamp, duration, message, name);
                 break;
             }
@@ -498,6 +503,8 @@ public class TeamCityPlugin implements EventListener {
     }
 
     private String formatCommand(String command, Object... parameters) {
+        System.out.println("@@formatCommand: " + command);
+        System.out.println("@@parameters: " + Arrays.asList(parameters));
         String[] escapedParameters = new String[parameters.length];
         for (int i = 0; i < escapedParameters.length; i++) {
             escapedParameters[i] = escape(parameters[i].toString());
