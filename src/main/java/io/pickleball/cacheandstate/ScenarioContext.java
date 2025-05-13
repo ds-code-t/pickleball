@@ -228,10 +228,7 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
 
 
         System.out.println("@@isPrimary: " + isPrimary);
-        if (isPrimary)
-            runMaps = new MapsWrapper(this.passedMap, this.examplesMap, this.stateMap, getGlobalConfigs());
-        else
-            runMaps = new MapsWrapper(this.passedMap, this.examplesMap, this.stateMap, getPrimaryScenarioStateMap(), getGlobalConfigs());
+        runMaps = new MapsWrapper(this.passedMap, this.examplesMap, this.stateMap, getTestStateMap(), getGlobalConfigs());
 
 
     }

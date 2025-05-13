@@ -49,6 +49,14 @@ public class LinkedMultiMap<K, V> extends HashMap<K, V> {
     }
 
     @SuppressWarnings("unchecked")
+    public void parseDirectoriesContents(String... filePaths) {
+        File[] files = Arrays.stream(filePaths)
+                .map(path -> getFile(path))
+                .toArray(File[]::new);
+        parseDirectoriesContents(files);
+    }
+
+
     public void parseDirectoriesContents(File... filesOrDirs) {
         for(File file: filesOrDirs) {
             if (file.isDirectory()) {
@@ -80,6 +88,7 @@ public class LinkedMultiMap<K, V> extends HashMap<K, V> {
     public Object putConfig(String key, Object value) {
         return put((K) (configFlag + key), (V) value);
     }
+
 
     @SuppressWarnings("unchecked")
     @Override
