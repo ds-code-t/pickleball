@@ -19,5 +19,4 @@ Feature: debug2 text3
 
 
   Scenario: tesa
-    And ss
     * DDDqq 'sss' and 'vvvv'

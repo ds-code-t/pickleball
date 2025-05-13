@@ -94,6 +94,10 @@ public class MapsWrapper extends HashMap<String, Object> {
         sortMaps();
     }
 
+    public Object getConfig(String key) {
+        return get(configFlag + key);
+    }
+
     @Override
     public String get(Object key) {
         Object baseMapVal = super.get(key);

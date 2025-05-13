@@ -255,9 +255,7 @@ public class StepWrapper extends BaseContext {
         return gherkinMessagesStep.getColonNesting();
     }
 
-//    public List<String> getFlagList() {
-//        return gherkinMessagesStep.getFlagList();
-//    }
+   
 
 
     public ExecutionMode getRunExecutionMode(ExecutionMode startingExecutionMode, String runFlag) {

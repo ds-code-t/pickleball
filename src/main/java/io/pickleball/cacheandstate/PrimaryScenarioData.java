@@ -71,7 +71,7 @@ public class PrimaryScenarioData {
     }
 
     public static void setPrimaryScenario(ScenarioContext primaryScenario) {
-        primaryScenario.setPrimary(true);
+//        primaryScenario.setPrimary(true);
         getState().primaryScenario = primaryScenario;
     }
 

@@ -51,9 +51,6 @@ public class PickleStepTestStep extends TestStep implements io.cucumber.plugin.e
     public Runner runner;
 
 
-    GherkinMessagesStep getGherkinMessagesStep() {
-        return (GherkinMessagesStep) getStep();
-    }
 
     PickleStepTestStep(UUID id, URI uri, Step step, PickleStepDefinitionMatch definitionMatch) {
         this(id, uri, step, Collections.emptyList(), Collections.emptyList(), definitionMatch);

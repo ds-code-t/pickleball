@@ -56,7 +56,7 @@ public class ScenarioSteps {
 
             TestCase lastTestCase = null;
             for (TestCase testCase : testCases) {
-                testCase.setPrimary(false);
+//                testCase.setPrimary(false);
                 lastTestCase = testCase;
                 testCase.addChildScenarioContext(testCase);
                 testCase.runComponent(getRunner().bus);

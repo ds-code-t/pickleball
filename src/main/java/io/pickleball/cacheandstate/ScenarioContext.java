@@ -15,6 +15,7 @@ import java.util.regex.Pattern;
 
 import static io.cucumber.core.gherkin.messages.GherkinMessagesStep.bookmarksPattern;
 import static io.pickleball.cacheandstate.GlobalCache.getGlobalConfigs;
+import static io.pickleball.cacheandstate.GlobalCache.getState;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
 import static io.pickleball.cacheandstate.StepWrapper.TABLE_ROW_LOOP;
 import static io.pickleball.cucumberutilities.ArgumentParsing.convertCommandLineToArgv;
@@ -35,17 +36,19 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
     public static final Pattern KEYED_TABLE_Regex = Pattern.compile("^\"([A-Za-z0-9_-]+)\"\\s+TABLE$");
 
 
-    public void setPrimary(Boolean primary) {
-        if (isPrimary != null)
-            throw new PickleballException("Primary Scenario status already set");
-        isPrimary = primary;
-    }
+//    public void setPrimary(Boolean primary) {
+//        if (isPrimary != null)
+//            throw new PickleballException("Primary Scenario status already set");
+//        isPrimary = primary;
+//        System.out.println("@@##isPrimary1: " + isPrimary);
+//    }
+//
+//    public boolean isPrimary() {
+//        System.out.println("@@##isPrimary2: " + isPrimary);
+//        return (isPrimary != null && isPrimary);
+//    }
 
-    public boolean isPrimary() {
-        return (isPrimary != null && isPrimary == true);
-    }
-
-    private Boolean isPrimary = null;
+    private boolean isPrimary = false;
 
 
     public void setCurrentWrapperNum(int currentWrapperNum) {
@@ -201,6 +204,10 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         return getCurrentScenario().runMaps;
     }
 
+    public static Object getRunConfig(String key) {
+        return getCurrentScenario().runMaps.getConfig(key);
+    }
+
     public MapsWrapper configMaps;
 
     public ScenarioContext(UUID id, GherkinMessagesPickle pickle, Runner runner, LinkedMultiMap<String, String> passedMap) {
@@ -208,7 +215,7 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         this.pickle = pickle;
         this.passedMap = passedMap;
         this.runner = runner;
-
+        this.isPrimary = getState() == null;
         TableRow valuesRow = pickle.getMessagePickle().getValueRow();
 
         if (valuesRow != null) {
@@ -219,7 +226,9 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
             examplesMap = null;
         }
 
-        if (isPrimary())
+
+        System.out.println("@@isPrimary: " + isPrimary);
+        if (isPrimary)
             runMaps = new MapsWrapper(this.passedMap, this.examplesMap, this.stateMap, getGlobalConfigs());
         else
             runMaps = new MapsWrapper(this.passedMap, this.examplesMap, this.stateMap, getPrimaryScenarioStateMap(), getGlobalConfigs());

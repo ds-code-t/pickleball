@@ -4,6 +4,7 @@ package io.pickleball.cacheandstate;
 import io.cucumber.core.backend.Status;
 import io.cucumber.core.gherkin.messages.GherkinMessagesDataTableArgument;
 import io.cucumber.core.gherkin.messages.GherkinMessagesDocStringArgument;
+import io.cucumber.core.gherkin.messages.GherkinMessagesStep;
 import io.cucumber.core.runner.ExecutionMode;
 import io.cucumber.core.runner.PickleStepDefinitionMatch;
 import io.cucumber.core.runner.PickleStepTestStep;
@@ -28,6 +29,19 @@ import static io.pickleball.mapandStateutilities.MapsWrapper.mapPriority;
 public class StepContext {
 
 
+    GherkinMessagesStep getGherkinMessagesStep() {
+        if(this instanceof PickleStepTestStep)
+            return (GherkinMessagesStep) (((PickleStepTestStep)this).getStep());
+        return null;
+    }
+
+    public List<String> getFlagList() {
+        return getGherkinMessagesStep().getFlagList();
+    }
+
+    public  static List<String> getCurrentFlagList() {
+        return getCurrentStep().getFlagList();
+    }
 
 
 //    public int getTableRowCounter() {

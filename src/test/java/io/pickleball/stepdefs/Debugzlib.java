@@ -21,6 +21,7 @@ import io.pickleball.exceptions.SoftFailureException;
 
 import java.util.List;
 
+import static io.pickleball.cacheandstate.ScenarioContext.getRunConfig;
 import static io.pickleball.cucumberutilities.GeneralUtilities.waitTime;
 
 public class Debugzlib {
@@ -48,10 +49,13 @@ public class Debugzlib {
 //        System.out.println("@Before Scenario: " + scenario);
 //    }
 
-    @Given("^DDDqq '(.*)' and '(.*)'$")
+//    @Given("^DDDqq '(.*)' and '(.*)'$")
     @Given("^DDDqq '(.*)' and '(.*)'$")
     public void DDDqq(String t1, String t2, DataTable dt) {
-        waitTime(300L);
+        System.out.println("@@getConfig chromeL " + getRunConfig("chrome"));
+
+        System.out.println("t1: " + t1);
+        System.out.println("t2: " + t2);
         System.out.println("With data Table: " + dt);
     }
 

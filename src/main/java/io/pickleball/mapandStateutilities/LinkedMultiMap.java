@@ -72,6 +72,15 @@ public class LinkedMultiMap<K, V> extends HashMap<K, V> {
     }
 
 
+
+    public Object getConfig(String key) {
+        return get(configFlag + key);
+    }
+
+    public Object putConfig(String key, Object value) {
+        return put((K) (configFlag + key), (V) value);
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public V put(K key, V value) {

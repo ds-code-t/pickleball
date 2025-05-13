@@ -55,7 +55,7 @@ public final class GherkinMessagesStep implements Step {
     private final Location location;
     private int colonNesting = 0;
     private String runTimeText;
-    private List<String> flagList;
+    private List<String> flagList = new ArrayList<>();
 
     public List<String> getBookmarksList() {
         return bookmarksList;
@@ -226,6 +226,8 @@ public final class GherkinMessagesStep implements Step {
 
 
     public static final String BOOKMARKS = "@BOOKMARKS:";
+
+//    public static final String CONTEXT = "@CONTEXT-";
 
 
     public static final List<String> givenPrefixes = asList("* ", "Given ", ":", BOOKMARKS, RUN_ALWAYS, RUN_IF, END_SCENARIO, FAIL_SCENARIO, END_TEST, FAIL_TEST, RUN_ON_PASS, RUN_ON_FAIL, RUN_ON_HARD_FAIL, RUN_ON_SOFT_FAIL);
