@@ -1,22 +1,14 @@
 package io.pickleball.metafunctionalities;
 
-import io.cucumber.core.runner.PickleStepTestStep;
-import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.When;
 import io.pickleball.annotations.NoEventEmission;
-import io.pickleball.cacheandstate.BaseContext;
 import io.pickleball.cacheandstate.ScenarioContext;
 import io.pickleball.customtypes.DynamicStep;
 import io.pickleball.exceptions.PickleballException;
 
-import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import static io.cucumber.core.gherkin.messages.GherkinMessagesStep.*;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
-import static io.pickleball.configs.Constants.orSubstitue;
 import static io.pickleball.cucumberutilities.CucumberObjectFactory.createPickleStepTestStep;
 import static io.pickleball.valueresolution.BooleanResolver.resolveObjectToBoolean;
 

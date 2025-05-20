@@ -6,15 +6,16 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.LinkedListMultimap;
 import com.jayway.jsonpath.DocumentContext;
 import com.jayway.jsonpath.JsonPath;
+import io.pickleball.datafunctions.TypeConverter;
 
 import java.io.File;
 import java.util.*;
 
-import static io.pickleball.configs.Constants.sFlag2;
+import static io.pickleball.stringutilities.Constants.sFlag2;
 import static io.pickleball.datafunctions.FileAndDataParsing.*;
 
 
-public class LinkedMultiMap extends HashMap<Object, Object> {
+public class LinkedMultiMap extends HashMap<Object, Object> implements TypeConverter {
 
     public static final String configFlag = sFlag2 + "~mapConfig~";
 

@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
 
 import static io.pickleball.cacheandstate.PrimaryScenarioData.getCurrentScenarioStatus;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.getPrimaryScenarioStatus;
-import static io.pickleball.configs.Constants.*;
+import static io.pickleball.stringutilities.Constants.*;
 import static io.pickleball.stringutilities.ObjectTransformer.transformUntilStable;
 import static io.pickleball.valueresolution.BooleanResolver.booleanMap;
 
@@ -83,10 +83,6 @@ public class ExpressionEvaluator extends ParseTransformer { // Note: Class name 
 
     public Object evaluate(String expression, Map<String, Object> variables) {
         try {
-//            Object returObj = transformUntilStable(expression, exp -> evaluateOnce(String.valueOf(exp), variables));
-//            System.out.println("@@returObj: " + returObj);
-//            System.out.println("@@returObj.getClass: " + returObj.getClass());
-//            return returObj;
             return transformUntilStable(expression, exp -> evaluateOnce(String.valueOf(exp), variables));
         } catch (Exception e) {
             String message = e.getMessage();
@@ -120,13 +116,9 @@ public class ExpressionEvaluator extends ParseTransformer { // Note: Class name 
 
         MapsWrapper subReplace = new MapsWrapper();
 
-        System.out.println("@@preEvalString: " + preEvalString);
-
         String stringToEvaluate = preEvalString
                 .replaceAll("(\\[|,)(?:<.*>|\\{\\{.*\\}\\})(,)","$1'null'$2")
                 .replaceAll("(,)(?:<.*>|\\{\\{.*\\}\\})(\\])","$1'null'$2");
-
-        System.out.println("@@stringToEvaluate: " + stringToEvaluate);
 
 
         stringToEvaluate = subReplace.matchReplace(stringToEvaluate, arrayPattern, ARRAY_PREFIX + "_%s__" , "seq.list($1)", " %s ");
@@ -138,18 +130,6 @@ public class ExpressionEvaluator extends ParseTransformer { // Note: Class name 
 
         return wrapper.evaluate(stringToEvaluate, evalMap);
 
-//        Object returnObj = null;
-//        String originalValue = "";
-//        while(!stringToEvaluate.equals(originalValue)) {
-//            System.out.println("\n---\n@@originalValue== "  +  originalValue);
-//            System.out.println("@@stringToEvaluate== "  +  stringToEvaluate);
-//            originalValue = stringToEvaluate;
-//            returnObj = wrapper.evaluate(stringToEvaluate, evalMap);
-//            System.out.println("@@returnObj: "+ returnObj);
-//            stringToEvaluate = returnObj.toString();
-//        }
-//        System.out.println("@@returnObj: " + returnObj);
-//        return returnObj;
 
     }
 

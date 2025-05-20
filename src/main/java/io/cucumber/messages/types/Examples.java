@@ -29,7 +29,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.IntStream;
 
-import static io.pickleball.configs.Constants.SCENARIO_TAGS;
+import static io.pickleball.stringutilities.Constants.SCENARIO_TAGS;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 

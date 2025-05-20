@@ -25,8 +25,6 @@ public class EvalFunctions {
 
         @Override
         public AviatorObject variadicCall(Map<String, Object> env, AviatorObject... args) {
-            System.out.println("@@seq.list " + env);
-            System.out.println("@@args: " + Arrays.asList(args));
             EvalList customList = createEvalList();
 
             // Add all arguments to the list
@@ -47,8 +45,6 @@ public class EvalFunctions {
 
         @Override
         public AviatorObject variadicCall(Map<String, Object> env, AviatorObject... args) {
-            System.out.println("@@predicateCheck: " + env);
-            System.out.println("@@args: " + Arrays.asList(args));
             // Create instance of custom list
 
             String opChain = String.valueOf(args[0].getValue(env));

@@ -5,7 +5,7 @@ Feature: debug2 text3
     * DDDqq '<configs.driverconfigs>' and '<configs.appr.name>'
 
 
-
+   @FFFF
   Scenario: prec test 6
     * DDDqq 'a' and '11'
     * DDDqq 'a' and '222'

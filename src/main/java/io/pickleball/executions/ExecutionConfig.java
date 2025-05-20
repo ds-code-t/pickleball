@@ -2,7 +2,7 @@ package io.pickleball.executions;
 
 import java.util.List;
 
-import static io.pickleball.configs.Constants.PRIORITY_TAG;
+import static io.pickleball.stringutilities.Constants.PRIORITY_TAG;
 
 public class ExecutionConfig {
 

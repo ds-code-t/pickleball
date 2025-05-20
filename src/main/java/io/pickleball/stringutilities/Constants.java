@@ -1,4 +1,4 @@
-package io.pickleball.configs;
+package io.pickleball.stringutilities;
 
 import java.util.List;
 import java.util.regex.Pattern;

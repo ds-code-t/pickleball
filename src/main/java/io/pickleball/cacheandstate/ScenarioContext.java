@@ -35,18 +35,6 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
     public static final Pattern KEYED_TABLE_Regex = Pattern.compile("^\"([A-Za-z0-9_-]+)\"\\s+TABLE$");
 
 
-//    public void setPrimary(Boolean primary) {
-//        if (isPrimary != null)
-//            throw new PickleballException("Primary Scenario status already set");
-//        isPrimary = primary;
-//        System.out.println("@@##isPrimary1: " + isPrimary);
-//    }
-//
-//    public boolean isPrimary() {
-//        System.out.println("@@##isPrimary2: " + isPrimary);
-//        return (isPrimary != null && isPrimary);
-//    }
-
     private boolean isPrimary = false;
 
 
@@ -225,11 +213,7 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
             examplesMap = null;
         }
 
-
-        System.out.println("@@isPrimary: " + isPrimary);
         runMaps = new MapsWrapper(this.passedMap, this.examplesMap, this.stateMap, getTestStateMap(), getGlobalConfigs());
-
-
     }
 
 

@@ -3,7 +3,7 @@ package io.pickleball.valueresolution;
 
 import java.util.*;
 
-import static io.pickleball.configs.Constants.sFlag2;
+import static io.pickleball.stringutilities.Constants.sFlag2;
 import static io.pickleball.datafunctions.EvalList.wrapListItems;
 
 public class BooleanResolver {

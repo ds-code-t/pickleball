@@ -39,6 +39,7 @@ import io.cucumber.core.backend.StaticHookDefinition;
 import io.cucumber.core.backend.StepDefinition;
 import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.core.gherkin.Step;
+import io.cucumber.core.gherkin.messages.GherkinMessagesStep;
 import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.core.stepexpression.StepExpression;
 import io.cucumber.core.stepexpression.StepExpressionFactory;
@@ -439,6 +440,7 @@ public final class CachingGlue implements Glue {
 
     public List<PickleStepDefinitionMatch> stepDefinitionMatches(URI uri, Step step) {
         List<PickleStepDefinitionMatch> result = new ArrayList<>();
+        GherkinMessagesStep gStep = (GherkinMessagesStep) step;
         for (CoreStepDefinition coreStepDefinition : stepDefinitionsByPattern.values()) {
             List<Argument> arguments = coreStepDefinition.matchedArguments(step);
             if (arguments != null) {

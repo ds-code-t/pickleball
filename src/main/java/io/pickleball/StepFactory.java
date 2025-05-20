@@ -9,6 +9,8 @@ import io.cucumber.messages.IdGenerator;
 import io.cucumber.messages.types.*;
 import io.pickleball.cucumberutilities.SimpleIdGenerator;
 
+import java.lang.Exception;
+import java.math.BigInteger;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -78,8 +80,8 @@ public class StepFactory {
                 pickleStep,
                 pickle.getDialect(), previousGivenWhenThen,
                 new io.cucumber.plugin.event.Location(Math.toIntExact(pickleStep.getStepTemplate().getLocation().getLine()), 0),
+//                pickleStep.keyWord());
                 pickleStep.getStepTemplate().getKeyword());
-
     }
 
 

@@ -8,19 +8,17 @@ public interface Registerable {
     // ThreadLocal Multimap to store lists of instances per thread
     ThreadLocal<Multimap<String, Registerable>> INSTANCES = ThreadLocal.withInitial(ArrayListMultimap::create);
 
+    default void register() {
+        register(getRegisterableName());
+    }
+
     // Default method to register instance with modified key
     default void register(String key) {
-        String modifiedKey = key + "_" + getRegisterableName();
+//        String modifiedKey = key + "_" + getRegisterableName();
         Multimap<String, Registerable> multimap = INSTANCES.get();
         // Prevent duplicate instance for same key
-        if (!multimap.get(modifiedKey).contains(this)) {
-            multimap.put(modifiedKey, this);
-        }
-
-        String registeredKey = "Registered_" + key;
-        // Also register under "Registered_" + key
-        if (!multimap.get(registeredKey).contains(this)) {
-            multimap.put(registeredKey, this);
+        if (!multimap.get(key).contains(this)) {
+            multimap.put(key, this);
         }
     }
 

@@ -55,6 +55,16 @@ public final class GherkinMessagesStep implements Step {
     private final Location location;
     private int colonNesting = 0;
     private String runTimeText;
+
+    public String getStepPrefix() {
+        if (stepPrefix == null)
+            return keyWord;
+        return stepPrefix;
+    }
+
+    private String stepPrefix;
+
+
     private List<String> flagList = new ArrayList<>();
 
     public List<String> getBookmarksList() {
@@ -187,11 +197,11 @@ public final class GherkinMessagesStep implements Step {
 
     @Override
     public String getText() {
-        if (runTimeText == null)
-            return pickleStep.getText();
-        return runTimeText;
+//        if (runTimeText == null)
+//            return pickleStep.getText();
+//        return runTimeText;
 
-//        return pickleStep.getText();
+        return pickleStep.getText();
     }
 
 
@@ -202,7 +212,8 @@ public final class GherkinMessagesStep implements Step {
         runFlag = templateStep.runFlag;
         colonNesting = templateStep.colonNesting;
         keyWord = templateStep.keyWord;
-        runTimeText =  templateStep.runTimeText;
+        runTimeText = templateStep.runTimeText;
+        stepPrefix = templateStep.stepPrefix;
         flagList = templateStep.flagList;
     }
 
@@ -237,7 +248,7 @@ public final class GherkinMessagesStep implements Step {
     ).toArray(String[]::new);
 
     public int parseRunTimeParameters() {
-        return parseRunTimeParameters(getKeyWord() + " " + getText());
+        return parseRunTimeParameters(getStepPrefix() + " " + getText());
     }
 
     //    @RUN-ALWAYS:
@@ -262,12 +273,12 @@ public final class GherkinMessagesStep implements Step {
     public static Pattern bookmarksPattern = Pattern.compile("&\\S+\\s");
 
     public int parseRunTimeParameters(String initialText) {
-
-        Pattern pattern = Pattern.compile("^(?<colons>(?:\\s*:)*)\\s*(?<flags>@\\S*\\s+)*(?:(?<keyWord>[^@\\s]+\\s+)(?<stepText>.*))?$");
+        Pattern pattern = Pattern.compile("^(?<stepPrefix>(?<colons>(?:\\s*:)*)\\s*(?<flags>@\\S*\\s+)*(?:(?<keyWord>[^@:\\s]+\\s+)))(?<stepText>.*)?$");
 
         Matcher matcher = pattern.matcher(initialText);
 
         if (matcher.find()) {
+            stepPrefix = matcher.group("stepPrefix");
             runTimeText = matcher.group("stepText");
             colonNesting = Optional.ofNullable(matcher.group("colons"))
                     .map(s -> s.replaceAll("\\s+", "").length())
@@ -292,10 +303,7 @@ public final class GherkinMessagesStep implements Step {
                         else if (runFlag.contains(RUN_IF))
                             runTimeText = "IF: false ";
                     }
-//                    else if (runFlag.contains(RUN_IF) && !runTimeText.startsWith("IF:")) {
-//                        System.out.println("@@RUN_IF 2 - ");
-//                        runTimeText = "IF: " + runTimeText;
-//                    }
+
                     if (runFlag.endsWith(IFSuffix)) {
                         runFlag = runFlag.replace(IFSuffix, ":");
                         if (!runTimeText.startsWith("IF:"))
@@ -332,7 +340,6 @@ public final class GherkinMessagesStep implements Step {
 
         if (!runFlag.isEmpty())
             setTextSuffix(" - " + runFlag);
-
 
 
         return colonNesting;

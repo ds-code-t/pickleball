@@ -1,6 +1,6 @@
 package io.pickleball.stringutilities;
 
-import static io.pickleball.configs.Constants.*;
+import static io.pickleball.stringutilities.Constants.*;
 
 public class ExpressionParsing {
     private static final String BOOLEAN_OPERATOR = "\\b(and|or)\\b";

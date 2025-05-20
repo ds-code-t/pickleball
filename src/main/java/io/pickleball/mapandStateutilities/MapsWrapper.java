@@ -1,5 +1,7 @@
 package io.pickleball.mapandStateutilities;
 
+import io.pickleball.datafunctions.TypeConverter;
+
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
@@ -9,12 +11,12 @@ import java.util.stream.Stream;
 
 import static io.pickleball.mapandStateutilities.LinkedMultiMap.configFlag;
 
-public class MapsWrapper extends HashMap<String, Object> {
+public class MapsWrapper extends HashMap<String, Object> implements TypeConverter {
     public static final String mapPriority = configFlag + "priority";
     final public List<Map<?, ?>> mapList;
     private final LinkedMultiMap firstMap = new LinkedMultiMap();
     private final LinkedMultiMap lastMap = new LinkedMultiMap();
-    ;
+    
 
 //    private LinkedMultiMap<String, LinkedMultiMap> keyedMaps = new LinkedMultiMap();
 //    private Map<String, LinkedMultiMap> keyedMaps = new HashMap<>();

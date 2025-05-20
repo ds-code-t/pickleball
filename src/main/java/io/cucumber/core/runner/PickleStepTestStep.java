@@ -176,6 +176,9 @@ public class PickleStepTestStep extends TestStep implements io.cucumber.plugin.e
     public String getStepText() {
         return step.getText();
     }
+    public String getRuntimeText() {
+        return ((GherkinMessagesStep)step).getRunTimeText();
+    }
 
     public Pickle getPickle() {
         return pickle;

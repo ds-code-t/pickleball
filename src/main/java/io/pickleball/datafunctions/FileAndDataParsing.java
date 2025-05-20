@@ -49,7 +49,6 @@ public class FileAndDataParsing {
     }
 
     public static File getFile(String path)  {
-        System.out.println("@@getFile: " + path);
         URL resourceUrl = GlobalCache.class.getClassLoader().getResource(path);
         try {
             return new File(resourceUrl.toURI());
@@ -58,6 +57,10 @@ public class FileAndDataParsing {
         }
     }
 
+
+    public static JsonNode getJsonNode(String path) {
+        return buildJsonFromPath(getFile(path));
+    }
 
     public static JsonNode buildJsonFromPath(File fileOrDir) {
         if (fileOrDir.isFile()) {

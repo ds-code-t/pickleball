@@ -11,9 +11,8 @@ import io.pickleball.mapandStateutilities.LinkedMultiMap;
 import java.util.*;
 
 import static io.pickleball.cacheandstate.PrimaryScenarioData.*;
-import static io.pickleball.configs.Constants.COMPONENT_PATH;
-import static io.pickleball.configs.Constants.SCENARIO_TAGS;
-import static io.pickleball.cucumberutilities.GeneralUtilities.waitTime;
+import static io.pickleball.stringutilities.Constants.COMPONENT_PATH;
+import static io.pickleball.stringutilities.Constants.SCENARIO_TAGS;
 
 
 public class ScenarioSteps {
@@ -28,10 +27,7 @@ public class ScenarioSteps {
         // Parse command-line arguments into RuntimeOptions
         for (LinkedMultiMap map : dataTable.asLinkedMultiMaps(String.class, String.class)) {
 
-//            Object tagsObj = map.getOrDefault(SCENARIO_TAGS, "");
-//            System.out.println("@@tagsObj: " + tagsObj);
             String tags = String.valueOf(map.getOrDefault(SCENARIO_TAGS, ""));
-//            String tags = map.getOrDefault("Scenario Tags #1", "");
             map.put("_calling tags", tags);
 
             String componentPaths = (String) map.getOrDefault(COMPONENT_PATH, "src/test/resources/features");

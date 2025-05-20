@@ -26,7 +26,7 @@ package io.cucumber.gherkin;
 
 import java.util.regex.Pattern;
 
-import static io.pickleball.configs.Constants.sFlag2;
+import static io.pickleball.stringutilities.Constants.sFlag2;
 
 public class StringUtils {
 

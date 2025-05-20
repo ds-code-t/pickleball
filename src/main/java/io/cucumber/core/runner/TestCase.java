@@ -147,8 +147,6 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
 
         Integer i = -1;
         while (true) {
-            System.out.println("@@@runStatus: " + runStatus);
-            System.out.println("@@@i-1: " + i);
             switch (runStatus) {
                 case NORMAL -> i++;
                 case FIND_NEXT -> i = findBoundaryValue(i, true);
@@ -167,8 +165,6 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
                 throw new PickleballException("Could not find matching step for: '" + (goToRegex == null ? goToBookmarks : goToRegex) + "'");
 
 
-            System.out.println("@@@i-2: " + i);
-            System.out.println("@@allSteps: " + allSteps.size());
             if (i < 0 || i >= allSteps.size()) {
                 System.out.println("End Of Scenario: " + getName());
                 break;
@@ -189,12 +185,9 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
             Iterator<LinkedMultiMap> tableRowIterator = stepWrapper.tableMaps.iterator();
             do {
                 LinkedMultiMap rowMap =  tableRowIterator.hasNext() ? tableRowIterator.next() : null;
-                System.out.println("@@nextExecutionMode11 : "+ nextExecutionMode);
                 nextExecutionMode = stepWrapper
                         .run(this, bus, state, nextExecutionMode, null, rowMap)
                         .next(nextExecutionMode);
-                System.out.println("@@nextExecutionMode22 : "+ nextExecutionMode);
-
             } while (tableRowIterator.hasNext());
 
 

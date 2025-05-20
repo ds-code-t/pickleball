@@ -1,7 +1,7 @@
 package io.pickleball.cucumberutilities;
 
 import static io.cucumber.gherkin.StringUtils.TRIM;
-import static io.pickleball.configs.Constants.sFlag2;
+import static io.pickleball.stringutilities.Constants.sFlag2;
 
 public class SourceParsing {
 

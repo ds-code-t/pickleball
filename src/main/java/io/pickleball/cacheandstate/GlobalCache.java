@@ -58,7 +58,6 @@ public class GlobalCache {
                 }
             }
         }
-//        System.out.println("@@globalConfigs: " + globalConfigs);
         return globalConfigs;
     }
 

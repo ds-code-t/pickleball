@@ -76,7 +76,6 @@ public final class Runner {
     ) {
         System.out.println(Arrays.toString(Thread.currentThread().getStackTrace()));
 //        setProjectRoot(runnerOptions);
-//        System.out.println("@@getGlobalConfigs(): " + getGlobalConfigs());
         this.bus = bus;
         this.runnerOptions = runnerOptions;
         this.backends = backends;
