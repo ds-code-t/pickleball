@@ -17,6 +17,7 @@ import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import io.pickleball.exceptions.SoftFailureException;
+import io.pickleball.mapandStateutilities.LinkedMultiMap;
 //import io.cucumber.messages.types.DataTable;
 
 import java.util.List;
@@ -109,11 +110,38 @@ public class Debugzlib {
 //        System.out.println(" BBBBBBB , t1:" + t1 + " , t2:" + t2);
 //    }
 
-    @Given("I have the following string list: {stringList}")
-    public void handleStringList(List<String> stringList) {
+    @Given("I have the following string list: {inLineList}")
+    public void handleStringList(List<?> list) {
         // stringList will contain: ["item, one", "item \"two\"", "item three", ""]
-        System.out.println(stringList.size());
-        stringList.forEach(s -> System.out.println("\n@@item: " + s));
+        System.out.println("@@list:: " + list.getClass());
+        System.out.println("@@list SIZE:: " + list.size());
+        System.out.println("@@list:: " +list);
+
+    }
+
+
+
+    @Given("zz {inLineList}")
+    public void handleStringListmmm(List<?> list) {
+        // stringList will contain: ["item, one", "item \"two\"", "item three", ""]
+        System.out.println("@@list:: " + list.getClass());
+        System.out.println("@@list SIZE:: " + list.size());
+        System.out.println("@@list:: " +list);
+
+    }
+
+    @Given("zz {inLineMap}")
+    public void handleStringListss(LinkedMultiMap map) {
+        // stringList will contain: ["item, one", "item \"two\"", "item three", ""]
+        System.out.println("@@MAP SIZE:: " + map.size());
+        System.out.println("@@MAP:: " +map);
+    }
+
+    @Given("I have the following string list: {inLineMap}")
+    public void handleStringList(LinkedMultiMap map) {
+        // stringList will contain: ["item, one", "item \"two\"", "item three", ""]
+        System.out.println("@@MAP SIZE:: " + map.size());
+        System.out.println("@@MAP:: " +map);
     }
 
     @When("I execute a steplzz")

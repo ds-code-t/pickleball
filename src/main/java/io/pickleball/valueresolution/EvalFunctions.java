@@ -5,6 +5,7 @@ import com.googlecode.aviator.runtime.type.AviatorObject;
 import com.googlecode.aviator.runtime.type.AviatorRuntimeJavaType;
 import io.pickleball.datafunctions.EvalList;
 import io.pickleball.exceptions.PickleballException;
+import io.pickleball.mapandStateutilities.LinkedMultiMap;
 
 import java.lang.reflect.Array;
 import java.util.Arrays;
@@ -15,7 +16,29 @@ import java.util.function.Predicate;
 import static io.pickleball.datafunctions.EvalList.createEvalList;
 
 public class EvalFunctions {
+    public static class SeqMapFunctionOverride extends AbstractVariadicFunction {
+        @Override
+        public String getName() {
+            return "seq.map"; // Overrides built-in seq.list
+        }
 
+        @Override
+        public AviatorObject variadicCall(Map<String, Object> env, AviatorObject... args) {
+
+//            EvalList customList = createEvalList();
+            LinkedMultiMap linkedMultiMap = new LinkedMultiMap();
+
+            // Add all arguments to the list
+            for (int i = 0; i < args.length; i += 2) {
+                Object key = args[i].getValue(env);
+                Object value = args[i + 1].getValue(env);
+                linkedMultiMap.put(key, value);
+            }
+
+            // Return as AviatorRuntimeJavaType, not AviatorJavaType
+            return new AviatorRuntimeJavaType(linkedMultiMap);
+        }
+    }
 
     public static class SeqListFunctionOverride extends AbstractVariadicFunction {
         @Override
@@ -25,10 +48,13 @@ public class EvalFunctions {
 
         @Override
         public AviatorObject variadicCall(Map<String, Object> env, AviatorObject... args) {
+            System.out.println("@@seq.list");
+
             EvalList customList = createEvalList();
 
             // Add all arguments to the list
             for (AviatorObject arg : args) {
+                System.out.println("@@list-arg: " + arg);
                 customList.addObject(arg.getValue(env));
             }
 
@@ -40,7 +66,7 @@ public class EvalFunctions {
     public static class predicateCheck extends AbstractVariadicFunction {
         @Override
         public String getName() {
-            return "predicateCheck"; // Overrides built-in seq.list
+            return "predicateCheck";
         }
 
         @Override

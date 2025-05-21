@@ -46,6 +46,7 @@ public class AviatorWrapper {
     public AviatorWrapper() {
         evaluator = AviatorEvaluator.getInstance(); // Fresh instance
         evaluator.addFunction(new EvalFunctions.SeqListFunctionOverride());
+        evaluator.addFunction(new EvalFunctions.SeqMapFunctionOverride());
         evaluator.addFunction(new EvalFunctions.predicateCheck());
         evaluator.aliasOperator(OperatorType.AND, "AND");
         evaluator.aliasOperator(OperatorType.OR, "OR");

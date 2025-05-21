@@ -4,18 +4,29 @@ import io.pickleball.valueresolution.ValueChecker;
 
 import java.math.BigDecimal;
 
+import static io.pickleball.cucumberutilities.GeneralUtilities.waitTime;
 import static io.pickleball.stringutilities.QuoteExtracter.QUOTED_STRING_REGEX;
 import static io.pickleball.valueresolution.BooleanResolver.resolveObjectToBoolean;
 
 
 public class ValWrapper implements ValueChecker {
     private final String stringVal;
+
+    public Object getValue() {
+        if(initialVal instanceof String)
+            return getString();
+        return initialVal;
+    }
+
+    public Object getInitialVal() {
+        return initialVal;
+    }
+
     private final Object initialVal;
     private final Class<?> originalType;
     private final String stringType;
 
     private ValWrapper(Object obj) {
-
         if (obj instanceof ValWrapper) {
             initialVal = ((ValWrapper) obj).initialVal;
         } else {

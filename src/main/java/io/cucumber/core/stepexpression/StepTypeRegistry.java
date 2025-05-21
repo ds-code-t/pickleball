@@ -34,14 +34,22 @@ import io.cucumber.datatable.TableEntryByTypeTransformer;
 import io.cucumber.docstring.DocStringType;
 import io.cucumber.docstring.DocStringTypeRegistry;
 import io.pickleball.customtypes.DynamicStep;
+import io.pickleball.datafunctions.EvalList;
+import io.pickleball.mapandStateutilities.LinkedMultiMap;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
+
+import static io.pickleball.cacheandstate.PrimaryScenarioData.getMvelWrapper;
+import static io.pickleball.cacheandstate.ScenarioContext.getRunMaps;
 import static io.pickleball.stringutilities.Constants.*;
 import static io.pickleball.stringutilities.QuoteExtracter.QUOTED_STRING_REGEX;
 import static io.pickleball.valueresolution.BooleanResolver.resolveObjectToBoolean;
+import static io.pickleball.valueresolution.ExpressionEvaluator.arrayPatternString;
+import static io.pickleball.valueresolution.ExpressionEvaluator.mapPatternString;
 
 public final class StepTypeRegistry implements io.cucumber.core.api.TypeRegistry {
 
@@ -179,27 +187,26 @@ public final class StepTypeRegistry implements io.cucumber.core.api.TypeRegistry
 // Define the reusable quotedString regex
 
 // Define the stringList ParameterType
-        parameterTypeRegistry.defineParameterType(new ParameterType<>(
-                "stringList",                            // Name of the composite parameter type
-                "\\[\\s*(?:" + QUOTED_STRING_REGEX + ")(?:\\s*,\\s*(?:" + QUOTED_STRING_REGEX + "))*\\s*\\]", // Embed quotedString regex
-                List.class,                              // Target class
+        parameterTypeRegistry.defineParameterType(new ParameterType<List>(
+                "inLineList",
+                "(\\bLIST:\\s*\\[[^:=\\[\\]]*\\])",
+                List.class,
                 (String input) -> {
-                    if (input == null || input.equals("[]")) {
-                        return List.of();                // Handle empty list
-                    }
-                    // Remove square brackets and parse inner content
-                    String innerContent = input.substring(1, input.length() - 1).trim();
-                    Matcher matcher = QUOTED_STRING_REGEX.matcher(innerContent);
-                    List<String> result = new ArrayList<>();
-                    while (matcher.find()) {
-                        String match = matcher.group();
-                        char quote = match.charAt(0);     // Get the opening quote character
-                        String content = match.substring(1, match.length() - 1); // Remove quotes
-                        content = content.replace("\\" + quote, String.valueOf(quote)) // Unescape the quote character
-                                .replace("\\\\", "\\"); // Unescape backslashes
-                        result.add(content);
-                    }
-                    return result;
+                    Object obj = getMvelWrapper().evaluate(input, getRunMaps());
+                    return ((EvalList) obj).mapToArrayList();
+                }
+        ));
+
+        // Define the stringList ParameterType
+        parameterTypeRegistry.defineParameterType(new ParameterType<LinkedMultiMap>(
+                "inLineMap",                            // Name of the composite parameter type
+                "(\\bMAP:\\s*\\[[^\\[\\]]*\\])",
+                LinkedMultiMap.class,                              // Target class
+                (String input) -> {
+                    Object obj = getMvelWrapper().evaluate(input, getRunMaps());
+                    System.out.println("@@obj::: "+ obj);
+                    System.out.println("@@obj getClass::: "+ obj.getClass());
+                    return (LinkedMultiMap) obj;
                 }
         ));
 

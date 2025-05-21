@@ -13,7 +13,9 @@ import static io.pickleball.valueresolution.ExpressionEvaluator.VALUE_PREFIX;
 
 public class QuoteExtracter extends HashMap<String, Object> {
     // Pattern that captures quoted strings, handling escaped quotes
-    public static final Pattern QUOTED_STRING_REGEX = Pattern.compile("(?<!\\\\)(['\"`])((?:\\\\.|(?!\\1).)*?)(?<!\\\\)(?:\\\\\\\\)*\\1");
+    public static final String QUOTED_STRING_REGEX_String = "(?<!\\\\)(['\"`])((?:\\\\.|(?!\\1).)*?)(?<!\\\\)(?:\\\\\\\\)*\\1";
+    public static final Pattern QUOTED_STRING_REGEX = Pattern.compile(QUOTED_STRING_REGEX_String);
+//    public static final Pattern QUOTED_STRING_REGEX = Pattern.compile("(?<!\\\\)(['\"`])((?:\\\\.|(?!\\1).)*?)(?<!\\\\)(?:\\\\\\\\)*\\1");
 
     private static final char MASK_CONTENT_CHAR = '\u2404';
     private static final char MASK_BOUNDARY_CHAR = '\u2405';

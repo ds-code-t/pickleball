@@ -11,6 +11,32 @@ import static io.pickleball.datafunctions.EvalList.CheckMode.*;
 
 public class EvalList extends ArrayList<ValWrapper> implements ValueChecker {
 
+    public ArrayList<?> mapToArrayList() {
+        return new ArrayList<>(this.stream()
+                .map(ValWrapper::getValue)
+                .toList());
+    }
+
+    public ArrayList<?> mapToStringArrayList() {
+        forEach(s -> {
+            System.out.println("\n--------\n@s:  " + s);
+            System.out.println("@s.class:  " + s.getClass());
+
+            System.out.println("@s.getInitialVal():  " + s.getInitialVal());
+            System.out.println("@s.getInitialVal().class:  " + s.getInitialVal().getClass());
+
+
+            System.out.println("@s.getString():  " + s.getString());
+            System.out.println("@s.getString().class:  " + s.getString().getClass());
+
+
+
+        });
+        return new ArrayList<>(this.stream()
+                .map(ValWrapper::getString)
+                .toList());
+    }
+
     public enum CheckMode {
         ANY,
         NONE,

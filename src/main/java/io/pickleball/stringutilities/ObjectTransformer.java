@@ -20,7 +20,6 @@ public class ObjectTransformer {
      */
     public static Object transformUntilStable(Object input,
                                               Function<Object, Object> transformation) {
-
         return transformUntilStable(input, transformation,
                 DEFAULT_MAX_ITERATIONS, DEFAULT_EXCEPTION);
     }
