@@ -25,11 +25,13 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static io.pickleball.datafunctions.FileAndDataParsing.getFile;
+
 
 
 //import static io.pickleball.pathrools.ProjectRootUtils.getConfigPaths;
@@ -51,18 +53,16 @@ public class GlobalCache {
 
 
     public static LinkedMultiMap getGlobalConfigs() {
-        if (globalConfigs == null){
+        if (globalConfigs == null) {
             synchronized (lock) {
-                if (globalConfigs == null){
-                    globalConfigs = new LinkedMultiMap(getFile("configs"));
+                if (globalConfigs == null) {
+                    globalConfigs = LinkedMultiMap.createMapFromPath("configs/defaults.yaml");
+                    System.out.println("@@globalConfigs: " + globalConfigs);
                 }
             }
         }
         return globalConfigs;
     }
-
-
-
 
 
     public static GherkinMessagesFeature getParsedFeature(URI uri) {

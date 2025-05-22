@@ -1219,7 +1219,7 @@ public class DataTable {
         return values;
     }
 
-    public  LinkedMultiMap asLinkedMultiMap(Object keyType, Object valueType) {
+    public  LinkedMultiMap asLinkedMultiMap() {
         List<List<String>> rows = this.cells(); // Use existing cells() method
         if (rows.isEmpty() || rows.get(0).isEmpty()) {
             return new LinkedMultiMap(); // Return an empty LinkedMultiMap for empty data
@@ -1227,27 +1227,32 @@ public class DataTable {
 
         List<Object> keys = new ArrayList<>();
         List<Object> values = new ArrayList<>();
-        for (List<String> row : rows) {
-//            Object key = convertValue(row.get(0), keyType); // Convert the first column to keys
-//            Object value = row.size() > 1 ? convertValue(row.get(1), valueType) : null; // Convert the second column to values
-            Object key = row.get(0);
-            Object value = row.size() > 1 ? row.get(1) : null; // Convert the second column to values
-            keys.add(key);
-            values.add(value);
+        List<String> keyRow = rows.get(0);
+        if(rows.size() ==1)
+        {
+            keyRow.forEach(keyString -> {
+                keys.add(keyString);
+                values.add(null);
+            });
+        }
+
+        for (int i =1; i < rows.size(); i ++) {
+            List<String> valRow = rows.get(i);
+            System.out.println("@@valRow: " + valRow);
+            for(int k = 0; k < keyRow.size(); k++)
+            {
+                keys.add(keyRow.get(k));
+                values.add(k < valRow.size()  ? valRow.get(k) : null);
+            }
         }
 
         return new LinkedMultiMap(keys, values);
     }
 
-    public List<LinkedMultiMap> asLinkedMultiMaps() {
-        return asLinkedMultiMaps(Object.class, Object.class);
-    }
 
-    public List<LinkedMultiMap> asLinkedStringMultiMaps() {
-        return asLinkedMultiMaps(String.class, String.class);
-    }
 
-    public  List<LinkedMultiMap> asLinkedMultiMaps(Object keyType, Object valueType) {
+
+    public  List<LinkedMultiMap> asLinkedMultiMaps() {
         List<List<String>> rows = this.cells(); // Use existing cells() method
 
         if (rows.size()<2) {

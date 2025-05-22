@@ -25,7 +25,7 @@ public class ScenarioSteps {
         StepContext originalStep = getCurrentStep();
 
         // Parse command-line arguments into RuntimeOptions
-        for (LinkedMultiMap map : dataTable.asLinkedMultiMaps(String.class, String.class)) {
+        for (LinkedMultiMap map : dataTable.asLinkedMultiMaps()) {
 
             String tags = String.valueOf(map.getOrDefault(SCENARIO_TAGS, ""));
             map.put("_calling tags", tags);

@@ -1,12 +1,24 @@
 Feature: sdf
 
+
+
+
   Scenario: ssdasdQQss3
     Given I am running a testlzz 1-<AA> and 1-<BB>
     : Given I am running a testlzz 2-<AA> and 2-<BB>
     * -TABLE-ROW-LOOP-
+      | AA | BB |
+      | 33 | 44  |
+    :: Given I am running a testlzz 2-<AA> and 2-<BB>
+    ::: Given I am running a testlzz 2-<AA> and 2-<BB>
+    * -TABLE-ROW-LOOP-
     | AA | BB |
     | 11 | 22  |
 
+    Given I am running a testlzz 1-<AA> and 1-<BB>
+  : Given I am running a testlzz 2-<AA> and 2-<BB>
+  :: Given I am running a testlzz 2-<AA> and 2-<BB>
+  ::: Given I am running a testlzz 2-<AA> and 2-<BB>
 
 
 
@@ -366,7 +378,11 @@ Feature: sdf
   @zzs82q
   Scenario Outline: Component CCC 8 <Scenario> <arg1> <A> <B>
     Given I am running a testlzz EwRROR and <arg1>
-    Given I am running a testlzz 5 and 6
+    Given I am running a testlzz <dA1> and <dA1.dB1>
+    Given I am running a testlzz 111 and <dA1.dB3.dA1.dB3.dC1>
+    Given I am running a testlzz 111 and <dA1.dB3.dA1.dB3.dC2>
+    Given I am running a testlzz 222 and <dA1.dB3.dA1.dB3>
+#    Given I am running a testlzz <defaults.dA1> and <defaults.dA1.dB1>
     Given I am running a testlzz 3 and 4
     Given I am running a testlzz 5 and 6
     Given I am running a testlzz bbb<A> and <B>

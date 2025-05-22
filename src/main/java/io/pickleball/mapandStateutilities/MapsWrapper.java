@@ -15,12 +15,25 @@ public class MapsWrapper extends HashMap<String, Object> implements TypeConverte
     public static final String mapPriority = configFlag + "priority";
     final public List<Map<?, ?>> mapList;
     private final LinkedMultiMap firstMap = new LinkedMultiMap();
+    private LinkedMultiMap tempMap = new LinkedMultiMap();
     private final LinkedMultiMap lastMap = new LinkedMultiMap();
     
 
 //    private LinkedMultiMap<String, LinkedMultiMap> keyedMaps = new LinkedMultiMap();
 //    private Map<String, LinkedMultiMap> keyedMaps = new HashMap<>();
 //    private Map<String, Integer> keyCount = new HashMap<>();
+
+    public void clearTempMap(){
+//        tempMap = new LinkedMultiMap();
+        mapList.remove(tempMap);
+    }
+
+    public void setTempMap(LinkedMultiMap tempMap){
+        this.tempMap = tempMap;
+        System.out.println("@@tempMap: " + tempMap);
+        System.out.println("@@tempMap.get(\"url\"): " + tempMap.get("url"));
+        mapList.add(1, tempMap);
+    }
 
 
     private static final AtomicInteger instanceCounter = new AtomicInteger(0);

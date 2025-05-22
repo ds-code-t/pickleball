@@ -3,7 +3,6 @@ package io.pickleball.cacheandstate;
 import io.cucumber.core.backend.Status;
 import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.core.exception.CucumberException;
-import io.cucumber.core.gherkin.DocStringArgument;
 import io.cucumber.core.gherkin.messages.GherkinMessagesDataTableArgument;
 import io.cucumber.core.gherkin.messages.GherkinMessagesPickle;
 import io.cucumber.core.gherkin.messages.GherkinMessagesStep;
@@ -24,6 +23,7 @@ import static io.cucumber.gherkin.PickleCompiler.pickleStepTypeFromKeywordType;
 import static io.pickleball.StepFactory.createGherkinMessagesStep;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.getCurrentState;
 
+import static io.pickleball.cacheandstate.ScenarioContext.getRunMaps;
 import static io.pickleball.mapandStateutilities.MappingFunctions.replaceNestedBrackets;
 
 public class StepWrapper extends BaseContext {
@@ -102,7 +102,8 @@ public class StepWrapper extends BaseContext {
 
     public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode startingExecutionMode, io.cucumber.core.runner.PickleStepTestStep parentStep, LinkedMultiMap... stepTables) {
 
-        LinkedMultiMap[] newStepMaps = parentStep == null ? stepTables : Stream.concat(parentStep.getAllStepMaps().stream(), Arrays.stream(stepTables))
+//        LinkedMultiMap[] newStepMaps = parentStep == null ? stepTables : Stream.concat(parentStep.getAllInheritedMaps().stream(), Arrays.stream(stepTables))
+        LinkedMultiMap[] newStepMaps = parentStep == null ? stepTables : Stream.concat(Arrays.stream(stepTables) , parentStep.getAllInheritedMaps().stream())
                 .toArray(LinkedMultiMap[]::new);
 
         io.cucumber.core.runner.PickleStepTestStep clone = modifyPickleStepTestStep(newStepMaps);
@@ -114,7 +115,7 @@ public class StepWrapper extends BaseContext {
 
         if (parentStep != null) {
             clone.setShouldUpdateStatus(parentStep.shouldUpdateStatus());
-            clone.setInheritedMaps(parentStep.getAllStepMaps());
+            clone.setInheritedMaps(parentStep.getAllInheritedMaps());
         }
 
         if (runFlag.isEmpty()) {
@@ -139,6 +140,9 @@ public class StepWrapper extends BaseContext {
         }
 
         testCase.setCurrentWrapperNum(getLastWrapperNumber());
+
+        getRunMaps().clearTempMap();
+
         if (parentTestCase.isForceComplete())
             return ExecutionMode.END_SCENARIO;
 
@@ -163,7 +167,7 @@ public class StepWrapper extends BaseContext {
     }
 
     public List<LinkedMultiMap> getDataMaps() {
-        return getDataTable().asLinkedMultiMaps(String.class, String.class);
+        return getDataTable().asLinkedMultiMaps();
     }
 
 

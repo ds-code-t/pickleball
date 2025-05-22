@@ -11,8 +11,10 @@ import static io.pickleball.cacheandstate.ScenarioContext.getRunMaps;
 public class WebDriverSteps {
 
 
-    @Given("^Navigate (\".*\" )?(.*) Browser")
+    @Given("^Navigate (?:\"(.*)\" )?(.*) Browser")
     public static void navigate(String customBrowserName, String browserType, DataTable dataTable) {
+        getRunMaps().setTempMap(dataTable.asLinkedMultiMap());
+        System.out.println("@@getRunMaps(): " + getRunMaps());
         UniversalWebDriver driver = callMethod("WebDrivers." + browserType);
         if (driver == null)
             throw new PickleballException(String.format("Browser '%s' not defined", browserType));

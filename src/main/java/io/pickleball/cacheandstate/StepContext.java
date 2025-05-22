@@ -53,19 +53,29 @@ public class StepContext {
 //
 //    int tableRowCounter = 0;
 
-    public LinkedMultiMap getStepMap() {
-        return stepMap;
+    public LinkedMultiMap getInheritedStepMap() {
+        return inheritedStepMap;
     }
 
     public void saveToStepMap(String key, Object map) {
-        stepMap.put(key, map);
+        inheritedStepMap.put(key, map);
     }
 
 //    public void setStepMap(LinkedMultiMap stepMap) {
 //        this.stepMap = stepMap;
 //    }
 
-    private final LinkedMultiMap stepMap = new LinkedMultiMap();
+    public void setInheritedStepMap(LinkedMultiMap inheritedStepMap) {
+        this.inheritedStepMap = inheritedStepMap;
+    }
+
+    private  LinkedMultiMap inheritedStepMap = new LinkedMultiMap();
+
+    public LinkedMultiMap getCurrentStepMap() {
+        return currentStepMap;
+    }
+
+    private final LinkedMultiMap currentStepMap = new LinkedMultiMap();
 
     public final MapsWrapper stepMapWrapper = new MapsWrapper();
 
@@ -73,17 +83,21 @@ public class StepContext {
     public static final String stepContextPrefix = sFlag2 + "~stepContext~";
 
     public void setStepContext(String key, Object value) {
-        stepMap.put(stepContextPrefix + key, value);
+        inheritedStepMap.put(stepContextPrefix + key, value);
     }
 
     public Object getStepContext(String key) {
-        return stepMap.get(stepContextPrefix + key);
+        return inheritedStepMap.get(stepContextPrefix + key);
     }
 
     private List<LinkedMultiMap> inheritedMaps = new ArrayList<>();
 
+    public List<LinkedMultiMap> getAllInheritedMaps() {
+        return Stream.concat(Stream.of(inheritedStepMap), inheritedMaps.stream()).toList();
+    }
+
     public List<LinkedMultiMap> getAllStepMaps() {
-        return Stream.concat(Stream.of(stepMap), inheritedMaps.stream()).toList();
+        return Stream.concat(Stream.of(currentStepMap, inheritedStepMap), inheritedMaps.stream()).toList();
     }
 
     public List<LinkedMultiMap> getInheritedMaps() {
@@ -192,8 +206,8 @@ public class StepContext {
     ) {
         this.id = id;
         this.pickleStepDefinitionMatch = pickleStepDefinitionMatch;
-        this.stepMap.put(mapPriority, -1);
-        this.stepMapWrapper.addMaps(stepMap);
+        this.inheritedStepMap.put(mapPriority, -1);
+        this.stepMapWrapper.addMaps(inheritedStepMap);
     }
 
     protected StepWrapper stepWrapper;

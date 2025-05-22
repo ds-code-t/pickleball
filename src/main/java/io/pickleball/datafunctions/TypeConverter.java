@@ -1,16 +1,27 @@
 package io.pickleball.datafunctions;
 
+import io.cucumber.plugin.event.Node;
+import io.pickleball.cacheandstate.StateUtilities;
+
+import javax.print.DocFlavor;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+
+import static io.pickleball.cacheandstate.StateUtilities.*;
 
 public interface TypeConverter {
     Object get(Object value);
 
     default List<Object> getNonNullValues(Object... values) {
+        System.out.println("@@getNonNullValues " + this.getClass());
+        System.out.println(this);
+        System.out.println("@@values " + Arrays.asList(values));
         List<Object> results = new ArrayList<>();
         for (Object value : values) {
+
             Object result = get(value);
             if (result != null) {
                 results.add(result);
@@ -30,9 +41,11 @@ public interface TypeConverter {
     }
 
     default String getFirstString(Object... values) {
+        System.out.println("@@getNonNullValues(values):  " + getNonNullValues(values));
         for (Object result : getNonNullValues(values)) {
             try {
-                return toString(result);
+                System.out.println("@@RSULUT-- : " +result );
+                return StateUtilities.toString(result);
             } catch (Exception ignored) {
             }
         }
@@ -123,7 +136,7 @@ public interface TypeConverter {
     default String getAsString(Object value) {
         try {
             Object result = get(value);
-            return toString(result);
+            return StateUtilities.toString(result);
         } catch (Exception e) {
             throw new IllegalArgumentException(
                     String.format("Failed to convert input=%s, get() result=%s to String: %s - %s",
@@ -219,39 +232,4 @@ public interface TypeConverter {
         }
     }
 
-    static String toString(Object value) {
-        return String.valueOf(value);
-    }
-
-    static Integer toInt(Object value) {
-        return new BigDecimal(String.valueOf(value)).intValue();
-    }
-
-    static Long toLong(Object value) {
-        return new BigDecimal(String.valueOf(value)).longValue();
-    }
-
-    static Double toDouble(Object value) {
-        return new BigDecimal(String.valueOf(value)).doubleValue();
-    }
-
-    static Float toFloat(Object value) {
-        return new BigDecimal(String.valueOf(value)).floatValue();
-    }
-
-    static Short toShort(Object value) {
-        return new BigDecimal(String.valueOf(value)).shortValue();
-    }
-
-    static Byte toByte(Object value) {
-        return new BigDecimal(String.valueOf(value)).byteValue();
-    }
-
-    static BigDecimal toBigDecimal(Object value) {
-        return new BigDecimal(String.valueOf(value));
-    }
-
-    static BigInteger toBigInteger(Object value) {
-        return new BigDecimal(String.valueOf(value)).toBigInteger();
-    }
 }
