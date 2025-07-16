@@ -264,13 +264,13 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         return descendantLevel == 0;
     }
 
-    public Stack<PickleStepTestStep> getExecutingStepStack() {
+    public Stack<TestStep> getExecutingStepStack() {
         return executingStepStack;
     }
 
-    private final Stack<PickleStepTestStep> executingStepStack = new Stack<>();
+    private final Stack<TestStep> executingStepStack = new Stack<>();
 
-    public static void setCurrentStep(PickleStepTestStep currentStep) {
+    public static void setCurrentStep(TestStep currentStep) {
         getCurrentScenario().getExecutingStepStack().add(currentStep);
     }
 
@@ -285,7 +285,7 @@ public abstract class ScenarioContext extends BaseContext implements io.cucumber
         child.descendantLevel = (descendantLevel + 1);
         child.position = children.size();
         children.add(child);
-        child.parentStep = getCurrentStep();
+        child.parentStep = (PickleStepTestStep) getCurrentStep();
     }
 
     public void addChildStepContext(StepWrapper child) {

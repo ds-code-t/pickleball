@@ -28,7 +28,7 @@ import io.cucumber.core.backend.TestCaseState;
 
 import java.lang.reflect.Method;
 
-interface StepDefinitionMatch {
+public interface StepDefinitionMatch {
 
     void runStep(TestCaseState state) throws Throwable;
 

@@ -94,7 +94,7 @@ public class PickleStepTestStep extends TestStep implements io.cucumber.plugin.e
     public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
         ExecutionMode nextExecutionMode = executionMode;
 
-        setCurrentStep(this);
+//        setCurrentStep(this);
         for (HookTestStep before : beforeStepHookSteps) {
             nextExecutionMode = before
                     .run(testCase, bus, state, executionMode)

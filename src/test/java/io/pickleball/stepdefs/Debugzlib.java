@@ -50,7 +50,7 @@ public class Debugzlib {
 //        System.out.println("@Before Scenario: " + scenario);
 //    }
 
-//    @Given("^DDDqq '(.*)' and '(.*)'$")
+    //    @Given("^DDDqq '(.*)' and '(.*)'$")
     @Given("^DDDqq '(.*)' and '(.*)'$")
     public void DDDqq(String t1, String t2, DataTable dt) {
         System.out.println("@@getConfig chromeL " + getRunConfig("chrome"));
@@ -87,6 +87,12 @@ public class Debugzlib {
         System.out.println(quotedString);
     }
 
+
+//    @Before(order = 0)
+//    public void before(Scenario scenario)
+//    {
+//        System.out.println("@@Before @@@@@@@@@@@!!!!!!!!$$$$###");
+//    }
 
     @Given("^I am running a testlzz (.*) and ([^\\s]*)$")
     public void iAmRunningATestlzz(String t1, String t2, DataTable dataTable) {

@@ -5,9 +5,7 @@ import io.cucumber.core.backend.Status;
 import io.cucumber.core.gherkin.messages.GherkinMessagesDataTableArgument;
 import io.cucumber.core.gherkin.messages.GherkinMessagesDocStringArgument;
 import io.cucumber.core.gherkin.messages.GherkinMessagesStep;
-import io.cucumber.core.runner.ExecutionMode;
-import io.cucumber.core.runner.PickleStepDefinitionMatch;
-import io.cucumber.core.runner.PickleStepTestStep;
+import io.cucumber.core.runner.*;
 import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.core.stepexpression.DataTableArgument;
 import io.cucumber.core.stepexpression.DocStringArgument;
@@ -142,7 +140,7 @@ public class StepContext {
 
 
     //    private ScenarioContext scenarioContext;
-    private final PickleStepDefinitionMatch pickleStepDefinitionMatch;
+    private final StepDefinitionMatch stepDefinitionMatch;
     public UUID id;
 
     private boolean runNestedSteps = true;
@@ -196,16 +194,19 @@ public class StepContext {
 
 
     public boolean shouldEmitEvent() {
-        return !pickleStepDefinitionMatch.method.isAnnotationPresent(NoEventEmission.class);
+        if(!(stepDefinitionMatch instanceof PickleStepDefinitionMatch))
+            return true;
+        return !((PickleStepDefinitionMatch) stepDefinitionMatch).method.isAnnotationPresent(NoEventEmission.class);
     }
 
 
     public StepContext(
             UUID id,
-            PickleStepDefinitionMatch pickleStepDefinitionMatch
+            StepDefinitionMatch stepDefinitionMatch
+//            PickleStepDefinitionMatch pickleStepDefinitionMatch
     ) {
         this.id = id;
-        this.pickleStepDefinitionMatch = pickleStepDefinitionMatch;
+        this.stepDefinitionMatch = stepDefinitionMatch;
         this.inheritedStepMap.put(mapPriority, -1);
         this.stepMapWrapper.addMaps(inheritedStepMap);
     }
@@ -214,8 +215,10 @@ public class StepContext {
 
 
     public List<Argument> getArguments() {
+        if(!(stepDefinitionMatch instanceof PickleStepDefinitionMatch))
+            return new ArrayList<>();
         try {
-            return pickleStepDefinitionMatch.getArguments();
+            return ((PickleStepDefinitionMatch) stepDefinitionMatch).getArguments();
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }

@@ -44,6 +44,7 @@ import static io.cucumber.core.exception.UnrecoverableExceptions.rethrowIfUnreco
 import static io.cucumber.core.runner.ExecutionMode.*;
 import static io.cucumber.core.runner.TestAbortedExceptions.createIsTestAbortedExceptionPredicate;
 import static io.pickleball.cacheandstate.PrimaryScenarioData.getCurrentStep;
+import static io.pickleball.cacheandstate.ScenarioContext.setCurrentStep;
 import static java.time.Duration.ZERO;
 
 public abstract class TestStep extends StepContext implements io.cucumber.plugin.event.TestStep {
@@ -54,7 +55,8 @@ public abstract class TestStep extends StepContext implements io.cucumber.plugin
     private final UUID id;
 
     TestStep(UUID id, StepDefinitionMatch stepDefinitionMatch) {
-        super(id, (PickleStepDefinitionMatch) stepDefinitionMatch);
+        super(id, stepDefinitionMatch);
+//        super(id, (PickleStepDefinitionMatch) stepDefinitionMatch);
         this.id = id;
         this.stepDefinitionMatch = stepDefinitionMatch;
     }
@@ -72,6 +74,8 @@ public abstract class TestStep extends StepContext implements io.cucumber.plugin
 
 
     public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode startExecutionMode) {
+        setCurrentStep(this);
+
         Instant startTime = bus.getInstant();
         newExecutionMapPut("startTime", startTime);
 
