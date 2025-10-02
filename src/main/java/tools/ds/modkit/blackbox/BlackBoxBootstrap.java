@@ -100,8 +100,8 @@ public final class BlackBoxBootstrap {
                                 args -> {
                                     System.out.println("@@scanner "+ Arrays.stream(args).toList());
                                     Class<?> aClass = (Class<?>) args[1];
-                                    return aClass.getSimpleName().toLowerCase().contains("dummysteps");
-
+//                                    return aClass.getSimpleName().toLowerCase().contains("dummysteps");
+                                    return aClass.equals(DummySteps.class);
                                 },
                                 args -> null // void method → return null when bypassing
                         )
