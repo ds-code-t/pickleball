@@ -33,6 +33,8 @@ public abstract class AbstractEventBus extends AbstractEventPublisher implements
 
     @Override
     public <T> void send(T event) {
+//        System.out.println("@@event: " + event);
+        System.out.println("@@eventc getClass : " + event.getClass());
         super.send(event);
     }
 

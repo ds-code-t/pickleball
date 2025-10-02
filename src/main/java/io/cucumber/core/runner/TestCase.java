@@ -93,6 +93,13 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
 
         preprocessSteps(this, testSteps);
 
+        System.out.println("@@pickle: " + pickle);
+        System.out.println("@@pickle getFeatureLocation: " + pickle.getFeatureLocation().get());
+        System.out.println("@@pickle getFeatureLocation: " + pickle.getFeatureLocation().get().getLine());
+        System.out.println("@@pickle getFeatureLocation: " + pickle.getName());
+        System.out.println("@@pickle getFeatureLocation: " + pickle.getLocation());
+        System.out.println("@@pickle getFeatureLocation: " + pickle);
+
 
     }
 
@@ -329,6 +336,7 @@ public final class TestCase extends ScenarioContext implements io.cucumber.plugi
     }
 
     private void emitTestCaseStarted(EventBus bus, Instant start, UUID executionId) {
+        System.out.println("@@testcase: " + this);
         bus.send(new TestCaseStarted(start, this));
         Envelope envelope = Envelope.of(new io.cucumber.messages.types.TestCaseStarted(
                 0L,

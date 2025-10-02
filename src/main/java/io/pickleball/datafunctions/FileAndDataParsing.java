@@ -63,22 +63,6 @@ public class FileAndDataParsing {
         }
     }
 
-//    public static String readResourceAsString(String path) {
-//        try (InputStream stream = GlobalCache.class.getClassLoader().getResourceAsStream(path)) {
-//            if (stream == null) {
-//                throw new PickleballException("Resource not found at path: " + path);
-//            }
-//            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
-//        } catch (IOException e) {
-//            throw new PickleballException("Failed to read resource at path: " + path, e);
-//        }
-//    }
-
-
-//    public static JsonNode getJsonNode(String path) {
-////        return buildJsonFromPath(getFile(path));
-//    }
-
 
     public static JsonNode buildJsonFromPath(String resourcePath) {
         ObjectNode folderNode = JSON_MAPPER.createObjectNode();
@@ -185,63 +169,6 @@ public class FileAndDataParsing {
         }
     }
 
-
-//    public static JsonNode buildJsonFromPath(File fileOrDir) {
-//        if (fileOrDir.isFile()) {
-//            return parseSingleFile(fileOrDir);
-//        } else if (fileOrDir.isDirectory()) {
-//            ObjectNode folderNode = JSON_MAPPER.createObjectNode();
-//            File[] children = fileOrDir.listFiles();
-//            if (children != null) {
-//                for (File child : children) {
-//                    if (child.isDirectory()) {
-//                        folderNode.set(child.getName(), buildJsonFromPath(child));
-//                    } else {
-//                        JsonNode fileContents = parseSingleFile(child);
-//                        if (fileContents != null) {
-//                            String baseName = removeFileExtension(child.getName());
-//                            folderNode.set(baseName, fileContents);
-//                        }
-//                    }
-//                }
-//            }
-//            return folderNode;
-//        } else {
-//            return JSON_MAPPER.createObjectNode();
-//        }
-//    }
-//
-//    public static JsonNode parseSingleFile(File file) {
-//        if (!file.isFile()) {
-//            return null;
-//        }
-//        try {
-//            String content = new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
-//            String fileName = file.getName().toLowerCase();
-//
-//            if (fileName.endsWith(".xml")) {
-//                try {
-//                    Object value = XML_MAPPER.readValue(content.strip(), Object.class);
-//                    return JSON_MAPPER.valueToTree(value);
-//                } catch (IOException e) {
-//                    System.out.println("XML parsing failed: " + e.getMessage());
-//                }
-//            }
-//
-//            try {
-//                return JSON_MAPPER.readTree(content);
-//            } catch (IOException ignored) {
-//            }
-//            try {
-//                return YAML_MAPPER.readTree(content);
-//            } catch (IOException ignored) {
-//            }
-//            return null;
-//        } catch (IOException e) {
-//            System.out.println("File reading failed: " + e.getMessage());
-//            return null;
-//        }
-//    }
 
     public static String getBaseFileName(String filePath) {
         String fileName = filePath.replace('\\', '/');

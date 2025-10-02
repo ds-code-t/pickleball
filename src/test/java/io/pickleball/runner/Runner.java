@@ -13,10 +13,12 @@ import java.util.Comparator;
 @CucumberOptions(
         features = {"src/test/resources/features"},
         glue = {"io.pickleball.stepdefs"},
-        plugin = {"pretty", "html:target/cucumber-reports/cucumber.html", "json:target/cucumber-reports/cucumber.json"}
-//        monochrome = true
-
+        plugin = {"pretty", "html:target/cucumber-reports/cucumber.html",
+                "json:target/cucumber-reports/cucumber.json",
+                "com.aventstack.extentreports.cucumber.adapter.ExtentCucumberAdapter:"
+        }
 )
+
 public class Runner extends AbstractTestNGCucumberTests {
     public Runner() {
         System.out.println("@@Runner: " + Thread.currentThread());
@@ -27,6 +29,7 @@ public class Runner extends AbstractTestNGCucumberTests {
     )
     @Parameters({"browser", "environment"})
     public void beforeTest(@Optional("chrome") String browser, @Optional("test") String environment) {
+        System.out.println("@@io.pickleball.runne.Runner");
         System.out.println("Cucumber tags: " + System.getProperty("cucumber.filter.tags"));
     }
 

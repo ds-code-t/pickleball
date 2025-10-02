@@ -57,12 +57,6 @@ public class LinkedMultiMap extends HashMap<Object, Object> implements TypeConve
     }
 
 
-//    public  void addConfigFile(String key, String path) {
-//        if(key == null || key.isBlank())
-//            addFromFile(path);
-//        JsonNode jsonNode = buildJsonFromPath(path);
-//        put(key, configFlag + jsonNode);
-//    }
 
     public  void addFromFile(String key, String path) {
         if(key == null || key.isBlank())
@@ -86,12 +80,6 @@ public class LinkedMultiMap extends HashMap<Object, Object> implements TypeConve
     }
 
 
-//    public LinkedMultiMap(File... filesOrDirs) {
-//        for (File file : filesOrDirs) {
-//            put(removeFileExtension(file.getName()), buildJsonFromPath(file));
-//        }
-//    }
-
 
     public LinkedMultiMap(List<?> keys, List<?> values) {
         for (int n = 0; n < keys.size(); n++) {
@@ -106,43 +94,6 @@ public class LinkedMultiMap extends HashMap<Object, Object> implements TypeConve
     public void removeFromLinkedListMultimap(String key) {
         multimap.removeAll(key);
     }
-//    public void parseDirectoriesContents(String key, String... filePaths) {
-//        for(String path: filePaths)
-//        {
-//            put(key,  createMapFromPath(path));
-//        }
-//    }
-
-    //    @SuppressWarnings("unchecked")
-//    public void parseDirectoriesContents(String... filePaths) {
-//        File[] files = Arrays.stream(filePaths)
-//                .map(path -> getFile(path))
-//                .toArray(File[]::new);
-//        parseDirectoriesContents(files);
-//    }
-
-
-//    public void parseDirectoriesContents(File... filesOrDirs) {
-//        for (File file : filesOrDirs) {
-//            if (file.isDirectory()) {
-//                File[] children = file.listFiles();
-//                if (children != null) {  // Always check for null as listFiles() may return null
-//                    for (File child : children) {
-//                        put(child.getName(), buildJsonFromPath(child));
-//                    }
-//                }
-//            } else if (file.isFile()) {
-//                JsonNode node = buildJsonFromPath(file);
-//                Iterator<Entry<String, JsonNode>> fields = node.fields();
-//                while (fields.hasNext()) {
-//                    Map.Entry<String, JsonNode> field = fields.next();
-//                    String fieldName = field.getKey();
-//                    JsonNode childNode = field.getValue();
-//                    put(fieldName, childNode);
-//                }
-//            }
-//        }
-//    }
 
 
     public Object getConfig(String key) {

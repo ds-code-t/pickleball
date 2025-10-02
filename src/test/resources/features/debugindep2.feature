@@ -1,5 +1,6 @@
 Feature: debug2 text3
 
+  @Tag2
   Scenario: prec test 7
     * DDDqq '<appr>' and '<appr.name>'
     * DDDqq '<configs.driverconfigs>' and '<configs.appr.name>'
