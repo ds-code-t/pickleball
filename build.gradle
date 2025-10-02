@@ -1,10 +1,13 @@
 plugins {
     id 'java-library'
     id 'maven-publish'
+    id 'signing'                                  // optional: only active if keys provided
+    id 'org.jreleaser' version '1.16.0'           // optional: only if you use JReleaser
+    // id 'com.github.jk1.dependency-license-report' version '2.9' // optional
 }
 
-group   = 'tools.ds'
-version = '1.0.0'  // <-- bump as you ship
+group   = 'tools.dscode'                          // ← old groupId
+version = '1.2.0'                                 // bump as needed
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }
@@ -12,11 +15,22 @@ java {
     withJavadocJar()
 }
 
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+javadoc {
+    options.encoding = 'UTF-8'
+    if (JavaVersion.current().isJava9Compatible()) {
+        options.addBooleanOption('html5', true)
+    }
+    options.addStringOption('Xdoclint:none', '-quiet')
+}
+
 repositories { mavenCentral() }
 
 dependencies {
+    // --- keep your NEW project deps exactly as you had them ---
     implementation 'com.google.guava:guava:33.4.8-jre'
-//    implementation 'org.apache.commons:commons-collections4:4.5.0'
     implementation "com.fasterxml.jackson.datatype:jackson-datatype-guava"
     api platform('io.cucumber:cucumber-bom:7.27.2')
     api 'io.cucumber:cucumber-java'
@@ -24,63 +38,134 @@ dependencies {
     api 'io.cucumber:cucumber-junit-platform-engine'
 
     implementation 'org.junit.platform:junit-platform-launcher:1.10.3'
-
     implementation 'net.bytebuddy:byte-buddy:1.17.7'
     implementation 'net.bytebuddy:byte-buddy-agent:1.17.7'
-
     implementation 'org.slf4j:slf4j-api:2.0.16'
-
     implementation 'org.junit.platform:junit-platform-suite:1.10.3'
     implementation 'org.junit.jupiter:junit-jupiter:5.10.3'
-//    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     implementation 'org.junit.platform:junit-platform-launcher'
-
     implementation 'com.googlecode.aviator:aviator:5.4.3'
-
     implementation platform('com.fasterxml.jackson:jackson-bom:2.20.0')
-
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'com.fasterxml.jackson.core:jackson-core'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
     implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
-
     implementation 'com.jayway.jsonpath:json-path:2.9.0'
     implementation 'com.ibm.jsonata4java:JSONata4Java:2.6.0'
 }
 
 tasks.test {
     useJUnitPlatform()
-    // Your test defaults, optional:
     jvmArgs '-Djdk.attach.allowAttachSelf=true'
     systemProperty 'modkit.debug', System.getProperty('modkit.debug', 'false')
     systemProperty "cucumber.filter.tags", System.getProperty("cucumber.filter.tags")
 }
 
 tasks.jar {
-    // So your jar can also run as a *real* -javaagent when needed
     manifest {
         attributes(
                 'Premain-Class': 'tools.ds.modkit.AgentBootstrap',
-                'Agent-Class': 'tools.ds.modkit.AgentBootstrap',
-                'Can-Redefine-Classes': 'true',
+                'Agent-Class' : 'tools.ds.modkit.AgentBootstrap',
+                'Can-Redefine-Classes'   : 'true',
                 'Can-Retransform-Classes': 'true'
         )
     }
 }
 
+/**
+ * Publishing: keep the old identity & POM while using the new code.
+ * artifactId defaults to settings.gradle's rootProject.name = "pickleball".
+ */
 publishing {
     publications {
-        mavenJava(MavenPublication) {
+        maven(MavenPublication) {
             from components.java
+            artifactId = 'pickleball' // explicit, though implied by project name
+
             pom {
-                name = 'modkit-cucumber'
-                description = 'Cucumber + ByteBuddy runtime override toolkit'
+                name = 'Pickleball'
+                description = 'Dynamic cucumber scenario testing'
+                url = 'https://dscode.tools'
+                licenses {
+                    license {
+                        name = 'The Apache License, Version 2.0'
+                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'danshell'
+                        name = 'Dan Shell'
+                        email = 'dscode80@proton.me'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/ds-code-t/pickleball'
+                    developerConnection = 'scm:git:https://github.com/ds-code-t/pickleball.git'
+                    url = 'https://github.com/ds-code-t/pickleball'
+                }
             }
         }
     }
     repositories {
-        // For local testing uncomment the next line:
+        // Uncomment for local testing:
         // mavenLocal()
-        // (See “Remote repo” below for GitHub Packages/Maven Central)
+        // JReleaser will handle Sonatype deploy; if you also want a direct repo here, add it.
     }
 }
+
+/**
+ * Signing: harmless if no keys are provided.
+ * Provide 'signingKey' and 'signingPassword' in gradle.properties or via -P.
+ */
+signing {
+    def k = findProperty("signingKey")
+    def p = findProperty("signingPassword")
+    if (k && p) {
+        useInMemoryPgpKeys(k, p)
+        sign publishing.publications.maven
+    }
+}
+
+/**
+ * JReleaser: mirrors your old setup; only engages if you run jreleaser tasks
+ * and supply the signing props. Safe to keep in the file.
+ */
+jreleaser {
+    signing {
+        active = 'ALWAYS'
+        armored = true
+        mode = 'MEMORY'
+        passphrase = findProperty('signingPassword')
+        secretKey = findProperty('signingKey')
+        verify = false
+    }
+    deploy {
+        maven {
+            mavenCentral {
+                sonatype {
+                    signing.verify = false
+                    active = 'ALWAYS'
+                    url = 'https://central.sonatype.com/api/v1/publisher'
+                    stagingRepository('target/staging-deploy')
+                }
+            }
+        }
+    }
+}
+
+// (Optional) bring back your helper dirs if you plan to run jreleaser locally
+tasks.register('prepareJReleaserDirs') {
+    doFirst {
+        mkdir layout.buildDirectory.dir("jreleaser").get().asFile
+        mkdir layout.buildDirectory.dir("staging-deploy").get().asFile
+    }
+}
+tasks.named('jreleaserConfig').configure { dependsOn 'prepareJReleaserDirs' }
+tasks.register('prepareTargetJReleaserDirs') {
+    doFirst {
+        mkdir new File(project.projectDir, "target/jreleaser")
+        mkdir new File(project.projectDir, "target/staging-deploy")
+    }
+}
+tasks.named('jreleaserFullRelease').configure { dependsOn 'prepareTargetJReleaserDirs' }
