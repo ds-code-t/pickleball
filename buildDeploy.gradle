@@ -1,8 +1,8 @@
 plugins {
     id 'java-library'
     id 'maven-publish'
-//    id 'signing'                                  // optional: only active if keys provided
-//    id 'org.jreleaser' version '1.16.0'           // optional: only if you use JReleaser
+    id 'signing'                                  // optional: only active if keys provided
+    id 'org.jreleaser' version '1.16.0'           // optional: only if you use JReleaser
     // id 'com.github.jk1.dependency-license-report' version '2.9' // optional
 }
 
@@ -118,54 +118,54 @@ publishing {
  * Signing: harmless if no keys are provided.
  * Provide 'signingKey' and 'signingPassword' in gradle.properties or via -P.
  */
-//signing {
-//    def k = findProperty("signingKey")
-//    def p = findProperty("signingPassword")
-//    if (k && p) {
-//        useInMemoryPgpKeys(k, p)
-//        sign publishing.publications.maven
-//    }
-//}
+signing {
+    def k = findProperty("signingKey")
+    def p = findProperty("signingPassword")
+    if (k && p) {
+        useInMemoryPgpKeys(k, p)
+        sign publishing.publications.maven
+    }
+}
 
 /**
  * JReleaser: mirrors your old setup; only engages if you run jreleaser tasks
  * and supply the signing props. Safe to keep in the file.
  */
-//jreleaser {
-//    signing {
-//        active = 'ALWAYS'
-//        armored = true
-//        mode = 'MEMORY'
-//        passphrase = findProperty('signingPassword')
-//        secretKey = findProperty('signingKey')
-//        verify = false
-//    }
-//    deploy {
-//        maven {
-//            mavenCentral {
-//                sonatype {
-//                    signing.verify = false
-//                    active = 'ALWAYS'
-//                    url = 'https://central.sonatype.com/api/v1/publisher'
-//                    stagingRepository('target/staging-deploy')
-//                }
-//            }
-//        }
-//    }
-//}
+jreleaser {
+    signing {
+        active = 'ALWAYS'
+        armored = true
+        mode = 'MEMORY'
+        passphrase = findProperty('signingPassword')
+        secretKey = findProperty('signingKey')
+        verify = false
+    }
+    deploy {
+        maven {
+            mavenCentral {
+                sonatype {
+                    signing.verify = false
+                    active = 'ALWAYS'
+                    url = 'https://central.sonatype.com/api/v1/publisher'
+                    stagingRepository('target/staging-deploy')
+                }
+            }
+        }
+    }
+}
 
 // (Optional) bring back your helper dirs if you plan to run jreleaser locally
-//tasks.register('prepareJReleaserDirs') {
-//    doFirst {
-//        mkdir layout.buildDirectory.dir("jreleaser").get().asFile
-//        mkdir layout.buildDirectory.dir("staging-deploy").get().asFile
-//    }
-//}
-//tasks.named('jreleaserConfig').configure { dependsOn 'prepareJReleaserDirs' }
-//tasks.register('prepareTargetJReleaserDirs') {
-//    doFirst {
-//        mkdir new File(project.projectDir, "target/jreleaser")
-//        mkdir new File(project.projectDir, "target/staging-deploy")
-//    }
-//}
-//tasks.named('jreleaserFullRelease').configure { dependsOn 'prepareTargetJReleaserDirs' }
+tasks.register('prepareJReleaserDirs') {
+    doFirst {
+        mkdir layout.buildDirectory.dir("jreleaser").get().asFile
+        mkdir layout.buildDirectory.dir("staging-deploy").get().asFile
+    }
+}
+tasks.named('jreleaserConfig').configure { dependsOn 'prepareJReleaserDirs' }
+tasks.register('prepareTargetJReleaserDirs') {
+    doFirst {
+        mkdir new File(project.projectDir, "target/jreleaser")
+        mkdir new File(project.projectDir, "target/staging-deploy")
+    }
+}
+tasks.named('jreleaserFullRelease').configure { dependsOn 'prepareTargetJReleaserDirs' }
