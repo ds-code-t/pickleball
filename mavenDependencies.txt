@@ -1,0 +1,123 @@
+<dependencies>
+  <!-- Guava -->
+  <dependency>
+    <groupId>com.google.guava</groupId>
+    <artifactId>guava</artifactId>
+    <version>33.4.8-jre</version>
+  </dependency>
+
+  <!-- Jackson Guava datatype -->
+  <dependency>
+    <groupId>com.fasterxml.jackson.datatype</groupId>
+    <artifactId>jackson-datatype-guava</artifactId>
+  </dependency>
+
+  <!-- Cucumber BOM -->
+  <dependency>
+    <groupId>io.cucumber</groupId>
+    <artifactId>cucumber-bom</artifactId>
+    <version>7.27.2</version>
+    <type>pom</type>
+    <scope>import</scope>
+  </dependency>
+
+  <!-- Cucumber modules (versions come from BOM) -->
+  <dependency>
+    <groupId>io.cucumber</groupId>
+    <artifactId>cucumber-java</artifactId>
+  </dependency>
+  <dependency>
+    <groupId>io.cucumber</groupId>
+    <artifactId>cucumber-core</artifactId>
+  </dependency>
+  <dependency>
+    <groupId>io.cucumber</groupId>
+    <artifactId>cucumber-junit-platform-engine</artifactId>
+  </dependency>
+
+  <!-- JUnit Platform -->
+  <dependency>
+    <groupId>org.junit.platform</groupId>
+    <artifactId>junit-platform-launcher</artifactId>
+    <version>1.10.3</version>
+  </dependency>
+  <dependency>
+    <groupId>org.junit.platform</groupId>
+    <artifactId>junit-platform-suite</artifactId>
+    <version>1.10.3</version>
+  </dependency>
+
+  <!-- JUnit Jupiter -->
+  <dependency>
+    <groupId>org.junit.jupiter</groupId>
+    <artifactId>junit-jupiter</artifactId>
+    <version>5.10.3</version>
+  </dependency>
+
+  <!-- Byte Buddy -->
+  <dependency>
+    <groupId>net.bytebuddy</groupId>
+    <artifactId>byte-buddy</artifactId>
+    <version>1.17.7</version>
+  </dependency>
+  <dependency>
+    <groupId>net.bytebuddy</groupId>
+    <artifactId>byte-buddy-agent</artifactId>
+    <version>1.17.7</version>
+  </dependency>
+
+  <!-- SLF4J API -->
+  <dependency>
+    <groupId>org.slf4j</groupId>
+    <artifactId>slf4j-api</artifactId>
+    <version>2.0.16</version>
+  </dependency>
+
+  <!-- Aviator -->
+  <dependency>
+    <groupId>com.googlecode.aviator</groupId>
+    <artifactId>aviator</artifactId>
+    <version>5.4.3</version>
+  </dependency>
+
+  <!-- Jackson BOM -->
+  <dependency>
+    <groupId>com.fasterxml.jackson</groupId>
+    <artifactId>jackson-bom</artifactId>
+    <version>2.20.0</version>
+    <type>pom</type>
+    <scope>import</scope>
+  </dependency>
+
+  <!-- Jackson modules (versions come from BOM) -->
+  <dependency>
+    <groupId>com.fasterxml.jackson.core</groupId>
+    <artifactId>jackson-databind</artifactId>
+  </dependency>
+  <dependency>
+    <groupId>com.fasterxml.jackson.core</groupId>
+    <artifactId>jackson-core</artifactId>
+  </dependency>
+  <dependency>
+    <groupId>com.fasterxml.jackson.dataformat</groupId>
+    <artifactId>jackson-dataformat-xml</artifactId>
+  </dependency>
+  <dependency>
+    <groupId>com.fasterxml.jackson.dataformat</groupId>
+    <artifactId>jackson-dataformat-yaml</artifactId>
+  </dependency>
+
+  <!-- JSONPath -->
+  <dependency>
+    <groupId>com.jayway.jsonpath</groupId>
+    <artifactId>json-path</artifactId>
+    <version>2.9.0</version>
+  </dependency>
+
+  <!-- JSONata4Java -->
+  <dependency>
+    <groupId>com.ibm.jsonata4java</groupId>
+    <artifactId>JSONata4Java</artifactId>
+    <version>2.6.0</version>
+  </dependency>
+</dependencies>
