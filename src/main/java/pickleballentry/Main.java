@@ -1,14 +1,14 @@
-package io.cucumber.core.cli;
+package pickleballentry;
 
 import tools.ds.modkit.EnsureInstalled;
 
 
-public class PickleBallEntry {
+public class Main {
     static {
         EnsureInstalled.ensureOrDie();
     }
     public static void main(String[] args) {
-        Main.main(args);
+        io.cucumber.core.cli.Main.main(args);
     }
 }
 
