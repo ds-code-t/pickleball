@@ -27,8 +27,6 @@ public class ModularScenarios {
     public static void runScenarios(DataTable dataTable) {
         StepExtension currentStep = getScenarioState().getCurrentStep();
         try {
-            if(true)
-                throw new RuntimeException("SSS");
             System.out.println("@@runScenarios==Datatble:\n" + dataTable);
             EventBus bus = getScenarioState().getBus();
             List<Map<String, String>> maps = dataTable.asMaps();
