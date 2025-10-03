@@ -24,17 +24,21 @@ public final class EnsureInstalled {
     private static final boolean DEBUG =
             Boolean.parseBoolean(System.getProperty("modkit.bootstrap.debug", "false"));
 
-    private static final String AGENT_ACTIVE_FLAG   = "modkit.agent.active";
+    private static final String AGENT_ACTIVE_FLAG = "modkit.agent.active";
     private static final String AGENT_BOOTSTRAP_CLASS = "tools.ds.modkit.AgentBootstrap";
-    private static final String EXTERNAL_ATTACH_MAIN  = "tools.ds.modkit.attach.ExternalAttacher";
+    private static final String EXTERNAL_ATTACH_MAIN = "tools.ds.modkit.attach.ExternalAttacher";
 
     private static final Duration WAIT_FOR_INST = Duration.ofSeconds(8);
     private static final Duration WAIT_FOR_FLAG = Duration.ofSeconds(3);
 
-    /** Ensure we only run once per JVM. */
+    /**
+     * Ensure we only run once per JVM.
+     */
     private static final AtomicBoolean DONE = new AtomicBoolean(false);
 
-    /** Public entry point: ensure agent + ModKit are active, or throw with guidance. */
+    /**
+     * Public entry point: ensure agent + ModKit are active, or throw with guidance.
+     */
     public static void ensureOrDie() {
         if (DONE.get()) return;
 
@@ -60,13 +64,41 @@ public final class EnsureInstalled {
 
             // 1) Self-attach (fast path)
             try {
+                // --- NO-JNA SELF-ATTACH (drop-in) ---
                 System.setProperty("jdk.attach.allowAttachSelf", "true");
-                Instrumentation inst = ByteBuddyAgent.install();
+
+// (Optional but helpful if JNA sneaks onto the classpath anyway)
+                System.setProperty("jna.nosys", "true");
+                System.setProperty("jna.noclasspath", "true");
+
+// Build an AttachmentProvider that EXCLUDES the JNA provider on purpose.
+                ByteBuddyAgent.AttachmentProvider noJnaProvider =
+                        new ByteBuddyAgent.AttachmentProvider.Compound(
+                                ByteBuddyAgent.AttachmentProvider.ForModularizedVm.INSTANCE,
+                                ByteBuddyAgent.AttachmentProvider.ForJ9Vm.INSTANCE,
+                                ByteBuddyAgent.AttachmentProvider.ForStandardToolsJarVm.JVM_ROOT,
+                                ByteBuddyAgent.AttachmentProvider.ForStandardToolsJarVm.JDK_ROOT,
+                                ByteBuddyAgent.AttachmentProvider.ForStandardToolsJarVm.MACINTOSH,
+                                ByteBuddyAgent.AttachmentProvider.ForUserDefinedToolsJar.INSTANCE
+                                // deliberately NO ForJna / emulation provider here
+                        );
+
+// Make sure the Attach API is actually around; otherwise this path can’t work.
+                ensureAttachApiAvailable(); // see helper below
+
+// Use the no-JNA provider for current process.
+                Instrumentation inst = ByteBuddyAgent.install(
+                        noJnaProvider,
+                        ByteBuddyAgent.ProcessProvider.ForCurrentVm.INSTANCE
+                );
+
+// proceed as you already do
                 InstrumentationHolder.set(inst);
-                log("[modkit] self-attach succeeded");
+                log("[modkit] self-attach (no JNA) succeeded");
                 afterInstrumentationAvailable(inst);
                 DONE.set(true);
                 return;
+
             } catch (Throwable t) {
                 log("[modkit] self-attach failed: " + summarize(t));
             }
@@ -93,7 +125,22 @@ public final class EnsureInstalled {
         }
     }
 
-    /** Called when Instrumentation is ready. Installs ModKit (which applies your DSL). */
+    private static void ensureAttachApiAvailable() {
+        boolean hasModule = ModuleLayer.boot().findModule("jdk.attach").isPresent();
+        try {
+            Class.forName("com.sun.tools.attach.VirtualMachine", false, EnsureInstalled.class.getClassLoader());
+        } catch (ClassNotFoundException e) {
+            String why = hasModule
+                    ? "com.sun.tools.attach.VirtualMachine not found on classpath"
+                    : "jdk.attach module not present in this runtime";
+            throw new IllegalStateException("Attach API unavailable: " + why);
+        }
+    }
+
+
+    /**
+     * Called when Instrumentation is ready. Installs ModKit (which applies your DSL).
+     */
     private static void afterInstrumentationAvailable(Instrumentation inst) {
         // Your ModKitCore should call BlackBoxBootstrap.register(), then use Weaver to
         // apply both method and constructor plans (including InstanceRegistry hooks).
@@ -119,8 +166,10 @@ public final class EnsureInstalled {
 
         List<String> cmd = new ArrayList<>();
         cmd.add(javaBin);
-        cmd.add("--add-modules"); cmd.add("jdk.attach");
-        cmd.add("-cp"); cmd.add(agentJar.toString());
+        cmd.add("--add-modules");
+        cmd.add("jdk.attach");
+        cmd.add("-cp");
+        cmd.add(agentJar.toString());
         cmd.add(EXTERNAL_ATTACH_MAIN);
         cmd.add(Long.toString(pid));
         cmd.add(agentJar.toString());
@@ -181,8 +230,8 @@ public final class EnsureInstalled {
         Attributes attrs = mf.getMainAttributes();
         attrs.put(Attributes.Name.MANIFEST_VERSION, "1.0");
         attrs.put(new Attributes.Name("Premain-Class"), AGENT_BOOTSTRAP_CLASS);
-        attrs.put(new Attributes.Name("Agent-Class"),  AGENT_BOOTSTRAP_CLASS);
-        attrs.put(new Attributes.Name("Can-Redefine-Classes"),    "true");
+        attrs.put(new Attributes.Name("Agent-Class"), AGENT_BOOTSTRAP_CLASS);
+        attrs.put(new Attributes.Name("Can-Redefine-Classes"), "true");
         attrs.put(new Attributes.Name("Can-Retransform-Classes"), "true");
 
         Path tmp = Files.createTempFile("modkit-agent-", ".jar");
@@ -209,7 +258,7 @@ public final class EnsureInstalled {
         Files.walk(dir)
                 .filter(Files::isRegularFile)
                 .forEach(p -> {
-                    String entry = root.relativize(p).toString().replace('\\','/');
+                    String entry = root.relativize(p).toString().replace('\\', '/');
                     try (InputStream in = Files.newInputStream(p)) {
                         JarEntry je = new JarEntry(entry);
                         jos.putNextEntry(je);
@@ -224,7 +273,12 @@ public final class EnsureInstalled {
     private static void waitForInstrumentationOrDie(String reason, Duration maxWait) {
         long deadline = System.currentTimeMillis() + Math.max(1, maxWait.toMillis());
         while (!InstrumentationHolder.isPresent() && System.currentTimeMillis() < deadline) {
-            try { Thread.sleep(25); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); break; }
+            try {
+                Thread.sleep(25);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                break;
+            }
         }
         if (!InstrumentationHolder.isPresent()) throw new IllegalStateException(reason);
     }
@@ -244,10 +298,12 @@ public final class EnsureInstalled {
     }
 
     private static boolean isWindows() {
-        return System.getProperty("os.name","").toLowerCase().contains("win");
+        return System.getProperty("os.name", "").toLowerCase().contains("win");
     }
 
-    private static void log(String s) { if (DEBUG) System.err.println(s); }
+    private static void log(String s) {
+        if (DEBUG) System.err.println(s);
+    }
 
     private static String summarize(Throwable t) {
         String m = t.getMessage();
@@ -257,39 +313,40 @@ public final class EnsureInstalled {
     static final class Guidance {
         static String message(String agentPath) {
             return """
-            How to run with the javaagent (choose one):
-
-            1) Gradle (build.gradle):
-               test {
-                 jvmArgs "-javaagent:%s"
-                 systemProperty "modkit.patches", "BlackBoxPatch"
-               }
-
-            2) Maven Surefire/Failsafe (pom.xml):
-               <plugin>
-                 <groupId>org.apache.maven.plugins</groupId>
-                 <artifactId>maven-surefire-plugin</artifactId>
-                 <version>3.2.5</version>
-                 <configuration>
-                   <argLine>-javaagent:%s -Dmodkit.patches=BlackBoxPatch</argLine>
-                 </configuration>
-               </plugin>
-
-            3) IntelliJ Run/Debug Configuration → VM Options:
-               -javaagent:%s -Dmodkit.patches=BlackBoxPatch
-
-            4) Environment variable:
-               # Linux/macOS
-               export JDK_JAVA_OPTIONS="-javaagent:%s -Dmodkit.patches=BlackBoxPatch"
-               # Windows PowerShell
-               setx JDK_JAVA_OPTIONS "-javaagent:%s -Dmodkit.patches=BlackBoxPatch"
-
-            Notes:
-            - Dynamic attach can be restricted by policy; -javaagent avoids that.
-            - Replace BlackBoxPatch with your patch id, if different.
-            """.formatted(agentPath, agentPath, agentPath, agentPath, agentPath);
+                    How to run with the javaagent (choose one):
+                    
+                    1) Gradle (build.gradle):
+                       test {
+                         jvmArgs "-javaagent:%s"
+                         systemProperty "modkit.patches", "BlackBoxPatch"
+                       }
+                    
+                    2) Maven Surefire/Failsafe (pom.xml):
+                       <plugin>
+                         <groupId>org.apache.maven.plugins</groupId>
+                         <artifactId>maven-surefire-plugin</artifactId>
+                         <version>3.2.5</version>
+                         <configuration>
+                           <argLine>-javaagent:%s -Dmodkit.patches=BlackBoxPatch</argLine>
+                         </configuration>
+                       </plugin>
+                    
+                    3) IntelliJ Run/Debug Configuration → VM Options:
+                       -javaagent:%s -Dmodkit.patches=BlackBoxPatch
+                    
+                    4) Environment variable:
+                       # Linux/macOS
+                       export JDK_JAVA_OPTIONS="-javaagent:%s -Dmodkit.patches=BlackBoxPatch"
+                       # Windows PowerShell
+                       setx JDK_JAVA_OPTIONS "-javaagent:%s -Dmodkit.patches=BlackBoxPatch"
+                    
+                    Notes:
+                    - Dynamic attach can be restricted by policy; -javaagent avoids that.
+                    - Replace BlackBoxPatch with your patch id, if different.
+                    """.formatted(agentPath, agentPath, agentPath, agentPath, agentPath);
         }
     }
 
-    private EnsureInstalled() {}
+    private EnsureInstalled() {
+    }
 }
