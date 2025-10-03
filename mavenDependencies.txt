@@ -121,3 +121,9 @@
     <version>2.6.0</version>
   </dependency>
 </dependencies>
+
+
+-javaagent:$PROJECT_DIR$/agent/modkit-agent.jar
+--add-opens=java.base/java.lang=ALL-UNNAMED
+--add-opens=java.base/jdk.internal.misc=ALL-UNNAMED
+-Dmodkit.disableSelfAttach=true
