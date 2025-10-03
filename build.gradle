@@ -29,7 +29,6 @@ javadoc {
 repositories { mavenCentral() }
 
 dependencies {
-    // --- keep your NEW project deps exactly as you had them ---
     implementation 'com.google.guava:guava:33.4.8-jre'
     implementation "com.fasterxml.jackson.datatype:jackson-datatype-guava"
     api platform('io.cucumber:cucumber-bom:7.27.2')
@@ -53,35 +52,93 @@ dependencies {
     implementation 'com.jayway.jsonpath:json-path:2.9.0'
     implementation 'com.ibm.jsonata4java:JSONata4Java:2.6.0'
 
-    implementation 'net.java.dev.jna:jna:5.14.0'
+    // ❌ remove JNA completely
+    // implementation 'net.java.dev.jna:jna:5.14.0'
 }
 
 configurations.all {
     resolutionStrategy {
-        force 'net.java.dev.jna:jna:5.14.0'
+        // ❌ remove the force; we don't want JNA at all
+        // force 'net.java.dev.jna:jna:5.14.0'
+    }
+}
+// --- 1) A dedicated agent JAR (separate from your normal jar) ---
+tasks.register('agentJar', Jar) {
+    group = 'build'
+    description = 'Builds the Java agent jar with Premain/Agent manifest.'
+    archiveClassifier.set('agent')                 // e.g., pickleball-1.2.0-agent.jar
+    from sourceSets.main.output                    // same compiled classes
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    manifest {
+        attributes(
+                'Premain-Class': 'tools.ds.modkit.AgentBootstrap',
+                'Agent-Class' : 'tools.ds.modkit.AgentBootstrap',
+                'Can-Redefine-Classes'   : 'true',
+                'Can-Retransform-Classes': 'true'
+        )
     }
 }
 
+// --- 2) Copy agent JAR to a repo-stable location that 'clean' won't touch ---
+tasks.register('publishAgentJar', Copy) {
+    dependsOn tasks.named('agentJar')
+    from(tasks.named('agentJar').map { it.archiveFile })
+    into("$projectDir/agent")                      // <repo>/agent/
+    rename { "modkit-agent.jar" }                  // stable name
+}
 
+// Optional: after a full build, also drop a fresh agent jar into /agent
+tasks.named('build') { finalizedBy 'publishAgentJar' }
+
+// --- 3) Make Gradle tests use the agent jar automatically ---
 tasks.test {
     useJUnitPlatform()
-    jvmArgs '-Djdk.attach.allowAttachSelf=true',
-            '-Djna.nosys=true',                   // ← don’t load system JNA native
-            '-Djna.noclasspath=false'             // ← allow from classpath (the one you pinned)
+    dependsOn tasks.named('agentJar')
+
+    doFirst {
+        def agentPath = tasks.named('agentJar').get().archiveFile.get().asFile.absolutePath
+        jvmArgs "-javaagent:${agentPath}",
+                "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+                "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED"
+    }
+
     systemProperty 'modkit.debug', System.getProperty('modkit.debug', 'false')
     systemProperty "cucumber.filter.tags", System.getProperty("cucumber.filter.tags")
 }
+
+tasks.test {
+    useJUnitPlatform()
+
+    // Make sure the agent jar exists before tests run
+    dependsOn tasks.jar
+
+    // Add the agent right before the test JVM launches (execution time, not config time)
+    doFirst {
+        def agentPath = tasks.jar.get().archiveFile.get().asFile.absolutePath
+        jvmArgs "-javaagent:${agentPath}"
+    }
+
+    // Friendly opens for Java 21 so Byte Buddy can define classes without JNA
+    jvmArgs "--add-opens", "java.base/java.lang=ALL-UNNAMED",
+            "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED"
+
+    // your existing props
+    systemProperty 'modkit.debug', System.getProperty('modkit.debug', 'false')
+    systemProperty "cucumber.filter.tags", System.getProperty("cucumber.filter.tags")
+}
+
 
 tasks.jar {
     manifest {
         attributes(
                 'Premain-Class': 'tools.ds.modkit.AgentBootstrap',
-                'Agent-Class': 'tools.ds.modkit.AgentBootstrap',
-                'Can-Redefine-Classes': 'true',
+                'Agent-Class' : 'tools.ds.modkit.AgentBootstrap',
+                'Can-Redefine-Classes'   : 'true',
                 'Can-Retransform-Classes': 'true'
         )
     }
 }
+
 
 /**
  * Publishing: keep the old identity & POM while using the new code.

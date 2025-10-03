@@ -40,6 +40,19 @@ public final class EnsureInstalled {
      * Public entry point: ensure agent + ModKit are active, or throw with guidance.
      */
     public static void ensureOrDie() {
+        if (Boolean.getBoolean("modkit.disableSelfAttach")) {
+            // If the agent isn't already present, guide the user to run with -javaagent:
+            if (!InstrumentationHolder.isPresent()) {
+                String agentHint = guessOwnJarPathForPrint();
+                throw new IllegalStateException(
+                        "[modkit] Self-attach disabled (modkit.disableSelfAttach=true). " +
+                                "Please run with -javaagent:" + agentHint
+                );
+            }
+            return;
+        }
+
+
         if (DONE.get()) return;
 
         synchronized (EnsureInstalled.class) {
@@ -68,8 +81,8 @@ public final class EnsureInstalled {
                 System.setProperty("jdk.attach.allowAttachSelf", "true");
 
 // (Optional but helpful if JNA sneaks onto the classpath anyway)
-                System.setProperty("jna.nosys", "true");
-                System.setProperty("jna.noclasspath", "true");
+//                System.setProperty("jna.nosys", "true");
+//                System.setProperty("jna.noclasspath", "true");
 
 // Build an AttachmentProvider that EXCLUDES the JNA provider on purpose.
                 ByteBuddyAgent.AttachmentProvider noJnaProvider =
@@ -183,18 +196,43 @@ public final class EnsureInstalled {
             throw new IllegalStateException("External attach helper failed (exit " + code + ")\n" + out);
         }
     }
+    private static final String PREBUILT_AGENT_PROP = "modkit.agentJar"; // optional override
 
     private static Path resolveAgentJar() {
+        // 0) If a specific jar is provided via system property, use it.
+        String override = System.getProperty(PREBUILT_AGENT_PROP);
+        if (override != null) {
+            Path p = Paths.get(override);
+            if (Files.isRegularFile(p) && Files.isReadable(p)) {
+                if (DEBUG) log("[modkit] using agent jar from -D" + PREBUILT_AGENT_PROP + "=" + p);
+                return p;
+            } else {
+                throw new IllegalStateException("Specified agent jar not found or unreadable: " + p);
+            }
+        }
+
+        // 1) Prefer a repo-local prebuilt jar: <repo>/agent/modkit-agent.jar
+        Path repoLocal = Paths.get(System.getProperty("user.dir"), "agent", "modkit-agent.jar");
+        if (Files.isRegularFile(repoLocal) && Files.isReadable(repoLocal)) {
+            if (DEBUG) log("[modkit] using prebuilt agent jar: " + repoLocal);
+            return repoLocal;
+        }
+
+        // 2) If we're already running from a packaged jar, use that.
         Path codeSource = codeSourcePathOf(loadClass(AGENT_BOOTSTRAP_CLASS));
         if (codeSource != null && Files.isRegularFile(codeSource)) {
-            return codeSource; // packaged agent jar
+            if (DEBUG) log("[modkit] using packaged agent jar from code source: " + codeSource);
+            return codeSource;
         }
+
+        // 3) Last resort: build a temporary agent jar from classes.
         try {
             return buildTempAgentJarFromClasses();
         } catch (IOException e) {
             throw new IllegalStateException("Cannot package temporary agent jar from classes", e);
         }
     }
+
 
     private static String guessOwnJarPathForPrint() {
         Path p = codeSourcePathOf(loadClass(AGENT_BOOTSTRAP_CLASS));

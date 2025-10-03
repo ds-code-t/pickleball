@@ -9,7 +9,10 @@ public final class AgentBootstrap {
     private static void boot(Instrumentation inst) {
         System.setProperty("modkit.agent.active","true");
         InstrumentationHolder.set(inst);
-        ModKitCore.install(inst); // your AgentBuilder + retransformation + eager retransform
+
+        // Non-JNA injection is handled *inside* ModKitCore.install(inst)
+        ModKitCore.install(inst);
     }
+
     private AgentBootstrap() {}
 }
