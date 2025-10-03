@@ -26,15 +26,17 @@ javadoc {
     options.addStringOption('Xdoclint:none', '-quiet')
 }
 
+
+def corpRepo = providers.gradleProperty("externalURL").orNull
+
 repositories {
-    if (project.hasProperty("corpRepoUrl")) {
-        maven {
-            url = uri(externalURL)
-        }
-    } else {
-        mavenCentral()
+    if (corpRepo) {
+        maven { url = uri(corpRepo) }
     }
+    // Always include Maven Central as a fallback (or put this in `else` if you want exclusive)
+    mavenCentral()
 }
+
 
 
 dependencies {
