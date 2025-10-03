@@ -193,28 +193,26 @@ public final class EnsureInstalled {
             throw new IllegalStateException("Specified agent jar not found or unreadable: " + p);
         }
 
-        // 1) Prefer a repo-local prebuilt jar: <repo>/agent/modkit-agent.jar
-        //    Try user.dir, and walk up a few parents to survive IDE/module working-dir quirks.
+        // 1) If AgentBootstrap is coming from a JAR file, just use that JAR.
+        Path codeSource = codeSourcePathOf(loadClass(AGENT_BOOTSTRAP_CLASS));
+        if (codeSource != null && Files.isRegularFile(codeSource)) {
+            if (DEBUG) log("[modkit] using agent jar from code source: " + codeSource);
+            return codeSource;
+        }
+
+        // 2) Prefer repo-local <repo>/agent/modkit-agent.jar (search up parents)
         Path fromCwd = findAgentJarInParents(Paths.get("").toAbsolutePath(), 6);
         if (fromCwd != null) {
             if (DEBUG) log("[modkit] using prebuilt agent jar (cwd search): " + fromCwd);
             return fromCwd;
         }
 
-        // 2) If running from a packaged jar, try its parent dirs too.
-        Path codeSource = codeSourcePathOf(loadClass(AGENT_BOOTSTRAP_CLASS));
-        if (codeSource != null) {
-            Path start = Files.isDirectory(codeSource) ? codeSource : codeSource.getParent();
-            if (start != null) {
-                Path fromCode = findAgentJarInParents(start.toAbsolutePath(), 6);
-                if (fromCode != null) {
-                    if (DEBUG) log("[modkit] using prebuilt agent jar (codesource search): " + fromCode);
-                    return fromCode;
-                }
-            }
-        }
+        // 3) (optional) try ~/.m2 path if you want a hard-coded fallback to a specific version
+        // Path m2 = Paths.get(System.getProperty("user.home"), ".m2", "repository",
+        //     "tools","dscode","pickleball","1.2.0","pickleball-1.2.0.jar");
+        // if (Files.isRegularFile(m2) && Files.isReadable(m2)) return m2;
 
-        // 3) Last resort: build a temporary agent jar from the current classes.
+        // 4) Last resort: build a temp agent jar (only works if running from classes dir)
         if (DEBUG) log("[modkit] prebuilt agent not found; building a temp agent jar");
         try {
             return buildTempAgentJarFromClasses();
