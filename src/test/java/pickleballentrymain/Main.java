@@ -1,4 +1,4 @@
-package pickleballentry;
+package pickleballentrymain;
 
 import tools.ds.modkit.EnsureInstalled;
 

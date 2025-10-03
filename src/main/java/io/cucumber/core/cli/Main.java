@@ -22,10 +22,13 @@ public class Main {
     static {
         EnsureInstalled.ensureOrDie();
     }
+
     public Main() {
+        System.out.println("@@Main-1");
     }
 
     public static void main(String... argv) {
+        System.out.println("@@Main-2");
         byte exitStatus = run(argv, Thread.currentThread().getContextClassLoader());
         System.exit(exitStatus);
     }
