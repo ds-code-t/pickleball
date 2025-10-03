@@ -26,7 +26,16 @@ javadoc {
     options.addStringOption('Xdoclint:none', '-quiet')
 }
 
-repositories { mavenCentral() }
+repositories {
+    if (project.hasProperty("corpRepoUrl")) {
+        maven {
+            url = uri(externalURL)
+        }
+    } else {
+        mavenCentral()
+    }
+}
+
 
 dependencies {
     implementation 'com.google.guava:guava:33.4.8-jre'
