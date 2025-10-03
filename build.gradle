@@ -27,14 +27,25 @@ javadoc {
 }
 
 
-def corpRepo = providers.gradleProperty("externalURL").orNull
-
 repositories {
+    def corpRepo = project.findProperty("externalURL")
+    println "[gradle] externalURL property = ${corpRepo ?: "<not set>"}"
+
     if (corpRepo) {
-        maven { url = uri(corpRepo) }
+        try {
+            def repoUri = uri(corpRepo)
+            println "[gradle] Using corporate repo at: ${repoUri}"
+            maven { url = repoUri }
+        } catch (Exception e) {
+            println "[gradle] ERROR: Failed to parse corporate repo URL '${corpRepo}'"
+            e.printStackTrace()
+            println "[gradle] Falling back to Maven Central"
+            mavenCentral()
+        }
+    } else {
+        println "[gradle] No corporate repo configured → using Maven Central"
+        mavenCentral()
     }
-    // Always include Maven Central as a fallback (or put this in `else` if you want exclusive)
-    mavenCentral()
 }
 
 
