@@ -38,8 +38,15 @@ dependencies {
     api 'io.cucumber:cucumber-junit-platform-engine'
 
     implementation 'org.junit.platform:junit-platform-launcher:1.10.3'
+
     implementation 'net.bytebuddy:byte-buddy:1.17.7'
-    implementation 'net.bytebuddy:byte-buddy-agent:1.17.7'
+
+    // ↓↓↓ CHANGE 1: exclude JNA only from the agent so Byte Buddy won't try the JNA path
+    implementation('net.bytebuddy:byte-buddy-agent:1.17.7') {
+        exclude group: 'net.java.dev.jna', module: 'jna'
+        exclude group: 'net.java.dev.jna', module: 'jna-platform'
+    }
+
     implementation 'org.slf4j:slf4j-api:2.0.16'
     implementation 'org.junit.platform:junit-platform-suite:1.10.3'
     implementation 'org.junit.jupiter:junit-jupiter:5.10.3'
@@ -56,9 +63,22 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // Existing flag for self-attach
     jvmArgs '-Djdk.attach.allowAttachSelf=true'
+
+    // ↓↓↓ CHANGE 2: ensure Attach API is available so Byte Buddy uses it (not JNA)
+    jvmArgs '--add-modules', 'jdk.attach'
+
     systemProperty 'modkit.debug', System.getProperty('modkit.debug', 'false')
     systemProperty "cucumber.filter.tags", System.getProperty("cucumber.filter.tags")
+}
+
+// If you have any custom JavaExec runs, make them consistent with tests:
+tasks.withType(JavaExec).configureEach {
+    jvmArgs '--add-modules', 'jdk.attach'
+    jvmArgs '-Djdk.attach.allowAttachSelf=true'
+    // If you want a belt-and-suspenders fallback when JNA sneaks in from somewhere else:
+    // jvmArgs '-Djna.nosys=true', '-Djna.noclasspath=true'
 }
 
 tasks.jar {
