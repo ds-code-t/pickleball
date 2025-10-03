@@ -98,7 +98,6 @@ public final class BlackBoxBootstrap {
                 on("io.cucumber.java.MethodScanner", "scan", 3)
                         .around(
                                 args -> {
-                                    System.out.println("@@scanner "+ Arrays.stream(args).toList());
                                     Class<?> aClass = (Class<?>) args[1];
 //                                    return aClass.getSimpleName().toLowerCase().contains("dummysteps");
                                     return aClass.equals(DummySteps.class);
