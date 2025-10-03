@@ -196,42 +196,66 @@ public final class EnsureInstalled {
             throw new IllegalStateException("External attach helper failed (exit " + code + ")\n" + out);
         }
     }
-    private static final String PREBUILT_AGENT_PROP = "modkit.agentJar"; // optional override
+    // Add near your other constants:
+    private static final String PREBUILT_AGENT_PROP = "modkit.agentJar"; // -Dmodkit.agentJar=/abs/path.jar
+    private static final String PREBUILT_AGENT_NAME = "modkit-agent.jar";
+    private static final String PREBUILT_AGENT_DIR  = "agent";
 
+    // Replace resolveAgentJar() with this:
     private static Path resolveAgentJar() {
-        // 0) If a specific jar is provided via system property, use it.
+        // 0) Explicit override via -Dmodkit.agentJar=...
         String override = System.getProperty(PREBUILT_AGENT_PROP);
         if (override != null) {
             Path p = Paths.get(override);
             if (Files.isRegularFile(p) && Files.isReadable(p)) {
                 if (DEBUG) log("[modkit] using agent jar from -D" + PREBUILT_AGENT_PROP + "=" + p);
                 return p;
-            } else {
-                throw new IllegalStateException("Specified agent jar not found or unreadable: " + p);
             }
+            throw new IllegalStateException("Specified agent jar not found or unreadable: " + p);
         }
 
         // 1) Prefer a repo-local prebuilt jar: <repo>/agent/modkit-agent.jar
-        Path repoLocal = Paths.get(System.getProperty("user.dir"), "agent", "modkit-agent.jar");
-        if (Files.isRegularFile(repoLocal) && Files.isReadable(repoLocal)) {
-            if (DEBUG) log("[modkit] using prebuilt agent jar: " + repoLocal);
-            return repoLocal;
+        //    Try user.dir, and walk up a few parents to survive IDE/module working-dir quirks.
+        Path fromCwd = findAgentJarInParents(Paths.get("").toAbsolutePath(), 6);
+        if (fromCwd != null) {
+            if (DEBUG) log("[modkit] using prebuilt agent jar (cwd search): " + fromCwd);
+            return fromCwd;
         }
 
-        // 2) If we're already running from a packaged jar, use that.
+        // 2) If running from a packaged jar, try its parent dirs too.
         Path codeSource = codeSourcePathOf(loadClass(AGENT_BOOTSTRAP_CLASS));
-        if (codeSource != null && Files.isRegularFile(codeSource)) {
-            if (DEBUG) log("[modkit] using packaged agent jar from code source: " + codeSource);
-            return codeSource;
+        if (codeSource != null) {
+            Path start = Files.isDirectory(codeSource) ? codeSource : codeSource.getParent();
+            if (start != null) {
+                Path fromCode = findAgentJarInParents(start.toAbsolutePath(), 6);
+                if (fromCode != null) {
+                    if (DEBUG) log("[modkit] using prebuilt agent jar (codesource search): " + fromCode);
+                    return fromCode;
+                }
+            }
         }
 
-        // 3) Last resort: build a temporary agent jar from classes.
+        // 3) Last resort: build a temporary agent jar from the current classes.
+        if (DEBUG) log("[modkit] prebuilt agent not found; building a temp agent jar");
         try {
             return buildTempAgentJarFromClasses();
         } catch (IOException e) {
             throw new IllegalStateException("Cannot package temporary agent jar from classes", e);
         }
     }
+
+    private static Path findAgentJarInParents(Path start, int maxUp) {
+        Path cur = start;
+        for (int i = 0; i < Math.max(1, maxUp) && cur != null; i++) {
+            Path candidate = cur.resolve(PREBUILT_AGENT_DIR).resolve(PREBUILT_AGENT_NAME);
+            if (Files.isRegularFile(candidate) && Files.isReadable(candidate)) {
+                return candidate;
+            }
+            cur = cur.getParent();
+        }
+        return null;
+    }
+
 
 
     private static String guessOwnJarPathForPrint() {

@@ -1,6 +1,7 @@
 Feature: Tiny calculator
 
 
+  @test1
   Scenario: conditionals2
     * IF: 1 + 1 > 5
   : Then a is 1 and b is 6

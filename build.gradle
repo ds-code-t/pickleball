@@ -108,17 +108,13 @@ tasks.test {
 
 tasks.test {
     useJUnitPlatform()
-
-    // Make sure the agent jar exists before tests run
     dependsOn tasks.jar
 
-    // Add the agent right before the test JVM launches (execution time, not config time)
     doFirst {
-        def agentPath = tasks.jar.get().archiveFile.get().asFile.absolutePath
+        def agentPath = tasks.jar.archiveFile.get().asFile.absolutePath
         jvmArgs "-javaagent:${agentPath}"
     }
 
-    // Friendly opens for Java 21 so Byte Buddy can define classes without JNA
     jvmArgs "--add-opens", "java.base/java.lang=ALL-UNNAMED",
             "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED"
 
