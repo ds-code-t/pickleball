@@ -129,33 +129,28 @@ tasks.jar {
 }
 
 
-/**
- * Publishing: keep the old identity & POM while using the new code.
- * artifactId defaults to settings.gradle's rootProject.name = "pickleball".
- */
+
+
+
+
+
 publishing {
     publications {
         maven(MavenPublication) {
             from components.java
-            artifactId = 'pickleball' // explicit, though implied by project name
+            artifactId = 'pickleball'
+
+            // publish the agent JAR as an additional artifact with classifier 'agent'
+            artifact(tasks.named('agentJar')) {
+                classifier = 'agent'
+            }
 
             pom {
                 name = 'Pickleball'
                 description = 'Dynamic cucumber scenario testing'
                 url = 'https://dscode.tools'
-                licenses {
-                    license {
-                        name = 'The Apache License, Version 2.0'
-                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
-                    }
-                }
-                developers {
-                    developer {
-                        id = 'danshell'
-                        name = 'Dan Shell'
-                        email = 'dscode80@proton.me'
-                    }
-                }
+                licenses { license { name = 'The Apache License, Version 2.0'; url = 'http://www.apache.org/licenses/LICENSE-2.0.txt' } }
+                developers { developer { id = 'danshell'; name = 'Dan Shell'; email = 'dscode80@proton.me' } }
                 scm {
                     connection = 'scm:git:https://github.com/ds-code-t/pickleball'
                     developerConnection = 'scm:git:https://github.com/ds-code-t/pickleball.git'
@@ -165,11 +160,63 @@ publishing {
         }
     }
     repositories {
-        // Uncomment for local testing:
-        // mavenLocal()
-        // JReleaser will handle Sonatype deploy; if you also want a direct repo here, add it.
+        mavenLocal()   // ← this is the local ~/.m2/repository
     }
 }
+
+
+
+
+
+
+//
+///**
+// * Publishing: keep the old identity & POM while using the new code.
+// * artifactId defaults to settings.gradle's rootProject.name = "pickleball".
+// */
+//publishing {
+//    publications {
+//        maven(MavenPublication) {
+//            from components.java
+//            artifactId = 'pickleball' // explicit, though implied by project name
+//
+//            pom {
+//                name = 'Pickleball'
+//                description = 'Dynamic cucumber scenario testing'
+//                url = 'https://dscode.tools'
+//                licenses {
+//                    license {
+//                        name = 'The Apache License, Version 2.0'
+//                        url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+//                    }
+//                }
+//                developers {
+//                    developer {
+//                        id = 'danshell'
+//                        name = 'Dan Shell'
+//                        email = 'dscode80@proton.me'
+//                    }
+//                }
+//                scm {
+//                    connection = 'scm:git:https://github.com/ds-code-t/pickleball'
+//                    developerConnection = 'scm:git:https://github.com/ds-code-t/pickleball.git'
+//                    url = 'https://github.com/ds-code-t/pickleball'
+//                }
+//            }
+//        }
+//    }
+//    repositories {
+//        // Uncomment for local testing:
+//        // mavenLocal()
+//        // JReleaser will handle Sonatype deploy; if you also want a direct repo here, add it.
+//    }
+//}
+
+
+
+
+
+
 
 /**
  * Signing: harmless if no keys are provided.
