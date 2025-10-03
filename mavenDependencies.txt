@@ -123,14 +123,5 @@
 </dependencies>
 
 
--javaagent:$PROJECT_DIR$/agent/modkit-agent.jar
---add-opens=java.base/java.lang=ALL-UNNAMED
---add-opens=java.base/jdk.internal.misc=ALL-UNNAMED
--Dmodkit.disableSelfAttach=true
-
-
 "-javaagent:$PROJECT_DIR$/agent/modkit-agent.jar"
---add-opens=java.base/java.lang=ALL-UNNAMED
---add-opens=java.base/jdk.internal.misc=ALL-UNNAMED
--Dmodkit.disableSelfAttach=true
--Dcucumber.glue=tools.ds.modkit.steps,tools.ds.modkit.hooks
+-Dcucumber.glue=tools.ds.modkit.steps,tools.ds.modkit.hooks   // optional but recommended to narrow scan

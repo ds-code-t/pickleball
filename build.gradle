@@ -91,34 +91,27 @@ tasks.register('publishAgentJar', Copy) {
 tasks.named('build') { finalizedBy 'publishAgentJar' }
 
 // --- 3) Make Gradle tests use the agent jar automatically ---
+// --- Make Gradle tests run WITH the agent jar (static attach) ---
 tasks.test {
     useJUnitPlatform()
-    dependsOn tasks.named('agentJar')
+
+    // Ensure we have the agent jar and the stable copy before tests launch
+    dependsOn tasks.named('publishAgentJar')
 
     doFirst {
-        def agentPath = tasks.named('agentJar').get().archiveFile.get().asFile.absolutePath
+        // Use the stable, repo-synced agent jar so IntelliJ/CI/Gradle all agree
+        def agentPath = file("$projectDir/agent/modkit-agent.jar").absolutePath
+
+        // Attach the agent and (optionally) add opens. (Opens are harmless even with JNA.)
         jvmArgs "-javaagent:${agentPath}",
                 "--add-opens", "java.base/java.lang=ALL-UNNAMED",
                 "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED"
+
+        // If you want to help JNA on locked-down Windows boxes (optional):
+        // jvmArgs "-Djna.nosys=true", "-Djna.tmpdir=${file("$buildDir/jna-tmp").absolutePath}"
     }
 
-    systemProperty 'modkit.debug', System.getProperty('modkit.debug', 'false')
-    systemProperty "cucumber.filter.tags", System.getProperty("cucumber.filter.tags")
-}
-
-tasks.test {
-    useJUnitPlatform()
-    dependsOn tasks.jar
-
-    doFirst {
-        def agentPath = tasks.jar.archiveFile.get().asFile.absolutePath
-        jvmArgs "-javaagent:${agentPath}"
-    }
-
-    jvmArgs "--add-opens", "java.base/java.lang=ALL-UNNAMED",
-            "--add-opens", "java.base/jdk.internal.misc=ALL-UNNAMED"
-
-    // your existing props
+    // Your existing props (kept)
     systemProperty 'modkit.debug', System.getProperty('modkit.debug', 'false')
     systemProperty "cucumber.filter.tags", System.getProperty("cucumber.filter.tags")
 }

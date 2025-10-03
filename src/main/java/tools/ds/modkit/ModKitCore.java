@@ -2,9 +2,7 @@ package tools.ds.modkit;
 
 import net.bytebuddy.agent.builder.AgentBuilder;
 
-import java.io.File;
 import java.lang.instrument.Instrumentation;
-import java.nio.file.Files;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,21 +26,9 @@ public final class ModKitCore {
 
         boolean debug = Boolean.getBoolean("modkit.debug");
 
-        // --- Force non-JNA injection path:
-        //     UsingInstrumentation injects helper types via appendToBootstrap.../system
-        //     and never touches ClassInjector.UsingJna even if JNA jars are present.
-        AgentBuilder.InjectionStrategy injection;
-        try {
-            File temp = Files.createTempDirectory("bb-inject").toFile();
-            temp.deleteOnExit();
-            injection = new AgentBuilder.InjectionStrategy.UsingInstrumentation(inst, temp);
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to initialize non-JNA injection strategy", e);
-        }
-
+        // Let Byte Buddy choose the injection strategy (JNA if present, or other fallbacks)
         AgentBuilder base = new AgentBuilder.Default()
                 .with(AgentBuilder.RedefinitionStrategy.RETRANSFORMATION)
-                .with(injection) // <<--- key: ensure Byte Buddy never chooses UsingJna
                 // keep ignores conservative so we don't wander into JDK/BB internals
                 .ignore(
                         nameStartsWith("net.bytebuddy.")

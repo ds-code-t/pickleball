@@ -76,38 +76,16 @@ public final class EnsureInstalled {
             }
 
             // 1) Self-attach (fast path)
+            // 1) Self-attach (fast path)
             try {
-                // --- NO-JNA SELF-ATTACH (drop-in) ---
                 System.setProperty("jdk.attach.allowAttachSelf", "true");
 
-// (Optional but helpful if JNA sneaks onto the classpath anyway)
-//                System.setProperty("jna.nosys", "true");
-//                System.setProperty("jna.noclasspath", "true");
+                // Let Byte Buddy pick the best provider (including JNA when present)
+                // If your JDK lacks jdk.attach, this may fail and we'll fall back to external attach.
+                Instrumentation inst = ByteBuddyAgent.install();
 
-// Build an AttachmentProvider that EXCLUDES the JNA provider on purpose.
-                ByteBuddyAgent.AttachmentProvider noJnaProvider =
-                        new ByteBuddyAgent.AttachmentProvider.Compound(
-                                ByteBuddyAgent.AttachmentProvider.ForModularizedVm.INSTANCE,
-                                ByteBuddyAgent.AttachmentProvider.ForJ9Vm.INSTANCE,
-                                ByteBuddyAgent.AttachmentProvider.ForStandardToolsJarVm.JVM_ROOT,
-                                ByteBuddyAgent.AttachmentProvider.ForStandardToolsJarVm.JDK_ROOT,
-                                ByteBuddyAgent.AttachmentProvider.ForStandardToolsJarVm.MACINTOSH,
-                                ByteBuddyAgent.AttachmentProvider.ForUserDefinedToolsJar.INSTANCE
-                                // deliberately NO ForJna / emulation provider here
-                        );
-
-// Make sure the Attach API is actually around; otherwise this path can’t work.
-                ensureAttachApiAvailable(); // see helper below
-
-// Use the no-JNA provider for current process.
-                Instrumentation inst = ByteBuddyAgent.install(
-                        noJnaProvider,
-                        ByteBuddyAgent.ProcessProvider.ForCurrentVm.INSTANCE
-                );
-
-// proceed as you already do
                 InstrumentationHolder.set(inst);
-                log("[modkit] self-attach (no JNA) succeeded");
+                log("[modkit] self-attach succeeded");
                 afterInstrumentationAvailable(inst);
                 DONE.set(true);
                 return;
@@ -115,6 +93,7 @@ public final class EnsureInstalled {
             } catch (Throwable t) {
                 log("[modkit] self-attach failed: " + summarize(t));
             }
+
 
             // 2) External attach (helper JVM). Builds a temp agent jar if running from classes.
             try {
