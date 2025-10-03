@@ -6,7 +6,7 @@ plugins {
     // id 'com.github.jk1.dependency-license-report' version '2.9' // optional
 }
 
-group   = 'tools.dscode'                          // ← old groupId
+group = 'tools.dscode'                          // ← old groupId
 version = '1.2.0'                                 // bump as needed
 
 java {
@@ -65,7 +65,9 @@ configurations.all {
 
 tasks.test {
     useJUnitPlatform()
-    jvmArgs '-Djdk.attach.allowAttachSelf=true'
+    jvmArgs '-Djdk.attach.allowAttachSelf=true',
+            '-Djna.nosys=true',                   // ← don’t load system JNA native
+            '-Djna.noclasspath=false'             // ← allow from classpath (the one you pinned)
     systemProperty 'modkit.debug', System.getProperty('modkit.debug', 'false')
     systemProperty "cucumber.filter.tags", System.getProperty("cucumber.filter.tags")
 }
@@ -74,8 +76,8 @@ tasks.jar {
     manifest {
         attributes(
                 'Premain-Class': 'tools.ds.modkit.AgentBootstrap',
-                'Agent-Class' : 'tools.ds.modkit.AgentBootstrap',
-                'Can-Redefine-Classes'   : 'true',
+                'Agent-Class': 'tools.ds.modkit.AgentBootstrap',
+                'Can-Redefine-Classes': 'true',
                 'Can-Retransform-Classes': 'true'
         )
     }
