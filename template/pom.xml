@@ -1,0 +1,100 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>consumer-demo</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.release>21</maven.compiler.release>
+        <maven.surefire.plugin.version>3.2.5</maven.surefire.plugin.version>
+        <junit.version>5.10.3</junit.version>
+        <!-- pass-through for cucumber tag filters at runtime -->
+        <cucumber.filter.tags></cucumber.filter.tags>
+    </properties>
+
+    <!-- No custom <repositories> needed. Maven will use ~/.m2 (local repo cache)
+         and Maven Central by default. Since your artifact is already in ~/.m2
+         via publishToMavenLocal, it will resolve immediately. -->
+
+    <dependencies>
+        <!-- Your library -->
+        <dependency>
+            <groupId>tools.dscode</groupId>
+            <artifactId>pickleball</artifactId>
+            <version>1.2.0</version>
+        </dependency>
+
+        <!-- Agent JAR via classifier = agent (made available to the build) -->
+        <dependency>
+            <groupId>tools.dscode</groupId>
+            <artifactId>pickleball</artifactId>
+            <version>1.2.0</version>
+            <classifier>agent</classifier>
+            <type>jar</type>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Test framework -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Copy the agent jar (classifier=agent) into target/agent/modkit-agent.jar
+                 before tests run -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>copy-agent</id>
+                        <phase>process-test-classes</phase>
+                        <goals><goal>copy</goal></goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>tools.dscode</groupId>
+                                    <artifactId>pickleball</artifactId>
+                                    <version>1.2.0</version>
+                                    <classifier>agent</classifier>
+                                    <type>jar</type>
+                                    <outputDirectory>${project.build.directory}/agent</outputDirectory>
+                                    <destFileName>modkit-agent.jar</destFileName>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Run tests with the agent attached and Java 21 opens -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven.surefire.plugin.version}</version>
+                <configuration>
+                    <useModulePath>false</useModulePath>
+                    <argLine>
+                        -javaagent:${project.build.directory}/agent/modkit-agent.jar
+                        --add-opens=java.base/java.lang=ALL-UNNAMED
+                        --add-opens=java.base/jdk.internal.misc=ALL-UNNAMED
+                    </argLine>
+                    <systemPropertyVariables>
+                        <!-- You can pass this on the command line to filter scenarios -->
+                        <cucumber.filter.tags>${cucumber.filter.tags}</cucumber.filter.tags>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
