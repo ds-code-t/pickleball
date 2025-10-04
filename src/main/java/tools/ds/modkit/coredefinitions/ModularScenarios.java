@@ -27,6 +27,7 @@ public class ModularScenarios {
     @Given("^RUN SCENARIOS(:.*)?$")
     public static void runScenarios(String scenario, DataTable dataTable) {
         System.out.println("@@runScenarios: " + scenario);
+        System.out.println("@@===dataTable: " + dataTable);
         StepExtension currentStep = getScenarioState().getCurrentStep();
         if ((scenario == null || scenario.isBlank()) && (dataTable == null || dataTable.isEmpty())) {
             StepExtension messageStep = getScenarioState().getCurrentStep().createMessageStep("Message tEst3");
