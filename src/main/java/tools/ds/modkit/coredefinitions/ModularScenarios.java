@@ -23,8 +23,8 @@ import static tools.ds.modkit.util.stepbuilder.StepUtilities.createPickleStepTes
 public class ModularScenarios {
 
 
-    @Given("RUN SCENARIOS")
-    public static void runScenarios(DataTable dataTable) {
+    @Given("RUN SCENARIOS(:.*)?")
+    public static void runScenarios(DataTable dataTable, String scenario) {
         StepExtension currentStep = getScenarioState().getCurrentStep();
         try {
             System.out.println("@@runScenarios==Datatble:\n" + dataTable);

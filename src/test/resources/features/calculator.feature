@@ -1,5 +1,10 @@
 Feature: Tiny calculator
 
+  Scenario: Calling Scenario
+    * RUN SCENARIOS
+      | Scenario Tags |
+      | @test1        |
+
 
   @test1
   Scenario: conditionals2
