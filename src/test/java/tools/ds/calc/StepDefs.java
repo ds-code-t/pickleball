@@ -21,6 +21,22 @@ public class StepDefs {
 //        EnsureInstalled.ensureOrDie();
     }
 
+
+
+    @Given("datatabletest{string}")
+    public static void datatableTest(String text, DataTable dataTable) {
+        System.out.println("@@datatabletest: " + dataTable);
+    }
+
+    @Given("nodatatabletest{string}")
+    public static void nodatatableTest() {
+        System.out.println("@@datatabnodatatableTestletest: " );
+    }
+
+
+
+
+
     private int a, b, result;
 
 

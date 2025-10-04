@@ -1,9 +1,25 @@
 Feature: Tiny calculator
 
+  Scenario: d test datatabletest
+    Then a is 1 and b is 1
+    * datatabletest"Sd"
+    Then a is 2 and b is 6
+
+  Scenario: d test nodatatabletest
+    Then a is 1 and b is 1
+    * nodatatabletest"Sd"
+      | d |
+      | 1 |
+
+    Then a is 2 and b is 6
+
+
   Scenario: Calling Scenario
+    Then a is 2 and b is 6
     * RUN SCENARIOS
-      | Scenario Tags |
-      | @test1        |
+#      | Scenario Tags |
+#      | @test1        |
+    Then a is 1 and b is 6
 
 
   @test1

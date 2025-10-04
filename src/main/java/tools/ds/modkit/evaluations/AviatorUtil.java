@@ -122,18 +122,15 @@ public final class AviatorUtil {
      * Shared truthiness (numbers: non-zero; strings/collections/maps: non-empty).
      */
     public static boolean isTruthy(Object v) {
-        System.out.println("@@isTruthy: "+ v +  " v: " + v.getClass());
         if (v == null) return false;
         if (v instanceof Boolean returnBool)
             return returnBool;
-        System.out.println("@@isTruthy1");
         if(!(v instanceof String)) {
             Object isEmpty = invokeAnyMethod(v, "isEmpty");
             if (isEmpty instanceof Boolean isEmptyBool) {
                 return !isEmptyBool;
             }
         }
-        System.out.println("@@isStringTruthy: " + v);
         return isStringTruthy(String.valueOf(v));
 
     }

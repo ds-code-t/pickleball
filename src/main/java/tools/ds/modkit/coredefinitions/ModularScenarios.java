@@ -23,9 +23,16 @@ import static tools.ds.modkit.util.stepbuilder.StepUtilities.createPickleStepTes
 public class ModularScenarios {
 
 
-    @Given("RUN SCENARIOS(:.*)?")
-    public static void runScenarios(DataTable dataTable, String scenario) {
+
+    @Given("^RUN SCENARIOS(:.*)?$")
+    public static void runScenarios(String scenario, DataTable dataTable) {
+        System.out.println("@@runScenarios: " + scenario);
         StepExtension currentStep = getScenarioState().getCurrentStep();
+        if ((scenario == null || scenario.isBlank()) && (dataTable == null || dataTable.isEmpty())) {
+            StepExtension messageStep = getScenarioState().getCurrentStep().createMessageStep("Message tEst3");
+            currentStep.insertNextSibling(messageStep);
+        }
+
         try {
             System.out.println("@@runScenarios==Datatble:\n" + dataTable);
             EventBus bus = getScenarioState().getBus();
