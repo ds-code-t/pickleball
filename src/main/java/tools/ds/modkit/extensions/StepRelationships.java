@@ -59,7 +59,9 @@ public abstract class StepRelationships {
         return childSteps;
     }
 
-
+    public void clearChildSteps() {
+        childSteps.clear();
+    }
     public void addChildStep(StepExtension child) {
         child.setParentStep((StepExtension) this);
         childSteps.add(child);

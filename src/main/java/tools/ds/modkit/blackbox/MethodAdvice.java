@@ -34,6 +34,7 @@ public final class MethodAdvice {
     static void exit(
             @Advice.Origin("#t") String typeName,
             @Advice.Origin("#m") String methodName,
+            @Advice.This(optional = true) Object self,   // <--- NEW
             @Advice.AllArguments Object[] args,
             @Advice.Return(readOnly = false, typing = Assigner.Typing.DYNAMIC) Object ret,
             @Advice.Thrown(readOnly = false) Throwable thrown,
@@ -54,11 +55,14 @@ public final class MethodAdvice {
                 thrown = p.onThrow.mutate(args, ret, thrown);
             }
 
-            if (p.after != null) {
+            if (p.afterSelf != null) {                        // <--- prefer self-aware mutator when present
+                ret = p.afterSelf.mutate(self, args, ret, thrown);
+            } else if (p.after != null) {
                 ret = p.after.mutate(args, ret, thrown);
             }
         } finally {
-            CallScope.clear(); // always clear
+            CallScope.clear();
         }
     }
+
 }

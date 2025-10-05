@@ -29,8 +29,8 @@ public class StepDefs {
     }
 
     @Given("nodatatabletest{string}")
-    public static void nodatatableTest() {
-        System.out.println("@@datatabnodatatableTestletest: " );
+    public static void nodatatableTest(String aa) {
+        System.out.println("@@datatabnodatatableTestletest: " + aa);
     }
 
 

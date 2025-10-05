@@ -143,8 +143,6 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         this.method = (Method) getProperty(step, "definitionMatch.stepDefinition.stepDefinition.method");
         this.methodName = this.method == null ? "" : this.method.getName();
 
-        System.out.println("@@method " + method);
-        System.out.println("@@methodName " + methodName);
         this.stepExecution = stepExecution;
         this.delegate = step;
 
@@ -178,8 +176,10 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         map.put("newStepText", "MESSAGE:\"" + newStepText + "\"");
         map.put("removeArgs", "true");
         map.put("RANDOMID", "RANDOMID");
-
-        return updateStep(map);
+        StepExtension messageStep = updateStep(map);
+        messageStep.setNextSibling(null);
+        messageStep.clearChildSteps();
+        return messageStep;
     }
 
     public StepExtension modifyStep(String newStepText) {
@@ -231,13 +231,10 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         );
 
         Object pickleStepDefinitionMatch = getDefinition(getScenarioState().getRunner(), getScenarioState().getScenarioPickle(), newGherikinMessageStep);
-        System.out.println("@@pickleStepDefinitionMatch " + pickleStepDefinitionMatch.getClass());
         List<io.cucumber.core.stepexpression.Argument> args = (List<io.cucumber.core.stepexpression.Argument>) getProperty(pickleStepDefinitionMatch, "arguments");
 
         io.cucumber.core.backend.StepDefinition javaStepDefinition = (io.cucumber.core.backend.StepDefinition) getProperty(pickleStepDefinitionMatch, "stepDefinition.stepDefinition");
         List<ParameterInfo> parameterInfoList = javaStepDefinition.parameterInfos();
-        System.out.println("@@args: " + args.stream().toList());
-        System.out.println("@@parameterInfoList: " + parameterInfoList.stream().map(p -> p.getType()).toList());
         if (args.size() != parameterInfoList.size()) {
             int mismatchCount = parameterInfoList.size() - args.size();
             if (mismatchCount > 0) {
@@ -263,12 +260,8 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
                         getProperty(pickleStepDefinitionMatch, "uri"),
                         getProperty(pickleStepDefinitionMatch, "step")
                 );
-
             }
-
-
         }
-
 
         PickleStepTestStep newPickTestStep = (PickleStepTestStep) Reflect.newInstance(
                 "io.cucumber.core.runner.PickleStepTestStep",

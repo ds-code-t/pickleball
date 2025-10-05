@@ -1,26 +1,24 @@
 package tools.ds.modkit.blackbox;
 
-import io.cucumber.plugin.event.PickleStepTestStep;
-import tools.ds.modkit.coredefinitions.GeneralSteps;
-import tools.ds.modkit.coredefinitions.MetaSteps;
+import io.cucumber.messages.types.*;
+import io.cucumber.plugin.event.Node;
 import tools.ds.modkit.extensions.StepExtension;
 import tools.ds.modkit.misc.DummySteps;
-import tools.ds.modkit.util.CallScope;
 
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static tools.ds.modkit.blackbox.Plans.*;
 import static tools.ds.modkit.state.ScenarioState.*;
 import static tools.ds.modkit.util.KeyFunctions.getUniqueKey;
-import static tools.ds.modkit.util.Reflect.invokeAnyMethod;
 
+import io.cucumber.messages.types.Tag;
+import io.cucumber.messages.types.PickleTag;
+import io.cucumber.messages.types.Examples;
+
+import io.cucumber.messages.types.TableRow;
+import io.cucumber.messages.types.TableCell;
 
 public final class BlackBoxBootstrap {
 
@@ -44,6 +42,7 @@ public final class BlackBoxBootstrap {
 
     public static final String metaFlag = "\u206AMETA";
 
+
     private static final Pattern LINE_SWAP_PATTERN = Pattern.compile(
             "^((?:(?:\\s*:)|(?:\\s*@\\[[^\\[\\]]*\\]))+)(\\s*[A-Z*].*$)",
             Pattern.MULTILINE
@@ -53,6 +52,10 @@ public final class BlackBoxBootstrap {
     );
 
     public final static UUID skipLogging = new java.util.UUID(0L, 0xFFL);
+
+    private static final String TagPrefix = "@__TAG_";
+    public static final String ComponentTagPrefix = TagPrefix + "COMPONENT_";
+    private static final String ScenarioTagPrefix = TagPrefix + "SCENARIO_";
 
     public static void register() {
         System.out.println("@@register DSL");
@@ -94,6 +97,227 @@ public final class BlackBoxBootstrap {
 //                        .build()
 //        );
 
+
+        // Add these imports if you don't already have them:
+
+// (Optional, if you want to inspect cells)
+// import io.cucumber.messages.types.TableCell;
+
+// You can also add a constant if you prefer (mirrors K_SCENARIO):
+// public static final String K_EXAMPLES = "io.cucumber.messages.types.Examples";
+
+
+
+
+        // Add if needed:
+
+
+
+
+
+
+// Modify the input *Token* before match_StepLine executes
+//        Registry.register(
+//                on("io.cucumber.gherkin.PickleCompiler", "pickleTags", 1)
+//                        .before(args -> {
+//                            List<PickleTag> tags = (List<PickleTag>) args[0];
+//                            System.out.println("@@pickleTags:: " + tags);
+//
+//                        })
+//                        .build()
+//        );
+
+
+
+
+
+
+
+
+//        Registry.register(
+//                on("io.cucumber.messages.types.Examples", "getTags", 0)
+//                        .returns("java.util.List")
+//                        // <-- needs a DSL hook that passes the receiver `self`
+//                        .afterSelf((self, args, ret, thr) -> {
+//                            Examples ex = (Examples) self;
+//
+//                            @SuppressWarnings("unchecked")
+//                            java.util.List<Tag> base = (ret == null)
+//                                    ? java.util.List.of()
+//                                    : (java.util.List<Tag>) ret;
+//
+//                            java.util.List<Tag> derived = deriveTagsFromExamplesInstance(ex);
+//
+//                            if (derived.isEmpty()) return ret; // keep original
+//
+//                            // Merge + dedupe by tag name
+//                            java.util.ArrayList<Tag> merged = new java.util.ArrayList<>(base);
+//                            java.util.HashSet<String> have = new java.util.HashSet<>();
+//                            for (Tag t : base) have.add(t.getName());
+//                            for (Tag t : derived) if (t != null && have.add(t.getName())) merged.add(t);
+//
+//                            // Preserve “unmodifiable” semantics of the generated types
+//                            return java.util.Collections.unmodifiableList(merged);
+//                        })
+//                        .build()
+//        );
+
+
+
+
+        Registry.register(
+                on("io.cucumber.messages.types.Pickle", "getTags", 0)
+                        .returns("java.util.List")
+                        .afterSelf((self, args, ret, thr) -> {
+                            Pickle p = (Pickle) self;
+
+                            @SuppressWarnings("unchecked")
+                            List<PickleTag> base = (ret == null)
+                                    ? List.of()
+                                    : (List<PickleTag>) ret;
+                            if (base.isEmpty()) return ret;
+
+                            List<String> ids = p.getAstNodeIds();
+                            if (ids == null || ids.isEmpty()) return ret;
+                            String myId = ids.get(ids.size() - 1);
+                            System.out.println("@@myId: " + myId);
+                            var out = new ArrayList<PickleTag>(base.size());
+                            for (PickleTag t : base) {
+                                String n = t.getName();
+                                if (n != null && n.startsWith(TagPrefix)) {
+                                    System.out.println("@@.getAstNodeId(): "+ t.getAstNodeId());
+                                    if (!Objects.equals(t.getAstNodeId(), myId)) {
+                                        // drop ELT_ tags that don't belong to this pickle
+                                        continue;
+                                    }
+                                    if (n.startsWith(ScenarioTagPrefix)) {
+                                        System.out.println("@@start ScenarioTagPrefix: " + new PickleTag("@" + n.substring(ScenarioTagPrefix.length()), t.getAstNodeId()));
+                                        out.add(new PickleTag("@" + n.substring(ScenarioTagPrefix.length()), t.getAstNodeId()));
+                                    } else if (n.startsWith(ComponentTagPrefix)) {
+                                        out.add(t); // keep as-is
+                                    } else {
+                                        out.add(t);
+                                    }
+                                } else {
+                                    out.add(t); // keep non-ELT tags
+                                }
+                            }
+
+//                            if (out.size() == base.size()) return ret; // unchanged
+                            System.out.println("@@out: " + out);
+                            return Collections.unmodifiableList(out);
+                        })
+                        .build()
+        );
+
+
+
+
+        Registry.register(
+                on("io.cucumber.messages.types.Examples", "getTags", 0)
+                        .returns("java.util.List")
+                        .afterSelf((self, args, ret, thr) -> {
+                            Examples ex = (Examples) self;
+                            var headerOpt = ex.getTableHeader();
+                            if (headerOpt.isEmpty()) return ret;
+
+                            var headers = headerOpt.get().getCells().stream().map(TableCell::getValue).toList();
+                            int iSt = headers.indexOf("Scenario Tags");
+                            int iCt = headers.indexOf("Component Tags");
+                            if (iSt < 0 && iCt < 0) return ret;
+
+                            @SuppressWarnings("unchecked")
+                            var base = ret == null ? List.<Tag>of() : (List<Tag>) ret;
+                            var newTags = new ArrayList<Tag>();
+                            var loc = ex.getLocation();
+
+                            for (TableRow row : ex.getTableBody()) {
+                                if (iSt >= 0) {
+                                    var v = row.getCells().get(iSt).getValue();
+                                    if (v != null && !v.isBlank()) {
+                                        for (String t : v.trim().split("\\s+")) {
+                                            if (!t.isBlank()) newTags.add(new Tag(loc, ScenarioTagPrefix + t.replace("@",""), row.getId())); // drop "1" if your Tag ctor is (Location,String)
+                                        }
+                                    }
+                                }
+                                if (iCt >= 0) {
+                                    var v = row.getCells().get(iCt).getValue();
+                                    if (v != null && !v.isBlank()) {
+                                        for (String t : v.trim().split("\\s+")) {
+                                            if (!t.isBlank()) newTags.add(new Tag(loc, ComponentTagPrefix + t.replace("@",""),  row.getId()));
+                                        }
+                                    }
+                                }
+                            }
+
+                            if (newTags.isEmpty()) return ret;
+
+                            var merged = new ArrayList<Tag>(base);
+                            merged.addAll(newTags);
+                            System.out.println("@@merged: " + merged);
+                            return Collections.unmodifiableList(merged);
+                        })
+                        .build()
+        );
+
+
+
+
+
+
+// --- io.cucumber.messages.types.Examples <ctor>(8 args) ---
+// arg indices:
+// 0: Location location
+// 1: java.util.List<Tag> tags
+// 2: String keyword
+// 3: String name
+// 4: String description
+// 5: TableRow tableHeader (nullable)
+// 6: java.util.List<TableRow> tableBody
+// 7: String id
+//        Registry.register(
+//                onCtor(/*K_EXAMPLES*/ "io.cucumber.messages.types.Examples", 8)
+//                        .before(args -> {
+//                            TableRow tableHeader = (TableRow) args[5];
+//                            List<String> headers = tableHeader.getCells().stream().map(TableCell::getValue).toList();
+//                            int indexScenarioTags = tableHeader.getCells().stream().map(TableCell::getValue).toList().indexOf("Scenario Tags");
+//                            int indexComponentTags = tableHeader.getCells().stream().map(TableCell::getValue).toList().indexOf("Component Tags");
+//                            if (Math.max(indexScenarioTags, indexComponentTags) >= 0) {
+//                                String newTagString = "";
+//                                List<TableRow> tableBody = (List<TableRow>) args[6];
+//                                for (final TableRow valuesRow : tableBody) {
+//                                    Long line = valuesRow.getLocation().getLine();
+//                                    if (indexScenarioTags != -1) {
+//                                        String val = valuesRow.getCells().get(indexScenarioTags).getValue();
+//                                        if (val != null && !val.isBlank()) {
+//                                            newTagString += " @ELT_ST_" + line + "_" + val.strip().replaceAll("\\s+", "____").replaceAll("@","");
+//                                        }
+//                                    }
+//                                }
+//                                for (final TableRow valuesRow : tableBody) {
+//                                    Long line = valuesRow.getLocation().getLine();
+//                                    if (indexComponentTags != -1) {
+//                                        String val = valuesRow.getCells().get(indexComponentTags).getValue();
+//                                        if (val != null && !val.isBlank()) {
+//                                            newTagString += " @ELT_CT_" + line + "_" + val.strip().replaceAll("\\s+", "____").replaceAll("@","");
+//                                        }
+//                                    }
+//                                }
+//                                Location location = (Location) args[0];
+//                                List<Tag> tags = new ArrayList<>((List<Tag>) args[1]);
+//                                List<Tag> newTags = Arrays.stream(newTagString.split("\\s+")).filter(s -> !s.isBlank()).map(s -> new Tag(location, s, "1")).toList();
+//                                System.out.println("@@newTags: " + newTags);
+//                                tags.addAll(newTags);
+//                                System.out.println("@@modified: " + tags);
+//                                args[1] = tags;
+//                            }
+//                        })
+//                        .build()
+//        );
+
+
+
+
         Registry.register(
                 on("io.cucumber.java.MethodScanner", "scan", 3)
                         .around(
@@ -117,7 +341,7 @@ public final class BlackBoxBootstrap {
                                     StepExtension step = getScenarioState().getCurrentStep();
 
 //                                    System.out.println("@@$$step: " + step.getId());
-                                    return step!=null && step.getId().equals(skipLogging); // bypass original
+                                    return step != null && step.getId().equals(skipLogging); // bypass original
 
                                 },
                                 args -> null // void method → return null when bypassing
@@ -132,7 +356,7 @@ public final class BlackBoxBootstrap {
                                 args -> {
                                     StepExtension step = getScenarioState().getCurrentStep();
 
-                                    return step!=null &&  step.getId().equals(skipLogging); // bypass original
+                                    return step != null && step.getId().equals(skipLogging); // bypass original
 
                                 },
                                 args -> null // void
@@ -174,7 +398,6 @@ public final class BlackBoxBootstrap {
                             int i = s.indexOf(metaFlag);
                             if (i >= 0) {
                                 String out = s.substring(0, i);
-                                System.out.println("[modkit] PickleStep#getText keep-before-flag → " + out);
                                 return out;
                             }
                             return s;
@@ -369,7 +592,6 @@ public final class BlackBoxBootstrap {
 
 
     }
-
 
 
     private BlackBoxBootstrap() {

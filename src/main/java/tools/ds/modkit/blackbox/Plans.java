@@ -14,6 +14,7 @@ public final class Plans {
     @FunctionalInterface public interface BypassDecider { boolean bypass(Object[] args) throws Throwable; }
     @FunctionalInterface public interface BypassSupplier { Object supply(Object[] args) throws Throwable; }
     @FunctionalInterface public interface InstanceMutator { void mutate(Object self) throws Throwable; } // optional for ctor exit (not used by default)
+    @FunctionalInterface public interface ReturnMutatorSelf {        Object mutate(Object self, Object[] args, Object ret, Throwable thrown) throws Throwable; }
 
     /* ========================= Keys ========================= */
 
@@ -36,12 +37,22 @@ public final class Plans {
         public final ThrowableMutator onThrow;// observe/mutate thrown; return null to swallow, or same/other to rethrow
         public final BypassDecider bypass;    // if true, skip original and return bypassReturn
         public final BypassSupplier bypassReturn;
+        public final ReturnMutatorSelf afterSelf;
 
         MethodPlan(String fqcn, String method, int argCount, String returnTypeFqcn,
                    ArgMutator before, ReturnMutator after, ThrowableMutator onThrow,
-                   BypassDecider bypass, BypassSupplier bypassReturn) {
-            this.fqcn = fqcn; this.method = method; this.argCount = argCount; this.returnTypeFqcn = returnTypeFqcn;
-            this.before = before; this.after = after; this.onThrow = onThrow; this.bypass = bypass; this.bypassReturn = bypassReturn;
+                   BypassDecider bypass, BypassSupplier bypassReturn,
+                   ReturnMutatorSelf afterSelf) {               // <--- NEW param
+            this.fqcn = fqcn;
+            this.method = method;
+            this.argCount = argCount;
+            this.returnTypeFqcn = returnTypeFqcn;
+            this.before = before;
+            this.after = after;
+            this.onThrow = onThrow;
+            this.bypass = bypass;
+            this.bypassReturn = bypassReturn;
+            this.afterSelf = afterSelf;                           // <--- assign
         }
 
         public String key() { return keyFor(fqcn, method, argCount); }
@@ -52,6 +63,7 @@ public final class Plans {
             private String returnTypeFqcn;
             private ArgMutator before; private ReturnMutator after; private ThrowableMutator onThrow;
             private BypassDecider bypass; private BypassSupplier bypassReturn;
+            private ReturnMutatorSelf afterSelf;
 
             public Builder(String fqcn, String method, int argc) {
                 this.fqcn = Objects.requireNonNull(fqcn); this.method = Objects.requireNonNull(method); this.argc = argc;
@@ -59,10 +71,16 @@ public final class Plans {
             public Builder returns(String returnTypeFqcn) { this.returnTypeFqcn = returnTypeFqcn; return this; }
             public Builder before(ArgMutator m) { this.before = m; return this; }
             public Builder after(ReturnMutator m) { this.after = m; return this; }
+            public Builder afterSelf(ReturnMutatorSelf m) { this.afterSelf = m; return this; }   // <--- NEW
             public Builder onThrow(ThrowableMutator m) { this.onThrow = m; return this; }
             public Builder around(BypassDecider d, BypassSupplier s) { this.bypass = d; this.bypassReturn = s; return this; }
+
             public MethodPlan build() {
-                return new MethodPlan(fqcn, method, argc, returnTypeFqcn, before, after, onThrow, bypass, bypassReturn);
+                return new MethodPlan(
+                        fqcn, method, argc, returnTypeFqcn,
+                        before, after, onThrow, bypass, bypassReturn,
+                        afterSelf                                   // <--- pass through
+                );
             }
         }
     }
