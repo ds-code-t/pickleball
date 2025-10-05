@@ -1,5 +1,15 @@
 Feature: Tiny calculator
 
+  Scenario Outline: Test
+    Then print"<A>"
+    Then a is <A> and b is 6
+
+    Examples:
+      | A  |
+      | 32 |
+
+
+
 #  Scenario: d test datatabletest
 #    Then a is 1 and b is 1
 #    * datatabletest"Sd"

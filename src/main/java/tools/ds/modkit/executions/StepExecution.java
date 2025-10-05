@@ -55,11 +55,12 @@ public class StepExecution {
         rootScenarioNameStep = new StepExtension(pickle, this, steps.getFirst().delegate);
 
         NodeMap runMap = new NodeMap(ParsingMap.MapType.RUN_MAP);
-        rootScenarioNameStep.setStepParsingMap(new ParsingMap(runMap));
+        ParsingMap rootParsingMap = new ParsingMap(runMap);
+        rootScenarioNameStep.setStepParsingMap(rootParsingMap);
         if (scenarioMap != null) {
             scenarioMap.setDataSource(NodeMap.DataSource.EXAMPLE_TABLE);
             scenarioMap.setMapType(ParsingMap.MapType.STEP_MAP);
-
+            rootParsingMap.addMaps(scenarioMap);
         }
 
         rootScenarioNameStep.overRideUUID = skipLogging;

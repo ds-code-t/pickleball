@@ -22,7 +22,6 @@ public class StepDefs {
     }
 
 
-
     @Given("datatabletest{string}")
     public static void datatableTest(String text, DataTable dataTable) {
         System.out.println("@@datatabletest: " + dataTable);
@@ -32,9 +31,6 @@ public class StepDefs {
     public static void nodatatableTest(String aa) {
         System.out.println("@@datatabnodatatableTestletest: " + aa);
     }
-
-
-
 
 
     private int a, b, result;
@@ -80,10 +76,16 @@ public class StepDefs {
         System.out.println("@@b: " + b);
     }
 
-//    @Given("save {string} as {string}")
+    //    @Given("save {string} as {string}")
 //    public void saveString(String a, String b) throws InterruptedException {
 //            getScenarioState().put(a, b);
 //    }
+    @Given("print{string}")
+    public void printTest(String message)  {
+        System.out.println("@@printTest: " + message);
+
+
+    }
 
     @Given("a is {int} and b is {int}")
     public void a_is_and_b_is(int a, int b) throws InterruptedException {
@@ -91,14 +93,14 @@ public class StepDefs {
         System.out.println("@@a_is_and_b_is");
         this.a = a;
         this.b = b;
-        if (a  == 22)
+        if (a == 22)
             throw new RuntimeException("Ss");
-        if (b  == 22)
+        if (b == 22)
             throw new SoftRuntimeException("Ss");
     }
 
     @Given("^stringCheck (.*)$")
-    public void stringCheck(String string)  {
+    public void stringCheck(String string) {
         System.out.println("@@String check: " + string);
     }
 
