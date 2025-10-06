@@ -4,7 +4,6 @@ import io.cucumber.core.backend.ParameterInfo;
 import io.cucumber.core.backend.TestCaseState;
 import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.datatable.DataTable;
-import io.cucumber.docstring.DocString;
 import io.cucumber.gherkin.GherkinDialects;
 import io.cucumber.messages.types.PickleStep;
 import io.cucumber.messages.types.PickleStepArgument;
@@ -19,9 +18,9 @@ import tools.ds.modkit.util.PickleStepArgUtils;
 import tools.ds.modkit.util.Reflect;
 
 import java.lang.reflect.Method;
-import java.lang.reflect.Type;
 import java.net.URI;
 import java.util.*;
+import java.util.function.BooleanSupplier;
 import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -37,7 +36,6 @@ import static tools.ds.modkit.util.ArgumentUtility.*;
 import static tools.ds.modkit.util.ExecutionModes.RUN;
 import static tools.ds.modkit.util.ExecutionModes.SKIP;
 import static tools.ds.modkit.util.KeyFunctions.getUniqueKey;
-import static tools.ds.modkit.util.PickleStepArgUtils.createDocStringArg;
 import static tools.ds.modkit.util.Reflect.getProperty;
 import static tools.ds.modkit.util.Reflect.invokeAnyMethod;
 import static tools.ds.modkit.util.stepbuilder.StepUtilities.createScenarioPickleStepTestStep;
@@ -110,8 +108,8 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
 
 
     //    private final StepDefinition stepDefinition;
-    private final Method method;
-    private final String methodName;
+    public final Method method;
+    public final String methodName;
 
     //    private final String stepTextOverRide;
     private final boolean isScenarioNameStep;
@@ -159,7 +157,7 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         rootText = strings[0].trim();
         metaData = strings.length == 1 ? "" : strings[1].trim();
         Matcher matcher = pattern.matcher(metaData);
-        isDataTableStep = isCoreStep && method.getName().equals("getDataTable");
+        isDataTableStep = isCoreStep && method.getName().equals("setDataTable");
         metaStep = isDataTableStep;
 
         while (matcher.find()) {
@@ -189,36 +187,28 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
     }
 
 
+    private StepExtension duplicateStepForRepeatedExecution(ParsingMap parsingMap) {
+        StepExtension templateStep = isTemplateStep ? this : this.templateStep;
+        StepExtension updatedStep = templateStep.buildNewStep(new HashMap<>(), parsingMap);
+        return updatedStep;
+    }
+
     private StepExtension updateStep() {
         return updateStep(new HashMap<>());
     }
 
     private StepExtension updateStep(Map<String, String> overrides) {
-        ParsingMap newParsingMap = this.getStepParsingMap();
+        StepExtension newStep = buildNewStep(overrides, this.getStepParsingMap());
+        copyRelationships(this, newStep);
+        return newStep;
+    }
 
+
+    private StepExtension buildNewStep(Map<String, String> overrides, ParsingMap newParsingMap) {
         PickleStepArgument argument = overrides.containsKey("removeArgs") ? null : rootStep.getArgument().orElse(null);
         UnaryOperator<String> external = newParsingMap::resolveWholeText;
         PickleStepArgument newPickleStepArgument = isScenarioNameStep ? null : PickleStepArgUtils.transformPickleArgument(argument, external);
-//        if(!isScenarioNameStep && newPickleStepArgument==null)
-//        {
-//            io.cucumber.core.backend.StepDefinition javaStepDefinition = (io.cucumber.core.backend.StepDefinition) getProperty(delegate, "definitionMatch.stepDefinition.stepDefinition");
-//            List<ParameterInfo> parameterInfoList = javaStepDefinition.parameterInfos();
-//            if(!parameterInfoList.isEmpty())
-//            {
-//                Type type = parameterInfoList.getLast().getType();
-//                if(type instanceof Class<?> clazz) {
-//                    if (clazz.equals(DataTable.class))
-//                    {
-//
-//                    }
-//                }
-//
-//
-//            }
-//            System.out.println("@@parameterInfoList: " + parameterInfoList.stream().map(p -> p.getType()).toList());
-//        }
         String newStepText = overrides.getOrDefault("newStepText", rootStep.getText());
-
         PickleStep pickleStep = new PickleStep(newPickleStepArgument, rootStep.getAstNodeIds(), rootStep.getId(), rootStep.getType().orElse(null), newParsingMap.resolveWholeText(newStepText));
 
         io.cucumber.core.gherkin.Step newGherikinMessageStep = (io.cucumber.core.gherkin.Step) Reflect.newInstance(
@@ -271,15 +261,13 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
                 pickleStepDefinitionMatch            // io.cucumber.core.runner.PickleStepDefinitionMatch (package-private instance is fine)
         );
 
-
         StepExtension newStep = new StepExtension(newPickTestStep, stepExecution, parentPickle);
-
-
         newStep.setExecutionArguments(args.stream().map(io.cucumber.core.stepexpression.Argument::getValue).toList());
 
-        copyRelationships(this, newStep);
         return newStep;
+
     }
+
 
 
     public boolean isFail() {
@@ -335,28 +323,50 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
 
     }
 
-
     public StepExtension run() {
         return run(ranTestCase, ranBus, ranState, ranExecutionMode);
     }
 
+    private int executionCount = 0;
+
+    public void setRepeatNum(int repeatNum) {
+        this.repeatNum = repeatNum;
+    }
+
+    private int repeatNum = 1;
+
     public StepExtension run(TestCase testCase, EventBus bus, TestCaseState state, Object executionMode) {
-        StepExtension nextSibling = getNextSibling();
-        if (nextSibling != null && nextSibling.metaStep) {
-            if (nextSibling.isDataTableStep) {
-                StepExtension updatedDataTableStep = nextSibling.updateStep();
-                setNextSibling(nextSibling.getNextSibling());
+        Object currentExecutionMode = executionMode;
+        StepExtension stepToExecute = this;
+        while (runChecks()) {
+            int currentExecutionCount  = stepToExecute.executionCount;
+            int currentRepeatNum  = stepToExecute.repeatNum;
+            if(currentExecutionCount >0)
+            {
+                StepExtension oldStep = stepToExecute;
+                stepToExecute = stepToExecute.duplicateStepForRepeatedExecution(getStepParsingMap());
+                copyRelationships(oldStep, stepToExecute);
+                stepToExecute.executionCount = currentExecutionCount;
+                stepToExecute.repeatNum = currentRepeatNum;
             }
+            currentExecutionMode = stepToExecute.executeStep(testCase, bus, state, currentExecutionMode);
+            executionCount++;
         }
+        StepExtension lastStepExecuted = stepToExecute;
+        StepExtension ranStep = runFirstChild();
+        if(ranStep != null)
+            lastStepExecuted = ranStep;
+        ranStep = runNextSibling();
+        if(ranStep != null)
+            lastStepExecuted = ranStep;
+        return lastStepExecuted;
+    }
 
 
+    public StepExtension executeStep(TestCase testCase, EventBus bus, TestCaseState state, Object executionMode) {
         getScenarioState().setCurrentStep(this);
-
         getScenarioState().register(this, getUniqueKey(this));
-
         skipped = stepExecution.isScenarioComplete();
-
-
         executionMode = shouldRun() ? RUN(executionMode) : SKIP(executionMode);
         System.out.println("@@getDefinitionArgument(): " + (getDefinitionArgument().isEmpty() ? null : getDefinitionArgument().getFirst().getValue()));
         Object returnObj = invokeAnyMethod(delegate, "run", testCase, bus, state, executionMode);
@@ -385,9 +395,37 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         ranState = state;
         ranExecutionMode = returnObj;
 
-        StepExtension ranStep = runFirstChild();
+        return this;
+    }
 
-        return runNextSibling();
+    private final List<BooleanSupplier> checks = new ArrayList<>(
+            List.of(() -> repeatNum > executionCount)
+    );
+
+    /**
+     * Adds a new check to the list.
+     */
+    public void addCheck(BooleanSupplier check) {
+        checks.add(check);
+    }
+
+    /**
+     * Runs all stored checks. Returns true only if all are true.
+     * Every check runs even if some return false.
+     */
+    public boolean runChecks() {
+        boolean all = true;
+        for (BooleanSupplier check : checks) {
+            all = all & check.getAsBoolean();  // non–short-circuit AND
+        }
+        return all;
+    }
+
+    /**
+     * Clears all stored checks (optional helper).
+     */
+    public void clear() {
+        checks.clear();
     }
 
 

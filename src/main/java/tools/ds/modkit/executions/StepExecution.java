@@ -54,8 +54,7 @@ public class StepExecution {
 
         rootScenarioNameStep = new StepExtension(pickle, this, steps.getFirst().delegate);
 
-        NodeMap runMap = new NodeMap(ParsingMap.MapType.RUN_MAP);
-        ParsingMap rootParsingMap = new ParsingMap(runMap);
+        ParsingMap rootParsingMap = getScenarioState().getParsingMap();
         rootScenarioNameStep.setStepParsingMap(rootParsingMap);
         if (scenarioMap != null) {
             scenarioMap.setDataSource(NodeMap.DataSource.EXAMPLE_TABLE);

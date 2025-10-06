@@ -53,8 +53,13 @@ public final class ScenarioState {
         return parsingMap;
     }
 
+    public NodeMap getRunMap() {
+        return runMap;
+    }
+
     // Canonical keys (unchanged)
-    private NodeMap runMap = new NodeMap();
+    private NodeMap runMap = new NodeMap(ParsingMap.MapType.RUN_MAP);
+
 
     public void mergeToRunMap( LinkedListMultimap<?,?> obj){
         runMap.merge(obj);

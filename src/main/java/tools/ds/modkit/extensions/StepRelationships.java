@@ -1,10 +1,15 @@
 package tools.ds.modkit.extensions;
 
+import com.google.common.collect.LinkedListMultimap;
+import io.cucumber.java.bs.A;
+import tools.ds.modkit.mappings.NodeMap;
 import tools.ds.modkit.mappings.ParsingMap;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import static tools.ds.modkit.mappings.ParsingMap.MapType.STEP_MAP;
 
 public abstract class StepRelationships {
 
@@ -20,7 +25,7 @@ public abstract class StepRelationships {
     public List<String> stepTags = new ArrayList<>();
     public List<String> bookmarks = new ArrayList<>();
 
-    public enum ConditionalStates { SKIP_CHILDREN, SKIP , FALSE, TRUE}
+    public enum ConditionalStates {SKIP_CHILDREN, SKIP, FALSE, TRUE}
 
     private final List<ConditionalStates> conditionalStates = new ArrayList<>();
 
@@ -45,9 +50,34 @@ public abstract class StepRelationships {
         return stepParsingMap;
     }
 
+
+    public NodeMap getStepNodeMap() {
+        return stepNodeMap;
+    }
+
+    private final NodeMap stepNodeMap = new NodeMap(STEP_MAP);
+
+    public void mergeToStepMap(LinkedListMultimap<?, ?> obj) {
+        stepNodeMap.merge(obj);
+    }
+
+
+    public void put(Object key, Object value) {
+        if (key == null || (key instanceof String && ((String) key).isBlank()))
+            throw new RuntimeException("key cannot be null or blank");
+        stepNodeMap.put(String.valueOf(key), value);
+    }
+
+
     public void setStepParsingMap(ParsingMap stepParsingMap) {
         this.stepParsingMap = stepParsingMap;
+        this.stepParsingMap.addMaps(stepNodeMap);
     }
+
+    public void addToStepParsingMap(NodeMap... nodes) {
+        this.stepParsingMap.addMaps(nodes);
+    }
+
 
     public void setParentStep(StepExtension parentStep) {
         this.parentStep = parentStep;
@@ -62,13 +92,14 @@ public abstract class StepRelationships {
     public void clearChildSteps() {
         childSteps.clear();
     }
+
     public void addChildStep(StepExtension child) {
         child.setParentStep((StepExtension) this);
         childSteps.add(child);
         child.setStepParsingMap(new ParsingMap(stepParsingMap));
         if (isFlagStep) {
-            System.out.println("@@flag-step: "+ this);
-            System.out.println("@@flag-child-step: "+ child);
+            System.out.println("@@flag-step: " + this);
+            System.out.println("@@flag-child-step: " + child);
             child.stepFlags.addAll(stepFlags);
         }
     }
@@ -137,8 +168,7 @@ public abstract class StepRelationships {
     protected StepExtension templateStep;
     protected boolean isTemplateStep = true;
 
-    public static void copyRelationships(StepExtension copyFrom, StepExtension copyTo)
-    {
+    public static void copyRelationships(StepExtension copyFrom, StepExtension copyTo) {
         copyTo.getChildSteps().addAll(copyFrom.getChildSteps());
         copyTo.setParentStep(copyFrom.getParentStep());
         copyTo.setPreviousSibling(copyFrom.getPreviousSibling());
