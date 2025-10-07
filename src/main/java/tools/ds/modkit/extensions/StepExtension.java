@@ -55,11 +55,11 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
     private Map<Object, Object> stepObjectMap = new HashMap<>();
 
     public void putToTemplateStep(Object key, Object value) {
-        getScenarioState().register(getUniqueKey(this), key, value);
+        getScenarioState().setKeyedTemplate(getUniqueKey(this), key, value);
     }
 
     public Object getFromTemplateStep(Object key) {
-        return getScenarioState().getKeyedInstance(getUniqueKey(this), key);
+        return getScenarioState().getKeyedTemplate(getUniqueKey(this), key);
     }
 
 
@@ -183,6 +183,7 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
             DataTable dataTable = (DataTable) args.getLast().getValue();
             if (tableName != null && !tableName.isBlank())
                 getScenarioState().register(dataTable, tableName);
+            System.out.println("@@register " + dataTable);
             putToTemplateStep(TABLE_KEY, dataTable);
         }
 
@@ -231,6 +232,7 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
     private StepExtension updateStep(Map<String, String> overrides) {
         StepExtension newStep = buildNewStep(overrides, this.getStepParsingMap());
         copyRelationships(this, newStep);
+        newStep.setStepParsingMap(getStepParsingMap());
         return newStep;
     }
 
@@ -347,6 +349,7 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
     public StepExtension runFirstChild() {
         if (getChildSteps().isEmpty() || getConditionalStates().contains(ConditionalStates.SKIP_CHILDREN))
             return null;
+        initializeChildSteps();
         StepExtension firstChildToRun = getChildSteps().getFirst().updateStep();
         firstChildToRun.setParentStep(this);
         return firstChildToRun.run(ranTestCase, ranBus, ranState, ranExecutionMode);
@@ -357,10 +360,18 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         return run(ranTestCase, ranBus, ranState, ranExecutionMode);
     }
 
+    public int getExecutionCount() {
+        return executionCount;
+    }
+
     private int executionCount = 0;
 
     public void setRepeatNum(int repeatNum) {
         this.repeatNum = repeatNum;
+    }
+
+    public int getRepeatNum() {
+        return repeatNum;
     }
 
     private int repeatNum = 1;

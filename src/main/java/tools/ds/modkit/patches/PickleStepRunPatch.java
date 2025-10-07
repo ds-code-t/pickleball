@@ -8,6 +8,8 @@ import tools.ds.modkit.blackbox.Registry;
 import tools.ds.modkit.state.ScenarioState;
 import tools.ds.modkit.util.CallScope;
 
+import java.util.Arrays;
+
 import static tools.ds.modkit.blackbox.Plans.on;
 import static tools.ds.modkit.state.ScenarioState.getScenarioState;
 import static tools.ds.modkit.trace.ObjDataRegistry.*;
@@ -17,22 +19,33 @@ public final class PickleStepRunPatch {
     private PickleStepRunPatch() {
     }
 
+
+
     /**
      * Register the step-run interception.
      */
     public static void register() {
         Registry.register(
+
+
+
                 on("io.cucumber.core.runner.PickleStepTestStep", "run", 4)
                         .returns("io.cucumber.core.runner.ExecutionMode")
 
                         .before(args -> {
-                            System.out.println("@@before");
+                            TestCase testCase = getScenarioState().testCase;
+                            if(testCase != null && !testCase.equals(args[0]))
+                                getScenarioState().clear();
+                            System.out.println("@@Thread  " + Thread.currentThread() + " id= " + Thread.currentThread().getId() + ", " + Thread.currentThread().threadId());
+                            System.out.println("@@before argslist: " + Arrays.stream(args).toList());
                         })
 
                         .around(
                                 args -> {
-                                    Object testCase = args[0]; // io.cucumber.core.runner.TestCase (non-public)
+
+                                    TestCase testCase = (TestCase) args[0]; // io.cucumber.core.runner.TestCase (non-public)
                                     ObjFlags st = getFlag(testCase);
+                                    System.out.println("@@testCase flags: " +  st);
                                     if (st.equals(ObjFlags.RUNNING))
                                         return false;
                                     Object self = CallScope.currentSelf();

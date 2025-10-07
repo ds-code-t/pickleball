@@ -1,5 +1,6 @@
 package tools.ds.modkit.coredefinitions;
 
+import com.google.common.collect.LinkedListMultimap;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Given;
 import tools.ds.modkit.extensions.StepExtension;
@@ -24,23 +25,41 @@ public class MappingSteps {
     public static void forEverRow(String tableName) {
         StepExtension currentStep = getCurrentStep();
         DataTable dataTable = null;
-        if (tableName == null || tableName.isBlank()) {
+        tableName = tableName == null || tableName.isBlank() ? "" : tableName.trim();
+        System.out.println("@@tableName: " + tableName + tableName.isEmpty());
+        if (tableName.isEmpty()) {
             StepExtension nestStep = currentStep.getNextSibling();
+            System.out.println("@@nestStep: " + nestStep);
+            System.out.println("@@nestStep.isDataTableStep: " + nestStep.isDataTableStep);
+            System.out.println("@@ nestStep.getDataTable() " +  nestStep.getDataTable());
             if (nestStep != null && nestStep.isDataTableStep)
                 dataTable = nestStep.getDataTable();
         } else {
-            dataTable = (DataTable) getScenarioState().getInstance(tableName.trim());
+            dataTable = (DataTable) getScenarioState().getInstance(tableName);
         }
         if (dataTable == null)
             throw new RuntimeException("Data Table not defined");
-        currentStep.getStepNodeMap().put(tableName.trim(), toRowsMultimap(dataTable));
+        LinkedListMultimap<String, LinkedListMultimap<String, String>>  maps = toRowsMultimap(dataTable);
+        if(!tableName.isEmpty())
+            currentStep.getStepNodeMap().put(tableName.trim(), maps);
+        currentStep.getStepNodeMap().merge(maps);
+        System.out.println("@@maps): " + maps);
+        System.out.println("@@maps.get(\"ROWS\")): " + maps.get("ROW"));
+        System.out.println("@@maps.get(\"ROW\").get(currentStep.getExecutionCount()): " + maps.get("ROW").get(currentStep.getExecutionCount()));
+        System.out.println("@@currentStep.getRepeatNum()): " + currentStep.getRepeatNum());
+        List<LinkedListMultimap<String, String>> rows = maps.get("ROW");
+        currentStep.setRepeatNum(rows.size());
+        currentStep.getStepNodeMap().merge(maps.get("ROW").get(currentStep.getExecutionCount()));
+        System.out.println("@@currentStep.getStepNodeMap(): " + currentStep.getStepNodeMap());
     }
 
     @Given("^(:?\"(.*)\"\\s+)?DATA TABLE$")
     public static void dataTable(String tableName, DataTable dataTable) {
-        tableName = tableName == null || tableName.isBlank() ? "" : tableName.trim();
-        getCurrentStep().putToTemplateStep(tableName, dataTable);
-        getScenarioState().register(dataTable, tableName);
+        System.out.println("Datatable Step tableName: " + tableName );
+        System.out.println("Datatable Step dataTable: " + dataTable);
+//        tableName = tableName == null || tableName.isBlank() ? "" : tableName.trim();
+//        getCurrentStep().putToTemplateStep(tableName, dataTable);
+//        getScenarioState().register(dataTable, tableName);
     }
 
     //    @Given("^([A-Z]*\\s+)*(:?\"(.*)\"\\s+)?DATA TABLE$")

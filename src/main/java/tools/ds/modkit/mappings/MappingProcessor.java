@@ -1,19 +1,29 @@
 package tools.ds.modkit.mappings;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.LinkedListMultimap;
 import tools.ds.modkit.mappings.queries.Tokenized;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static tools.ds.modkit.evaluations.AviatorUtil.eval;
 import static tools.ds.modkit.evaluations.AviatorUtil.evalToBoolean;
+import static tools.ds.modkit.mappings.NodeMap.MAPPER;
+import static tools.ds.modkit.util.StringUtilities.decodeBackToText;
+import static tools.ds.modkit.util.StringUtilities.encodeToPlaceHolders;
 
 
 public abstract class MappingProcessor implements Map<String, Object> {
 
+    @Override
+    public String toString() {
+        return String.valueOf(valuesInKeyOrder());
+    }
 
     private final LinkedListMultimap<ParsingMap.MapType, NodeMap> maps = LinkedListMultimap.create();
     private final List<ParsingMap.MapType> keyOrder;
@@ -77,15 +87,13 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     public void addMapsToStart(List<NodeMap> nodes) {
         List<List<NodeMap>> grouped = groupByMapType(nodes);
-        for(List<NodeMap> list : grouped)
-        {
-            if(list.isEmpty())
+        for (List<NodeMap> list : grouped) {
+            if (list.isEmpty())
                 continue;
             List<NodeMap> existingNodes = maps.get(list.getFirst().getMapType());
             existingNodes.addAll(list);
         }
     }
-
 
 
     public static List<List<NodeMap>> groupByMapType(List<NodeMap> nodes) {
@@ -175,7 +183,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     if (input.equals(prev)) equalityCount = 0;
                 }
             } while (equalityCount < 2);
-            return input;
+            return  decodeBackToText(input);
         } catch (Throwable t) {
             throw new RuntimeException("Could not resolve'" + input + "'", t);
         }
@@ -194,7 +202,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
             outer:
             while (m.find()) {
                 key = m.group(1);
-
                 Tokenized tokenized = new Tokenized(key);
 
                 for (NodeMap map : valuesInKeyOrder()) {
@@ -206,14 +213,13 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 }
             }
 
-
             if (replacement == null)
                 return s;
-
             String stringReplacement = getStringValue(replacement);
-            if (stringReplacement.isEmpty() && key != null)
-                stringReplacement = "<?" + key + ">";
-
+            if (stringReplacement.isEmpty() && key != null && !key.isBlank()) {
+                stringReplacement = key.startsWith("?") ? "<" + key + ">" : "<?" + key + ">";
+//                wait(300);
+            }
             m.appendReplacement(sb, stringReplacement);
 
             m.appendTail(sb);
@@ -230,6 +236,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
             StringBuffer sb = new StringBuffer();
             while (m.find()) {
                 String key = m.group(1).trim();
+                key = decodeBackToText(key);
                 String repl = key.endsWith("?") ? String.valueOf(evalToBoolean(key.substring(0, key.length() - 1), this)) : String.valueOf(eval(key, this));
                 m.appendReplacement(sb, repl == null ? m.group(0) : Matcher.quoteReplacement(repl));
             }
@@ -310,23 +317,46 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return Set.of();
     }
 
+//
+//    public static String getStringValue(Object obj) {
+//        if (obj instanceof List<?> list) {
+//            if (list.isEmpty()) return String.valueOf(obj);
+//            if (list.getFirst() instanceof JsonNode)
+//                return String.valueOf(((List<JsonNode>) list).stream().map(JsonNode::asText).toList());
+//        }
+//        if (obj instanceof JsonNode jsonNode)
+//            return jsonNode.asText();
+//        return String.valueOf(obj);
+//    }
+
+
+
 
     public static String getStringValue(Object obj) {
-        if (obj instanceof List<?> list) {
-            if (list.isEmpty()) return String.valueOf(obj);
-            if (list.getFirst() instanceof JsonNode)
-                return String.valueOf(((List<JsonNode>) list).stream().map(JsonNode::asText).toList());
+        if (obj == null)
+            return "";
+
+        if (obj instanceof JsonNode jsonNode) {
+            if (jsonNode.isTextual()) {
+                // avoid quotes around simple strings
+                return jsonNode.textValue();
+            }
+            if (jsonNode.isValueNode()) {
+                // numbers, booleans, null
+                return jsonNode.asText("");
+            }
+            try {
+                // arrays / objects → canonical JSON
+                String otherNode = MAPPER.writeValueAsString(jsonNode);
+                return encodeToPlaceHolders(otherNode);
+            } catch (JsonProcessingException e) {
+                // fallback to best-effort text
+                return jsonNode.toString();
+            }
         }
-        if (obj instanceof JsonNode jsonNode)
-            return jsonNode.asText();
+
         return String.valueOf(obj);
     }
 
-//    public static boolean isMatch(Object obj) {
-//        if(obj == null)
-//            return false;
-//        if(obj instanceof ArrayNode arrayNode)
-//
-//    }
 
 }

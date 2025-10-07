@@ -89,6 +89,7 @@ public final class ScenarioState {
      * Per-thread store lives inside the ScenarioState instance.
      */
     private final Map<Object, Object> store = new ConcurrentHashMap<>();
+    private final Map<Object, Object> templateStore = new ConcurrentHashMap<>();
 
 
     public TestCase testCase;
@@ -125,7 +126,7 @@ public final class ScenarioState {
         scenarioState.gherkinView = CucumberQueryUtil.describe(scenarioState.scenarioPickle);
         scenarioState.stepExecution = new StepExecution(testCase);
         scenarioState.runner = scenarioState.getRunner();
-        scenarioState.clear();
+//        scenarioState.clear();
     }
 
     public static ScenarioState getScenarioState() {
@@ -209,25 +210,25 @@ public final class ScenarioState {
         return (key == null) ? null : store.get(key);
     }
 
-    private final String keyFlag =  "_kEyflag_\u206AMETA";
+    private final String keyFlag = "_TemplateKey_\u206AMETA";
 
-    public Map<Object, Object> getKeyedInstanceMap(String key) {
+    public Map<Object, Object> getKeyedTemplateMap(String key) {
         if (key == null || key.isBlank())
             return null;
         key = keyFlag + key.trim();
-       return (Map<Object, Object>) store.computeIfAbsent(key, k -> new HashMap<>());
+        return (Map<Object, Object>) store.computeIfAbsent(key, k -> new HashMap<>());
     }
 
-    public void setKeyedInstance(String key, Object obj1,  Object obj2) {
-        Map<Object, Object> map = getKeyedInstanceMap(key);
-        if(map== null) throw new RuntimeException("key is null or empty.  Cannot put " + obj2);
-        getKeyedInstanceMap(key).put(obj1, obj2);
+    public void setKeyedTemplate(String uniqueObjectKey, Object key, Object value) {
+        Map<Object, Object> map = getKeyedTemplateMap(uniqueObjectKey);
+        if (map == null) throw new RuntimeException("uniqueObjectKey is null or empty.  Cannot put " + value);
+        map.put(key, value);
     }
 
-    public Object getKeyedInstance(String key, Object obj1) {
-        Map<Object, Object> map = getKeyedInstanceMap(key);
-        if(map== null) return null;
-        return map.get(obj1);
+    public Object getKeyedTemplate(String uniqueObjectKey, Object key) {
+        Map<Object, Object> map = (Map<Object, Object>) store.get(keyFlag + uniqueObjectKey);
+        if (map == null) return null;
+        return map.get(key);
     }
 
 

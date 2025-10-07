@@ -70,8 +70,10 @@ public abstract class StepRelationships {
 
 
     public void setStepParsingMap(ParsingMap stepParsingMap) {
+        System.out.println("@@setStepParsingMap for " + this);
         this.stepParsingMap = stepParsingMap;
         this.stepParsingMap.addMaps(stepNodeMap);
+        System.out.println("@@setStepParsingMap " + stepParsingMap);
     }
 
     public void addToStepParsingMap(NodeMap... nodes) {
@@ -85,6 +87,19 @@ public abstract class StepRelationships {
 
     private ParsingMap stepParsingMap;
 
+    public void initializeChildSteps() {
+        System.out.println("@@parent: " + this);
+        System.out.println("@@parent-stepParsingMap: " + stepParsingMap);
+        childSteps.forEach(this::initializeChildStep);
+    }
+
+    public void initializeChildStep(StepExtension child) {
+        System.out.println("@@parent--stepParsingMap: " + stepParsingMap);
+        child.setStepParsingMap(new ParsingMap(stepParsingMap));
+        System.out.println("@@child: " + child);
+        System.out.println("@@child-stepParsingMap: " + child.getStepParsingMap());
+    }
+
     public List<StepExtension> getChildSteps() {
         return childSteps;
     }
@@ -96,7 +111,6 @@ public abstract class StepRelationships {
     public void addChildStep(StepExtension child) {
         child.setParentStep((StepExtension) this);
         childSteps.add(child);
-        child.setStepParsingMap(new ParsingMap(stepParsingMap));
         if (isFlagStep) {
             System.out.println("@@flag-step: " + this);
             System.out.println("@@flag-child-step: " + child);
@@ -110,7 +124,7 @@ public abstract class StepRelationships {
         if (parentStep == null)
             return;
         newChild.setParentStep(parentStep);
-        newChild.setStepParsingMap(new ParsingMap(parentStep.getStepParsingMap()));
+//        newChild.setStepParsingMap(new ParsingMap(parentStep.getStepParsingMap()));
         if (parentStep.isFlagStep)
             newChild.stepFlags.addAll(parentStep.stepFlags);
         parentStep.getChildSteps().set(parentStep.getChildSteps().indexOf(oldChild), newChild);
@@ -156,7 +170,7 @@ public abstract class StepRelationships {
         setNextSibling(insertNextSibling);
         if (parentStep != null) {
             insertNextSibling.setParentStep(parentStep);
-            insertNextSibling.setStepParsingMap(new ParsingMap(parentStep.getStepParsingMap()));
+//            insertNextSibling.setStepParsingMap(new ParsingMap(parentStep.getStepParsingMap()));
             System.out.println("@@nextSibling22: " + originalNextSibling);
             if (originalNextSibling == null)
                 parentStep.getChildSteps().add(insertNextSibling);
@@ -172,7 +186,7 @@ public abstract class StepRelationships {
         copyTo.getChildSteps().addAll(copyFrom.getChildSteps());
         copyTo.setParentStep(copyFrom.getParentStep());
         copyTo.setPreviousSibling(copyFrom.getPreviousSibling());
-        copyTo.setStepParsingMap(copyFrom.getStepParsingMap());
+//        copyTo.setStepParsingMap(copyFrom.getStepParsingMap());
         copyTo.setNextSibling(copyFrom.getNextSibling());
         copyTo.setNestingLevel(copyFrom.getNestingLevel());
         copyTo.stepTags = copyFrom.stepTags;

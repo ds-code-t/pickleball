@@ -1,15 +1,28 @@
 Feature: Tiny calculator
 
   Scenario Outline: Test
-    Then print"<A>"
+    Then print "<K1>"
+    * For every ROW in DATA TABLE
+  : Then print "aa <x>  <x #1> <x[0]>  <K1> row- <ROW> ,<ROW.K1> <ROW[0].K1> <ROW #1.K1>"
+  : Then print "bb row-  <ROW>,  <ROW.K1> <ROW[1].K1> <ROW #2.K1>"
+  : Then print "<x>  <K1> <K2> <K3>"
+  :: Then print "<x>  <K1> <K2> <K3>"
     * DATA TABLE
-      | A 33 |
-      | 32ee |
-    Then a is <A> and b is 6
+      | K1 | x  |
+      | Z1 | 11 |
+      | Z2 | 22 |
+      | Z3 | 33 |
+
+    Then print "<K1> <K2> <K3>"
+
+#    Examples:
+#      | aK1 | aK2 | aK3 |
+#      | A1 | A2 | A3 |
+
 
     Examples:
-      | A  |
-      | 32 |
+      | K1 | K2 | K3 |
+      | A1 | A2 | A3 |
 
 
 

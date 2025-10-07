@@ -80,7 +80,7 @@ public class StepDefs {
 //    public void saveString(String a, String b) throws InterruptedException {
 //            getScenarioState().put(a, b);
 //    }
-    @Given("print{string}")
+    @Given("print {string}")
     public void printTest(String message)  {
         System.out.println("@@printTest: " + message);
 

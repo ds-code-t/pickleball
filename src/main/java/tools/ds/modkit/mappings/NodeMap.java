@@ -14,6 +14,10 @@ import static tools.ds.modkit.blackbox.BlackBoxBootstrap.metaFlag;
 
 public class NodeMap {
 
+    @Override
+    public String toString() {
+        return "Type: " + mapType + " Source: " + dataSource + "\n"+ root.toString();
+    }
 
     public DataSource getDataSource() {
         return dataSource;
