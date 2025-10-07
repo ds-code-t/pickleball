@@ -26,8 +26,6 @@ import static tools.ds.modkit.util.TableUtils.exampleHeaderValueMap;
 public final class ScenarioState {
 
 
-
-
     private Map<String, NodeMap> scenarioMaps = new HashMap<>();
 
     public NodeMap getScenarioMap(Pickle pickle) {
@@ -61,12 +59,12 @@ public final class ScenarioState {
     private NodeMap runMap = new NodeMap(ParsingMap.MapType.RUN_MAP);
 
 
-    public void mergeToRunMap( LinkedListMultimap<?,?> obj){
+    public void mergeToRunMap(LinkedListMultimap<?, ?> obj) {
         runMap.merge(obj);
     }
 
     public void put(Object key, Object value) {
-        if(key == null || (key instanceof String && ((String) key).isBlank()))
+        if (key == null || (key instanceof String && ((String) key).isBlank()))
             throw new RuntimeException("key cannot be null or blank");
         runMap.put(String.valueOf(key), value);
     }
@@ -210,6 +208,28 @@ public final class ScenarioState {
     public Object getInstance(Object key) {
         return (key == null) ? null : store.get(key);
     }
+
+    private final String keyFlag =  "_kEyflag_\u206AMETA";
+
+    public Map<Object, Object> getKeyedInstanceMap(String key) {
+        if (key == null || key.isBlank())
+            return null;
+        key = keyFlag + key.trim();
+       return (Map<Object, Object>) store.computeIfAbsent(key, k -> new HashMap<>());
+    }
+
+    public void setKeyedInstance(String key, Object obj1,  Object obj2) {
+        Map<Object, Object> map = getKeyedInstanceMap(key);
+        if(map== null) throw new RuntimeException("key is null or empty.  Cannot put " + obj2);
+        getKeyedInstanceMap(key).put(obj1, obj2);
+    }
+
+    public Object getKeyedInstance(String key, Object obj1) {
+        Map<Object, Object> map = getKeyedInstanceMap(key);
+        if(map== null) return null;
+        return map.get(obj1);
+    }
+
 
     public <T> T getInstance(Object key, Class<T> type) {
         if (key == null || type == null) return null;

@@ -5,7 +5,6 @@ import io.cucumber.java.en.Given;
 import tools.ds.modkit.extensions.StepExtension;
 import tools.ds.modkit.mappings.NodeMap;
 import tools.ds.modkit.mappings.ParsingMap;
-import tools.ds.modkit.state.ScenarioState;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -18,21 +17,37 @@ import static tools.ds.modkit.util.TableUtils.toRowsMultimap;
 
 public class MappingSteps {
 
+    public static final String TABLE_KEY = "\u206A_TABLE_KEY";
+    ;
 
     @Given("^For every ROW in (:?\"(.*)\"\\s+)?DATA TABLE$")
     public static void forEverRow(String tableName) {
         StepExtension currentStep = getCurrentStep();
-        StepExtension nestStep = currentStep.getNextSibling();
-        if(nestStep.methodName.equals("setDataTableValues"))
-        {
-
+        DataTable dataTable = null;
+        if (tableName == null || tableName.isBlank()) {
+            StepExtension nestStep = currentStep.getNextSibling();
+            if (nestStep != null && nestStep.isDataTableStep)
+                dataTable = nestStep.getDataTable();
+        } else {
+            dataTable = (DataTable) getScenarioState().getInstance(tableName.trim());
         }
+        if (dataTable == null)
+            throw new RuntimeException("Data Table not defined");
+        currentStep.getStepNodeMap().put(tableName.trim(), toRowsMultimap(dataTable));
     }
 
+    @Given("^(:?\"(.*)\"\\s+)?DATA TABLE$")
+    public static void dataTable(String tableName, DataTable dataTable) {
+        tableName = tableName == null || tableName.isBlank() ? "" : tableName.trim();
+        getCurrentStep().putToTemplateStep(tableName, dataTable);
+        getScenarioState().register(dataTable, tableName);
+    }
 
-//    @Given("^([A-Z]*\\s+)*(:?\"(.*)\"\\s+)?DATA TABLE$")
-    @Given("^(?:(DEFAULT|OVERRIDE)\\s+)?(:?\"(.*)\"\\s+)?DATA TABLE$")
+    //    @Given("^([A-Z]*\\s+)*(:?\"(.*)\"\\s+)?DATA TABLE$")
+    @Given("^wew(?:(DEFAULT|OVERRIDE)\\s+)?(:?\"(.*)\"\\s+)?DATA TABLE$")
     public static void setDataTableValues(String tableType, String tableName, DataTable dataTable) {
+//        if (tableName != null && !tableName.isBlank())
+//            getCurrentStep().templateStepObjectMap.put(TABLE_NAME, tableType.trim());
         List<String> parameters = tableType == null || tableType.isBlank() ? new ArrayList<>() :
                 Arrays.stream(tableType.strip().split("\\s+")).toList();
         ParsingMap parsingMap = parameters.contains("GLOBAL") ? getCurrentStep().getStepParsingMap() : getScenarioState().getParsingMap();

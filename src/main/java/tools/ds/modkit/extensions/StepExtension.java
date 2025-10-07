@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
 import static tools.ds.modkit.blackbox.BlackBoxBootstrap.metaFlag;
 import static tools.ds.modkit.blackbox.BlackBoxBootstrap.skipLogging;
 import static tools.ds.modkit.coredefinitions.FlagSteps.*;
+import static tools.ds.modkit.coredefinitions.MappingSteps.TABLE_KEY;
 import static tools.ds.modkit.coredefinitions.MetaSteps.defaultMatchFlag;
 import static tools.ds.modkit.evaluations.AviatorUtil.eval;
 
@@ -42,6 +43,25 @@ import static tools.ds.modkit.util.stepbuilder.StepUtilities.createScenarioPickl
 import static tools.ds.modkit.util.stepbuilder.StepUtilities.getDefinition;
 
 public class StepExtension extends StepRelationships implements PickleStepTestStep, io.cucumber.plugin.event.Step {
+
+    public Map<Object, Object> getStepObjectMap() {
+        return stepObjectMap;
+    }
+
+    public void setStepObjectMap(Map<Object, Object> stepObjectMap) {
+        this.stepObjectMap = stepObjectMap;
+    }
+
+    private Map<Object, Object> stepObjectMap = new HashMap<>();
+
+    public void putToTemplateStep(Object key, Object value) {
+        getScenarioState().register(getUniqueKey(this), key, value);
+    }
+
+    public Object getFromTemplateStep(Object key) {
+        return getScenarioState().getKeyedInstance(getUniqueKey(this), key);
+    }
+
 
     public Throwable storedThrowable;
 
@@ -66,12 +86,7 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
     public final String rootText;
     public final String metaData;
 
-
-//    private List<NodeMap> stepMaps = new ArrayList<>();
-
-
     public final io.cucumber.core.gherkin.Pickle parentPickle;
-//    public final String pickleKey;
 
     public DataTable getStepDataTable() {
         return stepDataTable;
@@ -95,10 +110,9 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
 
     private List<Object> executionArguments;
 
-    private final boolean isCoreStep;
-    private final boolean isDataTableStep;
+    public final boolean isCoreStep;
+    public final boolean isDataTableStep;
 
-    private final boolean metaStep;
 
     //    private static final Pattern pattern = Pattern.compile("@\\[([^\\[\\]]+)\\]");
     private static final Pattern pattern = Pattern.compile("@:([A-Z]+:[A-Z-a-z0-9]+)");
@@ -157,8 +171,21 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         rootText = strings[0].trim();
         metaData = strings.length == 1 ? "" : strings[1].trim();
         Matcher matcher = pattern.matcher(metaData);
-        isDataTableStep = isCoreStep && method.getName().equals("setDataTable");
-        metaStep = isDataTableStep;
+        isDataTableStep = isCoreStep && methodName.equals("dataTable");
+
+        System.out.println("@@step: " + this + " , #@@methodname: " + methodName);
+        System.out.println("@@isCoreStep: " + isCoreStep);
+        if (isDataTableStep) {
+            getProperty(step, "definitionMatch");
+            Object pickleStepDefinitionMatch = getProperty(step, "definitionMatch");
+            List<io.cucumber.core.stepexpression.Argument> args = (List<io.cucumber.core.stepexpression.Argument>) getProperty(pickleStepDefinitionMatch, "arguments");
+            String tableName = (String) args.getFirst().getValue();
+            DataTable dataTable = (DataTable) args.getLast().getValue();
+            if (tableName != null && !tableName.isBlank())
+                getScenarioState().register(dataTable, tableName);
+            putToTemplateStep(TABLE_KEY, dataTable);
+        }
+
 
         while (matcher.find()) {
             stepTags.add(matcher.group().substring(1).replaceAll("@:", ""));
@@ -166,6 +193,10 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
 
         stepTags.stream().filter(t -> t.startsWith("REF:")).forEach(t -> bookmarks.add(t.replaceFirst("REF:", "")));
         setNestingLevel((int) matcher.replaceAll("").chars().filter(ch -> ch == ':').count());
+    }
+
+    public DataTable getDataTable(){
+        return (DataTable) getFromTemplateStep(TABLE_KEY);
     }
 
 
@@ -269,7 +300,6 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
     }
 
 
-
     public boolean isFail() {
         return hardFail || softFail;
     }
@@ -339,10 +369,9 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         Object currentExecutionMode = executionMode;
         StepExtension stepToExecute = this;
         while (runChecks()) {
-            int currentExecutionCount  = stepToExecute.executionCount;
-            int currentRepeatNum  = stepToExecute.repeatNum;
-            if(currentExecutionCount >0)
-            {
+            int currentExecutionCount = stepToExecute.executionCount;
+            int currentRepeatNum = stepToExecute.repeatNum;
+            if (currentExecutionCount > 0) {
                 StepExtension oldStep = stepToExecute;
                 stepToExecute = stepToExecute.duplicateStepForRepeatedExecution(getStepParsingMap());
                 copyRelationships(oldStep, stepToExecute);
@@ -354,10 +383,10 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         }
         StepExtension lastStepExecuted = stepToExecute;
         StepExtension ranStep = runFirstChild();
-        if(ranStep != null)
+        if (ranStep != null)
             lastStepExecuted = ranStep;
         ranStep = runNextSibling();
-        if(ranStep != null)
+        if (ranStep != null)
             lastStepExecuted = ranStep;
         return lastStepExecuted;
     }

@@ -2,6 +2,9 @@ Feature: Tiny calculator
 
   Scenario Outline: Test
     Then print"<A>"
+    * DATA TABLE
+      | A 33 |
+      | 32ee |
     Then a is <A> and b is 6
 
     Examples:
