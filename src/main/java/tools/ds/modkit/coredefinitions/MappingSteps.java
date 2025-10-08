@@ -1,6 +1,8 @@
 package tools.ds.modkit.coredefinitions;
 
+import annotations.NoLogging;
 import com.google.common.collect.LinkedListMultimap;
+import com.google.common.collect.ListMultimap;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Given;
 import tools.ds.modkit.extensions.StepExtension;
@@ -12,6 +14,8 @@ import java.util.Arrays;
 import java.util.List;
 
 import static tools.ds.modkit.extensions.StepExtension.getCurrentStep;
+import static tools.ds.modkit.extensions.StepRelationships.pairSiblings;
+import static tools.ds.modkit.mappings.NodeMap.DataSource.TABLE_ROW;
 import static tools.ds.modkit.state.ScenarioState.getScenarioState;
 import static tools.ds.modkit.util.TableUtils.toFlatMultimap;
 import static tools.ds.modkit.util.TableUtils.toRowsMultimap;
@@ -19,19 +23,18 @@ import static tools.ds.modkit.util.TableUtils.toRowsMultimap;
 public class MappingSteps {
 
     public static final String TABLE_KEY = "\u206A_TABLE_KEY";
-    ;
 
+
+    //    @NoLogging
     @Given("^For every ROW in (:?\"(.*)\"\\s+)?DATA TABLE$")
     public static void forEverRow(String tableName) {
+        System.out.println("@@forEverRow!!");
+
         StepExtension currentStep = getCurrentStep();
         DataTable dataTable = null;
         tableName = tableName == null || tableName.isBlank() ? "" : tableName.trim();
-        System.out.println("@@tableName: " + tableName + tableName.isEmpty());
         if (tableName.isEmpty()) {
             StepExtension nestStep = currentStep.getNextSibling();
-            System.out.println("@@nestStep: " + nestStep);
-            System.out.println("@@nestStep.isDataTableStep: " + nestStep.isDataTableStep);
-            System.out.println("@@ nestStep.getDataTable() " +  nestStep.getDataTable());
             if (nestStep != null && nestStep.isDataTableStep)
                 dataTable = nestStep.getDataTable();
         } else {
@@ -39,23 +42,57 @@ public class MappingSteps {
         }
         if (dataTable == null)
             throw new RuntimeException("Data Table not defined");
-        LinkedListMultimap<String, LinkedListMultimap<String, String>>  maps = toRowsMultimap(dataTable);
-        if(!tableName.isEmpty())
-            currentStep.getStepNodeMap().put(tableName.trim(), maps);
-        currentStep.getStepNodeMap().merge(maps);
-        System.out.println("@@maps): " + maps);
-        System.out.println("@@maps.get(\"ROWS\")): " + maps.get("ROW"));
-        System.out.println("@@maps.get(\"ROW\").get(currentStep.getExecutionCount()): " + maps.get("ROW").get(currentStep.getExecutionCount()));
-        System.out.println("@@currentStep.getRepeatNum()): " + currentStep.getRepeatNum());
-        List<LinkedListMultimap<String, String>> rows = maps.get("ROW");
-        currentStep.setRepeatNum(rows.size());
-        currentStep.getStepNodeMap().merge(maps.get("ROW").get(currentStep.getExecutionCount()));
-        System.out.println("@@currentStep.getStepNodeMap(): " + currentStep.getStepNodeMap());
+        LinkedListMultimap<String, LinkedListMultimap<String, String>> rowMap = toRowsMultimap(dataTable);
+        if (!tableName.isEmpty())
+            currentStep.getStepNodeMap().put(tableName.trim(), rowMap);
+        else
+            currentStep.getStepNodeMap().merge(rowMap);
+
+        System.out.println("@@currentStep.getStepParsingMap:: " + currentStep.getStepParsingMap());
+
+        List<LinkedListMultimap<String, String>> rows = rowMap.get("ROW");
+
+        System.out.println("@@rowss: " + rows);
+        System.out.println("@@rows.size: " + rows.size());
+        StepExtension lastSibling = null;
+        List<StepExtension> children = currentStep.getChildSteps();
+        currentStep.clearChildSteps();
+        for (int r = 0; r < rows.size(); r++) {
+
+            LinkedListMultimap<String, String> row = rows.get(r);
+            NodeMap rowNodeMap = new NodeMap(row);
+            System.out.println("@@row=: " + row);
+            rowNodeMap.setDataSource(TABLE_ROW);
+            rowNodeMap.setMapType(ParsingMap.MapType.STEP_MAP);
+            System.out.println("@@step== " + "-" + r + "- " + currentStep.getStepText());
+            StepExtension nextSibling = currentStep.modifyStep("qq-" + r + "- " + currentStep.getStepText());
+            nextSibling.inheritFromParent = false;
+            System.out.println("\n\n@@rowNodeMap: "  + rowNodeMap );
+            System.out.println("\n\n@@nextSibling parsaing11:\n"  + nextSibling.getStepParsingMap() );
+            nextSibling.addToStepParsingMap(rowNodeMap);
+            System.out.println("\n\n@@nextSibling parsaing22:\n"  + nextSibling.getStepParsingMap() );
+            System.out.println("\n\n@@setchildren "  + children.size() + "  -  " + children);
+            nextSibling.setChildSteps(children);
+            currentStep.addChildStep(nextSibling);
+            System.out.println("@@nextSibling: " + nextSibling);
+            System.out.println("@@lastSibling: " + lastSibling);
+            if (lastSibling != null)
+                pairSiblings(lastSibling, nextSibling);
+            lastSibling = nextSibling;
+            System.out.println("\n\n@@nextSibling parsaing33:\n"  + nextSibling.getStepParsingMap() );
+        }
+
+    }
+
+    @Given("^qq-(\\d+)-( For .*)")
+    public static void loop(String count, String stepText) {
+
+        System.out.println("@@@LOOP _ " + count + "  -  " + stepText);
     }
 
     @Given("^(:?\"(.*)\"\\s+)?DATA TABLE$")
     public static void dataTable(String tableName, DataTable dataTable) {
-        System.out.println("Datatable Step tableName: " + tableName );
+        System.out.println("Datatable Step tableName: " + tableName);
         System.out.println("Datatable Step dataTable: " + dataTable);
 //        tableName = tableName == null || tableName.isBlank() ? "" : tableName.trim();
 //        getCurrentStep().putToTemplateStep(tableName, dataTable);

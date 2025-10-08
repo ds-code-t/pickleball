@@ -120,11 +120,11 @@ public class StepDefs {
         Object tc = getScenarioState().getTestCase();
         String tcName = getScenarioState().getTestCaseName();
         String pickleName = getScenarioState().getPickleName();
-        String scenarioName = getScenarioState().getScenarioName();
+//        String scenarioName = getScenarioState().getScenarioName();
 
         System.out.println("@@tcName: " + tcName);
         System.out.println("@@pickleName: " + pickleName);
-        System.out.println("@@scenarioName: " + scenarioName);
+//        System.out.println("@@scenarioName: " + scenarioName);
 
 
         System.out.println("@@Steps::: ");

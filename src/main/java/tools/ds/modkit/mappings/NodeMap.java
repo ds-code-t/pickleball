@@ -16,7 +16,7 @@ public class NodeMap {
 
     @Override
     public String toString() {
-        return "Type: " + mapType + " Source: " + dataSource + "\n"+ root.toString();
+        return "Type: " + mapType + " Source: " + dataSource + "\nroot:"+ root.toString();
     }
 
     public DataSource getDataSource() {
@@ -28,7 +28,7 @@ public class NodeMap {
         this.root.set(DataSourceKey, MAPPER.valueToTree(dataSource));
     }
 
-    public enum DataSource {CONFIGURATION_FILE, PASSED_TABLE, EXAMPLE_TABLE, STEP_TABLE, DEFAULT}
+    public enum DataSource {CONFIGURATION_FILE, PASSED_TABLE, EXAMPLE_TABLE, STEP_TABLE, TABLE_ROW, DEFAULT}
 
     private DataSource dataSource = DataSource.DEFAULT;
 

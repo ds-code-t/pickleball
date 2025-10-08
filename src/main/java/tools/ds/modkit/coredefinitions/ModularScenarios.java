@@ -1,5 +1,6 @@
 package tools.ds.modkit.coredefinitions;
 
+import annotations.NoLogging;
 import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.datatable.DataTable;
@@ -23,6 +24,7 @@ public class ModularScenarios {
 
 //    public static final String componentPrefix = "@_COMPONENT_";
 
+    @NoLogging
     @Given("^RUN COMPONENT SCENARIO:?(.*)?$")
     public static void runComponentScenarios(String scenario, DataTable dataTable) {
         List<Map<String, String>> maps = dataTable.asMaps().stream()
@@ -48,7 +50,7 @@ public class ModularScenarios {
         filterAndExecutePickles(maps, "'RUN COMPONENT SCENARIOS' step");
     }
 
-
+    @NoLogging
     @Given("^RUN SCENARIOS:?(.*)?$")
     public static void runScenarios(String scenario, DataTable dataTable) {
         List<Map<String, String>> maps = dataTable.asMaps().stream()

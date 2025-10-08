@@ -26,24 +26,22 @@ public final class PickleStepRunPatch {
      */
     public static void register() {
         Registry.register(
-
-
-
                 on("io.cucumber.core.runner.PickleStepTestStep", "run", 4)
                         .returns("io.cucumber.core.runner.ExecutionMode")
 
-                        .before(args -> {
-                            TestCase testCase = getScenarioState().testCase;
-                            if(testCase != null && !testCase.equals(args[0]))
-                                getScenarioState().clear();
-                            System.out.println("@@Thread  " + Thread.currentThread() + " id= " + Thread.currentThread().getId() + ", " + Thread.currentThread().threadId());
-                            System.out.println("@@before argslist: " + Arrays.stream(args).toList());
-                        })
+//                        .before(args -> {
+//                            TestCase testCase = getScenarioState().testCase;
+//                            System.out.println("@@testCase---: "+ args[0] + " , " + testCase);
+//                            if(testCase == null || !testCase.equals(args[0]))
+//                                resetScenarioState();
+//                            System.out.println("@@Thread  " + Thread.currentThread() + " id= " + Thread.currentThread().getId() + ", " + Thread.currentThread().threadId());
+//                            System.out.println("@@before argslist: " + Arrays.stream(args).toList());
+//                        })
 
                         .around(
                                 args -> {
-
                                     TestCase testCase = (TestCase) args[0]; // io.cucumber.core.runner.TestCase (non-public)
+                                    System.out.println("testCase "+ testCase);
                                     ObjFlags st = getFlag(testCase);
                                     System.out.println("@@testCase flags: " +  st);
                                     if (st.equals(ObjFlags.RUNNING))

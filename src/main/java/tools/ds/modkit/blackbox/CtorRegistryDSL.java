@@ -17,8 +17,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
-import static tools.ds.modkit.blackbox.BlackBoxBootstrap.K_JAVABACKEND;
-import static tools.ds.modkit.blackbox.BlackBoxBootstrap.K_RUNNER;
+import static tools.ds.modkit.blackbox.BlackBoxBootstrap.*;
 import static tools.ds.modkit.state.ScenarioState.getScenarioState;
 import static tools.ds.modkit.util.Reflect.getProperty;
 import static tools.ds.modkit.util.Reflect.invokeAnyMethod;
@@ -74,11 +73,17 @@ public final class CtorRegistryDSL {
             Registry.register(
                     Plans.onCtor(fqcn, 0) // arg count is irrelevant for afterInstance (Weaver matches all ctors)
                             .afterInstance(self -> {
+
 //                                if (!Registry.firstTimeForCtor(ctorKey, self)) return;
                                 if (self == null) return;
+                                String className = self.getClass().getCanonicalName();
 
+//                                if(!global && className.equals(K_TEST_CASE))
+//                                {
+//                                    resetScenarioState();
+//                                }
 
-                                if (self.getClass().getCanonicalName().equals(K_RUNNER)) {
+                                if (className.equals(K_RUNNER)) {
                                     Options runnerOptions = (Options) getProperty(self, "runnerOptions");
                                     List<URI> currentGluePaths = (List<URI>) getProperty(runnerOptions, "glue");
                                     Glue glue = (Glue) getProperty(self, "glue");

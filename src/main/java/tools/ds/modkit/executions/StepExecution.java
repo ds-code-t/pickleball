@@ -49,18 +49,26 @@ public class StepExecution {
         pSteps.forEach(step -> steps.add(new StepExtension(step, this, pickle)));
         ScenarioState scenarioState = getScenarioState();
         NodeMap scenarioMap = scenarioState.getScenarioMap(scenarioState.getScenarioPickle());
-
+        System.out.println("\n@@##scenarioMap:: " + scenarioMap);
+        System.out.println("\n\n======\n\n");
         Map<Integer, StepExtension> nestingMap = new HashMap<>();
 
         rootScenarioNameStep = new StepExtension(pickle, this, steps.getFirst().delegate);
 
-        ParsingMap rootParsingMap = getScenarioState().getParsingMap();
-        rootScenarioNameStep.setStepParsingMap(rootParsingMap);
+        System.out.println("@@getScenarioState(): " + getScenarioState());
+        ParsingMap rootParsingMap = new ParsingMap();
+
         if (scenarioMap != null) {
             scenarioMap.setDataSource(NodeMap.DataSource.EXAMPLE_TABLE);
             scenarioMap.setMapType(ParsingMap.MapType.STEP_MAP);
             rootParsingMap.addMaps(scenarioMap);
         }
+
+        getScenarioState().setParsingMap(rootParsingMap);
+
+        System.out.println("@@rootParsingMap: " + rootParsingMap);
+        System.out.println("@@rootScenarioNameStep: " + rootScenarioNameStep);
+        System.out.println("@@rootScenarioNameStepgetStepParsingMap : " + rootScenarioNameStep.getStepParsingMap());
 
         rootScenarioNameStep.overRideUUID = skipLogging;
         nestingMap.put(-1, rootScenarioNameStep);

@@ -1,5 +1,7 @@
 package tools.ds.modkit.extensions;
 
+import annotations.NoLogging;
+import com.google.common.collect.LinkedListMultimap;
 import io.cucumber.core.backend.ParameterInfo;
 import io.cucumber.core.backend.TestCaseState;
 import io.cucumber.core.eventbus.EventBus;
@@ -103,7 +105,6 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
     }
 
     public void setExecutionArguments(List<Object> executionArguments) {
-        System.out.println("@@setExecutionArguments " + executionArguments);
         this.executionArguments = executionArguments;
         this.stepDataTable = executionArguments.stream().filter(DataTable.class::isInstance).map(DataTable.class::cast).findFirst().orElse(null);
     }
@@ -144,9 +145,11 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         String codeLocation = step.getCodeLocation();
         if (codeLocation == null)
             codeLocation = "";
-        if (codeLocation.startsWith(ModularScenarios.class.getCanonicalName() + ".")) {
-            this.overRideUUID = skipLogging;
-        }
+
+
+//        if (codeLocation.startsWith(ModularScenarios.class.getCanonicalName() + ".")) {
+//            this.overRideUUID = skipLogging;
+//        }
 
         this.isScenarioNameStep = step.getStep().getText().contains(defaultMatchFlag + "Scenario");
         this.parentPickle = pickle;
@@ -154,6 +157,11 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         this.isCoreStep = codeLocation.startsWith(MetaSteps.class.getPackageName() + ".");
         this.method = (Method) getProperty(step, "definitionMatch.stepDefinition.stepDefinition.method");
         this.methodName = this.method == null ? "" : this.method.getName();
+
+        NoLogging tag = method.getAnnotation(NoLogging.class);
+        if (tag != null) {
+            this.overRideUUID = skipLogging;
+        }
 
         this.stepExecution = stepExecution;
         this.delegate = step;
@@ -173,8 +181,6 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         Matcher matcher = pattern.matcher(metaData);
         isDataTableStep = isCoreStep && methodName.equals("dataTable");
 
-        System.out.println("@@step: " + this + " , #@@methodname: " + methodName);
-        System.out.println("@@isCoreStep: " + isCoreStep);
         if (isDataTableStep) {
             getProperty(step, "definitionMatch");
             Object pickleStepDefinitionMatch = getProperty(step, "definitionMatch");
@@ -183,7 +189,6 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
             DataTable dataTable = (DataTable) args.getLast().getValue();
             if (tableName != null && !tableName.isBlank())
                 getScenarioState().register(dataTable, tableName);
-            System.out.println("@@register " + dataTable);
             putToTemplateStep(TABLE_KEY, dataTable);
         }
 
@@ -196,7 +201,7 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         setNestingLevel((int) matcher.replaceAll("").chars().filter(ch -> ch == ':').count());
     }
 
-    public DataTable getDataTable(){
+    public DataTable getDataTable() {
         return (DataTable) getFromTemplateStep(TABLE_KEY);
     }
 
@@ -219,7 +224,7 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
     }
 
 
-    private StepExtension duplicateStepForRepeatedExecution(ParsingMap parsingMap) {
+    public StepExtension duplicateStepForRepeatedExecution(ParsingMap parsingMap) {
         StepExtension templateStep = isTemplateStep ? this : this.templateStep;
         StepExtension updatedStep = templateStep.buildNewStep(new HashMap<>(), parsingMap);
         return updatedStep;
@@ -336,7 +341,6 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         StepExtension nextSibling = getNextSibling();
         if (nextSibling == null)
             return null;
-
         StepExtension nextStepToRun = nextSibling;
         if (nextSibling.isTemplateStep) {
             nextStepToRun = nextSibling.updateStep();
@@ -346,51 +350,31 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         return nextStepToRun.run(ranTestCase, ranBus, ranState, ranExecutionMode);
     }
 
+    public boolean inheritFromParent = true;
+
     public StepExtension runFirstChild() {
         if (getChildSteps().isEmpty() || getConditionalStates().contains(ConditionalStates.SKIP_CHILDREN))
             return null;
+        System.out.println("@@runFirstChild: " + this);
+        System.out.println("@@runFirstChildgetStepParsingMap: " + getChildSteps().getFirst().getStepParsingMap());
+        System.out.println("@@parent-StepParsingMap$$: " + getStepParsingMap());
         initializeChildSteps();
         StepExtension firstChildToRun = getChildSteps().getFirst().updateStep();
         firstChildToRun.setParentStep(this);
         return firstChildToRun.run(ranTestCase, ranBus, ranState, ranExecutionMode);
-
     }
 
     public StepExtension run() {
         return run(ranTestCase, ranBus, ranState, ranExecutionMode);
     }
 
-    public int getExecutionCount() {
-        return executionCount;
-    }
-
-    private int executionCount = 0;
-
-    public void setRepeatNum(int repeatNum) {
-        this.repeatNum = repeatNum;
-    }
-
-    public int getRepeatNum() {
-        return repeatNum;
-    }
-
-    private int repeatNum = 1;
 
     public StepExtension run(TestCase testCase, EventBus bus, TestCaseState state, Object executionMode) {
         Object currentExecutionMode = executionMode;
         StepExtension stepToExecute = this;
-        while (runChecks()) {
-            int currentExecutionCount = stepToExecute.executionCount;
-            int currentRepeatNum = stepToExecute.repeatNum;
-            if (currentExecutionCount > 0) {
-                StepExtension oldStep = stepToExecute;
-                stepToExecute = stepToExecute.duplicateStepForRepeatedExecution(getStepParsingMap());
-                copyRelationships(oldStep, stepToExecute);
-                stepToExecute.executionCount = currentExecutionCount;
-                stepToExecute.repeatNum = currentRepeatNum;
-            }
+        if (runChecks()) {
+            addExecuted();
             currentExecutionMode = stepToExecute.executeStep(testCase, bus, state, currentExecutionMode);
-            executionCount++;
         }
         StepExtension lastStepExecuted = stepToExecute;
         StepExtension ranStep = runFirstChild();
@@ -408,7 +392,6 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         getScenarioState().register(this, getUniqueKey(this));
         skipped = stepExecution.isScenarioComplete();
         executionMode = shouldRun() ? RUN(executionMode) : SKIP(executionMode);
-        System.out.println("@@getDefinitionArgument(): " + (getDefinitionArgument().isEmpty() ? null : getDefinitionArgument().getFirst().getValue()));
         Object returnObj = invokeAnyMethod(delegate, "run", testCase, bus, state, executionMode);
         List<Result> results = ((List<Result>) getProperty(state, "stepResults"));
         result = results.getLast();
@@ -438,9 +421,7 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         return this;
     }
 
-    private final List<BooleanSupplier> checks = new ArrayList<>(
-            List.of(() -> repeatNum > executionCount)
-    );
+    private final List<BooleanSupplier> checks = new ArrayList<>();
 
     /**
      * Adds a new check to the list.
@@ -566,4 +547,19 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
     }
 
 
+    protected LinkedListMultimap<String, StepExtension> executedChildSteps = LinkedListMultimap.create();
+
+    public void addExecuted() {
+        if (getParentStep() != null)
+            getParentStep().addExecutedChildStep(this);
+    }
+
+    public void getExecutedSiblings() {
+        if (getParentStep() != null)
+            getParentStep().executedChildSteps.get(getUniqueKey(this));
+    }
+
+    void addExecutedChildStep(StepExtension executedChildStep) {
+        executedChildSteps.put(getUniqueKey(executedChildStep), executedChildStep);
+    }
 }

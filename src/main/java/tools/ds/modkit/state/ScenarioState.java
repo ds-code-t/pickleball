@@ -25,6 +25,36 @@ import static tools.ds.modkit.util.TableUtils.exampleHeaderValueMap;
 
 public final class ScenarioState {
 
+    private static final ThreadLocal<ScenarioState> STATE_TL = ThreadLocal.withInitial(ScenarioState::new);
+
+    private ScenarioState() {
+        // private constructor, to enforce controlled creation
+    }
+
+    /** Returns the current thread's ScenarioState (may be null if not set). */
+    public static ScenarioState get() {
+        return STATE_TL.get();
+    }
+
+    /** Creates and sets a new ScenarioState, overwriting any existing one. */
+//    public static ScenarioState resetScenarioState() {
+////        System.out.println("@@resetScenarioState");
+////
+////        ScenarioState newScenarioState = new ScenarioState();
+////        ScenarioState oldScenarioState =  STATE_TL.get();
+////        if(oldScenarioState != null)
+////            newScenarioState.runner = oldScenarioState.runner;
+////        STATE_TL.set(newScenarioState);
+////        return newScenarioState;
+//        ScenarioState scenarioState = getScenarioState();
+//        scenarioState.parsingMap = new ParsingMap();
+//        return getScenarioState();
+//    }
+
+
+    public static ScenarioState getScenarioState() {
+        return STATE_TL.get();
+    }
 
     private Map<String, NodeMap> scenarioMaps = new HashMap<>();
 
@@ -55,8 +85,6 @@ public final class ScenarioState {
         return runMap;
     }
 
-    // Canonical keys (unchanged)
-    private NodeMap runMap = new NodeMap(ParsingMap.MapType.RUN_MAP);
 
 
     public void mergeToRunMap(LinkedListMultimap<?, ?> obj) {
@@ -77,13 +105,14 @@ public final class ScenarioState {
         return parsingMap.resolveWholeText(key);
     }
 
-    private ParsingMap parsingMap = new ParsingMap(runMap);
+    public void setParsingMap(ParsingMap parsingMap) {
+        this.parsingMap = parsingMap;
+    }
+
+    private ParsingMap parsingMap = new ParsingMap();
+    private final NodeMap runMap = parsingMap.getPrimaryRunMap();
 
 
-    /**
-     * No initial value — you must call beginNew() or set(...).
-     */
-    private static final ThreadLocal<ScenarioState> STATE_TL = ThreadLocal.withInitial(ScenarioState::new);
 
     /**
      * Per-thread store lives inside the ScenarioState instance.
@@ -129,9 +158,7 @@ public final class ScenarioState {
 //        scenarioState.clear();
     }
 
-    public static ScenarioState getScenarioState() {
-        return STATE_TL.get();
-    }
+
 
     public StepExecution getStepExecution() {
         return stepExecution;
@@ -248,9 +275,9 @@ public final class ScenarioState {
         return scenarioPickle;
     }
 
-    public Object getScenario() {
-        return getInstance(K_SCENARIO);
-    }
+//    public Object getScenario() {
+//        return getInstance(K_SCENARIO);
+//    }
 
     public Runner getRunner() {
         if (runner == null)
@@ -277,9 +304,9 @@ public final class ScenarioState {
         return getScenarioPickle().getLanguage();
     }
 
-    public String getScenarioName() {
-        return nameOf(getScenario());
-    }
+//    public String getScenarioName() {
+//        return nameOf(getScenario());
+//    }
 
     public io.cucumber.core.runner.Options getRuntimeOptions() {
         return (io.cucumber.core.runner.Options) getProperty(getRunner(), "runnerOptions");

@@ -1,12 +1,21 @@
 Feature: Tiny calculator
 
+  Scenario Outline: Test2
+    Then print "<K1>"
+
+    Examples:
+      | K1 | K2 | K3 |
+      | A1 | A2 | A3 |
+      | B1 | B2 | B3 |
+
   Scenario Outline: Test
     Then print "<K1>"
     * For every ROW in DATA TABLE
-  : Then print "aa <x>  <x #1> <x[0]>  <K1> row- <ROW> ,<ROW.K1> <ROW[0].K1> <ROW #1.K1>"
-  : Then print "bb row-  <ROW>,  <ROW.K1> <ROW[1].K1> <ROW #2.K1>"
-  : Then print "<x>  <K1> <K2> <K3>"
-  :: Then print "<x>  <K1> <K2> <K3>"
+  : Then print "aa <x> "
+#  : Then print "aa <x> <ROW.x>  <x #1> <x[0]>  <K1> row- <ROW> ,<ROW.K1> <ROW[0].K1> <ROW #1.K1>"
+#  : Then print "bb row-  <ROW>,  <ROW.K1> <ROW[1].K1> <ROW #2.K1>"
+#  : Then print "<x>  <K1> <K2> <K3>"
+#  :: Then print "<x>  <K1> <K2> <K3>"
     * DATA TABLE
       | K1 | x  |
       | Z1 | 11 |

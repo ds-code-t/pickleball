@@ -64,8 +64,8 @@ public final class BlackBoxBootstrap {
         CtorRegistryDSL.threadRegisterConstructed(
                 List.of(
                         K_TEST_CASE,
-                        K_PICKLE,
-                        K_SCENARIO,
+//                        K_PICKLE,
+//                        K_SCENARIO,
                         K_RUNNER
                 )
 //                ,                "current-scenario" // optional extra key (same value stored under multiple keys)

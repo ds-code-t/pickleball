@@ -10,10 +10,11 @@ import java.util.Arrays;
 import java.util.List;
 
 import static tools.ds.modkit.mappings.ParsingMap.MapType.STEP_MAP;
+import static tools.ds.modkit.util.KeyFunctions.getUniqueKey;
 
 public abstract class StepRelationships {
 
-    private final List<StepExtension> childSteps = new ArrayList<>();
+    private  List<StepExtension> childSteps = new ArrayList<>();
     private StepExtension parentStep;
     private StepExtension previousSibling;
     private StepExtension nextSibling;
@@ -71,13 +72,17 @@ public abstract class StepRelationships {
 
     public void setStepParsingMap(ParsingMap stepParsingMap) {
         System.out.println("@@setStepParsingMap for " + this);
-        this.stepParsingMap = stepParsingMap;
+        this.stepParsingMap.copyParsingMap(stepParsingMap);
+//        this.stepParsingMap = stepParsingMap;
         this.stepParsingMap.addMaps(stepNodeMap);
         System.out.println("@@setStepParsingMap " + stepParsingMap);
     }
 
     public void addToStepParsingMap(NodeMap... nodes) {
+        System.out.println("@@this.stepParsingMap1: " + this.stepParsingMap);
         this.stepParsingMap.addMaps(nodes);
+        System.out.println("@@this.stepParsingMap2: " + this.stepParsingMap);
+
     }
 
 
@@ -85,19 +90,21 @@ public abstract class StepRelationships {
         this.parentStep = parentStep;
     }
 
-    private ParsingMap stepParsingMap;
+    private final ParsingMap stepParsingMap = new ParsingMap();
 
     public void initializeChildSteps() {
-        System.out.println("@@parent: " + this);
+//        System.out.println("@@parent: " + this);
         System.out.println("@@parent-stepParsingMap: " + stepParsingMap);
         childSteps.forEach(this::initializeChildStep);
     }
 
     public void initializeChildStep(StepExtension child) {
-        System.out.println("@@parent--stepParsingMap: " + stepParsingMap);
+        System.out.println("@@parent## " + this);
+        System.out.println("@@parent##--stepParsingMap: " + stepParsingMap);
+        if(child.inheritFromParent)
         child.setStepParsingMap(new ParsingMap(stepParsingMap));
-        System.out.println("@@child: " + child);
-        System.out.println("@@child-stepParsingMap: " + child.getStepParsingMap());
+//        System.out.println("@@child: " + child);
+//        System.out.println("@@child-stepParsingMap: " + child.getStepParsingMap());
     }
 
     public List<StepExtension> getChildSteps() {
@@ -105,10 +112,17 @@ public abstract class StepRelationships {
     }
 
     public void clearChildSteps() {
+        childSteps = new ArrayList<>();
+    }
+
+    public void setChildSteps(List<StepExtension> newChildren) {
         childSteps.clear();
+        newChildren.forEach(this::addChildStep);
     }
 
     public void addChildStep(StepExtension child) {
+        System.out.println("@@addChildStep-currentChildren: "+ childSteps.size());
+        System.out.println("@@addChildStep-getStepParsingMap: "+ child.getStepParsingMap());
         child.setParentStep((StepExtension) this);
         childSteps.add(child);
         if (isFlagStep) {
@@ -149,6 +163,9 @@ public abstract class StepRelationships {
     }
 
     public static void pairSiblings(StepExtension sibling1, StepExtension sibling2) {
+        System.out.println("@@pairSiblings: " );
+        System.out.println("@@sibling1: " + sibling1);
+        System.out.println("@@sibling2: " + sibling2);
         sibling1.setNextSibling(sibling2);
         sibling2.setPreviousSibling(sibling1);
     }
@@ -194,6 +211,8 @@ public abstract class StepRelationships {
         copyTo.templateStep = copyFrom;
         copyTo.stepFlags.addAll(copyFrom.stepFlags);
     }
+
+
 
 
 }

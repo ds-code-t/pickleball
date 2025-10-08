@@ -19,23 +19,33 @@ import static tools.ds.modkit.util.StringUtilities.encodeToPlaceHolders;
 
 
 public abstract class MappingProcessor implements Map<String, Object> {
+    private LinkedListMultimap<ParsingMap.MapType, NodeMap> maps = LinkedListMultimap.create();
+    private final List<ParsingMap.MapType> keyOrder = new ArrayList<>();
 
-    @Override
-    public String toString() {
-        return String.valueOf(valuesInKeyOrder());
+    public void copyParsingMap(ParsingMap parsingMap)
+    {
+        maps.clear();
+        keyOrder.clear();
+        maps.putAll(parsingMap.getMaps());
+        keyOrder.addAll(parsingMap.keyOrder());
     }
 
-    private final LinkedListMultimap<ParsingMap.MapType, NodeMap> maps = LinkedListMultimap.create();
-    private final List<ParsingMap.MapType> keyOrder;
+
 
     public MappingProcessor(ParsingMap parsingMap) {
-        this.keyOrder = parsingMap.keyOrder();
-        this.maps.putAll(parsingMap.getMaps());
+        this.keyOrder.addAll(parsingMap.keyOrder());
+        LinkedListMultimap<ParsingMap.MapType, NodeMap> tmp = LinkedListMultimap.create();
+        tmp.putAll(parsingMap.getMaps());
+        this.maps = tmp;
+//        this.maps = LinkedListMultimap.create(parsingMap.getMaps());
+//        System.out.println("@@parsingMap.getMaps(): " + parsingMap.getMaps());
+//        System.out.println("@@MappingProcessor1: " + parsingMap);
+//        System.out.println("@@MappingProcessor2: " + this);
     }
 
     public MappingProcessor(ParsingMap.MapType... keys) {
         // Defensive copy to make key order immutable
-        this.keyOrder = Collections.unmodifiableList(new ArrayList<>(Arrays.asList(keys)));
+        this.keyOrder.addAll(Collections.unmodifiableList(new ArrayList<>(Arrays.asList(keys))));
     }
 
     protected LinkedListMultimap<ParsingMap.MapType, NodeMap> getMaps() {
@@ -358,5 +368,11 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return String.valueOf(obj);
     }
 
-
+    @Override
+    public String toString() {
+        return "\n====\n" + valuesInKeyOrder()
+                .stream()
+                .map(String::valueOf)   // safely converts each element to its string form
+                .collect(Collectors.joining(System.lineSeparator())) + "\n---\n";
+    }
 }
