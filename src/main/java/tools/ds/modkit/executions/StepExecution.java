@@ -62,13 +62,10 @@ public class StepExecution {
             scenarioMap.setDataSource(NodeMap.DataSource.EXAMPLE_TABLE);
             scenarioMap.setMapType(ParsingMap.MapType.STEP_MAP);
             rootParsingMap.addMaps(scenarioMap);
+            rootScenarioNameStep.setStepParsingMap(rootParsingMap);
         }
 
         getScenarioState().setParsingMap(rootParsingMap);
-
-        System.out.println("@@rootParsingMap: " + rootParsingMap);
-        System.out.println("@@rootScenarioNameStep: " + rootScenarioNameStep);
-        System.out.println("@@rootScenarioNameStepgetStepParsingMap : " + rootScenarioNameStep.getStepParsingMap());
 
         rootScenarioNameStep.overRideUUID = skipLogging;
         nestingMap.put(-1, rootScenarioNameStep);

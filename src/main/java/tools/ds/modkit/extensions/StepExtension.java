@@ -235,9 +235,13 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
     }
 
     private StepExtension updateStep(Map<String, String> overrides) {
+        System.out.println("@@update1: " + this );
+        System.out.println("@@map " + this.getStepParsingMap() );
         StepExtension newStep = buildNewStep(overrides, this.getStepParsingMap());
         copyRelationships(this, newStep);
         newStep.setStepParsingMap(getStepParsingMap());
+        System.out.println("@@update1: " + newStep );
+        System.out.println("@@map " + newStep.getStepParsingMap() );
         return newStep;
     }
 
@@ -370,6 +374,8 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
 
 
     public StepExtension run(TestCase testCase, EventBus bus, TestCaseState state, Object executionMode) {
+        System.out.println("@@run: " + this);
+        System.out.println("@@run getStepParsingMap: " + this.getStepParsingMap());
         Object currentExecutionMode = executionMode;
         StepExtension stepToExecute = this;
         if (runChecks()) {
