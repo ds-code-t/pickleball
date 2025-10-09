@@ -9,15 +9,23 @@ import java.util.regex.Pattern;
  * A concise quoted-text extractor that IS the map:
  *   placeholder -> inner (unescaped) value
  *
- * - Parses ' " ` quoted segments (unescaped, matching bookends)
+ * - Parses ' " ` and ''' quoted segments (unescaped, matching bookends)
  * - Masks them with ␅␄…␅ placeholders
  * - Lets you edit the outer masked text and the inner values separately
- * - Restores by re-wrapping inner values with their original quote char
+ * - Restores by re-wrapping inner values with their original quote/bookend
+ * - Or force a uniform wrapper (', ", or `); triple uses the ' escape char
  */
 public final class QuoteParser extends LinkedHashMap<String, String> {
-    private static final String QUOTED =
+    // Single-character bookends: ' " `
+    private static final String QUOTED_SINGLECHAR =
             "(?<!\\\\)(['\"`])((?:\\\\.|(?!\\1).)*?)(?<!\\\\)(?:\\\\\\\\)*\\1";
-    private static final Pattern P = Pattern.compile(QUOTED);
+    private static final Pattern P_SINGLECHAR = Pattern.compile(QUOTED_SINGLECHAR);
+
+    // Triple single quotes: '''
+    // Group(1) captures the literal ''' so we can negative-lookahead against it.
+    private static final String QUOTED_TRIPLE_SINGLE =
+            "(?<!\\\\)(?:\\\\\\\\)*(''')((?:\\\\.|(?!\\1).)*?)(?<!\\\\)(?:\\\\\\\\)*\\1";
+    private static final Pattern P_TRIPLE_SINGLE = Pattern.compile(QUOTED_TRIPLE_SINGLE);
 
     // “Untypable” control pictures for placeholders
     private static final char MASK_CONTENT  = '\u2404'; // ␄
@@ -26,34 +34,61 @@ public final class QuoteParser extends LinkedHashMap<String, String> {
     public static final char SINGLE = '\'';
     public static final char DOUBLE = '"';
     public static final char BACKTICK = '`';
+    public static final String TRIPLE_SINGLE = "'''";
 
     private final String original;
     private String masked; // mutable
-    private final Map<String, Character> quoteOf = new HashMap<>();
+    // placeholder -> delimiter (bookend string), e.g. "'", "\"", "`", or "'''"
+    private final Map<String, String> delimiterOf = new HashMap<>();
 
     public QuoteParser(String input) {
-        this.original = Objects.requireNonNull(input, "input");
+        this.original = input;
         AtomicInteger n = new AtomicInteger(1);
 
-        Matcher m = P.matcher(input);
+        // Pass 1: mask ' " `
+        ParsePass pass1 = applyMaskingPass(input, P_SINGLECHAR, n);
+        // Pass 2: mask ''' on the residual (so ''' inside the earlier segments is ignored)
+        ParsePass pass2 = applyMaskingPass(pass1.out.toString(), P_TRIPLE_SINGLE, n);
+
+        // Merge results
+        this.masked = pass2.out.toString();
+        super.putAll(pass1.captured);
+        super.putAll(pass2.captured);
+        delimiterOf.putAll(pass1.delimiterByPlaceholder);
+        delimiterOf.putAll(pass2.delimiterByPlaceholder);
+    }
+
+    // Single masking pass over a particular pattern
+    private ParsePass applyMaskingPass(String in, Pattern pattern, AtomicInteger n) {
+        Matcher m = pattern.matcher(in);
         StringBuffer out = new StringBuffer();
+        Map<String, String> captured = new LinkedHashMap<>();
+        Map<String, String> delims = new HashMap<>();
 
         while (m.find()) {
-            char q = m.group(1).charAt(0);
-            String inner = unescapeSameQuote(m.group(2), q);
+            String opening = m.group(1); // "'", "\"", "`", or "'''"
+            char escapeQuoteChar = opening.charAt(0); // the quote char to unescape (single char)
+            String inner = unescapeSameQuote(m.group(2), escapeQuoteChar);
 
             String placeholder = MASK_BOUNDARY
                     + String.valueOf(MASK_CONTENT).repeat(n.getAndIncrement())
                     + MASK_BOUNDARY;
 
-            // store inner (unescaped) value
-            super.put(placeholder, inner);
-            quoteOf.put(placeholder, q);
-
+            captured.put(placeholder, inner);
+            delims.put(placeholder, opening);
             m.appendReplacement(out, Matcher.quoteReplacement(placeholder));
         }
         m.appendTail(out);
-        this.masked = out.toString();
+        return new ParsePass(out, captured, delims);
+    }
+
+    private static final class ParsePass {
+        final StringBuffer out;
+        final Map<String,String> captured;
+        final Map<String,String> delimiterByPlaceholder;
+        ParsePass(StringBuffer out, Map<String,String> captured, Map<String,String> delimiterByPlaceholder) {
+            this.out = out; this.captured = captured; this.delimiterByPlaceholder = delimiterByPlaceholder;
+        }
     }
 
     // ---- accessors / mutators ----
@@ -62,41 +97,39 @@ public final class QuoteParser extends LinkedHashMap<String, String> {
     public void setMasked(String newMasked) { this.masked = Objects.requireNonNull(newMasked); }
 
     // ---- concise filtered views (by quote type) ----
-    public List<Map.Entry<String,String>> entriesSingle()  { return entriesByQuote(SINGLE); }
-    public List<Map.Entry<String,String>> entriesDouble()  { return entriesByQuote(DOUBLE); }
-    public List<Map.Entry<String,String>> entriesBacktick(){ return entriesByQuote(BACKTICK); }
+    public List<Map.Entry<String,String>> entriesSingle()        { return entriesByDelimiter("'"); }
+    public List<Map.Entry<String,String>> entriesDouble()        { return entriesByDelimiter("\""); }
+    public List<Map.Entry<String,String>> entriesBacktick()      { return entriesByDelimiter("`"); }
+    public List<Map.Entry<String,String>> entriesTripleSingle()  { return entriesByDelimiter(TRIPLE_SINGLE); }
 
-    private List<Map.Entry<String,String>> entriesByQuote(char q) {
+    private List<Map.Entry<String,String>> entriesByDelimiter(String delim) {
         List<Map.Entry<String,String>> list = new ArrayList<>();
         for (Map.Entry<String,String> e : super.entrySet()) {
-            if (quoteOf.get(e.getKey()) == q) list.add(e);
+            if (Objects.equals(delimiterOf.get(e.getKey()), delim)) list.add(e);
         }
         return list;
     }
 
-// ---- restore ----
-    /** Restore current masked text using current map values, wrapping with their original quote chars.
-     *  Any occurrences of that wrapping quote inside each value are escaped at restore time. */
+    // ---- restore ----
+    /** Restore current masked text using current map values, wrapping with each value's original bookend. */
     public String restore() { return restoreFrom(masked); }
 
-    /** Restore any text that contains these placeholders, honoring each placeholder's original quote type.
-     *  Escapes ONLY the same quote as the wrapper for each segment. */
+    /** Restore any text containing placeholders, honoring each placeholder's original bookend. */
     public String restoreFrom(String textWithPlaceholders) {
         String out = textWithPlaceholders;
-        // replace longer keys first to avoid partial overlaps
         List<String> keys = new ArrayList<>(super.keySet());
-        keys.sort((a,b) -> Integer.compare(b.length(), a.length()));
+        keys.sort((a,b) -> Integer.compare(b.length(), a.length())); // longest first
         for (String k : keys) {
-            char wrap = quoteOf.get(k);              // original bookend for this placeholder
+            String delim = delimiterOf.get(k);      // "'", "\"", "`", or "'''"
             String val = super.get(k);
-            String escaped = escapeForQuote(val, wrap);
-            out = out.replace(k, wrap + escaped + wrap);
+            char escapeChar = delim.charAt(0);      // we escape only this char inside the value
+            String escaped = escapeForQuote(val, escapeChar);
+            out = out.replace(k, delim + escaped + delim);
         }
         return out;
     }
 
-    /** Restore using a specific quote for ALL segments (', ", or `).
-     *  Escapes ONLY that quote inside the values; other quote chars remain unescaped. */
+    /** Restore using a specific single-character quote (', ", or `) for ALL segments. */
     public String restoreWithQuote(char q) {
         if (q != SINGLE && q != DOUBLE && q != BACKTICK) {
             throw new IllegalArgumentException("Quote must be ', \", or `");
@@ -112,16 +145,17 @@ public final class QuoteParser extends LinkedHashMap<String, String> {
         return out;
     }
 
-    public String restoreAsDouble()  { return restoreWithQuote(DOUBLE); }
-    public String restoreAsSingle()  { return restoreWithQuote(SINGLE); }
-    public String restoreAsBacktick(){ return restoreWithQuote(BACKTICK); }
+    public String restoreAsDouble()       { return restoreWithQuote(DOUBLE); }
+    public String restoreAsSingle()       { return restoreWithQuote(SINGLE); }
+    public String restoreAsBacktick()     { return restoreWithQuote(BACKTICK); }
 
-// ---- helper ----
+    // ---- helper ----
 
-    public char quoteTypeOf(String placeholder) {
-        Character q = quoteOf.get(placeholder);
-        if (q == null) throw new IllegalArgumentException("Unknown placeholder: " + placeholder);
-        return q;
+    /** Return the original delimiter/bookend string for this placeholder. */
+    public String delimiterOf(String placeholder) {
+        String d = delimiterOf.get(placeholder);
+        if (d == null) throw new IllegalArgumentException("Unknown placeholder: " + placeholder);
+        return d;
     }
 
     /** Escape ONLY the given quote char inside s (e.g., " -> \", ' -> \', ` -> \`) */
@@ -130,10 +164,21 @@ public final class QuoteParser extends LinkedHashMap<String, String> {
         return s.replace(String.valueOf(q), "\\" + q);
     }
 
-
-    // ---- helper ----
+    /** Turn \" -> " (or \' -> ', \` -> `) */
     private static String unescapeSameQuote(String s, char q) {
-        // turn \" -> " (or \' -> ', \` -> `)
         return s.replace("\\" + q, String.valueOf(q));
     }
+
+    /** Returns an entrySet view excluding all triple-single-quote (''') entries. */
+    public Set<Map.Entry<String,String>> entrySetWithoutTripleSingle() {
+        Set<Map.Entry<String,String>> filtered = new LinkedHashSet<>();
+        for (Map.Entry<String,String> e : super.entrySet()) {
+            String delim = delimiterOf.get(e.getKey());
+            if (!TRIPLE_SINGLE.equals(delim)) {
+                filtered.add(e);
+            }
+        }
+        return filtered;
+    }
+
 }

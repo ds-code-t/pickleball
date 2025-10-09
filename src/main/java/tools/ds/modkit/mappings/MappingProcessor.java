@@ -173,11 +173,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
         QuoteParser parsedObj = new QuoteParser(input);
         try {
             parsedObj.setMasked(resolveAll(parsedObj.masked()));
-            for (var e : parsedObj.entrySet()) {
-                char q = parsedObj.quoteTypeOf(e.getKey());
-                if (q == QuoteParser.SINGLE || q == QuoteParser.DOUBLE) {
-                    parsedObj.put(e.getKey(), resolveAll(e.getValue()));
-                }
+            for (var e : parsedObj.entrySetWithoutTripleSingle()) {
+                parsedObj.put(e.getKey(), resolveAll(e.getValue()));
             }
             return parsedObj.restore();
         } catch (Throwable t) {

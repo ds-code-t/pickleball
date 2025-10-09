@@ -3,21 +3,21 @@ Feature: Tiny calculator
   Scenario Outline: Test2
     * For every ROW in DATA TABLE
   : Then print "aa <ROWS[<x>].K1>"
-#  : Then print "aa x: <x> , ROW.x: <ROW.x>  , x #1: <x #1> , x[0]: <x[0]> , K1: <K1> , ROW: <ROW> ,   ROW.K1: <ROW.K1> ,  ROW[0].K1: <ROW[0].K1> , ROW #1.K1: <ROW #1.K1>"
-#  : Then print "bb  ROWS[1].K1: <ROWS[1].K1> ,  ROWS #2.K1: <ROWS #2.K1>"
-#  : Then print "<x>  <K1> <K2> <K3>"
-#  :: Then print "<x>  <K1> <K2> <K3>"
+  : Then print "aa x: <x> , ROW.x: <ROW.x>  , x #1: <x #1> , x[0]: <x[0]> , K1: <K1> , ROW: <ROW> ,   ROW.K1: <ROW.K1> ,  ROW[0].K1: <ROW[0].K1> , ROW #1.K1: <ROW #1.K1>"
+  : Then print "bb  ROWS[1].K1: <ROWS[1].K1> ,  ROWS #2.K1: <ROWS #2.K1>"
+  : Then print "<x>  <K1> <K2> <K3>"
+  :: Then print "<x>  <K1> <K2> <K3>"
     * DATA TABLE
-      | K1 | x  |
-      | Z1 | 0 |
+      | K1 | x |
+      | Z1 | 4 |
       | Z2 | 1 |
       | Z3 | 2 |
 
     Examples:
       | K1 | K2 | K3 |
-      | A1 | A2 | 1 |
-      | B1 | B2 | 2 |
-      | C1 | C2 | 3 |
+      | A1 | A2 | 1  |
+      | B1 | B2 | 2  |
+      | C1 | C2 | 3  |
 
   Scenario Outline: Test
     Then print "<K1>"
@@ -74,7 +74,7 @@ Feature: Tiny calculator
   Scenario Outline: conditionals2
     * IF: 1 + 1 > 5
   : Then a is 1 and b is 6
-    * ELSE-IF: 5 + 1 > 5
+    * ELSE-IF: 1 + 1 > 5
   : Then a is 1 and b is 6
     * ELSE-IF: 1 + 1 > 5
   : Then a is 1 and b is 6
@@ -212,31 +212,31 @@ Feature: Tiny calculator
 ##      | @bb  | 44 | 78 |
 #
 #
-#  @bb
-#  Scenario Outline: new  <A> , <B>, tags:  <D>
-#    Given stringCheck "0 d: <D>, a: <A> , c:<C>"
-#    Then RUN SCENARIOS
-#      | Scenario Tags |
-#      | <D>           |
-#
-#    Examples:
-#      | D   | A  | C    |
-#      | @aa | 22 | 9988 |
-##      | 33  | 44 | 9966 |
-#
-#
-#  @TagK @aa
-#  Scenario: scenarioA12
-#    Given stringCheck "1 d: <D>, a: <A> , c:<C>"
-#    * DATA TABLE
-#      | Scenario | A  | B   |
-#      | 1        | 11 | 222 |
-##    Given stringCheck "1 d: s, a: a , cc"
-##  :    Given stringCheck "2 d: <D>, a: <A> , c:<C>"
-##  :: Given a is 2 and b is 3
-##    Given a is 4 and b is 1
-###  : Given a is 4 and b is 2
-##  :: Given a is 4 and b is 3
+  @bb
+  Scenario Outline: new  <A> , <B>, tags:  <D>
+    Given stringCheck "0 d: <D>, a: <A> , c:<C>"
+    Then RUN SCENARIOS
+      | Tags |
+      | <D>  |
+
+    Examples:
+      | D   | A  | C    |
+      | @aa | 22 | 9988 |
+#      | 33  | 44 | 9966 |
+
+
+  @TagK @aa
+  Scenario: scenarioA12
+    Given stringCheck "1 d: <D>, a: <A> , c:<C>"
+    * DATA TABLE
+      | Scenario | A  | B   |
+      | 1        | 11 | 222 |
+#    Given stringCheck "1 d: s, a: a , cc"
+#  :    Given stringCheck "2 d: <D>, a: <A> , c:<C>"
+#  :: Given a is 2 and b is 3
+#    Given a is 4 and b is 1
+##  : Given a is 4 and b is 2
+#  :: Given a is 4 and b is 3
 #
 #
 #  Scenario: scenario test dtable
