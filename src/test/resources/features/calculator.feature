@@ -1,19 +1,30 @@
 Feature: Tiny calculator
 
   Scenario Outline: Test2
-    Then print "<K1>"
+    * For every ROW in DATA TABLE
+  : Then print "aa <ROWS[<x>].K1>"
+#  : Then print "aa x: <x> , ROW.x: <ROW.x>  , x #1: <x #1> , x[0]: <x[0]> , K1: <K1> , ROW: <ROW> ,   ROW.K1: <ROW.K1> ,  ROW[0].K1: <ROW[0].K1> , ROW #1.K1: <ROW #1.K1>"
+#  : Then print "bb  ROWS[1].K1: <ROWS[1].K1> ,  ROWS #2.K1: <ROWS #2.K1>"
+#  : Then print "<x>  <K1> <K2> <K3>"
+#  :: Then print "<x>  <K1> <K2> <K3>"
+    * DATA TABLE
+      | K1 | x  |
+      | Z1 | 0 |
+      | Z2 | 1 |
+      | Z3 | 2 |
 
     Examples:
       | K1 | K2 | K3 |
-      | A1 | A2 | A3 |
-      | B1 | B2 | B3 |
+      | A1 | A2 | 1 |
+      | B1 | B2 | 2 |
+      | C1 | C2 | 3 |
 
   Scenario Outline: Test
     Then print "<K1>"
     * For every ROW in DATA TABLE
-  : Then print "aa <x> "
-#  : Then print "aa <x> <ROW.x>  <x #1> <x[0]>  <K1> row- <ROW> ,<ROW.K1> <ROW[0].K1> <ROW #1.K1>"
-#  : Then print "bb row-  <ROW>,  <ROW.K1> <ROW[1].K1> <ROW #2.K1>"
+  : Then print "aa <ROWS[2]>"
+#  : Then print "aa x: <x> , ROW.x: <ROW.x>  , x #1: <x #1> , x[0]: <x[0]> , K1: <K1> , ROW: <ROW> ,   ROW.K1: <ROW.K1> ,  ROW[0].K1: <ROW[0].K1> , ROW #1.K1: <ROW #1.K1>"
+#  : Then print "bb  ROWS[1].K1: <ROWS[1].K1> ,  ROWS #2.K1: <ROWS #2.K1>"
 #  : Then print "<x>  <K1> <K2> <K3>"
 #  :: Then print "<x>  <K1> <K2> <K3>"
     * DATA TABLE

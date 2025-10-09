@@ -19,7 +19,7 @@ public class GlobalMappings extends NodeMap {
     public final static GlobalMappings GLOBALS = new GlobalMappings();
 
     public GlobalMappings(){
-        setMapType(ParsingMap.MapType.GLOBAL_NODE);
+        setMapType(MapConfigurations.MapType.GLOBAL_NODE);
     }
 
     private final ReadWriteLock rw = new ReentrantReadWriteLock();

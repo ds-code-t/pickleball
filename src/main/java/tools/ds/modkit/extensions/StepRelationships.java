@@ -1,7 +1,6 @@
 package tools.ds.modkit.extensions;
 
 import com.google.common.collect.LinkedListMultimap;
-import io.cucumber.java.bs.A;
 import tools.ds.modkit.mappings.NodeMap;
 import tools.ds.modkit.mappings.ParsingMap;
 
@@ -9,8 +8,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import static tools.ds.modkit.mappings.ParsingMap.MapType.STEP_MAP;
-import static tools.ds.modkit.util.KeyFunctions.getUniqueKey;
+import static tools.ds.modkit.mappings.MapConfigurations.MapType.STEP_MAP;
+
 
 public abstract class StepRelationships {
 

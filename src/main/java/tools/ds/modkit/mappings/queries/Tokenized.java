@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import tools.ds.modkit.mappings.ParsingMap;
+import tools.ds.modkit.mappings.MapConfigurations;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -34,6 +34,9 @@ public final class Tokenized {
 
     public final boolean directPath;
 
+    public final boolean isSingletonKey;
+    public final boolean isValueAssignmentKey;
+
     private static final Pattern INDEX_PATTERN = Pattern.compile("#(?:\\.\\.|[\\d,-]+)");
     private static final Pattern INT_PATTERN = Pattern.compile("\\d+");
     private static final Pattern SUFFIX_PATTERN = Pattern.compile("^(.*?)(?:\\s(as-[A-Z]+))?$");
@@ -41,7 +44,7 @@ public final class Tokenized {
 
     public static String topArrayFlag = metaFlag + "_topArray";
 
-    public static final List<String> allowedMapNames =  Arrays.stream(ParsingMap.MapType.values()).map(Enum::name).toList();
+    public static final List<String> allowedMapNames = Arrays.stream(MapConfigurations.MapType.values()).map(Enum::name).toList();
 
     public Tokenized(String inputQuery) {
         Matcher m = SUFFIX_PATTERN.matcher(inputQuery);
@@ -52,22 +55,38 @@ public final class Tokenized {
         if (prefix != null)
             q = q.substring(prefix.length());
         int idx = q.indexOf("::");
-        if(idx >= 0) {
+        if (idx >= 0) {
             q = q.substring(idx + 2);
-            String mapNameString  = q.substring(0, idx);
+            String mapNameString = q.substring(0, idx);
             mapNames = Arrays.stream(mapNameString.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
             List<String> invalid = new ArrayList<>();
-            List<ParsingMap.MapType> result = new ArrayList<>();
-            for (String n : mapNames) if (allowedMapNames.contains(n)) result.add(ParsingMap.MapType.valueOf(n)); else invalid.add(n);
-            if (!invalid.isEmpty()) throw new IllegalArgumentException("Invalid: " + invalid + ", allowed: " + allowedMapNames);
+            List<MapConfigurations.MapType> result = new ArrayList<>();
+            for (String n : mapNames)
+                if (allowedMapNames.contains(n)) result.add(MapConfigurations.MapType.valueOf(n));
+                else invalid.add(n);
+            if (!invalid.isEmpty())
+                throw new IllegalArgumentException("Invalid: " + invalid + ", allowed: " + allowedMapNames);
         }
 
         if (q.contains("#"))
             q = rewrite(q);
-        query = q.strip().replaceAll("^\\$\\.", "")
-                .replaceAll("(^[A-Za-z0-9_]+)(\\..*|$)", "$1." + topArrayFlag + "$2")
-                .replaceAll("\\s*([\\(\\){}\\[\\].#:,-])\\s*", "$1");
-//                .replaceAll("\\[\\*\\]", "");
+        q = q.strip().replaceAll("^\\$\\.", "").replaceAll("\\s*([\\(\\){}\\[\\].#:,-])\\s*", "$1");
+        isSingletonKey = q.startsWith("-");
+        if (isSingletonKey) q = q.substring(1);
+
+
+
+        q = q.replaceAll("(^[A-Za-z0-9_]+)(\\..*|$)", "$1." + topArrayFlag + "$2");
+
+        isValueAssignmentKey = q.endsWith("=");
+        if (isValueAssignmentKey)
+            q = q.substring(0, q.length() - 1);
+        query = q;
+
+        if (q.contains("ROWS")) {
+            System.out.println("@@inputQuery: " + inputQuery);
+            System.out.println("@@isValueAssignmentKey? " + isValueAssignmentKey);
+        }
 
         directPath = !query.replaceAll("\\[-?\\d+\\]", "")
                 .replaceAll("\\*|%|\\{|\\(|^|<|>|=|\\.\\.|,|:", "[").contains("\\[");
@@ -160,12 +179,16 @@ public final class Tokenized {
 
 
     public JsonNode setWithPath(JsonNode root, Object value) {
-        System.out.println("@@setWithPath: " + tokens + " , val: " + value);
+        if (query.contains("ROWS")) {
+            System.out.println("@@setWithPath: " + getQuery);
+            System.out.println("@@setWithPath: " + tokens + " , val: " + value);
+        }
         boolean isRootNode = root.has(MapTypeKey);
         boolean containsTopArrayFlag = tokenCount > 1 && tokens.get(1).equals(topArrayFlag);
         boolean processTopArrayFlag = (isRootNode && tokenCount == 2 && containsTopArrayFlag);
-        if (containsTopArrayFlag)
+        if (containsTopArrayFlag) {
             tokens.set(1, "[-1]");
+        }
         if (directPath) {
 
             JsonNode currentNode = root;
@@ -176,13 +199,17 @@ public final class Tokenized {
                 String token = tokens.get(i);
                 String nextToken = i + 1 < tokenCount ? tokens.get(i + 1) : null;
                 Object valueToSet = nextToken == null ? MAPPER.valueToTree(value) : processTopArrayFlag || nextToken.startsWith("[") ? ArrayNode.class : ObjectNode.class;
+
+
+//                if (isValueAssignmentKey && i == (tokenCount - 1)) {
+//
+//                } else
+
                 if (currentNode instanceof ArrayNode arrayNode) {
                     if (i == 1 && processTopArrayFlag)
                         arrayNode.add(NullNode.instance);
 
                     Integer index = token.startsWith("[") ? token.equals("[]") ? arrayNode.size() : Integer.parseInt(token.substring(1, token.length() - 1)) : null;
-
-
 
 
                     if (index < 0) {

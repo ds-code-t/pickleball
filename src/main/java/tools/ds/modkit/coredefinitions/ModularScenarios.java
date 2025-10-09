@@ -7,6 +7,7 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Given;
 import tools.ds.modkit.executions.StepExecution;
 import tools.ds.modkit.extensions.StepExtension;
+import tools.ds.modkit.mappings.MapConfigurations;
 import tools.ds.modkit.mappings.NodeMap;
 import tools.ds.modkit.mappings.ParsingMap;
 
@@ -16,6 +17,7 @@ import java.util.*;
 import static tools.ds.modkit.blackbox.BlackBoxBootstrap.ComponentTagPrefix;
 import static tools.ds.modkit.executions.StepExecution.setNesting;
 import static tools.ds.modkit.extensions.StepRelationships.pairSiblings;
+import static tools.ds.modkit.mappings.MapConfigurations.DataSource.PASSED_TABLE;
 import static tools.ds.modkit.modularexecutions.CucumberScanUtil.listPickles;
 import static tools.ds.modkit.state.ScenarioState.getScenarioState;
 import static tools.ds.modkit.util.stepbuilder.StepUtilities.createPickleStepTestStep;
@@ -123,8 +125,8 @@ public class ModularScenarios {
                     System.out.println("@@currentScenarioNameStep: " + currentScenarioNameStep);
                     System.out.println("@@currentScenarioNameStep-getChildSteps " + currentScenarioNameStep.getChildSteps());
                     if (scenarioMap != null) {
-                        scenarioMap.setMapType(ParsingMap.MapType.STEP_MAP);
-                        scenarioMap.setDataSource(NodeMap.DataSource.PASSED_TABLE);
+                        scenarioMap.setMapType(MapConfigurations.MapType.STEP_MAP);
+                        scenarioMap.setDataSource(PASSED_TABLE);
                         currentScenarioNameStep.getStepParsingMap().replaceMaps(scenarioMap);
                     }
 

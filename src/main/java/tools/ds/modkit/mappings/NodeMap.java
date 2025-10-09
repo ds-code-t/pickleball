@@ -14,34 +14,41 @@ import static tools.ds.modkit.blackbox.BlackBoxBootstrap.metaFlag;
 
 public class NodeMap {
 
+    public ObjectNode getRoot() {
+        return root;
+    }
+
+    private final ObjectNode root;
+
     @Override
     public String toString() {
-        return "Type: " + mapType + " Source: " + dataSource + "\nroot:"+ root.toString();
+        return "Type: " + mapType + " Source: " + dataSources + "\nroot:"+ root.toString();
     }
 
-    public DataSource getDataSource() {
-        return dataSource;
+    public List<MapConfigurations.DataSource> getDataSources() {
+        return dataSources;
     }
 
-    public void setDataSource(DataSource dataSource) {
-        this.dataSource = dataSource;
-        this.root.set(DataSourceKey, MAPPER.valueToTree(dataSource));
+    public void setDataSource(MapConfigurations.DataSource... dataSources) {
+        this.dataSources.addAll(List.of(dataSources));
     }
 
-    public enum DataSource {CONFIGURATION_FILE, PASSED_TABLE, EXAMPLE_TABLE, STEP_TABLE, TABLE_ROW, DEFAULT}
 
-    private DataSource dataSource = DataSource.DEFAULT;
+    private List<MapConfigurations.DataSource> dataSources = new ArrayList<>();
 
-    public ParsingMap.MapType getMapType() {
+    public MapConfigurations.MapType getMapType() {
         return mapType;
     }
 
-    public void setMapType(ParsingMap.MapType mapType) {
+    public final static String MapTypeKey = metaFlag + "_MapType";
+//    public final static String DataSourceKey = metaFlag + "_DataSource";
+
+    public void setMapType(MapConfigurations.MapType mapType) {
         this.mapType = mapType;
         this.root.set(MapTypeKey, MAPPER.valueToTree(mapType));
     }
 
-    private ParsingMap.MapType mapType = ParsingMap.MapType.DEFAULT;
+    private MapConfigurations.MapType mapType = MapConfigurations.MapType.DEFAULT;
 
     public static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -49,17 +56,15 @@ public class NodeMap {
         MAPPER.registerModule(new GuavaModule());
     }
 
-    public final static String MapTypeKey = metaFlag + "_MapType";
-    public final static String DataSourceKey = metaFlag + "_DataSource";
 
-    private final ObjectNode root;
 
-    public NodeMap(ParsingMap.MapType mapType, DataSource dataSource) {
+
+    public NodeMap(MapConfigurations.MapType mapType, MapConfigurations.DataSource... dataSources) {
         this(mapType);
-        this.dataSource = dataSource;
+        this.dataSources = Arrays.stream(dataSources).toList();
     }
 
-    public NodeMap(ParsingMap.MapType mapType) {
+    public NodeMap(MapConfigurations.MapType mapType) {
         this.root = MAPPER.createObjectNode();
         setMapType(mapType);
     }
@@ -91,6 +96,7 @@ public class NodeMap {
         return (new Tokenized(key).getList(root));
     }
 
+
     public Object get(Tokenized tokenized) {
         return tokenized.get(root);
     }
@@ -102,9 +108,12 @@ public class NodeMap {
 
 
     public void put(String key, Object value) {
-        (new Tokenized(key)).setWithPath(root, value);
+        put(new Tokenized(key), value);
     }
 
+    public void put(Tokenized key, Object value) {
+        key.setWithPath(root, value);
+    }
 
     // ---- Merge (ObjectNode, Map, LinkedListMultimap) ----
     public void merge(ObjectNode other) {

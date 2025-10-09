@@ -94,6 +94,12 @@ public final class ScenarioState {
     public void put(Object key, Object value) {
         if (key == null || (key instanceof String && ((String) key).isBlank()))
             throw new RuntimeException("key cannot be null or blank");
+        if(key instanceof String stringKey)
+        {
+
+
+        }
+
         runMap.put(String.valueOf(key), value);
     }
 

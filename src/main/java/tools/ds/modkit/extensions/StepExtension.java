@@ -6,6 +6,7 @@ import io.cucumber.core.backend.ParameterInfo;
 import io.cucumber.core.backend.TestCaseState;
 import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.datatable.DataTable;
+import io.cucumber.docstring.DocString;
 import io.cucumber.gherkin.GherkinDialects;
 import io.cucumber.messages.types.PickleStep;
 import io.cucumber.messages.types.PickleStepArgument;
@@ -30,6 +31,7 @@ import java.util.regex.Pattern;
 import static tools.ds.modkit.blackbox.BlackBoxBootstrap.metaFlag;
 import static tools.ds.modkit.blackbox.BlackBoxBootstrap.skipLogging;
 import static tools.ds.modkit.coredefinitions.FlagSteps.*;
+import static tools.ds.modkit.coredefinitions.MappingSteps.DocString_KEY;
 import static tools.ds.modkit.coredefinitions.MappingSteps.TABLE_KEY;
 import static tools.ds.modkit.coredefinitions.MetaSteps.defaultMatchFlag;
 import static tools.ds.modkit.evaluations.AviatorUtil.eval;
@@ -113,6 +115,7 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
 
     public final boolean isCoreStep;
     public final boolean isDataTableStep;
+    public final boolean isDocStringStep;
 
 
     //    private static final Pattern pattern = Pattern.compile("@\\[([^\\[\\]]+)\\]");
@@ -180,15 +183,30 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
         metaData = strings.length == 1 ? "" : strings[1].trim();
         Matcher matcher = pattern.matcher(metaData);
         isDataTableStep = isCoreStep && methodName.equals("dataTable");
+        isDocStringStep = isCoreStep && methodName.equals("docString");
 
-        if (isDataTableStep) {
+
+        if (isDocStringStep) {
+            getProperty(step, "definitionMatch");
+            Object pickleStepDefinitionMatch = getProperty(step, "definitionMatch");
+            List<io.cucumber.core.stepexpression.Argument> args = (List<io.cucumber.core.stepexpression.Argument>) getProperty(pickleStepDefinitionMatch, "arguments");
+            String docStringName = (String) args.getFirst().getValue();
+            DocString docString = (DocString) args.getLast().getValue();
+            if (docStringName != null && !docStringName.isBlank())
+                getScenarioState().getParsingMap().getRootSingletonMap().put("DOCSTRING."+docStringName.trim(), docString);
+//            if (docStringName != null && !docStringName.isBlank())
+//                getScenarioState().register(docString, docStringName.trim());
+            putToTemplateStep(DocString_KEY, docString);
+        } else if (isDataTableStep) {
             getProperty(step, "definitionMatch");
             Object pickleStepDefinitionMatch = getProperty(step, "definitionMatch");
             List<io.cucumber.core.stepexpression.Argument> args = (List<io.cucumber.core.stepexpression.Argument>) getProperty(pickleStepDefinitionMatch, "arguments");
             String tableName = (String) args.getFirst().getValue();
             DataTable dataTable = (DataTable) args.getLast().getValue();
             if (tableName != null && !tableName.isBlank())
-                getScenarioState().register(dataTable, tableName);
+                getScenarioState().getParsingMap().getRootSingletonMap().put("DATATABLE."+tableName.trim(), dataTable);
+//            if (tableName != null && !tableName.isBlank())
+//                getScenarioState().register(dataTable, tableName.trim());
             putToTemplateStep(TABLE_KEY, dataTable);
         }
 
@@ -224,6 +242,7 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
     }
 
 
+
     public StepExtension duplicateStepForRepeatedExecution(ParsingMap parsingMap) {
         StepExtension templateStep = isTemplateStep ? this : this.templateStep;
         StepExtension updatedStep = templateStep.buildNewStep(new HashMap<>(), parsingMap);
@@ -235,13 +254,75 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
     }
 
     private StepExtension updateStep(Map<String, String> overrides) {
-        System.out.println("@@update1: " + this );
-        System.out.println("@@map " + this.getStepParsingMap() );
+        System.out.println("@@update1: " + this);
+        System.out.println("@@map " + this.getStepParsingMap());
         StepExtension newStep = buildNewStep(overrides, this.getStepParsingMap());
         copyRelationships(this, newStep);
         newStep.setStepParsingMap(getStepParsingMap());
-        System.out.println("@@update1: " + newStep );
-        System.out.println("@@map " + newStep.getStepParsingMap() );
+        System.out.println("@@update1: " + newStep);
+        System.out.println("@@map " + newStep.getStepParsingMap());
+        return newStep;
+    }
+
+    public StepExtension buildNewStep(String newStepText) {
+        PickleStepArgument argument = null;
+
+        PickleStepArgument newPickleStepArgument = null;
+        PickleStep pickleStep = new PickleStep(newPickleStepArgument, rootStep.getAstNodeIds(), rootStep.getId(), rootStep.getType().orElse(null), newStepText);
+
+        io.cucumber.core.gherkin.Step newGherikinMessageStep = (io.cucumber.core.gherkin.Step) Reflect.newInstance(
+                "io.cucumber.core.gherkin.messages.GherkinMessagesStep",
+                pickleStep,
+                GherkinDialects.getDialect(getScenarioState().getPickleLanguage()).orElse(GherkinDialects.getDialect("en").get()),
+                gherikinMessageStep.getPreviousGivenWhenThenKeyword(),
+                gherikinMessageStep.getLocation(),
+                gherikinMessageStep.getKeyword()
+        );
+
+        Object pickleStepDefinitionMatch = getDefinition(getScenarioState().getRunner(), getScenarioState().getScenarioPickle(), newGherikinMessageStep);
+        List<io.cucumber.core.stepexpression.Argument> args = (List<io.cucumber.core.stepexpression.Argument>) getProperty(pickleStepDefinitionMatch, "arguments");
+
+        io.cucumber.core.backend.StepDefinition javaStepDefinition = (io.cucumber.core.backend.StepDefinition) getProperty(pickleStepDefinitionMatch, "stepDefinition.stepDefinition");
+        List<ParameterInfo> parameterInfoList = javaStepDefinition.parameterInfos();
+        if (args.size() != parameterInfoList.size()) {
+            int mismatchCount = parameterInfoList.size() - args.size();
+            if (mismatchCount > 0) {
+                for (int i = args.size(); i < parameterInfoList.size(); i++) {
+                    ParameterInfo p = parameterInfoList.get(i);
+                    if (p.getType().getTypeName().equals("io.cucumber.datatable.DataTable")) {
+                        args.add(emptyDataTable());
+                    } else if (p.getType().getTypeName().equals("io.cucumber.docstring.DocString")) {
+                        args.add(emptyDocString());
+                    }
+                }
+            } else {
+                if (parameterInfoList.stream().noneMatch(p -> p.getType().getTypeName().equals("io.cucumber.datatable.DataTable"))) {
+                    args = args.stream().filter(arg -> !(arg instanceof io.cucumber.core.stepexpression.DataTableArgument)).toList();
+                }
+                if (parameterInfoList.stream().noneMatch(p -> p.getType().getTypeName().equals("io.cucumber.docstring.DocString"))) {
+                    args = args.stream().filter(arg -> !(arg instanceof io.cucumber.core.stepexpression.DocStringArgument)).toList();
+                }
+                pickleStepDefinitionMatch = Reflect.newInstance(
+                        "io.cucumber.core.runner.PickleStepDefinitionMatch",
+                        args,
+                        getProperty(pickleStepDefinitionMatch, "stepDefinition"),
+                        getProperty(pickleStepDefinitionMatch, "uri"),
+                        getProperty(pickleStepDefinitionMatch, "step")
+                );
+            }
+        }
+
+        PickleStepTestStep newPickTestStep = (PickleStepTestStep) Reflect.newInstance(
+                "io.cucumber.core.runner.PickleStepTestStep",
+                UUID.randomUUID(),               // java.util.UUID
+                getUri(),                // java.net.URI
+                newGherikinMessageStep,        // io.cucumber.core.gherkin.Step (public)
+                pickleStepDefinitionMatch            // io.cucumber.core.runner.PickleStepDefinitionMatch (package-private instance is fine)
+        );
+
+        StepExtension newStep = new StepExtension(newPickTestStep, stepExecution, parentPickle);
+        newStep.setExecutionArguments(args.stream().map(io.cucumber.core.stepexpression.Argument::getValue).toList());
+
         return newStep;
     }
 

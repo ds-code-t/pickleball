@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.LinkedListMultimap;
 import tools.ds.modkit.mappings.queries.Tokenized;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -19,36 +18,44 @@ import static tools.ds.modkit.util.StringUtilities.encodeToPlaceHolders;
 
 
 public abstract class MappingProcessor implements Map<String, Object> {
-    private LinkedListMultimap<ParsingMap.MapType, NodeMap> maps = LinkedListMultimap.create();
-    private final List<ParsingMap.MapType> keyOrder = new ArrayList<>();
 
-    public void copyParsingMap(ParsingMap parsingMap)
-    {
+
+    protected final LinkedListMultimap<MapConfigurations.MapType, NodeMap> maps = LinkedListMultimap.create();
+    protected final List<MapConfigurations.MapType> keyOrder = new ArrayList<>();
+    protected final List<MapConfigurations.MapType> singletonOrder = new ArrayList<>();
+
+
+    public void copyParsingMap(ParsingMap parsingMap) {
         maps.clear();
         keyOrder.clear();
         maps.putAll(parsingMap.getMaps());
         keyOrder.addAll(parsingMap.keyOrder());
     }
 
-
-
     public MappingProcessor(ParsingMap parsingMap) {
-        this.keyOrder.addAll(parsingMap.keyOrder());
-        LinkedListMultimap<ParsingMap.MapType, NodeMap> tmp = LinkedListMultimap.create();
-        tmp.putAll(parsingMap.getMaps());
-        this.maps = tmp;
-//        this.maps = LinkedListMultimap.create(parsingMap.getMaps());
-//        System.out.println("@@parsingMap.getMaps(): " + parsingMap.getMaps());
-//        System.out.println("@@MappingProcessor1: " + parsingMap);
-//        System.out.println("@@MappingProcessor2: " + this);
+        copyParsingMap(parsingMap);
+        addMaps(new NodeMap(MapConfigurations.MapType.RUN_MAP));
+        addMaps(new NodeMap(MapConfigurations.MapType.SINGLETON));
     }
 
-    public MappingProcessor(ParsingMap.MapType... keys) {
+    public MappingProcessor() {
         // Defensive copy to make key order immutable
-        this.keyOrder.addAll(Collections.unmodifiableList(new ArrayList<>(Arrays.asList(keys))));
+        addMaps(new NodeMap(MapConfigurations.MapType.RUN_MAP));
+        addMaps(new NodeMap(MapConfigurations.MapType.SINGLETON));
+        this.keyOrder.addAll(Arrays.asList(MapConfigurations.MapType.OVERRIDE_MAP, MapConfigurations.MapType.STEP_MAP, MapConfigurations.MapType.RUN_MAP, MapConfigurations.MapType.SINGLETON, MapConfigurations.MapType.GLOBAL_NODE, MapConfigurations.MapType.DEFAULT));
+        this.singletonOrder.addAll(Arrays.asList(MapConfigurations.MapType.OVERRIDE_MAP, MapConfigurations.MapType.SINGLETON, MapConfigurations.MapType.STEP_MAP, MapConfigurations.MapType.RUN_MAP, MapConfigurations.MapType.GLOBAL_NODE, MapConfigurations.MapType.DEFAULT));
     }
 
-    protected LinkedListMultimap<ParsingMap.MapType, NodeMap> getMaps() {
+    public NodeMap getPrimaryRunMap() {
+        return maps.get(MapConfigurations.MapType.RUN_MAP).getFirst();
+    }
+
+    public NodeMap getRootSingletonMap() {
+        return maps.get(MapConfigurations.MapType.SINGLETON).getFirst();
+    }
+
+
+    protected LinkedListMultimap<MapConfigurations.MapType, NodeMap> getMaps() {
         return maps;
     }
 
@@ -119,7 +126,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
 
-    private void clearMapType(ParsingMap.MapType key) {
+    private void clearMapType(MapConfigurations.MapType key) {
         maps.removeAll(key);
     }
 
@@ -127,19 +134,28 @@ public abstract class MappingProcessor implements Map<String, Object> {
     /**
      * Get a flat list of values, grouped and ordered by the original key order
      */
-    public List<NodeMap> valuesInKeyOrder() {
+    public List<NodeMap> getMapsForResolution() {
         List<NodeMap> out = new ArrayList<>();
-        for (ParsingMap.MapType key : keyOrder) {
+        for (MapConfigurations.MapType key : keyOrder) {
             out.addAll(maps.get(key)); // maps.get() is live, but empty if unused
         }
         return out;
     }
 
 
+    public List<NodeMap> getMapsForSingletonResolution() {
+        List<NodeMap> out = new ArrayList<>();
+        for (MapConfigurations.MapType key : singletonOrder) {
+            List<NodeMap> mapList = maps.get(key);
+            out.addAll((key.equals(MapConfigurations.MapType.STEP_MAP) ? mapList.reversed() : mapList));
+        }
+        return out;
+    }
+
     /**
      * Expose immutable key order (for debugging/inspection)
      */
-    public List<ParsingMap.MapType> keyOrder() {
+    public List<MapConfigurations.MapType> keyOrder() {
         return keyOrder;
     }
 
@@ -193,7 +209,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     if (input.equals(prev)) equalityCount = 0;
                 }
             } while (equalityCount < 2);
-            return  decodeBackToText(input);
+            return decodeBackToText(input);
         } catch (Throwable t) {
             throw new RuntimeException("Could not resolve'" + input + "'", t);
         }
@@ -209,26 +225,19 @@ public abstract class MappingProcessor implements Map<String, Object> {
             StringBuffer sb = new StringBuffer();
             Object replacement = null;
 
-            outer:
             while (m.find()) {
                 key = m.group(1);
-                Tokenized tokenized = new Tokenized(key);
-
-                for (NodeMap map : valuesInKeyOrder()) {
-                    if (map == null) continue;
-                    replacement = map.get(tokenized);
-                    if (replacement != null) {
-                        break outer;  // exits BOTH loops in one go
-                    }
-                }
+                replacement = get(key);
+                if (replacement != null)
+                    break;
             }
 
             if (replacement == null)
                 return s;
+
             String stringReplacement = getStringValue(replacement);
             if (stringReplacement.isEmpty() && key != null && !key.isBlank()) {
                 stringReplacement = key.startsWith("?") ? "<" + key + ">" : "<?" + key + ">";
-//                wait(300);
             }
             m.appendReplacement(sb, stringReplacement);
 
@@ -262,6 +271,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
     public Object get(Object key) {
         if (key == null)
             throw new RuntimeException("key cannot be null");
+        if (key instanceof String stringKey)
+            return get(stringKey);
         for (NodeMap map : maps.values()) {
             Object returnObj = map.get(String.valueOf(key));
             if (returnObj != null)
@@ -271,10 +282,44 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
 
-    @Override
-    public Object put(String key, Object value) {
+    public Object get(String key) {
+        Tokenized tokenized = new Tokenized(key);
+        for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
+            if (map == null) continue;
+            Object replacement = map.get(tokenized);
+            if (replacement != null) {
+                return replacement;
+            }
+        }
         return null;
     }
+
+
+    @Override
+    public Object put(String key, Object value) {
+        if (key == null || key.isBlank())
+            throw new RuntimeException("key cannot be null or blank");
+        Tokenized tokenized = new Tokenized(key);
+        if (tokenized.isSingletonKey) {
+            Object oldValue = getRootSingletonMap().get(tokenized);
+            getRootSingletonMap().put(tokenized, value);
+            return oldValue;
+        }
+        Object oldValue = getPrimaryRunMap().get(tokenized);
+        getPrimaryRunMap().put(tokenized, value);
+        return oldValue;
+    }
+
+    public Object putObject(Object key, Object value) {
+        if (key instanceof String stringKey)
+            return put(stringKey, value);
+        if (key == null)
+            throw new RuntimeException("key cannot be null");
+        Object oldValue = getPrimaryRunMap().get(String.valueOf(key));
+        getPrimaryRunMap().put(String.valueOf(key), value);
+        return oldValue;
+    }
+
 
     @Override
     public int size() {
@@ -340,8 +385,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
 //    }
 
 
-
-
     public static String getStringValue(Object obj) {
         if (obj == null)
             return "";
@@ -370,7 +413,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     @Override
     public String toString() {
-        return "\n====\n" + valuesInKeyOrder()
+        return "\n====\n" + getMapsForResolution()
                 .stream()
                 .map(String::valueOf)   // safely converts each element to its string form
                 .collect(Collectors.joining(System.lineSeparator())) + "\n---\n";

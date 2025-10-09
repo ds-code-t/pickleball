@@ -17,7 +17,7 @@ public class TableUtils {
         List<LinkedListMultimap<K, V>> rowList = toListOfMultimap(dataTable);
         LinkedListMultimap<String, LinkedListMultimap<K, V>> returnMap = LinkedListMultimap.create();
         assert rowList != null;
-        rowList.forEach(r -> returnMap.put("ROW", r));
+        rowList.forEach(r -> returnMap.put("ROWS", r));
         return returnMap;
     }
 

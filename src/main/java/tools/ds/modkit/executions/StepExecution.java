@@ -6,6 +6,7 @@ import io.cucumber.messages.types.Pickle;
 import io.cucumber.plugin.event.PickleStepTestStep;
 import io.cucumber.plugin.event.TestCase;
 import tools.ds.modkit.extensions.StepExtension;
+import tools.ds.modkit.mappings.MapConfigurations;
 import tools.ds.modkit.mappings.NodeMap;
 import tools.ds.modkit.mappings.ParsingMap;
 import tools.ds.modkit.state.ScenarioState;
@@ -19,6 +20,7 @@ import java.util.Map;
 //import static tools.ds.modkit.coredefinitions.MetaSteps.RUN_SCENARIO;
 import static tools.ds.modkit.blackbox.BlackBoxBootstrap.skipLogging;
 import static tools.ds.modkit.extensions.StepRelationships.pairSiblings;
+import static tools.ds.modkit.mappings.MapConfigurations.DataSource.EXAMPLE_TABLE;
 import static tools.ds.modkit.state.GlobalState.*;
 import static tools.ds.modkit.state.ScenarioState.getScenarioState;
 import static tools.ds.modkit.trace.ObjDataRegistry.setFlag;
@@ -28,16 +30,6 @@ import static tools.ds.modkit.util.Reflect.getProperty;
 
 public class StepExecution {
     public final List<StepExtension> steps = new ArrayList<>();
-
-//    public boolean isRunComplete() {
-//        return runComplete;
-//    }
-//
-//    public void endRun(boolean runComplete) {
-//        this.runComplete = runComplete;
-//    }
-//
-//    private boolean runComplete = false;
 
     private final StepExtension rootScenarioNameStep;
 
@@ -59,17 +51,15 @@ public class StepExecution {
         ParsingMap rootParsingMap = new ParsingMap();
 
         if (scenarioMap != null) {
-            scenarioMap.setDataSource(NodeMap.DataSource.EXAMPLE_TABLE);
-            scenarioMap.setMapType(ParsingMap.MapType.STEP_MAP);
+            scenarioMap.setDataSource(EXAMPLE_TABLE);
+            scenarioMap.setMapType(MapConfigurations.MapType.STEP_MAP);
             rootParsingMap.addMaps(scenarioMap);
             rootScenarioNameStep.setStepParsingMap(rootParsingMap);
         }
 
         getScenarioState().setParsingMap(rootParsingMap);
-
         rootScenarioNameStep.overRideUUID = skipLogging;
         nestingMap.put(-1, rootScenarioNameStep);
-
         setNesting(steps, 0, nestingMap);
     }
 
