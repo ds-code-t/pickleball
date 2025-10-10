@@ -1,0 +1,59 @@
+plugins {
+    id 'java-library'    // needed for 'api' to expose transitive deps
+    id 'maven-publish'
+}
+
+group = 'tools.dscode'
+version = '7.27.2-dscode.1'
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
+    withSourcesJar()
+    withJavadocJar()
+}
+
+repositories { mavenCentral() }
+
+ext {
+    cucumberVer      = '7.27.2'
+    junitPlatformVer = '1.13.4'  // align all JUnit Platform artifacts
+    jupiterVer       = '5.11.4'
+}
+
+dependencies {
+    // Your forked core in this multi-project build
+    api project(':cucumber-core')
+
+    // Official cucumber-java (exclude upstream core; we provide our fork)
+    api("io.cucumber:cucumber-java:${cucumberVer}") {
+        exclude group: 'io.cucumber', module: 'cucumber-core'
+    }
+
+    // Cucumber engine for JUnit Platform (runs the scenarios)
+    api("io.cucumber:cucumber-junit-platform-engine:${cucumberVer}")
+
+    // JUnit Platform: engine/commons/launcher + Suite API for @Suite annotations
+    api("org.junit.platform:junit-platform-engine:${junitPlatformVer}")
+    api("org.junit.platform:junit-platform-commons:${junitPlatformVer}")
+    api("org.junit.platform:junit-platform-launcher:${junitPlatformVer}")
+    api("org.junit.platform:junit-platform-suite:${junitPlatformVer}")
+
+    // JUnit Jupiter API so consumers get Assertions, etc.
+    api("org.junit.jupiter:junit-jupiter-api:${jupiterVer}")
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+            groupId = 'tools.dscode'
+            artifactId = 'cucumber-bundle'
+            version = project.version
+            pom {
+                name = 'cucumber-bundle (dscode turnkey)'
+                description = 'Turnkey: cucumber-java + forked cucumber-core + aligned JUnit Platform (incl. Suite API)'
+            }
+        }
+    }
+    repositories { mavenLocal() }
+}

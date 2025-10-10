@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="Cucumber" time="0.302" tests="1" skipped="0" failures="0" errors="0" timestamp="2025-10-10T22:33:24.678136900Z">
+<testcase classname="Addition using custom cucumber-core" name="Add two numbers" time="0.234">
+<system-out><![CDATA[
+Given a starting total of 0.................................................passed
+When I add 3 and 4..........................................................passed
+Then the total should be 7..................................................passed
+]]></system-out>
+</testcase>
+</testsuite>

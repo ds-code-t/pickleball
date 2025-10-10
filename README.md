@@ -1,3 +1,16 @@
+## About this fork
+
+This project is a fork of [Cucumber-JVM](https://github.com/cucumber/cucumber-jvm),
+specifically the `cucumber-core` module, version 7.27.2.
+
+It retains the original [MIT License](LICENSE) from the Cucumber project.
+Modifications by [Your Name or Organization] are marked and distributed under
+the same MIT License.
+
+> **Note:** This repository is **not affiliated with or endorsed by the official Cucumber project**.
+> It is an independently maintained fork for custom behavior and experimentation.
+
+
 <h1 align="center">
   <img src="https://raw.githubusercontent.com/cucumber/cucumber-js/46a5a78107be27e99c6e044c69b6e8f885ce456c/docs/images/logo.svg" alt="Cucumber logo" width="75">
   <br>

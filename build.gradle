@@ -1,15 +1,23 @@
-plugins {
-    id 'java'
-}
+subprojects {
+    repositories { mavenCentral() }
 
-group = 'tools.dscode'
-version = '1.0-SNAPSHOT'
+    plugins.withId('java') {
+        java {
+            toolchain { languageVersion = JavaLanguageVersion.of(21) }
+        }
 
-
-repositories {
-    mavenCentral()
-}
-
-dependencies {
-
+        // Validate toolchain resolution with a helpful error
+        tasks.withType(JavaCompile).configureEach {
+            doFirst {
+                def launcher = project.extensions.getByType(org.gradle.jvm.toolchain.JavaToolchainService)
+                        .launcherFor(java.toolchain).get()
+                def toolchainJava = launcher.metadata.languageVersion
+                if (toolchainJava.asInt() < 21) {
+                    throw new GradleException("🚫 Pickleball requires a Java 21 toolchain; resolved ${toolchainJava}. " +
+                            "Ensure Gradle can provision JDK 21 or set org.gradle.java.installations.paths to your JDK 21.")
+                }
+            }
+            options.release = 21
+        }
+    }
 }
