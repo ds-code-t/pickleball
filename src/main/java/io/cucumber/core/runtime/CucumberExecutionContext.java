@@ -1,27 +1,3 @@
-/*
- * This file incorporates work covered by the following copyright and permission notice:
- *
- * Copyright (c) Cucumber Ltd
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-
 package io.cucumber.core.runtime;
 
 import io.cucumber.core.eventbus.EventBus;
@@ -51,7 +27,6 @@ import static io.cucumber.cienvironment.DetectCiEnvironment.detectCiEnvironment;
 import static io.cucumber.core.exception.ExceptionUtils.throwAsUncheckedException;
 import static io.cucumber.core.exception.UnrecoverableExceptions.rethrowIfUnrecoverable;
 import static io.cucumber.messages.Convertor.toMessage;
-import static io.pickleball.cacheandstate.GlobalCache.setGlobalRuntime;
 import static java.util.Collections.singletonList;
 
 public final class CucumberExecutionContext {
@@ -110,7 +85,7 @@ public final class CucumberExecutionContext {
         log.debug(() -> "Sending run test started event");
         start = bus.getInstant();
         bus.send(new TestRunStarted(start));
-        bus.send(Envelope.of(new io.cucumber.messages.types.TestRunStarted(toMessage(start))));
+        bus.send(Envelope.of(new io.cucumber.messages.types.TestRunStarted(toMessage(start), null)));
     }
 
     public void runBeforeAllHooks() {
@@ -145,7 +120,7 @@ public final class CucumberExecutionContext {
             exception != null ? exception.getMessage() : null,
             exception == null && exitStatus.isSuccess(),
             toMessage(instant),
-            exception == null ? null : toMessage(exception));
+            exception == null ? null : toMessage(exception), null);
         bus.send(Envelope.of(testRunFinished));
     }
 
@@ -158,7 +133,6 @@ public final class CucumberExecutionContext {
 
     public void runTestCase(Consumer<Runner> execution) {
         Runner runner = getRunner();
-        setGlobalRuntime(runner);
         collector.executeAndThrow(() -> execution.accept(runner));
     }
 

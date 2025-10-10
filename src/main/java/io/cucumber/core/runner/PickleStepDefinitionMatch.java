@@ -1,27 +1,3 @@
-/*
- * This file incorporates work covered by the following copyright and permission notice:
- *
- * Copyright (c) Cucumber Ltd
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-
 package io.cucumber.core.runner;
 
 import io.cucumber.core.backend.CucumberBackendException;
@@ -32,91 +8,37 @@ import io.cucumber.core.backend.TestCaseState;
 import io.cucumber.core.exception.CucumberException;
 import io.cucumber.core.gherkin.Step;
 import io.cucumber.core.stepexpression.Argument;
-import io.cucumber.core.stepexpression.DataTableArgument;
-import io.cucumber.core.stepexpression.DocStringArgument;
 import io.cucumber.cucumberexpressions.CucumberExpressionException;
 import io.cucumber.datatable.CucumberDataTableException;
-import io.cucumber.datatable.DataTable;
 import io.cucumber.datatable.UndefinedDataTableTypeException;
 import io.cucumber.docstring.CucumberDocStringException;
-import io.cucumber.docstring.DocString;
-import io.cucumber.java.JavaStepDefinition;
 
-import java.lang.reflect.Method;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.StackManipulation.removeFrameworkFramesAndAppendStepLocation;
-import static io.pickleball.cucumberutilities.AccessFunctions.safeCallMethod;
 
-public class PickleStepDefinitionMatch extends Match implements StepDefinitionMatch {
+class PickleStepDefinitionMatch extends Match implements StepDefinitionMatch {
 
     private final StepDefinition stepDefinition;
     private final URI uri;
     private final Step step;
-    public final Method method;
 
-    public DataTableArgument getDefaultDataTableArg() {
-        if (defaultDataTableArgs.isEmpty())
-            return DataTable.from("").toDataTableArgument();
-        return defaultDataTableArgs.remove(0);
-    }
-
-    public void setDefaultDataTableArg(DataTableArgument... defaultDataTableArgs) {
-        this.defaultDataTableArgs.addAll(List.of(defaultDataTableArgs));
-    }
-
-    public DocStringArgument getDefaultDocStringArg() {
-        if (defaultDocStringArgs.isEmpty())
-            return DocString.fromString("").toDocStringArgument();
-        return defaultDocStringArgs.remove(0);
-    }
-
-    public void setDefaultDocStringArg(DocStringArgument... defaultDocStringArgs) {
-        this.defaultDocStringArgs.addAll(List.of(defaultDocStringArgs));
-        ;
-    }
-
-    private final List<DataTableArgument> defaultDataTableArgs = new ArrayList<>();
-    private final List<DocStringArgument> defaultDocStringArgs = new ArrayList<>();
-
-    public PickleStepDefinitionMatch(List<Argument> arguments, StepDefinition stepDefinition, URI uri, Step step) {
+    PickleStepDefinitionMatch(List<Argument> arguments, StepDefinition stepDefinition, URI uri, Step step) {
         super(arguments, stepDefinition.getLocation());
         this.stepDefinition = stepDefinition;
         this.uri = uri;
         this.step = step;
-        Object javaStepDefinition = safeCallMethod(stepDefinition, "getStepDefinition");
-        this.method = javaStepDefinition instanceof JavaStepDefinition ? ((JavaStepDefinition) javaStepDefinition).method : null;
     }
 
-    public List<Object> getArgs() throws Throwable {
+    @Override
+    public void runStep(TestCaseState state) throws Throwable {
         List<Argument> arguments = getArguments();
         List<ParameterInfo> parameterInfos = stepDefinition.parameterInfos();
-        //pmod
         if (parameterInfos != null && arguments.size() != parameterInfos.size()) {
-            int mismatchCount = parameterInfos.size() - arguments.size();
-            if (mismatchCount > 0) {
-                for (int i = arguments.size(); i < parameterInfos.size(); i++) {
-                    ParameterInfo p = parameterInfos.get(i);
-                    if (p.getType().getTypeName().equals("io.cucumber.datatable.DataTable")) {
-                        arguments.add(getDefaultDataTableArg());
-                    } else if (p.getType().getTypeName().equals("io.cucumber.docstring.DocString")) {
-                        arguments.add(getDefaultDocStringArg());
-                    }
-                }
-            } else {
-                if (parameterInfos.stream().noneMatch(p -> p.getType().getTypeName().equals("io.cucumber.datatable.DataTable"))) {
-                    arguments = arguments.stream().filter(argument -> !(argument instanceof DataTableArgument)).toList();
-                }
-                if (parameterInfos.stream().noneMatch(p -> p.getType().getTypeName().equals("io.cucumber.docstring.DocString"))) {
-                    arguments = arguments.stream().filter(argument -> !(argument instanceof DocStringArgument)).toList();
-                }
-                if (arguments.size() != parameterInfos.size())
-                    throw arityMismatch(parameterInfos.size());
-            }
-
+            throw arityMismatch(parameterInfos.size());
         }
         List<Object> result = new ArrayList<>();
         try {
@@ -136,13 +58,6 @@ public class PickleStepDefinitionMatch extends Match implements StepDefinitionMa
         } catch (CucumberInvocationTargetException e) {
             throw removeFrameworkFramesAndAppendStepLocation(e, getStepLocation());
         }
-        return result;
-    }
-
-
-    @Override
-    public void runStep(TestCaseState state) throws Throwable {
-        List<Object> result = getArgs();
         try {
             stepDefinition.execute(result.toArray(new Object[0]));
         } catch (CucumberBackendException e) {
@@ -165,23 +80,23 @@ public class PickleStepDefinitionMatch extends Match implements StepDefinitionMa
     private CucumberException arityMismatch(int parameterCount) {
         List<String> arguments = createArgumentsForErrorMessage();
         return new CucumberException(String.format(
-                "Step [%s] is defined with %s parameters at '%s'.\n" +
-                        "However, the gherkin step has %s arguments%sStep text: %s",
-                stepDefinition.getPattern(),
-                parameterCount,
-                stepDefinition.getLocation(),
-                arguments.size(),
-                formatArguments(arguments),
-                step.getText()));
+            "Step [%s] is defined with %s parameters at '%s'.\n" +
+                    "However, the gherkin step has %s arguments%sStep text: %s",
+            stepDefinition.getPattern(),
+            parameterCount,
+            stepDefinition.getLocation(),
+            arguments.size(),
+            formatArguments(arguments),
+            step.getText()));
     }
 
     private CucumberException registerDataTableTypeInConfiguration(Exception e) {
         // TODO: Add doc URL
         return new CucumberException(String.format("" +
-                        "Could not convert arguments for step [%s] defined at '%s'.\n" +
-                        "It appears you did not register a data table type.",
-                stepDefinition.getPattern(),
-                stepDefinition.getLocation()), e);
+                "Could not convert arguments for step [%s] defined at '%s'.\n" +
+                "It appears you did not register a data table type.",
+            stepDefinition.getPattern(),
+            stepDefinition.getLocation()), e);
     }
 
     private CucumberInvocationTargetException causedByCucumberInvocationTargetException(RuntimeException e) {
@@ -194,29 +109,29 @@ public class PickleStepDefinitionMatch extends Match implements StepDefinitionMa
 
     private CucumberException couldNotConvertArguments(Exception e) {
         return new CucumberException(String.format(
-                "Could not convert arguments for step [%s] defined at '%s'.",
-                stepDefinition.getPattern(),
-                stepDefinition.getLocation()), e);
+            "Could not convert arguments for step [%s] defined at '%s'.",
+            stepDefinition.getPattern(),
+            stepDefinition.getLocation()), e);
     }
 
     private CucumberException couldNotInvokeArgumentConversion(CucumberBackendException e) {
         // TODO: Add doc URL
         return new CucumberException(String.format("" +
-                        "Could not convert arguments for step [%s] defined at '%s'.\n" +
-                        "It appears there was a problem with a hook or transformer definition.",
-                stepDefinition.getPattern(),
-                stepDefinition.getLocation()), e);
+                "Could not convert arguments for step [%s] defined at '%s'.\n" +
+                "It appears there was a problem with a hook or transformer definition.",
+            stepDefinition.getPattern(),
+            stepDefinition.getLocation()), e);
     }
 
     private Throwable couldNotInvokeStep(CucumberBackendException e, List<Object> result) {
         String argumentTypes = createArgumentTypes(result);
         // TODO: Add doc URL
         return new CucumberException(String.format("" +
-                        "Could not invoke step [%s] defined at '%s'.\n" +
-                        "It appears there was a problem with the step definition.\n" +
-                        "The converted arguments types were (" + argumentTypes + ")",
-                stepDefinition.getPattern(),
-                stepDefinition.getLocation()), e);
+                "Could not invoke step [%s] defined at '%s'.\n" +
+                "It appears there was a problem with the step definition.\n" +
+                "The converted arguments types were (" + argumentTypes + ")",
+            stepDefinition.getPattern(),
+            stepDefinition.getLocation()), e);
     }
 
     private StackTraceElement getStepLocation() {
@@ -253,7 +168,7 @@ public class PickleStepDefinitionMatch extends Match implements StepDefinitionMa
         return stepDefinition.getPattern();
     }
 
-    public StepDefinition getStepDefinition() {
+    StepDefinition getStepDefinition() {
         return stepDefinition;
     }
 

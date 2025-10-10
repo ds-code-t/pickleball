@@ -1,36 +1,14 @@
-/*
- * This file incorporates work covered by the following copyright and permission notice:
- *
- * Copyright (c) Cucumber Ltd
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-
 package io.cucumber.core.runtime;
 
 import io.cucumber.plugin.event.EventHandler;
 import io.cucumber.plugin.event.EventPublisher;
+import io.cucumber.plugin.event.Location;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.SnippetsSuggestedEvent;
 import io.cucumber.plugin.event.Status;
 import io.cucumber.plugin.event.TestCaseFinished;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
@@ -65,7 +43,7 @@ public final class TestCaseResultObserver implements AutoCloseable {
 
     private void handleSnippetSuggestedEvent(SnippetsSuggestedEvent event) {
         SnippetsSuggestedEvent.Suggestion s = event.getSuggestion();
-        suggestions.add(new Suggestion(s.getStep(), s.getSnippets()));
+        suggestions.add(new Suggestion(s.getStep(), s.getSnippets(), event.getUri(), event.getStepLocation()));
     }
 
     private void handleTestCaseFinished(TestCaseFinished event) {
@@ -104,10 +82,22 @@ public final class TestCaseResultObserver implements AutoCloseable {
 
         final String step;
         final List<String> snippets;
+        final URI uri;
+        final Location location;
 
+        @Deprecated
         public Suggestion(String step, List<String> snippets) {
             this.step = requireNonNull(step);
             this.snippets = unmodifiableList(requireNonNull(snippets));
+            this.uri = null;
+            this.location = null;
+        }
+
+        public Suggestion(String step, List<String> snippets, URI uri, Location location) {
+            this.step = requireNonNull(step);
+            this.snippets = unmodifiableList(requireNonNull(snippets));
+            this.uri = requireNonNull(uri);
+            this.location = requireNonNull(location);
         }
 
         public String getStep() {
@@ -118,6 +108,13 @@ public final class TestCaseResultObserver implements AutoCloseable {
             return snippets;
         }
 
+        public URI getUri() {
+            return uri;
+        }
+
+        public Location getLocation() {
+            return location;
+        }
     }
 
 }

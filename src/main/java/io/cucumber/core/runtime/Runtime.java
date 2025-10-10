@@ -1,27 +1,3 @@
-/*
- * This file incorporates work covered by the following copyright and permission notice:
- *
- * Copyright (c) Cucumber Ltd
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-
 package io.cucumber.core.runtime;
 
 import io.cucumber.core.eventbus.EventBus;
@@ -69,11 +45,10 @@ public final class Runtime {
 
     private final Predicate<Pickle> filter;
     private final int limit;
-    public final FeatureSupplier featureSupplier;
+    private final FeatureSupplier featureSupplier;
     private final ExecutorService executor;
     private final PickleOrder pickleOrder;
-    public final CucumberExecutionContext context;
-
+    private final CucumberExecutionContext context;
 
     private Runtime(
             final ExitStatus exitStatus,
@@ -109,10 +84,9 @@ public final class Runtime {
                 .flatMap(feature -> feature.getPickles().stream())
                 .filter(filter)
                 .collect(collectingAndThen(toList(),
-                        list -> pickleOrder.orderPickles(list).stream()))
+                    list -> pickleOrder.orderPickles(list).stream()))
                 .limit(limit > 0 ? limit : Integer.MAX_VALUE)
                 .map(pickle -> executor.submit(executePickle(pickle)))
-//                .map(this::executePickleBasedOnDecision)
                 .collect(toList());
 
         executor.shutdown();
@@ -181,7 +155,7 @@ public final class Runtime {
 
         public Runtime build() {
             final ObjectFactoryServiceLoader objectFactoryServiceLoader = new ObjectFactoryServiceLoader(classLoader,
-                    runtimeOptions);
+                runtimeOptions);
 
             final ObjectFactorySupplier objectFactorySupplier = runtimeOptions.isMultiThreaded()
                     ? new ThreadLocalObjectFactorySupplier(objectFactoryServiceLoader)
@@ -200,10 +174,10 @@ public final class Runtime {
 
             if (this.eventBus == null) {
                 final UuidGeneratorServiceLoader uuidGeneratorServiceLoader = new UuidGeneratorServiceLoader(
-                        classLoader,
-                        runtimeOptions);
+                    classLoader,
+                    runtimeOptions);
                 this.eventBus = new TimeServiceEventBus(Clock.systemUTC(),
-                        uuidGeneratorServiceLoader.loadUuidGenerator());
+                    uuidGeneratorServiceLoader.loadUuidGenerator());
             }
             final EventBus eventBus = synchronize(this.eventBus);
 

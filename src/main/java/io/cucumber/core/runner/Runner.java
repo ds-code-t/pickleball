@@ -1,27 +1,3 @@
-/*
- * This file incorporates work covered by the following copyright and permission notice:
- *
- * Copyright (c) Cucumber Ltd
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-
 package io.cucumber.core.runner;
 
 import io.cucumber.core.backend.Backend;
@@ -33,7 +9,6 @@ import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.core.exception.CucumberException;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.gherkin.Step;
-import io.cucumber.core.gherkin.messages.GherkinMessagesPickle;
 import io.cucumber.core.logging.Logger;
 import io.cucumber.core.logging.LoggerFactory;
 import io.cucumber.core.snippets.SnippetGenerator;
@@ -42,35 +17,31 @@ import io.cucumber.plugin.event.HookType;
 import io.cucumber.plugin.event.Location;
 import io.cucumber.plugin.event.SnippetsSuggestedEvent;
 import io.cucumber.plugin.event.SnippetsSuggestedEvent.Suggestion;
-import io.pickleball.mapandStateutilities.LinkedMultiMap;
 
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.exception.ExceptionUtils.throwAsUncheckedException;
 import static io.cucumber.core.runner.StackManipulation.removeFrameworkFrames;
-import static io.pickleball.cacheandstate.GlobalCache.setScenarioThreadState;
-import static io.pickleball.cacheandstate.PrimaryScenarioData.setPrimaryScenario;
 import static java.util.Collections.emptyList;
 
 public final class Runner {
 
     private static final Logger log = LoggerFactory.getLogger(Runner.class);
 
-    public CachingGlue getGlue() {
-        return glue;
-    }
-
     private final CachingGlue glue;
-    public final EventBus bus;
+    private final EventBus bus;
     private final Collection<? extends Backend> backends;
     private final Options runnerOptions;
     private final ObjectFactory objectFactory;
+    private final Map<String, Locale> localeCache = new HashMap<>();
     private List<SnippetGenerator> snippetGenerators;
 
     public Runner(
@@ -95,31 +66,24 @@ public final class Runner {
 
     public void runPickle(Pickle pickle) {
         try {
-            StepTypeRegistry stepTypeRegistry = createTypeRegistryForPickle(pickle);
-            snippetGenerators = createSnippetGeneratorsForPickle(stepTypeRegistry);
 
             // Java8 step definitions will be added to the glue here
             buildBackendWorlds();
-            glue.prepareGlue(stepTypeRegistry);
+
+            glue.prepareGlue(localeForPickle(pickle));
+            snippetGenerators = createSnippetGeneratorsForPickle(glue.getStepTypeRegistry());
+
             TestCase testCase = createTestCaseForPickle(pickle);
-            setScenarioThreadState(this, testCase);
-            setPrimaryScenario(testCase);
             testCase.run(bus);
-        } catch (Throwable t) {
-            // Log the exception with its full stack trace
-            System.err.println("Exception during pickle execution: " + t.getMessage());
-            throw t; // Re-throw to ensure the exception propagates as expected
         } finally {
             glue.removeScenarioScopedGlue();
             disposeBackendWorlds();
         }
     }
 
-
-    private StepTypeRegistry createTypeRegistryForPickle(Pickle pickle) {
+    private Locale localeForPickle(Pickle pickle) {
         String language = pickle.getLanguage();
-        Locale locale = new Locale(language);
-        return new StepTypeRegistry(locale);
+        return localeCache.computeIfAbsent(language, (lang) -> new Locale(language));
     }
 
     public void runBeforeAllHooks() {
@@ -149,9 +113,9 @@ public final class Runner {
             hookDefinition.execute();
         } catch (CucumberBackendException e) {
             CucumberException exception = new CucumberException(String.format("" +
-                            "Could not invoke hook defined at '%s'.\n" +
-                            "It appears there was a problem with the hook definition.",
-                    hookDefinition.getLocation()), e);
+                    "Could not invoke hook defined at '%s'.\n" +
+                    "It appears there was a problem with the hook definition.",
+                hookDefinition.getLocation()), e);
             throwAsUncheckedException(exception);
         } catch (CucumberInvocationTargetException e) {
             Throwable throwable = removeFrameworkFrames(e);
@@ -174,18 +138,16 @@ public final class Runner {
         }
     }
 
-    public TestCase createTestCaseForPickle(Pickle pickle) {
-        return createTestCaseForPickle(pickle, null);
-    }
-    public TestCase createTestCaseForPickle(Pickle pickle, LinkedMultiMap<String, String> map) {
+    private TestCase createTestCaseForPickle(Pickle pickle) {
         if (pickle.getSteps().isEmpty()) {
-            return new TestCase(bus.generateId(), emptyList(), emptyList(), emptyList(), (GherkinMessagesPickle) pickle,
-                    runnerOptions.isDryRun(), this, map);
+            return new TestCase(bus.generateId(), emptyList(), emptyList(), emptyList(), pickle,
+                runnerOptions.isDryRun());
         }
-        List<PickleStepTestStep> testSteps = createDummyTestStepsForPickleSteps(pickle);
+
+        List<PickleStepTestStep> testSteps = createTestStepsForPickleSteps(pickle);
         List<HookTestStep> beforeHooks = createTestStepsForBeforeHooks(pickle.getTags());
         List<HookTestStep> afterHooks = createTestStepsForAfterHooks(pickle.getTags());
-        return new TestCase(bus.generateId(), testSteps, beforeHooks, afterHooks, (GherkinMessagesPickle) pickle, runnerOptions.isDryRun(), this, map);
+        return new TestCase(bus.generateId(), testSteps, beforeHooks, afterHooks, pickle, runnerOptions.isDryRun());
     }
 
     private void disposeBackendWorlds() {
@@ -209,19 +171,6 @@ public final class Runner {
         return testSteps;
     }
 
-    private List<PickleStepTestStep> createDummyTestStepsForPickleSteps(Pickle pickle) {
-        List<PickleStepTestStep> testSteps = new ArrayList<>();
-
-        for (Step step : pickle.getSteps()) {
-            List<HookTestStep> afterStepHookSteps = createAfterStepHooks(pickle.getTags());
-            List<HookTestStep> beforeStepHookSteps = createBeforeStepHooks(pickle.getTags());
-            testSteps.add(new PickleStepTestStep(bus.generateId(), pickle.getUri(), step, beforeStepHookSteps,
-                    afterStepHookSteps, pickle, this));
-        }
-
-        return testSteps;
-    }
-
     private List<HookTestStep> createTestStepsForBeforeHooks(List<String> tags) {
         return createTestStepsForHooks(tags, glue.getBeforeHooks(), HookType.BEFORE);
     }
@@ -230,7 +179,7 @@ public final class Runner {
         return createTestStepsForHooks(tags, glue.getAfterHooks(), HookType.AFTER);
     }
 
-    public PickleStepDefinitionMatch matchStepToStepDefinition(Pickle pickle, Step step) {
+    private PickleStepDefinitionMatch matchStepToStepDefinition(Pickle pickle, Step step) {
         try {
             PickleStepDefinitionMatch match = glue.stepDefinitionMatch(pickle.getUri(), step);
             if (match != null) {
@@ -256,11 +205,11 @@ public final class Runner {
         bus.send(event);
     }
 
-    public List<HookTestStep> createAfterStepHooks(List<String> tags) {
+    private List<HookTestStep> createAfterStepHooks(List<String> tags) {
         return createTestStepsForHooks(tags, glue.getAfterStepHooks(), HookType.AFTER_STEP);
     }
 
-    public List<HookTestStep> createBeforeStepHooks(List<String> tags) {
+    private List<HookTestStep> createBeforeStepHooks(List<String> tags) {
         return createTestStepsForHooks(tags, glue.getBeforeStepHooks(), HookType.BEFORE_STEP);
     }
 

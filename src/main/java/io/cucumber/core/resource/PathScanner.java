@@ -1,31 +1,8 @@
-/*
- * This file incorporates work covered by the following copyright and permission notice:
- *
- * Copyright (c) Cucumber Ltd
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-
 package io.cucumber.core.resource;
 
 import io.cucumber.core.logging.Logger;
 import io.cucumber.core.logging.LoggerFactory;
+import org.apiguardian.api.API;
 
 import java.io.IOException;
 import java.net.URI;
@@ -44,8 +21,10 @@ import java.util.function.Predicate;
 import static java.nio.file.FileVisitResult.CONTINUE;
 import static java.nio.file.Files.exists;
 import static java.nio.file.Files.walkFileTree;
+import static org.apiguardian.api.API.Status.INTERNAL;
 
-class PathScanner {
+@API(status = INTERNAL)
+public class PathScanner {
 
     private static final Logger log = LoggerFactory.getLogger(PathScanner.class);
 
@@ -72,10 +51,14 @@ class PathScanner {
         if (!exists(path)) {
             throw new IllegalArgumentException("path must exist: " + path);
         }
+        findResourcesForPath(path, filter, consumer.apply(path));
+    }
 
+    public void findResourcesForPath(Path path, Predicate<Path> filter, Consumer<Path> consumer) {
         try {
-            walkFileTree(path, EnumSet.of(FileVisitOption.FOLLOW_LINKS), Integer.MAX_VALUE,
-                new ResourceFileVisitor(filter, consumer.apply(path)));
+            EnumSet<FileVisitOption> options = EnumSet.of(FileVisitOption.FOLLOW_LINKS);
+            ResourceFileVisitor visitor = new ResourceFileVisitor(filter, consumer);
+            walkFileTree(path, options, Integer.MAX_VALUE, visitor);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

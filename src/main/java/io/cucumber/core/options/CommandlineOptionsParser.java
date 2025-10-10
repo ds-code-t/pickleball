@@ -1,27 +1,3 @@
-/*
- * This file incorporates work covered by the following copyright and permission notice:
- *
- * Copyright (c) Cucumber Ltd
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-
 package io.cucumber.core.options;
 
 import io.cucumber.core.exception.CucumberException;
@@ -31,7 +7,7 @@ import io.cucumber.core.logging.LoggerFactory;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.datatable.DataTableFormatter;
 import io.cucumber.gherkin.GherkinDialect;
-import io.cucumber.gherkin.GherkinDialectProvider;
+import io.cucumber.gherkin.GherkinDialects;
 import io.cucumber.tagexpressions.TagExpressionParser;
 
 import java.io.BufferedReader;
@@ -42,10 +18,10 @@ import java.io.PrintWriter;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.ResourceBundle;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -220,30 +196,23 @@ public final class CommandlineOptionsParser {
     }
 
     private byte printI18n(String language) {
-        GherkinDialectProvider dialectProvider = new GherkinDialectProvider();
-        Set<String> languages = dialectProvider.getLanguages();
-
         if (language.equalsIgnoreCase("help")) {
-            if (language.equalsIgnoreCase("help")) {
-                List<GherkinDialect> dialects = languages.stream()
-                        .map(dialectProvider::getDialect)
-                        .filter(Optional::isPresent)
-                        .map(Optional::get)
-                        .collect(Collectors.toList());
+            Collection<GherkinDialect> dialects = GherkinDialects.getDialects();
 
-                int widestLanguage = findWidest(dialects, GherkinDialect::getLanguage);
-                int widestName = findWidest(dialects, GherkinDialect::getName);
-                int widestNativeName = findWidest(dialects, GherkinDialect::getNativeName);
+            int widestLanguage = findWidest(dialects, GherkinDialect::getLanguage);
+            int widestName = findWidest(dialects, GherkinDialect::getName);
+            int widestNativeName = findWidest(dialects, GherkinDialect::getNativeName);
 
-                for (GherkinDialect dialect : dialects) {
-                    printDialect(dialect, widestLanguage, widestName, widestNativeName);
-                }
-                return 0x0;
+            for (GherkinDialect dialect : dialects) {
+                printDialect(dialect, widestLanguage, widestName, widestNativeName);
             }
+            return 0x0;
         }
-        if (languages.contains(language)) {
-            dialectProvider.getDialect(language)
-                    .ifPresent(this::printKeywordsFor);
+
+        Optional<GherkinDialect> dialect = GherkinDialects.getDialect(language);
+        if (dialect.isPresent()) {
+            printKeywordsFor(dialect.get());
+            return 0x0;
         }
 
         out.println("Unrecognised ISO language code");
@@ -260,7 +229,7 @@ public final class CommandlineOptionsParser {
         }
     }
 
-    private int findWidest(List<GherkinDialect> dialects, Function<GherkinDialect, String> getNativeName) {
+    private int findWidest(Collection<GherkinDialect> dialects, Function<GherkinDialect, String> getNativeName) {
         return dialects.stream()
                 .map(getNativeName)
                 .mapToInt(String::length)
@@ -276,7 +245,7 @@ public final class CommandlineOptionsParser {
         out.println(langCode + name + nativeName);
     }
 
-    private byte printKeywordsFor(GherkinDialect dialect) {
+    private void printKeywordsFor(GherkinDialect dialect) {
         StringBuilder builder = new StringBuilder();
         List<List<String>> table = new ArrayList<>();
         addKeywordRow(table, "feature", dialect.getFeatureKeywords());
@@ -289,19 +258,16 @@ public final class CommandlineOptionsParser {
         addKeywordRow(table, "then", dialect.getThenKeywords());
         addKeywordRow(table, "and", dialect.getAndKeywords());
         addKeywordRow(table, "but", dialect.getButKeywords());
-        addKeywordRow(table, "if", dialect.getButKeywords());
         addCodeKeywordRow(table, "given", dialect.getGivenKeywords());
         addCodeKeywordRow(table, "when", dialect.getWhenKeywords());
         addCodeKeywordRow(table, "then", dialect.getThenKeywords());
         addCodeKeywordRow(table, "and", dialect.getAndKeywords());
         addCodeKeywordRow(table, "but", dialect.getButKeywords());
-        addCodeKeywordRow(table, "if", dialect.getButKeywords());
         DataTableFormatter.builder()
                 .prefixRow("      ")
                 .build()
                 .formatTo(DataTable.create(table), builder);
         out.println(builder);
-        return 0x0;
     }
 
     private String rightPad(String text, int maxWidth) {

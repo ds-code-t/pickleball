@@ -1,27 +1,3 @@
-/*
- * This file incorporates work covered by the following copyright and permission notice:
- *
- * Copyright (c) Cucumber Ltd
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-
 package io.cucumber.core.options;
 
 import io.cucumber.core.runtime.ObjectFactoryServiceLoader;
@@ -66,7 +42,8 @@ public final class Constants {
      * Valid values are {@code lexical}, {@code reverse}, {@code random} or
      * {@code random:[seed]}.
      * <p>
-     * By default features are executed in lexical file name order
+     * By default, features are executed in lexical file name order and
+     * scenarios in a feature from top to bottom.
      */
     public static final String EXECUTION_ORDER_PROPERTY_NAME = "cucumber.execution.order";
 
@@ -112,9 +89,10 @@ public final class Constants {
      * <p>
      * Filters scenarios by name based on the provided regex pattern e.g:
      * {@code ^Hello (World|Cucumber)$}. Scenarios that do not match the
-     * expression are not executed.
+     * expression are not executed. Combined with
+     * {@value FILTER_TAGS_PROPERTY_NAME} using "and" semantics.
      * <p>
-     * By default all scenarios are executed
+     * By default, all scenarios are executed
      */
     public static final String FILTER_NAME_PROPERTY_NAME = "cucumber.filter.name";
 
@@ -123,9 +101,10 @@ public final class Constants {
      * <p>
      * Filters scenarios by tag based on the provided tag expression e.g:
      * {@code @Cucumber and not (@Gherkin or @Zucchini)}. Scenarios that do not
-     * match the expression are not executed.
+     * match the expression are not executed. Combined with
+     * {@value FILTER_NAME_PROPERTY_NAME} using "and" semantics.
      * <p>
-     * By default all scenarios are executed
+     * By default, all scenarios are executed
      */
     public static final String FILTER_TAGS_PROPERTY_NAME = "cucumber.filter.tags";
 

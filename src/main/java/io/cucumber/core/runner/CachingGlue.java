@@ -1,27 +1,3 @@
-/*
- * This file incorporates work covered by the following copyright and permission notice:
- *
- * Copyright (c) Cucumber Ltd
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-
 package io.cucumber.core.runner;
 
 import io.cucumber.core.backend.DataTableTypeDefinition;
@@ -52,6 +28,7 @@ import io.cucumber.datatable.TableCellByTypeTransformer;
 import io.cucumber.datatable.TableEntryByTypeTransformer;
 import io.cucumber.messages.types.Envelope;
 import io.cucumber.messages.types.Hook;
+import io.cucumber.messages.types.HookType;
 import io.cucumber.messages.types.JavaMethod;
 import io.cucumber.messages.types.JavaStackTraceElement;
 import io.cucumber.messages.types.Location;
@@ -68,10 +45,11 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
-public final class CachingGlue implements Glue {
+final class CachingGlue implements Glue {
 
     private static final Comparator<CoreHookDefinition> HOOK_ORDER_ASCENDING = Comparator
             .comparingInt(CoreHookDefinition::getOrder)
@@ -98,13 +76,19 @@ public final class CachingGlue implements Glue {
     /*
      * Storing the pattern that matches the step text allows us to cache the
      * rather slow regex comparisons in `stepDefinitionMatches`. This cache does
-     * not need to be cleaned. The matching pattern be will used to look up a
+     * not need to be cleaned. The matching pattern be will be used to look up a
      * pickle specific step definition from `stepDefinitionsByPattern`.
      */
     private final Map<String, String> stepPatternByStepText = new HashMap<>();
     private final Map<String, CoreStepDefinition> stepDefinitionsByPattern = new TreeMap<>();
 
     private final EventBus bus;
+
+    private StepTypeRegistry stepTypeRegistry;
+    private Locale locale = null;
+    private StepExpressionFactory stepExpressionFactory = null;
+    private boolean cacheIsDirty = false;
+    private boolean hasScenarioScopedGlue = false;
 
     CachingGlue(EventBus bus) {
         this.bus = bus;
@@ -125,35 +109,43 @@ public final class CachingGlue implements Glue {
     @Override
     public void addStepDefinition(StepDefinition stepDefinition) {
         stepDefinitions.add(stepDefinition);
+        cacheIsDirty = true;
+        hasScenarioScopedGlue |= stepDefinition instanceof ScenarioScoped;
     }
 
     @Override
     public void addBeforeHook(HookDefinition hookDefinition) {
         beforeHooks.add(CoreHookDefinition.create(hookDefinition, bus::generateId));
         beforeHooks.sort(HOOK_ORDER_ASCENDING);
+        hasScenarioScopedGlue |= hookDefinition instanceof ScenarioScoped;
     }
 
     @Override
     public void addAfterHook(HookDefinition hookDefinition) {
         afterHooks.add(CoreHookDefinition.create(hookDefinition, bus::generateId));
         afterHooks.sort(HOOK_ORDER_ASCENDING);
+        hasScenarioScopedGlue |= hookDefinition instanceof ScenarioScoped;
     }
 
     @Override
     public void addBeforeStepHook(HookDefinition hookDefinition) {
         beforeStepHooks.add(CoreHookDefinition.create(hookDefinition, bus::generateId));
         beforeStepHooks.sort(HOOK_ORDER_ASCENDING);
+        hasScenarioScopedGlue |= hookDefinition instanceof ScenarioScoped;
     }
 
     @Override
     public void addAfterStepHook(HookDefinition hookDefinition) {
         afterStepHooks.add(CoreHookDefinition.create(hookDefinition, bus::generateId));
         afterStepHooks.sort(HOOK_ORDER_ASCENDING);
+        hasScenarioScopedGlue |= hookDefinition instanceof ScenarioScoped;
     }
 
     @Override
     public void addParameterType(ParameterTypeDefinition parameterType) {
         parameterTypeDefinitions.add(parameterType);
+        cacheIsDirty = true;
+        hasScenarioScopedGlue |= parameterType instanceof ScenarioScoped;
     }
 
     @Override
@@ -252,10 +244,29 @@ public final class CachingGlue implements Glue {
         return docStringTypeDefinitions;
     }
 
-    void prepareGlue(StepTypeRegistry stepTypeRegistry) throws DuplicateStepDefinitionException {
-        StepExpressionFactory stepExpressionFactory = new StepExpressionFactory(stepTypeRegistry, bus);
+    StepTypeRegistry getStepTypeRegistry() {
+        return stepTypeRegistry;
+    }
+
+    void prepareGlue(Locale locale) throws DuplicateStepDefinitionException {
+        boolean firstTime = stepTypeRegistry == null;
+        boolean languageChanged = !locale.equals(this.locale);
+        if (!firstTime && !languageChanged && !cacheIsDirty && !hasScenarioScopedGlue) {
+            return;
+        }
+        // conditions changed => invalidate the glue cache
+        // Note: we have a prudent approach of avoiding caching if
+        // scenario-scoped glue exist (e.g. cucumber-java8).
+        this.locale = locale;
+        stepTypeRegistry = new StepTypeRegistry(locale);
+        stepExpressionFactory = new StepExpressionFactory(stepTypeRegistry, bus);
+        stepDefinitionsByPattern.clear();
+        stepPatternByStepText.clear();
+        // since we must rebuild the cache, it will not be dirty the next time
+        cacheIsDirty = false;
 
         // TODO: separate prepared and unprepared glue into different classes
+        // parameters changed from the previous scenario => re-register them
         parameterTypeDefinitions.forEach(ptd -> {
             ParameterType<?> parameterType = ptd.parameterType();
             stepTypeRegistry.defineParameterType(parameterType);
@@ -309,7 +320,7 @@ public final class CachingGlue implements Glue {
         afterHooks.forEach(this::emitHook);
     }
 
-    public void emitParameterTypeDefined(ParameterTypeDefinition parameterTypeDefinition) {
+    private void emitParameterTypeDefined(ParameterTypeDefinition parameterTypeDefinition) {
         ParameterType<?> parameterType = parameterTypeDefinition.parameterType();
         io.cucumber.messages.types.ParameterType messagesParameterType = new io.cucumber.messages.types.ParameterType(
             parameterType.getName(),
@@ -323,18 +334,34 @@ public final class CachingGlue implements Glue {
         bus.send(Envelope.of(messagesParameterType));
     }
 
-    public void emitHook(CoreHookDefinition coreHook) {
+    private void emitHook(CoreHookDefinition coreHook) {
         Hook messagesHook = new Hook(
             coreHook.getId().toString(),
             null,
             coreHook.getDefinitionLocation()
                     .map(this::createSourceReference)
                     .orElseGet(this::emptySourceReference),
-            coreHook.getTagExpression());
+            coreHook.getTagExpression(),
+            coreHook.getHookType()
+                    .map(hookType -> {
+                        switch (hookType) {
+                            case BEFORE:
+                                return HookType.BEFORE_TEST_CASE;
+                            case AFTER:
+                                return HookType.AFTER_TEST_CASE;
+                            case BEFORE_STEP:
+                                return HookType.BEFORE_TEST_STEP;
+                            case AFTER_STEP:
+                                return HookType.AFTER_TEST_STEP;
+                            default:
+                                return null;
+                        }
+                    })
+                    .orElse(null));
         bus.send(Envelope.of(messagesHook));
     }
 
-    public void emitStepDefined(CoreStepDefinition coreStepDefinition) {
+    private void emitStepDefined(CoreStepDefinition coreStepDefinition) {
         bus.send(new StepDefinedEvent(
             bus.getInstant(),
             new io.cucumber.plugin.event.StepDefinition(
@@ -352,7 +379,7 @@ public final class CachingGlue implements Glue {
         bus.send(Envelope.of(messagesStepDefinition));
     }
 
-    public SourceReference createSourceReference(io.cucumber.core.backend.SourceReference reference) {
+    private SourceReference createSourceReference(io.cucumber.core.backend.SourceReference reference) {
         if (reference instanceof JavaMethodReference) {
             JavaMethodReference methodReference = (JavaMethodReference) reference;
             return SourceReference.of(new JavaMethod(
@@ -375,11 +402,11 @@ public final class CachingGlue implements Glue {
         return emptySourceReference();
     }
 
-    public SourceReference emptySourceReference() {
+    private SourceReference emptySourceReference() {
         return new SourceReference(null, null, null, null);
     }
 
-    public StepDefinitionPatternType getExpressionType(CoreStepDefinition stepDefinition) {
+    private StepDefinitionPatternType getExpressionType(CoreStepDefinition stepDefinition) {
         Class<? extends Expression> expressionType = stepDefinition.getExpression().getExpressionType();
         if (expressionType.isAssignableFrom(RegularExpression.class)) {
             return StepDefinitionPatternType.REGULAR_EXPRESSION;
@@ -390,7 +417,7 @@ public final class CachingGlue implements Glue {
         }
     }
 
-    public PickleStepDefinitionMatch stepDefinitionMatch(URI uri, Step step) throws AmbiguousStepDefinitionsException {
+    PickleStepDefinitionMatch stepDefinitionMatch(URI uri, Step step) throws AmbiguousStepDefinitionsException {
         PickleStepDefinitionMatch cachedMatch = cachedStepDefinitionMatch(uri, step);
         if (cachedMatch != null) {
             return cachedMatch;
@@ -398,7 +425,7 @@ public final class CachingGlue implements Glue {
         return findStepDefinitionMatch(uri, step);
     }
 
-    public PickleStepDefinitionMatch cachedStepDefinitionMatch(URI uri, Step step) {
+    private PickleStepDefinitionMatch cachedStepDefinitionMatch(URI uri, Step step) {
         String stepDefinitionPattern = stepPatternByStepText.get(step.getText());
         if (stepDefinitionPattern == null) {
             return null;
@@ -420,7 +447,7 @@ public final class CachingGlue implements Glue {
         return new PickleStepDefinitionMatch(arguments, coreStepDefinition, uri, step);
     }
 
-    public PickleStepDefinitionMatch findStepDefinitionMatch(URI uri, Step step)
+    private PickleStepDefinitionMatch findStepDefinitionMatch(URI uri, Step step)
             throws AmbiguousStepDefinitionsException {
         List<PickleStepDefinitionMatch> matches = stepDefinitionMatches(uri, step);
         if (matches.isEmpty()) {
@@ -437,7 +464,7 @@ public final class CachingGlue implements Glue {
         return match;
     }
 
-    public List<PickleStepDefinitionMatch> stepDefinitionMatches(URI uri, Step step) {
+    private List<PickleStepDefinitionMatch> stepDefinitionMatches(URI uri, Step step) {
         List<PickleStepDefinitionMatch> result = new ArrayList<>();
         for (CoreStepDefinition coreStepDefinition : stepDefinitionsByPattern.values()) {
             List<Argument> arguments = coreStepDefinition.matchedArguments(step);
@@ -449,7 +476,9 @@ public final class CachingGlue implements Glue {
     }
 
     void removeScenarioScopedGlue() {
-        stepDefinitionsByPattern.clear();
+        if (!hasScenarioScopedGlue) {
+            return;
+        }
         removeScenarioScopedGlue(beforeHooks);
         removeScenarioScopedGlue(beforeStepHooks);
         removeScenarioScopedGlue(afterHooks);
@@ -461,6 +490,7 @@ public final class CachingGlue implements Glue {
         removeScenarioScopedGlue(defaultParameterTransformers);
         removeScenarioScopedGlue(defaultDataTableEntryTransformers);
         removeScenarioScopedGlue(defaultDataTableCellTransformers);
+        hasScenarioScopedGlue = false;
     }
 
     private void removeScenarioScopedGlue(Iterable<?> glues) {
@@ -471,6 +501,7 @@ public final class CachingGlue implements Glue {
                 ScenarioScoped scenarioScoped = (ScenarioScoped) glue;
                 scenarioScoped.dispose();
                 glueIterator.remove();
+                cacheIsDirty = true;
             }
         }
     }

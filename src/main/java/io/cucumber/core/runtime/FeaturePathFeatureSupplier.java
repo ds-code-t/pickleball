@@ -1,35 +1,11 @@
-/*
- * This file incorporates work covered by the following copyright and permission notice:
- *
- * Copyright (c) Cucumber Ltd
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-
 package io.cucumber.core.runtime;
 
+import io.cucumber.core.feature.FeatureIdentifier;
 import io.cucumber.core.feature.FeatureParser;
 import io.cucumber.core.feature.Options;
 import io.cucumber.core.gherkin.Feature;
 import io.cucumber.core.logging.Logger;
 import io.cucumber.core.logging.LoggerFactory;
-import io.cucumber.core.options.RuntimeOptions;
 import io.cucumber.core.resource.ResourceScanner;
 
 import java.net.URI;
@@ -48,18 +24,19 @@ import static java.util.stream.Collectors.joining;
  * RuntimeOptions.
  */
 public final class FeaturePathFeatureSupplier implements FeatureSupplier {
+
     private static final Logger log = LoggerFactory.getLogger(FeaturePathFeatureSupplier.class);
 
-    public final Options featureOptions;
     private final ResourceScanner<Feature> featureScanner;
+
+    private final Options featureOptions;
 
     public FeaturePathFeatureSupplier(Supplier<ClassLoader> classLoader, Options featureOptions, FeatureParser parser) {
         this.featureOptions = featureOptions;
         this.featureScanner = new ResourceScanner<>(
-                classLoader,
-                uri -> isFeature(uri),
-                parser::parseResource
-        );
+            classLoader,
+            FeatureIdentifier::isFeature,
+            parser::parseResource);
     }
 
     @Override
@@ -71,23 +48,7 @@ public final class FeaturePathFeatureSupplier implements FeatureSupplier {
                 log.warn(() -> "Got no path to feature directory or feature file");
             } else {
                 log.warn(
-                        () -> "No features found at " + featurePaths.stream().map(URI::toString).collect(joining(", "))
-                );
-            }
-        }
-        return features;
-    }
-
-    public List<Feature> get(RuntimeOptions runtimeOptions) {
-        List<URI> featurePaths = runtimeOptions.getFeaturePaths();
-        List<Feature> features = loadFeatures(featurePaths);
-        if (features.isEmpty()) {
-            if (featurePaths.isEmpty()) {
-                log.warn(() -> "Got no path to feature directory or feature file");
-            } else {
-                log.warn(
-                        () -> "No features found at " + featurePaths.stream().map(URI::toString).collect(joining(", "))
-                );
+                    () -> "No features found at " + featurePaths.stream().map(URI::toString).collect(joining(", ")));
             }
         }
         return features;
@@ -109,6 +70,7 @@ public final class FeaturePathFeatureSupplier implements FeatureSupplier {
     }
 
     static final class FeatureBuilder {
+
         private final Map<String, Map<String, Feature>> sourceToFeature = new HashMap<>();
         private final List<Feature> features = new ArrayList<>();
 
@@ -123,9 +85,11 @@ public final class FeaturePathFeatureSupplier implements FeatureSupplier {
 
             Map<String, Feature> existingFeatures = sourceToFeature.get(parsedFeature.getSource());
             if (existingFeatures != null) {
+                // Same contents but different file names was probably
+                // intentional
                 Feature existingFeature = existingFeatures.get(parsedFileName);
                 if (existingFeature != null) {
-                    FeaturePathFeatureSupplier.log.error(() -> "" +
+                    log.error(() -> "" +
                             "Duplicate feature found: " +
                             parsedFeature.getUri() + " was identical to " + existingFeature.getUri() + "\n" +
                             "\n" +
