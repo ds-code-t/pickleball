@@ -1,5 +1,5 @@
 plugins {
-    id 'java'
+    id 'java-library'
     id 'maven-publish'
     id 'com.github.johnrengelman.shadow' version '8.1.1'
 }
@@ -7,23 +7,14 @@ plugins {
 group = 'tools.dscode'
 version = '7.27.2-dscode.1'
 
-java {
-    toolchain { languageVersion = JavaLanguageVersion.of(21) }
-}
+// Upstream builds target 8/11 for runtime; keep release = 11 for widest consumer compatibility
 tasks.withType(JavaCompile).configureEach {
-    // Pick ONE target:
-    options.release = (findProperty("RELEASE_TARGET") ?: "11") as int   // 11 is fine for Cucumber 7.27.x
-    // If you insist on 8, set -PRELEASE_TARGET=8 and optionally quiet the warning:
-    // options.compilerArgs += ['-Xlint:-options']
+    options.release = (findProperty("RELEASE_TARGET") ?: "11") as int
 }
-
-repositories { mavenCentral() }
 
 dependencies {
-    // Keep Cucumber versions aligned without hardcoding numbers everywhere
-    implementation platform("io.cucumber:cucumber-bom:7.27.2")
+    implementation platform("io.cucumber:cucumber-bom:${cucumberVer}")
 
-    // Upstream core's compile deps (no versions needed thanks to the BOM)
     implementation 'io.cucumber:cucumber-gherkin'
     implementation 'io.cucumber:cucumber-gherkin-messages'
     implementation 'io.cucumber:messages'
@@ -39,47 +30,43 @@ dependencies {
     implementation 'io.cucumber:ci-environment'
     implementation 'org.apiguardian:apiguardian-api'
 
-    // === JACKSON: needed at compile time and then SHADED into the jar ===
-    implementation platform("com.fasterxml.jackson:jackson-bom:2.19.2") // matches 7.27.x line
+    // Shade Jackson like upstream
+    implementation platform("com.fasterxml.jackson:jackson-bom:${jacksonBom}")
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'com.fasterxml.jackson.core:jackson-core'
     implementation 'com.fasterxml.jackson.core:jackson-annotations'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jdk8'
 }
 
-// Produce a shaded jar that relocates Jackson into io.cucumber.core.internal.com.fasterxml
 shadowJar {
-    archiveClassifier.set('') // make the shaded jar be the main artifact
-    // Only embed Jackson (like upstream)
+    archiveClassifier.set('') // this becomes the main artifact
+
+    // Only embed Jackson into the shaded jar (like upstream)
     dependencies {
         include(dependency('com.fasterxml.jackson.core:jackson-databind'))
         include(dependency('com.fasterxml.jackson.core:jackson-core'))
         include(dependency('com.fasterxml.jackson.core:jackson-annotations'))
         include(dependency('com.fasterxml.jackson.datatype:jackson-datatype-jdk8'))
     }
-    // Relocate to match upstream shaded package
+
     relocate 'com.fasterxml', 'io.cucumber.core.internal.com.fasterxml'
 
-    // Trim metadata similar to the Maven shade filters (multi-release jars etc.)
-    // Shadow doesn't support per-artifact filters as verbosely, but this covers the intent:
+    // trim metadata
     exclude 'module-info.class'
     exclude 'META-INF/MANIFEST.MF'
     exclude 'META-INF/services/**'
     exclude 'META-INF/versions/**'
 
-    // (Optional) try to keep only used classes
-    // minimize()
+    manifest {
+        attributes(
+                'Automatic-Module-Name': 'io.cucumber.core',
+                'Main-Class': 'io.cucumber.core.cli.Main'
+        )
+    }
 }
 
-// Make 'jar' == shaded jar
 tasks.jar.enabled = false
 tasks.assemble.dependsOn tasks.shadowJar
-
-// Keep Automatic-Module-Name like upstream
-tasks.shadowJar {
-    manifest { attributes('Automatic-Module-Name': 'io.cucumber.core',
-            'Main-Class': 'io.cucumber.core.cli.Main') }
-}
 
 publishing {
     publications {
@@ -87,7 +74,7 @@ publishing {
             artifact tasks.shadowJar
             groupId = 'tools.dscode'
             artifactId = 'cucumber-core'
-            version = '7.27.2-dscode.1'
+            version = project.version
             pom {
                 name = 'cucumber-core (dscode fork)'
                 description = 'Drop-in replacement of cucumber-core 7.27.2 with custom modifications (includes shaded Jackson)'
