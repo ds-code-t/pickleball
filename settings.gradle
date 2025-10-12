@@ -1,3 +1,10 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()  // where com.github.johnrengelman.shadow is published
+        mavenCentral()        // optional extra
+    }
+}
+
+
 rootProject.name = 'pickleball'
-include(':cucumber-core', ':cucumber-bundle')
 
