@@ -21,3 +21,13 @@ subprojects {
         }
     }
 }
+
+allprojects {
+    configurations.all {
+        resolutionStrategy.dependencySubstitution {
+            substitute(module("io.cucumber:cucumber-core"))
+                    .using(project(":cucumber-core"))
+        }
+    }
+}
+

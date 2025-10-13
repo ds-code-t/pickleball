@@ -15,22 +15,22 @@ java {
 repositories { mavenCentral() }
 
 ext {
-    cucumberVer      = '7.27.2'
+    cucumberVer = '7.27.2'
     junitPlatformVer = '1.13.4'  // align all JUnit Platform artifacts
-    jupiterVer       = '5.11.4'
+    jupiterVer = '5.11.4'
 }
 
 dependencies {
     // Your forked core in this multi-project build
     api project(':cucumber-core')
 
-    // Official cucumber-java (exclude upstream core; we provide our fork)
     api("io.cucumber:cucumber-java:${cucumberVer}") {
         exclude group: 'io.cucumber', module: 'cucumber-core'
     }
+    api("io.cucumber:cucumber-junit-platform-engine:${cucumberVer}") {
+        exclude group: 'io.cucumber', module: 'cucumber-core'
+    }
 
-    // Cucumber engine for JUnit Platform (runs the scenarios)
-    api("io.cucumber:cucumber-junit-platform-engine:${cucumberVer}")
 
     // JUnit Platform: engine/commons/launcher + Suite API for @Suite annotations
     api("org.junit.platform:junit-platform-engine:${junitPlatformVer}")
