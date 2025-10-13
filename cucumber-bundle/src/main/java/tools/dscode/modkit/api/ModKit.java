@@ -1,4 +1,4 @@
-// tools/ds/modkit/api/ModKit.java
+// tools/dscode/modkit/api/ModKit.java
 package tools.dscode.modkit.api;
 
 import net.bytebuddy.agent.ByteBuddyAgent;
@@ -20,9 +20,12 @@ public final class ModKit {
                 .with(AgentBuilder.RedefinitionStrategy.RETRANSFORMATION)
                 .with(AgentBuilder.TypeStrategy.Default.REDEFINE)
                 .disableClassFormatChanges()
-                // Helpful logging in case something’s odd on a user’s box:
-                .with(AgentBuilder.Listener.StreamWriting.toSystemError())
-                .with(AgentBuilder.InstallationListener.StreamWriting.toSystemError())
+                // Keep logs quiet: only errors from transformations
+                .with(AgentBuilder.Listener.StreamWriting
+                        .toSystemError()
+                        .withErrorsOnly())
+                // Silence installation chatter entirely
+                .with(AgentBuilder.InstallationListener.NoOp.INSTANCE)
                 // Ignore noise (keeps perf good and avoids self-instrumentation):
                 .ignore(nameStartsWith("net.bytebuddy.")
                         .or(nameStartsWith("org.slf4j."))

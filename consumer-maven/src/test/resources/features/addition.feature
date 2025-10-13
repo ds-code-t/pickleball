@@ -7,7 +7,7 @@ Feature: Addition using custom cucumber-core
     When I add 3 and 4
     Then the total should be 7
 
-  @wip
+#  @wip
   Scenario: Add negative numbers
     Given a starting total of 0
     When I add -2 and -5
