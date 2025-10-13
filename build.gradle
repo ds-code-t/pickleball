@@ -1,193 +1,36 @@
-plugins {
-    id 'java-library'
-    id 'maven-publish'
-//    id 'com.github.johnrengelman.shadow' version '8.1.1'
-    id 'com.gradleup.shadow' version '8.3.6'
-}
+subprojects {
+    repositories { mavenCentral() }
 
-group = 'io.cucumber'
-version = '7.27.2'
+    plugins.withId('java') {
+        java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
 
-java {
-    toolchain { languageVersion = JavaLanguageVersion.of(21) }
-    withSourcesJar()
-    withJavadocJar()
-}
-
-repositories {
-    mavenLocal()
-    mavenCentral()
-}
-
-ext {
-    apiguardianVersion = '1.1.2'
-    jacksonBomVersion = '2.19.2'
-    junitBomVersion = '5.13.4'
-    jsoupVersion = '1.21.1'
-    xmlunitVersion = '2.10.3'
-    hamcrestVersion = '3.0'
-    mockitoVersion = '5.19.0'
-    vertxVersion = '4.5.18'
-    reactiveStreamsVer = '1.0.4'
-
-    // Your additional libs (these were causing conflicts via older transitives)
-    byteBuddyVersion = '1.17.7'
-    guavaVersion = '33.4.8-jre'
-    errorProneAnnVer = '2.41.0'   // newer than 2.36.0 pulled via gson
-}
-
-configurations.all {
-    resolutionStrategy {
-        failOnVersionConflict()
-
-        // HARD-PIN the problematic ones across all configurations (including runtimeClasspath)
-        force "net.bytebuddy:byte-buddy:${byteBuddyVersion}"
-        force "net.bytebuddy:byte-buddy-agent:${byteBuddyVersion}"
-        force "com.google.guava:guava:${guavaVersion}"
-        force "com.google.errorprone:error_prone_annotations:${errorProneAnnVer}"
-    }
-}
-
-dependencies {
-    // --- Enforce BOMs so transitive deps can't override them ---
-    implementation enforcedPlatform("io.cucumber:cucumber-bom:${version}")
-    testImplementation enforcedPlatform("io.cucumber:cucumber-bom:${version}")
-
-    implementation enforcedPlatform("org.junit:junit-bom:${junitBomVersion}")
-    testImplementation enforcedPlatform("org.junit:junit-bom:${junitBomVersion}")
-
-    implementation enforcedPlatform("com.fasterxml.jackson:jackson-bom:${jacksonBomVersion}")
-
-    // --- Cucumber core deps (from 7.27.2 POM) ---
-    api "io.cucumber:cucumber-gherkin"
-    api "io.cucumber:cucumber-gherkin-messages"
-    api "io.cucumber:messages"
-    api "io.cucumber:pretty-formatter"
-    api "io.cucumber:testng-xml-formatter"
-    api "io.cucumber:tag-expressions"
-    api "io.cucumber:cucumber-expressions"
-    api "io.cucumber:datatable"
-    api "io.cucumber:cucumber-plugin"
-    api "io.cucumber:docstring"
-    api "io.cucumber:html-formatter"
-    api "io.cucumber:junit-xml-formatter"
-    implementation "io.cucumber:ci-environment"
-
-    compileOnly "org.apiguardian:apiguardian-api:${apiguardianVersion}"
-
-    // --- Jackson modules (SHADED & RELOCATED) ---
-    implementation "com.fasterxml.jackson.core:jackson-databind"
-    implementation "com.fasterxml.jackson.core:jackson-core"
-    implementation "com.fasterxml.jackson.core:jackson-annotations"
-    implementation "com.fasterxml.jackson.datatype:jackson-datatype-jdk8"
-    implementation "com.fasterxml.jackson.datatype:jackson-datatype-guava"
-    implementation "com.fasterxml.jackson.dataformat:jackson-dataformat-xml"
-    implementation "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml"
-
-
-    // --- Your additional libs ---
-
-    api("io.cucumber:cucumber-java:7.27.2") {
-        exclude group: 'io.cucumber', module: 'cucumber-core'
-    }
-
-
-    implementation "net.bytebuddy:byte-buddy:${byteBuddyVersion}"
-    implementation "net.bytebuddy:byte-buddy-agent:${byteBuddyVersion}"
-
-    implementation "com.google.guava:guava:${guavaVersion}"
-    implementation "com.jayway.jsonpath:json-path:2.9.0"
-    implementation "com.ibm.jsonata4java:JSONata4Java:2.6.0"
-    implementation "com.googlecode.aviator:aviator:5.4.3"
-
-    // --- Test deps (from POM) ---
-    testImplementation "org.xmlunit:xmlunit-core:${xmlunitVersion}"
-    testImplementation("org.xmlunit:xmlunit-matchers:${xmlunitVersion}") {
-        exclude group: 'org.hamcrest', module: 'hamcrest-core'
-    }
-    testImplementation "org.jsoup:jsoup:${jsoupVersion}"
-    testImplementation("org.mockito:mockito-junit-jupiter:${mockitoVersion}") {
-        // keep test classpath clean of older byte-buddy that mockito might bring
-        exclude group: 'net.bytebuddy', module: 'byte-buddy'
-        exclude group: 'net.bytebuddy', module: 'byte-buddy-agent'
-    }
-    testImplementation "io.vertx:vertx-web:${vertxVersion}"
-    testImplementation "io.vertx:vertx-junit5:${vertxVersion}"
-    testImplementation "org.reactivestreams:reactive-streams:${reactiveStreamsVer}"
-    testImplementation "org.hamcrest:hamcrest:${hamcrestVersion}"
-    testImplementation "org.skyscreamer:jsonassert:1.5.3"
-}
-
-tasks.test {
-    useJUnitPlatform()
-}
-
-tasks.jar {
-    manifest {
-        attributes('Main-Class': 'io.cucumber.core.cli.Main')
-    }
-}
-
-tasks.processResources {
-    // Don’t expand everything—limit to specific files or patterns
-    filesMatching(['application.properties', 'version.properties']) {
-        expand(project.properties)
-        filteringCharset = 'UTF-8'
-    }
-}
-
-
-tasks.shadowJar {
-    archiveClassifier.set('') // shaded jar becomes the main
-
-    // Include ALL Jackson bits we rely on, so relocation is consistent
-    dependencies {
-        include(dependency("com.fasterxml.jackson.core:jackson-core"))
-        include(dependency("com.fasterxml.jackson.core:jackson-annotations"))
-        include(dependency("com.fasterxml.jackson.core:jackson-databind"))
-        include(dependency("com.fasterxml.jackson.datatype:jackson-datatype-jdk8"))
-        include(dependency("com.fasterxml.jackson.datatype:jackson-datatype-guava"))
-        include(dependency("com.fasterxml.jackson.dataformat:jackson-dataformat-xml"))
-        include(dependency("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml"))
-    }
-
-    // Relocate ALL com.fasterxml.* into the internal namespace
-    relocate 'com.fasterxml', 'io.cucumber.core.internal.com.fasterxml'
-
-    // Match POM filters broadly
-    exclude '**/module-info.class'
-    exclude 'META-INF/MANIFEST.MF'
-    exclude 'META-INF/services/**'
-    exclude 'META-INF/versions/**'
-}
-
-tasks.named('jar') { finalizedBy tasks.named('shadowJar') }
-
-artifacts { archives tasks.named('shadowJar') }
-
-publishing {
-    publications {
-        mavenJava(MavenPublication) {
-            from components.java
-            groupId = 'io.cucumber'
-            artifactId = 'cucumber-core'
-            version = project.version
-            pom {
-                name.set("Cucumber-JVM: Core (custom)")
-                description.set("Custom build aligned to cucumber-core 7.27.2 with shaded Jackson")
-                url.set("https://example.com/your-repo")
-                licenses { license { name.set("MIT"); url.set("https://opensource.org/licenses/MIT") } }
-                developers { developer { id.set("you"); name.set("Your Name") } }
-                scm { url.set("https://example.com/your-repo.git") }
+        tasks.withType(JavaCompile).configureEach {
+            // Helpful guard so CI/IDEs don’t silently downgrade the toolchain
+            doFirst {
+                def svc = project.extensions.getByType(org.gradle.jvm.toolchain.JavaToolchainService)
+                def launcher = svc.launcherFor(java.toolchain).get()
+                def toolchainJava = launcher.metadata.languageVersion
+                if (toolchainJava.asInt() < 21) {
+                    throw new GradleException(
+                            "🚫 Requires Java 21 toolchain; resolved ${toolchainJava}. " +
+                                    "Ensure Gradle can provision JDK 21 or set org.gradle.java.installations.paths to JDK 21."
+                    )
+                }
             }
         }
     }
-    repositories { mavenLocal() }
-}
 
-tasks.withType(Javadoc).configureEach {
-    options.addBooleanOption('Xdoclint:none', true)  // disable doclint
-    options.addBooleanOption('quiet', true)          // correct way to pass -quiet
-    failOnError = false                              // don’t fail build on Javadoc issues
-}
+    tasks.withType(Javadoc).configureEach {
+        options.addStringOption('Xdoclint:none', '-quiet')
+        failOnError = false
+    }
 
+    // Common versions (kept here for simplicity; could move to gradle.properties)
+    ext {
+        cucumberVer      = '7.27.2'
+        junitPlatformVer = '1.13.4'
+        jupiterVer       = '5.11.4'
+        byteBuddyVer     = '1.17.7'
+        jacksonBom       = '2.19.2'
+    }
+}
