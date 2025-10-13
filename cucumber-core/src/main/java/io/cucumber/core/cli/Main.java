@@ -10,6 +10,8 @@ import org.apiguardian.api.API;
 
 import java.util.Optional;
 
+import static io.cucumber.core.internal.util.ReflectiveAgentInvoker.tryInitAgent;
+
 /**
  * Cucumber Main. Runs Cucumber as a CLI.
  * <p>
@@ -25,6 +27,11 @@ import java.util.Optional;
  */
 @API(status = API.Status.STABLE)
 public class Main {
+
+    static
+    {
+        tryInitAgent();
+    }
 
     public static void main(String... argv) {
         byte exitStatus = run(argv, Thread.currentThread().getContextClassLoader());
