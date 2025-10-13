@@ -40,24 +40,6 @@ dependencies {
 
     // JUnit Jupiter API so consumers get Assertions, etc.
     api("org.junit.jupiter:junit-jupiter-api:${jupiterVer}")
-
-    implementation 'net.bytebuddy:byte-buddy:1.17.7'
-    implementation 'net.bytebuddy:byte-buddy-agent:1.17.7'
-
-    implementation 'com.google.guava:guava:33.4.8-jre'
-    implementation "com.fasterxml.jackson.datatype:jackson-datatype-guava"
-
-    implementation platform('com.fasterxml.jackson:jackson-bom:2.20.0')
-    implementation 'com.fasterxml.jackson.core:jackson-databind'
-    implementation 'com.fasterxml.jackson.core:jackson-core'
-    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
-    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
-    implementation 'com.jayway.jsonpath:json-path:2.9.0'
-    implementation 'com.ibm.jsonata4java:JSONata4Java:2.6.0'
-
-    implementation 'com.googlecode.aviator:aviator:5.4.3'
-
-
 }
 
 publishing {

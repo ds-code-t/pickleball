@@ -9,10 +9,6 @@ import io.cucumber.core.logging.LoggerFactory;
 @Deprecated
 public class Main {
 
-    static {
-//        InitAgent();
-    }
-
     private static final Logger log = LoggerFactory.getLogger(Main.class);
 
     public static void main(String[] argv) {
