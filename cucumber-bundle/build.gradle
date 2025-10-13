@@ -60,12 +60,6 @@ dependencies {
 
 }
 
-tasks.withType(Javadoc).configureEach {
-    options.addStringOption('Xdoclint:none', '-quiet')
-    failOnError = false
-}
-
-
 publishing {
     publications {
         mavenJava(MavenPublication) {

@@ -2,35 +2,22 @@ subprojects {
     repositories { mavenCentral() }
 
     plugins.withId('java') {
-        java { toolchain { languageVersion = JavaLanguageVersion.of(21) } }
+        java {
+            toolchain { languageVersion = JavaLanguageVersion.of(21) }
+        }
 
+        // Validate toolchain resolution with a helpful error
         tasks.withType(JavaCompile).configureEach {
-            // Helpful guard so CI/IDEs don’t silently downgrade the toolchain
             doFirst {
-                def svc = project.extensions.getByType(org.gradle.jvm.toolchain.JavaToolchainService)
-                def launcher = svc.launcherFor(java.toolchain).get()
+                def launcher = project.extensions.getByType(org.gradle.jvm.toolchain.JavaToolchainService)
+                        .launcherFor(java.toolchain).get()
                 def toolchainJava = launcher.metadata.languageVersion
                 if (toolchainJava.asInt() < 21) {
-                    throw new GradleException(
-                            "🚫 Requires Java 21 toolchain; resolved ${toolchainJava}. " +
-                                    "Ensure Gradle can provision JDK 21 or set org.gradle.java.installations.paths to JDK 21."
-                    )
+                    throw new GradleException("🚫 Pickleball requires a Java 21 toolchain; resolved ${toolchainJava}. " +
+                            "Ensure Gradle can provision JDK 21 or set org.gradle.java.installations.paths to your JDK 21.")
                 }
             }
+            options.release = 21
         }
-    }
-
-    tasks.withType(Javadoc).configureEach {
-        options.addStringOption('Xdoclint:none', '-quiet')
-        failOnError = false
-    }
-
-    // Common versions (kept here for simplicity; could move to gradle.properties)
-    ext {
-        cucumberVer      = '7.27.2'
-        junitPlatformVer = '1.13.4'
-        jupiterVer       = '5.11.4'
-        byteBuddyVer     = '1.17.7'
-        jacksonBom       = '2.19.2'
     }
 }
