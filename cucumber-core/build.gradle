@@ -19,33 +19,32 @@ tasks.withType(JavaCompile).configureEach {
 
 repositories { mavenCentral() }
 
+
 dependencies {
-    // Keep Cucumber versions aligned without hardcoding numbers everywhere
-    implementation platform("io.cucumber:cucumber-bom:7.27.2")
+    api platform("io.cucumber:cucumber-bom:7.27.2")
+    api 'io.cucumber:cucumber-plugin'        // provides io.cucumber.plugin.event.*
+    api 'io.cucumber:cucumber-gherkin'       // io.cucumber.core.gherkin.Pickle lives in core, but other modules matter
+    api 'io.cucumber:cucumber-gherkin-messages'
+    api 'io.cucumber:messages'
+    api 'io.cucumber:pretty-formatter'
+    api 'io.cucumber:testng-xml-formatter'
+    api 'io.cucumber:tag-expressions'
+    api 'io.cucumber:cucumber-expressions'
+    api 'io.cucumber:datatable'
+    api 'io.cucumber:docstring'
+    api 'io.cucumber:html-formatter'
+    api 'io.cucumber:junit-xml-formatter'
+    api 'io.cucumber:ci-environment'
+    api 'org.apiguardian:apiguardian-api'
 
-    // Upstream core's compile deps (no versions needed thanks to the BOM)
-    implementation 'io.cucumber:cucumber-gherkin'
-    implementation 'io.cucumber:cucumber-gherkin-messages'
-    implementation 'io.cucumber:messages'
-    implementation 'io.cucumber:pretty-formatter'
-    implementation 'io.cucumber:testng-xml-formatter'
-    implementation 'io.cucumber:tag-expressions'
-    implementation 'io.cucumber:cucumber-expressions'
-    implementation 'io.cucumber:datatable'
-    implementation 'io.cucumber:cucumber-plugin'
-    implementation 'io.cucumber:docstring'
-    implementation 'io.cucumber:html-formatter'
-    implementation 'io.cucumber:junit-xml-formatter'
-    implementation 'io.cucumber:ci-environment'
-    implementation 'org.apiguardian:apiguardian-api'
-
-    // === JACKSON: needed at compile time and then SHADED into the jar ===
-    implementation platform("com.fasterxml.jackson:jackson-bom:2.19.2") // matches 7.27.x line
+    // Jackson can stay implementation; you shade it when publishing
+    implementation platform("com.fasterxml.jackson:jackson-bom:2.19.2")
     implementation 'com.fasterxml.jackson.core:jackson-databind'
     implementation 'com.fasterxml.jackson.core:jackson-core'
     implementation 'com.fasterxml.jackson.core:jackson-annotations'
     implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jdk8'
 }
+
 
 // Produce a shaded jar that relocates Jackson into io.cucumber.core.internal.com.fasterxml
 shadowJar {

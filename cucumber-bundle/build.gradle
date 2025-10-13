@@ -1,5 +1,5 @@
 plugins {
-    id 'java-library'    // needed for 'api' to expose transitive deps
+    id 'java-library'    // exposes api to consumers
     id 'maven-publish'
 }
 
@@ -15,51 +15,47 @@ java {
 repositories { mavenCentral() }
 
 ext {
-    cucumberVer = '7.27.2'
-    junitPlatformVer = '1.13.4'  // align all JUnit Platform artifacts
-    jupiterVer = '5.11.4'
+    cucumberVer      = '7.27.2'
+    junitPlatformVer = '1.13.4'  // Platform 1.13.x pairs with Jupiter 5.13.x
+    jupiterVer       = '5.13.4'
 }
 
 dependencies {
-    // Your forked core in this multi-project build
+    // Your forked core (acts as the "cucumber-core" for consumers)
     api project(':cucumber-core')
 
+    // Cucumber Java API (Given/When/Then). Exclude upstream core.
     api("io.cucumber:cucumber-java:${cucumberVer}") {
         exclude group: 'io.cucumber', module: 'cucumber-core'
     }
+
+    // Cucumber engine for JUnit Platform. Exclude upstream core.
     api("io.cucumber:cucumber-junit-platform-engine:${cucumberVer}") {
         exclude group: 'io.cucumber', module: 'cucumber-core'
     }
 
-
-    // JUnit Platform: engine/commons/launcher + Suite API for @Suite annotations
+    // JUnit Platform bits so consumers can write @Suite runners and launch
+    api("org.junit.platform:junit-platform-suite:${junitPlatformVer}")
     api("org.junit.platform:junit-platform-engine:${junitPlatformVer}")
     api("org.junit.platform:junit-platform-commons:${junitPlatformVer}")
     api("org.junit.platform:junit-platform-launcher:${junitPlatformVer}")
-    api("org.junit.platform:junit-platform-suite:${junitPlatformVer}")
 
-    // JUnit Jupiter API so consumers get Assertions, etc.
+    // Give consumers JUnit 5 Assertions, etc.
     api("org.junit.jupiter:junit-jupiter-api:${jupiterVer}")
 
-
-    implementation 'com.google.guava:guava:33.4.8-jre'
-    implementation "com.fasterxml.jackson.datatype:jackson-datatype-guava"
-
-    implementation 'org.junit.platform:junit-platform-launcher:1.10.3'
+    // ---- Internals used by your custom features (kept out of consumer API) ----
     implementation 'net.bytebuddy:byte-buddy:1.17.7'
     implementation 'net.bytebuddy:byte-buddy-agent:1.17.7'
     implementation 'org.slf4j:slf4j-api:2.0.16'
-    implementation 'org.junit.platform:junit-platform-suite:1.10.3'
-    implementation 'org.junit.jupiter:junit-jupiter:5.10.3'
-    implementation 'org.junit.platform:junit-platform-launcher'
+    implementation 'com.google.guava:guava:33.4.8-jre'
     implementation 'com.googlecode.aviator:aviator:5.4.3'
-    implementation platform('com.fasterxml.jackson:jackson-bom:2.20.0')
-    implementation 'com.fasterxml.jackson.core:jackson-databind'
-    implementation 'com.fasterxml.jackson.core:jackson-core'
-    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-xml'
-    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
     implementation 'com.jayway.jsonpath:json-path:2.9.0'
     implementation 'com.ibm.jsonata4java:JSONata4Java:2.6.0'
+
+
+    implementation platform('com.fasterxml.jackson:jackson-bom:2.19.2')
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-guava'
 }
 
 publishing {
@@ -77,7 +73,6 @@ publishing {
     }
     repositories { mavenLocal() }
 }
-
 
 javadoc {
     options.encoding = 'UTF-8'

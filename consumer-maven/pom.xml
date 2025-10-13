@@ -18,7 +18,6 @@
             <groupId>tools.dscode</groupId>
             <artifactId>cucumber-bundle</artifactId>
             <version>7.27.2-dscode.1</version>
-<!--            <scope>test</scope>-->
         </dependency>
 
     </dependencies>
