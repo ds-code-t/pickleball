@@ -43,6 +43,8 @@ tasks.shadowJar {
 
         // Shade only Cucumber (not JUnit). Important: use project.configurations/dependencies here.
         def shaded = project.configurations.detachedConfiguration(
+                project.dependencies.create("io.cucumber:cucumber-pickleball-common:${cucumberVersion}"),
+
                 project.dependencies.create("io.cucumber:cucumber-core:${cucumberVersion}"),
                 project.dependencies.create("io.cucumber:cucumber-java:${cucumberVersion}"),
                 project.dependencies.create("io.cucumber:cucumber-junit:${cucumberVersion}"),
@@ -114,6 +116,7 @@ import org.gradle.internal.os.OperatingSystem
 
 // Build only the modules you want into ~/.m2 (Pico excluded)
 def includeModules = [
+        "cucumber-pickleball-common",
         "cucumber-bom",
         "cucumber-plugin",
         "cucumber-gherkin",
