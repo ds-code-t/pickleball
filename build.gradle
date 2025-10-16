@@ -1,0 +1,168 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'com.github.johnrengelman.shadow' version '8.1.1'
+}
+
+group = "tools.dscode"
+version = "1.0"
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
+    withSourcesJar()   // optional
+    withJavadocJar()   // optional
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencies {
+    // Expose JUnit API & Suite annotations to consumers at compile time
+    api("org.junit.jupiter:junit-jupiter-api:5.10.2")
+    api("org.junit.platform:junit-platform-suite-api:1.10.2")
+
+    // Engines & launcher so Maven Surefire picks the JUnit Platform provider
+    api("org.junit.jupiter:junit-jupiter-engine:5.10.2")
+    api("org.junit.platform:junit-platform-engine:1.10.2")
+    api("org.junit.platform:junit-platform-launcher:1.10.2")
+    api("org.junit.platform:junit-platform-suite-engine:1.10.2")
+}
+
+tasks.jar { enabled = false } // publish only the shaded jar
+
+tasks.shadowJar {
+    archiveBaseName.set("pickleball")
+    archiveClassifier.set("")           // no "-all"
+    archiveVersion.set(version)
+
+    doFirst {
+        // Use your locally built cucumber version; override with -PcukeVer=... if needed
+        def cucumberVersion = findProperty("cukeVer") ?: "7.30.0"
+
+        // Shade only Cucumber (not JUnit). Important: use project.configurations/dependencies here.
+        def shaded = project.configurations.detachedConfiguration(
+                project.dependencies.create("io.cucumber:cucumber-core:${cucumberVersion}"),
+                project.dependencies.create("io.cucumber:cucumber-java:${cucumberVersion}"),
+                project.dependencies.create("io.cucumber:cucumber-junit:${cucumberVersion}"),
+                project.dependencies.create("io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}"),
+                project.dependencies.create("io.cucumber:cucumber-plugin:${cucumberVersion}"),
+                // omit picocontainer on purpose
+                // project.dependencies.create("io.cucumber:cucumber-picocontainer:${cucumberVersion}"),
+                // optional extras (uncomment if you need them)
+                // project.dependencies.create("io.cucumber:cucumber-spring:${cucumberVersion}"),
+                // project.dependencies.create("io.cucumber:cucumber-testng:${cucumberVersion}"),
+                project.dependencies.create("io.cucumber:cucumber-gherkin:${cucumberVersion}"),
+                project.dependencies.create("io.cucumber:cucumber-gherkin-messages:${cucumberVersion}"),
+                project.dependencies.create("io.cucumber:datatable:${cucumberVersion}"),
+                project.dependencies.create("io.cucumber:datatable-matchers:${cucumberVersion}"),
+                project.dependencies.create("io.cucumber:docstring:${cucumberVersion}")
+        )
+
+        // Embed resolved jars into our shaded jar
+        shaded.resolve().each { f ->
+            from(project.zipTree(f))
+        }
+    }
+
+    // Keep original io.cucumber.* packages (no relocation)
+    mergeServiceFiles()
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            groupId = project.group
+            artifactId = "pickleball"
+            version = project.version
+
+            // Publish the shaded jar as the main artifact
+            artifact(tasks.shadowJar)
+
+            // Author the POM so consumers get JUnit 5 transitively (but no Cucumber)
+            pom.withXml { xml ->
+                def root = xml.asNode()
+
+                // Clean out any existing <dependencies>
+                root.get('dependencies')?.each { root.remove(it) }
+
+                // Create a fresh <dependencies> block with JUnit 5 entries
+                def depsNode = root.appendNode('dependencies')
+                def addDep = { g, a, v, s ->
+                    def d = depsNode.appendNode('dependency')
+                    d.appendNode('groupId', g)
+                    d.appendNode('artifactId', a)
+                    d.appendNode('version', v)
+                    if (s) d.appendNode('scope', s) // use 'compile' so Surefire sees them
+                }
+
+                // JUnit 5 (compile scope so Maven test classpath includes them)
+                addDep('org.junit.jupiter',  'junit-jupiter-api',         '5.10.2', 'compile')
+                addDep('org.junit.jupiter',  'junit-jupiter-engine',      '5.10.2', 'compile')
+                addDep('org.junit.platform', 'junit-platform-engine',     '1.10.2', 'compile')
+                addDep('org.junit.platform', 'junit-platform-launcher',   '1.10.2', 'compile')
+                addDep('org.junit.platform', 'junit-platform-suite-api',  '1.10.2', 'compile')
+                addDep('org.junit.platform', 'junit-platform-suite-engine','1.10.2','compile')
+            }
+        }
+    }
+    repositories { mavenLocal() }
+}
+
+import org.gradle.internal.os.OperatingSystem
+
+// Build only the modules you want into ~/.m2 (Pico excluded)
+def includeModules = [
+        "cucumber-bom",
+        "cucumber-plugin",
+        "cucumber-gherkin",
+        "cucumber-gherkin-messages",
+        "datatable",
+        "docstring",
+        "cucumber-core",
+        "cucumber-junit-platform-engine",
+        "cucumber-java",
+        "cucumber-junit",
+        // add if you actually need them:
+        // "cucumber-spring",
+        // "cucumber-testng",
+]
+
+tasks.register("buildFork") {
+    group = "build"
+    description = "Builds selected cucumber-jvm modules into mavenLocal (excludes Pico)"
+
+    doLast {
+        def isWin = OperatingSystem.current().isWindows()
+        def wrapper = file(isWin ? "cucumber-jvm/mvnw.cmd" : "cucumber-jvm/mvnw")
+        def useWrapper = wrapper.exists()
+        def modulesArg = includeModules.join(",")
+
+        def cmd
+        if (useWrapper) {
+            if (!isWin) {
+                exec { workingDir = file("cucumber-jvm"); commandLine "bash","-lc","chmod +x ./mvnw" }
+            }
+            cmd = isWin
+                    ? [wrapper.absolutePath, "-DskipTests", "clean", "install", "-pl", modulesArg, "-am"]
+                    : ["bash","-lc","./mvnw -DskipTests clean install -pl " + modulesArg + " -am"]
+        } else {
+            cmd = isWin
+                    ? ["cmd","/c","mvn","-DskipTests","clean","install","-pl", modulesArg,"-am"]
+                    : ["bash","-lc","mvn -DskipTests clean install -pl " + modulesArg + " -am"]
+        }
+
+        exec {
+            workingDir = file("cucumber-jvm")
+            commandLine = cmd
+            standardOutput = System.out
+            errorOutput = System.err
+            ignoreExitValue = false
+        }
+    }
+}
+
+// Auto-build the fork before building/publishing the shaded artifact
+tasks.named("build").configure { dependsOn("buildFork") }
+tasks.named("publishToMavenLocal").configure { dependsOn("buildFork") }
