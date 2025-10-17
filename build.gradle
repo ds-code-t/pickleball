@@ -7,6 +7,9 @@ plugins {
 group = "tools.dscode"
 version = "1.0"
 
+// keep this in sync with your fork build (you can override with -PcukeVer=7.30.0)
+ext.cukeVer = (findProperty("cukeVer") ?: "7.30.0")
+
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }
     withSourcesJar()   // optional
@@ -18,8 +21,12 @@ repositories {
     mavenCentral()
 }
 
+/* =========================
+   RUNTIME API FOR CONSUMERS
+   ========================= */
+
 dependencies {
-    // Expose JUnit API & Suite annotations to consumers at compile time
+    // Expose JUnit API & Suite annotations so consumers can compile and run tests
     api("org.junit.jupiter:junit-jupiter-api:5.10.2")
     api("org.junit.platform:junit-platform-suite-api:1.10.2")
 
@@ -30,47 +37,155 @@ dependencies {
     api("org.junit.platform:junit-platform-suite-engine:1.10.2")
 }
 
+/* =========================
+   BUILD-TIME OFFLINE WEAVER
+   ========================= */
+
+sourceSets {
+    // Build-time only weaver code (not shipped in the shaded jar)
+    weaver {
+        java.srcDir 'src/weaver/java'
+        compileClasspath += sourceSets.main.compileClasspath
+        runtimeClasspath += sourceSets.main.runtimeClasspath
+    }
+}
+
+configurations {
+    weaverImplementation.extendsFrom implementation
+    // compile-only deps just for the weaver source set
+    weaverCompileOnly
+}
+
+dependencies {
+    // Byte Buddy for offline weaving (weaver source set only)
+    weaverImplementation("net.bytebuddy:byte-buddy:1.14.18")
+    // If your weaver/advices reference agent-specific annotations/utilities, uncomment:
+    // weaverImplementation("net.bytebuddy:byte-buddy-agent:1.14.18")
+
+    // Let the weaver import Cucumber types (type-safe), compile-only (NOT shipped)
+    weaverCompileOnly("io.cucumber:cucumber-core:${cukeVer}")
+    weaverCompileOnly("io.cucumber:cucumber-java:${cukeVer}")
+    weaverCompileOnly("io.cucumber:cucumber-junit:${cukeVer}")
+    weaverCompileOnly("io.cucumber:cucumber-junit-platform-engine:${cukeVer}")
+    weaverCompileOnly("io.cucumber:cucumber-plugin:${cukeVer}")
+    weaverCompileOnly("io.cucumber:cucumber-gherkin:${cukeVer}")
+    weaverCompileOnly("io.cucumber:cucumber-gherkin-messages:${cukeVer}")
+    weaverCompileOnly("io.cucumber:datatable:${cukeVer}")
+    weaverCompileOnly("io.cucumber:datatable-matchers:${cukeVer}")
+    weaverCompileOnly("io.cucumber:docstring:${cukeVer}")
+    // If your DSL imports your new module:
+    weaverCompileOnly("io.cucumber:cucumber-pickleball-common:${cukeVer}")
+}
+
+// ensure your fork jars exist in ~/.m2 BEFORE compiling the weaver
+tasks.named("compileWeaverJava").configure { dependsOn("buildFork") }
+
+/* Helper to resolve the exact Cucumber jars we will weave and later shade */
+// Helper you already have (or add if missing)
+def resolveCukeJars = { String cv ->
+    project.configurations.detachedConfiguration(
+            project.dependencies.create("io.cucumber:cucumber-pickleball-common:${cv}"),
+            project.dependencies.create("io.cucumber:cucumber-core:${cv}"),
+            project.dependencies.create("io.cucumber:cucumber-java:${cv}"),
+            project.dependencies.create("io.cucumber:cucumber-junit:${cv}"),
+            project.dependencies.create("io.cucumber:cucumber-junit-platform-engine:${cv}"),
+            project.dependencies.create("io.cucumber:cucumber-plugin:${cv}"),
+            project.dependencies.create("io.cucumber:cucumber-gherkin:${cv}"),
+            project.dependencies.create("io.cucumber:cucumber-gherkin-messages:${cv}"),
+            project.dependencies.create("io.cucumber:datatable:${cv}"),
+            project.dependencies.create("io.cucumber:datatable-matchers:${cv}"),
+            project.dependencies.create("io.cucumber:docstring:${cv}")
+            // DO NOT include cucumber-bom here (it's a POM, not a JAR)
+    ).resolve().findAll { it.name.endsWith(".jar") }
+}
+
+tasks.register("weaveCucumber") {
+    group = "build"
+    description = "Offline-weaves Cucumber classes (one JavaExec per jar)"
+    dependsOn("compileWeaverJava")
+
+    // Use your property or default
+    def cv = (findProperty("cukeVer") ?: "7.30.0")
+
+    // Resolve once; we also use this list as the resolver classpath
+    def allJars = resolveCukeJars(cv)
+
+    inputs.files(allJars)
+    outputs.dir("$buildDir/weaved-jars")
+
+    doLast {
+        def outDir = file("$buildDir/weaved-jars")
+        outDir.mkdirs()
+
+        // The resolver classpath we pass to the weaver (all related jars)
+        def cpString = allJars.collect { it.absolutePath }.join(File.pathSeparator)
+
+        allJars.each { File inJar ->
+            def outJar = new File(outDir, inJar.name.replaceAll(/\.jar$/, "-weaved.jar"))
+            logger.lifecycle("[weave] in: ${inJar}  -> out: ${outJar}")
+
+            // ⬇️ Your snippet lives right here:
+            javaexec {
+                classpath = sourceSets.weaver.runtimeClasspath
+                mainClass = "tools.dscode.modkit.blackbox.OfflineWeaverMain"
+                args inJar.absolutePath, outJar.absolutePath
+
+                // Memory and system properties for the weaver
+                jvmArgs "-Xmx1g",
+                        "-Dweaver.classpath=${cpString}",
+                        // target packages to weave (includes messages.* for Pickle#getTags)
+                        "-Dweaver.targets=io.cucumber.core.,io.cucumber.messages.,io.cucumber.gherkin.,io.cucumber.plugin."
+            }
+        }
+    }
+}
+
+
+
+/* =========================
+   SHADING (ONE FAT JAR)
+   ========================= */
+
 tasks.jar { enabled = false } // publish only the shaded jar
 
 tasks.shadowJar {
+    dependsOn("weaveCucumber")
+
     archiveBaseName.set("pickleball")
-    archiveClassifier.set("")           // no "-all"
+    archiveClassifier.set("")      // publish as main (no "-all")
     archiveVersion.set(version)
 
-    doFirst {
-        // Use your locally built cucumber version; override with -PcukeVer=... if needed
-        def cucumberVersion = findProperty("cukeVer") ?: "7.30.0"
-
-        // Shade only Cucumber (not JUnit). Important: use project.configurations/dependencies here.
-        def shaded = project.configurations.detachedConfiguration(
-                project.dependencies.create("io.cucumber:cucumber-pickleball-common:${cucumberVersion}"),
-
-                project.dependencies.create("io.cucumber:cucumber-core:${cucumberVersion}"),
-                project.dependencies.create("io.cucumber:cucumber-java:${cucumberVersion}"),
-                project.dependencies.create("io.cucumber:cucumber-junit:${cucumberVersion}"),
-                project.dependencies.create("io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}"),
-                project.dependencies.create("io.cucumber:cucumber-plugin:${cucumberVersion}"),
-                // omit picocontainer on purpose
-                // project.dependencies.create("io.cucumber:cucumber-picocontainer:${cucumberVersion}"),
-                // optional extras (uncomment if you need them)
-                // project.dependencies.create("io.cucumber:cucumber-spring:${cucumberVersion}"),
-                // project.dependencies.create("io.cucumber:cucumber-testng:${cucumberVersion}"),
-                project.dependencies.create("io.cucumber:cucumber-gherkin:${cucumberVersion}"),
-                project.dependencies.create("io.cucumber:cucumber-gherkin-messages:${cucumberVersion}"),
-                project.dependencies.create("io.cucumber:datatable:${cucumberVersion}"),
-                project.dependencies.create("io.cucumber:datatable-matchers:${cucumberVersion}"),
-                project.dependencies.create("io.cucumber:docstring:${cucumberVersion}")
-        )
-
-        // Embed resolved jars into our shaded jar
-        shaded.resolve().each { f ->
-            from(project.zipTree(f))
-        }
-    }
-
-    // Keep original io.cucumber.* packages (no relocation)
+    // keep original packages; merge service descriptors
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
     mergeServiceFiles()
+
+    // 🔹 Include your own code:
+    // - main classes (runtime helpers your woven code may call)
+    // - weaver classes (Plans/Registry/advices/etc.) so NoClassDefFoundError disappears
+    from(sourceSets.main.output)
+    from(sourceSets.weaver.output)
+
+    doFirst {
+        // Use weaved jars if present; otherwise fall back to originals
+        def originals = resolveCukeJars(cukeVer)
+        def weavedDir = file("$buildDir/weaved-jars")
+        def weaved = weavedDir.exists()
+                ? weavedDir.listFiles({ f -> f.name.endsWith(".jar") } as java.io.FileFilter)
+                : [] as File[]
+
+        def toZip = (weaved && weaved.length > 0) ? weaved : originals
+        logger.lifecycle("[shadowJar] adding ${toZip.size()} dependency jars (${(weaved && weaved.length>0) ? 'weaved' : 'original'})")
+
+        // Unzip deps into the fat jar
+        toZip.each { File f -> from(project.zipTree(f)) }
+    }
 }
+
+
+
+/* =========================
+   PUBLISHING (NO io.cucumber:* IN POM)
+   ========================= */
 
 publishing {
     publications {
@@ -96,10 +211,9 @@ publishing {
                     d.appendNode('groupId', g)
                     d.appendNode('artifactId', a)
                     d.appendNode('version', v)
-                    if (s) d.appendNode('scope', s) // use 'compile' so Surefire sees them
+                    if (s) d.appendNode('scope', s) // 'compile' so Surefire sees them
                 }
 
-                // JUnit 5 (compile scope so Maven test classpath includes them)
                 addDep('org.junit.jupiter',  'junit-jupiter-api',         '5.10.2', 'compile')
                 addDep('org.junit.jupiter',  'junit-jupiter-engine',      '5.10.2', 'compile')
                 addDep('org.junit.platform', 'junit-platform-engine',     '1.10.2', 'compile')
@@ -111,6 +225,10 @@ publishing {
     }
     repositories { mavenLocal() }
 }
+
+/* =========================
+   BUILD YOUR FORK FIRST
+   ========================= */
 
 import org.gradle.internal.os.OperatingSystem
 
@@ -127,7 +245,6 @@ def includeModules = [
         "cucumber-junit-platform-engine",
         "cucumber-java",
         "cucumber-junit",
-        // add if you actually need them:
         // "cucumber-spring",
         // "cucumber-testng",
 ]
@@ -166,6 +283,6 @@ tasks.register("buildFork") {
     }
 }
 
-// Auto-build the fork before building/publishing the shaded artifact
+// Ensure ordering: build fork -> compile weaver -> weave -> shade -> publish
 tasks.named("build").configure { dependsOn("buildFork") }
 tasks.named("publishToMavenLocal").configure { dependsOn("buildFork") }
