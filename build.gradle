@@ -28,6 +28,22 @@ dependencies {
     api("org.junit.platform:junit-platform-engine:1.10.2")
     api("org.junit.platform:junit-platform-launcher:1.10.2")
     api("org.junit.platform:junit-platform-suite-engine:1.10.2")
+
+
+
+    // --- Option A (NEW): let root src/main/java compile against forked modules from mavenLocal ---
+    def cukeVer = findProperty("cukeVer") ?: "7.30.0"
+    implementation("io.cucumber:cucumber-core:${cukeVer}")
+    implementation("io.cucumber:cucumber-java:${cukeVer}")
+    implementation("io.cucumber:cucumber-junit:${cukeVer}")
+    implementation("io.cucumber:cucumber-junit-platform-engine:${cukeVer}")
+    implementation("io.cucumber:cucumber-plugin:${cukeVer}")
+    implementation("io.cucumber:cucumber-gherkin:${cukeVer}")
+    implementation("io.cucumber:cucumber-gherkin-messages:${cukeVer}")
+    implementation("io.cucumber:datatable:${cukeVer}")
+    implementation("io.cucumber:datatable-matchers:${cukeVer}")
+    implementation("io.cucumber:docstring:${cukeVer}")
+    implementation("io.cucumber:cucumber-pickleball-common:${cukeVer}") // your custom module if present
 }
 
 tasks.jar { enabled = false } // publish only the shaded jar
@@ -170,6 +186,8 @@ tasks.register("buildFork") {
         }
     }
 }
+// (NEW) Ensure your root code compiles only after the forked modules are installed
+tasks.named("compileJava") { dependsOn("buildFork") }
 
 // Auto-build the fork before building/publishing the shaded artifact
 tasks.named("build").configure { dependsOn("buildFork") }

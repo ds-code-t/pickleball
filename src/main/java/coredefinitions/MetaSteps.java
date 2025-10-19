@@ -1,0 +1,26 @@
+package coredefinitions;
+
+import io.cucumber.java.en.Given;
+
+import static tools.dscode.common.GlobalConstants.defaultMatchFlag;
+
+//import static tools.dscode.coredefinitions.MetaSteps.defaultMatchFlag;
+
+public class MetaSteps {
+
+    public static final String RUN_SCENARIO = "RUN SCENARIO:";
+
+    @Given("^" + RUN_SCENARIO + "(.*)$")
+    public static void runScenario(String scenarioName) {
+        System.out.println("@@runScenario");
+        System.out.println("@@scenarioName: " + scenarioName);
+        // place Holder
+    }
+
+
+    @Given("^" + defaultMatchFlag + "(.*)$")
+    public static void matchDefault(String text) {
+        System.out.println("@@DEFAULT_DEFINITION_text:: " + text);
+    }
+
+}
