@@ -1,4 +1,4 @@
-package coredefinitions;
+package tools.dscode.coredefinitions;
 
 import com.google.common.collect.LinkedListMultimap;
 import io.cucumber.datatable.DataTable;

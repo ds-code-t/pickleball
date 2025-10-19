@@ -1,4 +1,4 @@
-package coredefinitions;
+package tools.dscode.coredefinitions;
 
 import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.core.gherkin.Pickle;

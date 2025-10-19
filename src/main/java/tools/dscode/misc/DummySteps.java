@@ -1,4 +1,4 @@
-package misc;
+package tools.dscode.misc;
 
 import io.cucumber.java.en.When;
 

@@ -1,10 +1,10 @@
-package coredefinitions;
+package tools.dscode.coredefinitions;
 
 import io.cucumber.java.en.Given;
 
 import static tools.dscode.common.GlobalConstants.defaultMatchFlag;
 
-//import static tools.dscode.coredefinitions.MetaSteps.defaultMatchFlag;
+//import static tools.dscode.tools.dscode.coredefinitions.MetaSteps.defaultMatchFlag;
 
 public class MetaSteps {
 

@@ -1,4 +1,4 @@
-package coredefinitions;
+package tools.dscode.coredefinitions;
 
 import io.cucumber.java.en.Given;
 
