@@ -39,6 +39,8 @@ dependencies {
     implementation("io.cucumber:cucumber-junit-platform-engine:${cukeVer}")
     implementation("io.cucumber:cucumber-plugin:${cukeVer}")
     implementation("io.cucumber:cucumber-gherkin:${cukeVer}")
+    implementation("io.cucumber:gherkin:35.1.0")
+    implementation("io.cucumber:messages:29.0.1")
     implementation("io.cucumber:cucumber-gherkin-messages:${cukeVer}")
     implementation("io.cucumber:datatable:${cukeVer}")
     implementation("io.cucumber:datatable-matchers:${cukeVer}")
@@ -69,6 +71,8 @@ tasks.shadowJar {
                 project.dependencies.create("io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}"),
                 project.dependencies.create("io.cucumber:cucumber-plugin:${cucumberVersion}"),
                 project.dependencies.create("io.cucumber:cucumber-gherkin:${cucumberVersion}"),
+                project.dependencies.create("io.cucumber:gherkin:35.1.0"),
+                project.dependencies.create("io.cucumber:messages:29.0.1"),
                 project.dependencies.create("io.cucumber:cucumber-gherkin-messages:${cucumberVersion}"),
                 project.dependencies.create("io.cucumber:datatable:${cucumberVersion}"),
                 project.dependencies.create("io.cucumber:datatable-matchers:${cucumberVersion}"),
@@ -91,7 +95,6 @@ tasks.shadowJar {
         }
     }
 }
-
 
 publishing {
     publications {

@@ -4,6 +4,7 @@ import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Given;
+import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.NoLogging;
 import tools.dscode.executions.StepExecution;
 import tools.dscode.extensions.StepExtension;
@@ -24,7 +25,7 @@ import static tools.dscode.modularexecutions.CucumberScanUtil.listPickles;
 import static tools.dscode.state.ScenarioState.getScenarioState;
 import static tools.dscode.util.stepbuilder.StepUtilities.createPickleStepTestStep;
 
-public class ModularScenarios {
+public class ModularScenarios extends CoreSteps {
 
     // public static final String componentPrefix = "@_COMPONENT_";
 
@@ -46,7 +47,6 @@ public class ModularScenarios {
                 String cleaned = value.startsWith("@") ? value.substring(1) : value;
                 return COMPONENT_TAG_PREFIX + cleaned;
             });
-
         });
 
         System.out.println("@@RUN COMPONENT SCENA " + maps);
@@ -89,7 +89,7 @@ public class ModularScenarios {
                     StepExtension messageStep = getScenarioState().getCurrentStep()
                             .createMessageStep(messagePrefix + " No 'Tags' , or 'Features' set");
                     messageStep.storedThrowable = new RuntimeException(
-                        "Scenario execution steps set with missing or incorrect parameters.  Check the datatatable");
+                            "Scenario execution steps set with missing or incorrect parameters.  Check the datatatable");
                     currentStep.insertNextSibling(messageStep);
                     return;
                 }
@@ -124,17 +124,17 @@ public class ModularScenarios {
 
                     List<StepExtension> stepExtensions = pickle.getSteps().stream()
                             .map(s -> new StepExtension(createPickleStepTestStep(s, bus.generateId(), pickle.getUri()),
-                                stepExecution, pickle))
+                                    stepExecution, pickle))
                             .toList();
                     currentScenarioNameStep = new StepExtension(pickle, stepExecution,
-                        stepExtensions.getFirst().delegate);
+                            stepExtensions.getFirst().delegate);
 
                     currentStep.addChildStep(currentScenarioNameStep);
                     System.out.println("@@currentStep: " + currentStep);
                     System.out.println("@@currentStep-getChildSteps " + currentStep.getChildSteps());
                     System.out.println("@@currentScenarioNameStep: " + currentScenarioNameStep);
                     System.out.println(
-                        "@@currentScenarioNameStep-getChildSteps " + currentScenarioNameStep.getChildSteps());
+                            "@@currentScenarioNameStep-getChildSteps " + currentScenarioNameStep.getChildSteps());
                     if (scenarioMap != null) {
                         scenarioMap.setMapType(MapConfigurations.MapType.STEP_MAP);
                         scenarioMap.setDataSource(PASSED_TABLE);
@@ -161,7 +161,7 @@ public class ModularScenarios {
                     StepExtension messageStep = getScenarioState().getCurrentStep()
                             .createMessageStep(messagePrefix + " step had No Matching Scenarios for " + map);
                     messageStep.storedThrowable = new RuntimeException(
-                        "Scenario execution step No Matching Scenarios for " + map);
+                            "Scenario execution step No Matching Scenarios for " + map);
                     currentStep.insertNextSibling(messageStep);
                 }
             }

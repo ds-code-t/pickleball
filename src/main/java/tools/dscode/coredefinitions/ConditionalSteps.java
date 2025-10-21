@@ -1,12 +1,13 @@
 package tools.dscode.coredefinitions;
 
 import io.cucumber.java.en.Given;
+import tools.dscode.common.CoreSteps;
 import tools.dscode.extensions.StepExtension;
 import tools.dscode.extensions.StepRelationships;
 
 import static tools.dscode.state.ScenarioState.getScenarioState;
 
-public class ConditionalSteps {
+public class ConditionalSteps extends CoreSteps {
 
     @Given("^((?:IF:|ELSE:|ELSE-IF:|THEN:).*)$")
     public static void runConditional(String inputString) {

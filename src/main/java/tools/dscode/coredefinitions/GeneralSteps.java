@@ -1,10 +1,21 @@
 package tools.dscode.coredefinitions;
 
 import io.cucumber.java.en.Given;
+import tools.dscode.common.CoreSteps;
+import tools.dscode.common.annotations.DefinitionFlag;
+import tools.dscode.common.annotations.DefinitionFlags;
 
+import static tools.dscode.common.GlobalConstants.META_FLAG;
+import static tools.dscode.common.GlobalConstants.ROOT_STEP;
 import static tools.dscode.state.ScenarioState.getScenarioState;
 
-public class GeneralSteps {
+public class GeneralSteps  extends CoreSteps {
+
+    @DefinitionFlags(DefinitionFlag.NO_LOGGING)
+    @Given("ROOTSTEP")
+    public static void rootStep() {
+        System.out.println("@@ROOT_STEP!!");
+    }
 
     @Given("MESSAGE:{string}")
     public static void setValues(String message) {
@@ -22,3 +33,4 @@ public class GeneralSteps {
     }
 
 }
+

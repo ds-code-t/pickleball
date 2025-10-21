@@ -1,6 +1,7 @@
 package tools.dscode.coredefinitions;
 
 import io.cucumber.java.en.Given;
+import tools.dscode.common.CoreSteps;
 
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.GlobalConstants.AND_IGNORE_FAILURES;
@@ -13,7 +14,7 @@ import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_HARD_FAILED;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_PASSING;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
 
-public class FlagSteps {
+public class FlagSteps  extends CoreSteps {
 
 
 

@@ -3,6 +3,7 @@ package tools.dscode.coredefinitions;
 import com.google.common.collect.LinkedListMultimap;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Given;
+import tools.dscode.common.CoreSteps;
 import tools.dscode.extensions.StepExtension;
 import tools.dscode.common.mappings.NodeMap;
 
@@ -14,7 +15,7 @@ import static tools.dscode.state.ScenarioState.getScenarioState;
 import static tools.dscode.util.TableUtils.toFlatMultimap;
 import static tools.dscode.util.TableUtils.toRowsMultimap;
 
-public class MappingSteps {
+public class MappingSteps  extends CoreSteps {
 
 
 

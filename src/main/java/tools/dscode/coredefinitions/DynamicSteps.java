@@ -1,5 +1,7 @@
 package tools.dscode.coredefinitions;
 
-public class DynamicSteps {
+import tools.dscode.common.CoreSteps;
+
+public class DynamicSteps  extends CoreSteps {
 
 }

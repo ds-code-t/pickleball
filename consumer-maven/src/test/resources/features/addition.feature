@@ -13,6 +13,12 @@ Feature: Addition using custom cucumber-core
     When I add -2 and -5
     Then the total should be -7
 
+  Scenario Outline: ddf
+    When I add <A> and -5
+
+  Examples:
+  | A |
+  | 1  |
 #  Scenario: conditionals2
 #    * IF: 1 + 1 > 5
 #  : Then print A

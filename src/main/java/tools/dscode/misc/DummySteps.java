@@ -1,8 +1,9 @@
 package tools.dscode.misc;
 
 import io.cucumber.java.en.When;
+import tools.dscode.common.IgnoredSteps;
 
-public class DummySteps {
+public class DummySteps extends IgnoredSteps {
 
     @When("^(?:IF:|ELSE-IF:|ELSE:) ((?:(?!THEN:).)*) THEN: ((?:(?!(?:ELSE:|ELSE-IF:)).)*)(?: ELSE-IF: ((?:(?!THEN:).)*) THEN: ((?:(?!(?:ELSE:|ELSE-IF:)).)*))?(?: ELSE-IF: ((?:(?!THEN:).)*) THEN: ((?:(?!(?:ELSE:|ELSE-IF:)).)*))?(?: ELSE-IF: ((?:(?!THEN:).)*) THEN: ((?:(?!(?:ELSE:|ELSE-IF:)).)*))?(?: ELSE-IF: ((?:(?!THEN:).)*) THEN: ((?:(?!(?:ELSE:|ELSE-IF:)).)*))?(?: ELSE-IF: ((?:(?!THEN:).)*) (?:THEN:)?.*)$")
     public void dummyNOElseIF() {
