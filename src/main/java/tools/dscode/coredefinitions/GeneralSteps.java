@@ -11,8 +11,8 @@ import static tools.dscode.state.ScenarioState.getScenarioState;
 
 public class GeneralSteps  extends CoreSteps {
 
-    @DefinitionFlags(DefinitionFlag.NO_LOGGING)
-    @Given("ROOTSTEP")
+//    @DefinitionFlags(DefinitionFlag.NO_LOGGING)
+    @Given(ROOT_STEP)
     public static void rootStep() {
         System.out.println("@@ROOT_STEP!!");
     }
