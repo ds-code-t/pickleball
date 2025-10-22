@@ -3,7 +3,6 @@ package tools.dscode.util.stepbuilder;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.gherkin.Step;
 import io.cucumber.core.runner.Runner;
-import io.cucumber.gherkin.GherkinDialect;
 import io.cucumber.gherkin.GherkinDialects;
 import io.cucumber.messages.types.PickleStep;
 import io.cucumber.messages.types.PickleStepArgument;
