@@ -14,10 +14,10 @@ import java.util.UUID;
 public class PickleStepTestStep extends TestStep implements io.cucumber.plugin.event.PickleStepTestStep {
 
     private final URI uri;
-    private final Step step;
+    public final Step step;
     private final List<HookTestStep> afterStepHookSteps;
     private final List<HookTestStep> beforeStepHookSteps;
-    private final PickleStepDefinitionMatch definitionMatch;
+    public final PickleStepDefinitionMatch definitionMatch;
 
     // pickleball change
     public PickleStepTestStep(UUID id, URI uri, Step step, PickleStepDefinitionMatch definitionMatch) {

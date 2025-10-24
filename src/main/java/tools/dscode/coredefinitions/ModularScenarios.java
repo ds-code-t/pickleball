@@ -6,7 +6,7 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.NoLogging;
-import tools.dscode.executions.StepExecution;
+import tools.dscode.extensions.ScenarioStep;
 import tools.dscode.extensions.StepExtension;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
@@ -18,12 +18,11 @@ import java.util.List;
 import java.util.Map;
 
 import static tools.dscode.common.GlobalConstants.COMPONENT_TAG_PREFIX;
-import static tools.dscode.executions.StepExecution.setNesting;
 import static tools.dscode.extensions.StepRelationships.pairSiblings;
 import static tools.dscode.common.mappings.MapConfigurations.DataSource.PASSED_TABLE;
 import static tools.dscode.modularexecutions.CucumberScanUtil.listPickles;
+import static tools.dscode.state.ScenarioState.getCurrentStep;
 import static tools.dscode.state.ScenarioState.getScenarioState;
-import static tools.dscode.util.stepbuilder.StepUtilities.createPickleStepTestStep;
 
 public class ModularScenarios extends CoreSteps {
 
@@ -70,10 +69,10 @@ public class ModularScenarios extends CoreSteps {
     public static void filterAndExecutePickles(List<Map<String, String>> maps, String... messageString) {
         System.out.println("@@runScenarios - " + maps);
         String messagePrefix = String.join("," + Arrays.stream(messageString).toList());
-        StepExtension currentStep = getScenarioState().getCurrentStep();
+        StepExtension currentStep = getCurrentStep();
         if (maps.isEmpty()) {
-            StepExtension messageStep = getScenarioState().getCurrentStep()
-                    .createMessageStep(messagePrefix + " No scenario data");
+            StepExtension messageStep = getCurrentStep()
+                    .createMessageStepExtension(messagePrefix + " No scenario data");
             currentStep.insertNextSibling(messageStep);
             return;
         }
@@ -86,8 +85,8 @@ public class ModularScenarios extends CoreSteps {
             for (Map<String, String> map : maps) {
                 System.out.println(" " + map);
                 if (!map.containsKey("Tags") && !map.containsKey("Features")) {
-                    StepExtension messageStep = getScenarioState().getCurrentStep()
-                            .createMessageStep(messagePrefix + " No 'Tags' , or 'Features' set");
+                    StepExtension messageStep = getCurrentStep()
+                            .createMessageStepExtension(messagePrefix + " No 'Tags' , or 'Features' set");
                     messageStep.storedThrowable = new RuntimeException(
                             "Scenario execution steps set with missing or incorrect parameters.  Check the datatatable");
                     currentStep.insertNextSibling(messageStep);
@@ -97,8 +96,8 @@ public class ModularScenarios extends CoreSteps {
                 String featurePaths = map.get("Features");
                 if ((scenarioTags == null || scenarioTags.isBlank())
                         && (featurePaths == null || featurePaths.isBlank())) {
-                    StepExtension messageStep = getScenarioState().getCurrentStep()
-                            .createMessageStep(messagePrefix + " No 'Tags' , or 'Features' set");
+                    StepExtension messageStep = getCurrentStep()
+                            .createMessageStepExtension(messagePrefix + " No 'Tags' , or 'Features' set");
                     currentStep.insertNextSibling(messageStep);
                     lastScenarioNameStep = messageStep;
                     continue;
@@ -110,9 +109,9 @@ public class ModularScenarios extends CoreSteps {
                     cucumberProps.put("cucumber.features", featurePaths);
                 List<Pickle> pickles = listPickles(cucumberProps);
 
-                int startingNestingLevel = getScenarioState().getCurrentStep().getNestingLevel() + 1;
 
-                StepExecution stepExecution = getScenarioState().stepExecution;
+
+//                StepExecution stepExecution = getScenarioState().stepExecution;
                 StepExtension currentScenarioNameStep;
                 System.out.println("@@pickle/. size: " + pickles.size());
                 for (Pickle pickle : pickles) {
@@ -122,13 +121,7 @@ public class ModularScenarios extends CoreSteps {
                     // pickle.getName();
                     NodeMap scenarioMap = getScenarioState().getScenarioMap(pickle);
 
-                    List<StepExtension> stepExtensions = pickle.getSteps().stream()
-                            .map(s -> new StepExtension(createPickleStepTestStep(s, bus.generateId(), pickle.getUri()),
-                                    stepExecution, pickle))
-                            .toList();
-                    currentScenarioNameStep = new StepExtension(pickle, stepExecution,
-                            stepExtensions.getFirst().delegate);
-
+                    currentScenarioNameStep = new ScenarioStep(pickle, false, currentStep.getNestingLevel());
                     currentStep.addChildStep(currentScenarioNameStep);
                     System.out.println("@@currentStep: " + currentStep);
                     System.out.println("@@currentStep-getChildSteps " + currentStep.getChildSteps());
@@ -151,15 +144,12 @@ public class ModularScenarios extends CoreSteps {
                         pairSiblings(lastScenarioNameStep, currentScenarioNameStep);
                     }
 
-                    Map<Integer, StepExtension> nestingMap = new HashMap<>();
-                    nestingMap.put(startingNestingLevel - 1, currentScenarioNameStep);
-                    setNesting(stepExtensions, startingNestingLevel, nestingMap);
                     lastScenarioNameStep = currentScenarioNameStep;
 
                 }
                 if (pickles.isEmpty()) {
-                    StepExtension messageStep = getScenarioState().getCurrentStep()
-                            .createMessageStep(messagePrefix + " step had No Matching Scenarios for " + map);
+                    StepExtension messageStep = getCurrentStep()
+                            .createMessageStepExtension(messagePrefix + " step had No Matching Scenarios for " + map);
                     messageStep.storedThrowable = new RuntimeException(
                             "Scenario execution step No Matching Scenarios for " + map);
                     currentStep.insertNextSibling(messageStep);
@@ -168,8 +158,8 @@ public class ModularScenarios extends CoreSteps {
 
         } catch (Throwable t) {
             t.printStackTrace();
-            StepExtension messageStep = getScenarioState().getCurrentStep()
-                    .createMessageStep("ERROR in 'RUN SCENARIOS' " + t.getMessage());
+            StepExtension messageStep = getCurrentStep()
+                    .createMessageStepExtension("ERROR in 'RUN SCENARIOS' " + t.getMessage());
             messageStep.storedThrowable = t;
             currentStep.insertNextSibling(messageStep);
         }

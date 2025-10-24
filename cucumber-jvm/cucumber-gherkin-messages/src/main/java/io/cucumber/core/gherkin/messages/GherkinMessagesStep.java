@@ -11,7 +11,7 @@ import io.cucumber.plugin.event.Location;
 
 public final class GherkinMessagesStep implements Step {
     // PickleBall Change
-    private final PickleStep pickleStep;
+    public final PickleStep pickleStep;
     private final Argument argument;
     private final String keyWord;
     private final StepType stepType;

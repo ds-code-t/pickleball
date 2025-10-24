@@ -6,10 +6,12 @@ import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.extensions.StepExtension;
 import tools.dscode.common.mappings.NodeMap;
+import tools.dscode.extensions.StepRelationships;
 
 import java.util.List;
 
 import static tools.dscode.extensions.StepRelationships.pairSiblings;
+import static tools.dscode.state.ScenarioState.getCurrentStep;
 import static tools.dscode.state.ScenarioState.getScenarioState;
 import static tools.dscode.util.TableUtils.toFlatMultimap;
 import static tools.dscode.util.TableUtils.toRowsMultimap;
@@ -27,9 +29,9 @@ public class MappingSteps  extends CoreSteps {
         DataTable dataTable = null;
         tableName = tableName == null || tableName.isBlank() ? "" : tableName.trim();
         if (tableName.isEmpty()) {
-            StepExtension nestStep = currentStep.getNextSibling();
-            if (nestStep != null && nestStep.isDataTableStep)
-                dataTable = nestStep.getDataTable();
+            StepRelationships nestStep = currentStep.getNextSibling();
+            if (nestStep != null && nestStep.dataTable!=null)
+                dataTable = nestStep.dataTable;
         } else {
             dataTable = (DataTable) getScenarioState().get("-DATATABLE." + tableName);
         }
@@ -52,13 +54,13 @@ public class MappingSteps  extends CoreSteps {
         System.out
                 .println("@currentStepgetStepParsingMap get(\"ROWS\") " + currentStep.getStepParsingMap().get("ROWS"));
         StepExtension lastSibling = null;
-        List<StepExtension> children = currentStep.getChildSteps();
+        List<StepRelationships> children = currentStep.getChildSteps();
         currentStep.clearChildSteps();
 
         System.out.println("@@rows.size(): " + rows.size());
         for (int r = 0; r < rows.size(); r++) {
             LinkedListMultimap<String, String> row = rows.get(r);
-            StepExtension nextSibling = currentStep.buildNewStep("-" + r + "- " + currentStep.getStepText());
+            StepExtension nextSibling = currentStep.modifyStep("-" + r + "- " + currentStep.getStepText());
             nextSibling.setStepParsingMap(currentStep.getStepParsingMap());
             System.out.println("@@row: " + row);
             nextSibling.mergeToStepMap(row);

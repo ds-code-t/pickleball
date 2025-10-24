@@ -5,6 +5,8 @@ import io.cucumber.core.gherkin.Step;
 import io.cucumber.core.runner.HookTestStep;
 import io.cucumber.core.runner.PickleStepDefinitionMatch;
 import io.cucumber.core.runner.PickleStepTestStep;
+import io.cucumber.datatable.DataTable;
+import io.cucumber.docstring.DocString;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
 
@@ -14,6 +16,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 
+import static tools.dscode.common.evaluations.AviatorUtil.eval;
 import static tools.dscode.common.mappings.MapConfigurations.MapType.STEP_MAP;
 
 public abstract class StepRelationships extends PickleStepTestStep {
@@ -28,10 +31,25 @@ public abstract class StepRelationships extends PickleStepTestStep {
         super(id, uri, step, beforeStepHookSteps, afterStepHookSteps, definitionMatch);
     }
 
-    private List<StepExtension> childSteps = new ArrayList<>();
-    private StepExtension parentStep;
-    private StepExtension previousSibling;
-    private StepExtension nextSibling;
+    protected StepRelationships() {
+        super(
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+    }
+
+    public DocString docString;
+    public DataTable dataTable;
+    public Throwable storedThrowable;
+
+    protected boolean isScenarioNameStep = false;
+    private List<StepRelationships> childSteps = new ArrayList<>();
+    private StepRelationships parentStep;
+    private StepRelationships previousSibling;
+    private StepRelationships nextSibling;
     protected boolean isFlagStep = false;
     protected final List<String> stepFlags = new ArrayList<>();
 
@@ -97,7 +115,7 @@ public abstract class StepRelationships extends PickleStepTestStep {
 
     }
 
-    public void setParentStep(StepExtension parentStep) {
+    public void setParentStep(StepRelationships parentStep) {
         this.parentStep = parentStep;
     }
 
@@ -109,7 +127,7 @@ public abstract class StepRelationships extends PickleStepTestStep {
         childSteps.forEach(this::initializeChildStep);
     }
 
-    public void initializeChildStep(StepExtension child) {
+    public void initializeChildStep(StepRelationships child) {
         System.out.println("@@parent## " + this);
         System.out.println("@@parent##--stepParsingMap: " + stepParsingMap);
         // if (child.inheritFromParent)
@@ -119,7 +137,7 @@ public abstract class StepRelationships extends PickleStepTestStep {
         // child.getStepParsingMap());
     }
 
-    public List<StepExtension> getChildSteps() {
+    public List<StepRelationships> getChildSteps() {
         return childSteps;
     }
 
@@ -127,12 +145,12 @@ public abstract class StepRelationships extends PickleStepTestStep {
         childSteps = new ArrayList<>();
     }
 
-    public void setChildSteps(List<StepExtension> newChildren) {
+    public void setChildSteps(List<StepRelationships> newChildren) {
         childSteps.clear();
         newChildren.forEach(this::addChildStep);
     }
 
-    public void addChildStep(StepExtension child) {
+    public void addChildStep(StepRelationships child) {
         System.out.println("@@addChildStep-currentChildren: " + childSteps.size());
         System.out.println("@@addChildStep-getStepParsingMap: " + child.getStepParsingMap());
         child.setParentStep((StepExtension) this);
@@ -144,8 +162,8 @@ public abstract class StepRelationships extends PickleStepTestStep {
         }
     }
 
-    public static void replaceChildStep(StepExtension oldChild, StepExtension newChild) {
-        StepExtension parentStep = oldChild.getParentStep();
+    public static void replaceChildStep(StepRelationships oldChild, StepRelationships newChild) {
+        StepRelationships parentStep = oldChild.getParentStep();
         if (parentStep == null)
             return;
         newChild.setParentStep(parentStep);
@@ -156,23 +174,23 @@ public abstract class StepRelationships extends PickleStepTestStep {
         parentStep.getChildSteps().set(parentStep.getChildSteps().indexOf(oldChild), newChild);
     }
 
-    public StepExtension getParentStep() {
+    public StepRelationships getParentStep() {
         return parentStep;
     }
 
-    public StepExtension getPreviousSibling() {
+    public StepRelationships getPreviousSibling() {
         return previousSibling;
     }
 
-    protected void setPreviousSibling(StepExtension previousSibling) {
+    protected void setPreviousSibling(StepRelationships previousSibling) {
         this.previousSibling = previousSibling;
     }
 
-    protected void setNextSibling(StepExtension nextSibling) {
+    protected void setNextSibling(StepRelationships nextSibling) {
         this.nextSibling = nextSibling;
     }
 
-    public static void pairSiblings(StepExtension sibling1, StepExtension sibling2) {
+    public static void pairSiblings(StepRelationships sibling1, StepRelationships sibling2) {
         System.out.println("@@pairSiblings: ");
         System.out.println("@@sibling1: " + sibling1);
         System.out.println("@@sibling2: " + sibling2);
@@ -184,12 +202,12 @@ public abstract class StepRelationships extends PickleStepTestStep {
         sibling1.insertNextSibling(sibling2);
     }
 
-    public StepExtension getNextSibling() {
+    public StepRelationships getNextSibling() {
         return nextSibling;
     }
 
     public void insertNextSibling(StepExtension insertNextSibling) {
-        StepExtension originalNextSibling = getNextSibling();
+        StepRelationships originalNextSibling = getNextSibling();
         if (originalNextSibling != null)
             insertNextSibling.setNextSibling(originalNextSibling);
         System.out.println("@@nextSibling11: " + originalNextSibling);
@@ -221,6 +239,10 @@ public abstract class StepRelationships extends PickleStepTestStep {
         copyTo.isTemplateStep = false;
         copyTo.templateStep = copyFrom;
         copyTo.stepFlags.addAll(copyFrom.stepFlags);
+    }
+
+    public String evalWithStepMaps(String expression) {
+        return String.valueOf(eval(expression, getStepParsingMap()));
     }
 
 }

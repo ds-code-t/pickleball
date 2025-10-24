@@ -17,7 +17,7 @@ import static tools.dscode.common.GlobalConstants.META_FLAG;
 // Generated code
 @SuppressWarnings("unused")
 public final class PickleStep {
-    private final PickleStepArgument argument;
+    public final PickleStepArgument argument;
     private final java.util.List<String> astNodeIds;
     private final String id;
     private final PickleStepType type;

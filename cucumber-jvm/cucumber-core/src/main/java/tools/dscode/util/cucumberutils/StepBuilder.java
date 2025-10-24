@@ -63,4 +63,12 @@ public class StepBuilder {
     public static PickleStepDefinitionMatch matchStepToStepDefinition(Runner runner, Pickle pickle, Step step) {
         return (PickleStepDefinitionMatch) invokeAnyMethod(runner, "matchStepToStepDefinition", pickle, step);
     }
+
+    public static PickleStepTestStep createMessageStep(PickleStepTestStep step, String message) {
+        return createPickleStepTestStep(
+            step,
+            "MESSAGE:\"" + message + "\"",
+            null);
+    }
+
 }

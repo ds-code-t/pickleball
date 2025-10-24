@@ -1,7 +1,9 @@
 package tools.dscode.extensions;
 
 import io.cucumber.core.eventbus.EventBus;
+import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.gherkin.Step;
+import io.cucumber.core.gherkin.messages.GherkinMessagesStep;
 import io.cucumber.core.runner.ExecutionMode;
 import io.cucumber.core.runner.HookTestStep;
 import io.cucumber.core.runner.PickleStepDefinitionMatch;
@@ -27,13 +29,14 @@ import java.util.regex.Pattern;
 
 import static tools.dscode.common.GlobalConstants.DocString_KEY;
 import static tools.dscode.common.GlobalConstants.TABLE_KEY;
-import static tools.dscode.common.GlobalConstants.defaultMatchFlag;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.state.ScenarioState.getBus;
 import static tools.dscode.state.ScenarioState.getScenarioState;
 import static tools.dscode.state.ScenarioState.getTestCase;
 import static tools.dscode.state.ScenarioState.getTestCaseState;
 import static tools.dscode.state.ScenarioState.setKeyedTemplate;
+import static tools.dscode.util.cucumberutils.StepBuilder.createMessageStep;
+import static tools.dscode.util.cucumberutils.StepBuilder.createStepExtension;
 
 /**
  * StepExtension is a decorator that extends {@link PickleStepTestStep} while
@@ -56,7 +59,7 @@ public class StepExtension extends StepRelationships {
     public static final String KEY_BEFORE_STEP_HOOKS = "beforeStepHookSteps";
     public static final String KEY_AFTER_STEP_HOOKS = "afterStepHookSteps";
 
-    private final PickleStepTestStep delegate;
+    protected PickleStepTestStep delegate;
     private final ConcurrentHashMap<String, Object> overrides = new ConcurrentHashMap<>();
 
     // private static final Pattern pattern =
@@ -67,24 +70,27 @@ public class StepExtension extends StepRelationships {
 
     public String metaData;
     public PickleStep rootStep;
-    public io.cucumber.core.gherkin.Step gherikinMessageStep;
+    public GherkinMessagesStep gherikinMessageStep;
 
     // private final StepDefinition stepDefinition;
     public Method method;
     public String methodName;
 
     // private final String stepTextOverRide;
-    private boolean isScenarioNameStep;
     // PickleballChange
     public DefinitionFlag[] definitionFlags;
 
     public io.cucumber.core.gherkin.Pickle parentPickle;
 
+    public StepExtension(PickleStepTestStep delegate) {
+        this(delegate, null);
+    }
+
     /**
      * Constructs a delegating step that mirrors the provided {@code delegate}.
      * All calls are forwarded to that delegate unless a getter override is set.
      */
-    public StepExtension(PickleStepTestStep delegate) {
+    public StepExtension(PickleStepTestStep delegate, Pickle pickle) {
         // Initialize super with the delegate's current state so the base class
         // fields are consistent (id, uri, step, hooks, definitionMatch).
         super(
@@ -95,15 +101,16 @@ public class StepExtension extends StepRelationships {
             delegate.getAfterStepHookSteps(),
             delegate.getDefinitionMatch());
         this.delegate = delegate;
+        this.parentPickle = pickle;
+    }
+
+    protected StepExtension() {
     }
 
     public void initialize() {
         String codeLocation = delegate.getCodeLocation();
         if (codeLocation == null)
             codeLocation = "";
-
-        this.isScenarioNameStep = delegate.getStep().getText().contains(defaultMatchFlag
-                + "Scenario");
 
         this.isCoreStep = codeLocation.startsWith("tools.dscode.tools.dscode.coredefinitions.");
         this.method = (Method) getProperty(delegate,
@@ -119,8 +126,8 @@ public class StepExtension extends StepRelationships {
             stepFlags.add(delegate.getStep().getText());
         }
 
-        this.gherikinMessageStep = (io.cucumber.core.gherkin.Step) getProperty(delegate, "step");
-        this.rootStep = (PickleStep) getProperty(gherikinMessageStep, "pickleStep");
+        this.gherikinMessageStep = (GherkinMessagesStep) delegate.step;
+        this.rootStep = gherikinMessageStep.pickleStep;
 
         metaData = rootStep.metaText;
         Matcher matcher = pattern.matcher(metaData);
@@ -137,7 +144,7 @@ public class StepExtension extends StepRelationships {
             List<io.cucumber.core.stepexpression.Argument> args = (List<io.cucumber.core.stepexpression.Argument>) getProperty(
                 pickleStepDefinitionMatch, "arguments");
             String docStringName = (String) args.getFirst().getValue();
-            DocString docString = (DocString) args.getLast().getValue();
+            docString = (DocString) args.getLast().getValue();
             if (docStringName != null && !docStringName.isBlank())
                 getScenarioState().getParsingMap().getRootSingletonMap().put("DOCSTRING." +
                         docStringName.trim(),
@@ -151,7 +158,7 @@ public class StepExtension extends StepRelationships {
             List<io.cucumber.core.stepexpression.Argument> args = (List<io.cucumber.core.stepexpression.Argument>) getProperty(
                 pickleStepDefinitionMatch, "arguments");
             String tableName = (String) args.getFirst().getValue();
-            DataTable dataTable = (DataTable) args.getLast().getValue();
+            dataTable = (DataTable) args.getLast().getValue();
             if (tableName != null && !tableName.isBlank())
                 getScenarioState().getParsingMap().getRootSingletonMap().put("DATATABLE." +
                         tableName.trim(),
@@ -331,4 +338,14 @@ public class StepExtension extends StepRelationships {
         }
         return delegate.equals(obj);
     }
+
+    public StepExtension createMessageStepExtension(String message) {
+        return new StepExtension(createMessageStep(this, message));
+    }
+
+    public StepExtension modifyStep(String newStepText) {
+        StepExtension newStep = createStepExtension(this, newStepText, rootStep.argument);
+        return newStep;
+    }
+
 }
