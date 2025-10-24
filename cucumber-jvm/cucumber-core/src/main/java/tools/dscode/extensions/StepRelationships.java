@@ -1,16 +1,32 @@
 package tools.dscode.extensions;
 
 import com.google.common.collect.LinkedListMultimap;
+import io.cucumber.core.gherkin.Step;
+import io.cucumber.core.runner.HookTestStep;
+import io.cucumber.core.runner.PickleStepDefinitionMatch;
+import io.cucumber.core.runner.PickleStepTestStep;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
 import static tools.dscode.common.mappings.MapConfigurations.MapType.STEP_MAP;
 
-public abstract class StepRelationships {
+public abstract class StepRelationships extends PickleStepTestStep {
+
+    protected StepRelationships(
+            UUID id, URI uri,
+            Step step,
+            List<HookTestStep> beforeStepHookSteps,
+            List<HookTestStep> afterStepHookSteps,
+            PickleStepDefinitionMatch definitionMatch
+    ) {
+        super(id, uri, step, beforeStepHookSteps, afterStepHookSteps, definitionMatch);
+    }
 
     private List<StepExtension> childSteps = new ArrayList<>();
     private StepExtension parentStep;
@@ -96,8 +112,8 @@ public abstract class StepRelationships {
     public void initializeChildStep(StepExtension child) {
         System.out.println("@@parent## " + this);
         System.out.println("@@parent##--stepParsingMap: " + stepParsingMap);
-        if (child.inheritFromParent)
-            child.setStepParsingMap(new ParsingMap(stepParsingMap));
+        // if (child.inheritFromParent)
+        // child.setStepParsingMap(new ParsingMap(stepParsingMap));
         // System.out.println("@@child: " + child);
         // System.out.println("@@child-stepParsingMap: " +
         // child.getStepParsingMap());

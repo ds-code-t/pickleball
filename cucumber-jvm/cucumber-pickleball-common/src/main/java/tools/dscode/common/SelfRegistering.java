@@ -36,29 +36,10 @@ public abstract class SelfRegistering {
         return normalizeKey(type.getName());
     }
 
-    /** Retrieve from global by Class. */
-    public static <T extends SelfRegistering> T globalOf(Class<T> type) {
-        SelfRegistering inst = GLOBAL.get(keyFor(type));
-        return (inst == null) ? null : type.cast(inst);
-    }
-
-    /** Retrieve from local (thread) by Class. */
-    public static <T extends SelfRegistering> T localOf(Class<T> type) {
-        SelfRegistering inst = LOCAL.get().get(keyFor(type));
-        return (inst == null) ? null : type.cast(inst);
-    }
-
-    /**
-     * Retrieve from local first, else global, by Class. Returns null if not
-     * found in either.
+    /*
+     * ========= String-based lookups (single source of truth for normalization)
+     * =========
      */
-    public static <T extends SelfRegistering> T localOrGlobalOf(Class<T> type) {
-        String key = keyFor(type);
-        SelfRegistering inst = LOCAL.get().get(key);
-        if (inst == null)
-            inst = GLOBAL.get(key);
-        return (inst == null) ? null : type.cast(inst);
-    }
 
     /**
      * Retrieve from global by fully-qualified class name (case-insensitive).
@@ -82,6 +63,32 @@ public abstract class SelfRegistering {
         if (inst == null)
             inst = GLOBAL.get(key);
         return (T) inst;
+    }
+
+    /* ========= Class-based overloads (forward to String versions) ========= */
+
+    /** Retrieve from global by Class (forwards to the String-based method). */
+    public static <T extends SelfRegistering> T globalOf(Class<T> type) {
+        SelfRegistering inst = globalOf(type.getName());
+        return (inst == null) ? null : type.cast(inst);
+    }
+
+    /**
+     * Retrieve from local (thread) by Class (forwards to the String-based
+     * method).
+     */
+    public static <T extends SelfRegistering> T localOf(Class<T> type) {
+        SelfRegistering inst = localOf(type.getName());
+        return (inst == null) ? null : type.cast(inst);
+    }
+
+    /**
+     * Retrieve from local first, else global, by Class (forwards to the
+     * String-based method). Returns null if not found in either.
+     */
+    public static <T extends SelfRegistering> T localOrGlobalOf(Class<T> type) {
+        SelfRegistering inst = localOrGlobalOf(type.getName());
+        return (inst == null) ? null : type.cast(inst);
     }
 
     /** Clear the thread-local registry for this thread. */

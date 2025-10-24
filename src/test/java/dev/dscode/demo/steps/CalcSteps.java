@@ -7,11 +7,13 @@ import io.cucumber.java.en.When;
 //import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class CalcSteps {
+    private int total;
+
+
     @Given("zzz")
     public void zzz() {
         System.out.println("@@zzz");
     }
-    private int total;
 
     @Given("a starting total of {int}")
     public void start(int s) {

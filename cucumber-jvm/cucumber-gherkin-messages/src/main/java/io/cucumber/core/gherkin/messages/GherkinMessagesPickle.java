@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-
 /**
  * Wraps {@link Pickle} to avoid exposing the gherkin library to all of
  * Cucumber.

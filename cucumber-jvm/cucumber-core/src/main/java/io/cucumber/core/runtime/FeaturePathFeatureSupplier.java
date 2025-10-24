@@ -7,6 +7,7 @@ import io.cucumber.core.gherkin.Feature;
 import io.cucumber.core.logging.Logger;
 import io.cucumber.core.logging.LoggerFactory;
 import io.cucumber.core.resource.ResourceScanner;
+import tools.dscode.common.SelfRegistering;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -23,8 +24,8 @@ import static java.util.stream.Collectors.joining;
  * Supplies a list of features found on the the feature path provided to
  * RuntimeOptions.
  */
-public final class FeaturePathFeatureSupplier implements FeatureSupplier {
-
+public final class FeaturePathFeatureSupplier extends SelfRegistering implements FeatureSupplier {
+    // Picklechange registering
     private static final Logger log = LoggerFactory.getLogger(FeaturePathFeatureSupplier.class);
 
     private final ResourceScanner<Feature> featureScanner;

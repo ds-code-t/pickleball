@@ -1,182 +1,118 @@
 package tools.dscode.extensions;
 
-import com.google.common.collect.LinkedListMultimap;
-import io.cucumber.core.backend.ParameterInfo;
-import io.cucumber.core.backend.TestCaseState;
 import io.cucumber.core.eventbus.EventBus;
+import io.cucumber.core.gherkin.Step;
+import io.cucumber.core.runner.ExecutionMode;
+import io.cucumber.core.runner.HookTestStep;
+import io.cucumber.core.runner.PickleStepDefinitionMatch;
+import io.cucumber.core.runner.PickleStepTestStep;
+import io.cucumber.core.runner.TestCaseState;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
-import io.cucumber.gherkin.GherkinDialects;
 import io.cucumber.messages.types.PickleStep;
-import io.cucumber.messages.types.PickleStepArgument;
 import io.cucumber.plugin.event.Argument;
-import io.cucumber.plugin.event.Location;
-import io.cucumber.plugin.event.PickleStepTestStep;
-import io.cucumber.plugin.event.Result;
-import io.cucumber.plugin.event.Status;
-import io.cucumber.plugin.event.Step;
 import io.cucumber.plugin.event.StepArgument;
 import io.cucumber.plugin.event.TestCase;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.DefinitionFlags;
-import tools.dscode.common.mappings.ParsingMap;
-import tools.dscode.common.status.SoftException;
-import tools.dscode.common.status.SoftRuntimeException;
-import tools.dscode.common.util.Reflect;
-import tools.dscode.executions.StepExecution;
-import tools.dscode.util.PickleStepArgUtils;
 
 import java.lang.reflect.Method;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.function.BooleanSupplier;
-import java.util.function.UnaryOperator;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.GlobalConstants.DocString_KEY;
-import static tools.dscode.common.GlobalConstants.IGNORE_FAILURES;
-import static tools.dscode.common.GlobalConstants.META_FLAG;
-import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FAILED;
-import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_HARD_FAILED;
-import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_PASSING;
-import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
 import static tools.dscode.common.GlobalConstants.TABLE_KEY;
 import static tools.dscode.common.GlobalConstants.defaultMatchFlag;
-import static tools.dscode.common.evaluations.AviatorUtil.eval;
 import static tools.dscode.common.util.Reflect.getProperty;
-import static tools.dscode.common.util.Reflect.invokeAnyMethod;
+import static tools.dscode.state.ScenarioState.getBus;
 import static tools.dscode.state.ScenarioState.getScenarioState;
-import static tools.dscode.util.ArgumentUtility.emptyDataTable;
-import static tools.dscode.util.ArgumentUtility.emptyDocString;
-import static tools.dscode.util.ExecutionModes.RUN;
-import static tools.dscode.util.ExecutionModes.SKIP;
-import static tools.dscode.util.KeyFunctions.getUniqueKey;
-import static tools.dscode.util.stepbuilder.StepUtilities.createScenarioPickleStepTestStep;
-import static tools.dscode.util.stepbuilder.StepUtilities.getDefinition;
+import static tools.dscode.state.ScenarioState.getTestCase;
+import static tools.dscode.state.ScenarioState.getTestCaseState;
+import static tools.dscode.state.ScenarioState.setKeyedTemplate;
 
-public class StepExtension extends StepRelationships implements PickleStepTestStep, Step {
+/**
+ * StepExtension is a decorator that extends {@link PickleStepTestStep} while
+ * delegating all behavior to a provided {@code PickleStepTestStep}.
+ * Additionally, it supports overriding returned values from selected getters
+ * via an internal overrides map. If an override for a given property key is
+ * present and non-null, the getter returns that value instead of delegating.
+ */
+public class StepExtension extends StepRelationships {
 
-    public Map<Object, Object> getStepObjectMap() {
-        return stepObjectMap;
-    }
+    /* ===================== Override Keys ===================== */
+    public static final String KEY_PATTERN = "pattern";
+    public static final String KEY_STEP = "step";
+    public static final String KEY_DEFINITION_ARGUMENTS = "definitionArguments";
+    public static final String KEY_DEFINITION_MATCH = "definitionMatch";
+    public static final String KEY_STEP_ARGUMENT = "stepArgument";
+    public static final String KEY_STEP_LINE = "stepLine";
+    public static final String KEY_URI = "uri";
+    public static final String KEY_STEP_TEXT = "stepText";
+    public static final String KEY_BEFORE_STEP_HOOKS = "beforeStepHookSteps";
+    public static final String KEY_AFTER_STEP_HOOKS = "afterStepHookSteps";
 
-    public void setStepObjectMap(Map<Object, Object> stepObjectMap) {
-        this.stepObjectMap = stepObjectMap;
-    }
-
-    private Map<Object, Object> stepObjectMap = new HashMap<>();
-
-    public void putToTemplateStep(Object key, Object value) {
-        getScenarioState().setKeyedTemplate(getUniqueKey(this), key, value);
-    }
-
-    public Object getFromTemplateStep(Object key) {
-        return getScenarioState().getKeyedTemplate(getUniqueKey(this), key);
-    }
-
-    public Throwable storedThrowable;
-
-    public String evalWithStepMaps(String expression) {
-        return String.valueOf(eval(expression, getStepParsingMap()));
-    }
-
-    @Override
-    public String toString() {
-        return getStepText();
-    }
-
-    public static StepExtension getCurrentStep() {
-        return getScenarioState().getCurrentStep();
-    }
-    // private boolean SKIP_LOGGING;
-
-    public final PickleStepTestStep delegate;
-    public final PickleStep rootStep;
-    public final io.cucumber.core.gherkin.Step gherikinMessageStep;
-    public final String rootText;
-    public final String metaData;
-
-    public final io.cucumber.core.gherkin.Pickle parentPickle;
-
-    public DataTable getStepDataTable() {
-        return stepDataTable;
-    }
-
-    private DataTable stepDataTable;
-
-    public final StepExecution stepExecution;
-    public Result result;
-
-    public List<Object> getExecutionArguments() {
-        return executionArguments;
-    }
-
-    public void setExecutionArguments(List<Object> executionArguments) {
-        this.executionArguments = executionArguments;
-        this.stepDataTable = executionArguments.stream().filter(DataTable.class::isInstance).map(DataTable.class::cast)
-                .findFirst().orElse(null);
-    }
-
-    private List<Object> executionArguments;
-
-    public final boolean isCoreStep;
-    public final boolean isDataTableStep;
-    public final boolean isDocStringStep;
+    private final PickleStepTestStep delegate;
+    private final ConcurrentHashMap<String, Object> overrides = new ConcurrentHashMap<>();
 
     // private static final Pattern pattern =
     // Pattern.compile("@\\[([^\\[\\]]+)\\]");
     private static final Pattern pattern = Pattern.compile("@:([A-Z]+:[A-Z-a-z0-9]+)");
 
+    public boolean isCoreStep;
+
+    public String metaData;
+    public PickleStep rootStep;
+    public io.cucumber.core.gherkin.Step gherikinMessageStep;
+
     // private final StepDefinition stepDefinition;
-    public final Method method;
-    public final String methodName;
+    public Method method;
+    public String methodName;
 
     // private final String stepTextOverRide;
-    private final boolean isScenarioNameStep;
+    private boolean isScenarioNameStep;
     // PickleballChange
-    public final DefinitionFlag[] definitionFlags;
+    public DefinitionFlag[] definitionFlags;
 
-    public StepExtension(
-            io.cucumber.core.gherkin.Pickle pickle, StepExecution stepExecution,
-            PickleStepTestStep step
-    ) {
-        this(createScenarioPickleStepTestStep(pickle, step), stepExecution, pickle);
+    public io.cucumber.core.gherkin.Pickle parentPickle;
+
+    /**
+     * Constructs a delegating step that mirrors the provided {@code delegate}.
+     * All calls are forwarded to that delegate unless a getter override is set.
+     */
+    public StepExtension(PickleStepTestStep delegate) {
+        // Initialize super with the delegate's current state so the base class
+        // fields are consistent (id, uri, step, hooks, definitionMatch).
+        super(
+            nonNull(delegate, "delegate").getId(),
+            delegate.getUri(),
+            delegate.getStep(),
+            delegate.getBeforeStepHookSteps(),
+            delegate.getAfterStepHookSteps(),
+            delegate.getDefinitionMatch());
+        this.delegate = delegate;
     }
 
-    public StepExtension(
-            PickleStepTestStep step, StepExecution stepExecution,
-            io.cucumber.core.gherkin.Pickle pickle
-    ) {
-        this(step, stepExecution, pickle, new HashMap<>());
-    }
-
-    public StepExtension(
-            PickleStepTestStep step, StepExecution stepExecution,
-            io.cucumber.core.gherkin.Pickle pickle, Map<String, Object> configs
-    ) {
-        String codeLocation = step.getCodeLocation();
+    public void initialize() {
+        String codeLocation = delegate.getCodeLocation();
         if (codeLocation == null)
             codeLocation = "";
 
-        this.isScenarioNameStep = step.getStep().getText().contains(defaultMatchFlag + "Scenario");
-        this.parentPickle = pickle;
+        this.isScenarioNameStep = delegate.getStep().getText().contains(defaultMatchFlag
+                + "Scenario");
 
         this.isCoreStep = codeLocation.startsWith("tools.dscode.tools.dscode.coredefinitions.");
-        this.method = (Method) getProperty(step, "definitionMatch.stepDefinition.stepDefinition.method");
+        this.method = (Method) getProperty(delegate,
+            "definitionMatch.stepDefinition.stepDefinition.method");
         this.methodName = this.method == null ? "" : this.method.getName();
 
         DefinitionFlags annotation = method.getAnnotation(DefinitionFlags.class);
 
-        definitionFlags = annotation != null ? new DefinitionFlag[] {} : annotation.value();
-
-        this.stepExecution = stepExecution;
-        this.delegate = step;
+        definitionFlags = annotation == null ? new DefinitionFlag[] {} : annotation.value();
 
         if (isCoreStep && methodName.startsWith("flagStep_")) {
             this.isFlagStep = true;
@@ -185,486 +121,214 @@ public class StepExtension extends StepRelationships implements PickleStepTestSt
 
         this.gherikinMessageStep = (io.cucumber.core.gherkin.Step) getProperty(delegate, "step");
         this.rootStep = (PickleStep) getProperty(gherikinMessageStep, "pickleStep");
-        String[] strings = ((String) getProperty(rootStep, "text")).split(META_FLAG);
-        rootText = strings[0].trim();
-        metaData = strings.length == 1 ? "" : strings[1].trim();
-        Matcher matcher = pattern.matcher(metaData);
-        isDataTableStep = isCoreStep && methodName.equals("dataTable");
-        isDocStringStep = isCoreStep && methodName.equals("docString");
 
-        if (isDocStringStep) {
-            getProperty(step, "definitionMatch");
-            Object pickleStepDefinitionMatch = getProperty(step, "definitionMatch");
+        metaData = rootStep.metaText;
+        Matcher matcher = pattern.matcher(metaData);
+
+        while (matcher.find()) {
+            stepTags.add(matcher.group().substring(1).replaceAll("@:", ""));
+        }
+        stepTags.stream().filter(t -> t.startsWith("REF:")).forEach(t -> bookmarks.add(t.replaceFirst("REF:", "")));
+        setNestingLevel((int) matcher.replaceAll("").chars().filter(ch -> ch == ':').count());
+
+        if (isCoreStep && methodName.equals("docString")) {
+            getProperty(delegate, "definitionMatch");
+            Object pickleStepDefinitionMatch = getProperty(delegate, "definitionMatch");
             List<io.cucumber.core.stepexpression.Argument> args = (List<io.cucumber.core.stepexpression.Argument>) getProperty(
                 pickleStepDefinitionMatch, "arguments");
             String docStringName = (String) args.getFirst().getValue();
             DocString docString = (DocString) args.getLast().getValue();
             if (docStringName != null && !docStringName.isBlank())
-                getScenarioState().getParsingMap().getRootSingletonMap().put("DOCSTRING." + docStringName.trim(),
+                getScenarioState().getParsingMap().getRootSingletonMap().put("DOCSTRING." +
+                        docStringName.trim(),
                     docString);
             // if (docStringName != null && !docStringName.isBlank())
             // getScenarioState().register(docString, docStringName.trim());
-            putToTemplateStep(DocString_KEY, docString);
-        } else if (isDataTableStep) {
-            getProperty(step, "definitionMatch");
-            Object pickleStepDefinitionMatch = getProperty(step, "definitionMatch");
+            setKeyedTemplate(this, DocString_KEY, docString);
+        } else if (isCoreStep && methodName.equals("dataTable")) {
+            getProperty(delegate, "definitionMatch");
+            Object pickleStepDefinitionMatch = getProperty(delegate, "definitionMatch");
             List<io.cucumber.core.stepexpression.Argument> args = (List<io.cucumber.core.stepexpression.Argument>) getProperty(
                 pickleStepDefinitionMatch, "arguments");
             String tableName = (String) args.getFirst().getValue();
             DataTable dataTable = (DataTable) args.getLast().getValue();
             if (tableName != null && !tableName.isBlank())
-                getScenarioState().getParsingMap().getRootSingletonMap().put("DATATABLE." + tableName.trim(),
+                getScenarioState().getParsingMap().getRootSingletonMap().put("DATATABLE." +
+                        tableName.trim(),
                     dataTable);
             // if (tableName != null && !tableName.isBlank())
             // getScenarioState().register(dataTable, tableName.trim());
-            putToTemplateStep(TABLE_KEY, dataTable);
+            setKeyedTemplate(this, TABLE_KEY, dataTable);
         }
-
-        while (matcher.find()) {
-            stepTags.add(matcher.group().substring(1).replaceAll("@:", ""));
-        }
-
-        stepTags.stream().filter(t -> t.startsWith("REF:")).forEach(t -> bookmarks.add(t.replaceFirst("REF:", "")));
-        setNestingLevel((int) matcher.replaceAll("").chars().filter(ch -> ch == ':').count());
     }
 
-    public DataTable getDataTable() {
-        return (DataTable) getFromTemplateStep(TABLE_KEY);
+    public void runExtension() {
+        delegate.run(getTestCase(), getBus(), getTestCaseState(), ExecutionMode.RUN);
     }
 
-    public StepExtension createMessageStep(String newStepText) {
-        Map<String, String> map = new HashMap<>();
-        map.put("newStepText", "MESSAGE:\"" + newStepText + "\"");
-        map.put("removeArgs", "true");
-        map.put("RANDOMID", "RANDOMID");
-        StepExtension messageStep = updateStep(map);
-        messageStep.setNextSibling(null);
-        messageStep.clearChildSteps();
-        return messageStep;
+    /**
+     * Expose the underlying step, if needed.
+     */
+    public PickleStepTestStep getDelegate() {
+        return delegate;
     }
 
-    public StepExtension modifyStep(String newStepText) {
-        Map<String, String> map = new HashMap<>();
-        map.put("newStepText", newStepText);
-        return updateStep(map);
-    }
+    /* ===================== Overrides API ===================== */
 
-    public StepExtension duplicateStepForRepeatedExecution(ParsingMap parsingMap) {
-        StepExtension templateStep = isTemplateStep ? this : this.templateStep;
-        StepExtension updatedStep = templateStep.buildNewStep(new HashMap<>(), parsingMap);
-        return updatedStep;
-    }
-
-    private StepExtension updateStep() {
-        return updateStep(new HashMap<>());
-    }
-
-    private StepExtension updateStep(Map<String, String> overrides) {
-        System.out.println("@@update1: " + this);
-        System.out.println("@@map " + this.getStepParsingMap());
-        StepExtension newStep = buildNewStep(overrides, this.getStepParsingMap());
-        copyRelationships(this, newStep);
-        newStep.setStepParsingMap(getStepParsingMap());
-        System.out.println("@@update1: " + newStep);
-        System.out.println("@@map " + newStep.getStepParsingMap());
-        return newStep;
-    }
-
-    public StepExtension buildNewStep(String newStepText) {
-        PickleStepArgument argument = null;
-
-        PickleStepArgument newPickleStepArgument = null;
-        PickleStep pickleStep = new PickleStep(newPickleStepArgument, rootStep.getAstNodeIds(), rootStep.getId(),
-            rootStep.getType().orElse(null), newStepText);
-
-        io.cucumber.core.gherkin.Step newGherikinMessageStep = (io.cucumber.core.gherkin.Step) Reflect.newInstance(
-            "io.cucumber.core.gherkin.messages.GherkinMessagesStep",
-            pickleStep,
-            GherkinDialects.getDialect(getScenarioState().getPickleLanguage())
-                    .orElse(GherkinDialects.getDialect("en").get()),
-            gherikinMessageStep.getPreviousGivenWhenThenKeyword(),
-            gherikinMessageStep.getLocation(),
-            gherikinMessageStep.getKeyword());
-
-        Object pickleStepDefinitionMatch = getDefinition(getScenarioState().getRunner(),
-            getScenarioState().getScenarioPickle(), newGherikinMessageStep);
-        List<io.cucumber.core.stepexpression.Argument> args = (List<io.cucumber.core.stepexpression.Argument>) getProperty(
-            pickleStepDefinitionMatch, "arguments");
-
-        io.cucumber.core.backend.StepDefinition javaStepDefinition = (io.cucumber.core.backend.StepDefinition) getProperty(
-            pickleStepDefinitionMatch, "stepDefinition.stepDefinition");
-        List<ParameterInfo> parameterInfoList = javaStepDefinition.parameterInfos();
-        if (args.size() != parameterInfoList.size()) {
-            int mismatchCount = parameterInfoList.size() - args.size();
-            if (mismatchCount > 0) {
-                for (int i = args.size(); i < parameterInfoList.size(); i++) {
-                    ParameterInfo p = parameterInfoList.get(i);
-                    if (p.getType().getTypeName().equals("io.cucumber.datatable.DataTable")) {
-                        args.add(emptyDataTable());
-                    } else if (p.getType().getTypeName().equals("io.cucumber.docstring.DocString")) {
-                        args.add(emptyDocString());
-                    }
-                }
-            } else {
-                if (parameterInfoList.stream()
-                        .noneMatch(p -> p.getType().getTypeName().equals("io.cucumber.datatable.DataTable"))) {
-                    args = args.stream()
-                            .filter(arg -> !(arg instanceof io.cucumber.core.stepexpression.DataTableArgument))
-                            .toList();
-                }
-                if (parameterInfoList.stream()
-                        .noneMatch(p -> p.getType().getTypeName().equals("io.cucumber.docstring.DocString"))) {
-                    args = args.stream()
-                            .filter(arg -> !(arg instanceof io.cucumber.core.stepexpression.DocStringArgument))
-                            .toList();
-                }
-                pickleStepDefinitionMatch = Reflect.newInstance(
-                    "io.cucumber.core.runner.PickleStepDefinitionMatch",
-                    args,
-                    getProperty(pickleStepDefinitionMatch, "stepDefinition"),
-                    getProperty(pickleStepDefinitionMatch, "uri"),
-                    getProperty(pickleStepDefinitionMatch, "step"));
-            }
-        }
-
-        PickleStepTestStep newPickTestStep = (PickleStepTestStep) Reflect.newInstance(
-            "io.cucumber.core.runner.PickleStepTestStep",
-            UUID.randomUUID(), // java.util.UUID
-            getUri(), // java.net.URI
-            newGherikinMessageStep, // io.cucumber.core.gherkin.Step (public)
-            pickleStepDefinitionMatch // io.cucumber.core.runner.PickleStepDefinitionMatch
-        // (package-private instance is fine)
-        );
-
-        StepExtension newStep = new StepExtension(newPickTestStep, stepExecution, parentPickle);
-        newStep.setExecutionArguments(args.stream().map(io.cucumber.core.stepexpression.Argument::getValue).toList());
-
-        return newStep;
-    }
-
-    private StepExtension buildNewStep(Map<String, String> overrides, ParsingMap newParsingMap) {
-        PickleStepArgument argument = overrides.containsKey("removeArgs") ? null : rootStep.getArgument().orElse(null);
-        UnaryOperator<String> external = newParsingMap::resolveWholeText;
-        PickleStepArgument newPickleStepArgument = isScenarioNameStep ? null
-                : PickleStepArgUtils.transformPickleArgument(argument, external);
-        String newStepText = overrides.getOrDefault("newStepText", rootStep.getText());
-        PickleStep pickleStep = new PickleStep(newPickleStepArgument, rootStep.getAstNodeIds(), rootStep.getId(),
-            rootStep.getType().orElse(null), newParsingMap.resolveWholeText(newStepText));
-
-        io.cucumber.core.gherkin.Step newGherikinMessageStep = (io.cucumber.core.gherkin.Step) Reflect.newInstance(
-            "io.cucumber.core.gherkin.messages.GherkinMessagesStep",
-            pickleStep,
-            GherkinDialects.getDialect(getScenarioState().getPickleLanguage())
-                    .orElse(GherkinDialects.getDialect("en").get()),
-            gherikinMessageStep.getPreviousGivenWhenThenKeyword(),
-            gherikinMessageStep.getLocation(),
-            gherikinMessageStep.getKeyword());
-
-        Object pickleStepDefinitionMatch = getDefinition(getScenarioState().getRunner(),
-            getScenarioState().getScenarioPickle(), newGherikinMessageStep);
-        List<io.cucumber.core.stepexpression.Argument> args = (List<io.cucumber.core.stepexpression.Argument>) getProperty(
-            pickleStepDefinitionMatch, "arguments");
-
-        io.cucumber.core.backend.StepDefinition javaStepDefinition = (io.cucumber.core.backend.StepDefinition) getProperty(
-            pickleStepDefinitionMatch, "stepDefinition.stepDefinition");
-        List<ParameterInfo> parameterInfoList = javaStepDefinition.parameterInfos();
-        if (args.size() != parameterInfoList.size()) {
-            int mismatchCount = parameterInfoList.size() - args.size();
-            if (mismatchCount > 0) {
-                for (int i = args.size(); i < parameterInfoList.size(); i++) {
-                    ParameterInfo p = parameterInfoList.get(i);
-                    if (p.getType().getTypeName().equals("io.cucumber.datatable.DataTable")) {
-                        args.add(emptyDataTable());
-                    } else if (p.getType().getTypeName().equals("io.cucumber.docstring.DocString")) {
-                        args.add(emptyDocString());
-                    }
-                }
-            } else {
-                if (parameterInfoList.stream()
-                        .noneMatch(p -> p.getType().getTypeName().equals("io.cucumber.datatable.DataTable"))) {
-                    args = args.stream()
-                            .filter(arg -> !(arg instanceof io.cucumber.core.stepexpression.DataTableArgument))
-                            .toList();
-                }
-                if (parameterInfoList.stream()
-                        .noneMatch(p -> p.getType().getTypeName().equals("io.cucumber.docstring.DocString"))) {
-                    args = args.stream()
-                            .filter(arg -> !(arg instanceof io.cucumber.core.stepexpression.DocStringArgument))
-                            .toList();
-                }
-                pickleStepDefinitionMatch = Reflect.newInstance(
-                    "io.cucumber.core.runner.PickleStepDefinitionMatch",
-                    args,
-                    getProperty(pickleStepDefinitionMatch, "stepDefinition"),
-                    getProperty(pickleStepDefinitionMatch, "uri"),
-                    getProperty(pickleStepDefinitionMatch, "step"));
-            }
-        }
-
-        PickleStepTestStep newPickTestStep = (PickleStepTestStep) Reflect.newInstance(
-            "io.cucumber.core.runner.PickleStepTestStep",
-            (overrides.containsKey("RANDOMID") ? UUID.randomUUID() : getId()), // java.util.UUID
-            getUri(), // java.net.URI
-            newGherikinMessageStep, // io.cucumber.core.gherkin.Step (public)
-            pickleStepDefinitionMatch // io.cucumber.core.runner.PickleStepDefinitionMatch
-        // (package-private instance is fine)
-        );
-
-        StepExtension newStep = new StepExtension(newPickTestStep, stepExecution, parentPickle);
-        newStep.setExecutionArguments(args.stream().map(io.cucumber.core.stepexpression.Argument::getValue).toList());
-
-        return newStep;
-
-    }
-
-    public boolean isFail() {
-        return hardFail || softFail;
-    }
-
-    public boolean isHardFail() {
-        return hardFail;
-    }
-
-    public boolean isSoftFail() {
-        return softFail;
-    }
-
-    public void setHardFail() {
-        this.hardFail = true;
-    }
-
-    public void setSoftFail() {
-        this.softFail = true;
-    }
-
-    private boolean hardFail = false;
-    private boolean softFail = false;
-    private boolean skipped = false;
-
-    TestCase ranTestCase;
-    EventBus ranBus;
-    TestCaseState ranState;
-    Object ranExecutionMode;
-
-    public StepExtension runNextSibling() {
-        StepExtension nextSibling = getNextSibling();
-        if (nextSibling == null)
-            return null;
-        StepExtension nextStepToRun = nextSibling;
-        if (nextSibling.isTemplateStep) {
-            nextStepToRun = nextSibling.updateStep();
-            setNextSibling(nextStepToRun);
-            nextStepToRun.setPreviousSibling(this);
-        }
-        return nextStepToRun.run(ranTestCase, ranBus, ranState, ranExecutionMode);
-    }
-
-    public boolean inheritFromParent = true;
-
-    public StepExtension runFirstChild() {
-        if (getChildSteps().isEmpty() || getConditionalStates().contains(ConditionalStates.SKIP_CHILDREN))
-            return null;
-        System.out.println("@@runFirstChild: " + this);
-        System.out.println("@@runFirstChildgetStepParsingMap: " + getChildSteps().getFirst().getStepParsingMap());
-        System.out.println("@@parent-StepParsingMap$$: " + getStepParsingMap());
-        initializeChildSteps();
-        StepExtension firstChildToRun = getChildSteps().getFirst().updateStep();
-        firstChildToRun.setParentStep(this);
-        return firstChildToRun.run(ranTestCase, ranBus, ranState, ranExecutionMode);
-    }
-
-    public StepExtension run() {
-        return run(ranTestCase, ranBus, ranState, ranExecutionMode);
-    }
-
-    public StepExtension run(TestCase testCase, EventBus bus, TestCaseState state, Object executionMode) {
-        System.out.println("@@run: " + this);
-        System.out.println("@@run getStepParsingMap: " + this.getStepParsingMap());
-        Object currentExecutionMode = executionMode;
-        StepExtension stepToExecute = this;
-        if (runChecks()) {
-            addExecuted();
-            currentExecutionMode = stepToExecute.executeStep(testCase, bus, state, currentExecutionMode);
-        }
-        StepExtension lastStepExecuted = stepToExecute;
-        StepExtension ranStep = runFirstChild();
-        if (ranStep != null)
-            lastStepExecuted = ranStep;
-        ranStep = runNextSibling();
-        if (ranStep != null)
-            lastStepExecuted = ranStep;
-        return lastStepExecuted;
-    }
-
-    public StepExtension executeStep(TestCase testCase, EventBus bus, TestCaseState state, Object executionMode) {
-        getScenarioState().setCurrentStep(this);
-        getScenarioState().register(this, getUniqueKey(this));
-        skipped = stepExecution.isScenarioComplete();
-        executionMode = shouldRun() ? RUN(executionMode) : SKIP(executionMode);
-        Object returnObj = invokeAnyMethod(delegate, "run", testCase, bus, state, executionMode);
-        List<Result> results = ((List<Result>) getProperty(state, "stepResults"));
-        result = results.getLast();
-
-        if (result.getStatus().equals(Status.FAILED) || result.getStatus().equals(Status.UNDEFINED)) {
-            Throwable throwable = result.getError();
-            if (throwable != null && (throwable.getClass().equals(SoftException.class)
-                    || throwable.getClass().equals(SoftRuntimeException.class)))
-                setSoftFail();
-            else
-                setHardFail();
-        }
-
-        if (!(stepFlags.contains(IGNORE_FAILURES) || stepExecution.isScenarioComplete())) {
-            if (isSoftFail())
-                stepExecution.setScenarioSoftFail();
-            else if (isHardFail())
-                stepExecution.setScenarioHardFail();
-        }
-
-        ranTestCase = testCase;
-        ranBus = bus;
-        ranState = state;
-        ranExecutionMode = returnObj;
-
+    /**
+     * Put/replace an override value for a given key. Use the KEY_* constants.
+     */
+    public StepExtension withOverride(String key, Object value) {
+        putOverride(key, value);
         return this;
     }
 
-    private final List<BooleanSupplier> checks = new ArrayList<>();
-
     /**
-     * Adds a new check to the list.
+     * Put/replace an override value for a given key.
      */
-    public void addCheck(BooleanSupplier check) {
-        checks.add(check);
+    public void putOverride(String key, Object value) {
+        Objects.requireNonNull(key, "key");
+        overrides.put(key, value);
     }
 
     /**
-     * Runs all stored checks. Returns true only if all are true. Every check
-     * runs even if some return false.
+     * Remove a specific override.
      */
-    public boolean runChecks() {
-        boolean all = true;
-        for (BooleanSupplier check : checks) {
-            all = all & check.getAsBoolean(); // non–short-circuit AND
+    public void removeOverride(String key) {
+        if (key != null) {
+            overrides.remove(key);
         }
-        return all;
     }
 
     /**
-     * Clears all stored checks (optional helper).
+     * Clear all overrides.
      */
-    public void clear() {
-        checks.clear();
+    public void clearOverrides() {
+        overrides.clear();
     }
 
-    public boolean shouldRun() {
-        if (getParentStep() == null)
-            return true;
+    /*
+     * ===================== Delegation + Override Helpers =====================
+     */
 
-        if (stepFlags.contains(ALWAYS_RUN))
-            return true;
+    private static <T> T nonNull(T value, String name) {
+        return Objects.requireNonNull(value, name);
+    }
 
-        if (stepFlags.contains(RUN_IF_SCENARIO_FAILED)) {
-            return (stepExecution.isScenarioFailed());
+    private <T> T orOverride(String key, Class<T> type, Supplier<T> fallback) {
+        if (overrides.containsKey(key)) { // instead of checking for non-null
+            Object o = overrides.get(key);
+            if (o == null)
+                return null; // explicit null override
+            if (!type.isInstance(o)) {
+                throw new ClassCastException("Override for key '" + key + "' is not of type " + type.getName());
+            }
+            return type.cast(o);
         }
+        return fallback.get();
+    }
 
-        if (stepFlags.contains(RUN_IF_SCENARIO_SOFT_FAILED))
-            return isSoftFail();
-        if (stepFlags.contains(RUN_IF_SCENARIO_HARD_FAILED))
-            return isHardFail();
-        if (stepFlags.contains(RUN_IF_SCENARIO_PASSING))
-            return !(isHardFail() || isSoftFail());
-        return !skipped;
+    private int orOverrideInt(String key, Supplier<Integer> fallback) {
+        Object o = overrides.get(key);
+        if (o != null) {
+            if (!(o instanceof Integer)) {
+                throw new ClassCastException(
+                    "Override for key '" + key + "' is not an Integer (was "
+                            + o.getClass().getName() + ")");
+            }
+            return (Integer) o;
+        }
+        return fallback.get();
+    }
+
+    /*
+     * ===================== Delegation Overrides (with overrides)
+     * =====================
+     */
+
+    // Keep execution consistent; this is not a getter and is not overridden via
+    // map.
+    @Override
+    public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
+        return delegate.run(testCase, bus, state, executionMode);
+    }
+
+    // Hook lists (package-private in base). We expose as public and allow
+    // overrides.
+    @Override
+    public List<HookTestStep> getBeforeStepHookSteps() {
+        return orOverride(KEY_BEFORE_STEP_HOOKS, (Class<List<HookTestStep>>) (Class<?>) List.class,
+            delegate::getBeforeStepHookSteps);
+    }
+
+    @Override
+    public List<HookTestStep> getAfterStepHookSteps() {
+        return orOverride(KEY_AFTER_STEP_HOOKS, (Class<List<HookTestStep>>) (Class<?>) List.class,
+            delegate::getAfterStepHookSteps);
     }
 
     @Override
     public String getPattern() {
-        return delegate.getPattern();
+        return orOverride(KEY_PATTERN, String.class, delegate::getPattern);
     }
 
     @Override
     public Step getStep() {
-        return this;
+        return orOverride(KEY_STEP, Step.class, delegate::getStep);
     }
 
     @Override
     public List<Argument> getDefinitionArgument() {
-        return delegate.getDefinitionArgument();
+        return orOverride(KEY_DEFINITION_ARGUMENTS, (Class<List<Argument>>) (Class<?>) List.class,
+            delegate::getDefinitionArgument);
+    }
+
+    @Override
+    public PickleStepDefinitionMatch getDefinitionMatch() {
+        return orOverride(KEY_DEFINITION_MATCH, PickleStepDefinitionMatch.class, delegate::getDefinitionMatch);
     }
 
     @Override
     public StepArgument getStepArgument() {
-        return delegate.getStepArgument();
+        return orOverride(KEY_STEP_ARGUMENT, StepArgument.class, delegate::getStepArgument);
     }
 
     @Override
     public int getStepLine() {
-        return isScenarioNameStep ? parentPickle.getLocation().getLine() : delegate.getStepLine();
+        return orOverrideInt(KEY_STEP_LINE, delegate::getStepLine);
     }
 
     @Override
     public URI getUri() {
-        return delegate.getUri();
+        return orOverride(KEY_URI, URI.class, delegate::getUri);
     }
 
     @Override
     public String getStepText() {
-        return delegate.getStepText();
+        return orOverride(KEY_STEP_TEXT, String.class, delegate::getStepText);
+    }
+
+    /* ===================== Niceties ===================== */
+
+    @Override
+    public String toString() {
+        return "StepExtension(delegate=" + delegate + ", overrides=" + overrides.keySet() + ")";
     }
 
     @Override
-    public String getCodeLocation() {
-        return delegate.getCodeLocation();
-    }
-
-    // public UUID overRideUUID = null;
-
-    @Override
-    public UUID getId() {
-        return delegate.getId();
-    }
-
-    // from gherikin step
-
-    @Override
-    public StepArgument getArgument() {
-        return gherikinMessageStep.getArgument();
+    public int hashCode() {
+        // Preserve identity through the delegate to avoid surprising set
+        // behavior.
+        return delegate.hashCode();
     }
 
     @Override
-    public String getKeyword() {
-        return gherikinMessageStep.getKeyword();
-    }
-
-    @Override
-    public String getText() {
-        return "\u00A0\u00A0\u00A0\u00A0\u00A0".repeat(getNestingLevel())
-                + (gherikinMessageStep.getText().replaceFirst(defaultMatchFlag, ""));
-    }
-
-    @Override
-    public int getLine() {
-        return isScenarioNameStep ? parentPickle.getLocation().getLine() : gherikinMessageStep.getLine();
-    }
-
-    @Override
-    public Location getLocation() {
-        return isScenarioNameStep ? parentPickle.getLocation() : gherikinMessageStep.getLocation();
-    }
-
-    protected LinkedListMultimap<String, StepExtension> executedChildSteps = LinkedListMultimap.create();
-
-    public void addExecuted() {
-        if (getParentStep() != null)
-            getParentStep().addExecutedChildStep(this);
-    }
-
-    public void getExecutedSiblings() {
-        if (getParentStep() != null)
-            getParentStep().executedChildSteps.get(getUniqueKey(this));
-    }
-
-    void addExecutedChildStep(StepExtension executedChildStep) {
-        executedChildSteps.put(getUniqueKey(executedChildStep), executedChildStep);
+    public boolean equals(Object obj) {
+        if (this == obj)
+            return true;
+        if (obj instanceof StepExtension other) {
+            return delegate.equals(other.delegate);
+        }
+        return delegate.equals(obj);
     }
 }

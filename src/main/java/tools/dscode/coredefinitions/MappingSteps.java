@@ -9,7 +9,6 @@ import tools.dscode.common.mappings.NodeMap;
 
 import java.util.List;
 
-import static tools.dscode.extensions.StepExtension.getCurrentStep;
 import static tools.dscode.extensions.StepRelationships.pairSiblings;
 import static tools.dscode.state.ScenarioState.getScenarioState;
 import static tools.dscode.util.TableUtils.toFlatMultimap;

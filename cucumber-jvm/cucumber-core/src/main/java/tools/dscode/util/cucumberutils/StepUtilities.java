@@ -1,9 +1,11 @@
-package tools.dscode.util.stepbuilder;
+package tools.dscode.util.cucumberutils;
 
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.gherkin.Step;
+import io.cucumber.core.runner.PickleStepDefinitionMatch;
 import io.cucumber.core.runner.Runner;
 import io.cucumber.gherkin.GherkinDialects;
+import io.cucumber.messages.IdGenerator;
 import io.cucumber.messages.types.PickleStep;
 import io.cucumber.messages.types.PickleStepArgument;
 import io.cucumber.messages.types.PickleStepType;
@@ -18,47 +20,56 @@ import java.util.List;
 import java.util.UUID;
 
 import static tools.dscode.common.GlobalConstants.defaultMatchFlag;
-import static tools.dscode.common.SelfRegistering.localOrGlobalOf;
 import static tools.dscode.common.util.Reflect.invokeAnyMethod;
+import static tools.dscode.state.ScenarioState.getGherkinMessagesPickle;
+import static tools.dscode.state.ScenarioState.getPickleLanguage;
+import static tools.dscode.state.ScenarioState.getRunner;
 import static tools.dscode.state.ScenarioState.getScenarioState;
 
 public class StepUtilities {
-
-
-    // public static GherkinDialect dialect;
+    public static IdGenerator idGenerator = () -> UUID.randomUUID().toString();
     //
-    // static {
-    //
+    // public static OLDStepExtension createGenericStepExtension(
+    // String stepText, OLDStepExtension OLDStepExtension
+    // ) {
+    // return new OLDStepExtension(OLDStepExtension.parentPickle,
+    // OLDStepExtension.OLDTestCaseExtension,
+    // createGenericPickleStep(stepText, OLDStepExtension));
     // }
     //
-    // public static void main(String[] args) {
-    // GherkinDialect dialect = GherkinDialects.getDialect(pickle.getLanguage())
-    // .orElse(GherkinDialects.getDialect("en").get());
-    // String keyword = dialect.getThenKeywords().getFirst();
-    //
-    // PickleStep pickleStep = createPickleStep(ROOT_STEP);
-    // System.out.println("@@dialect: " + dialect);
+    // public static io.cucumber.core.runner.PickleStepTestStep
+    // createGenericPickleStep(
+    // String stepText, OLDStepExtension OLDStepExtension
+    // ) {
+    // PickleStep pickleStep = new PickleStep(null, new ArrayList<>(),
+    // idGenerator.newId(), PickleStepType.CONTEXT,
+    // stepText);
+    // System.out.println("@@dialect: " + getDialect());
     // System.out.println("@@pickleStep: " + pickleStep);
-    // System.out.println("@@keyword: " + keyword);
-    // Step gherikinMessageStep = (Step) Reflect.newInstance(
-    // "io.cucumber.core.gherkin.messages.GherkinMessagesStep",
+    // System.out.println("@@keyword: " + getKeyword());
+    // GherkinMessagesStep gherikinMessageStep = new GherkinMessagesStep(
     // pickleStep,
-    // dialect,
-    // keyword,
-    // new Location(1, 1),
-    // keyword);
-    // try {
+    // getDialect(),
+    // getKeyword(),
+    // OLDStepExtension.getStep().getLocation(),
+    // getKeyword());
     // System.out.println("@@##gherikinMessageStep: " + gherikinMessageStep);
-    // PickleStepTestStep rootStep = (PickleStepTestStep) StepUtilities
-    // .createPickleStepTestStep(gherikinMessageStep, UUID.randomUUID(), new
-    // URI(""));
-    // rootStep.run(this, bus, state, nextExecutionMode);
-    //
-    // } catch (URISyntaxException e) {
-    // throw new RuntimeException(e);
+    // PickleStepDefinitionMatch pickleStepDefinitionMatch =
+    // getDefinition(getRunner(),
+    // getGherkinMessagesPickle(), gherikinMessageStep);
+    // System.out.println("@@gherikinMessageStep: " + gherikinMessageStep);
+    // System.out.println("@@gherikinMessageStep getText: " +
+    // gherikinMessageStep.getText());
+    // System.out.println("@@pickleStepDefinitionMatch: " +
+    // pickleStepDefinitionMatch);
+    // return new io.cucumber.core.runner.PickleStepTestStep(
+    // UUID.randomUUID(), // java.util.UUID
+    // OLDStepExtension.getUri(), // java.net.URI
+    // gherikinMessageStep, // io.cucumber.core.gherkin.Step (public)
+    // pickleStepDefinitionMatch //
+    // io.cucumber.core.runner.PickleStepDefinitionMatch
+    // );
     // }
-    // }
-
 
     public static PickleStep createPickleStep(
             PickleStepArgument pickleStepArgument, List<String> astNodeIds, String id, PickleStepType pickleStepType,
@@ -77,7 +88,7 @@ public class StepUtilities {
         return (Step) Reflect.newInstance(
             "io.cucumber.core.gherkin.messages.GherkinMessagesStep",
             pickleStep,
-            GherkinDialects.getDialect(getScenarioState().getPickleLanguage())
+            GherkinDialects.getDialect(getPickleLanguage())
                     .orElse(GherkinDialects.getDialect("en").get()),
             previousGivenWhenThenKeyword,
             location,
@@ -85,8 +96,8 @@ public class StepUtilities {
     }
 
     public static PickleStepTestStep createPickleStepTestStep(Step gherikinMessageStep, UUID uuid, URI uri) {
-        Object pickleStepDefinitionMatch = getDefinition(localOrGlobalOf("io.cucumber.core.runner.Runner"),
-            localOrGlobalOf("io.cucumber.core.gherkin.messages.GherkinMessagesPickle"), gherikinMessageStep);
+        Object pickleStepDefinitionMatch = getDefinition(getRunner(),
+            getGherkinMessagesPickle(), gherikinMessageStep);
         System.out.println("@@gherikinMessageStep: " + gherikinMessageStep);
         System.out.println("@@gherikinMessageStep getText: " + gherikinMessageStep.getText());
         System.out.println("@@pickleStepDefinitionMatch: " + pickleStepDefinitionMatch);
@@ -96,7 +107,7 @@ public class StepUtilities {
             uri, // java.net.URI
             gherikinMessageStep, // io.cucumber.core.gherkin.Step (public)
             pickleStepDefinitionMatch // io.cucumber.core.runner.PickleStepDefinitionMatch
-                                      // (package-private instance is fine)
+        // (package-private instance is fine)
         );
     }
 
@@ -127,12 +138,12 @@ public class StepUtilities {
         }
     }
 
-    public static Object getDefinition(Runner runner, Pickle scenarioPickle, Step step) {
+    public static PickleStepDefinitionMatch getDefinition(Runner runner, Pickle scenarioPickle, Step step) {
         return matchStepToStepDefinition(runner, scenarioPickle, step);
     }
 
-    public static Object matchStepToStepDefinition(Runner runner, Pickle pickle, Step step) {
-        return invokeAnyMethod(runner, "matchStepToStepDefinition", pickle, step);
+    public static PickleStepDefinitionMatch matchStepToStepDefinition(Runner runner, Pickle pickle, Step step) {
+        return (PickleStepDefinitionMatch) invokeAnyMethod(runner, "matchStepToStepDefinition", pickle, step);
     }
 
     public static PickleStepTestStep CreateOrphanStep(String stepText) throws URISyntaxException {

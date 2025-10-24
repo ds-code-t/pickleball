@@ -9,8 +9,8 @@ import io.cucumber.messages.types.PickleStep;
 import io.cucumber.messages.types.PickleTable;
 import io.cucumber.plugin.event.Location;
 
-final class GherkinMessagesStep implements Step {
-
+public final class GherkinMessagesStep implements Step {
+    // PickleBall Change
     private final PickleStep pickleStep;
     private final Argument argument;
     private final String keyWord;
@@ -18,7 +18,8 @@ final class GherkinMessagesStep implements Step {
     private final String previousGwtKeyWord;
     private final Location location;
 
-    GherkinMessagesStep(
+    // PickleBall Change
+    public GherkinMessagesStep(
             PickleStep pickleStep,
             GherkinDialect dialect,
             String previousGwtKeyWord,

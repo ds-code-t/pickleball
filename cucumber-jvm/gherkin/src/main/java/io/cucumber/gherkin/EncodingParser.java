@@ -9,6 +9,7 @@ import java.util.regex.Pattern;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Locale.ROOT;
 import static java.util.regex.Pattern.CASE_INSENSITIVE;
+import static tools.dscode.common.GlobalConstants.META_FLAG;
 
 /**
  * Parser for the {@code # encoding: <encoding> } pragma.
@@ -19,13 +20,21 @@ final class EncodingParser {
     private static final Pattern ENCODING_PATTERN = Pattern.compile("^\\s*#\\s*encoding\\s*:\\s*([0-9a-zA-Z\\-]+)",
         CASE_INSENSITIVE);
     private static final Pattern LINE_SPLIT_PATTERN = Pattern.compile("([^\\n\\r]+)[\\n\\r]");
+    // Swap “leading tags/colon blob” with the step text, inserting META_FLAG
+    // between
+    private static final Pattern LINE_SWAP_PATTERN = Pattern.compile(
+        "^((?:(?:\\s*:)|(?:\\s*@\\[[^\\[\\]]*\\]))+)(\\s*[A-Z*].*$)",
+        Pattern.MULTILINE);
 
+    // PickballChange
     static String readWithEncodingFromSource(byte[] source) {
         byte[] bomFreeSource = removeByteOrderMarker(source);
         String presumedUtf8Source = new String(bomFreeSource, UTF_8);
-        return parseEncodingPragma(presumedUtf8Source)
+        String originalString = parseEncodingPragma(presumedUtf8Source)
                 .map(charset -> new String(bomFreeSource, charset))
                 .orElse(presumedUtf8Source);
+        Matcher matcher = LINE_SWAP_PATTERN.matcher(originalString);
+        return matcher.replaceAll("$2" + META_FLAG + "$1");
     }
 
     private static byte[] removeByteOrderMarker(byte[] source) {

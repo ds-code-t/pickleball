@@ -10,6 +10,7 @@ import io.cucumber.plugin.event.EmbedEvent;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.TestCase;
 import io.cucumber.plugin.event.WriteEvent;
+import tools.dscode.common.SelfRegistering;
 
 import java.net.URI;
 import java.time.Instant;
@@ -24,16 +25,16 @@ import static java.util.Collections.max;
 import static java.util.Comparator.comparing;
 import static java.util.Objects.requireNonNull;
 
-class TestCaseState implements io.cucumber.core.backend.TestCaseState {
-
+public class TestCaseState extends SelfRegistering implements io.cucumber.core.backend.TestCaseState {
+    // Pickleballchange
     private final List<Result> stepResults = new ArrayList<>();
     private final EventBus bus;
     private final TestCase testCase;
     private final UUID testExecutionId;
 
     private UUID currentTestStepId;
-
-    TestCaseState(EventBus bus, UUID testExecutionId, TestCase testCase) {
+    // Pickleballchange
+    public TestCaseState(EventBus bus, UUID testExecutionId, TestCase testCase) {
         this.bus = requireNonNull(bus);
         this.testExecutionId = requireNonNull(testExecutionId);
         this.testCase = requireNonNull(testCase);
@@ -150,7 +151,8 @@ class TestCaseState implements io.cucumber.core.backend.TestCaseState {
         return testCase.getLocation().getLine();
     }
 
-    Throwable getError() {
+    // Pickleballchange
+    public Throwable getError() {
         if (stepResults.isEmpty()) {
             return null;
         }

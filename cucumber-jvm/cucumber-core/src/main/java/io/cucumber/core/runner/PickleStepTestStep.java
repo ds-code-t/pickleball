@@ -11,7 +11,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-final class PickleStepTestStep extends TestStep implements io.cucumber.plugin.event.PickleStepTestStep {
+public class PickleStepTestStep extends TestStep implements io.cucumber.plugin.event.PickleStepTestStep {
 
     private final URI uri;
     private final Step step;
@@ -19,11 +19,13 @@ final class PickleStepTestStep extends TestStep implements io.cucumber.plugin.ev
     private final List<HookTestStep> beforeStepHookSteps;
     private final PickleStepDefinitionMatch definitionMatch;
 
-    PickleStepTestStep(UUID id, URI uri, Step step, PickleStepDefinitionMatch definitionMatch) {
+    // pickleball change
+    public PickleStepTestStep(UUID id, URI uri, Step step, PickleStepDefinitionMatch definitionMatch) {
         this(id, uri, step, Collections.emptyList(), Collections.emptyList(), definitionMatch);
     }
 
-    PickleStepTestStep(
+    // pickleball change
+    protected PickleStepTestStep(
             UUID id, URI uri,
             Step step,
             List<HookTestStep> beforeStepHookSteps,
@@ -38,8 +40,9 @@ final class PickleStepTestStep extends TestStep implements io.cucumber.plugin.ev
         this.definitionMatch = definitionMatch;
     }
 
+    // pickleball change
     @Override
-    ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
+    public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
         ExecutionMode nextExecutionMode = executionMode;
 
         for (HookTestStep before : beforeStepHookSteps) {
@@ -60,11 +63,12 @@ final class PickleStepTestStep extends TestStep implements io.cucumber.plugin.ev
         return nextExecutionMode;
     }
 
-    List<HookTestStep> getBeforeStepHookSteps() {
+    public List<HookTestStep> getBeforeStepHookSteps() {
         return beforeStepHookSteps;
     }
 
-    List<HookTestStep> getAfterStepHookSteps() {
+    // PickleStepTestStep
+    public List<HookTestStep> getAfterStepHookSteps() {
         return afterStepHookSteps;
     }
 

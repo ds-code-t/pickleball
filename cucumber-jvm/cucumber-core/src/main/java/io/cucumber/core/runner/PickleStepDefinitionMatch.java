@@ -20,13 +20,15 @@ import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.StackManipulation.removeFrameworkFramesAndAppendStepLocation;
 
-class PickleStepDefinitionMatch extends Match implements StepDefinitionMatch {
+// Pickleball Change
+public class PickleStepDefinitionMatch extends Match implements StepDefinitionMatch {
 
     private final StepDefinition stepDefinition;
     private final URI uri;
     private final Step step;
 
-    PickleStepDefinitionMatch(List<Argument> arguments, StepDefinition stepDefinition, URI uri, Step step) {
+    // Pickleball Change
+    public PickleStepDefinitionMatch(List<Argument> arguments, StepDefinition stepDefinition, URI uri, Step step) {
         super(arguments, stepDefinition.getLocation());
         this.stepDefinition = stepDefinition;
         this.uri = uri;

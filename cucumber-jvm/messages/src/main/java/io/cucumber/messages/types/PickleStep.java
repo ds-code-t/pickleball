@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
+import static tools.dscode.common.GlobalConstants.META_FLAG;
 
 /**
  * Represents the PickleStep message in <a
@@ -21,6 +22,8 @@ public final class PickleStep {
     private final String id;
     private final PickleStepType type;
     private final String text;
+    // PickleballChange
+    public final String metaText;
 
     public PickleStep(
             PickleStepArgument argument,
@@ -34,7 +37,16 @@ public final class PickleStep {
             new ArrayList<>(requireNonNull(astNodeIds, "PickleStep.astNodeIds cannot be null")));
         this.id = requireNonNull(id, "PickleStep.id cannot be null");
         this.type = type;
-        this.text = requireNonNull(text, "PickleStep.text cannot be null");
+        String originalText = requireNonNull(text, "PickleStep.text cannot be null");
+        int i = originalText.indexOf(META_FLAG);
+        if (i >= 0) {
+            this.metaText = originalText.substring(i);
+            this.text = originalText.substring(0, i);
+        } else {
+            this.metaText = "";
+            this.text = originalText;
+        }
+        ;
     }
 
     public Optional<PickleStepArgument> getArgument() {

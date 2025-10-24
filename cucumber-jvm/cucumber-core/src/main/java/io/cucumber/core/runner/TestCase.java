@@ -3,11 +3,7 @@ package io.cucumber.core.runner;
 import io.cucumber.core.backend.StepDefinition;
 import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.core.gherkin.Pickle;
-import io.cucumber.core.gherkin.Step;
-import io.cucumber.gherkin.GherkinDialect;
-import io.cucumber.gherkin.GherkinDialects;
 import io.cucumber.messages.types.Envelope;
-import io.cucumber.messages.types.PickleStep;
 import io.cucumber.messages.types.StepMatchArgument;
 import io.cucumber.messages.types.StepMatchArgumentsList;
 import io.cucumber.plugin.event.Argument;
@@ -18,11 +14,9 @@ import io.cucumber.plugin.event.Status;
 import io.cucumber.plugin.event.TestCaseFinished;
 import io.cucumber.plugin.event.TestCaseStarted;
 import io.cucumber.plugin.event.TestStep;
-import tools.dscode.common.util.Reflect;
-import tools.dscode.util.stepbuilder.StepUtilities;
+import tools.dscode.common.SelfRegistering;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -36,20 +30,18 @@ import static io.cucumber.messages.Convertor.toMessage;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
-import static tools.dscode.common.GlobalConstants.ROOT_STEP;
-import static tools.dscode.state.GlobalState.globalInitialize;
-import static tools.dscode.util.stepbuilder.StepUtilities.createPickleStep;
 
-final class TestCase implements io.cucumber.plugin.event.TestCase {
+// PickleballChange
+public class TestCase extends SelfRegistering implements io.cucumber.plugin.event.TestCase {
 
-    private final Pickle pickle;
-    private final List<PickleStepTestStep> testSteps;
-    private final ExecutionMode executionMode;
-    private final List<HookTestStep> beforeHooks;
-    private final List<HookTestStep> afterHooks;
-    private final UUID id;
+    public final Pickle pickle;
+    public final List<PickleStepTestStep> testSteps;
+    public final ExecutionMode executionMode;
+    public final List<HookTestStep> beforeHooks;
+    public final List<HookTestStep> afterHooks;
+    protected final UUID id;
 
-    TestCase(
+    protected TestCase(
             UUID id, List<PickleStepTestStep> testSteps,
             List<HookTestStep> beforeHooks,
             List<HookTestStep> afterHooks,
@@ -62,7 +54,6 @@ final class TestCase implements io.cucumber.plugin.event.TestCase {
         this.afterHooks = afterHooks;
         this.pickle = pickle;
         this.executionMode = dryRun ? DRY_RUN : RUN;
-        globalInitialize();
     }
 
     private static io.cucumber.messages.types.Group makeMessageGroup(
@@ -93,36 +84,10 @@ final class TestCase implements io.cucumber.plugin.event.TestCase {
                     .next(nextExecutionMode);
         }
 
-        // PickleballChange
-        // for (PickleStepTestStep step : testSteps) {
-        // nextExecutionMode = step
-        // .run(this, bus, state, nextExecutionMode)
-        // .next(nextExecutionMode);
-        // }
-
-        GherkinDialect dialect = GherkinDialects.getDialect(pickle.getLanguage())
-                .orElse(GherkinDialects.getDialect("en").get());
-        String keyword = dialect.getThenKeywords().getFirst();
-
-        PickleStep pickleStep = createPickleStep(ROOT_STEP);
-        System.out.println("@@dialect: " + dialect);
-        System.out.println("@@pickleStep: " + pickleStep);
-        System.out.println("@@keyword: " + keyword);
-        Step gherikinMessageStep = (Step) Reflect.newInstance(
-            "io.cucumber.core.gherkin.messages.GherkinMessagesStep",
-            pickleStep,
-            dialect,
-            keyword,
-            new Location(1, 1),
-            keyword);
-        try {
-            System.out.println("@@##gherikinMessageStep: " + gherikinMessageStep);
-            PickleStepTestStep rootStep = (PickleStepTestStep) StepUtilities
-                    .createPickleStepTestStep(gherikinMessageStep, UUID.randomUUID(), new URI(""));
-            rootStep.run(this, bus, state, nextExecutionMode);
-
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
+        for (PickleStepTestStep step : testSteps) {
+            nextExecutionMode = step
+                    .run(this, bus, state, nextExecutionMode)
+                    .next(nextExecutionMode);
         }
 
         for (HookTestStep after : afterHooks) {
@@ -194,7 +159,7 @@ final class TestCase implements io.cucumber.plugin.event.TestCase {
         return id;
     }
 
-    private void emitTestCaseMessage(EventBus bus) {
+    public void emitTestCaseMessage(EventBus bus) {
         Envelope envelope = Envelope.of(new io.cucumber.messages.types.TestCase(
             id.toString(),
             pickle.getId(),
@@ -258,7 +223,7 @@ final class TestCase implements io.cucumber.plugin.event.TestCase {
                 .collect(Collectors.collectingAndThen(toList(), StepMatchArgumentsList::new));
     }
 
-    private void emitTestCaseStarted(EventBus bus, Instant start, UUID executionId) {
+    public void emitTestCaseStarted(EventBus bus, Instant start, UUID executionId) {
         bus.send(new TestCaseStarted(start, this));
         Envelope envelope = Envelope.of(new io.cucumber.messages.types.TestCaseStarted(
             0L,
@@ -269,7 +234,7 @@ final class TestCase implements io.cucumber.plugin.event.TestCase {
         bus.send(envelope);
     }
 
-    private void emitTestCaseFinished(
+    public void emitTestCaseFinished(
             EventBus bus, UUID executionId, Instant stop, Result result
     ) {
         bus.send(new TestCaseFinished(stop, this, result));

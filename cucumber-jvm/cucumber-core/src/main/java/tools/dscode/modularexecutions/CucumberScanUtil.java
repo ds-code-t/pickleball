@@ -40,7 +40,6 @@ public final class CucumberScanUtil {
     private CucumberScanUtil() {
     }
 
-
     /**
      * List matching scenarios (Pickles) for the given cucumber.* properties.
      * Important keys you may pass: - cucumber.features (comma-separated URIs;

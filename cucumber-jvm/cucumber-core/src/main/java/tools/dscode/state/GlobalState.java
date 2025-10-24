@@ -1,38 +1,33 @@
 package tools.dscode.state;
 
-import io.cucumber.core.gherkin.Pickle;
-import io.cucumber.gherkin.GherkinDialect;
-import io.cucumber.gherkin.GherkinDialects;
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static tools.dscode.common.SelfRegistering.localOrGlobalOf;
-
 public final class GlobalState {
-    private static volatile boolean initialized = false;
-    private static final Object lock = new Object();
+    // private static volatile boolean initialized = false;
+    // private static final Object lock = new Object();
 
     private GlobalState() {
 
     }
 
+    // public static void globalInitialize() {
+    // if (initialized)
+    // return; // fast path
+    // Pickle pickle =
+    // localOrGlobalOf("io.cucumber.core.gherkin.messages.GherkinMessagesPickle");
+    // synchronized (lock) {
+    // if (initialized)
+    // return; // re-check inside lock
+    // globalDialect = GherkinDialects.getDialect(pickle.getLanguage())
+    // .orElse(GherkinDialects.getDialect("en").get());
+    // givenKeyword = globalDialect.getGivenKeywords().getFirst();
+    // initialized = true;
+    // }
+    // }
 
-    public static void globalInitialize() {
-        if (initialized)
-            return; // fast path
-        Pickle pickle = localOrGlobalOf("io.cucumber.core.gherkin.messages.GherkinMessagesPickle");
-        synchronized (lock) {
-            if (initialized)
-                return; // re-check inside lock
-            globalDialect = GherkinDialects.getDialect(pickle.getLanguage())
-                    .orElse(GherkinDialects.getDialect("en").get());
-
-            initialized = true;
-        }
-    }
-
-    public static GherkinDialect globalDialect;
+    // public static GherkinDialect globalDialect;
+    // public static String givenKeyword;
 
     private static final GlobalState INSTANCE = new GlobalState();
 

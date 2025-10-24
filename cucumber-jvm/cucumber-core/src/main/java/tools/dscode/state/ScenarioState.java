@@ -3,15 +3,16 @@ package tools.dscode.state;
 //import com.google.common.collect.LinkedListMultimap;
 
 import com.google.common.collect.LinkedListMultimap;
-import io.cucumber.core.backend.TestCaseState;
 import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.runner.Runner;
-import io.cucumber.plugin.event.TestCase;
+import io.cucumber.core.runner.TestCase;
+import io.cucumber.gherkin.GherkinDialect;
+import io.cucumber.gherkin.GherkinDialects;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
-import tools.dscode.executions.StepExecution;
 import tools.dscode.extensions.StepExtension;
+import tools.dscode.extensions.TestCaseExtension;
 import tools.dscode.util.CucumberQueryUtil;
 import tools.dscode.util.CucumberTagUtils;
 
@@ -21,14 +22,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static tools.dscode.common.GlobalConstants.K_FEATUREPARSER;
-import static tools.dscode.common.GlobalConstants.K_FEATURESUPPLIER;
-import static tools.dscode.common.GlobalConstants.K_RUNNER;
-import static tools.dscode.common.GlobalConstants.K_RUNTIME;
 import static tools.dscode.common.SelfRegistering.localOrGlobalOf;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.nameOf;
-import static tools.dscode.util.KeyFunctions.getPickleKey;
+import static tools.dscode.util.KeyFunctions.getUniqueKey;
 import static tools.dscode.util.TableUtils.exampleHeaderValueMap;
 
 public final class ScenarioState {
@@ -39,39 +36,14 @@ public final class ScenarioState {
         // private constructor, to enforce controlled creation
     }
 
-    /**
-     * Returns the current thread's ScenarioState (may be null if not set).
-     */
-    public static ScenarioState get() {
-        return STATE_TL.get();
-    }
-
-
-
-    /**
-     * Creates and sets a new ScenarioState, overwriting any existing one.
-     */
-    // public static ScenarioState resetScenarioState() {
-    ////        System.out.println("@@resetScenarioState");
-    ////
-    ////        ScenarioState newScenarioState = new ScenarioState();
-    ////        ScenarioState oldScenarioState =  STATE_TL.get();
-    ////        if(oldScenarioState != null)
-    ////            newScenarioState.runner = oldScenarioState.runner;
-    ////        STATE_TL.set(newScenarioState);
-    ////        return newScenarioState;
-    // ScenarioState scenarioState = getScenarioState();
-    // scenarioState.parsingMap = new ParsingMap();
-    // return getScenarioState();
-    // }
     public static ScenarioState getScenarioState() {
         return STATE_TL.get();
     }
 
-    private Map<String, NodeMap> scenarioMaps = new HashMap<>();
+    private final Map<String, NodeMap> scenarioMaps = new HashMap<>();
 
     public NodeMap getScenarioMap(Pickle pickle) {
-        return scenarioMaps.computeIfAbsent(getPickleKey(pickle), k -> {
+        return scenarioMaps.computeIfAbsent(getUniqueKey(pickle), k -> {
             LinkedListMultimap<String, String> map = exampleHeaderValueMap(pickle);
             if (map == null)
                 return null;
@@ -79,12 +51,12 @@ public final class ScenarioState {
         });
     }
 
-    public StepExtension getCurrentStep() {
-        return currentStep;
+    public static StepExtension getCurrentStep() {
+        return getScenarioState().currentStep;
     }
 
-    public void setCurrentStep(StepExtension currentStep) {
-        this.currentStep = currentStep;
+    public static void setCurrentStep(StepExtension currentStep) {
+        getScenarioState().currentStep = currentStep;
     }
 
     private StepExtension currentStep;
@@ -132,67 +104,23 @@ public final class ScenarioState {
     private final Map<Object, Object> store = new ConcurrentHashMap<>();
     private final Map<Object, Object> templateStore = new ConcurrentHashMap<>();
 
-    public TestCase testCase;
-    public Pickle scenarioPickle;
     public CucumberQueryUtil.GherkinView gherkinView;
     public EventBus bus;
-    public TestCaseState state;
 
-    public StepExecution stepExecution;
+    public TestCaseExtension testCaseExtension;
     public Runner runner;
 
-    public EventBus getBus() {
-        return bus;
+    public static EventBus getBus() {
+        return getRunner().getBus();
     }
 
-    public TestCaseState getTestCaseState() {
-        return state;
+    public static io.cucumber.core.runner.TestCaseState getTestCaseState() {
+        return localOrGlobalOf(io.cucumber.core.runner.TestCaseState.class);
     }
 
-    // private ScenarioState(TestCase testCase, EventBus bus,
-    // io.cucumber.core.backend.TestCaseState state) {
-    // this.bus = bus;
-    // this.state = state;
-    // this.testCase = testCase;
-    // this.scenarioPickle = (io.cucumber.core.gherkin.Pickle)
-    // getProperty(testCase, "pickle");
-    // this.stepExecution = new StepExecution(testCase);
-    // }
-
-    public static void setScenarioStateValues(TestCase testCase, EventBus bus, TestCaseState state) {
-        ScenarioState scenarioState = getScenarioState();
-        scenarioState.bus = bus;
-        scenarioState.state = state;
-        scenarioState.testCase = testCase;
-        scenarioState.scenarioPickle = (Pickle) getProperty(testCase, "pickle");
-        scenarioState.gherkinView = CucumberQueryUtil.describe(scenarioState.scenarioPickle);
-        scenarioState.stepExecution = new StepExecution(testCase);
-        scenarioState.runner = scenarioState.getRunner();
-        // scenarioState.clear();
+    public TestCaseExtension getStepExecution() {
+        return testCaseExtension;
     }
-
-    public StepExecution getStepExecution() {
-        return stepExecution;
-    }
-
-    public TestCase getTestCase() {
-        return testCase;
-    }
-
-    /* ========================= lifecycle ========================= */
-
-    // /**
-    // * Install a fresh ScenarioState on this thread, cleaning up any previous
-    // one.
-    // */
-    // public static ScenarioState beginNew(TestCase testCase, EventBus bus,
-    // io.cucumber.core.backend.TestCaseState state) {
-    // ScenarioState prev = STATE_TL.get();
-    // if (prev != null) prev.onClose();
-    // ScenarioState next = new ScenarioState(testCase, bus, state);
-    // STATE_TL.set(next);
-    // return next;
-    // }
 
     /**
      * Replace with a provided instance (rare). Cleans up any previous one.
@@ -254,7 +182,7 @@ public final class ScenarioState {
         return (key == null) ? null : store.get(key);
     }
 
-    private final String keyFlag = "_TemplateKey_\u206AMETA";
+    private static final String keyFlag = "_TemplateKey_\u206AMETA";
 
     public Map<Object, Object> getKeyedTemplateMap(String key) {
         if (key == null || key.isBlank())
@@ -263,15 +191,33 @@ public final class ScenarioState {
         return (Map<Object, Object>) store.computeIfAbsent(key, k -> new HashMap<>());
     }
 
-    public void setKeyedTemplate(String uniqueObjectKey, Object key, Object value) {
-        Map<Object, Object> map = getKeyedTemplateMap(uniqueObjectKey);
+    // public static void setKeyedTemplate(String uniqueObjectKey, Object key,
+    // Object value) {
+    // Map<Object, Object> map =
+    // getScenarioState().getKeyedTemplateMap(uniqueObjectKey);
+    // if (map == null)
+    // throw new RuntimeException("uniqueObjectKey is null or empty. Cannot put
+    // " + value);
+    // map.put(key, value);
+    // }
+    //
+    // public Object getKeyedTemplate(String uniqueObjectKey, Object key) {
+    // Map<Object, Object> map = (Map<Object, Object>)
+    // getScenarioState().store.get(keyFlag + uniqueObjectKey);
+    // if (map == null)
+    // return null;
+    // return map.get(key);
+    // }
+
+    public static void setKeyedTemplate(Object object, Object key, Object value) {
+        Map<Object, Object> map = getScenarioState().getKeyedTemplateMap(getUniqueKey(object));
         if (map == null)
             throw new RuntimeException("uniqueObjectKey is null or empty.  Cannot put " + value);
         map.put(key, value);
     }
 
-    public Object getKeyedTemplate(String uniqueObjectKey, Object key) {
-        Map<Object, Object> map = (Map<Object, Object>) store.get(keyFlag + uniqueObjectKey);
+    public Object getKeyedTemplate(Object object, Object key) {
+        Map<Object, Object> map = (Map<Object, Object>) getScenarioState().store.get(keyFlag + getUniqueKey(object));
         if (map == null)
             return null;
         return map.get(key);
@@ -293,65 +239,64 @@ public final class ScenarioState {
     /*
      * ========================= convenience getters =========================
      */
-    public Pickle getScenarioPickle() {
-        return scenarioPickle;
+    public static Pickle getScenarioPickle() {
+        return (Pickle) getProperty(getTestCase(), "pickle");
     }
 
-    // public Object getScenario() {
-    // return getInstance(K_SCENARIO);
-    // }
-
-    public Runner getRunner() {
-        if (runner == null)
-            return (Runner) getInstance(K_RUNNER);
-        return runner;
+    public static Runner getRunner() {
+        return localOrGlobalOf(io.cucumber.core.runner.Runner.class);
     }
 
-    // public io.cucumber.core.runtime.Runtime getRuntime() {
-    // return (io.cucumber.core.runtime.Runtime) get(K_RUNTIME);
-    // }
-
-    public String getTestCaseName() {
+    public static String getTestCaseName() {
         return nameOf(getTestCase());
     }
 
-    public String getPickleName() {
+    public static String getPickleName() {
         return nameOf(getScenarioPickle());
     }
 
-    public String getPickleLanguage() {
+    public static String getPickleLanguage() {
         return getScenarioPickle().getLanguage();
     }
 
-    // public String getScenarioName() {
-    // return nameOf(getScenario());
-    // }
+    public static GherkinDialect getDialect() {
+        return GherkinDialects.getDialect(getPickleLanguage())
+                .orElse(GherkinDialects.getDialect("en").get());
+    }
 
-    public io.cucumber.core.runner.Options getRuntimeOptions() {
+    public static String getKeyword() {
+        return getDialect().getGivenKeywords().getFirst();
+    }
+
+    public static io.cucumber.core.runner.Options getRuntimeOptions() {
         return (io.cucumber.core.runner.Options) getProperty(getRunner(), "runnerOptions");
     }
 
     public static io.cucumber.core.runtime.Runtime getRuntime() {
-        return localOrGlobalOf(K_RUNTIME);
+        return localOrGlobalOf(io.cucumber.core.runtime.Runtime.class);
     }
 
     public static io.cucumber.core.feature.FeatureParser getFeatureParser() {
-        return localOrGlobalOf(K_FEATUREPARSER);
+        return localOrGlobalOf(io.cucumber.core.feature.FeatureParser.class);
     }
 
     public static io.cucumber.core.runtime.FeatureSupplier getFeatureSupplier() {
-        return localOrGlobalOf(K_FEATURESUPPLIER);
+        return localOrGlobalOf(io.cucumber.core.runtime.FeaturePathFeatureSupplier.class);
+    }
+
+    public static TestCase getTestCase() {
+        return localOrGlobalOf(TestCase.class);
     }
 
     public static io.cucumber.core.gherkin.messages.GherkinMessagesPickle getGherkinMessagesPickle() {
-        return localOrGlobalOf("io.cucumber.core.gherkin.messages.GherkinMessagesPickle");
+        return localOrGlobalOf(io.cucumber.core.gherkin.messages.GherkinMessagesPickle.class);
     }
 
-    public List<String> getTags() {
+    public static List<String> getTags() {
         return CucumberTagUtils.extractTags(getRuntimeOptions());
     }
 
-    public CucumberQueryUtil.GherkinView getCucumberQuery() {
+    public static CucumberQueryUtil.GherkinView getCucumberQuery() {
         return CucumberQueryUtil.describe(getScenarioPickle());
     }
 

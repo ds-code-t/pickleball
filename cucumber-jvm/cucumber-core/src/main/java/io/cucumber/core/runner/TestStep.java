@@ -22,7 +22,8 @@ import static io.cucumber.core.runner.TestStepResultStatusMapper.from;
 import static io.cucumber.messages.Convertor.toMessage;
 import static java.time.Duration.ZERO;
 
-abstract class TestStep implements io.cucumber.plugin.event.TestStep {
+//PickleballChange
+public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
 
     private final Predicate<Throwable> isTestAbortedException = createIsTestAbortedExceptionPredicate();
     private final StepDefinitionMatch stepDefinitionMatch;
@@ -43,7 +44,8 @@ abstract class TestStep implements io.cucumber.plugin.event.TestStep {
         return id;
     }
 
-    ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
+    // PickleballChange
+    public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
         Instant startTime = bus.getInstant();
         emitTestStepStarted(testCase, bus, state.getTestExecutionId(), startTime);
 
