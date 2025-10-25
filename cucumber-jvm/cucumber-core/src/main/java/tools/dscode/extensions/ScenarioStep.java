@@ -32,7 +32,8 @@ public class ScenarioStep extends StepExtension {
         ScenarioStep scenarioStep = new ScenarioStep(newPickleStepTestStep, testCaseExtension.pickle, isRoot, 0);
         System.out.println("@@scenarioStep getStepLine11 " + scenarioStep.getStepLine());
         System.out.println("@@scenarioStep getStepLine22: " + scenarioStep.delegate.getStepLine());
-
+        testCaseExtension.registerStep(scenarioStep.delegate);
+        // putTestStepById(scenarioStep);
         return scenarioStep;
     }
 

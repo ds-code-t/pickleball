@@ -30,7 +30,6 @@ dependencies {
     api("org.junit.platform:junit-platform-suite-engine:1.10.2")
 
 
-
     // --- Option A (NEW): let root src/main/java compile against forked modules from mavenLocal ---
     def cukeVer = findProperty("cukeVer") ?: "7.30.0"
     implementation("io.cucumber:cucumber-core:${cukeVer}")
@@ -41,6 +40,7 @@ dependencies {
     implementation("io.cucumber:cucumber-gherkin:${cukeVer}")
     implementation("io.cucumber:gherkin:35.1.0")
     implementation("io.cucumber:messages:29.0.1")
+    implementation("io.cucumber:query:14.4.0")
     implementation("io.cucumber:cucumber-gherkin-messages:${cukeVer}")
     implementation("io.cucumber:datatable:${cukeVer}")
     implementation("io.cucumber:datatable-matchers:${cukeVer}")
@@ -73,6 +73,7 @@ tasks.shadowJar {
                 project.dependencies.create("io.cucumber:cucumber-gherkin:${cucumberVersion}"),
                 project.dependencies.create("io.cucumber:gherkin:35.1.0"),
                 project.dependencies.create("io.cucumber:messages:29.0.1"),
+                project.dependencies.create("io.cucumber:query:14.4.0"),
                 project.dependencies.create("io.cucumber:cucumber-gherkin-messages:${cucumberVersion}"),
                 project.dependencies.create("io.cucumber:datatable:${cucumberVersion}"),
                 project.dependencies.create("io.cucumber:datatable-matchers:${cucumberVersion}"),
@@ -124,12 +125,12 @@ publishing {
                 }
 
                 // JUnit 5 (compile scope so Maven test classpath includes them)
-                addDep('org.junit.jupiter',  'junit-jupiter-api',         '5.10.2', 'compile')
-                addDep('org.junit.jupiter',  'junit-jupiter-engine',      '5.10.2', 'compile')
-                addDep('org.junit.platform', 'junit-platform-engine',     '1.10.2', 'compile')
-                addDep('org.junit.platform', 'junit-platform-launcher',   '1.10.2', 'compile')
-                addDep('org.junit.platform', 'junit-platform-suite-api',  '1.10.2', 'compile')
-                addDep('org.junit.platform', 'junit-platform-suite-engine','1.10.2','compile')
+                addDep('org.junit.jupiter', 'junit-jupiter-api', '5.10.2', 'compile')
+                addDep('org.junit.jupiter', 'junit-jupiter-engine', '5.10.2', 'compile')
+                addDep('org.junit.platform', 'junit-platform-engine', '1.10.2', 'compile')
+                addDep('org.junit.platform', 'junit-platform-launcher', '1.10.2', 'compile')
+                addDep('org.junit.platform', 'junit-platform-suite-api', '1.10.2', 'compile')
+                addDep('org.junit.platform', 'junit-platform-suite-engine', '1.10.2', 'compile')
             }
         }
     }
@@ -169,15 +170,15 @@ tasks.register("buildFork") {
         def cmd
         if (useWrapper) {
             if (!isWin) {
-                exec { workingDir = file("cucumber-jvm"); commandLine "bash","-lc","chmod +x ./mvnw" }
+                exec { workingDir = file("cucumber-jvm"); commandLine "bash", "-lc", "chmod +x ./mvnw" }
             }
             cmd = isWin
                     ? [wrapper.absolutePath, "-DskipTests", "clean", "install", "-pl", modulesArg, "-am"]
-                    : ["bash","-lc","./mvnw -DskipTests clean install -pl " + modulesArg + " -am"]
+                    : ["bash", "-lc", "./mvnw -DskipTests clean install -pl " + modulesArg + " -am"]
         } else {
             cmd = isWin
-                    ? ["cmd","/c","mvn","-DskipTests","clean","install","-pl", modulesArg,"-am"]
-                    : ["bash","-lc","mvn -DskipTests clean install -pl " + modulesArg + " -am"]
+                    ? ["cmd", "/c", "mvn", "-DskipTests", "clean", "install", "-pl", modulesArg, "-am"]
+                    : ["bash", "-lc", "mvn -DskipTests clean install -pl " + modulesArg + " -am"]
         }
 
         exec {

@@ -58,6 +58,7 @@
 
         <module>gherkin</module>
         <module>messages</module>
+        <module>query</module>
 
 
         <module>cucumber-archetype</module>

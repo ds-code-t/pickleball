@@ -149,7 +149,7 @@ public class StepBuilder {
             gherkinMessagesStep.getKeyword());
         PickleStepDefinitionMatch pickleStepDefinitionMatch = getDefinition(getRunner(),
             getGherkinMessagesPickle(), newGherkinMessagesStep);
-        return new PickleStepTestStep(pickleStepTestStep.getId(), pickleStepTestStep.getUri(), newGherkinMessagesStep,
+        return new PickleStepTestStep(UUID.randomUUID(), pickleStepTestStep.getUri(), newGherkinMessagesStep,
             pickleStepDefinitionMatch);
     }
 

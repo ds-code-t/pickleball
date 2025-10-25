@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+import static io.cucumber.query.Query.setCustomStepMap;
 import static tools.dscode.extensions.ScenarioStep.createScenarioStep;
 import static tools.dscode.state.ScenarioState.getBus;
 import static tools.dscode.state.ScenarioState.getTestCaseState;
@@ -82,6 +83,7 @@ public final class TestCaseExtension extends TestCase implements io.cucumber.plu
         testSteps.get(2).run(delegate, bus, testCaseState, nextExecutionMode);
 
         root.run(delegate, bus, testCaseState, nextExecutionMode);
+        root.delegate.run(delegate, bus, testCaseState, nextExecutionMode);
 
         testSteps.get(2).run(delegate, bus, testCaseState, nextExecutionMode);
         for (PickleStepTestStep step : testSteps) {
@@ -101,6 +103,11 @@ public final class TestCaseExtension extends TestCase implements io.cucumber.plu
         Status status = Status.valueOf(testCaseState.getStatus().name());
         Result result = new Result(status, duration, testCaseState.getError());
         emitTestCaseFinished(bus, executionId, stop, result);
+    }
+
+    public void registerStep(PickleStepTestStep pickleStepTestStep) {
+        io.cucumber.messages.types.TestStep testStep = createTestStep(pickleStepTestStep);
+        setCustomStepMap(testStep);
     }
 
     @Override

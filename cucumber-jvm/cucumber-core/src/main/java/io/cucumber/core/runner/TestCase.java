@@ -171,7 +171,7 @@ public class TestCase extends SelfRegistering implements io.cucumber.plugin.even
         bus.send(envelope);
     }
 
-    private io.cucumber.messages.types.TestStep createTestStep(TestStep pluginTestStep) {
+    public io.cucumber.messages.types.TestStep createTestStep(TestStep pluginTestStep) {
         // public TestStep(String hookId, String id, String pickleStepId,
         // List<String> stepDefinitionIds, List<StepMatchArgumentsList>
         // stepMatchArgumentsLists) {
