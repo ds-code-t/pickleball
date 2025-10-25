@@ -17,10 +17,10 @@ public class GeneralSteps  extends CoreSteps {
     }
 
 //    @DefinitionFlags(DefinitionFlag.NO_LOGGING)
-    @Given(ROOT_STEP)
-    public static void rootStep() {
-        System.out.println("@@ROOT_STEP!!");
-    }
+//    @Given(ROOT_STEP)
+//    public static void rootStep() {
+//        System.out.println("@@ROOT_STEP!!11");
+//    }
 
     @Given("MESSAGE:{string}")
     public static void setValues(String message) {

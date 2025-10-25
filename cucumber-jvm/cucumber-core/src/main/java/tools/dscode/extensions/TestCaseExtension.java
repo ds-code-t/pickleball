@@ -1,7 +1,9 @@
 package tools.dscode.extensions;
 
 import io.cucumber.core.eventbus.EventBus;
+import io.cucumber.core.gherkin.messages.GherkinMessagesStep;
 import io.cucumber.core.runner.ExecutionMode;
+import io.cucumber.core.runner.PickleStepTestStep;
 import io.cucumber.core.runner.TestCase;
 import io.cucumber.core.runner.TestCaseState;
 import io.cucumber.plugin.event.HookTestStep;
@@ -17,8 +19,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+import static tools.dscode.extensions.ScenarioStep.createScenarioStep;
 import static tools.dscode.state.ScenarioState.getBus;
-import static tools.dscode.util.cucumberutils.StepBuilder.createStepExtension;
+import static tools.dscode.state.ScenarioState.getTestCaseState;
 
 /**
  * Delegates all io.cucumber.plugin.event.TestCase calls to a wrapped
@@ -26,7 +29,6 @@ import static tools.dscode.util.cucumberutils.StepBuilder.createStepExtension;
  * can also forward package-private methods like run(EventBus).
  */
 public final class TestCaseExtension extends TestCase implements io.cucumber.plugin.event.TestCase {
-    boolean rootTestCase = true;
 
     private final TestCase delegate;
     private final TestCaseState testCaseState;
@@ -48,6 +50,7 @@ public final class TestCaseExtension extends TestCase implements io.cucumber.plu
      * Convenience: forwards to the package-private TestCase#run(EventBus).
      */
     public void run(EventBus bus) {
+        System.out.println("@@runTextCaseExtension");
         ExecutionMode nextExecutionMode = delegate.executionMode;
         emitTestCaseMessage(bus);
 
@@ -61,14 +64,31 @@ public final class TestCaseExtension extends TestCase implements io.cucumber.plu
                     .next(nextExecutionMode);
         }
 
-        StepExtension root = createStepExtension(testSteps.getFirst(), "zzz");
-        root.runExtension();
+        System.out.println("@@testCaseState: " + testCaseState);
+        System.out.println("@@getTestCaseState(): " + getTestCaseState());
+        ScenarioStep root = createScenarioStep(this, true);
+        System.out.println("@@root-newPickleStepTestStep1: " + root.getStepText());
+        System.out.println("@@root-newPickleStepTestStep2: " + ((GherkinMessagesStep) root.step).getText());
+        System.out.println("@@root-newPickleStepTestStep3: " + ((GherkinMessagesStep) root.step).pickleStep.text);
 
-        // for (PickleStepTestStep step : testSteps) {
-        // nextExecutionMode = step
-        // .run(delegate, bus, state, nextExecutionMode)
-        // .next(nextExecutionMode);
-        // }
+        System.out.println("@@root nextExecutionMode: " + nextExecutionMode);
+        System.out.println("@@g root.getClass(): " + root.getClass());
+        System.out.println("@@g root.delegate.getClass(): " + root.delegate.getClass());
+        System.out.println("@@root: " + root.getStepText());
+        System.out.println("@@root delgate " + root.delegate.getStepText());
+        System.out.println("@@root definitionMatch " + root.definitionMatch);
+        // root.executeStep(delegate, bus, testCaseState, nextExecutionMode);
+        // root.putOverride(StepExtension.KEY_STEP_TEXT, ROOT_STEP);
+        testSteps.get(2).run(delegate, bus, testCaseState, nextExecutionMode);
+
+        root.run(delegate, bus, testCaseState, nextExecutionMode);
+
+        testSteps.get(2).run(delegate, bus, testCaseState, nextExecutionMode);
+        for (PickleStepTestStep step : testSteps) {
+            nextExecutionMode = step
+                    .run(delegate, bus, testCaseState, nextExecutionMode)
+                    .next(nextExecutionMode);
+        }
 
         for (HookTestStep after : afterHooks) {
             nextExecutionMode = ((io.cucumber.core.runner.TestStep) after)

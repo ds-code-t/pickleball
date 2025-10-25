@@ -1,6 +1,7 @@
 package tools.dscode.extensions;
 
 import io.cucumber.core.gherkin.Pickle;
+import io.cucumber.core.gherkin.messages.GherkinMessagesStep;
 import io.cucumber.core.runner.PickleStepTestStep;
 
 import java.util.ArrayList;
@@ -10,17 +11,55 @@ import java.util.Map;
 
 import static tools.dscode.common.GlobalConstants.META_FLAG;
 import static tools.dscode.common.GlobalConstants.ROOT_STEP;
-import static tools.dscode.util.cucumberutils.StepBuilder.createStepExtension;
+import static tools.dscode.state.ScenarioState.getBus;
+import static tools.dscode.util.cucumberutils.StepBuilder.createPickleStepTestStep;
+import static tools.dscode.util.cucumberutils.StepBuilder.updatePickleStepTestStep;
 
 public class ScenarioStep extends StepExtension {
 
-    public ScenarioStep(Pickle pickle, boolean isRoot, int nestingLevel) {
-        super(createStepExtension((PickleStepTestStep) pickle.getSteps().getFirst(),
-            isRoot ? ROOT_STEP : META_FLAG + "SCENARIO: " + pickle.getName()));
+    public static ScenarioStep createScenarioStep(
+            TestCaseExtension testCaseExtension, boolean isRoot
+    ) {
+        PickleStepTestStep modelStep = (PickleStepTestStep) testCaseExtension.getTestSteps().getFirst();
+        String stepText = isRoot ? ROOT_STEP
+                : META_FLAG + "SCENARIO: " +
+                        testCaseExtension.pickle.getName();
+        PickleStepTestStep newPickleStepTestStep = updatePickleStepTestStep(modelStep, stepText, null);
+        System.out.println("@@newPickleStepTestStep1: " + newPickleStepTestStep.getStepText());
+        System.out.println("@@newPickleStepTestStep2: " + ((GherkinMessagesStep) newPickleStepTestStep.step).getText());
+        System.out.println(
+            "@@newPickleStepTestStep3: " + ((GherkinMessagesStep) newPickleStepTestStep.step).pickleStep.text);
+        ScenarioStep scenarioStep = new ScenarioStep(newPickleStepTestStep, testCaseExtension.pickle, isRoot, 0);
+        System.out.println("@@scenarioStep getStepLine11 " + scenarioStep.getStepLine());
+        System.out.println("@@scenarioStep getStepLine22: " + scenarioStep.delegate.getStepLine());
+
+        return scenarioStep;
+    }
+
+    private ScenarioStep(PickleStepTestStep modelStep, Pickle pickle, boolean isRoot, int nestingLevel) {
+        super(modelStep);
+        // super(createPickleStepTestStepFromGherkinMessagesStep((GherkinMessagesStep)
+        // pickle.getSteps().getFirst(),
+        // isRoot ? "a starting total of 2"
+        // : META_FLAG + "SCENARIO: " +
+        // pickle.getName(),
+        // null));
+        // isRoot ? ROOT_STEP : META_FLAG + "SCENARIO: " + pickle.getName(),
+        // null));
+
         setNestingLevel(nestingLevel);
         isScenarioNameStep = true;
         List<StepExtension> steps = new ArrayList<>();
-        pickle.getSteps().forEach(step -> steps.add(new StepExtension((PickleStepTestStep) step, pickle)));
+        pickle.getSteps().forEach(step -> steps.add(
+            new StepExtension(
+                createPickleStepTestStep((GherkinMessagesStep) step, getBus().generateId(), pickle.getUri()))));
+
+        // delegate =
+        // createPickleStepTestStepFromGherkinMessagesStep((GherkinMessagesStep)
+        // pickle.getSteps().getFirst(),
+        // isRoot ? ROOT_STEP : META_FLAG + "SCENARIO: " + pickle.getName(),
+        // null);
+
         int size = steps.size();
 
         Map<Integer, StepExtension> nestingMap = new HashMap<>();
@@ -30,7 +69,6 @@ public class ScenarioStep extends StepExtension {
         for (int s = 0; s < size; s++) {
             StepExtension currentStep = steps.get(s);
             currentStep.setNestingLevel(currentStep.getNestingLevel() + startingNesting);
-            // int currentNesting = currentStep.nestingLevel + startingNesting;
             int currentNesting = currentStep.getNestingLevel();
 
             StepExtension parentStep = nestingMap.get(currentNesting - 1);

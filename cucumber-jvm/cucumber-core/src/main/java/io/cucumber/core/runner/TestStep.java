@@ -46,6 +46,9 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
 
     // PickleballChange
     public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
+        System.out.println(
+            "@@runTestStep1 " + (stepDefinitionMatch == null ? "@@stepDefinitionMatch is null !" : getCodeLocation()));
+        System.out.println("@@runTestStep2 executionMode: " + executionMode);
         Instant startTime = bus.getInstant();
         emitTestStepStarted(testCase, bus, state.getTestExecutionId(), startTime);
 
@@ -68,8 +71,12 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
         return result.getStatus().is(Status.PASSED) ? executionMode : SKIP;
     }
 
-    private void emitTestStepStarted(TestCase testCase, EventBus bus, UUID textExecutionId, Instant startTime) {
-        System.out.println("@@emitTestStepStarted: " + this);
+    protected void emitTestStepStarted(TestCase testCase, EventBus bus, UUID textExecutionId, Instant startTime) {
+        System.out.println("@@emitTestStepStarted-getTestCaseState() : " + this.getClass().getSimpleName());
+        System.out.println("@@emitTestStepStarted-bus: " + bus);
+        System.out.println("@@emitTestStepStarted: "
+                + (this instanceof PickleStepTestStep pickleStepTestStep ? pickleStepTestStep.getStepText()
+                        : this.getClass().getSimpleName()));
         bus.send(new TestStepStarted(startTime, testCase, this));
         Envelope envelope = Envelope.of(new io.cucumber.messages.types.TestStepStarted(
             textExecutionId.toString(),
@@ -78,7 +85,8 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
         bus.send(envelope);
     }
 
-    private Status executeStep(TestCaseState state, ExecutionMode executionMode) throws Throwable {
+    // PickleballChange
+    protected Status executeStep(TestCaseState state, ExecutionMode executionMode) throws Throwable {
         state.setCurrentTestStepId(id);
         try {
             return executionMode.execute(stepDefinitionMatch, state);
@@ -87,7 +95,8 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
         }
     }
 
-    private Status mapThrowableToStatus(Throwable t) {
+    // PickleballChange
+    protected Status mapThrowableToStatus(Throwable t) {
         if (t.getClass().isAnnotationPresent(Pending.class)) {
             return Status.PENDING;
         }
@@ -103,14 +112,15 @@ public abstract class TestStep implements io.cucumber.plugin.event.TestStep {
         return Status.FAILED;
     }
 
-    private Result mapStatusToResult(Status status, Throwable error, Duration duration) {
+    // PickleballChange
+    protected Result mapStatusToResult(Status status, Throwable error, Duration duration) {
         if (status == Status.UNDEFINED) {
             return new Result(status, ZERO, null);
         }
         return new Result(status, duration, error);
     }
 
-    private void emitTestStepFinished(
+    protected void emitTestStepFinished(
             TestCase testCase, EventBus bus, UUID textExecutionId, Instant stopTime, Duration duration, Result result
     ) {
         bus.send(new TestStepFinished(stopTime, testCase, this, result));

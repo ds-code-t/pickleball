@@ -4,11 +4,17 @@ import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 
+import static tools.dscode.common.GlobalConstants.ROOT_STEP;
+
 //import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class CalcSteps {
     private int total;
 
+    @Given(ROOT_STEP)
+    public static void rootStep() {
+        System.out.println("@@ROOT_STEP!!222");
+    }
 
     @Given("zzz")
     public void zzz() {

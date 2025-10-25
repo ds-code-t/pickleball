@@ -18,6 +18,10 @@ public class PickleStepTestStep extends TestStep implements io.cucumber.plugin.e
     private final List<HookTestStep> afterStepHookSteps;
     private final List<HookTestStep> beforeStepHookSteps;
     public final PickleStepDefinitionMatch definitionMatch;
+    // pickleball change
+    public String overrideText = null;
+    // public PickleStepArgument overridePickleStepArgument = null;
+    // public boolean returnNullPickleStepArgument = false;
 
     // pickleball change
     public PickleStepTestStep(UUID id, URI uri, Step step, PickleStepDefinitionMatch definitionMatch) {
@@ -43,6 +47,8 @@ public class PickleStepTestStep extends TestStep implements io.cucumber.plugin.e
     // pickleball change
     @Override
     public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
+        System.out.println("@@runPickleStepTestStep " + getStepText());
+        System.out.println("@@runPickleStepTestStep getClass " + getClass());
         ExecutionMode nextExecutionMode = executionMode;
 
         for (HookTestStep before : beforeStepHookSteps) {
@@ -50,7 +56,7 @@ public class PickleStepTestStep extends TestStep implements io.cucumber.plugin.e
                     .run(testCase, bus, state, executionMode)
                     .next(nextExecutionMode);
         }
-
+        System.out.println("@@super getClass " + super.getClass());
         nextExecutionMode = super.run(testCase, bus, state, nextExecutionMode)
                 .next(nextExecutionMode);
 

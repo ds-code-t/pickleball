@@ -13,6 +13,8 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.messages.types.PickleStep;
 import io.cucumber.plugin.event.Argument;
+import io.cucumber.plugin.event.Result;
+import io.cucumber.plugin.event.Status;
 import io.cucumber.plugin.event.StepArgument;
 import io.cucumber.plugin.event.TestCase;
 import tools.dscode.common.annotations.DefinitionFlag;
@@ -20,6 +22,8 @@ import tools.dscode.common.annotations.DefinitionFlags;
 
 import java.lang.reflect.Method;
 import java.net.URI;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,6 +31,8 @@ import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static io.cucumber.core.exception.UnrecoverableExceptions.rethrowIfUnrecoverable;
+import static io.cucumber.core.runner.ExecutionMode.SKIP;
 import static tools.dscode.common.GlobalConstants.DocString_KEY;
 import static tools.dscode.common.GlobalConstants.TABLE_KEY;
 import static tools.dscode.common.util.Reflect.getProperty;
@@ -94,7 +100,7 @@ public class StepExtension extends StepRelationships {
         // Initialize super with the delegate's current state so the base class
         // fields are consistent (id, uri, step, hooks, definitionMatch).
         super(
-            nonNull(delegate, "delegate").getId(),
+            delegate.getId(),
             delegate.getUri(),
             delegate.getStep(),
             delegate.getBeforeStepHookSteps(),
@@ -170,6 +176,8 @@ public class StepExtension extends StepRelationships {
     }
 
     public void runExtension() {
+        System.out.println("runExtension " + getStepText());
+        System.out.println("runExtension delegate " + delegate.getStepText());
         delegate.run(getTestCase(), getBus(), getTestCaseState(), ExecutionMode.RUN);
     }
 
@@ -253,12 +261,14 @@ public class StepExtension extends StepRelationships {
      * =====================
      */
 
-    // Keep execution consistent; this is not a getter and is not overridden via
-    // map.
-    @Override
-    public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState state, ExecutionMode executionMode) {
-        return delegate.run(testCase, bus, state, executionMode);
-    }
+    // // Keep execution consistent; this is not a getter and is not overridden
+    // via
+    // // map.
+    // @Override
+    // public ExecutionMode run(TestCase testCase, EventBus bus, TestCaseState
+    // state, ExecutionMode executionMode) {
+    // return delegate.run(testCase, bus, state, executionMode);
+    // }
 
     // Hook lists (package-private in base). We expose as public and allow
     // overrides.
@@ -312,6 +322,7 @@ public class StepExtension extends StepRelationships {
 
     @Override
     public String getStepText() {
+        System.out.println("@@getStepText()== " + orOverride(KEY_STEP_TEXT, String.class, delegate::getStepText));
         return orOverride(KEY_STEP_TEXT, String.class, delegate::getStepText);
     }
 
@@ -346,6 +357,35 @@ public class StepExtension extends StepRelationships {
     public StepExtension modifyStep(String newStepText) {
         StepExtension newStep = createStepExtension(this, newStepText, rootStep.argument);
         return newStep;
+    }
+
+    public StepExtension executeStep(
+            TestCase testCase, EventBus bus,
+            TestCaseState state, ExecutionMode executionMode
+    ) {
+
+        System.out.println("@@runTestStep executionMode: " + executionMode);
+        Instant startTime = bus.getInstant();
+        emitTestStepStarted(testCase, bus, state.getTestExecutionId(), startTime);
+        Status status;
+        Throwable error = null;
+        try {
+            status = executeStep(state, executionMode);
+        } catch (Throwable t) {
+            rethrowIfUnrecoverable(t);
+            error = t;
+            status = mapThrowableToStatus(t);
+        }
+        Instant stopTime = bus.getInstant();
+        Duration duration = Duration.between(startTime, stopTime);
+        Result result = mapStatusToResult(status, error, duration);
+        state.add(result);
+
+        emitTestStepFinished(testCase, bus, state.getTestExecutionId(), stopTime, duration, result);
+
+        ExecutionMode endExecutionMode = result.getStatus().is(Status.PASSED) ? executionMode : SKIP;
+
+        return this;
     }
 
 }

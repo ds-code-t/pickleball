@@ -17,14 +17,15 @@ import static tools.dscode.common.GlobalConstants.META_FLAG;
 // Generated code
 @SuppressWarnings("unused")
 public final class PickleStep {
-    public final PickleStepArgument argument;
-    private final java.util.List<String> astNodeIds;
-    private final String id;
-    private final PickleStepType type;
-    private final String text;
+    public PickleStepArgument argument;
+    public java.util.List<String> astNodeIds;
+    public String id;
+    public PickleStepType type;
+    public String text;
     // PickleballChange
     public final String metaText;
 
+    // PickleballChange
     public PickleStep(
             PickleStepArgument argument,
             java.util.List<String> astNodeIds,

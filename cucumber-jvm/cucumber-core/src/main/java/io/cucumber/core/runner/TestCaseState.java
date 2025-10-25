@@ -40,11 +40,13 @@ public class TestCaseState extends SelfRegistering implements io.cucumber.core.b
         this.testCase = requireNonNull(testCase);
     }
 
-    void add(Result result) {
+    // Pickleballchange
+    public void add(Result result) {
         stepResults.add(result);
     }
 
-    UUID getTestExecutionId() {
+    // Pickleballchange
+    public UUID getTestExecutionId() {
         return testExecutionId;
     }
 

@@ -19,6 +19,7 @@ import io.cucumber.plugin.event.HookType;
 import io.cucumber.plugin.event.SnippetsSuggestedEvent;
 import io.cucumber.plugin.event.SnippetsSuggestedEvent.Suggestion;
 import tools.dscode.common.SelfRegistering;
+import tools.dscode.extensions.TestCaseExtension;
 
 import java.net.URI;
 import java.util.ArrayList;
@@ -77,9 +78,13 @@ public final class Runner extends SelfRegistering {
 
             glue.prepareGlue(localeForPickle(pickle));
             snippetGenerators = createSnippetGeneratorsForPickle(pickle.getLanguage(), glue.getStepTypeRegistry());
-
             TestCase testCase = createTestCaseForPickle(pickle);
-            testCase.run(bus);
+            // Pickleballchange
+            System.out.println("@@testCase getClass: " + testCase.getClass());
+            if (testCase instanceof TestCaseExtension testCaseExtension)
+                testCaseExtension.run(bus);
+            else
+                testCase.run(bus);
         } finally {
             glue.removeScenarioScopedGlue();
             disposeBackendWorlds();
@@ -145,16 +150,19 @@ public final class Runner extends SelfRegistering {
         }
     }
 
+    // PickleballChange
     private TestCase createTestCaseForPickle(Pickle pickle) {
+        System.out.println("@@createTestCaseForPickle pickle: " + pickle.getName());
+        System.out.println("@@createTestCaseForPickle pickle getSteps().size(): " + pickle.getSteps().size());
         if (pickle.getSteps().isEmpty()) {
             return new TestCase(bus.generateId(), emptyList(), emptyList(), emptyList(), pickle,
                 runnerOptions.isDryRun());
         }
-
         List<PickleStepTestStep> testSteps = createTestStepsForPickleSteps(pickle);
         List<HookTestStep> beforeHooks = createTestStepsForBeforeHooks(pickle.getTags());
         List<HookTestStep> afterHooks = createTestStepsForAfterHooks(pickle.getTags());
-        return new TestCase(bus.generateId(), testSteps, beforeHooks, afterHooks, pickle, runnerOptions.isDryRun());
+        return new TestCaseExtension(
+            new TestCase(bus.generateId(), testSteps, beforeHooks, afterHooks, pickle, runnerOptions.isDryRun()));
     }
 
     private void disposeBackendWorlds() {
