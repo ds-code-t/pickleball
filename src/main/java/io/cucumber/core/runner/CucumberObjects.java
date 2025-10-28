@@ -2,6 +2,7 @@ package io.cucumber.core.runner;
 
 import io.cucumber.core.gherkin.Feature;
 import io.cucumber.core.gherkin.Pickle;
+import io.cucumber.plugin.event.TestCase;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -10,88 +11,94 @@ import java.nio.file.Path;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Utilities to create fully functional Cucumber objects (Feature, Pickle, TestCase, PickleStepTestStep)
- * from in-memory strings, backed by a real Runner/Runtime via {@link RunnerRuntimeRegistry}.
+ * Utilities for constructing full Cucumber objects (Feature, Pickle, TestCase, PickleStepTestStep)
+ * from strings or existing Pickles, backed by a real Cucumber Runtime environment.
  *
- * No mocks, no dummies: we write a temporary .feature file, initialize a Cucumber context with the
- * given glue paths, then use the real Cucumber pipeline to produce objects.
- *
- * NOTE:
- *  - For {@link #createStepFromText(String, String...)}, you must have woven the ITD:
- *      - Runner implements RunnerExtras
- *      - Runner has createStepForText(Pickle,String)
- *    so we can call ((RunnerExtras)(Object) runner).createStepForText(...)
+ * Delegates everything to {@link RunnerRuntimeRegistry} + {@link RunnerRuntimeContext}.
  */
 public final class CucumberObjects {
 
     private CucumberObjects() {}
 
-    /* ───────────────────────────────────────────── Public API ───────────────────────────────────────────── */
+    // ────────────────────────────── PUBLIC HIGH-LEVEL API ──────────────────────────────
+
+    /** Convenience: Pull pickles from a live Runtime created from CLI args */
+    public static List<Pickle> picklesFromCli(String... cliArgs) {
+        return RunnerRuntimeRegistry.getOrInit(cliArgs).collectPickles();
+    }
 
     /**
-     * Create a fully matched {@link PickleStepTestStep} from a single Gherkin step text and glue paths.
-     *
-     * We synthesize a minimal .feature that contains exactly one scenario with the provided step,
-     * initialize a Runner/Runtime with the given glue, and ask the woven Runner method to match it.
-     *
-     * @param stepText   e.g. "Given I log in" or "@___ROOTSTEP_" or "I log in"
-     *                   (if no keyword is included, "*" is used so any step definition can match)
-     * @param gluePaths  one or more glue packages (e.g., "tools.dscode.coredefinitions")
+     * Create a fully matched PickleStepTestStep from a raw step text & glue.
      */
     public static PickleStepTestStep createStepFromText(String stepText, String... gluePaths) {
         Objects.requireNonNull(stepText, "stepText");
-        String featureSrc = minimalFeatureWithSingleStep(stepText);
+        String feature = minimalFeatureWithSingleStep(stepText);
 
-        var ctx = contextForFeatureSource(featureSrc, gluePaths);
-        Pickle pickle = ctx.firstPickle()
-                .orElseThrow(() -> new IllegalStateException("No pickle produced from synthesized feature"));
-
-        // Use the ITD to construct a fully matched PickleStepTestStep
-        return ((RunnerExtras) (Object) ctx.runner).createStepForText(pickle, rawStepText(stepText));
+        RunnerRuntimeContext ctx = contextForFeatureSource(feature, gluePaths);
+        Pickle pickle = ctx.firstPickle();
+        return ctx.createStepFromText(pickle, rawStepText(stepText));
     }
 
-    /** Parse a Feature from an in-memory string + glue paths (for proper type resolution). */
+    /** Parse features from in-memory DSL */
     public static List<Feature> featuresFromSource(String featureSource, String... gluePaths) {
         return contextForFeatureSource(featureSource, gluePaths).loadFeatures();
     }
 
-    /** Collect Pickles from an in-memory feature string, honoring any filters/order from default options. */
+    /** Fully filtered, ordered pickles from in-memory DSL */
     public static List<Pickle> picklesFromSource(String featureSource, String... gluePaths) {
         return contextForFeatureSource(featureSource, gluePaths).collectPickles();
     }
 
-    /** Create a {@link TestCase} for the first Pickle in the in-memory feature. */
+    /** Create one TestCase for the first pickle parsed from an in-memory feature */
     public static TestCase testCaseFromSource(String featureSource, String... gluePaths) {
         var ctx = contextForFeatureSource(featureSource, gluePaths);
-        Pickle p = ctx.firstPickle()
-                .orElseThrow(() -> new IllegalStateException("No pickle produced from feature source"));
-        return ctx.createTestCase(p);
+        Pickle first = ctx.firstPickle();
+        return ctx.createTestCase(first);
     }
 
-    /** Create {@link TestCase}s for all Pickles produced by the in-memory feature. */
+    /** All TestCases for a given in-memory feature */
     public static List<TestCase> testCasesFromSource(String featureSource, String... gluePaths) {
         var ctx = contextForFeatureSource(featureSource, gluePaths);
-        return ctx.createTestCases();
+        List<TestCase> result = new ArrayList<>();
+        for (Pickle p : ctx.collectPickles()) {
+            result.add(ctx.createTestCase(p));
+        }
+        return result;
     }
 
-    /** Convenience: first Pickle by exact name. */
+    /** Find first pickle by name */
     public static Optional<Pickle> firstPickleByName(String featureSource, String name, String... gluePaths) {
-        return contextForFeatureSource(featureSource, gluePaths).picklesByName(name).stream().findFirst();
+        return picklesFromSource(featureSource, gluePaths)
+                .stream()
+                .filter(p -> Objects.equals(p.getName(), name))
+                .findFirst();
     }
 
-    /* ───────────────────────────────────────── Internal plumbing ───────────────────────────────────────── */
+    /** Utility: given an existing pickle, just rebuild scenario state around glue */
+    public static TestCase testCaseFromPickle(Pickle pickle, String... gluePaths) {
+        Objects.requireNonNull(pickle, "pickle");
+        var ctx = contextForGlueOnly(gluePaths);
+        return ctx.createTestCase(pickle);
+    }
 
-    /**
-     * Build or reuse a Runner/Runtime context keyed by normalized args:
-     *   [--glue <each glue>] <tempFeaturePath>
-     */
+    // ────────────────────────────── INTERNAL CONTEXT CREATION ───────────────────────────
+
     private static RunnerRuntimeContext contextForFeatureSource(String featureSource, String... gluePaths) {
-        Path featurePath = writeTempFeature(featureSource);
+        Path featureFile = writeTempFeature(featureSource);
+        List<String> args = glueArgs(gluePaths);
+        args.add(featureFile.toAbsolutePath().toString());
+        return RunnerRuntimeRegistry.getOrInit(args.toArray(new String[0]));
+    }
+
+    private static RunnerRuntimeContext contextForGlueOnly(String... gluePaths) {
+        return RunnerRuntimeRegistry.getOrInit(glueArgs(gluePaths).toArray(new String[0]));
+    }
+
+    private static List<String> glueArgs(String... gluePaths) {
         List<String> args = new ArrayList<>();
         if (gluePaths != null) {
             for (String g : gluePaths) {
@@ -101,56 +108,52 @@ public final class CucumberObjects {
                 }
             }
         }
-        args.add(featurePath.toAbsolutePath().toString());
-        return RunnerRuntimeRegistry.getOrInit(args.toArray(new String[0]));
+        return args;
     }
 
-    /** Write an ephemeral .feature file (deleted on JVM exit). */
-    private static Path writeTempFeature(String featureSource) {
+    private static Path writeTempFeature(String source) {
         try {
             Path dir = Files.createTempDirectory("cuke-src-");
             Path file = dir.resolve("temp.feature");
-            Files.writeString(file, featureSource, StandardCharsets.UTF_8);
-            // best-effort cleanup
+            Files.writeString(file, source, StandardCharsets.UTF_8);
             file.toFile().deleteOnExit();
             dir.toFile().deleteOnExit();
             return file;
         } catch (IOException e) {
-            throw new IllegalStateException("Failed writing temporary .feature file", e);
+            throw new IllegalStateException("Unable to write temporary .feature file", e);
         }
     }
 
-    /** Build a minimal, valid feature with one scenario and exactly one step. */
+    // ────────────────────────────── GHERKIN HELPERS ──────────────────────────────
+
     private static String minimalFeatureWithSingleStep(String stepText) {
         String keyworded = ensureKeyword(stepText);
         return """
-               Feature: Generated Feature
-                 Scenario: Generated Scenario
+               Feature: Virtual Feature
+                 Scenario: Virtual Scenario
                    %s
                """.formatted(keyworded);
     }
 
-    /** If the user didn't include a keyword, prefix with '*' (valid Gherkin wildcard). */
     private static String ensureKeyword(String stepText) {
         String t = stepText.strip();
         if (startsWithKeyword(t)) return t;
         return "* " + t;
     }
 
-    /** The woven Runner helper expects raw step text (without the keyword). */
+    private static boolean startsWithKeyword(String t) {
+        return t.startsWith("Given ") || t.startsWith("When ")
+                || t.startsWith("Then ")  || t.startsWith("And ")
+                || t.startsWith("But ")   || t.startsWith("* ");
+    }
+
+    /** Extract raw text for matching (drop keyword or leading '*') */
     private static String rawStepText(String stepText) {
         String t = stepText.strip();
         if (startsWithKeyword(t)) {
-            int idx = t.indexOf(' ');
+            int idx = t.indexOf(" ");
             return (idx > 0 && idx + 1 < t.length()) ? t.substring(idx + 1) : "";
         }
-        // if "*" prefixed or no keyword, treat the whole thing as raw text
         return t.startsWith("* ") ? t.substring(2) : t;
-    }
-
-    private static boolean startsWithKeyword(String t) {
-        // Keep it simple (case-sensitive standard English keywords and '*')
-        return t.startsWith("Given ") || t.startsWith("When ") || t.startsWith("Then ")
-                || t.startsWith("And ")   || t.startsWith("But ")  || t.startsWith("* ");
     }
 }

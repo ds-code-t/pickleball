@@ -13,9 +13,8 @@ import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
-import static io.cucumber.core.runner.CurrentScenarioState.getGherkinDialect;
-import static io.cucumber.core.runner.CurrentScenarioState.getGherkinMessagesPickle;
 import static io.cucumber.core.runner.GlobalState.getEventBus;
+import static io.cucumber.core.runner.GlobalState.getGherkinDialect;
 import static io.cucumber.core.runner.GlobalState.getPickleFromPickleTestStep;
 import static io.cucumber.core.runner.GlobalState.getRunner;
 import static tools.dscode.common.util.Reflect.getProperty;

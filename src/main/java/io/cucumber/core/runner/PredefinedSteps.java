@@ -28,11 +28,15 @@ import static java.util.stream.Collectors.collectingAndThen;
 import static java.util.stream.Collectors.toList;
 import static tools.dscode.common.GlobalConstants.ROOT_STEP;
 import static tools.dscode.common.util.Reflect.getProperty;
+import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 
 public class PredefinedSteps {
 
-    public static final io.cucumber.core.runner.PickleStepTestStep rootStep =  CucumberObjects.createStepFromText(ROOT_STEP, "tools.dscode.coredefinitions");
+    public static final io.cucumber.core.runner.PickleStepTestStep rootStep = CucumberObjects.createStepFromText(ROOT_STEP, "tools.dscode.coredefinitions");
 
+    static {
+        invokeAnyMethod(rootStep, "setNoLogging", true);
+    }
 //    public static final io.cucumber.core.runner.PickleStepTestStep rootStep = ((List<PickleStepTestStep>)getProperty(getTestCase("@___ROOTSTEP_"), "newSteps")).getFirst();
 //
 //    // 1) Initialize singleton Runner (CLI-style)
@@ -52,7 +56,6 @@ public class PredefinedSteps {
 //    PickleStepTestStep step = RunnerExtrasSupport.createStepFromText(
 //            runner, pickles.getFirst(), "Given I am logged in"
 //    );
-
 
 
 }

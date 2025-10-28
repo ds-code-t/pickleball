@@ -4,10 +4,11 @@ import tools.dscode.registry.GlobalRegistry;
 
 public aspect RegisterBothByList {
 
-    /* Broad capture: constructor executions inside relevant Cucumber packages */
+    /* Include runner package so TestCase is captured */
     pointcut ctorInScope():
             execution(io.cucumber.core.runtime..*.new(..))
                     || execution(io.cucumber.core.feature..*.new(..))
+                    || execution(io.cucumber.core.runner..*.new(..))    // ← added
                     || execution(io.cucumber.java..*.new(..));
 
     /* Allow-list by FQCN (loader-agnostic matching) */
@@ -25,7 +26,6 @@ public aspect RegisterBothByList {
         return false;
     }
 
-    /** Loader-agnostic “assignable” check (by FQCN name) */
     private static boolean matchesByName(Object o) {
         if (o == null) return false;
         Class<?> c = o.getClass();
@@ -44,16 +44,11 @@ public aspect RegisterBothByList {
         return n.contains("$$") || n.matches(".*\\$\\d+");
     }
 
-    /* After successful constructor execution: fetch the instance and register */
-    after() returning(): ctorInScope() {
-        Object obj = thisJoinPoint.getThis();
+    /* Cleaner binding: get constructed instance directly */
+    after(Object obj) returning : ctorInScope() && this(obj) {
         if (obj == null) return;
         if (looksAnonymousOrSynthetic(obj.getClass())) return;
         if (!matchesByName(obj)) return;
-
-        // DEBUG (optional): uncomment to verify loader differences
-        // ClassLoader cl = obj.getClass().getClassLoader();
-        // System.out.println("[AOP] match: " + obj.getClass().getName() + " via CL=" + cl);
 
         GlobalRegistry.registerBoth(obj);
     }

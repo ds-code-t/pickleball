@@ -101,7 +101,7 @@ tasks.register('compileAspects', JavaExec) {
 
     args = [
             // Change to '-release','17' if you want 17-level bytecode
-            '-1.8',
+            '-21',
             '-sourceroots', aspectsSrcDir.absolutePath,
             '-d', aspectsOutDir.get().asFile.absolutePath,
             '-classpath', cp,
@@ -118,12 +118,8 @@ tasks.register('weaveTargets', JavaExec) {
     dependsOn 'compileAspects'
     outputs.dir(wovenDir)
 
-    // Resolve ALL jars to weave in a single FileCollection
-    doFirst {
-        wovenDir.get().asFile.mkdirs()
-    }
+    doFirst { wovenDir.get().asFile.mkdirs() }
 
-    // Collect the exact jars we want to weave (same list you use elsewhere)
     def inpathFiles = provider {
         def artifacts = configurations.weaveLibs
                 .resolvedConfiguration
@@ -137,27 +133,35 @@ tasks.register('weaveTargets', JavaExec) {
     mainClass.set('org.aspectj.tools.ajc.Main')
     classpath = configurations.ajcTools
 
-    // One outjar containing all woven classes (we’ll explode it for shading)
     def outJar = wovenDir.map { it.file("all-woven.jar") }.get().asFile
+
+    // 👇 include your compiled classes so RunnerExtras is resolvable
+    def weaverClasspath = files(
+            configurations.weaveLibs,
+            configurations.ajcRuntime,
+            sourceSets.main.output            // <— ADD THIS
+    ).asPath
 
     args = [
             '-showWeaveInfo',
             '-verbose',
             '-Xlint:warning',
 
-            // *** ALL targets together ***
             '-inpath', files(inpathFiles).asPath,
 
-            // compiled .aj -> classes
-            '-aspectpath', aspectsOutDir.get().asFile.absolutePath,
+            // aspects bytecode
+            '-aspectpath', files(
+            aspectsOutDir.get().asFile,
+            sourceSets.main.output          // (optional) safe to include here too
+    ).asPath,
 
-            // classpath for resolution
-            '-classpath', files(configurations.weaveLibs, configurations.ajcRuntime).asPath,
+            // resolution classpath (must include your own types like RunnerExtras)
+            '-classpath', weaverClasspath,
 
-            // single output jar with all woven types
             '-outjar', outJar.absolutePath
     ]
 }
+
 
 // Expand the woven jars before shadowJar runs (configure-time safe)
 tasks.register('expandWoven', Sync) {

@@ -5,6 +5,7 @@ import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.DefinitionFlags;
 
+import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.GlobalConstants.META_FLAG;
 import static tools.dscode.common.GlobalConstants.ROOT_STEP;
 
@@ -19,6 +20,8 @@ public class GeneralSteps  extends CoreSteps {
     @Given(ROOT_STEP)
     public static void rootStep() {
         System.out.println("@@ROOT_STEP!!11");
+        System.out.println("@@ROOT_STEP!!getCurrentScenarioState " + getCurrentScenarioState());
+        System.out.println("@@ROOT_STEP!!getCurrentScenarioState-testCase " + getCurrentScenarioState().pickle.getName());
     }
 //
 //    @Given("MESSAGE:{string}")
