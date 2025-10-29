@@ -6,7 +6,7 @@ import static java.util.Objects.requireNonNull;
 
 /**
  * Adds a new 'metaText' property to Step and peeks at the constructor arguments.
- * If the 'text' argument contains META_FLAG, split on the first occurrence:
+ * If the 'text' argument contains PARSER_FLAG, split on the first occurrence:
  *   - left  -> becomes the Step's 'text'
  *   - right -> stored in the introduced 'metaText' property
  *
@@ -85,7 +85,7 @@ public privileged aspect StepMetaTextAspect {
     /**
      * Resolve the META flag to look for, in priority order:
      *  1) System property: -Dcucumber.meta.flag=...
-     *  2) Public static String META_FLAG in one of the known classes (via reflection)
+     *  2) Public static String PARSER_FLAG in one of the known classes (via reflection)
      *  3) Fallback default "@@META@@"
      */
     private static String resolveMetaFlag() {
@@ -95,12 +95,12 @@ public privileged aspect StepMetaTextAspect {
         }
         // Try a few likely holders; customize this list for your project
         String[] candidates = new String[] {
-                "io.cucumber.gherkin.EncodingParserLineSwap", // if you exposed a public static META_FLAG
+                "io.cucumber.gherkin.EncodingParserLineSwap", // if you exposed a public static PARSER_FLAG
                 "io.cucumber.gherkin.Meta",
                 "tools.dscode.aspects.MetaFlags"
         };
         for (String fqn : candidates) {
-            String v = tryGetPublicStaticStringField(fqn, "META_FLAG");
+            String v = tryGetPublicStaticStringField(fqn, "PARSER_FLAG");
             if (v != null && !v.isEmpty()) {
                 return v;
             }

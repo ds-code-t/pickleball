@@ -18,6 +18,7 @@ public aspect RegisterBothByList {
             "io.cucumber.core.feature.FeatureParser",
             "io.cucumber.core.runtime.FeaturePathFeatureSupplier",
             "io.cucumber.core.runner.TestCase",
+            "io.cucumber.core.runner.TestCaseState",
             "io.cucumber.java.JavaBackend"
     };
 

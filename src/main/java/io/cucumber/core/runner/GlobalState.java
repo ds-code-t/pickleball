@@ -31,9 +31,6 @@ public class GlobalState {
         return (io.cucumber.core.gherkin.Pickle) getProperty(pickleStepTestStep, "pickle");
     }
 
-
-
-
     public static io.cucumber.core.gherkin.Pickle getGherkinMessagesPickle() {
         return (io.cucumber.core.gherkin.Pickle) getProperty(getTestCase(), "pickle");
     }
@@ -54,6 +51,11 @@ public class GlobalState {
     public static io.cucumber.core.runner.TestCase getTestCase() {
         return localOrGlobalOf(io.cucumber.core.runner.TestCase.class);
     }
+
+    public static io.cucumber.core.runner.TestCaseState getTestCaseState() {
+        return localOrGlobalOf(io.cucumber.core.runner.TestCaseState.class);
+    }
+
     public static io.cucumber.core.runner.CurrentScenarioState getCurrentScenarioState() {
         return (CurrentScenarioState) getProperty(localOrGlobalOf(TestCase.class), "currentScenarioState");
     }

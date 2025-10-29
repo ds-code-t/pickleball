@@ -5,7 +5,7 @@ import java.util.List;
 
 /**
  * Adds a 'metaText' property to PickleStep, and intercepts the constructor call.
- * If the incoming 'text' contains META_FLAG, split on first occurrence:
+ * If the incoming 'text' contains PARSER_FLAG, split on first occurrence:
  *   - left  -> used as the real PickleStep 'text'
  *   - right -> stored into introduced 'metaText'
  *
@@ -83,9 +83,9 @@ public privileged aspect PickleStepMetaTextAspect {
      * ========================= */
 
     /**
-     * Resolve META_FLAG in priority order:
+     * Resolve PARSER_FLAG in priority order:
      *  1) System property: -Dcucumber.meta.flag=...
-     *  2) public static String META_FLAG in known classes (via reflection)
+     *  2) public static String PARSER_FLAG in known classes (via reflection)
      *  3) default fallback "@@META@@"
      */
     private static String resolveMetaFlag() {
@@ -99,7 +99,7 @@ public privileged aspect PickleStepMetaTextAspect {
                 "tools.dscode.aspects.MetaFlags"            // example placeholder
         };
         for (String fqn : candidates) {
-            String v = tryGetPublicStaticStringField(fqn, "META_FLAG");
+            String v = tryGetPublicStaticStringField(fqn, "PARSER_FLAG");
             if (v != null && !v.isEmpty()) return v;
         }
         return "@@META@@";

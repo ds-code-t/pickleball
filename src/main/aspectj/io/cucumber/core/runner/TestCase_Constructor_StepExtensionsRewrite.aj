@@ -57,7 +57,7 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
             PickleStepTestStep step = (o instanceof PickleStepTestStep)
                     ? (PickleStepTestStep) o : null;
             if (step != null) {
-                extensions.add(new StepExtension(pickle, step));
+                extensions.add(new StepExtension(tc, step));
             }
         }
 

@@ -22,6 +22,7 @@ public class GeneralSteps  extends CoreSteps {
         System.out.println("@@ROOT_STEP!!11");
         System.out.println("@@ROOT_STEP!!getCurrentScenarioState " + getCurrentScenarioState());
         System.out.println("@@ROOT_STEP!!getCurrentScenarioState-testCase " + getCurrentScenarioState().pickle.getName());
+        getCurrentScenarioState().runStepExtensions();
     }
 //
 //    @Given("MESSAGE:{string}")

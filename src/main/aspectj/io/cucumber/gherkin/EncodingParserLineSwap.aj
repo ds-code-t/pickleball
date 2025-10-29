@@ -3,7 +3,7 @@ package io.cucumber.gherkin;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static tools.dscode.common.GlobalConstants.META_FLAG;
+import static tools.dscode.common.GlobalConstants.PARSER_FLAG;
 
 /**
  * Rewrites the string returned by EncodingParser.readWithEncodingFromSource(..)
@@ -13,7 +13,7 @@ import static tools.dscode.common.GlobalConstants.META_FLAG;
  * ByteBuddy DSL intent:
  *   - Pattern (MULTILINE):
  *       ^((?:(?:\s*:)|(?:\s*@\[[^\[\]]*\]))+)(\s*[A-Z*].*$)
- *   - Replacement: "$2" + META_FLAG + "$1"
+ *   - Replacement: "$2" + PARSER_FLAG + "$1"
  *
  * This aspect applies the same transformation with AspectJ.
  */
@@ -41,6 +41,6 @@ public aspect EncodingParserLineSwap {
         String ret = proceed();
         String original = (ret == null) ? "" : ret;
         Matcher matcher = LINE_SWAP_PATTERN.matcher(original);
-        return matcher.replaceAll("$2" + META_FLAG + "$1");
+        return matcher.replaceAll("$2" + PARSER_FLAG + "$1");
     }
 }

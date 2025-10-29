@@ -1,7 +1,7 @@
 package io.cucumber.core.runner;
 
-import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.plugin.event.PickleStepTestStep;
+import io.cucumber.plugin.event.TestCase;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.DefinitionFlags;
 
@@ -10,19 +10,21 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static io.cucumber.core.runner.GlobalState.getEventBus;
+import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 
-public class StepExtension  {
+public class StepExtension extends StepRelationships  {
 
     public List<DefinitionFlag> definitionFlags;
     public PickleStepTestStep pickleStepTestStep;
-    public Pickle pickle;
+    public TestCase testCase;
     public Method method;
 
-    public StepExtension(Pickle pickle, PickleStepTestStep pickleStepTestStep) {
+    public StepExtension(TestCase testCase, PickleStepTestStep pickleStepTestStep) {
         getProperty(pickleStepTestStep, "stepExtension");
-        this.pickle = pickle;
+        this.testCase = testCase;
         this.pickleStepTestStep = pickleStepTestStep;
         try {
             this.method = (Method) getProperty(pickleStepTestStep, "definitionMatch.stepDefinition.stepDefinition.method");
@@ -35,4 +37,10 @@ public class StepExtension  {
         if(definitionFlags.contains(DefinitionFlag.NO_LOGGING))
             invokeAnyMethod(pickleStepTestStep, "setNoLogging", true);
     }
+
+    public StepExtension run() {
+        invokeAnyMethod(pickleStepTestStep, "run", testCase, getEventBus(), getTestCaseState(), ExecutionMode.RUN);
+        return this;
+    }
+
 }

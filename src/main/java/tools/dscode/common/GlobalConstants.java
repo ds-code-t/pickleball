@@ -33,6 +33,7 @@ public class GlobalConstants {
     // Invisible meta flag injected into EncodingParser output then stripped at
     // PickleStep#getText
     public static final String META_FLAG = "\u206AMETA";
+    public static final String PARSER_FLAG = ",,,\u207A,,,";
     public static final String ROOT_STEP = "___-ROOT-STEP-";
     // public static final String ROOT_STEP = "ROOTSTEP";
     public static final UUID SKIP_LOGGING = new UUID(0L, 0xFFL);
