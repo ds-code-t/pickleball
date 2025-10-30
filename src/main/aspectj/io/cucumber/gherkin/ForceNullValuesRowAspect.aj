@@ -1,49 +1,39 @@
 package io.cucumber.gherkin;
 
 import java.util.List;
-
-import io.cucumber.messages.types.PickleStep;
-import io.cucumber.messages.types.Step;
 import io.cucumber.messages.types.TableCell;
-import io.cucumber.messages.types.TableRow;
-import io.cucumber.messages.types.StepKeywordType;
 
 /**
- * Forces PickleCompiler.pickleStep(..) to always receive a null valuesRow,
- * regardless of what the caller passes.
+ * Disables placeholder substitution ONLY when interpolate(...) executes
+ * while we're in the control flow of PickleCompiler.pickleStep(...).
  *
- * Signature being intercepted:
- *   private PickleStep pickleStep(
- *       Step step,
- *       List<TableCell> variableCells,
- *       TableRow valuesRow,
- *       StepKeywordType keywordType)
+ * We do NOT change valuesRow or other params; we just bypass the string
+ * substitution so step text stays as-is (e.g., "Given <X> ...").
  */
 public privileged aspect ForceNullValuesRowAspect {
 
-    /**
-     * Execution of PickleCompiler.pickleStep(..) with its four parameters.
-     * We bind all args so we can re-invoke with a null for the 3rd one.
-     */
-    pointcut execPickleStep(
-            Step step,
-            List<TableCell> variableCells,
-            TableRow valuesRow,
-            StepKeywordType keywordType
-    ) :
-            execution(io.cucumber.messages.types.PickleStep io.cucumber.gherkin.PickleCompiler.pickleStep(..))
-                    && args(step, variableCells, valuesRow, keywordType);
+    /** Any execution of PickleCompiler.pickleStep(..). */
+    pointcut inPickleStepExec():
+            execution(* io.cucumber.gherkin.PickleCompiler.pickleStep(..));
+
+    /** Any join points that occur under pickleStep's control flow. */
+    pointcut underPickleStepFlow():
+            cflowbelow(inPickleStepExec());
 
     /**
-     * Around advice: proceed with the same args, but force valuesRow = null.
+     * When interpolate(...) runs anywhere under the control flow of
+     * pickleStep(...), return the original name untouched.
+     *
+     * This also covers interpolate() calls made indirectly via
+     * pickleDataTable(...) and pickleDocString(...), because they're invoked
+     * from within pickleStep(...).
      */
-    PickleStep around(
-            Step step,
-            List<TableCell> variableCells,
-            TableRow valuesRow,
-            StepKeywordType keywordType
-    ) : execPickleStep(step, variableCells, valuesRow, keywordType) {
-        // Ignore the incoming valuesRow and pass null instead.
-        return proceed(step, variableCells, null, keywordType);
-    }
+    String around(String name, List<TableCell> variableCells, List<TableCell> valueCells)
+            : execution(String io.cucumber.gherkin.PickleCompiler.interpolate(String, java.util.List, java.util.List))
+            && args(name, variableCells, valueCells)
+            && underPickleStepFlow()
+            {
+                // No substitution when building PickleStep text / nested args.
+                return name;
+            }
 }

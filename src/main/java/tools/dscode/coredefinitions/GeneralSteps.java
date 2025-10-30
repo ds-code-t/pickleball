@@ -28,7 +28,7 @@ public class GeneralSteps extends CoreSteps {
 
     @Given(INFO_STEP)
     public static void infoStep(String message) {
-
+        System.out.println(message);
     }
 
     @Given(HARD_ERROR_STEP)

@@ -14,36 +14,26 @@ import io.cucumber.messages.types.Location;
 
 public aspect OutlineRowsAndTagAugment {
 
-    /* =========================================================
-     * (1) Introduce List<String> headerRow/valueRow on Pickle
-     * ========================================================= */
+    /* (1) Introduced outline row snapshots on Pickle */
     private transient List<String> io.cucumber.messages.types.Pickle.headerRow;
     private transient List<String> io.cucumber.messages.types.Pickle.valueRow;
 
     public List<String> io.cucumber.messages.types.Pickle.getHeaderRow() {
-        return (headerRow == null) ? List.of() : headerRow;
+        return (this.headerRow == null) ? List.of() : this.headerRow;
     }
     public List<String> io.cucumber.messages.types.Pickle.getValueRow() {
-        return (valueRow == null) ? List.of() : valueRow;
+        return (this.valueRow == null) ? List.of() : this.valueRow;
     }
     public void io.cucumber.messages.types.Pickle.setOutlineRows(List<String> hdr, List<String> vals) {
         this.headerRow = (hdr == null || hdr.isEmpty()) ? List.of() : List.copyOf(hdr);
-        this.valueRow = (vals == null || vals.isEmpty()) ? List.of() : List.copyOf(vals);
+        this.valueRow  = (vals == null || vals.isEmpty()) ? List.of() : List.copyOf(vals);
     }
 
-    /* =========================================================
-     * (2) Per-thread context for Examples row
-     *     Stack entries:
-     *       [0] = List<String> headerRow
-     *       [1] = List<String> valueRow
-     *       [2] = Location (derived from valuesRow if present, else fallback)
-     * ========================================================= */
+    /* (2) Per-thread context for Examples row: [hdr, vals, loc] */
     private static final ThreadLocal<Deque<Object[]>> CTX =
             ThreadLocal.withInitial(ArrayDeque::new);
 
-    /* =========================================================
-     * (3) Pointcuts
-     * ========================================================= */
+    /* (3) Pointcuts */
     pointcut withinCompileScenarioOutline():
             withincode(* io.cucumber.gherkin.PickleCompiler.compileScenarioOutline(..));
 
@@ -51,61 +41,55 @@ public aspect OutlineRowsAndTagAugment {
             List<?> bgSteps, List<?> scenarioSteps,
             List<TableCell> variableCells, TableRow valuesRow):
             call(* io.cucumber.gherkin.PickleCompiler.compilePickleSteps(..))
-                    && args(bgSteps, scenarioSteps, variableCells, valuesRow);
+                    && args(bgSteps, scenarioSteps, variableCells, valuesRow, ..);
+
+    pointcut callCompileTags(List<Tag> a, List<Tag> b):
+            call(* io.cucumber.gherkin.PickleCompiler.compileTags(..))
+                    && args(a, b, ..);
 
     pointcut callPickleCtor():
             call(io.cucumber.messages.types.Pickle+.new(..));
 
-    pointcut callCompileTags(List<Tag> a, List<Tag> b):
-            call(* io.cucumber.gherkin.PickleCompiler.compileTags(..))
-                    && args(a, b);
-
-    /* =========================================================
-     * (4) Push header/value rows (and location) for this Examples row
-     * ========================================================= */
+    /* (4) Push header/value rows + location for the current Examples row */
     Object around(List<?> bgSteps, List<?> scenarioSteps,
                   List<TableCell> variableCells, TableRow valuesRow)
             : callCompilePickleStepsWithCells(bgSteps, scenarioSteps, variableCells, valuesRow)
             && withinCompileScenarioOutline()
             {
-                boolean isOutlineRow = (valuesRow != null);
-                if (isOutlineRow) {
-                    List<String> hdr = variableCells.stream().map(TableCell::getValue).collect(Collectors.toList());
-                    List<String> vals = valuesRow.getCells().stream().map(TableCell::getValue).collect(Collectors.toList());
+                if (valuesRow != null) {
+                    final List<String> hdr  = (variableCells == null)
+                            ? List.of()
+                            : variableCells.stream().map(TableCell::getValue).collect(Collectors.toList());
+                    final List<String> vals = (valuesRow.getCells() == null)
+                            ? List.of()
+                            : valuesRow.getCells().stream().map(TableCell::getValue).collect(Collectors.toList());
                     Location loc = valuesRow.getLocation();
-                    if (loc == null) {
-                        loc = new Location(0L, null);
-                    }
+                    if (loc == null) loc = new Location(0L, null);
+
                     CTX.get().push(new Object[]{hdr, vals, loc});
                 }
                 return proceed(bgSteps, scenarioSteps, variableCells, valuesRow);
             }
 
-    /* =========================================================
-     * (5) Augment tags using header/value rows; use Tag(Location, String, String)
-     * ========================================================= */
+    /* (5) Augment tags using header/value rows */
     List<Tag> around(List<Tag> a, List<Tag> b)
             : callCompileTags(a, b)
             && withinCompileScenarioOutline()
             {
                 @SuppressWarnings("unchecked")
                 List<Tag> base = (List<Tag>) proceed(a, b);
-
                 List<Tag> out = new ArrayList<>(base);
 
                 Deque<Object[]> stack = CTX.get();
                 if (!stack.isEmpty()) {
                     Object[] top = stack.peek();
-                    @SuppressWarnings("unchecked")
-                    List<String> header = (List<String>) top[0];
-                    @SuppressWarnings("unchecked")
-                    List<String> values = (List<String>) top[1];
+                    @SuppressWarnings("unchecked") List<String> header = (List<String>) top[0];
+                    @SuppressWarnings("unchecked") List<String> values = (List<String>) top[1];
                     Location loc = (Location) top[2];
 
-                    int idxScenarioTags = header.indexOf("Scenario Tags");
+                    int idxScenarioTags  = header.indexOf("Scenario Tags");
                     int idxComponentTags = header.indexOf("Component Tags");
 
-                    // Scenario Tags → ensure leading '@'
                     if (idxScenarioTags >= 0 && idxScenarioTags < values.size()) {
                         String raw = values.get(idxScenarioTags);
                         if (raw != null && !raw.isBlank()) {
@@ -117,26 +101,22 @@ public aspect OutlineRowsAndTagAugment {
                         }
                     }
 
-                    // Component Tags → prefix with @_COMPONENT_TAG_ (strip a leading '@' if present)
                     if (idxComponentTags >= 0 && idxComponentTags < values.size()) {
                         String raw = values.get(idxComponentTags);
                         if (raw != null && !raw.isBlank()) {
                             for (String t : raw.trim().split("\\s+")) {
                                 if (t.isBlank()) continue;
                                 String token = t.startsWith("@") ? t.substring(1) : t;
-                                String comp = "@_COMPONENT_TAG_" + token;
+                                String comp  = "@_COMPONENT_TAG_" + token;
                                 out.add(new Tag(loc, comp, comp));
                             }
                         }
                     }
                 }
-
                 return out;
             }
 
-    /* =========================================================
-     * (6) After Pickle creation: attach rows and pop
-     * ========================================================= */
+    /* (6) After Pickle creation: attach rows and pop */
     after() returning(Pickle p)
             : callPickleCtor()
             && withinCompileScenarioOutline()
@@ -144,12 +124,19 @@ public aspect OutlineRowsAndTagAugment {
                 Deque<Object[]> stack = CTX.get();
                 if (!stack.isEmpty()) {
                     Object[] top = stack.peek();
-                    @SuppressWarnings("unchecked")
-                    List<String> hdr = (List<String>) top[0];
-                    @SuppressWarnings("unchecked")
-                    List<String> vals = (List<String>) top[1];
+                    @SuppressWarnings("unchecked") List<String> hdr  = (List<String>) top[0];
+                    @SuppressWarnings("unchecked") List<String> vals = (List<String>) top[1];
                     p.setOutlineRows(hdr, vals);
                     stack.pop();
                 }
+            }
+
+    /* (7) Guard against leaks if an exception aborts before Pickle construction */
+    after() throwing(Throwable t)
+            : withinCompileScenarioOutline()
+            && call(* io.cucumber.gherkin.PickleCompiler.compilePickleSteps(..))
+            {
+                Deque<Object[]> stack = CTX.get();
+                if (!stack.isEmpty()) stack.pop();
             }
 }

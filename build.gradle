@@ -205,7 +205,7 @@ tasks.shadowJar {
     //  - include AspectJ runtime so consumers don't add it
     //  - EXCLUDE original cucumber-* to avoid overwriting woven classes
     dependencies {
-        include(dependency("org.aspectj:aspectjrt:${aspectjVersion}"))
+//        include(dependency("org.aspectj:aspectjrt:${aspectjVersion}"))
         exclude(dependency("io.cucumber:cucumber-core:${cucumberVersion}"))
         exclude(dependency("io.cucumber:cucumber-java:${cucumberVersion}"))
         exclude(dependency("io.cucumber:cucumber-plugin:${cucumberVersion}"))

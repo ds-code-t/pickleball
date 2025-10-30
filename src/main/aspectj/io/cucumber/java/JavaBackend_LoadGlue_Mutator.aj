@@ -19,7 +19,7 @@ public aspect JavaBackend_LoadGlue_Mutator {
             String text = uri.toString();
 
             if (text.startsWith("classpath:/tools/dscode/coredefinitions")) continue;
-            if (text.equals("classpath:")) continue;
+            if (text.equals("classpath:") || text.equals("classpath:/")) continue;
 
             modified.add(uri);
         }
