@@ -1,4 +1,4 @@
-package io.cucumber.core;
+package io.cucumber.core.runner;
 
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.plugin.event.PickleStepTestStep;
@@ -9,26 +9,28 @@ import java.util.List;
 import java.util.Map;
 
 import static io.cucumber.core.runner.CucumberObjects.createStepFromText;
+import static io.cucumber.core.runner.CucumberObjects.createStepFromTextAndLocation;
+import static tools.dscode.common.GlobalConstants.META_FLAG;
 import static tools.dscode.common.util.Reflect.getProperty;
+import static tools.dscode.common.util.Reflect.setProperty;
 
 public class ScenarioStep extends StepExtension {
-    List<StepExtension> steps;
-    public void createRootStep(TestCase testCase) {
 
 
-
+    public static ScenarioStep createScenarioStep(TestCase testCase) {
+        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = createStepFromTextAndLocation( "SCENARIO: " + testCase.getName(), testCase.getLocation(), testCase.getUri(), "tools.dscode.coredefinitions");
+        System.out.println("@@scenarioPickleStepTestStep1: " + scenarioPickleStepTestStep);
+        System.out.println("@@scenarioPickleStepTestStep2: " + scenarioPickleStepTestStep.getStep().getText());
+        System.out.println("@@scenarioPickleStepTestStep3: " + getProperty(scenarioPickleStepTestStep, "definitionMatch"));
+        ScenarioStep scenarioStep = new ScenarioStep(testCase, scenarioPickleStepTestStep);
+        setProperty(testCase, "rootScenarioStep", scenarioStep);
+        return scenarioStep;
     }
 
-    public void createScenarioStep(TestCase testCase) {
-        steps = (List<StepExtension>) getProperty(testCase, "stepExtensions");
 
-        PickleStepTestStep scenarioStep = createStepFromText("a");
-
-    }
-
-
-    private ScenarioStep(TestCase testCase, PickleStepTestStep pickleStepTestStep) {
+    private ScenarioStep(TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
         super(testCase, pickleStepTestStep);
+        initializeScenarioSteps();
     }
 
     private void initializeScenarioSteps() {

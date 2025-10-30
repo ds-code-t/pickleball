@@ -1,5 +1,6 @@
 package io.cucumber.core.runner;
 
+
 /**
  * Adds a public StepExtension property to PickleStepTestStep.
  *
@@ -10,6 +11,9 @@ public aspect PickleStepTestStepExtensionAspect {
 
     // Introduced public field (null by default)
     public StepExtension io.cucumber.core.runner.PickleStepTestStep.stepExtension;
+    public io.cucumber.messages.types.PickleStep io.cucumber.core.runner.PickleStepTestStep.getPickleStep() {
+        return (io.cucumber.messages.types.PickleStep) tools.dscode.common.util.Reflect.getProperty(getStep(), "pickleStep");
+    }
 
     // (Optional) convenience accessors — uncomment if you prefer methods.
     // public StepExtension io.cucumber.core.runner.PickleStepTestStep.getStepExtension() { return stepExtension; }

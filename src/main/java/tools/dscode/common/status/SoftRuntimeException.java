@@ -1,6 +1,6 @@
 package tools.dscode.common.status;
 
-public class SoftRuntimeException extends RuntimeException {
+public class SoftRuntimeException extends RuntimeException implements SoftExceptionInterface {
 
     public SoftRuntimeException() {
         super();

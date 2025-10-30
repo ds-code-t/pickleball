@@ -34,7 +34,12 @@ public class GlobalConstants {
     // PickleStep#getText
     public static final String META_FLAG = "\u206AMETA";
     public static final String PARSER_FLAG = ",,,\u207A,,,";
-    public static final String ROOT_STEP = "___-ROOT-STEP-";
+    public static final String STEP_PREFIX = "\uFEFF\u200B\u00A0\u200C";
+    public static final String ROOT_STEP = STEP_PREFIX + "-ROOT-STEP-";
+    public static final String INFO_STEP = STEP_PREFIX + "INFO: ";
+    public static final String HARD_ERROR_STEP = STEP_PREFIX + "FAIL ERROR: ";
+    public static final String SOFT_ERROR_STEP = STEP_PREFIX + "ERROR: ";
+    public static final String SCENARIO_STEP = STEP_PREFIX + "SCENARIO: ";
     // public static final String ROOT_STEP = "ROOTSTEP";
     public static final UUID SKIP_LOGGING = new UUID(0L, 0xFFL);
 

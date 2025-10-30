@@ -4,36 +4,44 @@ import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.DefinitionFlags;
+import tools.dscode.common.status.SoftRuntimeException;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
-import static tools.dscode.common.GlobalConstants.META_FLAG;
+import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
+import static tools.dscode.common.GlobalConstants.INFO_STEP;
 import static tools.dscode.common.GlobalConstants.ROOT_STEP;
+import static tools.dscode.common.GlobalConstants.SOFT_ERROR_STEP;
 
-public class GeneralSteps  extends CoreSteps {
+public class GeneralSteps extends CoreSteps {
 
-    @Given(META_FLAG + "SCENARIO: (.*)")
-    public static void senarioStep() {
-        System.out.println("@@ROOT_STEP!!");
+    @Given("^SCENARIO: (.*)$")
+    public static void scenarioStep(String scenarioName) {
+        System.out.println("Running Scenario: " + scenarioName);
     }
 
     @DefinitionFlags(DefinitionFlag.NO_LOGGING)
     @Given(ROOT_STEP)
     public static void rootStep() {
-        System.out.println("@@ROOT_STEP!!11");
-        System.out.println("@@ROOT_STEP!!getCurrentScenarioState " + getCurrentScenarioState());
-        System.out.println("@@ROOT_STEP!!getCurrentScenarioState-testCase " + getCurrentScenarioState().pickle.getName());
-        getCurrentScenarioState().runStepExtensions();
+        System.out.println("Starting Scenario Run");
+        getCurrentScenarioState().startScenarioRun();
     }
-//
-//    @Given("MESSAGE:{string}")
-//    public static void setValues(String message) {
-//        System.out.println("MESSAGE: " + message);
-//        Throwable t = getScenarioState().getCurrentStep().storedThrowable;
-//        if (t != null) {
-//            getScenarioState().getCurrentStep().storedThrowable = null;
-//            throw new RuntimeException(t);
-//        }
-//    }
+
+    @Given(INFO_STEP)
+    public static void infoStep(String message) {
+
+    }
+
+    @Given(HARD_ERROR_STEP)
+    public static void hardFailStep(String message) {
+        throw new RuntimeException(message);
+    }
+
+    @Given(SOFT_ERROR_STEP)
+    public static void softFailStep(String message) {
+        throw new SoftRuntimeException(message);
+    }
+
+
 
     @Given("^print (.*)$")
     public static void printVal(String message) {

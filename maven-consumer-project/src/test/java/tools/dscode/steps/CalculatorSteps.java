@@ -28,6 +28,11 @@ public class CalculatorSteps {
         result = a + b;
     }
 
+    @When("throw error")
+    public void throwError() {
+        throw new RuntimeException("testing error in step");
+    }
+
     @Then("the result should be {int}")
     public void the_result_should_be(int expected) {
         assertThat(result).isEqualTo(expected);

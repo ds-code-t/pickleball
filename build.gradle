@@ -10,29 +10,38 @@ version = findProperty('version')  ?: '1.0.0-SNAPSHOT'
 repositories { mavenCentral() }
 
 def cucumberVersion = findProperty('cucumberVersion') ?: '7.27.2'
-def aspectjVersion  = findProperty('aspectjVersion')  ?: '1.9.21'
-def messagesVersion  = findProperty('aspectjVersion')  ?: '29.0.1'
-def gherkinVersion  = findProperty('aspectjVersion')  ?: '35.1.0'
+def aspectjVersion  = findProperty('aspectjVersion')  ?: '1.9.24'
+def messagesVersion = findProperty('messagesVersion')  ?: '29.0.1'
+def gherkinVersion  = findProperty('gherkinVersion')  ?: '35.1.0'
 
 // List of modules to weave (add more entries here later)
 def toWeave = [
-        [group: 'io.cucumber', name: 'cucumber-core', version: cucumberVersion],
-        [group: 'io.cucumber', name: 'cucumber-java', version: cucumberVersion],
+        [group: 'io.cucumber', name: 'cucumber-core',   version: cucumberVersion],
+        [group: 'io.cucumber', name: 'cucumber-java',   version: cucumberVersion],
         [group: 'io.cucumber', name: 'cucumber-plugin', version: cucumberVersion],
-        [group: 'io.cucumber', name: 'messages', version: messagesVersion],
-        [group: 'io.cucumber', name: 'gherkin', version: gherkinVersion],
+        [group: 'io.cucumber', name: 'messages',        version: messagesVersion],
+        [group: 'io.cucumber', name: 'gherkin',         version: gherkinVersion],
 ]
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }
 }
 
+
+/* 👇 Add this new block right after the java { } block */
+sourceSets {
+    main { java { srcDirs = ['src/main/java', 'src/main/aspectj'] } }
+    test { java { srcDirs += ['src/test/aspectj'] } }
+}
+
+
+
+
 configurations {
     // JARs we want to weave (allow transitives for type resolution)
     weaveLibs {
         transitive = true
         exclude group: 'net.bytebuddy'
-        // important: resolve only at execution time in tasks (Gradle 9 safe)
     }
     // AspectJ tool binaries (ajc)
     ajcTools
@@ -52,7 +61,6 @@ dependencies {
     api("com.fasterxml.jackson.datatype:jackson-datatype-guava:2.20.0")
     api("com.googlecode.aviator:aviator:5.4.3")
     api("com.ibm.jsonata4java:JSONata4Java:2.6.0")
-
 
     // AspectJ toolchain + runtime
     ajcTools    "org.aspectj:aspectjtools:${aspectjVersion}"
@@ -74,40 +82,38 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
-def aspectsSrcDir = file('src/main/aspectj')
-def aspectsOutDir = layout.buildDirectory.dir('classes-aspectj/main')
-
-// Compile .aj sources with AJC
-tasks.register('compileAspects', JavaExec) {
+tasks.register('ajcMain', JavaExec) {
     group = 'build'
-    description = 'Compiles AspectJ sources'
-    // ensure your Java helpers are compiled first
-    dependsOn 'classes'
+    description = 'Compile Java + AspectJ (main) with ajc'
 
-    inputs.dir(aspectsSrcDir)
-    outputs.dir(aspectsOutDir)
+    def outDir = sourceSets.main.java.destinationDirectory.get().asFile
+    outputs.dir(outDir)
 
     mainClass.set('org.aspectj.tools.ajc.Main')
     classpath = configurations.ajcTools
 
-    doFirst { aspectsOutDir.get().asFile.mkdirs() }
+    def cp = files(sourceSets.main.compileClasspath, configurations.ajcRuntime).asPath
 
-    // resolvable compile CP + AspectJ runtime + your compiled Java helpers
-    def cp = files(
-            sourceSets.main.compileClasspath,
-            sourceSets.main.output,     // <— your Java classes available to aspects
-            configurations.ajcRuntime
-    ).asPath
+    // 👇 Use ONLY what sourceSets already knows (includes aspectj dir)
+    def allSourceRoots = sourceSets.main.java.srcDirs
+            .collect { it.absolutePath }
+            .join(File.pathSeparator)
 
     args = [
-            // Change to '-release','17' if you want 17-level bytecode
             '-21',
-            '-sourceroots', aspectsSrcDir.absolutePath,
-            '-d', aspectsOutDir.get().asFile.absolutePath,
+            '-sourceroots', allSourceRoots,
+            '-d', outDir.absolutePath,
             '-classpath', cp,
             '-Xlint:ignore'
     ]
 }
+
+// Disable javac—ajc produces the class files
+tasks.named('compileJava').configure { enabled = false }
+// Make lifecycle compile depend on ajc
+tasks.named('classes') { dependsOn 'ajcMain' }
+
+// --- BINARY WEAVING OF DEPENDENCY JARS (unchanged in spirit) ---
 
 def wovenDir      = layout.buildDirectory.dir('woven')
 def wovenExpanded = layout.buildDirectory.dir('woven-expanded')
@@ -115,7 +121,7 @@ def wovenExpanded = layout.buildDirectory.dir('woven-expanded')
 tasks.register('weaveTargets', JavaExec) {
     group = 'build'
     description = 'Weaves ALL target jars with compiled aspects in one AJC run'
-    dependsOn 'compileAspects'
+    dependsOn 'ajcMain'
     outputs.dir(wovenDir)
 
     doFirst { wovenDir.get().asFile.mkdirs() }
@@ -134,12 +140,13 @@ tasks.register('weaveTargets', JavaExec) {
     classpath = configurations.ajcTools
 
     def outJar = wovenDir.map { it.file("all-woven.jar") }.get().asFile
+    def classesDir = sourceSets.main.java.destinationDirectory.get().asFile
 
-    // 👇 include your compiled classes so RunnerExtras is resolvable
+    // Resolution CP includes your compiled classes (types used by aspects)
     def weaverClasspath = files(
             configurations.weaveLibs,
             configurations.ajcRuntime,
-            sourceSets.main.output            // <— ADD THIS
+            classesDir
     ).asPath
 
     args = [
@@ -149,21 +156,17 @@ tasks.register('weaveTargets', JavaExec) {
 
             '-inpath', files(inpathFiles).asPath,
 
-            // aspects bytecode
-            '-aspectpath', files(
-            aspectsOutDir.get().asFile,
-            sourceSets.main.output          // (optional) safe to include here too
-    ).asPath,
+            // aspects bytecode: your compiled classes contain the aspects now
+            '-aspectpath', files(classesDir).asPath,
 
-            // resolution classpath (must include your own types like RunnerExtras)
+            // resolution classpath
             '-classpath', weaverClasspath,
 
             '-outjar', outJar.absolutePath
     ]
 }
 
-
-// Expand the woven jars before shadowJar runs (configure-time safe)
+// Expand the woven jars before shadowJar runs (same as before)
 tasks.register('expandWoven', Sync) {
     group = 'build'
     description = 'Expands woven jar into a staging directory for shading'
@@ -181,21 +184,17 @@ tasks.register('expandWoven', Sync) {
 }
 
 tasks.shadowJar {
-    dependsOn 'expandWoven', 'compileAspects', 'classes'
+    // use ajc output + woven deps
+    dependsOn 'ajcMain', 'expandWoven', 'classes'
 
     archiveBaseName.set('pickleball')
     archiveVersion.set(project.version.toString())
     archiveClassifier.set('') // publish as main artifact
 
-    // include your compiled Java helpers
+    // include your compiled Java + aspects (now both in main output)
     from(sourceSets.main.output) {
         include '**/*.class'
         includeEmptyDirs = false
-    }
-
-    // include the compiled aspects
-    from(aspectsOutDir) {
-        include '**/*.class'
     }
 
     // put woven classes LAST so they overwrite any originals
@@ -204,7 +203,7 @@ tasks.shadowJar {
 
     // Only shade what we really need:
     //  - include AspectJ runtime so consumers don't add it
-    //  - EXCLUDE original cucumber-core/java to avoid overwriting woven classes
+    //  - EXCLUDE original cucumber-* to avoid overwriting woven classes
     dependencies {
         include(dependency("org.aspectj:aspectjrt:${aspectjVersion}"))
         exclude(dependency("io.cucumber:cucumber-core:${cucumberVersion}"))
@@ -219,12 +218,10 @@ tasks.shadowJar {
     zip64 = true
 }
 
-
 // Disable the plain jar so only the shaded jar is produced/published
 tasks.jar { enabled = false }
 
-// Publish the SHADOW component and ensure all *other* runtime deps
-// (everything on runtimeClasspath except the shaded ones) are present in the POM.
+// Publish shaded artifact; POM massaging kept as-is
 publishing {
     publications {
         create('maven', MavenPublication) { pub ->
@@ -232,14 +229,11 @@ publishing {
             artifactId = 'pickleball'
             version    = project.version as String
 
-            // Publish the shaded jar with dependency-reduced POM baseline
             project.shadow.component(pub)
 
-            // Add back all non-shaded runtime dependencies so Maven consumers get them
             pom.withXml {
                 def pomNode = asNode()
 
-                // Get or create a single <dependencies> node
                 groovy.util.Node depsNode
                 def depsNodeList = pomNode.get('dependencies') as groovy.util.NodeList
                 if (depsNodeList && depsNodeList.size() > 0) {
@@ -248,7 +242,6 @@ publishing {
                     depsNode = pomNode.appendNode('dependencies')
                 }
 
-                // Existing deps (GA) to avoid duplicates
                 Set<String> existing = depsNode.children()
                         .findAll { it instanceof groovy.util.Node && ((groovy.util.Node) it).name() == 'dependency' }
                         .collect { n ->
@@ -256,10 +249,8 @@ publishing {
                             "${node.get('groupId')[0].text()}:${node.get('artifactId')[0].text()}"
                         } as Set
 
-                // Which modules are shaded (and thus should NOT be listed)
                 Set<String> shadedGA = (['org.aspectj:aspectjrt'] + toWeave.collect { "${it.group}:${it.name}" }) as Set
 
-                // Walk the resolved runtime classpath and add everything except shaded parents
                 def rtArtifacts = configurations.runtimeClasspath
                         .resolvedConfiguration
                         .resolvedArtifacts
@@ -296,6 +287,41 @@ publishing {
     }
     repositories { mavenLocal() }
 }
+
+
+
+
+
+
+apply plugin: 'idea'
+
+// Ensure woven jar exists when IDEA syncs
+tasks.named('ideaModule') { dependsOn 'weaveTargets' }
+
+configurations { wovenInsight }
+
+dependencies {
+    // Put your woven classes into an IDE-only configuration
+    wovenInsight files("$buildDir/woven/all-woven.jar")
+}
+
+idea {
+    module {
+        // Make sure the AspectJ folder stays a source root in IDEA
+        sourceDirs += file('src/main/aspectj')
+
+        // ▶ Add woven classes to IDE classpath for code insight
+        scopes.COMPILE.plus  += [ configurations.wovenInsight ]
+        scopes.RUNTIME.plus  += [ configurations.wovenInsight ]
+        // ▶ Remove the *unwoven* jars from IDE classpath (build remains unchanged)
+        scopes.COMPILE.minus += [ configurations.weaveLibs ]
+        scopes.RUNTIME.minus += [ configurations.weaveLibs ]
+    }
+}
+
+
+
+
 
 // Lifecycle
 tasks.assemble { dependsOn tasks.shadowJar }

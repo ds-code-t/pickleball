@@ -1,6 +1,6 @@
 package tools.dscode.common.status;
 
-public class SoftException extends Exception {
+public class SoftException  extends Exception implements SoftExceptionInterface {
 
     public SoftException() {
         super();

@@ -2,9 +2,12 @@ package io.cucumber.core.runner;
 
 import io.cucumber.core.gherkin.Feature;
 import io.cucumber.core.gherkin.Pickle;
+import io.cucumber.core.gherkin.Step;
+import io.cucumber.plugin.event.Location;
 import io.cucumber.plugin.event.TestCase;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -42,6 +45,23 @@ public final class CucumberObjects {
         Pickle pickle = ctx.firstPickle();
         return ctx.createStepFromText(pickle, rawStepText(stepText));
     }
+
+    public static PickleStepTestStep createStepFromTextAndLocation(String stepText, Location location, URI uri, String... gluePaths) {
+        Objects.requireNonNull(stepText, "stepText");
+        String feature = minimalFeatureWithSingleStep(stepText);
+
+        RunnerRuntimeContext ctx = contextForFeatureSource(feature, gluePaths);
+        Pickle pickle = ctx.firstPickle();
+        PickleStepTestStep returnStep = ctx.createStepFromText(pickle, rawStepText(stepText));
+
+        // No HasOverrides cast; just use the helper:
+        OverrideSupport.set(returnStep, "uri", uri);
+        OverrideSupport.set(returnStep.getStep(), "location", location);
+        OverrideSupport.set(returnStep.getStep(), "line", Integer.valueOf(location.getLine()));
+
+        return returnStep;
+    }
+
 
     /** Parse features from in-memory DSL */
     public static List<Feature> featuresFromSource(String featureSource, String... gluePaths) {

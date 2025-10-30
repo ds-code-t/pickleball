@@ -1,7 +1,6 @@
 package io.cucumber.core.runner;
 
 import io.cucumber.core.gherkin.Pickle;
-import io.cucumber.plugin.event.PickleStepTestStep;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -17,6 +16,10 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
     // Stores one StepExtension per original PickleStepTestStep
     public List<StepExtension> io.cucumber.core.runner.TestCase.stepExtensions;
 
+    public ScenarioStep io.cucumber.core.runner.TestCase.rootScenarioStep;
+    public ScenarioStep io.cucumber.core.runner.TestCase.getRootScenarioStep() {
+       return rootScenarioStep;
+    }
     // ✅ New field introduced as requested
     public CurrentScenarioState io.cucumber.core.runner.TestCase.currentScenarioState;
 
@@ -46,6 +49,7 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
         List replaced = new ArrayList(1);
         replaced.add(io.cucumber.core.runner.PredefinedSteps.rootStep);
 
+        System.out.println("@@dryRun: " + dryRun);
         // Build TestCase normally but with replaced list
         TestCase tc = (TestCase) proceed(id, replaced, beforeHooks, afterHooks, pickle, dryRun);
 
@@ -66,6 +70,7 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
 
         // ✅ New — assign CurrentScenarioState bound to this TestCase
         tc.currentScenarioState = new CurrentScenarioState(tc);
+        tc.rootScenarioStep = ScenarioStep.createScenarioStep(tc);
 
         return tc;
     }

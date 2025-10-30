@@ -1,7 +1,8 @@
 package io.cucumber.messages.types;
 
-import java.lang.reflect.Field;
 import java.util.List;
+
+import static tools.dscode.common.GlobalConstants.PARSER_FLAG;
 
 /**
  * Adds a 'metaText' property to PickleStep, and intercepts the constructor call.
@@ -16,11 +17,12 @@ public privileged aspect PickleStepMetaTextAspect {
     /* =========================
      * Introduced member(s)
      * ========================= */
-    private String io.cucumber.messages.types.PickleStep.metaText;
+    /* ===== Introduced members (ITDs) ===== */
+    public String io.cucumber.messages.types.PickleStep.metaText;
 
-    /** Returns the additional meta text (may be null). */
+    /** Getter exposed to callers (ITD). */
     public String io.cucumber.messages.types.PickleStep.getMetaText() {
-        return metaText;
+        return metaText == null ? "" : metaText;
     }
 
     /** Convenience flag: true when metaText was captured. */
@@ -58,7 +60,7 @@ public privileged aspect PickleStepMetaTextAspect {
             String text
     ) : pickleStepCtorCall(argument, astNodeIds, id, type, text) {
 
-        final String flag = resolveMetaFlag();
+        final String flag = PARSER_FLAG;
         if (text != null && flag != null && !flag.isEmpty()) {
             int idx = text.indexOf(flag);
             if (idx >= 0) {
@@ -78,44 +80,6 @@ public privileged aspect PickleStepMetaTextAspect {
         return (PickleStep) proceed(argument, astNodeIds, id, type, text);
     }
 
-    /* =========================
-     * Flag resolution helpers
-     * ========================= */
 
-    /**
-     * Resolve PARSER_FLAG in priority order:
-     *  1) System property: -Dcucumber.meta.flag=...
-     *  2) public static String PARSER_FLAG in known classes (via reflection)
-     *  3) default fallback "@@META@@"
-     */
-    private static String resolveMetaFlag() {
-        String prop = System.getProperty("cucumber.meta.flag");
-        if (prop != null && !prop.isEmpty()) return prop;
 
-        // Add/adjust candidates as needed in your project
-        String[] candidates = new String[] {
-                "io.cucumber.gherkin.Meta",                 // e.g., a utility holder you define
-                "io.cucumber.gherkin.EncodingParserMeta",   // example placeholder
-                "tools.dscode.aspects.MetaFlags"            // example placeholder
-        };
-        for (String fqn : candidates) {
-            String v = tryGetPublicStaticStringField(fqn, "PARSER_FLAG");
-            if (v != null && !v.isEmpty()) return v;
-        }
-        return "@@META@@";
-    }
-
-    private static String tryGetPublicStaticStringField(String className, String fieldName) {
-        try {
-            Class<?> c = Class.forName(className);
-            Field f = c.getField(fieldName);
-            if (f.getType() == String.class) {
-                Object v = f.get(null);
-                return (String) v;
-            }
-        } catch (Throwable ignore) {
-            // Not found / not accessible — ignore
-        }
-        return null;
-    }
 }
