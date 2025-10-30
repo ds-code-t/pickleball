@@ -2,9 +2,8 @@ package io.cucumber.core.runner;
 
 import io.cucumber.core.backend.Status;
 import io.cucumber.core.gherkin.Pickle;
-import io.cucumber.plugin.event.Result;
 import tools.dscode.common.annotations.DefinitionFlag;
-import tools.dscode.common.status.SoftException;
+import tools.dscode.common.mappings.ScenarioMapping;
 import tools.dscode.common.status.SoftExceptionInterface;
 
 import java.util.List;
@@ -17,12 +16,18 @@ import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_PASSING;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
 import static tools.dscode.common.util.Reflect.getProperty;
 
-public class CurrentScenarioState {
+public class CurrentScenarioState extends ScenarioMapping {
 
     public final TestCase testCase;
     public final Pickle pickle;
     List<StepExtension> stepExtensions;
     private TestCaseState testCaseState;
+
+    public StepExtension getCurrentStep() {
+        return currentStep;
+    }
+
+    private StepExtension currentStep;
 
 //    public ScenarioStep rootScenarioStep;
 

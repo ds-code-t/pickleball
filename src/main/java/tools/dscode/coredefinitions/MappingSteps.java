@@ -1,20 +1,18 @@
 //package tools.dscode.coredefinitions;
 //
 //import com.google.common.collect.LinkedListMultimap;
+//import io.cucumber.core.runner.StepData;
+//import io.cucumber.core.runner.StepExtension;
 //import io.cucumber.datatable.DataTable;
 //import io.cucumber.java.en.Given;
 //import tools.dscode.common.CoreSteps;
 //import tools.dscode.common.mappings.NodeMap;
-//import tools.dscode.extensions.StepExtension;
-//import tools.dscode.extensions.StepRelationships;
 //
 //import java.util.List;
 //
-//import static io.cucumber.core.runner.ScenarioState.getCurrentStep;
-//import static io.cucumber.core.runner.ScenarioState.getScenarioState;
-//import static tools.dscode.extensions.StepRelationships.pairSiblings;
-//import static tools.dscode.util.TableUtils.toFlatMultimap;
-//import static tools.dscode.util.TableUtils.toRowsMultimap;
+//import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
+//import static io.cucumber.core.runner.util.TableUtils.toRowsMultimap;
+//
 //
 //public class MappingSteps  extends CoreSteps {
 //
@@ -25,15 +23,15 @@
 //    public static void forEverRow(String tableName) {
 //        System.out.println("@@forEverRow!!");
 //
-//        StepExtension currentStep = getCurrentStep();
+//        StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
 //        DataTable dataTable = null;
 //        tableName = tableName == null || tableName.isBlank() ? "" : tableName.trim();
 //        if (tableName.isEmpty()) {
-//            StepRelationships nestStep = currentStep.getNextSibling();
+//            StepData nestStep = currentStep.nextSibling;
 //            if (nestStep != null && nestStep.dataTable!=null)
 //                dataTable = nestStep.dataTable;
 //        } else {
-//            dataTable = (DataTable) getScenarioState().get("-DATATABLE." + tableName);
+//            dataTable = (DataTable) getCurrentScenarioState().get("-DATATABLE." + tableName);
 //        }
 //        if (dataTable == null)
 //            throw new RuntimeException("Data Table not defined");
@@ -54,7 +52,7 @@
 //        System.out
 //                .println("@currentStepgetStepParsingMap get(\"ROWS\") " + currentStep.getStepParsingMap().get("ROWS"));
 //        StepExtension lastSibling = null;
-//        List<StepRelationships> children = currentStep.getChildSteps();
+//        List<StepData> children = currentStep.getChildSteps();
 //        currentStep.clearChildSteps();
 //
 //        System.out.println("@@rows.size(): " + rows.size());

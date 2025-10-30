@@ -13,6 +13,7 @@ import java.util.regex.Pattern;
 
 import static io.cucumber.core.runner.GlobalState.getEventBus;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
+import static io.cucumber.core.runner.PickleStepTestStepRewriter.cloneWithOverride;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 
@@ -54,7 +55,7 @@ public class StepExtension extends StepData {
     public Result run() {
         System.out.println("@@run: " + this);
         io.cucumber.plugin.event.Result result = execute();
-        System.out.println("@@result: " + result );
+        System.out.println("@@result: " + result);
         return result;
     }
 
@@ -72,9 +73,14 @@ public class StepExtension extends StepData {
         }
     }
 
-
     @Override
     public String toString() {
         return "SE: " + pickleStepTestStep.getStep().getText();
     }
+
+    public StepExtension modifyStepExtension(String newText) {
+        return new StepExtension(testCase, cloneWithOverride(pickleStepTestStep, newText));
+    }
+
+
 }

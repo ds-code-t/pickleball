@@ -3,14 +3,16 @@ package io.cucumber.core.runner;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.TestCase;
 import tools.dscode.common.annotations.DefinitionFlag;
+import tools.dscode.common.mappings.StepMapping;
 import tools.dscode.coredefinitions.GeneralSteps;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 
-public abstract class StepData {
+public abstract class StepData extends StepMapping {
     public io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep;
     public TestCase testCase;
     public List<StepData> childSteps = new ArrayList<>();
@@ -32,6 +34,21 @@ public abstract class StepData {
     public boolean hardFail = false;
     public boolean softFail = false;
     public boolean skipped = false;
+
+    public enum ConditionalStates {
+        SKIP_CHILDREN, SKIP, FALSE, TRUE
+    }
+
+    private final List<ConditionalStates> conditionalStates = new ArrayList<>();
+
+    public List<ConditionalStates> getConditionalStates() {
+        return conditionalStates;
+    }
+
+    public void addConditionalStates(ConditionalStates... states) {
+        this.conditionalStates.addAll(Arrays.stream(states).toList());
+    }
+
 
     public StepData initializeChildSteps() {
         if (childSteps.isEmpty()) return null;

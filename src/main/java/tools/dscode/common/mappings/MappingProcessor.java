@@ -364,18 +364,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return Set.of();
     }
 
-    //
-    // public static String getStringValue(Object obj) {
-    // if (obj instanceof List<?> list) {
-    // if (list.isEmpty()) return String.valueOf(obj);
-    // if (list.getFirst() instanceof JsonNode)
-    // return String.valueOf(((List<JsonNode>)
-    // list).stream().map(JsonNode::asText).toList());
-    // }
-    // if (obj instanceof JsonNode jsonNode)
-    // return jsonNode.asText();
-    // return String.valueOf(obj);
-    // }
 
     public static String getStringValue(Object obj) {
         if (obj == null)
