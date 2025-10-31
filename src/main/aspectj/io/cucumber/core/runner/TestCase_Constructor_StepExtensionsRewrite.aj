@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static io.cucumber.core.runner.PredefinedSteps.getRootStep;
+
 /**
  * Rewrites TestCase construction so that:
  *  - runtime sees a single root predefined step
@@ -47,7 +49,7 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
 
         // Replace Cucumber runtime execution list with rootStep only
         List replaced = new ArrayList(1);
-        replaced.add(io.cucumber.core.runner.PredefinedSteps.rootStep);
+        replaced.add(getRootStep() );
 
         System.out.println("@@dryRun: " + dryRun);
         // Build TestCase normally but with replaced list
@@ -71,7 +73,9 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
         // ✅ New — assign CurrentScenarioState bound to this TestCase
         tc.currentScenarioState = new CurrentScenarioState(tc);
         tc.rootScenarioStep = ScenarioStep.createScenarioStep(tc);
-
+        System.out.println("@@tc.rootScenarioStep: " + tc.rootScenarioStep);
+        System.out.println("@@tc.getTestSteps().size(): " + tc.getTestSteps().size());
+        System.out.println("@tc.getTestSteps().getFirst().getStepText(): " + ((io.cucumber.plugin.event.PickleStepTestStep)tc.getTestSteps().getFirst()).getStepText());
         return tc;
     }
 }

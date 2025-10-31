@@ -61,6 +61,7 @@ dependencies {
     api("com.fasterxml.jackson.datatype:jackson-datatype-guava:2.20.0")
     api("com.googlecode.aviator:aviator:5.4.3")
     api("com.ibm.jsonata4java:JSONata4Java:2.6.0")
+    api("io.github.classgraph:classgraph:4.8.184")
 
     // AspectJ toolchain + runtime
     ajcTools    "org.aspectj:aspectjtools:${aspectjVersion}"

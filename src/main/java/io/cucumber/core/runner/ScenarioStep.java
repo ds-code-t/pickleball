@@ -8,20 +8,24 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+
 import static io.cucumber.core.runner.CucumberObjects.createStepFromText;
-import static io.cucumber.core.runner.CucumberObjects.createStepFromTextAndLocation;
-import static tools.dscode.common.GlobalConstants.META_FLAG;
+import static io.cucumber.core.runner.StepCloner.clonePickleStepTestStep;
+import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.setProperty;
 
 public class ScenarioStep extends StepExtension {
-
-
     public static ScenarioStep createScenarioStep(TestCase testCase) {
-        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = createStepFromTextAndLocation( "SCENARIO: " + testCase.getName(), testCase.getLocation(), testCase.getUri(), "tools.dscode.coredefinitions");
+        Map<String, Object> overrideMap = new HashMap<>();
+        overrideMap.put("text", SCENARIO_STEP + testCase.getName());
+        overrideMap.put("location", testCase.getLocation());
+        overrideMap.put("uri", testCase.getUri());
+        overrideMap.put("gluePaths", new String[]{"tools.dscode.coredefinitions"});
+        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = createStepFromText( "SCENARIO: " + testCase.getName(),  "tools.dscode.coredefinitions");
+//        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = clonePickleStepTestStep( ((List<StepExtension>) getProperty(testCase, "stepExtensions")).getFirst().pickleStepTestStep,  overrideMap);
         System.out.println("@@scenarioPickleStepTestStep1: " + scenarioPickleStepTestStep);
         System.out.println("@@scenarioPickleStepTestStep2: " + scenarioPickleStepTestStep.getStep().getText());
-        System.out.println("@@scenarioPickleStepTestStep3: " + getProperty(scenarioPickleStepTestStep, "definitionMatch"));
         ScenarioStep scenarioStep = new ScenarioStep(testCase, scenarioPickleStepTestStep);
         setProperty(testCase, "rootScenarioStep", scenarioStep);
         return scenarioStep;

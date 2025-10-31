@@ -4,6 +4,7 @@ import io.cucumber.java.en.*;
 import tools.dscode.registry.GlobalRegistry;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
 

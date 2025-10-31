@@ -10,11 +10,12 @@ import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.GlobalConstants.INFO_STEP;
 import static tools.dscode.common.GlobalConstants.ROOT_STEP;
+import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.GlobalConstants.SOFT_ERROR_STEP;
 
 public class GeneralSteps extends CoreSteps {
 
-    @Given("^SCENARIO: (.*)$")
+    @Given("^" + SCENARIO_STEP + "(.*)$")
     public static void scenarioStep(String scenarioName) {
         System.out.println("Running Scenario: " + scenarioName);
     }
@@ -40,7 +41,6 @@ public class GeneralSteps extends CoreSteps {
     public static void softFailStep(String message) {
         throw new SoftRuntimeException(message);
     }
-
 
 
     @Given("^print (.*)$")
