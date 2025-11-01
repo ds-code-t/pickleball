@@ -3,9 +3,8 @@ package io.cucumber.core.runner;
 import java.util.HashMap;
 import java.util.Map;
 
-import static io.cucumber.core.runner.CucumberObjects.createStepFromText;
-import static io.cucumber.core.runner.StepBuilder.buildPickleStepTestStep;
-import static io.cucumber.core.runner.StepCloner.clonePickleStepTestStep;
+import static io.cucumber.core.runner.GlobalState.getGivenKeyword;
+import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.GlobalConstants.INFO_STEP;
 import static tools.dscode.common.GlobalConstants.ROOT_STEP;
@@ -18,7 +17,7 @@ public class PredefinedSteps {
 
     public static PickleStepTestStep getRootStep() {
 //        rootStep =   buildPickleStepTestStep(ROOT_STEP, "tools.dscode.coredefinitions");
-        rootStep =   createStepFromText( ROOT_STEP,  "tools.dscode.coredefinitions");;
+        rootStep =   getPickleStepTestStepFromStrings(getGivenKeyword(),  ROOT_STEP, null);;
         invokeAnyMethod(rootStep, "setNoLogging", true);
         return rootStep;
     }
@@ -28,16 +27,16 @@ public class PredefinedSteps {
     public StepExtension createMessageStep(StepExtension stepExtension, String message) {
         PickleStepTestStep modelStep = stepExtension.pickleStepTestStep;
         Map<String, Object> map = new HashMap<>();
-        return new StepExtension(stepExtension.testCase, clonePickleStepTestStep( modelStep, INFO_STEP + message, "tools.dscode.coredefinitions"));
+        return new StepExtension(stepExtension.testCase, getPickleStepTestStepFromStrings( modelStep,getGivenKeyword(),   INFO_STEP + message, null));
     }
 
     public StepExtension createHardErrorStep(StepExtension stepExtension, String message) {
         PickleStepTestStep modelStep = stepExtension.pickleStepTestStep;
-        return new StepExtension(stepExtension.testCase, clonePickleStepTestStep(modelStep,   HARD_ERROR_STEP + message,"tools.dscode.coredefinitions"));
+        return new StepExtension(stepExtension.testCase, getPickleStepTestStepFromStrings( modelStep,getGivenKeyword(),    HARD_ERROR_STEP + message, null));
     }
 
     public StepExtension createSoftErrorStep(StepExtension stepExtension, String message) {
         PickleStepTestStep modelStep = stepExtension.pickleStepTestStep;
-        return new StepExtension(stepExtension.testCase, clonePickleStepTestStep( modelStep, SOFT_ERROR_STEP + message,  "tools.dscode.coredefinitions"));
+        return new StepExtension(stepExtension.testCase, getPickleStepTestStepFromStrings( modelStep,getGivenKeyword(),   SOFT_ERROR_STEP + message, null));
     }
 }

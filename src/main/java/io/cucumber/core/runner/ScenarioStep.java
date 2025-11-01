@@ -1,7 +1,5 @@
 package io.cucumber.core.runner;
 
-import io.cucumber.core.runner.StepExtension;
-import io.cucumber.plugin.event.PickleStepTestStep;
 import io.cucumber.plugin.event.TestCase;
 
 import java.util.HashMap;
@@ -9,8 +7,8 @@ import java.util.List;
 import java.util.Map;
 
 
-import static io.cucumber.core.runner.CucumberObjects.createStepFromText;
-import static io.cucumber.core.runner.StepCloner.clonePickleStepTestStep;
+import static io.cucumber.core.runner.GlobalState.getGivenKeyword;
+import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.setProperty;
@@ -21,9 +19,7 @@ public class ScenarioStep extends StepExtension {
         overrideMap.put("text", SCENARIO_STEP + testCase.getName());
         overrideMap.put("location", testCase.getLocation());
         overrideMap.put("uri", testCase.getUri());
-        overrideMap.put("gluePaths", new String[]{"tools.dscode.coredefinitions"});
-        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = createStepFromText( "SCENARIO: " + testCase.getName(),  "tools.dscode.coredefinitions");
-//        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = clonePickleStepTestStep( ((List<StepExtension>) getProperty(testCase, "stepExtensions")).getFirst().pickleStepTestStep,  overrideMap);
+        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = getPickleStepTestStepFromStrings(getGivenKeyword() ,  SCENARIO_STEP + testCase.getName(), null);
         System.out.println("@@scenarioPickleStepTestStep1: " + scenarioPickleStepTestStep);
         System.out.println("@@scenarioPickleStepTestStep2: " + scenarioPickleStepTestStep.getStep().getText());
         ScenarioStep scenarioStep = new ScenarioStep(testCase, scenarioPickleStepTestStep);

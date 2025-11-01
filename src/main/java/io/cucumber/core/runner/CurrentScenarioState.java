@@ -44,7 +44,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     public void startScenarioRun() {
         StepExtension rootScenarioStep = testCase.getRootScenarioStep();
-        rootScenarioStep.addDefinitionFlag(DefinitionFlag.NO_LOGGING);
+//        rootScenarioStep.addDefinitionFlag(DefinitionFlag.NO_LOGGING);
         testCaseState = getTestCaseState();
         runStep(rootScenarioStep);
     }
@@ -54,8 +54,8 @@ public class CurrentScenarioState extends ScenarioMapping {
         Status currentStatus = testCaseState.getStatus();
         if (shouldRun(stepExtension)) {
             io.cucumber.plugin.event.Result result = stepExtension.run();
+            System.out.println("@@result2:: " + result);
             io.cucumber.plugin.event.Status status = result.getStatus();
-            System.out.println("@@result:: " + result);
             if (!result.getStatus().equals(io.cucumber.plugin.event.Status.PASSED)) {
                 Throwable throwable = result.getError();
                 if (throwable == null) {

@@ -40,7 +40,7 @@ public class GlobalConstants {
     public static final String HARD_ERROR_STEP = STEP_PREFIX + "FAIL ERROR: ";
     public static final String SOFT_ERROR_STEP = STEP_PREFIX + "ERROR: ";
 //    public static final String SCENARIO_STEP = STEP_PREFIX + "SCENARIO: ";
-    public static final String SCENARIO_STEP = "SCENARIO: ";
+    public static final String SCENARIO_STEP = "qqSCENARIO: ";
     // public static final String ROOT_STEP = "ROOTSTEP";
     public static final UUID SKIP_LOGGING = new UUID(0L, 0xFFL);
 

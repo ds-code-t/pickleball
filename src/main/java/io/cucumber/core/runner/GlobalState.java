@@ -19,6 +19,10 @@ public class GlobalState {
         return localOrGlobalOf(io.cucumber.core.runner.Runner.class);
     }
 
+    public static CachingGlue getCachingGlue() {
+        return (CachingGlue) getProperty(getRunner(), "glue");
+    }
+
     public static  Options getOptions() {
         return (Options) getProperty(getRunner(), "runnerOptions");
     }
@@ -35,13 +39,14 @@ public class GlobalState {
         return (io.cucumber.core.gherkin.Pickle) getProperty(getTestCase(), "pickle");
     }
 
+    public static String language = "en";
+
     public static String getLanguage() {
-        return getGherkinMessagesPickle().getLanguage();
+        return language;
     }
 
     public static GherkinDialect getGherkinDialect() {
-        return GherkinDialects.getDialect(getLanguage())
-                .orElse(GherkinDialects.getDialect("en").get());
+        return GherkinDialects.getDialect(language).orElse(GherkinDialects.getDialect("en").get());
     }
 
     public static String getGivenKeyword() {

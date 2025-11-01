@@ -43,6 +43,7 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
             boolean dryRun
     ) : ctorCall(id, testSteps, beforeHooks, afterHooks, pickle, dryRun) {
 
+        GlobalState.language = pickle.getLanguage();
         List original = testSteps;
 
         System.out.println("@@TestCase_Constructor_StepExtensionsRewrite: Original Steps = " + original.size());
