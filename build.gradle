@@ -4,23 +4,23 @@ plugins {
     id 'maven-publish'
 }
 
-group   = findProperty('group')    ?: 'tools.dscode'
-version = findProperty('version')  ?: '1.0.0-SNAPSHOT'
+group = findProperty('group') ?: 'tools.dscode'
+version = findProperty('version') ?: '1.0.0-SNAPSHOT'
 
 repositories { mavenCentral() }
 
 def cucumberVersion = findProperty('cucumberVersion') ?: '7.27.2'
-def aspectjVersion  = findProperty('aspectjVersion')  ?: '1.9.24'
-def messagesVersion = findProperty('messagesVersion')  ?: '29.0.1'
-def gherkinVersion  = findProperty('gherkinVersion')  ?: '35.1.0'
+def aspectjVersion = findProperty('aspectjVersion') ?: '1.9.24'
+def messagesVersion = findProperty('messagesVersion') ?: '29.0.1'
+def gherkinVersion = findProperty('gherkinVersion') ?: '35.1.0'
 
 // List of modules to weave (add more entries here later)
 def toWeave = [
-        [group: 'io.cucumber', name: 'cucumber-core',   version: cucumberVersion],
-        [group: 'io.cucumber', name: 'cucumber-java',   version: cucumberVersion],
+        [group: 'io.cucumber', name: 'cucumber-core', version: cucumberVersion],
+        [group: 'io.cucumber', name: 'cucumber-java', version: cucumberVersion],
         [group: 'io.cucumber', name: 'cucumber-plugin', version: cucumberVersion],
-        [group: 'io.cucumber', name: 'messages',        version: messagesVersion],
-        [group: 'io.cucumber', name: 'gherkin',         version: gherkinVersion],
+        [group: 'io.cucumber', name: 'messages', version: messagesVersion],
+        [group: 'io.cucumber', name: 'gherkin', version: gherkinVersion],
 ]
 
 java {
@@ -33,8 +33,6 @@ sourceSets {
     main { java { srcDirs = ['src/main/java', 'src/main/aspectj'] } }
     test { java { srcDirs += ['src/test/aspectj'] } }
 }
-
-
 
 
 configurations {
@@ -61,17 +59,18 @@ dependencies {
     api("com.fasterxml.jackson.datatype:jackson-datatype-guava:2.20.0")
     api("com.googlecode.aviator:aviator:5.4.3")
     api("com.ibm.jsonata4java:JSONata4Java:2.6.0")
-    api("io.github.classgraph:classgraph:4.8.184")
+//    api("io.github.classgraph:classgraph:4.8.184")
+    implementation("io.github.classgraph:classgraph:4.8.184")
 
     // AspectJ toolchain + runtime
-    ajcTools    "org.aspectj:aspectjtools:${aspectjVersion}"
-    ajcRuntime  "org.aspectj:aspectjrt:${aspectjVersion}"
+    ajcTools "org.aspectj:aspectjtools:${aspectjVersion}"
+    ajcRuntime "org.aspectj:aspectjrt:${aspectjVersion}"
     implementation "org.aspectj:aspectjrt:${aspectjVersion}" // shaded into pickleball
 
     // Declare weave targets, compile visibility, and runtime graph entries
     toWeave.each { gav ->
-        weaveLibs      "${gav.group}:${gav.name}:${gav.version}"
-        compileOnly    "${gav.group}:${gav.name}:${gav.version}"
+        weaveLibs "${gav.group}:${gav.name}:${gav.version}"
+        compileOnly "${gav.group}:${gav.name}:${gav.version}"
         implementation "${gav.group}:${gav.name}:${gav.version}"
     }
 
@@ -116,7 +115,7 @@ tasks.named('classes') { dependsOn 'ajcMain' }
 
 // --- BINARY WEAVING OF DEPENDENCY JARS (unchanged in spirit) ---
 
-def wovenDir      = layout.buildDirectory.dir('woven')
+def wovenDir = layout.buildDirectory.dir('woven')
 def wovenExpanded = layout.buildDirectory.dir('woven-expanded')
 
 tasks.register('weaveTargets', JavaExec) {
@@ -192,9 +191,8 @@ tasks.shadowJar {
     archiveVersion.set(project.version.toString())
     archiveClassifier.set('') // publish as main artifact
 
-    // include your compiled Java + aspects (now both in main output)
+    // ✅ include classes AND resources (keeps META-INF/services/*)
     from(sourceSets.main.output) {
-        include '**/*.class'
         includeEmptyDirs = false
     }
 
@@ -202,11 +200,8 @@ tasks.shadowJar {
     from(wovenExpanded)
     duplicatesStrategy = DuplicatesStrategy.INCLUDE  // last-wins merge
 
-    // Only shade what we really need:
-    //  - include AspectJ runtime so consumers don't add it
-    //  - EXCLUDE original cucumber-* to avoid overwriting woven classes
+    // Only shade what we really need
     dependencies {
-//        include(dependency("org.aspectj:aspectjrt:${aspectjVersion}"))
         exclude(dependency("io.cucumber:cucumber-core:${cucumberVersion}"))
         exclude(dependency("io.cucumber:cucumber-java:${cucumberVersion}"))
         exclude(dependency("io.cucumber:cucumber-plugin:${cucumberVersion}"))
@@ -214,10 +209,17 @@ tasks.shadowJar {
         exclude(dependency("io.cucumber:gherkin:${gherkinVersion}"))
     }
 
-    mergeServiceFiles()
+    // ✅ ensure service descriptors are merged for discovery
+    mergeServiceFiles {
+        include 'META-INF/services/io.cucumber.core.backend.Backend'
+        include 'META-INF/services/io.cucumber.core.backend.ObjectFactory'
+        include 'META-INF/services/org.junit.platform.engine.TestEngine'
+    }
+
     exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
     zip64 = true
 }
+
 
 // Disable the plain jar so only the shaded jar is produced/published
 tasks.jar { enabled = false }
@@ -226,9 +228,9 @@ tasks.jar { enabled = false }
 publishing {
     publications {
         create('maven', MavenPublication) { pub ->
-            groupId    = project.group as String
+            groupId = project.group as String
             artifactId = 'pickleball'
-            version    = project.version as String
+            version = project.version as String
 
             project.shadow.component(pub)
 
@@ -250,7 +252,11 @@ publishing {
                             "${node.get('groupId')[0].text()}:${node.get('artifactId')[0].text()}"
                         } as Set
 
-                Set<String> shadedGA = (['org.aspectj:aspectjrt'] + toWeave.collect { "${it.group}:${it.name}" }) as Set
+//                Set<String> shadedGA = (['org.aspectj:aspectjrt'] + toWeave.collect { "${it.group}:${it.name}" }) as Set
+                Set<String> shadedGA = (
+                        ['org.aspectj:aspectjrt', 'io.github.classgraph:classgraph'] +
+                                toWeave.collect { "${it.group}:${it.name}" }
+                ) as Set
 
                 def rtArtifacts = configurations.runtimeClasspath
                         .resolvedConfiguration
@@ -265,10 +271,10 @@ publishing {
                     def ga = "${ra.moduleVersion.id.group}:${ra.name}"
                     if (!existing.contains(ga)) {
                         def d = depsNode.appendNode('dependency')
-                        d.appendNode('groupId',    ra.moduleVersion.id.group)
+                        d.appendNode('groupId', ra.moduleVersion.id.group)
                         d.appendNode('artifactId', ra.name)
-                        d.appendNode('version',    ra.moduleVersion.id.version)
-                        d.appendNode('scope',      'compile')
+                        d.appendNode('version', ra.moduleVersion.id.version)
+                        d.appendNode('scope', 'compile')
                     }
                 }
             }
@@ -290,10 +296,6 @@ publishing {
 }
 
 
-
-
-
-
 apply plugin: 'idea'
 
 // Ensure woven jar exists when IDEA syncs
@@ -312,16 +314,13 @@ idea {
         sourceDirs += file('src/main/aspectj')
 
         // ▶ Add woven classes to IDE classpath for code insight
-        scopes.COMPILE.plus  += [ configurations.wovenInsight ]
-        scopes.RUNTIME.plus  += [ configurations.wovenInsight ]
+        scopes.COMPILE.plus += [configurations.wovenInsight]
+        scopes.RUNTIME.plus += [configurations.wovenInsight]
         // ▶ Remove the *unwoven* jars from IDE classpath (build remains unchanged)
-        scopes.COMPILE.minus += [ configurations.weaveLibs ]
-        scopes.RUNTIME.minus += [ configurations.weaveLibs ]
+        scopes.COMPILE.minus += [configurations.weaveLibs]
+        scopes.RUNTIME.minus += [configurations.weaveLibs]
     }
 }
-
-
-
 
 
 // Lifecycle

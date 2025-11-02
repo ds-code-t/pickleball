@@ -17,6 +17,7 @@ import java.util.UUID;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.createGherkinMessagesPickle;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.createGherkinMessagesStep;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
+import static io.cucumber.core.runner.ArgStepFunctions.updatePickleStepDefinitionMatch;
 import static io.cucumber.core.runner.GlobalState.getCachingGlue;
 import static io.cucumber.core.runner.GlobalState.getGherkinDialect;
 import static io.cucumber.core.runner.GlobalState.getOptions;
@@ -27,8 +28,8 @@ import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 
 public class NPickleStepTestStepFactory {
 
-    public static PickleStepTestStep createPickleStepTestStep(URI uri, Step step, PickleStepDefinitionMatch definitionMatch) {
-        return new PickleStepTestStep(UUID.randomUUID(), uri, step, definitionMatch);
+    public static PickleStepTestStep createPickleStepTestStep(URI uri, Step step, PickleStepDefinitionMatch pickleStepDefinitionMatch) {
+        return new PickleStepTestStep(UUID.randomUUID(), uri, step, updatePickleStepDefinitionMatch(pickleStepDefinitionMatch));
     }
 
 
@@ -73,11 +74,7 @@ public class NPickleStepTestStepFactory {
         List<PickleStepDefinitionMatch> matches = new ArrayList<>();
         System.out.println("@@MAtching step text = " + step.getText());
         for (CoreStepDefinition coreStepDefinition : stepDefinitionsByPattern.values()) {
-            System.out.println("@@coreStepDefinition-getStepDefinition1: " + coreStepDefinition.getStepDefinition());
-            System.out.println("@@coreStepDefinition-getStepDefinition().getLocation2: " + coreStepDefinition.getStepDefinition().getLocation());
-            System.out.println("@@coreStepDefinition-coreStepDefinition.getPattern()3: " + coreStepDefinition.getPattern());
-            System.out.println("@@coreStepDefinition-coreStepDefinition.getExpression()3: " + coreStepDefinition.getExpression());
-            System.out.println("@@coreStepDefinition-coreStepDefinition.getExpression().getSource()3: " + coreStepDefinition.getExpression().getSource());
+            System.out.println("@@coreStepDefinition-coreStepDefinition.getPattern(): " + coreStepDefinition.getPattern());
             Type[] types = (Type[]) getProperty(coreStepDefinition, "types");
 
             StepExpression stepExpression = coreStepDefinition.getExpression();

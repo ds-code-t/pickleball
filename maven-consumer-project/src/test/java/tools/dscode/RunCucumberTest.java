@@ -5,6 +5,7 @@ import org.junit.platform.suite.api.IncludeEngines;
 import org.junit.platform.suite.api.SelectPackages;
 import org.junit.platform.suite.api.Suite;
 
+import static io.cucumber.core.options.Constants.FILTER_TAGS_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
 
 @Suite
@@ -12,5 +13,6 @@ import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
 @SelectPackages("features") // <-- instead of @SelectClasspathResource("features")
 @ConfigurationParameter(
         key = GLUE_PROPERTY_NAME,
-        value = "tools.dscode.steps,tools.dscode.zzzqqq"
-)public class RunCucumberTest {}
+        value = "tools.dscode.steps,tools.dscode.zzzqqq,tools.dscode.ereaaa")
+@ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME, value = "@Tag3")
+public class RunCucumberTest {}

@@ -17,7 +17,7 @@ public class PredefinedSteps {
 
     public static PickleStepTestStep getRootStep() {
 //        rootStep =   buildPickleStepTestStep(ROOT_STEP, "tools.dscode.coredefinitions");
-        rootStep =   getPickleStepTestStepFromStrings(getGivenKeyword(),  ROOT_STEP, null);;
+        rootStep = getPickleStepTestStepFromStrings(getGivenKeyword(),  ROOT_STEP, null);;
         invokeAnyMethod(rootStep, "setNoLogging", true);
         return rootStep;
     }
