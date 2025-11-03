@@ -10,7 +10,7 @@ Feature: Addition
   Scenario Outline: conditionals2
     * IF: 1 + 1 < 0
   : Then print A
-    * ELSE-IF: 1 + 1 > 5
+    * ELSE-IF: 1 + 1 > 0
   : Then print B
     * ELSE-IF: 1 + 1 < 5
   : Then print C
