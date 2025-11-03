@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
+import static io.cucumber.core.runner.StepData.ConditionalStates.SKIP_CHILDREN;
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FAILED;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_HARD_FAILED;
@@ -39,10 +40,6 @@ public class CurrentScenarioState extends ScenarioMapping {
         this.stepExtensions = (List<StepExtension>) getProperty(testCase, "stepExtensions");
     }
 
-//    public void runStepExtensions() {
-//        System.out.println("@@runStepExtensions: " + this.stepExtensions.getFirst().pickleStepTestStep.getStep().getText());
-//        this.stepExtensions.getFirst().run();
-//    }
 
     public void startScenarioRun() {
         StepExtension rootScenarioStep = testCase.getRootScenarioStep();
@@ -53,23 +50,21 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void runStep(StepExtension stepExtension) {
-        System.out.println("@@runStep: " + stepExtension);
+        currentStep = stepExtension;
+        System.out.println("@@runStep: " + stepExtension + "");
         if (!shouldRun(stepExtension)) return;
+        System.out.println("@@running!: stepExtension.runMethodDirectly: " + stepExtension.runMethodDirectly + "");
 
         Result result;
         if (stepExtension.runMethodDirectly) {
-            System.out.println("@@runStep:a: " + stepExtension);
             stepExtension.runPickleStepDefinitionMatch();
-            System.out.println("@@runStep:b: " + stepExtension);
             result = new Result(Status.PASSED, Duration.ZERO, null);
-            System.out.println("@@runStep:c: " + stepExtension);
         } else {
-            System.out.println("@@runStep:d: " + stepExtension);
             result = stepExtension.run();
-            System.out.println("@@runStep:e: " + stepExtension);
         }
-        System.out.println("@@runStep:f: " + stepExtension);
-        System.out.println("@@result2:: " + result);
+        System.out.println("@@resultx: " + result);
+
+
         io.cucumber.plugin.event.Status status = result.getStatus();
         if (!result.getStatus().equals(io.cucumber.plugin.event.Status.PASSED)) {
             Throwable throwable = result.getError();
@@ -79,10 +74,7 @@ public class CurrentScenarioState extends ScenarioMapping {
                 else
                     throwable = new RuntimeException("Step failed with status: " + status);
             }
-            System.out.println("@@after-runStep1: " + stepExtension);
-            System.out.println("@@after-runStep2: " + throwable);
             if (throwable != null) {
-                System.out.println("@@throwable: " + throwable.getMessage());
                 if (SoftExceptionInterface.class.isAssignableFrom(throwable.getClass()))
                     isScenarioSoftFail = true;
                 else {
@@ -92,22 +84,21 @@ public class CurrentScenarioState extends ScenarioMapping {
             }
         }
 
-        System.out.println("@@runStep2: " + stepExtension);
         if (isScenarioComplete())
             return;
-        System.out.println("@@runStep3: " + stepExtension);
         for (StepData attachedStep : stepExtension.attachedSteps) {
             runStep((StepExtension) attachedStep);
         }
-
-        StepData firstChild = stepExtension.initializeChildSteps();
-        System.out.println("@@firstChild: " + firstChild);
-        if (firstChild != null) runStep((StepExtension) firstChild);
-
+        if (!stepExtension.childSteps.isEmpty() && !stepExtension.getConditionalStates().contains(SKIP_CHILDREN)
+                && stepExtension.initializeChildSteps() instanceof StepExtension firstChild) {
+            System.out.println("@@firstChild: " + firstChild);
+            runStep(firstChild);
+        }
         if (stepExtension.nextSibling != null) {
             runStep((StepExtension) stepExtension.nextSibling);
         }
     }
+
 
     private boolean isScenarioHardFail = false;
     private boolean isScenarioSoftFail = false;

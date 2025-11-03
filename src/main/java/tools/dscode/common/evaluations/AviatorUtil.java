@@ -104,7 +104,6 @@ public final class AviatorUtil {
         if (expr == null)
             return null;
         String processedExpression = preprocessExpression(expr.toString());
-        System.out.println("@@@###processedExpression: " + processedExpression);
         if (map == null)
             return AviatorEvaluator.execute(processedExpression);
         return AviatorEvaluator.execute(processedExpression, map);

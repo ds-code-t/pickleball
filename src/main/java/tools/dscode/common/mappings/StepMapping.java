@@ -34,13 +34,10 @@ public class StepMapping {
         this.stepParsingMap.copyParsingMap(stepParsingMap);
         // this.stepParsingMap = stepParsingMap;
         this.stepParsingMap.addMaps(stepNodeMap);
-        System.out.println("@@setStepParsingMap " + stepParsingMap);
     }
 
     public void addToStepParsingMap(NodeMap... nodes) {
-        System.out.println("@@this.stepParsingMap1: " + this.stepParsingMap);
         this.stepParsingMap.addMaps(nodes);
-        System.out.println("@@this.stepParsingMap2: " + this.stepParsingMap);
     }
 
     public String evalWithStepMaps(String expression) {

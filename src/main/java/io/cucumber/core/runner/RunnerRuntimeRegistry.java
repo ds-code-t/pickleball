@@ -34,8 +34,6 @@ public final class RunnerRuntimeRegistry {
     public static RunnerRuntimeContext getOrInit(String... cliArgs) {
         String key = normalizeArgs(cliArgs);
         RunnerRuntimeContext ctx = CONTEXTS.computeIfAbsent(key, k -> buildContext(cliArgs));
-        out.println("@@ cliArgs: " + java.util.Arrays.toString(cliArgs));
-        out.println("@@ context.runtimeOptions.getGlue: " + ctx.runtimeOptions.getGlue());
         return ctx;
     }
 
@@ -52,7 +50,6 @@ public final class RunnerRuntimeRegistry {
         CommandlineOptionsParser parser = new CommandlineOptionsParser(out);
         RuntimeOptions runtimeOptions =
                 parser.parse(cliArgs == null ? new String[0] : cliArgs).build();
-        out.println("@@runtimeOptions.getGlue():: " + runtimeOptions.getGlue());
 
         // Choose one loader that can see BOTH: consumer test classes and your dep jar.
         ClassLoader fallback = RunnerRuntimeRegistry.class.getClassLoader();
@@ -93,9 +90,6 @@ public final class RunnerRuntimeRegistry {
             out.println("@@ probe: coredefinitions NOT visible to loader -> " + e);
         }
 
-        out.println("@@ classloader.effective = " + effectiveCl);
-        out.println("@@ classloader.of RunnerRuntimeRegistry = " + fallback);
-        out.println("@@ classloader.of TCCL (after) = " + Thread.currentThread().getContextClassLoader());
 
         return new RunnerRuntimeContext(runner, runtimeOptions, runtime);
     }

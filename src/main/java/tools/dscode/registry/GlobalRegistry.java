@@ -15,13 +15,11 @@ public final class GlobalRegistry {
     public static String keyFor(Class<?> type)     { return normalizeKey(type.getName()); }
 
     public static void registerGlobal(Object instance) {
-        System.out.println("@@registerGlobal: " + instance.getClass().getName());
         GLOBAL.putIfAbsent(keyFor(instance.getClass()), instance);
         // DEBUG (optional):
         // System.out.println("[Reg][GLOBAL] " + instance.getClass().getName());
     }
     public static void registerLocal(Object instance) {
-        System.out.println("@@registerLocal: " + instance.getClass().getName());
         LOCAL.get().putIfAbsent(keyFor(instance.getClass()), instance);
         // System.out.println("[Reg][LOCAL ] " + instance.getClass().getName());
     }

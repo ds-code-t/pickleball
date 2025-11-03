@@ -3,6 +3,7 @@ package io.cucumber.core.runner;
 
 import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.plugin.event.TestCase;
+import tools.dscode.common.annotations.DefinitionFlag;
 
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static tools.dscode.common.GlobalConstants.ROOT_STEP;
@@ -38,7 +39,8 @@ public privileged aspect PickleStepTestStep_RunInterceptor {
         String text = self.getStepText();
         System.out.println("@@text=: " + text + "");
         System.out.println("@@ROOT_STEP=: " + ROOT_STEP + "");
-        if (text != null && text.equals(ROOT_STEP)) {
+//        if (text != null && text.equals(ROOT_STEP)) {
+        if (self.getDefinitionFlags().contains(DefinitionFlag.RUN_METHOD_DIRECTLY)) {
             System.out.println("@@getDefinitionMatch-runStep:");
             // Run the underlying definition directly and do NOT execute the normal run body
             System.out.println("@@getTestCaseState(): " + getTestCaseState() );

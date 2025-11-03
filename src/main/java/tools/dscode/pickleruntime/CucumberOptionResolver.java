@@ -131,7 +131,6 @@ public final class CucumberOptionResolver {
                 List<String> list = (v == null) ? new ArrayList<>() : new ArrayList<>(v);
                 if (list.stream().noneMatch("tools.dscode.coredefinitions"::equals)) {
                     list.add("tools.dscode.coredefinitions");
-                    System.out.println("@@CucumberOptionResolver: Added default glue path 'tools.dscode.coredefinitions'");
                 }
                 return list;
             });
@@ -140,8 +139,6 @@ public final class CucumberOptionResolver {
 
             try {
                 String[] cli = toCliArgs(CACHE);
-                System.out.println("@@CucumberOptionResolver.globalOptions = " + normalized);
-                System.out.println("@@CucumberOptionResolver.globalArgs    = " + java.util.Arrays.toString(cli));
             } catch (Throwable ignore) { /* best-effort */ }
         }
         return Collections.unmodifiableMap(CACHE);
@@ -201,7 +198,6 @@ public final class CucumberOptionResolver {
         try {
             Class<?> cgClass = tryLoadClassGraph();
             if (cgClass == null) {
-                System.out.println("@@CucumberOptionResolver: ClassGraph not on classpath; skipping JUnit5 suite scan.");
                 return;
             }
             dbg("JUnit5 scan using ClassGraph %s @ %s", cgClass.getName(), where(cgClass));

@@ -63,10 +63,14 @@ public privileged aspect PickleStepMetaTextAspect {
         final String flag = PARSER_FLAG;
         if (text != null && flag != null && !flag.isEmpty()) {
             int idx = text.indexOf(flag);
+            System.out.println("@@flag index: " + idx);
+            System.out.println("@@text: " + text);
             if (idx >= 0) {
                 // Split on first occurrence only
                 String left  = text.substring(0, idx);
                 String right = text.substring(idx + flag.length());
+                System.out.println("@@left: " + left);
+                System.out.println("@@right: " + right);
 
                 // Proceed with 'left' as the official PickleStep text
                 PickleStep ps = (PickleStep) proceed(argument, astNodeIds, id, type, left);

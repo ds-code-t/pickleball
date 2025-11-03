@@ -19,6 +19,7 @@ public class ConditionalSteps extends CoreSteps {
 
     @Given("^((?:IF:|ELSE:|ELSE-IF:|THEN:).*)$")
     public static void runConditional(String inputString) {
+        System.out.println("@@runConditional: " + inputString);
         StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
         if (inputString.startsWith("ELSE")) {
             if (!currentStep.previousSibling.getConditionalStates()

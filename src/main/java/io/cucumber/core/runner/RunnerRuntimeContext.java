@@ -78,7 +78,6 @@ public final class RunnerRuntimeContext {
     }
 
     public TestCase createTestCase(Pickle pickle) {
-        System.out.println("@@createTestCase1-pickle.getName(): " + pickle.getName());
         return extras().createTestCase(pickle);
     }
 
@@ -94,9 +93,6 @@ public final class RunnerRuntimeContext {
 
     public static PickleStepDefinitionMatch findPickleStepDefinitionMatch(io.cucumber.core.gherkin.Step step, String... gluePaths) {
         RunnerRuntimeContext context = io.cucumber.core.runner.RunnerRuntimeRegistry.getOrInit(gluePaths);
-        System.out.println("@@context.runtimeOptions.getGlue(): " + context.runtimeOptions.getGlue());
-        System.out.println("@@getGherkinMessagesPickle(): " + getGherkinMessagesPickle().getName());
-        System.out.println("@@step: " + step.getText());
         return (PickleStepDefinitionMatch) invokeAnyMethod(context.runner, "matchStepToStepDefinition", getGherkinMessagesPickle(), step);
     }
 

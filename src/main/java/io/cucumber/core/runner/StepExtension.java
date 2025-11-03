@@ -32,7 +32,6 @@ public class StepExtension extends StepData {
 
     public StepExtension(TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
         super(testCase, pickleStepTestStep);
-        System.out.println("@@StepExtension1: " + pickleStepTestStep.getStepText());
         try {
             this.method = (Method) getProperty(pickleStepTestStep, "definitionMatch.stepDefinition.stepDefinition.method");
             DefinitionFlags annotation = method.getAnnotation(DefinitionFlags.class);
@@ -54,6 +53,7 @@ public class StepExtension extends StepData {
 
 
         String metaText = pickleStepTestStep.getPickleStep().getMetaText();
+        System.out.println("@@metaText: " + metaText);
         Matcher matcher = pattern.matcher(metaText);
 
         while (matcher.find()) {
@@ -76,30 +76,17 @@ public class StepExtension extends StepData {
 //            }
             PickleStepTestStep executionPickleStepTestStep = resolveAndClone(getStepParsingMap());
             io.cucumber.plugin.event.Result result = execute(executionPickleStepTestStep);
-            System.out.println("@@executionPickleStepTestStep1: " + executionPickleStepTestStep.getStepText());
-            System.out.println("@@executionPickleStepTestStep2: " + executionPickleStepTestStep.getDefinitionMatch());
-            System.out.println("@@executionPickleStepTestStep3: " + executionPickleStepTestStep.getDefinitionMatch().getCodeLocation());
-            System.out.println("@@executionPickleStepTestStep4: " + executionPickleStepTestStep.getDefinitionMatch().getLocation());
             System.out.println("@@result1: " + result);
             return result;
     }
 
     public Result execute(io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep) {
         System.out.println("@@execute: " + this);
-        System.out.println("@@getTestCase(): " + getTestCase());
-        System.out.println("@@getEventBus(): " + getEventBus());
-        System.out.println("@@getTestCaseState(): " + getTestCaseState());
         try {
             Object r = invokeAnyMethod(executionPickleStepTestStep, "run", getTestCase(), getEventBus(), getTestCaseState(), ExecutionMode.RUN);
-            System.out.println("@@pickleStepTestStep.getLastResult(); : " + executionPickleStepTestStep.getLastResult());
 //            System.out.println("@@pickleStepTestStep._lastResult : " + pickleStepTestStep._lastResult);
             TestStep testStep = executionPickleStepTestStep;
-            System.out.println("@@");
             System.out.println("@@testStep.getLastResult(); : " + testStep.getLastResult());
-//            System.out.println("@@testStep._lastResult; : " + testStep._lastResult);
-//            System.out.println("@@r: " + r);
-//            System.out.println("@@r getClass: " + r.getClass());
-//            System.out.println("@@getTestCaseState .getStatus(): " + getTestCaseState().getStatus());
         }
         catch (Throwable t)
         {

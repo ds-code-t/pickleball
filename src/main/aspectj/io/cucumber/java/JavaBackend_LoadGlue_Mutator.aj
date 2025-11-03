@@ -3,6 +3,7 @@ package io.cucumber.java;
 
 import tools.dscode.pickleruntime.CucumberOptionResolver;
 
+import java.net.URI;
 import java.net.URISyntaxException;
 
 import static tools.dscode.pickleruntime.CucumberOptionResolver.glueDistinct;
@@ -50,7 +51,11 @@ public aspect JavaBackend_LoadGlue_Mutator {
             if (modified.contains(uri)) continue;
             modified.add(uri);
         }
-
+        try {
+            modified.remove(new URI("classpath:/"));
+        } catch (URISyntaxException e) {
+            throw new RuntimeException(e);
+        }
         System.out.println("@@modified gluePaths: " + modified);
         proceed(glue, modified);
     }

@@ -105,12 +105,9 @@ public class AviatorFunctions {
             // Resolve the first argument against env
             Object resolved = args[0].getValue(env); // <-- resolves identifiers
                                                      // & expressions
-            System.out.println("@@resolved: " + resolved);
             // If you want to keep your existing isTruthy(String) signature:
             String s = (resolved == null || resolved == AviatorNil.NIL) ? "" : String.valueOf(resolved);
-            System.out.println("@@s " + s);
             boolean result = isTruthy(s); // your custom logic that takes String
-            System.out.println("@@result " + result);
             // If you have isTruthy(Object), you could instead do:
             // boolean result = isTruthy(resolved);
 
@@ -123,18 +120,15 @@ public class AviatorFunctions {
             THEN = operatorFlag + "THEN:";
 
     static String processTernaryExpression(String fullString) {
-        System.out.println("@@processTernaryExpression: " + fullString);
         fullString = fullString.replaceAll("\\bELSE-IF:", ELSEIF)
                 .replaceAll("\\bIF:", IF)
                 .replaceAll("\\bTHEN:", THEN)
                 .replaceAll("\\bELSE:", ELSE);
 
         Pattern p = Pattern.compile("(\\([^()]+\\))");
-        System.out.println("@@fullString: " + fullString);
         String returnString = p.matcher(fullString)
                 .replaceAll(m -> "(" + processTernaryString(m.group(1)) + ")");
 
-        System.out.println("@@returnString: " + returnString);
         return processTernaryString(returnString);
     }
 

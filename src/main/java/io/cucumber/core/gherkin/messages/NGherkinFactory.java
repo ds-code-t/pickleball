@@ -34,7 +34,6 @@ public class NGherkinFactory {
 
 
     public static GherkinMessagesPickle createGherkinMessagesPickle(String keyword, String stepText, String argument) {
-        System.out.println("@@createGherkinMessagesPickle1: " + stepText);
         StringBuilder featureSrc = new StringBuilder()
                 .append("Feature: Virtual Feature\n")
                 .append("  Scenario: Virtual Scenario\n")
@@ -55,8 +54,6 @@ public class NGherkinFactory {
             GherkinMessagesFeature feature =
                     (GherkinMessagesFeature) parsed.orElseThrow(
                             () -> new IllegalStateException("No feature parsed from generated source"));
-
-            System.out.println("@@createGherkinMessagesPickle2: @@feature::: " + feature.getSource());
 
             return (GherkinMessagesPickle) feature.getPickles()
                     .stream()

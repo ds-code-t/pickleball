@@ -20,8 +20,6 @@ public class ScenarioStep extends StepExtension {
         overrideMap.put("location", testCase.getLocation());
         overrideMap.put("uri", testCase.getUri());
         io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = getPickleStepTestStepFromStrings(getGivenKeyword() ,  SCENARIO_STEP + testCase.getName(), null);
-        System.out.println("@@scenarioPickleStepTestStep1: " + scenarioPickleStepTestStep);
-        System.out.println("@@scenarioPickleStepTestStep2: " + scenarioPickleStepTestStep.getStep().getText());
         ScenarioStep scenarioStep = new ScenarioStep(testCase, scenarioPickleStepTestStep);
         setProperty(testCase, "rootScenarioStep", scenarioStep);
         return scenarioStep;
@@ -44,6 +42,7 @@ public class ScenarioStep extends StepExtension {
             StepExtension currentStep = steps.get(s);
             currentStep.nestingLevel = currentStep.nestingLevel + startingNesting;
             int currentNesting = currentStep.nestingLevel;
+            System.out.println("@@currentNesting: " + currentNesting + "");
             StepExtension parentStep = nestingMap.get(currentNesting - 1);
             StepExtension previousSibling = currentNesting > lastNestingLevel ? null : nestingMap.get(currentNesting);
             if (previousSibling != null) {

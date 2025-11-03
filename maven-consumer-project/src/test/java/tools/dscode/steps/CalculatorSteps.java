@@ -17,11 +17,6 @@ public class CalculatorSteps {
 
         io.cucumber.core.feature.FeatureParser featureParser = GlobalRegistry.globalOf(io.cucumber.core.feature.FeatureParser.class);
         io.cucumber.core.runtime.FeaturePathFeatureSupplier featurePathFeatureSupplier = GlobalRegistry.localOf(io.cucumber.core.runtime.FeaturePathFeatureSupplier.class);
-
-        System.out.println("@@GLOBAL:  " + GLOBAL);
-        System.out.println("@@LOCAL:  " + LOCAL);
-        System.out.println("@@featureParser:  " + featureParser);
-        System.out.println("@@featurePathFeatureSupplier:  " + featurePathFeatureSupplier);
     }
 
     @When("I add them")

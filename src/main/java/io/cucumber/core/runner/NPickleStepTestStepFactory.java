@@ -42,7 +42,6 @@ public class NPickleStepTestStepFactory {
 
 
     public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(String keyword, String stepText, String argument) {
-        System.out.println("@@getPickleStepTestStepFromStrings1: " + stepText);
 //        Pickle pickle = createGherkinMessagesPickle("* " + stepText, argument);
         Pickle pickle = createGherkinMessagesPickle(keyword , stepText, argument);
         Step onlyStep =  pickle.getSteps().getFirst();
@@ -51,8 +50,6 @@ public class NPickleStepTestStepFactory {
     }
 
     public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(PickleStepTestStep modelStep, String keyword, String stepText, String argument) {
-        System.out.println("@@getPickleStepTestStepFromStrings1: " + stepText);
-//        Pickle pickle = createGherkinMessagesPickle("* " + stepText, argument);
         Pickle pickle = createGherkinMessagesPickle(keyword , stepText, argument);
         Step onlyStep =  pickle.getSteps().getFirst();
         PickleStep pickleStep = (PickleStep) getProperty(modelStep, "pickleStep");
@@ -67,14 +64,10 @@ public class NPickleStepTestStepFactory {
 
 
     public static PickleStepDefinitionMatch getStepDefinitionMatch(URI uri, Step step) {
-        System.out.println("@@getOptions().getGlue(): " + getOptions().getGlue());
         Map<String, CoreStepDefinition> stepDefinitionsByPattern = getCachingGlue().getStepDefinitionsByPattern();
-        System.out.println("@@stepDefinitionsByPattern: " + stepDefinitionsByPattern.values());
         io.cucumber.core.gherkin.Argument arg = step.getArgument();
         List<PickleStepDefinitionMatch> matches = new ArrayList<>();
-        System.out.println("@@MAtching step text = " + step.getText());
         for (CoreStepDefinition coreStepDefinition : stepDefinitionsByPattern.values()) {
-            System.out.println("@@coreStepDefinition-coreStepDefinition.getPattern(): " + coreStepDefinition.getPattern());
             Type[] types = (Type[]) getProperty(coreStepDefinition, "types");
 
             StepExpression stepExpression = coreStepDefinition.getExpression();

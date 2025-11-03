@@ -65,7 +65,6 @@ public class StringUtilities {
             m.appendReplacement(sb, Matcher.quoteReplacement(replacement));
         }
         m.appendTail(sb);
-        System.out.println("@@decodeBackToText== " + sb.toString());
         return sb.toString();
     }
 

@@ -20,7 +20,7 @@ public class GeneralSteps extends CoreSteps {
         System.out.println("Running Scenario: " + scenarioName);
     }
 
-    @DefinitionFlags(DefinitionFlag.NO_LOGGING)
+    @DefinitionFlags(DefinitionFlag.RUN_METHOD_DIRECTLY)
     @Given(ROOT_STEP)
     public static void rootStep() {
         System.out.println("Starting Scenario Run");
