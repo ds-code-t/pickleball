@@ -5,6 +5,7 @@ import io.cucumber.core.gherkin.Step;
 import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.core.stepexpression.StepExpression;
 import io.cucumber.messages.types.PickleStep;
+import io.cucumber.messages.types.PickleStepArgument;
 import tools.dscode.common.mappings.ParsingMap;
 
 import java.lang.reflect.Type;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.createGherkinMessagesPickle;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.createGherkinMessagesStep;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
@@ -28,7 +30,14 @@ import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 
 public class NPickleStepTestStepFactory {
 
+    public static List<PickleStepTestStep> createPickleStepTestStepsFromPickle(Pickle pickle) {
+        return pickle.getSteps().stream().map(step ->
+                createPickleStepTestStep(pickle.getUri(), step, getStepDefinitionMatch(pickle.getUri(), step))
+        ).toList();
+    }
+
     public static PickleStepTestStep createPickleStepTestStep(URI uri, Step step, PickleStepDefinitionMatch pickleStepDefinitionMatch) {
+        System.out.println("@@createPickleStepTestStep: " + step.getText());
         return new PickleStepTestStep(UUID.randomUUID(), uri, step, updatePickleStepDefinitionMatch(pickleStepDefinitionMatch));
     }
 
@@ -37,30 +46,48 @@ public class NPickleStepTestStepFactory {
         Step gherkinMessagesStep = pickleStepTestStep.getStep();
         String resolvedStepString = parsingMap.resolveWholeText(gherkinMessagesStep.getText());
         String resolvedArgString = parsingMap.resolveWholeText(getGherkinArgumentText(gherkinMessagesStep));
-        return getPickleStepTestStepFromStrings(gherkinMessagesStep.getKeyword(), resolvedStepString, resolvedArgString);
+        return getPickleStepTestStepFromStrings(pickleStepTestStep, gherkinMessagesStep.getKeyword(), resolvedStepString, resolvedArgString);
+    }
+
+    public static io.cucumber.core.runner.PickleStepTestStep resolvePickleStepTestStep(PickleStepTestStep pickleStepTestStep, ParsingMap parsingMap, String newText) {
+        Step gherkinMessagesStep = pickleStepTestStep.getStep();
+        String resolvedStepString = parsingMap.resolveWholeText(newText);
+        String resolvedArgString = parsingMap.resolveWholeText(getGherkinArgumentText(gherkinMessagesStep));
+        return getPickleStepTestStepFromStrings(pickleStepTestStep, gherkinMessagesStep.getKeyword(), resolvedStepString, resolvedArgString);
+    }
+    public static io.cucumber.core.runner.PickleStepTestStep resolvePickleStepTestStep(PickleStepTestStep pickleStepTestStep, ParsingMap parsingMap, String newText, PickleStepArgument newPickleStepArgument) {
+        Step gherkinMessagesStep = pickleStepTestStep.getStep();
+        String resolvedStepString = parsingMap.resolveWholeText(newText);
+        String resolvedArgString = parsingMap.resolveWholeText(argumentToGherkinText(newPickleStepArgument));
+        return getPickleStepTestStepFromStrings(pickleStepTestStep, gherkinMessagesStep.getKeyword(), resolvedStepString, resolvedArgString);
     }
 
 
     public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(String keyword, String stepText, String argument) {
-//        Pickle pickle = createGherkinMessagesPickle("* " + stepText, argument);
-        Pickle pickle = createGherkinMessagesPickle(keyword , stepText, argument);
-        Step onlyStep =  pickle.getSteps().getFirst();
+        Pickle pickle = createGherkinMessagesPickle(keyword, stepText, argument);
+        Step onlyStep = pickle.getSteps().getFirst();
         PickleStepDefinitionMatch pickleStepDefinitionMatch = getStepDefinitionMatch(pickle.getUri(), onlyStep);
         return createPickleStepTestStep(pickle.getUri(), onlyStep, pickleStepDefinitionMatch);
     }
 
-    public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(PickleStepTestStep modelStep, String keyword, String stepText, String argument) {
-        Pickle pickle = createGherkinMessagesPickle(keyword , stepText, argument);
-        Step onlyStep =  pickle.getSteps().getFirst();
-        PickleStep pickleStep = (PickleStep) getProperty(modelStep, "pickleStep");
-        Step copiedStep = createGherkinMessagesStep(pickleStep, getGherkinDialect(),onlyStep.getPreviousGivenWhenThenKeyword(),  modelStep.getStep().getLocation(), onlyStep.getKeyword());
-        PickleStepDefinitionMatch pickleStepDefinitionMatch = getStepDefinitionMatch(modelStep.getUri(), copiedStep);
-        return createPickleStepTestStep(modelStep.getUri(), copiedStep, pickleStepDefinitionMatch);
+    public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(Pickle modelPickle, String keyword, String stepText, String argument) {
+        Pickle pickle = createGherkinMessagesPickle(keyword, stepText, argument);
+        Step onlyStep = pickle.getSteps().getFirst();
+        PickleStep pickleStep = (PickleStep) getProperty(onlyStep, "pickleStep");
+        Step copiedStep = createGherkinMessagesStep(pickleStep, getGherkinDialect(), onlyStep.getPreviousGivenWhenThenKeyword(), modelPickle.getLocation(), onlyStep.getKeyword());
+        PickleStepDefinitionMatch pickleStepDefinitionMatch = getStepDefinitionMatch(modelPickle.getUri(), copiedStep);
+        return createPickleStepTestStep(modelPickle.getUri(), copiedStep, pickleStepDefinitionMatch);
     }
 
 
-
-
+    public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(PickleStepTestStep modelStep, String keyword, String stepText, String argument) {
+        Pickle pickle = createGherkinMessagesPickle(keyword, stepText, argument);
+        Step onlyStep = pickle.getSteps().getFirst();
+        PickleStep pickleStep = (PickleStep) getProperty(onlyStep, "pickleStep");
+        Step copiedStep = createGherkinMessagesStep(pickleStep, getGherkinDialect(), onlyStep.getPreviousGivenWhenThenKeyword(), modelStep.getStep().getLocation(), onlyStep.getKeyword());
+        PickleStepDefinitionMatch pickleStepDefinitionMatch = getStepDefinitionMatch(modelStep.getUri(), copiedStep);
+        return createPickleStepTestStep(modelStep.getUri(), copiedStep, pickleStepDefinitionMatch);
+    }
 
 
     public static PickleStepDefinitionMatch getStepDefinitionMatch(URI uri, Step step) {
@@ -83,13 +110,6 @@ public class NPickleStepTestStepFactory {
             throw new RuntimeException("No matches found for step: " + step.getText());
         return matches.getFirst();
     }
-
-
-
-
-
-
-
 
 
 }

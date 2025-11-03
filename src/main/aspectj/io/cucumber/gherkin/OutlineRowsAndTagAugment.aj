@@ -12,6 +12,9 @@ import io.cucumber.messages.types.TableRow;
 import io.cucumber.messages.types.Tag;
 import io.cucumber.messages.types.Location;
 
+import static tools.dscode.common.GlobalConstants.COMPONENT_TAG_META_CHAR;
+import static tools.dscode.common.GlobalConstants.COMPONENT_TAG_PREFIX;
+
 public aspect OutlineRowsAndTagAugment {
 
     /* (1) Introduced outline row snapshots on Pickle */
@@ -26,7 +29,7 @@ public aspect OutlineRowsAndTagAugment {
     }
     public void io.cucumber.messages.types.Pickle.setOutlineRows(List<String> hdr, List<String> vals) {
         this.headerRow = (hdr == null || hdr.isEmpty()) ? List.of() : List.copyOf(hdr);
-        this.valueRow  = (vals == null || vals.isEmpty()) ? List.of() : List.copyOf(vals);
+        this.valueRow = (vals == null || vals.isEmpty()) ? List.of() : List.copyOf(vals);
     }
 
     /* (2) Per-thread context for Examples row: [hdr, vals, loc] */
@@ -57,7 +60,7 @@ public aspect OutlineRowsAndTagAugment {
             && withinCompileScenarioOutline()
             {
                 if (valuesRow != null) {
-                    final List<String> hdr  = (variableCells == null)
+                    final List<String> hdr = (variableCells == null)
                             ? List.of()
                             : variableCells.stream().map(TableCell::getValue).collect(Collectors.toList());
                     final List<String> vals = (valuesRow.getCells() == null)
@@ -87,28 +90,20 @@ public aspect OutlineRowsAndTagAugment {
                     @SuppressWarnings("unchecked") List<String> values = (List<String>) top[1];
                     Location loc = (Location) top[2];
 
-                    int idxScenarioTags  = header.indexOf("Scenario Tags");
-                    int idxComponentTags = header.indexOf("Component Tags");
+                    int idxScenarioTags = header.indexOf("Scenario Tags");
+//                    int idxComponentTags = header.indexOf("Component Tags");
 
                     if (idxScenarioTags >= 0 && idxScenarioTags < values.size()) {
                         String raw = values.get(idxScenarioTags);
                         if (raw != null && !raw.isBlank()) {
                             for (String t : raw.trim().split("\\s+")) {
                                 if (t.isBlank()) continue;
-                                String withAt = t.startsWith("@") ? t : "@" + t;
-                                out.add(new Tag(loc, withAt, withAt));
-                            }
-                        }
-                    }
-
-                    if (idxComponentTags >= 0 && idxComponentTags < values.size()) {
-                        String raw = values.get(idxComponentTags);
-                        if (raw != null && !raw.isBlank()) {
-                            for (String t : raw.trim().split("\\s+")) {
-                                if (t.isBlank()) continue;
-                                String token = t.startsWith("@") ? t.substring(1) : t;
-                                String comp  = "@_COMPONENT_TAG_" + token;
-                                out.add(new Tag(loc, comp, comp));
+                                if (t.startsWith("@")) {
+                                    out.add(new Tag(loc, t, t));
+                                } else if (t.startsWith(COMPONENT_TAG_META_CHAR)) {
+                                    String comp  = COMPONENT_TAG_PREFIX + t.substring(1);
+                                    out.add(new Tag(loc, comp, comp));
+                                }
                             }
                         }
                     }
@@ -124,7 +119,7 @@ public aspect OutlineRowsAndTagAugment {
                 Deque<Object[]> stack = CTX.get();
                 if (!stack.isEmpty()) {
                     Object[] top = stack.peek();
-                    @SuppressWarnings("unchecked") List<String> hdr  = (List<String>) top[0];
+                    @SuppressWarnings("unchecked") List<String> hdr = (List<String>) top[0];
                     @SuppressWarnings("unchecked") List<String> vals = (List<String>) top[1];
                     p.setOutlineRows(hdr, vals);
                     stack.pop();

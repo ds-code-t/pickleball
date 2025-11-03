@@ -73,7 +73,7 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
 
         // ✅ New — assign CurrentScenarioState bound to this TestCase
         tc.currentScenarioState = new CurrentScenarioState(tc);
-        tc.rootScenarioStep = ScenarioStep.createScenarioStep(tc);
+        tc.rootScenarioStep = ScenarioStep.createRootScenarioStep(tc);
         System.out.println("@@tc.rootScenarioStep: " + tc.rootScenarioStep);
         System.out.println("@@tc.getTestSteps().size(): " + tc.getTestSteps().size());
         System.out.println("@tc.getTestSteps().getFirst().getStepText(): " + ((io.cucumber.plugin.event.PickleStepTestStep)tc.getTestSteps().getFirst()).getStepText());

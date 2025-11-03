@@ -145,21 +145,6 @@ public final class CucumberOptionResolver {
     }
 
     public static Map<String, List<String>> globalOptions() { return getAllOptions(); }
-//
-//    public static io.cucumber.core.runner.Runner getGlobalRunner() {
-//        String[] args = toCliArgs(getAllOptions());
-//        return getGlobalContext(args).runner;
-//    }
-//
-//    public static io.cucumber.core.runner.RunnerRuntimeContext getGlobalContext() {
-//        String[] args = toCliArgs(getAllOptions());
-//        dbg("CLI args = %s", Arrays.toString(args));
-//        return getGlobalContext(args);
-//    }
-//
-//    private static io.cucumber.core.runner.RunnerRuntimeContext getGlobalContext(String[] cliArgs) {
-//        return io.cucumber.core.runner.RunnerRuntimeRegistry.getOrInit(cliArgs);
-//    }
 
     public static String[] toCliArgs(Map<String, List<String>> opts) {
         List<String> args = new ArrayList<>();

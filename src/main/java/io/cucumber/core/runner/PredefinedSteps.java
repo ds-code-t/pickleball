@@ -13,12 +13,13 @@ import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 
 public class PredefinedSteps {
 
-    private static  PickleStepTestStep rootStep;
+    private static PickleStepTestStep rootStep;
 
-    public static PickleStepTestStep getRootStep() {
-//        rootStep =   buildPickleStepTestStep(ROOT_STEP, "tools.dscode.coredefinitions");
-        rootStep = getPickleStepTestStepFromStrings(getGivenKeyword(),  ROOT_STEP, null);;
-        invokeAnyMethod(rootStep, "setNoLogging", true);
+    public static synchronized PickleStepTestStep getRootStep() {
+        if (rootStep == null) {
+            rootStep = getPickleStepTestStepFromStrings(getGivenKeyword(), ROOT_STEP, null);
+            invokeAnyMethod(rootStep, "setNoLogging", true);
+        }
         return rootStep;
     }
 

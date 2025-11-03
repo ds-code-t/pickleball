@@ -24,12 +24,25 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.modularexecutions.FilePathResolver.findFileDirectoryPaths;
+import static tools.dscode.pickleruntime.CucumberOptionResolver.features;
 
 public final class CucumberScanUtil {
 
     // Cache parsed Features keyed by normalized, sorted feature-URI list
     private static final ConcurrentHashMap<String, List<Feature>> FEATURE_CACHE = new ConcurrentHashMap<>();
+
+    private static String globalFeaturePathsString;
+
+    public static synchronized String getGlobalFeaturePathsString() {
+        if (globalFeaturePathsString == null) {
+            List<String> features = features();
+            globalFeaturePathsString = features.isEmpty() ? normalizeKey(List.of(DEFAULT_FEATURE_DIRS)) : normalizeKey(features());
+        }
+        return globalFeaturePathsString;
+    }
+
 
     // Default directories if cucumber.features is not provided
     private static final String[] DEFAULT_FEATURE_DIRS = {
@@ -38,6 +51,26 @@ public final class CucumberScanUtil {
     };
 
     private CucumberScanUtil() {
+    }
+
+    public static List<Pickle> listPicklesByTags(String tagString) {
+        String featurePathsOption = getGlobalFeaturePathsString();
+                List<Feature> features = FEATURE_CACHE.computeIfAbsent(featurePathsOption, k ->
+        {
+            Map<String, String> featureOptions = new HashMap<>();
+            featureOptions.put("cucumber.features", k);
+            RuntimeOptions runtimeOptions = new CucumberPropertiesParser().parse(featureOptions).build();
+            return parseFeatures(runtimeOptions);
+        });
+
+        Map<String, String> cucumberProps = new HashMap<>();
+        cucumberProps.put("cucumber.filter.tags", tagString);
+        RuntimeOptions cucumberOptions = new CucumberPropertiesParser().parse(cucumberProps).build();
+        Filters filters = new Filters(cucumberOptions);
+        return features.stream()
+                .flatMap(f -> f.getPickles().stream())
+                .filter(filters::test)
+                .collect(Collectors.toUnmodifiableList());
     }
 
     /**
@@ -87,7 +120,7 @@ public final class CucumberScanUtil {
     }
 
     private static String normalizeKey(List<String> featureUris) {
-        return featureUris.stream().map(String::trim).sorted().collect(Collectors.joining("|"));
+        return featureUris.stream().map(String::trim).sorted().collect(Collectors.joining(","));
     }
 
     private static List<String> resolveFeatureUris(String cucumberFeaturesProp) {

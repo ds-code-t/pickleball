@@ -25,8 +25,9 @@ public class GlobalConstants {
     public static final String K_JAVABACKEND = "io.cucumber.java.JavaBackend";
 
     // Tag mangling helpers
-    public static final String TAG_PREFIX = "@__TAG_";
-    public static final String COMPONENT_TAG_PREFIX = TAG_PREFIX + "COMPONENT_";
+//    public static final String TAG_PREFIX = "@__COMPONENT_";
+    public static final String COMPONENT_TAG_META_CHAR = "%";
+    public static final String COMPONENT_TAG_PREFIX =  "@__COMPONENT_";
     // public static final String SCENARIO_TAG_PREFIX = TAG_PREFIX +
     // "SCENARIO_";
 

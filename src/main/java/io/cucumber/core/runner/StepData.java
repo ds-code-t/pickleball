@@ -1,5 +1,7 @@
 package io.cucumber.core.runner;
 
+import io.cucumber.datatable.DataTable;
+import io.cucumber.docstring.DocString;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.TestCase;
 import tools.dscode.common.annotations.DefinitionFlag;
@@ -35,6 +37,23 @@ public abstract class StepData extends StepMapping {
     public boolean softFail = false;
     public boolean skipped = false;
 
+    public DocString getDocString() {
+        if(docString == null && nextSibling != null)
+            return nextSibling.getDocString();
+        return docString;
+    }
+
+    public DataTable getDataTable() {
+        if(dataTable ==null && nextSibling != null)
+            return nextSibling.getDataTable();
+        return dataTable;
+    }
+
+
+
+    public DocString docString;
+    public DataTable dataTable;
+
     public enum ConditionalStates {
         SKIP_CHILDREN, SKIP, FALSE, TRUE
     }
@@ -52,7 +71,7 @@ public abstract class StepData extends StepMapping {
 
     public StepData initializeChildSteps() {
         if (childSteps.isEmpty()) return null;
-        childSteps.forEach(child ->{
+        childSteps.forEach(child -> {
             child.parentStep = this;
             child.stepFlags.addAll(stepFlags);
         });

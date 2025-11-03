@@ -1,6 +1,18 @@
 Feature: Addition
 
 
+  Scenario: row Test
+    Then For every ROW in DATA TABLE
+    : * print printing== <A>
+     * print printing== <B>
+    * DATA TABLE
+    | A |
+    | 1 |
+    | 2 |
+
+  Scenario: Start Run component
+    * RUN SCENARIOS: %test3
+
   @Tag3
   Scenario: aaa
     Given QQQ
@@ -19,8 +31,8 @@ Feature: Addition
 
     @sc2
     Examples:
-      | Component Tags | Scenario Tags |
-      | test3          | @test4        |
+      | Scenario Tags |
+      | %test3        |
 
 #  Scenario: qq
 #    Given I have numbers 2 and 3

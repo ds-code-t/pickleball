@@ -1,5 +1,7 @@
 package io.cucumber.core.runner;
 
+//import io.cucumber.messages.types.Pickle;
+import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.plugin.event.TestCase;
 
 import java.util.HashMap;
@@ -8,31 +10,37 @@ import java.util.Map;
 
 
 import static io.cucumber.core.runner.GlobalState.getGivenKeyword;
+import static io.cucumber.core.runner.GlobalState.getTestCase;
+import static io.cucumber.core.runner.NPickleStepTestStepFactory.createPickleStepTestStepsFromPickle;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.setProperty;
 
 public class ScenarioStep extends StepExtension {
-    public static ScenarioStep createScenarioStep(TestCase testCase) {
-        Map<String, Object> overrideMap = new HashMap<>();
-        overrideMap.put("text", SCENARIO_STEP + testCase.getName());
-        overrideMap.put("location", testCase.getLocation());
-        overrideMap.put("uri", testCase.getUri());
-        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = getPickleStepTestStepFromStrings(getGivenKeyword() ,  SCENARIO_STEP + testCase.getName(), null);
+    public static ScenarioStep createRootScenarioStep(io.cucumber.core.runner.TestCase testCase) {
+        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = getPickleStepTestStepFromStrings((Pickle) getProperty(testCase, "pickle"),getGivenKeyword() ,  SCENARIO_STEP + testCase.getName(), null);
         ScenarioStep scenarioStep = new ScenarioStep(testCase, scenarioPickleStepTestStep);
         setProperty(testCase, "rootScenarioStep", scenarioStep);
+        scenarioStep.initializeScenarioSteps((List<StepExtension>) getProperty(testCase, "stepExtensions"));
+        return scenarioStep;
+    }
+
+    public static ScenarioStep createScenarioStep(Pickle pickle) {
+        io.cucumber.core.runner.TestCase topLevel  =   GlobalState.getTestCase();
+        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = getPickleStepTestStepFromStrings(pickle, getGivenKeyword() ,  SCENARIO_STEP + pickle.getName(), null);
+        ScenarioStep scenarioStep = new ScenarioStep(topLevel, scenarioPickleStepTestStep);
+        scenarioStep.initializeScenarioSteps(createPickleStepTestStepsFromPickle(pickle).stream().map(step -> new StepExtension(topLevel, step)).toList());
         return scenarioStep;
     }
 
 
     private ScenarioStep(TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
         super(testCase, pickleStepTestStep);
-        initializeScenarioSteps();
+
     }
 
-    private void initializeScenarioSteps() {
-        List<StepExtension> steps = (List<StepExtension>) getProperty(testCase, "stepExtensions");
+    private void initializeScenarioSteps(List<StepExtension> steps) {
         int size = steps.size();
         Map<Integer, StepExtension> nestingMap = new HashMap<>();
         nestingMap.put(nestingLevel, this);

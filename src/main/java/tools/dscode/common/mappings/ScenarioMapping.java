@@ -33,9 +33,9 @@ public class ScenarioMapping {
         return parsingMap.resolveWholeText(key);
     }
 
-    public void setParsingMap(ParsingMap parsingMap) {
-        this.parsingMap = parsingMap;
-    }
+//    public void setParsingMap(ParsingMap parsingMap) {
+//        this.parsingMap = parsingMap;
+//    }
 
 
 }

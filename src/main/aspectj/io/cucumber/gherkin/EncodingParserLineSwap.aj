@@ -40,10 +40,7 @@ public aspect EncodingParserLineSwap {
     String around(): readWithEncoding() {
         String ret = proceed();
         String original = (ret == null) ? "" : ret;
-        System.out.println("@@original: " + original);
         Matcher matcher = LINE_SWAP_PATTERN.matcher(original);
-        System.out.println("@@matcher.replaceAll(\"$2\" + PARSER_FLAG + \"$1\"): " + matcher.replaceAll("$2" + PARSER_FLAG + "$1"));
-
         return matcher.replaceAll("$2" + PARSER_FLAG + "$1");
     }
 }

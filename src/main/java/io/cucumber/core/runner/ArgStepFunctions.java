@@ -1,6 +1,7 @@
 package io.cucumber.core.runner;
 
 import io.cucumber.core.backend.ParameterInfo;
+import io.cucumber.core.backend.StepDefinition;
 import io.cucumber.core.gherkin.Step;
 import io.cucumber.core.stepexpression.Argument;
 
@@ -16,10 +17,11 @@ public class ArgStepFunctions {
 
     public static PickleStepDefinitionMatch updatePickleStepDefinitionMatch(PickleStepDefinitionMatch pickleStepDefinitionMatch) {
         List<Argument> args = pickleStepDefinitionMatch.getArguments();
-        io.cucumber.core.backend.StepDefinition javaStepDefinition = pickleStepDefinitionMatch.getStepDefinition();
-        if (!javaStepDefinition.getClass().getName().equals("io.cucumber.java.JavaStepDefinition"))
+        StepDefinition stepDefinition = pickleStepDefinitionMatch.getStepDefinition();
+        if (!stepDefinition.getClass().getName().equals("io.cucumber.core.runner.CoreStepDefinition"))
             return pickleStepDefinitionMatch;
-        List<ParameterInfo> parameterInfoList = javaStepDefinition.parameterInfos();
+        CoreStepDefinition coreStepDefinition = (CoreStepDefinition) stepDefinition;
+        List<ParameterInfo> parameterInfoList = coreStepDefinition.parameterInfos();
         if (args.size() == parameterInfoList.size())
             return pickleStepDefinitionMatch;
         int mismatchCount = parameterInfoList.size() - args.size();
@@ -47,7 +49,7 @@ public class ArgStepFunctions {
             }
         }
         return new PickleStepDefinitionMatch(
-                args, javaStepDefinition, (URI) getProperty(pickleStepDefinitionMatch, "uri"), (Step) getProperty(pickleStepDefinitionMatch, "step"));
+                args, coreStepDefinition, (URI) getProperty(pickleStepDefinitionMatch, "uri"), (Step) getProperty(pickleStepDefinitionMatch, "step"));
     }
 
 
