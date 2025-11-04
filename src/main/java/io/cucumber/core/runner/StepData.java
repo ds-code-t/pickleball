@@ -3,7 +3,6 @@ package io.cucumber.core.runner;
 
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
-import io.cucumber.messages.types.Pickle;
 import io.cucumber.plugin.event.Result;
 
 import tools.dscode.common.annotations.DefinitionFlag;
@@ -14,8 +13,6 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import static tools.dscode.common.annotations.DefinitionFlag.SKIP_CHILDREN;
 
 
 public abstract class StepData extends StepMapping {
@@ -30,7 +27,7 @@ public abstract class StepData extends StepMapping {
     public StepData parentStep;
     public StepData previousSibling;
     public StepData nextSibling;
-    public String loggingTextOverride = null;
+    public String overrideLoggingText = null;
 
     public int getNestingLevel() {
         return nestingLevel;
@@ -57,17 +54,30 @@ public abstract class StepData extends StepMapping {
 
     public DocString getDocString() {
         if (docString == null && nextSibling != null)
-            return nextSibling.getDocString();
+            docString = nextSibling.getDocString();
+        if (docString == null)
+            docString = getDocStringFromParent();
         return docString;
     }
 
+    public DocString getDocStringFromParent() {
+        if (docString == null && parentStep != null)
+            docString = parentStep.getDocStringFromParent();
+        return docString;
+    }
+
+
     public DataTable getDataTable() {
-        System.out.println("@@getDataTable!!!: " + dataTable);
-        System.out.println("@@dataTable: " + dataTable);
-        System.out.println("@@nextSibling: " + nextSibling);
         if (dataTable == null && nextSibling != null)
-            return nextSibling.getDataTable();
-        System.out.println("@@dataTable2: " + dataTable);
+            dataTable = nextSibling.getDataTable();
+        if (dataTable == null)
+            dataTable = getDataTableFromParent();
+        return dataTable;
+    }
+
+    public DataTable getDataTableFromParent() {
+        if (dataTable == null && parentStep != null)
+            dataTable = parentStep.getDataTableFromParent();
         return dataTable;
     }
 

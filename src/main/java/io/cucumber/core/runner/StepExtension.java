@@ -5,7 +5,6 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.messages.types.PickleStepArgument;
 import io.cucumber.plugin.event.Result;
-import io.cucumber.plugin.event.TestCase;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.ParsingMap;
 
@@ -21,9 +20,7 @@ import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleStepTestStep;
-import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.invokeAnyMethod;
-import static tools.dscode.common.util.Reflect.setProperty;
 
 public class StepExtension extends StepData {
     private static final Pattern pattern = Pattern.compile("@:([A-Z]+:[A-Z-a-z0-9]+)");
@@ -96,9 +93,9 @@ public class StepExtension extends StepData {
         System.out.println("@@run: " + this);
 
         System.out.println("@@executionPickleStepTestStep args11::: " + pickleStepTestStep.getDefinitionMatch().getArguments().stream().map(Argument::getValue).toList());
-
         executingPickleStepTestStep = resolveAndClone(getStepParsingMap());
         executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
+        executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
         io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep);
         System.out.println("@@result1: " + result);
         return result;
