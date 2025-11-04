@@ -13,6 +13,8 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static tools.dscode.common.GlobalConstants.META_FLAG;
 
@@ -118,6 +120,23 @@ public class NodeMap {
         if (other != null)
             root.setAll(other);
     }
+
+    public void merge(List<?> keys, List<?> values) {
+        if (keys == null || values == null) {
+            return; // or throw, depending on your desired behavior
+        }
+
+        if (keys.size() != values.size()) {
+            throw new IllegalArgumentException("Keys and values must have the same size");
+        }
+
+        Map<Object, Object> map = IntStream.range(0, keys.size())
+                .boxed()
+                .collect(Collectors.toMap(keys::get, values::get));
+
+        merge(map); // delegate to your original method
+    }
+
 
     public void merge(Map<?, ?> other) {
         if (other != null)

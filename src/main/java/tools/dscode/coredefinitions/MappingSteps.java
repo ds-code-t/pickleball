@@ -19,6 +19,8 @@ import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.util.TableUtils.toFlatMultimap;
 import static io.cucumber.core.runner.util.TableUtils.toRowsMultimap;
+import static tools.dscode.common.GlobalConstants.MATCH_START;
+import static tools.dscode.common.GlobalConstants.META_FLAG;
 
 
 public class MappingSteps extends CoreSteps {
@@ -65,42 +67,24 @@ public class MappingSteps extends CoreSteps {
         StepExtension lastSibling = null;
         StepExtension currentSibling = null;
 
-
+        currentStep.insertChildNesting();
         System.out.println("@@rows.size(): " + rows.size());
         for (int r = 0; r < rows.size(); r++) {
+            System.out.println("@@row::::: " + r);
             LinkedListMultimap<String, String> row = rows.get(r);
-            currentSibling = currentStep.cloneWithOverrides("ROW " + r + ": " + row);
-            currentSibling.parentStep = currentStep;
-            currentStep.childSteps.add(currentSibling);
+            currentSibling = currentStep.cloneWithOverrides(MATCH_START + "ROW " + (r + 1) + ": " + row);
+            currentStep.addChildStep(currentSibling);
             currentSibling.mergeToStepMap(row);
             if (lastSibling != null) {
                 currentSibling.previousSibling = lastSibling;
                 lastSibling.nextSibling = currentSibling;
             }
-
             lastSibling = currentSibling;
-
-//            nextSibling.setStepParsingMap(currentStep.getStepParsingMap());
-//            System.out.println("@@row: " + row);
-//            nextSibling.mergeToStepMap(row);
-//            nextSibling.put("ROW", row);
-//            if (!tableName.isEmpty())
-//                nextSibling.put(tableName + ".ROW", row);
-//
-//            nextSibling.setChildSteps(children);
-//            currentStep.addChildStep(nextSibling);
-//            if (lastSibling != null)
-//                pairSiblings(lastSibling, nextSibling);
-//            else
-//                System.out.println("@@nextSibling getNextSibling: " + nextSibling.getNextSibling());
-//
-//            lastSibling = nextSibling;
-//            System.out.println("\n\n@@nextSibling parsaing33:\n" + nextSibling.getStepParsingMap());
         }
 
     }
 
-    @Given("^ROW (\\d+): (.*)$")
+    @Given("^"+ MATCH_START + "ROW (\\d+): (.*)$")
     public static void loop(String count, String mapString) {
         System.out.println("@@@LOOP _ " + count + "  -  " + mapString);
     }

@@ -1,6 +1,7 @@
 package io.cucumber.core.runner;
 
 import io.cucumber.core.gherkin.Pickle;
+import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import tools.dscode.common.annotations.DefinitionFlag;
@@ -11,12 +12,12 @@ import java.time.Duration;
 import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
-import static io.cucumber.core.runner.StepData.ConditionalStates.SKIP_CHILDREN;
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FAILED;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_HARD_FAILED;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_PASSING;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
+import static tools.dscode.common.annotations.DefinitionFlag.SKIP_CHILDREN;
 import static tools.dscode.common.util.Reflect.getProperty;
 
 public class CurrentScenarioState extends ScenarioMapping {
@@ -50,8 +51,10 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void runStep(StepExtension stepExtension) {
+        System.out.println("@@executionPickleStepTestStep args00aaa::: " + stepExtension + "\n@@args: " + stepExtension.pickleStepTestStep.getDefinitionMatch().getArguments().stream().map(Argument::getValue).toList());
+
         currentStep = stepExtension;
-        System.out.println("@@runStep: " + stepExtension + "");
+        System.out.println("\n\n@@runStep: " + stepExtension + "");
         if (!shouldRun(stepExtension)) return;
         System.out.println("@@running!: stepExtension.runMethodDirectly: " + stepExtension.runMethodDirectly + "");
 
@@ -89,10 +92,14 @@ public class CurrentScenarioState extends ScenarioMapping {
         for (StepData attachedStep : stepExtension.attachedSteps) {
             runStep((StepExtension) attachedStep);
         }
-        if (!stepExtension.childSteps.isEmpty() && !stepExtension.getConditionalStates().contains(SKIP_CHILDREN)
-                && stepExtension.initializeChildSteps() instanceof StepExtension firstChild) {
+        System.out.println("@@stepExtension: " + stepExtension);
+        System.out.println("@@stepExtension.childSteps: " + stepExtension.childSteps.size());
+        System.out.println("@@stepExtension.getConditionalStates(): " + stepExtension.getConditionalStates());
+        if (!stepExtension.childSteps.isEmpty() && !stepExtension.definitionFlags.contains(SKIP_CHILDREN)) {
+            StepExtension firstChild = (StepExtension) stepExtension.initializeChildSteps();
             System.out.println("@@firstChild: " + firstChild);
-            runStep(firstChild);
+            if (firstChild != null)
+                runStep(firstChild);
         }
         if (stepExtension.nextSibling != null) {
             runStep((StepExtension) stepExtension.nextSibling);

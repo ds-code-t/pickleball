@@ -17,6 +17,7 @@ public class ArgStepFunctions {
 
     public static PickleStepDefinitionMatch updatePickleStepDefinitionMatch(PickleStepDefinitionMatch pickleStepDefinitionMatch) {
         List<Argument> args = pickleStepDefinitionMatch.getArguments();
+        System.out.println("@@updatePickleStepDefinitionMatch1: " + args.stream().map(Argument::getValue).toList());
         StepDefinition stepDefinition = pickleStepDefinitionMatch.getStepDefinition();
         if (!stepDefinition.getClass().getName().equals("io.cucumber.core.runner.CoreStepDefinition"))
             return pickleStepDefinitionMatch;
@@ -25,6 +26,7 @@ public class ArgStepFunctions {
         if (args.size() == parameterInfoList.size())
             return pickleStepDefinitionMatch;
         int mismatchCount = parameterInfoList.size() - args.size();
+        System.out.println("@@mismatchCount: " + mismatchCount);
         if (mismatchCount > 0) {
             for (int i = args.size(); i < parameterInfoList.size(); i++) {
                 ParameterInfo p = parameterInfoList.get(i);
@@ -48,6 +50,8 @@ public class ArgStepFunctions {
                         .toList();
             }
         }
+        System.out.println("@@updatePickleStepDefinitionMatch2: " + args.stream().map(Argument::getValue).toList());
+
         return new PickleStepDefinitionMatch(
                 args, coreStepDefinition, (URI) getProperty(pickleStepDefinitionMatch, "uri"), (Step) getProperty(pickleStepDefinitionMatch, "step"));
     }

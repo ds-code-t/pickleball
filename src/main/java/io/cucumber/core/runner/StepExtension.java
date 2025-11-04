@@ -21,19 +21,25 @@ import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleStepTestStep;
+import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.invokeAnyMethod;
+import static tools.dscode.common.util.Reflect.setProperty;
 
 public class StepExtension extends StepData {
     private static final Pattern pattern = Pattern.compile("@:([A-Z]+:[A-Z-a-z0-9]+)");
     boolean runMethodDirectly = false;
 
 
-    public StepExtension(TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
+    public StepExtension(io.cucumber.core.runner.TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
         super(testCase, pickleStepTestStep);
+
+//        pickle = (io.cucumber.messages.types.Pickle) getProperty(testCase, "pickle");
         method = pickleStepTestStep.getMethod();
         definitionFlags = pickleStepTestStep.getDefinitionFlags();
 
+
         this.methodName = this.method == null ? "" : this.method.getName();
+        System.out.println("@@methodName: " + methodName);
         System.out.println("@@methodName: " + methodName);
 
         if (definitionFlags.contains(DefinitionFlag.NO_LOGGING))
@@ -54,7 +60,19 @@ public class StepExtension extends StepData {
         }
 
         stepTags.stream().filter(t -> t.startsWith("REF:")).forEach(t -> bookmarks.add(t.replaceFirst("REF:", "")));
-        nestingLevel = (int) matcher.replaceAll("").chars().filter(ch -> ch == ':').count();
+        setNestingLevel((int) matcher.replaceAll("").chars().filter(ch -> ch == ':').count());
+
+        List<Argument> argstests = pickleStepTestStep.getDefinitionMatch().getArguments();
+        System.out.println("@@STEP pickleStepTestStep: " + pickleStepTestStep.getStepText());
+        System.out.println("@@STEP Args: " + argstests.size());
+        System.out.println("@@STEP methodName: " + methodName);
+        System.out.println("@@STEP isCoreStep " + isCoreStep);
+        System.out.println("@@STEP methodName.equals(\"dataTable\") " + methodName.equals("dataTable"));
+        System.out.println("@@STEP isCoreStep && methodName.equals(\"dataTable\") " + (isCoreStep && methodName.equals("dataTable")));
+        for (Argument arg : argstests) {
+            System.out.println("@@arg: " + arg.getClass().getName() + "");
+            System.out.println("@@arg: " + arg.getValue() + "");
+        }
 
         if (isCoreStep && methodName.equals("docString")) {
             List<Argument> args = pickleStepTestStep.getDefinitionMatch().getArguments();
@@ -67,17 +85,21 @@ public class StepExtension extends StepData {
             List<Argument> args = pickleStepTestStep.getDefinitionMatch().getArguments();
             String tableName = (String) args.getFirst().getValue();
             dataTable = (DataTable) args.getLast().getValue();
+            System.out.println("@@dataTable!!\n" + dataTable);
             if (tableName != null && !tableName.isBlank()) {
                 getCurrentScenarioState().getParsingMap().getRootSingletonMap().put("DATATABLE." + tableName.trim(), dataTable);
             }
         }
-
     }
 
     public Result run() {
         System.out.println("@@run: " + this);
-        PickleStepTestStep executionPickleStepTestStep = resolveAndClone(getStepParsingMap());
-        io.cucumber.plugin.event.Result result = execute(executionPickleStepTestStep);
+
+        System.out.println("@@executionPickleStepTestStep args11::: " + pickleStepTestStep.getDefinitionMatch().getArguments().stream().map(Argument::getValue).toList());
+
+        executingPickleStepTestStep = resolveAndClone(getStepParsingMap());
+        executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
+        io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep);
         System.out.println("@@result1: " + result);
         return result;
     }
@@ -125,7 +147,9 @@ public class StepExtension extends StepData {
 
 
     public PickleStepTestStep resolveAndClone(ParsingMap parsingMap) {
-        return resolvePickleStepTestStep(pickleStepTestStep, parsingMap);
+        pickleStepTestStep.getDefinitionMatch().getArguments().stream().map(Argument::getValue).forEach(System.out::println);
+        PickleStepTestStep clonePickleStepTestStep = resolvePickleStepTestStep(pickleStepTestStep, parsingMap);
+        return clonePickleStepTestStep;
     }
 
     public PickleStepTestStep resolveAndClone(ParsingMap parsingMap, String newText) {

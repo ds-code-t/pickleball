@@ -2,7 +2,6 @@ package io.cucumber.core.runner;
 
 //import io.cucumber.messages.types.Pickle;
 import io.cucumber.core.gherkin.Pickle;
-import io.cucumber.plugin.event.TestCase;
 
 import java.util.HashMap;
 import java.util.List;
@@ -30,26 +29,28 @@ public class ScenarioStep extends StepExtension {
         io.cucumber.core.runner.TestCase topLevel  =   GlobalState.getTestCase();
         io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = getPickleStepTestStepFromStrings(pickle, getGivenKeyword() ,  SCENARIO_STEP + pickle.getName(), null);
         ScenarioStep scenarioStep = new ScenarioStep(topLevel, scenarioPickleStepTestStep);
-        scenarioStep.initializeScenarioSteps(createPickleStepTestStepsFromPickle(pickle).stream().map(step -> new StepExtension(topLevel, step)).toList());
+        scenarioStep.initializeScenarioSteps(createPickleStepTestStepsFromPickle(pickle).stream().map(step -> new StepExtension(getTestCase(), step)).toList());
         return scenarioStep;
     }
 
 
     private ScenarioStep(TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
         super(testCase, pickleStepTestStep);
-
+        Pickle gherkinMessagesPickle = (Pickle) getProperty(testCase, "pickle");
+        io.cucumber.messages.types.Pickle pickle = (io.cucumber.messages.types.Pickle) getProperty(gherkinMessagesPickle, "pickle");
+        getStepNodeMap().merge(pickle.getHeaderRow(), pickle.getValueRow());
     }
 
     private void initializeScenarioSteps(List<StepExtension> steps) {
         int size = steps.size();
         Map<Integer, StepExtension> nestingMap = new HashMap<>();
-        nestingMap.put(nestingLevel, this);
+        nestingMap.put(getNestingLevel(), this);
         int lastNestingLevel = 0;
-        int startingNesting = nestingLevel + 1;
+        int startingNesting = getNestingLevel() + 1;
         for (int s = 0; s < size; s++) {
             StepExtension currentStep = steps.get(s);
-            currentStep.nestingLevel = currentStep.nestingLevel + startingNesting;
-            int currentNesting = currentStep.nestingLevel;
+            currentStep.setNestingLevel(currentStep.getNestingLevel() + startingNesting);
+            int currentNesting = currentStep.getNestingLevel();
             System.out.println("@@currentNesting: " + currentNesting + "");
             StepExtension parentStep = nestingMap.get(currentNesting - 1);
             StepExtension previousSibling = currentNesting > lastNestingLevel ? null : nestingMap.get(currentNesting);

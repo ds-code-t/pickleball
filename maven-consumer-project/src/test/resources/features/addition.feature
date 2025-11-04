@@ -1,14 +1,28 @@
 Feature: Addition
 
+  Scenario: nestTest
+    * zprint printing== <A>
+    : * zprint printing== <A>
+    : : * zprint printing== <A>
+
+  Scenario: table Test
+    * zdatatable Adatatabela
+      | A | bqqw  |
+      | 1 | qqqw1 |
+      | 2 | qqqw2 |
 
   Scenario: row Test
+    * zdatatable Adatatabela
+      | A | bqqw  |
+      | 1 | qqqw1 |
+      | 2 | qqqw2 |
     Then For every ROW in DATA TABLE
-    : * print printing== <A>
-     * print printing== <B>
+  : * print printing== <A>
+#     * print printing== <B>
     * DATA TABLE
-    | A |
-    | 1 |
-    | 2 |
+      | A | bqqw  |
+      | 1 | qqqw1 |
+      | 2 | qqqw2 |
 
   Scenario: Start Run component
     * RUN SCENARIOS: %test3
