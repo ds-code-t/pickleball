@@ -104,7 +104,6 @@ public class LineData {
                     xPathy = applyTextOp(xPathy, op, text);
                 else
                     xPathy = applyAttrOp(xPathy, com.xpathy.Attribute.custom(attribute.attrName), op, attribute.predicateVal);
-                System.out.println("@@xPathy: " + xPathy);
             }
         }
     }

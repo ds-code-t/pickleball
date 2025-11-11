@@ -8,6 +8,8 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.NoLogging;
+import tools.dscode.common.mappings.MapConfigurations;
+import tools.dscode.common.mappings.NodeMap;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -18,6 +20,7 @@ import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.ScenarioStep.createScenarioStep;
 import static tools.dscode.common.GlobalConstants.COMPONENT_TAG_META_CHAR;
 import static tools.dscode.common.GlobalConstants.COMPONENT_TAG_PREFIX;
+import static tools.dscode.common.util.Reflect.getProperty;
 
 public class ModularScenarios extends CoreSteps {
 
@@ -58,14 +61,21 @@ public class ModularScenarios extends CoreSteps {
 
             ScenarioStep currentScenarioNameStep;
             System.out.println("@@pickle/. size: " + pickles.size());
-            for (Pickle pickle : pickles) {
-                currentScenarioNameStep = createScenarioStep(pickle);
+            for (Pickle gherkinMessagesPickle : pickles) {
+                currentScenarioNameStep = createScenarioStep(gherkinMessagesPickle);
+                io.cucumber.messages.types.Pickle pickle = (io.cucumber.messages.types.Pickle) getProperty(gherkinMessagesPickle, "pickle");
+                NodeMap passedMap = new NodeMap(MapConfigurations.MapType.PASSED_MAP);
+                passedMap.merge(map);
+                currentScenarioNameStep.getStepParsingMap().addMaps(passedMap);
+                    if(pickle.getValueRow()!=null && !pickle.getValueRow().isEmpty()) {
+                        NodeMap examples = new NodeMap(MapConfigurations.MapType.EXAMPLE_MAP);
+                        examples.merge(pickle.getHeaderRow(), pickle.getValueRow());
+                        currentScenarioNameStep.getStepParsingMap().addMaps(examples);
+                    }
+
                 currentStep.childSteps.add(currentScenarioNameStep);
 
                 if (lastScenarioNameStep != null) {
-                    System.out.println("@@pairSiblings!!");
-                    System.out.println("@@lastScenarioNameStep: " + lastScenarioNameStep);
-                    System.out.println("@@currentScenarioNameStep: " + currentScenarioNameStep);
                     lastScenarioNameStep.nextSibling = currentScenarioNameStep;
                     currentScenarioNameStep.previousSibling = lastScenarioNameStep;
                 }

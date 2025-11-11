@@ -37,8 +37,6 @@ public class StepExtension extends StepData {
 
 
         this.methodName = this.method == null ? "" : this.method.getName();
-        System.out.println("@@methodName: " + methodName);
-        System.out.println("@@methodName: " + methodName);
 
         if (definitionFlags.contains(DefinitionFlag.NO_LOGGING))
             invokeAnyMethod(pickleStepTestStep, "setNoLogging", true);
@@ -50,7 +48,6 @@ public class StepExtension extends StepData {
 
 
         String metaText = pickleStepTestStep.getPickleStep().getMetaText();
-        System.out.println("@@metaText: " + metaText);
         Matcher matcher = pattern.matcher(metaText);
 
         while (matcher.find()) {
@@ -61,16 +58,6 @@ public class StepExtension extends StepData {
         setNestingLevel((int) matcher.replaceAll("").chars().filter(ch -> ch == ':').count());
 
         List<Argument> argstests = pickleStepTestStep.getDefinitionMatch().getArguments();
-        System.out.println("@@STEP pickleStepTestStep: " + pickleStepTestStep.getStepText());
-        System.out.println("@@STEP Args: " + argstests.size());
-        System.out.println("@@STEP methodName: " + methodName);
-        System.out.println("@@STEP isCoreStep " + isCoreStep);
-        System.out.println("@@STEP methodName.equals(\"dataTable\") " + methodName.equals("dataTable"));
-        System.out.println("@@STEP isCoreStep && methodName.equals(\"dataTable\") " + (isCoreStep && methodName.equals("dataTable")));
-        for (Argument arg : argstests) {
-            System.out.println("@@arg: " + arg.getClass().getName() + "");
-            System.out.println("@@arg: " + arg.getValue() + "");
-        }
 
         if (isCoreStep && methodName.equals("docString")) {
             List<Argument> args = pickleStepTestStep.getDefinitionMatch().getArguments();
@@ -83,7 +70,6 @@ public class StepExtension extends StepData {
             List<Argument> args = pickleStepTestStep.getDefinitionMatch().getArguments();
             String tableName = (String) args.getFirst().getValue();
             dataTable = (DataTable) args.getLast().getValue();
-            System.out.println("@@dataTable!!\n" + dataTable);
             if (tableName != null && !tableName.isBlank()) {
                 getCurrentScenarioState().getParsingMap().getRootSingletonMap().put("DATATABLE." + tableName.trim(), dataTable);
             }
@@ -91,24 +77,18 @@ public class StepExtension extends StepData {
     }
 
     public Result run() {
-        System.out.println("@@run: " + this);
-
-        System.out.println("@@executionPickleStepTestStep args11::: " + pickleStepTestStep.getDefinitionMatch().getArguments().stream().map(Argument::getValue).toList());
         executingPickleStepTestStep = resolveAndClone(getStepParsingMap());
         executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
         executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
         io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep);
-        System.out.println("@@result1: " + result);
         return result;
     }
 
     public Result execute(io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep) {
-        System.out.println("@@execute: " + this);
         try {
             Object r = invokeAnyMethod(executionPickleStepTestStep, "run", getTestCase(), getEventBus(), getTestCaseState(), ExecutionMode.RUN);
 //            System.out.println("@@pickleStepTestStep._lastResult : " + pickleStepTestStep._lastResult);
             TestStep testStep = executionPickleStepTestStep;
-            System.out.println("@@testStep.getLastResult(); : " + testStep.getLastResult());
         } catch (Throwable t) {
             System.out.println("@@catch t: " + t.getMessage() + " " + t.getCause());
             t.printStackTrace();
@@ -127,7 +107,6 @@ public class StepExtension extends StepData {
 
     @Override
     public void addDefinitionFlag(DefinitionFlag... flags) {
-        System.out.println("@@this.definitionFlags-class: " + this.definitionFlags.getClass().getName());
         Arrays.stream(flags).toList().forEach(f -> System.out.println("@@flag: " + f + ""));
         for (DefinitionFlag flag : flags) {
             if (flag == DefinitionFlag.NO_LOGGING)
@@ -147,6 +126,7 @@ public class StepExtension extends StepData {
 
 
     public PickleStepTestStep resolveAndClone(ParsingMap parsingMap) {
+
         pickleStepTestStep.getDefinitionMatch().getArguments().stream().map(Argument::getValue).forEach(System.out::println);
         PickleStepTestStep clonePickleStepTestStep = resolvePickleStepTestStep(pickleStepTestStep, parsingMap);
         return clonePickleStepTestStep;

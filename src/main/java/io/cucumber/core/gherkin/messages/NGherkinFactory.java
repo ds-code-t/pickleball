@@ -39,11 +39,33 @@ public class NGherkinFactory {
                 .append("  Scenario: Virtual Scenario\n")
                 .append("    ").append(keyword).append(stepText).append("\n");
 
+// --- decide how to render the argument ---
         if (argument != null && !argument.isBlank()) {
-            featureSrc.append("      \"\"\"\n")
-                    .append(argument).append("\n")
-                    .append("      \"\"\"\n");
+            // Heuristic: every non-blank line starts and ends with a pipe -> treat as DataTable
+            var lines = argument.lines()
+                    .map(String::stripTrailing)
+                    .filter(l -> !l.isBlank())
+                    .toList();
+
+            boolean looksLikeTable = !lines.isEmpty()
+                    && lines.stream().allMatch(l -> {
+                String t = l.strip();
+                return t.startsWith("|") && t.endsWith("|");
+            });
+
+            if (looksLikeTable) {
+                // Emit a real Gherkin DataTable (no docstring fence)
+                for (String l : lines) {
+                    featureSrc.append("      ").append(l.strip()).append("\n");
+                }
+            } else {
+                // Emit as DocString
+                featureSrc.append("      \"\"\"\n")
+                        .append(argument.replace("\r\n", "\n").replace("\r", "\n")).append("\n")
+                        .append("      \"\"\"\n");
+            }
         }
+
 
         byte[] bytes = featureSrc.toString().getBytes(StandardCharsets.UTF_8);
         try (InputStream in = new ByteArrayInputStream(bytes)) {

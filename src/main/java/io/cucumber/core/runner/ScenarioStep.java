@@ -36,9 +36,9 @@ public class ScenarioStep extends StepExtension {
 
     private ScenarioStep(TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
         super(testCase, pickleStepTestStep);
-        Pickle gherkinMessagesPickle = (Pickle) getProperty(testCase, "pickle");
-        io.cucumber.messages.types.Pickle pickle = (io.cucumber.messages.types.Pickle) getProperty(gherkinMessagesPickle, "pickle");
-        getStepNodeMap().merge(pickle.getHeaderRow(), pickle.getValueRow());
+//        Pickle gherkinMessagesPickle = (Pickle) getProperty(testCase, "pickle");
+//        io.cucumber.messages.types.Pickle pickle = (io.cucumber.messages.types.Pickle) getProperty(gherkinMessagesPickle, "pickle");
+//        getStepNodeMap().merge(pickle.getHeaderRow(), pickle.getValueRow());
     }
 
     private void initializeScenarioSteps(List<StepExtension> steps) {
@@ -51,7 +51,6 @@ public class ScenarioStep extends StepExtension {
             StepExtension currentStep = steps.get(s);
             currentStep.setNestingLevel(currentStep.getNestingLevel() + startingNesting);
             int currentNesting = currentStep.getNestingLevel();
-            System.out.println("@@currentNesting: " + currentNesting + "");
             StepExtension parentStep = nestingMap.get(currentNesting - 1);
             StepExtension previousSibling = currentNesting > lastNestingLevel ? null : nestingMap.get(currentNesting);
             if (previousSibling != null) {

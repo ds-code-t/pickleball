@@ -1,10 +1,13 @@
 package tools.dscode.coredefinitions;
 
 import io.cucumber.java.en.Given;
+import org.openqa.selenium.chromium.ChromiumDriver;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.DefinitionFlags;
 import tools.dscode.common.status.SoftRuntimeException;
+import tools.dscode.common.treeparsing.DictionaryA;
+import tools.dscode.common.treeparsing.LineExecution;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
@@ -12,8 +15,20 @@ import static tools.dscode.common.GlobalConstants.INFO_STEP;
 import static tools.dscode.common.GlobalConstants.ROOT_STEP;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.GlobalConstants.SOFT_ERROR_STEP;
+import static tools.dscode.common.domoperations.DriverFactory.createChromeDriver;
 
 public class GeneralSteps extends CoreSteps {
+
+
+    @Given("^,(.*)$")
+    public void dynamicStep(String stepText) {
+        System.out.println("dynamicStep: " + stepText);
+        DictionaryA dict = new DictionaryA();
+        LineExecution lineData = dict.getLineExecutionData(stepText);
+        lineData.execute(BrowserSteps.getDriver());
+    }
+
+
 
     @Given("^" + SCENARIO_STEP + "(.*)$")
     public static void scenarioStep(String scenarioName) {

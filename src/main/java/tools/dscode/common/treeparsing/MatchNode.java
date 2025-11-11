@@ -73,19 +73,13 @@ public final class MatchNode {
                       String originalText,
                       String token,
                       LinkedListMultimap<String, Object> globalState) {
-        System.out.println("@@MatchNode--parent1: " + parent);
         this.parseNode = Objects.requireNonNull(parseNode, "parseNode");
         this.parent = parent;
-        System.out.println("@@MatchNode--parent2: " + parent);
         this.originalText = originalText;
         this.token = token;
-        System.out.println("@@MatchNode--parent3: " + parent);
-        System.out.println("@@globalState " + globalState);
         this.globalState = (globalState != null) ? globalState : LinkedListMultimap.create();
         if (this.globalState.isEmpty())
             this.globalState.put("_MatchNodeMap", new HashMap<String, MatchNode>());
-        System.out.println("@@globalState:" + globalState);
-        System.out.println("@@globalState.get(\"_MatchNodeMap\").size: " + this.globalState.get("_MatchNodeMap"));
         this.localState = LinkedListMultimap.create();
         this.groups = null; // set by engine when created from a regex match
         this.start = start;
@@ -261,10 +255,7 @@ public final class MatchNode {
 
     public List<MatchNode> getDescendants(String name) {
         List<MatchNode> descendants = new ArrayList<>();
-        System.out.println("-@@name: " + name);
-
         for (MatchNode child : children.values()) {
-            System.out.println("@@child.name(): " + child.name() + "  -name: " + name);
             if (child.name().equals(name)) {
                 descendants.add(child);
                 descendants.addAll(child.getDescendants(name));
@@ -304,14 +295,10 @@ public final class MatchNode {
      */
     public List<MatchNode> getNextSiblings(String... names) {
         var allow = nameFilter(names);
-        System.out.println("@@allow: " + allow + "");
         var out = new ArrayList<MatchNode>();
         for (MatchNode n = this.nextSibling; n != null; n = n.nextSibling) {
-            System.out.println("@@n: " + n.name() + "");
             if (allow.test(n)) out.add(n);
         }
-        System.out.println("@@out: " + out + "");
-        System.out.println("@@out: " + out.size() + "");
         return out; // already nearest -> farthest
     }
 
@@ -325,7 +312,6 @@ public final class MatchNode {
         System.out.println("@@nameFilter: " + set);
 
         return mn -> {
-            System.out.println("@@Testing MatchNode: " + mn);
             if (mn == null) return false;
             System.out.println("   mn.name = " + mn.name());
             boolean match = mn.name() != null && set.contains(mn.name());

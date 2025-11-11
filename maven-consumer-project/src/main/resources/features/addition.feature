@@ -38,7 +38,7 @@ Feature: Addition
     * , I click "Learn more" Link
 
   Scenario: Start Run component
-    * RUN SCENARIOS: @test3
+    * RUN SCENARIOS: test3
 
   @Tag3
   Scenario: aaa
@@ -59,7 +59,7 @@ Feature: Addition
     @sc2
     Examples:
       | Scenario Tags | B  |
-      | @test3        | 22 |
+      | test3         | 22 |
 
 #  Scenario: qq
 #    Given I have numbers 2 and 3

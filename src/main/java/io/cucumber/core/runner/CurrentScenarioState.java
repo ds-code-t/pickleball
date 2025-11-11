@@ -5,12 +5,16 @@ import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import tools.dscode.common.annotations.DefinitionFlag;
+import tools.dscode.common.mappings.MapConfigurations;
+import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
 import tools.dscode.common.status.SoftExceptionInterface;
 
 import java.time.Duration;
 import java.util.List;
 
+import static io.cucumber.core.runner.GlobalState.getGherkinMessagesPickle;
+import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FAILED;
@@ -43,7 +47,15 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
     public void startScenarioRun() {
-        StepExtension rootScenarioStep = testCase.getRootScenarioStep();
+           StepExtension rootScenarioStep = testCase.getRootScenarioStep();
+        Pickle gherkinMessagesPickle = (Pickle) getProperty(testCase, "pickle");
+        io.cucumber.messages.types.Pickle pickle = (io.cucumber.messages.types.Pickle) getProperty(gherkinMessagesPickle, "pickle");
+        rootScenarioStep.setStepParsingMap(getParsingMap());
+        if(pickle.getValueRow()!=null && !pickle.getValueRow().isEmpty()) {
+            NodeMap examples = new NodeMap(MapConfigurations.MapType.EXAMPLE_MAP);
+            examples.merge(pickle.getHeaderRow(), pickle.getValueRow());
+            rootScenarioStep.getStepParsingMap().addMaps(examples);
+        }
 //        rootScenarioStep.addDefinitionFlag(DefinitionFlag.NO_LOGGING);
         testCaseState = getTestCaseState();
         rootScenarioStep.runMethodDirectly = true;
@@ -51,12 +63,8 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void runStep(StepExtension stepExtension) {
-        System.out.println("@@executionPickleStepTestStep args00aaa::: " + stepExtension + "\n@@args: " + stepExtension.pickleStepTestStep.getDefinitionMatch().getArguments().stream().map(Argument::getValue).toList());
-
         currentStep = stepExtension;
-        System.out.println("\n\n@@runStep: " + stepExtension + "");
         if (!shouldRun(stepExtension)) return;
-        System.out.println("@@running!: stepExtension.runMethodDirectly: " + stepExtension.runMethodDirectly + "");
 
         Result result;
         if (stepExtension.runMethodDirectly) {
@@ -65,7 +73,6 @@ public class CurrentScenarioState extends ScenarioMapping {
         } else {
             result = stepExtension.run();
         }
-        System.out.println("@@resultx: " + result);
 
 
         io.cucumber.plugin.event.Status status = result.getStatus();
@@ -92,12 +99,8 @@ public class CurrentScenarioState extends ScenarioMapping {
         for (StepData attachedStep : stepExtension.attachedSteps) {
             runStep((StepExtension) attachedStep);
         }
-        System.out.println("@@stepExtension: " + stepExtension);
-        System.out.println("@@stepExtension.childSteps: " + stepExtension.childSteps.size());
-        System.out.println("@@stepExtension.getConditionalStates(): " + stepExtension.getConditionalStates());
         if (!stepExtension.childSteps.isEmpty() && !stepExtension.definitionFlags.contains(SKIP_CHILDREN)) {
             StepExtension firstChild = (StepExtension) stepExtension.initializeChildSteps();
-            System.out.println("@@firstChild: " + firstChild);
             if (firstChild != null)
                 runStep(firstChild);
         }

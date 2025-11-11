@@ -1,7 +1,16 @@
 package tools.dscode.steps;
 
+import io.cucumber.datatable.DataTable;
+import io.cucumber.java.Before;
+import io.cucumber.java.BeforeAll;
 import io.cucumber.java.en.*;
+import org.openqa.selenium.chrome.ChromeDriver;
+import tools.dscode.coredefinitions.BrowserSteps;
+
+import tools.dscode.coredefinitions.NavigationSteps;
 import tools.dscode.registry.GlobalRegistry;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
@@ -33,4 +42,8 @@ public class CalculatorSteps {
     public void the_result_should_be(int expected) {
         assertThat(result).isEqualTo(expected);
     }
+
+
+
+
 }

@@ -11,8 +11,8 @@ public class ParsingMap extends MappingProcessor {
     public ParsingMap() {
     }
 
-    public ParsingMap(ParsingMap parsingMap) {
-        super(parsingMap);
-    }
+//    public ParsingMap(ParsingMap parsingMap) {
+//        super(parsingMap);
+//    }
 
 }

@@ -116,6 +116,7 @@ public abstract class StepData extends StepMapping {
                 lastChild.nextSibling = child;
                 child.previousSibling = lastChild;
             }
+            child.setStepParsingMap(getStepParsingMap());
             lastChild = child;
         }
         return childSteps.getFirst();
@@ -138,15 +139,12 @@ public abstract class StepData extends StepMapping {
 
 
     StepData(TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
-        System.out.println("@@StepData: " + pickleStepTestStep.getStep().getText());
         this.testCase = testCase;
         this.pickleStepTestStep = pickleStepTestStep;
         codeLocation = pickleStepTestStep.getCodeLocation();
         if (codeLocation == null)
             codeLocation = "";
         isCoreStep = codeLocation.startsWith(corePackagePath);
-        System.out.println("@@isCoreStep: " + isCoreStep + " codeLocation: " + codeLocation + "");
-        System.out.println("@@corePackagePath: " + corePackagePath);
     }
 
     public abstract Result run();

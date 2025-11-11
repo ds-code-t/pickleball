@@ -1,6 +1,11 @@
 package tools.dscode.common.mappings;
 
 import com.google.common.collect.LinkedListMultimap;
+import com.google.common.collect.Multimaps;
+import io.cucumber.core.runner.ScenarioStep;
+
+import java.util.EnumSet;
+import java.util.Set;
 
 import static tools.dscode.common.evaluations.AviatorUtil.eval;
 import static tools.dscode.common.mappings.MapConfigurations.MapType.STEP_MAP;
@@ -19,7 +24,7 @@ public class StepMapping {
 
     private final NodeMap stepNodeMap = new NodeMap(STEP_MAP);
 
-    public void mergeToStepMap(LinkedListMultimap<?, ?> obj) {
+    public void mergeToStepNodeMap(LinkedListMultimap<?, ?> obj) {
         stepNodeMap.merge(obj);
     }
 
@@ -30,8 +35,7 @@ public class StepMapping {
     }
 
     public void setStepParsingMap(ParsingMap stepParsingMap) {
-        System.out.println("@@setStepParsingMap for " + this);
-        this.stepParsingMap.copyParsingMap(stepParsingMap);
+        copyParsingMap(stepParsingMap);
         // this.stepParsingMap = stepParsingMap;
         this.stepParsingMap.addMaps(stepNodeMap);
     }
@@ -42,5 +46,21 @@ public class StepMapping {
 
     public String evalWithStepMaps(String expression) {
         return String.valueOf(eval(expression, getStepParsingMap()));
+    }
+
+    public void copyParsingMap(ParsingMap parsingMap) {
+        System.out.println("@\n\n==@@copyParsingMap for step: " + this);
+        System.out.println("@@parsingMap.getMaps()11: " +parsingMap.getMaps());
+        System.out.println("-------------");
+        this.stepParsingMap.clear();
+        this.stepParsingMap.keyOrder.clear();
+        if (this instanceof ScenarioStep) {
+            Set<MapConfigurations.MapType> exclude = EnumSet.of(MapConfigurations.MapType.PASSED_MAP, MapConfigurations.MapType.EXAMPLE_MAP);
+            this.stepParsingMap.maps.putAll(Multimaps.filterKeys(parsingMap.getMaps(), k -> !exclude.contains(k)));
+            this.stepParsingMap.keyOrder.addAll(parsingMap.keyOrder());
+        } else {
+            this.stepParsingMap.maps.putAll(parsingMap.getMaps());
+            this.stepParsingMap.keyOrder.addAll(parsingMap.keyOrder());
+        }
     }
 }

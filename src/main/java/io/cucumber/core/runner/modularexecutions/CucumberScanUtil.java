@@ -55,6 +55,7 @@ public final class CucumberScanUtil {
 
     public static List<Pickle> listPicklesByTags(String tagString) {
         String featurePathsOption = getGlobalFeaturePathsString();
+        System.out.println("@@featurePathsOption: " + featurePathsOption + "");
                 List<Feature> features = FEATURE_CACHE.computeIfAbsent(featurePathsOption, k ->
         {
             Map<String, String> featureOptions = new HashMap<>();

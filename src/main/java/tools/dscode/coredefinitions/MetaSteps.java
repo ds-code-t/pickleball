@@ -13,7 +13,6 @@ public class MetaSteps  extends CoreSteps {
 
     @Given("^" + RUN_SCENARIO + "(.*)$")
     public static void runScenario(String scenarioName) {
-        System.out.println("@@runScenario");
         System.out.println("@@scenarioName: " + scenarioName);
         // place Holder
     }

@@ -3,11 +3,13 @@ package tools.dscode.common.mappings;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.LinkedListMultimap;
+import com.google.common.collect.Multimaps;
 import tools.dscode.common.mappings.queries.Tokenized;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -27,29 +29,39 @@ public abstract class MappingProcessor implements Map<String, Object> {
     protected final List<MapConfigurations.MapType> keyOrder = new ArrayList<>();
     protected final List<MapConfigurations.MapType> singletonOrder = new ArrayList<>();
 
-    public void copyParsingMap(ParsingMap parsingMap) {
-        maps.clear();
-        keyOrder.clear();
-        maps.putAll(parsingMap.getMaps());
-        keyOrder.addAll(parsingMap.keyOrder());
-    }
+//    public void copyParsingMap(ParsingMap parsingMap) {
+//        maps.clear();
+//        keyOrder.clear();
+//        maps.putAll(parsingMap.getMaps());
+//        keyOrder.addAll(parsingMap.keyOrder());
+//    }
+//
+//    public void copyParsingMapToRootStep(ParsingMap parsingMap) {
+//        maps.clear();
+//        keyOrder.clear();
+//        Set<MapConfigurations.MapType> exclude = EnumSet.of(MapConfigurations.MapType.PASSED_MAP, MapConfigurations.MapType.EXAMPLE_MAP);
+//        maps.putAll(Multimaps.filterKeys(parsingMap.getMaps(), k -> !exclude.contains(k)));
+//        keyOrder.addAll(parsingMap.keyOrder());
+//    }
 
-    public MappingProcessor(ParsingMap parsingMap) {
-        copyParsingMap(parsingMap);
-        addMaps(new NodeMap(MapConfigurations.MapType.RUN_MAP));
-        addMaps(new NodeMap(MapConfigurations.MapType.SINGLETON));
-    }
+//    public MappingProcessor(ParsingMap parsingMap) {
+//        copyParsingMap(parsingMap);
+//        addMaps(new NodeMap(MapConfigurations.MapType.RUN_MAP));
+//        addMaps(new NodeMap(MapConfigurations.MapType.SINGLETON));
+//    }
 
     public MappingProcessor() {
         // Defensive copy to make key order immutable
         addMaps(new NodeMap(MapConfigurations.MapType.RUN_MAP));
         addMaps(new NodeMap(MapConfigurations.MapType.SINGLETON));
-        this.keyOrder.addAll(Arrays.asList(MapConfigurations.MapType.OVERRIDE_MAP, MapConfigurations.MapType.STEP_MAP,
-            MapConfigurations.MapType.RUN_MAP, MapConfigurations.MapType.SINGLETON,
-            MapConfigurations.MapType.GLOBAL_NODE, MapConfigurations.MapType.DEFAULT));
+        this.keyOrder.addAll(Arrays.asList(MapConfigurations.MapType.OVERRIDE_MAP,
+                MapConfigurations.MapType.PASSED_MAP, MapConfigurations.MapType.EXAMPLE_MAP, MapConfigurations.MapType.STEP_MAP,
+                MapConfigurations.MapType.RUN_MAP, MapConfigurations.MapType.SINGLETON,
+                MapConfigurations.MapType.GLOBAL_NODE, MapConfigurations.MapType.DEFAULT));
         this.singletonOrder.addAll(Arrays.asList(MapConfigurations.MapType.OVERRIDE_MAP,
-            MapConfigurations.MapType.SINGLETON, MapConfigurations.MapType.STEP_MAP, MapConfigurations.MapType.RUN_MAP,
-            MapConfigurations.MapType.GLOBAL_NODE, MapConfigurations.MapType.DEFAULT));
+                MapConfigurations.MapType.SINGLETON, MapConfigurations.MapType.PASSED_MAP,
+                MapConfigurations.MapType.EXAMPLE_MAP, MapConfigurations.MapType.STEP_MAP, MapConfigurations.MapType.RUN_MAP,
+                MapConfigurations.MapType.GLOBAL_NODE, MapConfigurations.MapType.DEFAULT));
     }
 
     public NodeMap getPrimaryRunMap() {
@@ -60,7 +72,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return maps.get(MapConfigurations.MapType.SINGLETON).getFirst();
     }
 
-    protected LinkedListMultimap<MapConfigurations.MapType, NodeMap> getMaps() {
+    public LinkedListMultimap<MapConfigurations.MapType, NodeMap> getMaps() {
         return maps;
     }
 
@@ -139,7 +151,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
         List<NodeMap> out = new ArrayList<>();
         for (MapConfigurations.MapType key : keyOrder) {
             out.addAll(maps.get(key)); // maps.get() is live, but empty if
-                                       // unused
+            // unused
         }
         return out;
     }
@@ -212,7 +224,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     private String resolveByMap(String s) {
-        System.out.println("@@===resolveByMap: " + s);
 
         String key = null;
         try {
@@ -346,7 +357,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     @Override
     public void clear() {
-
+        maps.clear();
     }
 
     @Override
@@ -396,7 +407,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return "\n====\n" + getMapsForResolution()
                 .stream()
                 .map(String::valueOf) // safely converts each element to its
-                                      // string form
+                // string form
                 .collect(Collectors.joining(System.lineSeparator())) + "\n---\n";
     }
 }

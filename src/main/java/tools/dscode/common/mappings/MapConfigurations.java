@@ -9,7 +9,7 @@ public class MapConfigurations {
         CONFIGURATION_FILE, PASSED_TABLE, EXAMPLE_TABLE, STEP_TABLE, TABLE_ROW
     }
     public enum MapType {
-        OVERRIDE_MAP, STEP_MAP, RUN_MAP, GLOBAL_NODE, DEFAULT, SINGLETON
+        OVERRIDE_MAP,  PASSED_MAP, EXAMPLE_MAP, STEP_MAP, RUN_MAP, GLOBAL_NODE, DEFAULT, SINGLETON
     }
 
     // private static final Map<String, DataSource> dataSourceMap = new

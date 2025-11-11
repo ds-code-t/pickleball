@@ -18,9 +18,7 @@ import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
  * A small palette of nodes used by tests.
  */
 public class DictionaryA extends NodeDictionary {
-
-    public static void main(String[] args) {
-
+    static {
         XPathyRegistry.add("Button", (v, op) ->
                 orMap(
                         textOp(op, v),
@@ -36,28 +34,24 @@ public class DictionaryA extends NodeDictionary {
                         () -> XPathy.from(Tag.a)                                       // //button[…]
                 )
         );
+    }
+
+    public static void main(String[] args) {
+
+
 
         ChromiumDriver driver = createChromeDriver();
         driver.get("https://www.iana.org/help/example-domains");
-        System.out.println("@@main");
         DictionaryA dict = new DictionaryA();
         String input = """
                 click the "RFC 2606" Link
                 """;
         LineExecution lineData = dict.getLineExecutionData(input);
-        System.out.println("@@lineExecutionData: " + lineData);
-        System.out.println("@@lineExecutionData: " + lineData.execute(driver));
     }
 
     public LineExecution getLineExecutionData(String input) {
-        System.out.println("@@getLineExecutionData: " + input);
         MatchNode lineNode = parse(input);
-//        MatchNode lineNode = matchNode.getDescendants("line").getFirst();
         LineExecution lineExecution = new LineExecution(lineNode);
-        System.out.println("@@lineExecutionData: " + lineExecution);
-        System.out.println("@@ineExecutionData.phrases.getFirst().type: " + lineExecution.phrases.getFirst().type);
-//        System.out.println("@@ineExecutionData.element " + lineExecution.phrases.getFirst().element);
-//        System.out.println("@@ineExecutionData.xPathy " + lineExecution.phrases.getFirst().element.xPathy);
 
         return lineExecution;
     }
@@ -84,7 +78,6 @@ public class DictionaryA extends NodeDictionary {
     ParseNode preProcess = new ParseNode("^.*$") {
         @Override
         public String onCapture(String s) {
-            System.out.println("@@preProcess onCapture: " + s);
             return normalizeWhitespace(s)
                     .replaceAll("(?i)\\b(?:the|then|a)\\b", "")
                     .replaceAll("([^" + punc + "]$)", "$1.")
@@ -102,7 +95,6 @@ public class DictionaryA extends NodeDictionary {
     ParseNode phrase = new ParseNode("(?<conjunction>\\b(?:and|or)\\b)?\\s*(?i:(?<context>from|after|before|for|in)?)(?<body>[^" + punc + "]+)(?<punc>[" + punc + "])") {
         @Override
         public String onCapture(MatchNode self) {
-            System.out.println("@@phrase onCapture11: " + self.token() + " " + self.resolvedGroupText("body"));
             self.putToLocalState("context", self.resolvedGroupText("context"));
             self.putToLocalState("conjunctions", self.resolvedGroupText("conjunctions"));
             self.putToLocalState("punc", self.resolvedGroupText("punc"));
