@@ -3,55 +3,336 @@ package tools.dscode.common.treeparsing;
 import com.google.common.collect.LinkedListMultimap;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+
+import static tools.dscode.common.treeparsing.RegexUtil.TOKEN_BODY;
+import static tools.dscode.common.treeparsing.RegexUtil.TOKEN_END;
+import static tools.dscode.common.treeparsing.RegexUtil.TOKEN_START;
 
 /**
- * Per-match, per-run state container. Minimal logic; recursion does the work.
+ * Runtime node created for each match.
  */
 public final class MatchNode {
+    public MatchNode nextSibling;
+    public MatchNode previousSibling;
+    public int position;        // (fixed the "nt" -> int)
+    //    public String name;
+    private final ParseNode parseNode;
+    private final MatchNode parent;
+    private final String token;
 
-    public final ParseNode parseNode;
-    public final MatchNode parent; // nullable
+    /**
+     * Per-run shared state (inherited from root).
+     */
+    private final LinkedListMultimap<String, Object> globalState;
 
-    public final String originalText;   // exact group(0)
-    public String modifiedText;         // onCapture(originalText)
-    public String maskedText;           // modifiedText with child tokens substituted
-    public final String token;          // ⟦unique⟧
+    /**
+     * Per-node local state (unique to this match).
+     */
+    private final LinkedListMultimap<String, Object> localState;
 
-    public final List<MatchNode> children = new ArrayList<>();
-    public final LinkedListMultimap<String, MatchNode> matchMap = LinkedListMultimap.create();
+    /**
+     * Named and numbered capture groups for this match (null for root).
+     */
+    private NamedGroupMap groups;
 
-    // NEW: sibling pointers (within the same parent.children list)
-    public MatchNode previousSibling;   // nullable
-    public MatchNode nextSibling;       // nullable
+    //    private final List<MatchNode> children = new ArrayList<>();
+    protected final LinkedListMultimap<String, MatchNode> children = LinkedListMultimap.create();
+    protected List<MatchNode> sortedChildren;
 
-    // Scratch state maps (per-match and global shared-by-reference)
-    public final LinkedListMultimap<String, Object> stateMap = LinkedListMultimap.create();
-    public final LinkedListMultimap<String, Object> globalState;
+    private String originalText;
+    private String modifiedText;
+    private String maskedText;
+    int start;
+    private int end;
 
-    public final List<PhaseRun> phaseRuns = new ArrayList<>();
 
-    public MatchNode(ParseNode parseNode,
-                     MatchNode parent,
-                     String originalText,
-                     String token,
-                     LinkedListMultimap<String,Object> globalState) {
+    public static MatchNode createMatchNode(int start, int ends, ParseNode parseNode, MatchNode parent, String originalText, String baseToken, int occurrence, LinkedListMultimap<String, Object> globalState) {
+        if (baseToken == null) return new MatchNode(start, ends, parseNode, parent, originalText, null, globalState);
+        int size = globalState.get(baseToken).size();
+        String token = TOKEN_START + "_" + baseToken + "_" + occurrence + "_" + size + "_" + TOKEN_END;
+        MatchNode matchNode = new MatchNode(start, ends, parseNode, parent, originalText, token, globalState);
+        globalState.put(baseToken, matchNode);
+        System.out.println("@@globalState.get(\"_MatchNodeMap\").size: " + globalState.get("_MatchNodeMap").size());
+        if (parent != null)
+            ((Map<String, MatchNode>) globalState.get("_MatchNodeMap").getFirst()).put(token, matchNode);
+        return matchNode;
+    }
+
+    private MatchNode(int start, int ends,
+                      ParseNode parseNode,
+                      MatchNode parent,
+                      String originalText,
+                      String token,
+                      LinkedListMultimap<String, Object> globalState) {
+        System.out.println("@@MatchNode--parent1: " + parent);
         this.parseNode = Objects.requireNonNull(parseNode, "parseNode");
         this.parent = parent;
-        this.originalText = Objects.requireNonNull(originalText, "originalText");
-        this.token = Objects.requireNonNull(token, "token");
-        this.globalState = Objects.requireNonNull(globalState, "globalState");
-        this.modifiedText = originalText;
-        this.maskedText = originalText;
+        System.out.println("@@MatchNode--parent2: " + parent);
+        this.originalText = originalText;
+        this.token = token;
+        System.out.println("@@MatchNode--parent3: " + parent);
+        System.out.println("@@globalState " + globalState);
+        this.globalState = (globalState != null) ? globalState : LinkedListMultimap.create();
+        if (this.globalState.isEmpty())
+            this.globalState.put("_MatchNodeMap", new HashMap<String, MatchNode>());
+        System.out.println("@@globalState:" + globalState);
+        System.out.println("@@globalState.get(\"_MatchNodeMap\").size: " + this.globalState.get("_MatchNodeMap"));
+        this.localState = LinkedListMultimap.create();
+        this.groups = null; // set by engine when created from a regex match
+        this.start = start;
+        this.end = ends;
     }
 
-    /** Recursively resolve: replace each child token (in appearance order) with child.unmasked(). */
-    public String unmasked() {
-        String out = maskedText;
-        for (MatchNode child : children) {
-            out = out.replace(child.token, child.unmasked());
-        }
-        return out;
+    @Override
+    public String toString() {
+        if (globalState != null) return maskedText;
+        return Pattern.compile(TOKEN_BODY).matcher(maskedText)
+                .replaceAll(mr -> {
+                    Object replacement = getFromGlobalState(mr.group(0));
+                    return replacement == null ? mr.group(0) : replacement.toString();
+                });
     }
+
+    // ---- getters for printer/engine ----
+    public String name() {
+        return parseNode.getName();
+    }
+
+    public String regex() {
+        return parseNode.getRegexPattern();
+    }
+
+    public String token() {
+        return token;
+    }
+
+    public String originalText() {
+        return originalText;
+    }
+
+    public String modifiedText() {
+        return modifiedText;
+    }
+
+    public String maskedText() {
+        return maskedText;
+    }
+
+    public LinkedListMultimap<String, MatchNode> childrenMap() {
+        return children;
+    }
+
+    public List<MatchNode> children() {
+        return children.values();
+    }
+
+    public void addChildMatchNode(MatchNode child) {
+        System.out.println("\n@@addChildMatchNode: " + name() + "");
+        System.out.println("@@child: " + child.name() + "");
+        children.put(child.name(), child);
+    }
+
+    /**
+     * Shared across the entire parse run.
+     */
+    public LinkedListMultimap<String, Object> globalState() {
+        return globalState;
+    }
+
+    /**
+     * Specific to this node instance only.
+     */
+    public LinkedListMultimap<String, Object> localState() {
+        return localState;
+    }
+
+    public Object getFromGlobalState(String key) {
+        List<Object> list = globalState.get(key);
+        if (list.isEmpty() || list.getLast() == null) return null;
+        return list.getLast();
+    }
+
+    public boolean putToGlobalState(String key, Object value) {
+        if (value == null || value.toString().isBlank()) return false;
+        return globalState.put(key, value);
+    }
+
+
+    public Object getFromLocalState(String key) {
+        List<Object> list = localState.get(key);
+        if (list.isEmpty() || list.getLast() == null) return null;
+        return list.getLast();
+    }
+
+    public boolean localStateBoolean(String key) {
+        List<Object> list = localState.get(key);
+        if (list.isEmpty() || list.getLast() == null) return false;
+        String s = list.getLast().toString().toLowerCase().strip();
+        return !s.isBlank() && !s.equals("false") && !s.equals("0");
+    }
+
+    public boolean globalStateBoolean(String key) {
+        List<Object> list = globalState.get(key);
+        if (list.isEmpty() || list.getLast() == null) return false;
+        String s = list.getLast().toString().toLowerCase().strip();
+        return !s.isBlank() && !s.equals("false") && !s.equals("0");
+    }
+
+    public boolean putToLocalState(String key, Object value) {
+        if (value == null) return false;
+        return localState.put(key, value);
+    }
+
+
+    /**
+     * Iterate global replacements until fixed point so sibling tokens inside expansions are handled.
+     */
+    private String unmask(String s) {
+        if(s == null) return null;
+        Map<String, MatchNode> matchNodeMap = ((Map<String, MatchNode>) globalState.get("_MatchNodeMap").getFirst());
+        if (s.isEmpty() || matchNodeMap.isEmpty()) return s;
+        String prev;
+        String cur = s;
+        do {
+            prev = cur;
+            for (Map.Entry<String, MatchNode> m : matchNodeMap.entrySet()) {
+                if(m.getValue().modifiedText == null) continue;
+                cur = cur.replaceAll(
+                        Pattern.quote(m.getKey()),
+                        Matcher.quoteReplacement(m.getValue().modifiedText)
+                );
+            }
+        } while (!cur.equals(prev));
+        return cur;
+    }
+
+    public String resolvedGroupText(String groupName) {
+        return unmask(groups().get(groupName));
+    }
+
+    public String resolvedGroupText(int groupNum) {
+        return unmask(groups().get(groupNum));
+    }
+
+
+    /**
+     * Named/numbered groups for this match (may be null for the root).
+     */
+    public NamedGroupMap groups() {
+        return groups;
+    }
+
+    // ---- setters used by engine ----
+    public void setModifiedText(String s) {
+        this.modifiedText = s;
+    }
+
+    public void setMaskedText(String s) {
+        this.maskedText = s;
+    }
+
+    public void setGroups(NamedGroupMap g) {
+        this.groups = g;
+    }
+
+    // (optional) accessors if needed elsewhere
+    public ParseNode parseNode() {
+        return parseNode;
+    }
+
+    public MatchNode parent() {
+        return parent;
+    }
+
+    public MatchNode getAncestor(String name) {
+        MatchNode current = parent;
+        while (current != null && !current.name().equals(name)) current = current.parent;
+        return current;
+    }
+
+    public List<MatchNode> getDescendants(String name) {
+        List<MatchNode> descendants = new ArrayList<>();
+        System.out.println("-@@name: " + name);
+
+        for (MatchNode child : children.values()) {
+            System.out.println("@@child.name(): " + child.name() + "  -name: " + name);
+            if (child.name().equals(name)) {
+                descendants.add(child);
+                descendants.addAll(child.getDescendants(name));
+            }
+        }
+        return descendants;
+    }
+
+    public MatchNode getChild(String name) {
+        List<MatchNode> matches = getChildList(name);
+        return matches.isEmpty() ? null : matches.getFirst();
+    }
+
+    public MatchNode getChild(String name, int index) {
+        List<MatchNode> matches = getChildList(name);
+        return index >= matches.size() ? null : matches.get(index);
+    }
+
+    public List<MatchNode> getChildList(String name) {
+        return children.get(name);
+    }
+
+    /**
+     * Preceding siblings, nearest-first; filter by any of the names (or all if none provided).
+     */
+    public List<MatchNode> getPreviousSiblings(String... names) {
+        var allow = nameFilter(names);
+        var out = new ArrayList<MatchNode>();
+        for (MatchNode p = this.previousSibling; p != null; p = p.previousSibling) {
+            if (allow.test(p)) out.add(p);
+        }
+        return out; // already nearest -> farthest
+    }
+
+    /**
+     * Following siblings, nearest-first; filter by any of the names (or all if none provided).
+     */
+    public List<MatchNode> getNextSiblings(String... names) {
+        var allow = nameFilter(names);
+        System.out.println("@@allow: " + allow + "");
+        var out = new ArrayList<MatchNode>();
+        for (MatchNode n = this.nextSibling; n != null; n = n.nextSibling) {
+            System.out.println("@@n: " + n.name() + "");
+            if (allow.test(n)) out.add(n);
+        }
+        System.out.println("@@out: " + out + "");
+        System.out.println("@@out: " + out.size() + "");
+        return out; // already nearest -> farthest
+    }
+
+    private static Predicate<MatchNode> nameFilter(String... names) {
+        if (names == null || names.length == 0) return mn -> true;
+
+        var set = Arrays.stream(names)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toUnmodifiableSet());
+
+        System.out.println("@@nameFilter: " + set);
+
+        return mn -> {
+            System.out.println("@@Testing MatchNode: " + mn);
+            if (mn == null) return false;
+            System.out.println("   mn.name = " + mn.name());
+            boolean match = mn.name() != null && set.contains(mn.name());
+            System.out.println("   => result = " + match);
+            return match;
+        };
+    }
+
+
 }

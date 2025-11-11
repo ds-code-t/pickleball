@@ -1,118 +1,188 @@
 package tools.dscode.common.treeparsing;
 
 import java.lang.reflect.Field;
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Minimal dictionary: field names → ParseNode instances; YAML rows → 2D children (row0 parsing, rows≥1 phases). */
+/**
+ * Base class for declaring ParseNode fields and wiring them via a tiny YAML-like format.
+ * <p>
+ * Usage:
+ * public class MyDict extends NodeDictionary {
+ * ParseNode A = new ParseNode("a+");
+ * ParseNode B = new ParseNode("b+");
+ * ParseNode root = buildFromYaml("""
+ * A:
+ * - B
+ * """);
+ * }
+ */
 public abstract class NodeDictionary {
 
-    /** Build a fresh top-level ParseNode from a tiny YAML grid spec (deep-copying referenced fields). */
-    public ParseNode buildFromYaml(String yaml) {
-        Objects.requireNonNull(yaml, "yaml");
-        Spec spec = parseTinyYaml(yaml);
-        Map<String, ParseNode> pool = reflectNodePool();
+    /**
+     * Root node; typically assigned by buildFromYaml(...) in the subclass.
+     */
+    protected ParseNode root;
 
-        List<List<ParseNode>> rows = new ArrayList<>();
-        for (List<String> rowIds : spec.rows) {
-            List<ParseNode> row = new ArrayList<>(rowIds.size());
-            for (String id : rowIds) {
-                ParseNode original = pool.get(id);
-                if (original == null) {
-                    throw new IllegalArgumentException("Unknown node id '" + id + "' on " + getClass().getSimpleName());
-                }
-                row.add(deepCopyTree(original)); // fresh identity per placement
-            }
-            rows.add(List.copyOf(row));
-        }
-        return new ParseNode(spec.rootKey, "", List.copyOf(rows), null) {};
+    private Map<String, ParseNode> fieldMap; // lazy cached reflection map
+
+
+    /**
+     * Parse with this dictionary's root node.
+     */
+    public MatchNode parse(String input) {
+        if (root == null) throw new IllegalStateException("No root assigned. Call buildFromYaml(...) or set 'root'.");
+        return root.initiateParsing(input);
     }
 
-    /* ---------------------------- reflection of fields ---------------------------- */
+    /**
+     * Name -> ParseNode map based on declared fields in subclass chain (subclass-first).
+     */
+    public synchronized Map<String, ParseNode> nodesByName() {
+        if (fieldMap != null) return fieldMap;
 
-    private Map<String, ParseNode> reflectNodePool() {
         Map<String, ParseNode> map = new LinkedHashMap<>();
-        Class<?> c = this.getClass();
-        while (c != null && NodeDictionary.class.isAssignableFrom(c)) {
-            for (Field f : c.getDeclaredFields()) {
+        // subclass-first linearization up to NodeDictionary (exclusive)
+        Class<?> c = getClass();
+        List<Class<?>> chain = new ArrayList<>();
+        while (c != null && c != NodeDictionary.class) {
+            chain.add(c);
+            c = c.getSuperclass();
+        }
+        for (Class<?> k : chain) {
+            for (Field f : k.getDeclaredFields()) {
                 if (!ParseNode.class.isAssignableFrom(f.getType())) continue;
                 f.setAccessible(true);
                 try {
-                    Object v = f.get(this);
-                    if (v != null) map.put(f.getName(), (ParseNode) v);
+                    ParseNode pn = (ParseNode) f.get(this);
+                    if (pn != null) {
+                        String name = f.getName();
+                        // first declaration wins; also set a friendly name for printing/tokens
+                        if (!map.containsKey(name)) {
+                            pn.setName(name);
+                            map.put(name, pn);
+                        }
+                    }
                 } catch (IllegalAccessException e) {
-                    throw new RuntimeException(e);
+                    throw new RuntimeException("Cannot access ParseNode field: " + f.getName(), e);
                 }
             }
-            c = c.getSuperclass();
         }
-        return map;
+        fieldMap = Collections.unmodifiableMap(map);
+        for (ParseNode parseNode : fieldMap.values()) {
+            if (!parseNode.useRegexTemplating)
+                continue;
+            Pattern pattern = Pattern.compile("<<(.+?)>>");
+//            System.out.println("@@parseNode.selfRegex: " + parseNode.getName() + "  ::  " + parseNode.selfRegex);
+            Matcher m = pattern.matcher(parseNode.selfRegex);
+            parseNode.selfRegex = m.replaceAll((MatchResult mr) -> {
+                String key = mr.group(1);
+                if (!fieldMap.containsKey(key))
+                    return mr.group(0);
+                return Matcher.quoteReplacement(fieldMap.get(key).tokenKeyPattern());
+            });
+        }
+        return fieldMap;
     }
 
-    /* ---------------------------- deep copy via delegation ---------------------------- */
+    /**
+     * Tiny YAML-like wiring (indent 2 spaces; list items start with "- ").
+     * Example:
+     * RootName:
+     * - childA
+     * - childB:
+     * - grand
+     */
+    public ParseNode buildFromYaml(String yaml) {
+        Objects.requireNonNull(yaml, "yaml");
 
-    private static ParseNode deepCopyTree(ParseNode src) {
-        List<List<ParseNode>> newRows = new ArrayList<>(src.rows.size());
-        for (List<ParseNode> row : src.rows) {
-            List<ParseNode> newRow = new ArrayList<>(row.size());
-            for (ParseNode child : row) newRow.add(deepCopyTree(child));
-            newRows.add(List.copyOf(newRow));
+        Map<String, ParseNode> dict = nodesByName();
+        List<String> lines = normalizeToLines(yaml);
+        if (lines.isEmpty()) throw new IllegalArgumentException("YAML is empty.");
+
+        int i = 0;
+        while (i < lines.size() && lines.get(i).isBlank()) i++;
+        if (i >= lines.size()) throw new IllegalArgumentException("YAML has no content.");
+
+        String header = lines.get(i).trim();
+        if (!header.endsWith(":")) {
+            throw new IllegalArgumentException("Expected 'RootName:' at top, got: " + header);
         }
-        return new DelegatingNode(src, List.copyOf(newRows));
-    }
-
-    private static final class DelegatingNode extends ParseNode {
-        private final ParseNode delegate;
-        DelegatingNode(ParseNode delegate, List<List<ParseNode>> rows) {
-            super(delegate.keyName, delegate.keySuffix, rows, delegate.selfRegex);
-            this.delegate = delegate;
+        String rootName = header.substring(0, header.length() - 1).trim();
+        ParseNode root = dict.get(rootName);
+        if (root == null) {
+            throw new IllegalArgumentException("Unknown node name for root: " + rootName);
         }
-        @Override public void beforeCapture(MatchNode self) { delegate.beforeCapture(self); }
-        @Override public String onCapture(String s) { return delegate.onCapture(s); }
-        @Override public void afterCapture(MatchNode self) { delegate.afterCapture(self); }
-        @Override public MatchNode createMatchNode(ParseNode node, MatchNode parent, String text, String token,
-                                                   com.google.common.collect.LinkedListMultimap<String,Object> gs) {
-            return delegate.createMatchNode(this, parent, text, token, gs);
-        }
-        @Override public String getUniqueKey(int n) { return delegate.getUniqueKey(n); }
-    }
+        root.parseChildren.clear();
 
-    /* ---------------------------- tiny YAML: Root: - [a,b] - [c] ---------------------------- */
+        Deque<ParseNode> parentStack = new ArrayDeque<>();
+        Deque<Integer> depthStack = new ArrayDeque<>();
+        parentStack.push(root);
+        depthStack.push(0);
 
-    private static final class Spec {
-        final String rootKey; final List<List<String>> rows;
-        Spec(String rootKey, List<List<String>> rows) { this.rootKey = rootKey; this.rows = rows; }
-    }
+        for (int line = i + 1; line < lines.size(); line++) {
+            String raw = lines.get(line);
+            if (raw.isBlank()) continue;
 
-    private static Spec parseTinyYaml(String yaml) {
-        String[] lines = yaml.replace("\r\n","\n").split("\n");
-        int i = 0; while (i < lines.length && lines[i].trim().isBlank()) i++;
-        if (i >= lines.length) throw new IllegalArgumentException("Empty YAML");
-        String head = lines[i].trim();
-        int colon = head.indexOf(':');
-        if (colon <= 0) throw new IllegalArgumentException("Expected 'RootKey:' on first non-blank line");
-        String rootKey = head.substring(0, colon).trim();
-        i++;
-
-        Pattern rowPat = Pattern.compile("^\\s*-\\s*\\[(.*)]\\s*$");
-        List<List<String>> rows = new ArrayList<>();
-        for (; i < lines.length; i++) {
-            String raw = lines[i];
-            if (raw.trim().isBlank()) continue;
-            Matcher m = rowPat.matcher(raw);
-            if (!m.find()) throw new IllegalArgumentException("Expected '- [a, b, c]': " + raw);
-            String inside = m.group(1);
-            if (inside.isBlank()) { rows.add(List.of()); continue; }
-            String[] parts = inside.split(",");
-            List<String> ids = new ArrayList<>();
-            for (String p : parts) {
-                String id = p.trim();
-                if (!id.isEmpty()) ids.add(id);
+            int leading = countLeadingSpaces(raw);
+            if ((leading % 2) != 0) {
+                throw new IllegalArgumentException("Indentation must be multiples of 2 spaces: '" + raw + "'");
             }
-            rows.add(List.copyOf(ids));
+            int depth = leading / 2;
+            String trimmed = raw.trim();
+
+            if (!trimmed.startsWith("- ")) {
+                throw new IllegalArgumentException("Expected list item '- name' at: '" + raw + "'");
+            }
+            String name = trimmed.substring(2).trim();
+            if (name.endsWith(":")) name = name.substring(0, name.length() - 1).trim();
+            if (name.isEmpty()) {
+                throw new IllegalArgumentException("Empty node name at: '" + raw + "'");
+            }
+
+            ParseNode node = dict.get(name);
+            if (node == null) {
+                throw new IllegalArgumentException("Unknown node name: " + name);
+            }
+
+            // Pop up until we're at the correct parent for this depth (parent depth = depth, child depth = depth+1)
+            while (!depthStack.isEmpty() && depthStack.peek() >= depth + 1) {
+                depthStack.pop();
+                parentStack.pop();
+            }
+            ParseNode parent = parentStack.peek();
+            if (parent == null) throw new IllegalStateException("No parent available for line: '" + raw + "'");
+
+            parent.parseChildren.add(node);
+
+            // This node might be a parent for deeper items
+            parentStack.push(node);
+            depthStack.push(depth + 1);
         }
-        if (rows.isEmpty()) rows = List.of(List.of());
-        return new Spec(rootKey, List.copyOf(rows));
+
+        this.root = root;
+        return root;
+    }
+
+    // ---- helpers ----
+    private static int countLeadingSpaces(String s) {
+        int i = 0;
+        while (i < s.length() && s.charAt(i) == ' ') i++;
+        return i;
+    }
+
+    private static List<String> normalizeToLines(String s) {
+        String[] arr = s.replace("\r\n", "\n").replace("\r", "\n").split("\n", -1);
+        return Arrays.asList(arr);
     }
 }

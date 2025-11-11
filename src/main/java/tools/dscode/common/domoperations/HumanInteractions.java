@@ -1,0 +1,318 @@
+package tools.dscode.common.domoperations;
+
+import org.openqa.selenium.*;
+import org.openqa.selenium.chromium.ChromiumDriver;
+import org.openqa.selenium.interactions.Actions;
+
+import java.time.Duration;
+import java.util.Objects;
+
+public final class HumanInteractions {
+
+    private static final Duration SHORT = Duration.ofMillis(70);
+    private static final Duration MID   = Duration.ofMillis(120);
+
+    private HumanInteractions() {}
+
+    // =======================
+    // Mouse interactions
+    // =======================
+
+    /** Move, hover briefly, and click. JS-dispatch fallback if Actions fails. */
+    public static void click(ChromiumDriver driver, WebElement el) {
+        Objects.requireNonNull(el);
+        try {
+            centerScroll(driver, el);
+            new Actions(driver)
+                    .moveToElement(el).pause(SHORT)
+                    .click().pause(SHORT)
+                    .build().perform();
+        } catch (RuntimeException e) {
+            jsClick(driver, el);
+        }
+    }
+
+    /** Move and double-click (user-like). JS fallback dispatches dblclick. */
+    public static void doubleClick(ChromiumDriver driver, WebElement el) {
+        Objects.requireNonNull(el);
+        try {
+            centerScroll(driver, el);
+            new Actions(driver)
+                    .moveToElement(el).pause(SHORT)
+                    .doubleClick().pause(SHORT)
+                    .build().perform();
+        } catch (RuntimeException e) {
+            jsDispatchMouse(driver, el, "dblclick");
+        }
+    }
+
+    /** Move and context-click. JS fallback dispatches contextmenu. */
+    public static void contextClick(ChromiumDriver driver, WebElement el) {
+        Objects.requireNonNull(el);
+        try {
+            centerScroll(driver, el);
+            new Actions(driver)
+                    .moveToElement(el).pause(MID)
+                    .contextClick().pause(SHORT)
+                    .build().perform();
+        } catch (RuntimeException e) {
+            jsDispatchMouse(driver, el, "contextmenu");
+        }
+    }
+
+    /** Just hover; useful to open menus/tooltips. JS fallback dispatches mouseover/mouseenter. */
+    public static void hover(ChromiumDriver driver, WebElement el) {
+        Objects.requireNonNull(el);
+        try {
+            centerScroll(driver, el);
+            new Actions(driver)
+                    .moveToElement(el).pause(Duration.ofMillis(250))
+                    .build().perform();
+        } catch (RuntimeException e) {
+            jsHover(driver, el);
+        }
+    }
+
+    /** Drag source element onto target. JS fallback uses HTML5 drag/drop dispatch. */
+    public static void dragAndDrop(ChromiumDriver driver, WebElement source, WebElement target) {
+        Objects.requireNonNull(source);
+        Objects.requireNonNull(target);
+        try {
+            centerScroll(driver, source);
+            centerScroll(driver, target);
+            new Actions(driver)
+                    .moveToElement(source).pause(SHORT)
+                    .clickAndHold().pause(MID)
+                    .moveToElement(target).pause(MID)
+                    .release().pause(SHORT)
+                    .build().perform();
+        } catch (RuntimeException e) {
+            jsHtml5DragDrop(driver, source, target);
+        }
+    }
+
+    /** Drag by an x/y offset. JS fallback tries HTML5 drag with offset. */
+    public static void dragByOffset(ChromiumDriver driver, WebElement source, int xOffset, int yOffset) {
+        Objects.requireNonNull(source);
+        try {
+            centerScroll(driver, source);
+            new Actions(driver)
+                    .moveToElement(source).pause(SHORT)
+                    .clickAndHold().pause(MID)
+                    .moveByOffset(xOffset, yOffset).pause(MID)
+                    .release().pause(SHORT)
+                    .build().perform();
+        } catch (RuntimeException e) {
+            jsHtml5DragBy(driver, source, xOffset, yOffset);
+        }
+    }
+
+    /** Wheel-scroll the element into view center, then nudge by deltaY pixels. */
+    public static void wheelScrollBy(ChromiumDriver driver, WebElement el, int deltaY) {
+        Objects.requireNonNull(el);
+        try {
+            centerScroll(driver, el);
+            new Actions(driver)
+                    .scrollByAmount(0, deltaY).pause(SHORT)
+                    .build().perform();
+        } catch (RuntimeException e) {
+            jsScrollBy(driver, el, deltaY);
+        }
+    }
+
+    // =======================
+    // Keyboard interactions
+    // =======================
+
+    /** Focus element, clear (Ctrl/Cmd+A + Delete), then type text. JS fallback sets value + events. */
+    public static void clearAndType(ChromiumDriver driver, WebElement el, CharSequence text) {
+        Objects.requireNonNull(el);
+        try {
+            centerScroll(driver, el);
+            new Actions(driver)
+                    .moveToElement(el).pause(SHORT)
+                    .click().pause(SHORT)
+                    .keyDown(osControlKey()).sendKeys("a").keyUp(osControlKey()).pause(SHORT)
+                    .sendKeys(Keys.DELETE).pause(SHORT)
+                    .sendKeys(text).pause(SHORT)
+                    .build().perform();
+        } catch (RuntimeException e) {
+            jsSetValue(driver, el, text == null ? "" : text.toString(), true);
+        }
+    }
+
+    /** Focus element and type text as-is. JS fallback appends value + events. */
+    public static void typeText(ChromiumDriver driver, WebElement el, CharSequence text) {
+        Objects.requireNonNull(el);
+        try {
+            centerScroll(driver, el);
+            new Actions(driver)
+                    .moveToElement(el).pause(SHORT)
+                    .click().pause(SHORT)
+                    .sendKeys(text).pause(SHORT)
+                    .build().perform();
+        } catch (RuntimeException e) {
+            jsAppendValue(driver, el, text == null ? "" : text.toString());
+        }
+    }
+
+    /** Send raw keys to the currently focused element (e.g., ENTER, ESC). */
+    public static void sendKeys(ChromiumDriver driver, CharSequence... keys) {
+        try {
+            new Actions(driver)
+                    .pause(SHORT)
+                    .sendKeys(keys).pause(SHORT)
+                    .build().perform();
+        } catch (RuntimeException e) {
+            // No JS fallback for global key events that target active element reliably
+            throw e;
+        }
+    }
+
+    /** Press ENTER on an element (focus first). */
+    public static void pressEnter(ChromiumDriver driver, WebElement el) {
+        Objects.requireNonNull(el);
+        try {
+            centerScroll(driver, el);
+            new Actions(driver)
+                    .moveToElement(el).pause(SHORT)
+                    .click().pause(SHORT)
+                    .sendKeys(Keys.ENTER).pause(SHORT)
+                    .build().perform();
+        } catch (RuntimeException e) {
+            jsDispatchKeyboard(driver, el, "Enter");
+        }
+    }
+
+    /** Press ESC (global). */
+    public static void pressEsc(ChromiumDriver driver) {
+        sendKeys(driver, Keys.ESCAPE);
+    }
+
+    // =======================
+    // Helpers
+    // =======================
+
+    private static Keys osControlKey() {
+        String os = System.getProperty("os.name", "").toLowerCase();
+        return os.contains("mac") ? Keys.COMMAND : Keys.CONTROL;
+    }
+
+    /** Center-scroll to reduce sticky header/overlay issues. */
+    private static void centerScroll(ChromiumDriver driver, WebElement el) {
+        ((JavascriptExecutor) driver).executeScript(
+                "try{arguments[0].scrollIntoView({block:'center',inline:'center'});}catch(e){}", el);
+    }
+
+    private static void jsClick(ChromiumDriver driver, WebElement el) {
+        ((JavascriptExecutor) driver).executeScript(
+                """
+                const el = arguments[0];
+                if(!el) return;
+                const fire = (type) => el.dispatchEvent(new MouseEvent(type, {bubbles:true, cancelable:true, view:window}));
+                el.focus && el.focus({preventScroll:true});
+                fire('mouseover'); fire('mousedown'); fire('mouseup'); fire('click');
+                """, el);
+    }
+
+    private static void jsDispatchMouse(ChromiumDriver driver, WebElement el, String type) {
+        ((JavascriptExecutor) driver).executeScript(
+                """
+                const el = arguments[0], type = arguments[1];
+                if(!el) return;
+                el.dispatchEvent(new MouseEvent(type, {bubbles:true, cancelable:true, view:window, button: (type==='contextmenu'?2:0)}));
+                """, el, type);
+    }
+
+    private static void jsHover(ChromiumDriver driver, WebElement el) {
+        ((JavascriptExecutor) driver).executeScript(
+                """
+                const el = arguments[0];
+                if(!el) return;
+                el.dispatchEvent(new MouseEvent('mouseover', {bubbles:true, cancelable:true, view:window}));
+                el.dispatchEvent(new MouseEvent('mouseenter', {bubbles:true, cancelable:true, view:window}));
+                """, el);
+    }
+
+    private static void jsSetValue(ChromiumDriver driver, WebElement el, String value, boolean clear) {
+        ((JavascriptExecutor) driver).executeScript(
+                """
+                const el = arguments[0], val = arguments[1], clr = arguments[2];
+                if(!el) return;
+                if (clr) el.value = '';
+                el.value = val;
+                el.dispatchEvent(new Event('input',  {bubbles:true}));
+                el.dispatchEvent(new Event('change', {bubbles:true}));
+                """, el, value, clear);
+    }
+
+    private static void jsAppendValue(ChromiumDriver driver, WebElement el, String value) {
+        ((JavascriptExecutor) driver).executeScript(
+                """
+                const el = arguments[0], val = arguments[1];
+                if(!el) return;
+                el.value = (el.value ?? '') + val;
+                el.dispatchEvent(new Event('input',  {bubbles:true}));
+                """, el, value);
+    }
+
+    private static void jsDispatchKeyboard(ChromiumDriver driver, WebElement el, String key) {
+        ((JavascriptExecutor) driver).executeScript(
+                """
+                const el = arguments[0], key = arguments[1];
+                if(!el) return;
+                el.focus && el.focus({preventScroll:true});
+                const opts = {bubbles:true, cancelable:true, key:key, code:key};
+                el.dispatchEvent(new KeyboardEvent('keydown', opts));
+                el.dispatchEvent(new KeyboardEvent('keypress', opts));
+                el.dispatchEvent(new KeyboardEvent('keyup', opts));
+                """, el, key);
+    }
+
+    private static void jsScrollBy(ChromiumDriver driver, WebElement el, int dy) {
+        ((JavascriptExecutor) driver).executeScript(
+                """
+                const el = arguments[0], dy = arguments[1];
+                try{ el.scrollBy(0, dy); }catch(e){ window.scrollBy(0, dy); }
+                """, el, dy);
+    }
+
+    /** HTML5 drag/drop via DataTransfer; works for many modern UIs when Actions fails. */
+    private static void jsHtml5DragDrop(ChromiumDriver driver, WebElement source, WebElement target) {
+        ((JavascriptExecutor) driver).executeScript(
+                """
+                const src = arguments[0], tgt = arguments[1];
+                const dt = new DataTransfer();
+                function fire(el, type, dt){
+                  const e = new DragEvent(type, {bubbles:true, cancelable:true, dataTransfer:dt});
+                  return el.dispatchEvent(e);
+                }
+                src.scrollIntoView({block:'center', inline:'center'});
+                tgt.scrollIntoView({block:'center', inline:'center'});
+                fire(src,'dragstart',dt);
+                fire(tgt,'dragenter',dt);
+                fire(tgt,'dragover',dt);
+                fire(tgt,'drop',dt);
+                fire(src,'dragend',dt);
+                """, source, target);
+    }
+
+    private static void jsHtml5DragBy(ChromiumDriver driver, WebElement source, int dx, int dy) {
+        ((JavascriptExecutor) driver).executeScript(
+                """
+                const src = arguments[0], dx = arguments[1], dy = arguments[2];
+                const dt = new DataTransfer();
+                function fireAt(el, type, clientX, clientY, dt){
+                  const e = new DragEvent(type, {bubbles:true, cancelable:true, clientX, clientY, dataTransfer:dt});
+                  el.dispatchEvent(e);
+                }
+                const r = src.getBoundingClientRect();
+                const startX = r.left + r.width/2;
+                const startY = r.top  + r.height/2;
+                fireAt(src,'dragstart',startX,startY,dt);
+                fireAt(document,'dragover',startX+dx,startY+dy,dt);
+                fireAt(document,'drop',startX+dx,startY+dy,dt);
+                fireAt(src,'dragend',startX+dx,startY+dy,dt);
+                """, source, dx, dy);
+    }
+}

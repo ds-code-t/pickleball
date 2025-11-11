@@ -1,265 +1,278 @@
 package tools.dscode.common.treeparsing;
 
 import com.google.common.collect.LinkedListMultimap;
+import org.intellij.lang.annotations.Language;
 
-import java.lang.reflect.Field;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Stateless grammar node.
- * Row 0 = parse children (alternation). Rows >=1 = sequential successor passes (fresh parses).
- * Implicit unmatched: row 0 tiles parent span with explicit matches + synthesized gap nodes.
- */
-public abstract class ParseNode {
+import static tools.dscode.common.treeparsing.MatchNode.createMatchNode;
+import static tools.dscode.common.treeparsing.RegexUtil.TOKEN_END;
+import static tools.dscode.common.treeparsing.RegexUtil.TOKEN_START;
 
-    public static final char TOKEN_L = '\uF115';
-    public static final char TOKEN_R = '\uF116';
 
-    /** Semantic name; defaults to subclass simple name. */
-    public final String keyName;
+public class ParseNode {
 
-    /** Optional salt for uniqueness; default "" */
-    public final String keySuffix;
 
-    /** 2-D grid: row 0 = parsing children; rows 1..N = phase rows (successor passes). */
-    public final List<List<ParseNode>> rows;
+    private String keyName;         // pretty/debug name (also used in tokens)
+    private String keySuffix;       // optional suffix
+    String selfRegex;       // null => this node doesn't match by itself
+    boolean useRegexTemplating = true;
+    /**
+     * Ordered children; each is a sequential pass over this node's maskedText.
+     */
+    public final List<ParseNode> parseChildren = new ArrayList<>();
 
-    /** Optional leaf pattern if row 0 has no children. Can be provided by subclasses or auto-discovered. */
-    protected final String selfRegex;
-
-    /* ---------------------------- Constructors ---------------------------- */
-
-    /** Most concise: subclasses may just declare a String field named 'regex', which will be auto-discovered. */
-    protected ParseNode() {
-        this(null, "", null, null);
+    // ----- ctors -----
+    public ParseNode() {
+        this(null, null, null, null, false);
     }
 
-    /** Provide explicit pieces (rows may be null ⇒ empty row0; regex may be null ⇒ try field 'regex'). */
-    protected ParseNode(String keyName,
-                        String keySuffix,
-                        List<List<ParseNode>> rows,
-                        String regexPattern) {
-        this.keyName = (keyName == null || keyName.isBlank()) ? getClass().getSimpleName() : keyName;
-        this.keySuffix = (keySuffix == null) ? "" : keySuffix;
-        this.rows = rows == null ? List.of(List.of()) : deepCopy(rows);
-        this.selfRegex = (regexPattern != null) ? regexPattern : reflectRegexFieldOrNull(this);
+    public ParseNode(@Language("RegExp") String regex) {
+        this(null, null, null, regex, true);
     }
 
-    private static List<List<ParseNode>> deepCopy(List<List<ParseNode>> src) {
-        List<List<ParseNode>> out = new ArrayList<>(src.size());
-        for (List<ParseNode> r : src) out.add(List.copyOf(r));
-        return List.copyOf(out);
+    public ParseNode(@Language("RegExp") String regex, boolean useRegexTemplating) {
+        this(null, null, null, regex, useRegexTemplating);
+
     }
 
-    /** If row 0 has children, build alternation of their patterns; else return this node's leaf regex (if any). */
+    private ParseNode(String keyName, String keySuffix, List<ParseNode> children, @Language("RegExp") String regex, boolean useRegexTemplating) {
+        this.useRegexTemplating = useRegexTemplating;
+        this.keyName = keyName;
+        this.keySuffix = keySuffix;
+        this.selfRegex = regex;
+        if (children != null) this.parseChildren.addAll(children);
+    }
+
+    // ----- identity / naming -----
+    public String getName() {
+        return (keyName != null) ? keyName : getClass().getSimpleName();
+    }
+
+    public ParseNode setName(String name) {
+        this.keyName = name;
+        return this;
+    }
+
+    public String getSuffix() {
+        return keySuffix;
+    }
+
+    public ParseNode setSuffix(String suffix) {
+        this.keySuffix = suffix;
+        return this;
+    }
+
+    private String keyBase() {
+        String base = getName();
+        if (keySuffix != null && !keySuffix.isBlank()) base = base + "_" + keySuffix;
+        return base;
+    }
+
+//    /**
+//     * Unique key BODY (without sentinels) used inside the token.
+//     * Option A: "_<name>_<index>_"
+//     */
+//    public String getUniqueKey(int index) {
+//        return  keyBase() + "_" + index;
+//    }
+
+
+    // ----- regex access -----
+    public boolean hasRegex() {
+        return selfRegex != null;
+    }
+
     public String getRegexPattern() {
-        if (!rows.isEmpty() && !rows.get(0).isEmpty()) {
-            String alt = alternationOf(rows.get(0));
-            return alt;
-        }
         return selfRegex;
     }
 
-    /* ---------------------------- Hooks (override as needed) ---------------------------- */
+    // ----- hooks -----
 
-    public void beforeCapture(MatchNode self) { }
-    public String onCapture(String captured) { return captured; }
-    public void afterCapture(MatchNode self) { }
-
-    public String getUniqueKey(int matchCount) {
-        return keyName + (keySuffix.isBlank() ? "" : "_" + keySuffix) + "#" + matchCount;
+    /**
+     * Primary hook: capture transform with full access to the MatchNode.
+     * Default delegates to onCapture(String).
+     */
+    public String onCapture(MatchNode self) {
+        return onCapture(self.originalText());
     }
 
-    public MatchNode createMatchNode(ParseNode node,
-                                     MatchNode parent,
-                                     String originalText,
-                                     String token,
-                                     LinkedListMultimap<String,Object> globalState) {
-        return new MatchNode(node, parent, originalText, token, globalState);
+    /**
+     * Legacy/compat hook: capture transform by raw string. Default: identity.
+     */
+    public String onCapture(String original) {
+        return original;
     }
 
-    /* ---------------------------- Entry points ---------------------------- */
-
-    public PhaseTrace initiateParsing(String originalText) {
-        return initiateParsing(originalText, (LinkedListMultimap<String,Object>) null);
+    /**
+     * Decide what replaces this child's match in the parent's masked stream. Default: token.
+     */
+    public String onSubstitute(MatchNode self) {
+        return self.token();
     }
 
-    public PhaseTrace initiateParsing(String originalText, Map<String,Object> seed) {
-        LinkedListMultimap<String,Object> mm = null;
-        if (seed != null && !seed.isEmpty()) {
-            mm = LinkedListMultimap.create();
-            for (var e : seed.entrySet()) mm.put(e.getKey(), e.getValue());
+    /**
+     * Post-order hook: called after this node's descendants have completed. Default: no-op.
+     */
+    public void onResolve(MatchNode self) {
+
+    }
+
+
+    public void descendantsResolved(MatchNode self) {
+        System.out.println("\n@@descendantsResolved: " + self.name() + "");
+        self.sortedChildren = new ArrayList<>(self.children.values());
+        self.sortedChildren.sort(Comparator.comparingInt(m -> m.start));
+
+        for (int i = 0; i < self.sortedChildren.size(); i++) {
+            var n = self.sortedChildren.get(i);
+            System.out.println("@@child: " + n.name() + "  -position: " + i);
+            n.position = i;
+            n.previousSibling = (i > 0) ? self.sortedChildren.get(i - 1) : null;
+            n.nextSibling = (i + 1 < self.sortedChildren.size()) ? self.sortedChildren.get(i + 1) : null;
         }
-        return initiateParsing(originalText, mm);
+        onResolve(self);
     }
 
-    public PhaseTrace initiateParsing(String originalText,
-                                      LinkedListMultimap<String,Object> seedState) {
-        Objects.requireNonNull(originalText, "originalText");
+    // ----- entry point for parsing -----
+    public MatchNode initiateParsing(String input) {
+        // Root "captures" the entire input once (no regex groups here)
+        MatchNode top = createMatchNode(0, input.length(), this, null, input, null, 0, LinkedListMultimap.create());
 
-        var ctx = new Context();
-        var global = LinkedListMultimap.<String,Object>create();
+        String transformed = onCapture(top);
+        top.setModifiedText(transformed);
+        top.setMaskedText(transformed);
 
-        String topToken = tokenFor(this, ctx.bump(this));
-        MatchNode top = this.createMatchNode(this, null, originalText, topToken, global);
-        if (seedState != null) seedState.entries().forEach(e -> top.stateMap.put(e.getKey(), e.getValue()));
+        // Children run sequentially over top.maskedText
+        applyChildrenOverMasked(this, top);
 
-        processNode(top, ctx);
-
-        String output = top.unmasked();
-        return new PhaseTrace(top, output, List.copyOf(top.phaseRuns));
+        // Root post-order
+        descendantsResolved(top);
+        return top;
     }
 
-    /* ---------------------------- Engine ---------------------------- */
+    // ----- core engine: children scan parent's maskedText -----
+    protected void applyChildrenOverMasked(ParseNode parentDef, MatchNode parentMatch) {
+        List<Object> skipAllChildren = parentMatch.localState().get("skipAllChildren");
+        if (!skipAllChildren.isEmpty() && String.valueOf(skipAllChildren.getLast()).equalsIgnoreCase("true")) return;
+        for (ParseNode childDef : parentDef.parseChildren) {
+//            Object obj = parentMatch.getFromLocalState("skip:"+childDef.getName());
+//            System.out.println("@@parentMatch: " + parentMatch.localState());
+//            if(obj != null) {
+//                System.out.println("@@parentMatch: " + parentMatch);
+//                System.out.println("@@childDef: " + childDef);
+//            }
+            if (parentMatch.localStateBoolean("skip:" + childDef.getName())) continue;
 
-    private static void processNode(MatchNode m, Context ctx) {
-        m.parseNode.beforeCapture(m);
-        m.modifiedText = m.parseNode.onCapture(m.originalText);
+            String parentSnapshot = parentMatch.maskedText();
+            if (parentSnapshot == null) parentSnapshot = "";
+            if (!childDef.hasRegex()) continue;
 
-        // Parent vs leaf
-        boolean hasRow0 = !m.parseNode.rows.isEmpty() && !m.parseNode.rows.get(0).isEmpty();
-        String row0Alt = hasRow0 ? alternationOf(m.parseNode.rows.get(0)) : null;
+            // Keep the Pattern so we can build NamedGroupMap later
+            Pattern pattern = Pattern.compile(childDef.getRegexPattern(), Pattern.DOTALL);
+            Matcher m = pattern.matcher(parentSnapshot);
 
-        if (row0Alt == null) {
-            // Leaf: maskedText == modifiedText
-            m.maskedText = m.modifiedText;
-        } else {
-            // Parent: scan row-0 with implicit unmatched tiling
-            Pattern p = Pattern.compile(row0Alt, Pattern.DOTALL);
-            Matcher matcher = p.matcher(m.modifiedText);
-            StringBuilder buf = new StringBuilder();
-            int cursor = 0;
-
-            while (matcher.find()) {
-                int start = matcher.start(), end = matcher.end();
-
-                // gap before
-                if (cursor < start) {
-                    appendImplicitGap(m, m.modifiedText.substring(cursor, start), buf, ctx);
+            StringBuilder newMasked = new StringBuilder(parentSnapshot.length());
+            int lastEnd = 0;
+            int occurrence = 1;
+            System.out.println("@@Attempting child " + childDef.getName() + " regex=" + childDef.getRegexPattern() + " against=\"" + parentSnapshot + "\"");
+            while (m.find()) {
+                System.out.println("@@Matched " + childDef.getName() + ": \"" + m.group() + "\"");
+                if (m.start() > lastEnd) {
+                    newMasked.append(parentSnapshot, lastEnd, m.start());
                 }
 
-                int index = matchedGroupIndex(matcher, m.parseNode.rows.get(0));
-                ParseNode childNode = m.parseNode.rows.get(0).get(index);
-                String hit = matcher.group(0);
+                String childOriginal = m.group(0);
+                // Build token with Option A format
+                String childToken = childDef.keyBase();
+                // Provide shared global state from parent; localState is fresh.
+                MatchNode childMatch = createMatchNode(
+                        m.start(), m.end(),
+                        childDef,
+                        parentMatch,
+                        childOriginal,
+                        childToken,
+                        occurrence++,
+                        parentMatch.globalState()
+                );
 
-                String token = tokenFor(childNode, ctx.bump(childNode));
-                MatchNode child = childNode.createMatchNode(childNode, m, hit, token, m.globalState);
-                processNode(child, ctx);
+                // Capture and store regex groups for this match
+                childMatch.setGroups(new NamedGroupMap(pattern, m.toMatchResult()));
 
-                buf.append(token);
-                linkAndTrackChild(m, child);
-                cursor = end;
+                parentMatch.addChildMatchNode(childMatch);
+
+                // Transform & initialize child texts
+                String childTransformed = childDef.onCapture(childMatch);
+                childMatch.setModifiedText(childTransformed);
+                childMatch.setMaskedText(childTransformed);
+
+                // Recurse to resolve grandchildren over child's masked text
+                childDef.applyChildrenOverMasked(childDef, childMatch);
+
+                // Child post-order (its subtree is now complete)
+                childDef.descendantsResolved(childMatch);
+
+                // Substitute into parent's masked stream
+                String substitute = childDef.onSubstitute(childMatch);
+                if (substitute == null) substitute = "";
+                newMasked.append(substitute);
+
+                lastEnd = m.end();
             }
-
-            // trailing gap
-            if (cursor < m.modifiedText.length()) {
-                appendImplicitGap(m, m.modifiedText.substring(cursor), buf, ctx);
+            if (lastEnd < parentSnapshot.length()) {
+                newMasked.append(parentSnapshot, lastEnd, parentSnapshot.length());
             }
-
-            m.maskedText = buf.toString();
+            parentMatch.setMaskedText(newMasked.toString());
         }
-
-        // Resolve, then run successor rows (fresh parses)
-        String resolved = m.unmasked();
-        if (m.parseNode.rows.size() > 1) {
-            // Seed phases from root state (first value per key)
-            MatchNode root = m;
-            while (root.parent != null) root = root.parent;
-            Map<String,Object> seed = new HashMap<>();
-            root.stateMap.asMap().forEach((k, vs) -> { if (!vs.isEmpty()) seed.put(k, vs.iterator().next()); });
-
-            for (int r = 1; r < m.parseNode.rows.size(); r++) {
-                List<ParseNode> phaseChildren = m.parseNode.rows.get(r);
-                if (phaseChildren.isEmpty()) continue;
-
-                // Synthetic phase-root with row-0 = this phase's children
-                ParseNode phaseRoot = new ParseNode("PHASE_"+m.parseNode.keyName+"_"+r, "", List.of(List.copyOf(phaseChildren)), null) {};
-                PhaseTrace run = phaseRoot.initiateParsing(resolved, seed);
-                var pr = new PhaseRun(phaseRoot, resolved, run.topLevelRootMatch(), run.topLevelOutput(), r-1);
-                m.phaseRuns.add(pr);
-                resolved = run.topLevelOutput();
-            }
-            m.maskedText = resolved;
-        }
-
-        m.parseNode.afterCapture(m);
     }
 
-    private static String alternationOf(List<ParseNode> kids) {
-        StringBuilder sb = null;
-        int gi = 0; boolean any = false;
-        for (ParseNode c : kids) {
-            String p = c.getRegexPattern();
-            if (p == null) continue;
-            if (!any) { sb = new StringBuilder().append("(?:"); any = true; }
-            else sb.append('|');
-            sb.append("(?<G").append(gi++).append(">").append(p).append(")");
+    // ===== resolution helper =====
+
+    /**
+     * Fully resolves a node's masked text by recursively expanding child tokens.
+     */
+    protected static String fullyResolve(MatchNode m) {
+        String out = (m.maskedText() == null) ? "" : m.maskedText();
+        if (out.isEmpty()) return out;
+
+        for (MatchNode c : m.children()) {
+            String token = c.token();
+            if (token == null || token.isEmpty()) continue;
+            String childResolved = fullyResolve(c);
+            out = out.replace(token, childResolved);
         }
-        if (!any) return null;
-        return sb.append(')').toString();
-        // Note: groups are positional; matchedGroupIndex uses the same order
+        return out;
     }
 
-    private static int matchedGroupIndex(Matcher m, List<ParseNode> kids) {
-        for (int i = 0; i < kids.size(); i++) {
-            String p = kids.get(i).getRegexPattern();
-            if (p == null) continue;
-            if (m.group("G"+i) != null) return i;
-        }
-        for (int i = 0; i < kids.size(); i++) {
-            try { if (m.group("G"+i) != null) return i; } catch (Exception ignored) { }
-        }
-        throw new IllegalStateException("No matching child group");
+    // ===== regex helpers & toString =====
+
+
+    public String tokenKeyPattern() {
+        // literal prefix up to the digits
+        String literalPrefix = TOKEN_START + "_" + keyBase() + "_";
+        // literal suffix after the digits
+        String literalSuffix = "_" + TOKEN_END;
+        // quote only the literal parts, keep \d+ as regex
+        return Pattern.quote(literalPrefix) + "\\d+_\\d+" + Pattern.quote(literalSuffix);
     }
 
-    private static void appendImplicitGap(MatchNode parent, String gapText, StringBuilder buf, Context ctx) {
-        ParseNode gapNode = new ParseNode("unmatched", "", List.of(), null) {};
-        String token = tokenFor(gapNode, ctx.bump(gapNode));
-        MatchNode gap = gapNode.createMatchNode(gapNode, parent, gapText, token, parent.globalState);
-        gap.modifiedText = gapText;
-        gap.maskedText = gapText;
-        buf.append(token);
-        linkAndTrackChild(parent, gap);
+    public String definedRegex() {
+        return hasRegex() ? getRegexPattern() : "(?!)";
     }
 
-    private static void linkAndTrackChild(MatchNode parent, MatchNode child) {
-        if (!parent.children.isEmpty()) {
-            MatchNode prev = parent.children.get(parent.children.size() - 1);
-            prev.nextSibling = child;
-            child.previousSibling = prev;
-        }
-        parent.children.add(child);
-        parent.matchMap.put(child.token, child);
+    @Override
+    public String toString() {
+        return keyName + " " + fullRegex();
     }
 
-    private static String tokenFor(ParseNode n, int count) {
-        return new StringBuilder().append(TOKEN_L).append(n.getUniqueKey(count)).append(TOKEN_R).toString();
-    }
 
-    private static final class Context {
-        private final IdentityHashMap<ParseNode, Integer> counters = new IdentityHashMap<>();
-        int bump(ParseNode n) { int next = counters.getOrDefault(n, 0) + 1; counters.put(n, next); return next; }
-    }
-
-    /* ---------------------------- Helpers ---------------------------- */
-
-    /** Allow super-concise subclasses: String field named 'regex' (any visibility). */
-    private static String reflectRegexFieldOrNull(Object obj) {
-        Class<?> c = obj.getClass();
-        while (c != null && ParseNode.class.isAssignableFrom(c)) {
-            for (Field f : c.getDeclaredFields()) {
-                if (!f.getName().equals("regex")) continue;
-                if (f.getType() != String.class) continue;
-                try {
-                    f.setAccessible(true);
-                    Object v = f.get(obj);
-                    if (v instanceof String s && !s.isBlank()) return s;
-                } catch (IllegalAccessException ignored) { }
-            }
-            c = c.getSuperclass();
-        }
-        return null;
+    public String fullRegex() {
+        String keys = tokenKeyPattern();
+        if (!hasRegex()) return keys;
+        return "(?:" + definedRegex() + ")|(?:" + keys + ")";
     }
 }
