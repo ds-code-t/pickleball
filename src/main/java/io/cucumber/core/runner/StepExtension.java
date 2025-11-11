@@ -8,6 +8,7 @@ import io.cucumber.plugin.event.Result;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.ParsingMap;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -126,6 +127,8 @@ public class StepExtension extends StepData {
 
     @Override
     public void addDefinitionFlag(DefinitionFlag... flags) {
+        System.out.println("@@this.definitionFlags-class: " + this.definitionFlags.getClass().getName());
+        Arrays.stream(flags).toList().forEach(f -> System.out.println("@@flag: " + f + ""));
         for (DefinitionFlag flag : flags) {
             if (flag == DefinitionFlag.NO_LOGGING)
                 pickleStepTestStep.setNoLogging(true);

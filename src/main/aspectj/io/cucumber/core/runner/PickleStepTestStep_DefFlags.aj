@@ -15,7 +15,7 @@ import java.util.*;
  *
  * Safe defaults:
  * - method = null
- * - definitionFlags = Collections.emptyList()
+ * - definitionFlags =  new ArrayList<>()
  */
 public privileged aspect PickleStepTestStep_DefFlags {
 
@@ -26,7 +26,7 @@ public privileged aspect PickleStepTestStep_DefFlags {
 
     /** Flags declared on the method via @DefinitionFlags (or empty). */
     public List<DefinitionFlag> io.cucumber.core.runner.PickleStepTestStep.definitionFlags =
-            java.util.Collections.emptyList();
+            new ArrayList<>();
 
     /* Optional convenience getters (remove if you don't want them) */
     public Method io.cucumber.core.runner.PickleStepTestStep.getMethod() {
@@ -55,23 +55,23 @@ public privileged aspect PickleStepTestStep_DefFlags {
             if (m != null) {
                 DefinitionFlags ann = m.getAnnotation(DefinitionFlags.class);
                 flags = (ann == null)
-                        ? java.util.Collections.emptyList()
-                        : Arrays.asList(ann.value());
+                        ? new ArrayList<>()
+                        : new ArrayList<>(Arrays.asList(ann.value()));
             } else {
-                flags = java.util.Collections.emptyList();
+                flags = new ArrayList<>();
             }
 
             // Assign safely
             thiz.method = m;
             // Use an immutable view to avoid accidental external mutation
             thiz.definitionFlags = (flags == null || flags.isEmpty())
-                    ? java.util.Collections.emptyList()
-                    : java.util.List.copyOf(flags);
+                    ? new ArrayList<>()
+                    : new ArrayList<>(flags);
 
         } catch (Throwable t) {
             // Fail-safe defaults
             thiz.method = null;
-            thiz.definitionFlags = java.util.Collections.emptyList();
+            thiz.definitionFlags = new ArrayList<>();
         }
     }
 

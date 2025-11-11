@@ -37,7 +37,7 @@ Feature: Addition
     * IF: 1 + 1 < 0
   : Then print A
     * ELSE-IF: 1 + 1 > 0
-  : Then print B
+  : Then print B<B>
     * ELSE-IF: 1 + 1 < 5
   : Then print C
     * ELSE:
@@ -45,8 +45,8 @@ Feature: Addition
 
     @sc2
     Examples:
-      | Scenario Tags |
-      | %test3        |
+      | Scenario Tags | B|
+      | test3        |  22 |
 
 #  Scenario: qq
 #    Given I have numbers 2 and 3
