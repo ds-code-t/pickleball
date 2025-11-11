@@ -65,11 +65,6 @@ dependencies {
 //    api("io.github.classgraph:classgraph:4.8.184")
     implementation("io.github.classgraph:classgraph:4.8.184")
 
-    // xpath and selenium
-    implementation 'org.seleniumhq.selenium:selenium-java:4.38.0'
-    implementation 'com.github.Volta-Jebaprashanth:xpathy:3.0.0'
-
-    implementation 'org.jetbrains:annotations:26.0.2-1'
 
     // AspectJ toolchain + runtime
     ajcTools "org.aspectj:aspectjtools:${aspectjVersion}"
@@ -85,6 +80,14 @@ dependencies {
 
     // BOM for alignment (optional but nice to keep)
     implementation platform("io.cucumber:cucumber-bom:${cucumberVersion}")
+
+
+    // xpath and selenium
+    implementation 'org.seleniumhq.selenium:selenium-java:4.38.0'
+    implementation 'com.github.Volta-Jebaprashanth:xpathy:3.0.0'
+
+    // misc
+    implementation 'org.jetbrains:annotations:26.0.2-1'
 }
 
 tasks.withType(JavaCompile).configureEach {
