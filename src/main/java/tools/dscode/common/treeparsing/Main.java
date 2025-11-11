@@ -1,198 +1,136 @@
 package tools.dscode.common.treeparsing;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
-/**
- * Multiple matches per ParseNode + phases at two levels.
- */
 public class Main {
 
-    /* ---------------------- External mutable object ---------------------- */
-    public static final class Stats {
-        public int tagCount;
-        public int numCount;
-        public int evenCount; // numbers marked even by phase
-        @Override public String toString() {
-            return "Stats{tagCount=" + tagCount + ", numCount=" + numCount + ", evenCount=" + evenCount + "}";
-        }
+    public static void main(String[] args) {
+        System.out.println("Running NodeDictionary/ParseNode integration tests …\n");
+
+        testQuotesAndBrackets();
+        testOrderOfOccurrence();
+        testPhasesChainWordCount();
+        testImplicitUnmatchedAndSiblings();
+
+        System.out.println("\nAll tests done.");
     }
 
-    /* ---------------------- Helpers ---------------------- */
-    private static Stats getStatsFromRoot(MatchNode self) {
-        MatchNode root = self;
-        while (root.parent != null) root = root.parent;
-        var vals = root.stateMap.get("stats");
-        return vals.isEmpty() ? null : (Stats) vals.get(0);
+    /* ---------------------------- Tests ---------------------------- */
+
+    private static void testQuotesAndBrackets() {
+        System.out.println("=== Quotes + Brackets (row-0 parsing with implicit-unmatched) ===");
+        var dict = new GrammarDictionary();
+        var top = dict.buildFromYaml("""
+Top:
+  - [DQ, BR]
+""");
+        String input = "Hello \"world\" and [box]!";
+        String expected = "Hello <q>world</q> and (BR:box)!";
+        var trace = top.initiateParsing(input);
+        String actual = trace.topLevelOutput();
+
+        printBlock("Input", input);
+        printBlock("Expected", expected);
+        printBlock("Actual", actual);
+        assertPrint(expected.equals(actual), "Output equals expected");
+
+        // Show top child sequence types to prove implicit unmatched tiling
+        var kids = trace.topLevelRootMatch().children();
+        List<String> types = new ArrayList<>();
+        for (var k : kids) types.add(k.parseNode.keyName);
+        System.out.println("Child types (in order): " + types);
+        assertPrint(types.size() >= 3, "Tiling produced unmatched + DQ + BR segments");
+        System.out.println();
     }
-    private static String indent(String s) { return "  " + s.replace("\n", "\n  "); }
-    private static void assertStacked(String name, String expectedText, String actualText,
-                                      int expTags, int actTags,
-                                      int expNums, int actNums,
-                                      int expEvens, int actEvens) {
-        boolean pass = Objects.equals(expectedText, actualText)
-                && expTags == actTags && expNums == actNums && expEvens == actEvens;
+
+    private static void testOrderOfOccurrence() {
+        System.out.println("=== Order of occurrence ===");
+        var dict = new GrammarDictionary();
+        var top = dict.buildFromYaml("""
+Top:
+  - [DQ, BR]
+""");
+        String input = "\"a\"[b]\"c\"";
+        String expected = "<q>a</q>(BR:b)<q>c</q>";
+        var trace = top.initiateParsing(input);
+        String actual = trace.topLevelOutput();
+
+        printBlock("Input", input);
+        printBlock("Expected", expected);
+        printBlock("Actual", actual);
+        assertPrint(expected.equals(actual), "Flat alternation preserves left→right order");
+        System.out.println();
+    }
+
+    private static void testPhasesChainWordCount() {
+        System.out.println("=== Phases chain: CountWords + CollapseSpaces + CollapseBangs + UpperWOW ===");
+        var dict = new GrammarDictionary();
+        var top = dict.buildFromYaml("""
+Top:
+  - []
+  - [CountWords, CollapseSpaces, CollapseBangs, UpperWOW]
+""");
+        String input = "This   is wow!! Right?";
+        String expected = "This is WOW! Right?";
+
+        var trace = top.initiateParsing(input, Map.of()); // no seed needed
+        String actual = trace.topLevelOutput();
+
+        printBlock("Input", input);
+        printBlock("Expected", expected);
+        printBlock("Actual", actual);
+        assertPrint(expected.equals(actual), "Phase output equals expected");
+
+        // Fetch the wordCount from the top-level root's globalState
+        var root = trace.topLevelRootMatch();
+        var g = root.globalState();
+        int wordCount = 0;
+        if (g.get("wordCount") != null && !g.get("wordCount").isEmpty() && g.get("wordCount").get(0) instanceof Integer i) {
+            wordCount = i;
+        }
+        printKV("wordCount (expected)", "4");
+        printKV("wordCount (actual)  ", String.valueOf(wordCount));
+        assertPrint(wordCount == 4, "CountWords phase counted 4 words");
+        System.out.println();
+    }
+
+    private static void testImplicitUnmatchedAndSiblings() {
+        System.out.println("=== Implicit unmatched & sibling links ===");
+        var dict = new GrammarDictionary();
+        var top = dict.buildFromYaml("""
+Top:
+  - [DQ]
+""");
+        String input = "aaa \"X\" bbb";
+        var trace = top.initiateParsing(input);
+
+        var kids = trace.topLevelRootMatch().children();
+        printKV("Child count (expected)", "3");
+        printKV("Child count (actual)  ", String.valueOf(kids.size()));
+        assertPrint(kids.size() == 3, "Tiled as unmatched, DQ, unmatched");
+
+        // Check sibling pointers
+        var a = kids.get(0), b = kids.get(1), c = kids.get(2);
+        assertPrint(a.previousSibling() == null, "First.previousSibling == null");
+        assertPrint(a.nextSibling() == b, "First.nextSibling == second");
+        assertPrint(b.previousSibling() == a, "Second.previousSibling == first");
+        assertPrint(b.nextSibling() == c, "Second.nextSibling == third");
+        assertPrint(c.nextSibling() == null, "Third.nextSibling == null");
 
         System.out.println();
-        System.out.println("=== " + name + " ===");
-        System.out.println("Text — Expected:\n" + indent(expectedText));
-        System.out.println("Text — Actual:\n"   + indent(actualText));
-        System.out.println("Stats — Expected:");
-        System.out.println(indent("tagCount=" + expTags + ", numCount=" + expNums + ", evenCount=" + expEvens));
-        System.out.println("Stats — Actual:");
-        System.out.println(indent("tagCount=" + actTags + ", numCount=" + actNums + ", evenCount=" + actEvens));
-        System.out.println("Result: " + (pass ? "[PASS]" : "[FAIL]"));
     }
 
-    /* ---------------------- Grammar: many matches per node ---------------------- */
+    /* ---------------------------- tiny assert+print helpers ---------------------------- */
 
-    /** Matches hashtags: #word ; counts tags; emits <tag:lower>. */
-    static final class TagNode extends ParseNode {
-        private static final String P = "#[A-Za-z0-9_]+";
-        TagNode() { super("TAG", "", null, List.of(), List.of(), P); }
-        @Override public void beforeCapture(MatchNode self) {
-            Stats s = getStatsFromRoot(self);
-            if (s != null) s.tagCount++;
-        }
-        @Override public String onCapture(String captured) {
-            String inner = captured.substring(1);
-            return "<tag:" + inner.toLowerCase() + ">";
-        }
+    private static void printBlock(String title, String text) {
+        System.out.println(title + ":\n  " + text);
     }
-
-    /** Matches numbers: \b\d+\b ; counts; pads 1-digit; emits [num:XX]. */
-    static final class NumberNode extends ParseNode {
-        private static final String P = "\\b\\d+\\b";
-        NumberNode(List<ParseNode> phases) { super("NUM", "", null, List.of(), phases, P); }
-        @Override public void beforeCapture(MatchNode self) {
-            Stats s = getStatsFromRoot(self);
-            if (s != null) s.numCount++;
-        }
-        @Override public String onCapture(String captured) {
-            String digits = captured.length() == 1 ? "0" + captured : captured;
-            return "[num:" + digits + "]";
-        }
+    private static void printKV(String k, String v) {
+        System.out.println(k + "  " + v);
     }
-
-    /** Top-level delegator; children: TAG | NUM; hosts global phases. */
-    static final class TopNode extends ParseNode {
-        TopNode(List<ParseNode> children, List<ParseNode> phases) {
-            super("TOP", "", null, children, phases, null);
-        }
-    }
-
-    /* ---------------------- Phase containers with replacer leaves ---------------------- */
-
-    /** Tiny utility: a leaf that replaces any match with onCapture(...) */
-    static abstract class ReplacerLeaf extends ParseNode {
-        protected ReplacerLeaf(String key, String pattern) { super(key, "", null, List.of(), List.of(), pattern); }
-        @Override public abstract String onCapture(String captured);
-    }
-
-    /** Per-number phase: [num:NN...] -> append <even> when even */
-    static final class NumberEvenPhase extends ParseNode {
-        NumberEvenPhase() {
-            super("NUM_EVEN", "", null,
-                    List.of(new ReplacerLeaf("NUM_LEAF", "\\[num:(\\d+)\\]") {
-                        @Override public String onCapture(String c) {
-                            int start = c.indexOf(':') + 1, end = c.indexOf(']');
-                            String digits = c.substring(start, end);
-                            boolean even = digits.charAt(digits.length() - 1) % 2 == 0;
-                            return even ? "[num:" + digits + "]<even>" : c;
-                        }
-                        @Override public void afterCapture(MatchNode self) {
-                            if (self.modifiedText.endsWith("<even>")) {
-                                Stats s = getStatsFromRoot(self);
-                                if (s != null) s.evenCount++;
-                            }
-                        }
-                    }),
-                    List.of(), null);
-        }
-    }
-
-    /** Global phase: collapse multiple spaces -> one space. */
-    static final class CollapseSpacesPhase extends ParseNode {
-        CollapseSpacesPhase() {
-            super("COLLAPSE_SPACES", "", null,
-                    List.of(new ReplacerLeaf("SPACES", "\\s{2,}") {
-                        @Override public String onCapture(String c) { return " "; }
-                    }),
-                    List.of(), null);
-        }
-    }
-
-    /** Global phase: collapse "!!!" -> "!" */
-    static final class CollapseExclamPhase extends ParseNode {
-        CollapseExclamPhase() {
-            super("COLLAPSE_BANG", "", null,
-                    List.of(new ReplacerLeaf("BANGS", "!{2,}") {
-                        @Override public String onCapture(String c) { return "!"; }
-                    }),
-                    List.of(), null);
-        }
-    }
-
-    /** Global phase: convert <tag:foo> -> <TAG:FOO> (after all other work) */
-    static final class TagUpperPhase extends ParseNode {
-        TagUpperPhase() {
-            super("TAG_UPPER", "", null,
-                    List.of(new ReplacerLeaf("TAG_LEAF", "<tag:([a-z0-9_]+)>") {
-                        @Override public String onCapture(String c) {
-                            String inner = c.substring(5, c.length() - 1);
-                            return "<TAG:" + inner.toUpperCase() + ">";
-                        }
-                    }),
-                    List.of(), null);
-        }
-    }
-
-    /* ---------------------- Demo ---------------------- */
-
-    public static void main(String[] args) {
-        // Build phases
-        ParseNode numEven       = new NumberEvenPhase();     // per-number
-        ParseNode collapseSpace = new CollapseSpacesPhase(); // global
-        ParseNode collapseBang  = new CollapseExclamPhase(); // global
-        ParseNode tagUpper      = new TagUpperPhase();       // global
-
-        // Children that will each produce MULTIPLE matches
-        ParseNode numberNode = new NumberNode(List.of(numEven));
-        ParseNode tagNode    = new TagNode();
-
-        // Top with children and ALL global phases (no mutation after)
-        ParseNode top = new TopNode(
-                List.of(tagNode, numberNode),
-                List.of(collapseSpace, collapseBang, tagUpper)
-        );
-
-        // Seed external stats
-        Stats stats = new Stats();
-        Map<String, Object> seed = Map.of("stats", stats);
-
-        String input =
-                "Tags #one #Two #three and   numbers 1 23 456!!! Wow!!! #last 7?!";
-
-        String expected =
-                "Tags <TAG:ONE> <TAG:TWO> <TAG:THREE> and numbers [num:01] [num:23] [num:456]<even>! Wow! <TAG:LAST> [num:07]?!";
-
-        // Run (requires your earlier phase-state propagation fix)
-        PhaseTrace trace = top.initiateParsing(input, seed);
-
-        // Actual
-        String actual = trace.topLevelOutput();
-        int actTags   = stats.tagCount;  // 4 tags
-        int actNums   = stats.numCount;  // 4 numbers
-        int actEvens  = stats.evenCount; // 1 even (456)
-
-        // Expected stats
-        int expTags = 4, expNums = 4, expEvens = 1;
-
-        assertStacked("Multiple matches per ParseNode + Two-level Phases",
-                expected, actual,
-                expTags, actTags,
-                expNums, actNums,
-                expEvens, actEvens);
+    private static void assertPrint(boolean ok, String label) {
+        System.out.println("Result: " + (ok ? "[PASS] " : "[FAIL] ") + label);
     }
 }
