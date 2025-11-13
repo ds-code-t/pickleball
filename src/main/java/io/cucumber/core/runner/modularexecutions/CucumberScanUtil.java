@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.modularexecutions.FilePathResolver.findFileDirectoryPaths;
+import static io.cucumber.core.runner.modularexecutions.FilePathResolver.toAbsoluteFileUri;
 import static tools.dscode.pickleruntime.CucumberOptionResolver.features;
 
 public final class CucumberScanUtil {
@@ -37,8 +38,9 @@ public final class CucumberScanUtil {
 
     public static synchronized String getGlobalFeaturePathsString() {
         if (globalFeaturePathsString == null) {
-            List<String> features = features();
-            globalFeaturePathsString = features.isEmpty() ? normalizeKey(List.of(DEFAULT_FEATURE_DIRS)) : normalizeKey(features());
+            List<String> features = features().stream().map(FilePathResolver::toAbsoluteFileUri).toList();
+            System.out.println("@@features: " + features + "");
+            globalFeaturePathsString = features.isEmpty() ? normalizeKey(List.of(DEFAULT_FEATURE_DIRS)) : normalizeKey(features);
         }
         return globalFeaturePathsString;
     }
@@ -56,18 +58,23 @@ public final class CucumberScanUtil {
     public static List<Pickle> listPicklesByTags(String tagString) {
         String featurePathsOption = getGlobalFeaturePathsString();
         System.out.println("@@featurePathsOption: " + featurePathsOption + "");
-                List<Feature> features = FEATURE_CACHE.computeIfAbsent(featurePathsOption, k ->
+        List<Feature> features = FEATURE_CACHE.computeIfAbsent(featurePathsOption, k ->
         {
+            System.out.println("\n@@Resolving " + FEATURE_CACHE);
+            System.out.println("@@featurePathsOption " + featurePathsOption);
+
             Map<String, String> featureOptions = new HashMap<>();
             featureOptions.put("cucumber.features", k);
             RuntimeOptions runtimeOptions = new CucumberPropertiesParser().parse(featureOptions).build();
             return parseFeatures(runtimeOptions);
-        });
-
+        });;
+        System.out.println("zz@@features: " + features.size() + "");
         Map<String, String> cucumberProps = new HashMap<>();
         cucumberProps.put("cucumber.filter.tags", tagString);
         RuntimeOptions cucumberOptions = new CucumberPropertiesParser().parse(cucumberProps).build();
         Filters filters = new Filters(cucumberOptions);
+        features.stream()
+                .flatMap(f -> f.getPickles().stream()).forEach(pickle -> System.out.println("@@pickle.getTags(): " + pickle.getTags()));
         return features.stream()
                 .flatMap(f -> f.getPickles().stream())
                 .filter(filters::test)

@@ -13,7 +13,7 @@ import io.cucumber.messages.types.Tag;
 import io.cucumber.messages.types.Location;
 
 import static tools.dscode.common.GlobalConstants.COMPONENT_TAG_META_CHAR;
-import static tools.dscode.common.GlobalConstants.COMPONENT_TAG_PREFIX;
+//import static tools.dscode.common.GlobalConstants.COMPONENT_TAG_PREFIX;
 
 public aspect OutlineRowsAndTagAugment {
 
@@ -101,7 +101,7 @@ public aspect OutlineRowsAndTagAugment {
                                 if (t.startsWith("@")) {
                                     out.add(new Tag(loc, t, t));
                                 } else if (t.startsWith(COMPONENT_TAG_META_CHAR)) {
-                                    String comp  = COMPONENT_TAG_PREFIX + t.substring(1);
+                                    String comp  = "@" + t;
                                     out.add(new Tag(loc, comp, comp));
                                 }
                             }

@@ -37,15 +37,19 @@ Feature: Addition
       | https://example.com |
     * , I click "Learn more" Link
 
-  Scenario: Start Run component
-    * RUN SCENARIOS: @test3
 
-  @Tag3
+
+  Scenario: sStart Run component
+    Then print Arrrrrrrrr
+    * RUN SCENARIOS: %wtest33
+
+  @%wtest33
   Scenario: aaa
+    Then print Awwwwwwwww
     Given QQQ
     Given QQQ2ss2
 
-  @test1 @sc1 @smoke
+  @test1 @sc1 @smoke @%fg
   Scenario Outline: conditionals2
     * IF: 1 + 1 < 0
   : Then print A
@@ -59,12 +63,14 @@ Feature: Addition
     @sc2
     Examples:
       | Scenario Tags | B  |
-      | @test3        | 22 |
+      | @t1estz3q2        | 22 |
 
-#  Scenario: qq
-#    Given I have numbers 2 and 3
-#    Given QQQ
-#    Given QQQ2ss2
+
+    @%t1est3q2
+    Scenario: qq
+    Given I have numbers 2 and 3
+    Given QQQ
+    Given QQQ2ss2
 #
 #  @Tag1
 #  Scenario: Add two numbers

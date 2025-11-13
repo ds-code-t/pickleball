@@ -2,19 +2,12 @@ package io.cucumber.core.runner;
 
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.gherkin.Step;
-import io.cucumber.core.stepexpression.Argument;
-import io.cucumber.core.stepexpression.ArgumentMatcher;
-import io.cucumber.core.stepexpression.StepExpression;
 import io.cucumber.messages.types.PickleStep;
 import io.cucumber.messages.types.PickleStepArgument;
 import tools.dscode.common.mappings.ParsingMap;
 
-import java.lang.reflect.Type;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
@@ -24,9 +17,7 @@ import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgume
 import static io.cucumber.core.runner.ArgStepFunctions.updatePickleStepDefinitionMatch;
 import static io.cucumber.core.runner.GlobalState.getCachingGlue;
 import static io.cucumber.core.runner.GlobalState.getGherkinDialect;
-import static io.cucumber.core.runner.GlobalState.getOptions;
-import static io.cucumber.core.runner.GlobalState.getRunner;
-import static io.cucumber.core.runner.GlobalState.getRuntime;
+import static io.cucumber.core.runner.modularexecutions.FilePathResolver.toAbsoluteFileUri;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 
@@ -39,7 +30,7 @@ public class NPickleStepTestStepFactory {
     }
 
     public static PickleStepTestStep createPickleStepTestStep(URI uri, Step step, PickleStepDefinitionMatch pickleStepDefinitionMatch) {
-        return new PickleStepTestStep(UUID.randomUUID(), uri, step, updatePickleStepDefinitionMatch(pickleStepDefinitionMatch));
+        return new PickleStepTestStep(UUID.randomUUID(), toAbsoluteFileUri(uri), step, updatePickleStepDefinitionMatch(pickleStepDefinitionMatch));
     }
 
 

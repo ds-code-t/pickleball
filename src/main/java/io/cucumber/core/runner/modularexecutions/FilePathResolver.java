@@ -2,6 +2,8 @@ package io.cucumber.core.runner.modularexecutions;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URL;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -94,6 +96,56 @@ public class FilePathResolver {
     private static String absString(Path p) {
         return p.toAbsolutePath().normalize().toString().replace('\\', '/');
     }
+
+
+    private static volatile URI BASE_URI;
+
+    public static String toAbsoluteFileUri(String classpathUri) {
+        if (classpathUri == null || !classpathUri.startsWith("classpath:")) return classpathUri;
+
+        try {
+            String rel = classpathUri.replaceFirst("^classpath:", "").replaceFirst("^/+", "");
+            int i = rel.indexOf('/');
+            String base = (i >= 0 ? rel.substring(0, i) : rel);
+            String rest = (i >= 0 ? rel.substring(i + 1) : "");
+
+            if (BASE_URI == null) {
+                synchronized (FilePathResolver.class) {
+                    if (BASE_URI == null) {
+                        URL url = Thread.currentThread().getContextClassLoader().getResource(base + "/");
+                        if (url == null) return classpathUri;
+                        BASE_URI = url.toURI(); // typically .../target/test-classes/base/ or .../build/resources/test/base/
+                    }
+                }
+            }
+
+            URI resolved = BASE_URI.resolve(rest);
+            if (!"file".equalsIgnoreCase(resolved.getScheme())) return classpathUri;
+
+            // Canonical file:///... form
+            Path builtPath = Paths.get(resolved);
+
+            // Heuristic: prefer source tree if present
+            String p = builtPath.toString().replace(File.separatorChar, '/');
+            Path maybeSource = null;
+            if (p.contains("/target/test-classes/")) {
+                maybeSource = Paths.get(p.replace("/target/test-classes/", "/src/test/resources/"));
+            } else if (p.contains("/build/resources/test/")) {
+                maybeSource = Paths.get(p.replace("/build/resources/test/", "/src/test/resources/"));
+            }
+
+            Path finalPath = (maybeSource != null && Files.exists(maybeSource)) ? maybeSource : builtPath;
+            return finalPath.toUri().toString(); // yields file:///C:/... on Windows
+        } catch (Exception e) {
+            return classpathUri; // fall back on any failure
+        }
+    }
+
+    public static URI toAbsoluteFileUri(URI classpathUri) {
+        if (classpathUri == null) return null;
+        return URI.create(toAbsoluteFileUri(classpathUri.toString()));
+    }
+
 
     // ------------------ demo ------------------
 

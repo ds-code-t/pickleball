@@ -6,6 +6,7 @@ import io.cucumber.core.runner.StepExtension;
 import io.cucumber.core.runner.modularexecutions.CucumberScanUtil;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Given;
+import org.intellij.lang.annotations.Language;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.NoLogging;
 import tools.dscode.common.mappings.MapConfigurations;
@@ -19,7 +20,7 @@ import java.util.Map;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.ScenarioStep.createScenarioStep;
 import static tools.dscode.common.GlobalConstants.COMPONENT_TAG_META_CHAR;
-import static tools.dscode.common.GlobalConstants.COMPONENT_TAG_PREFIX;
+//import static tools.dscode.common.GlobalConstants.COMPONENT_TAG_PREFIX;
 import static tools.dscode.common.util.Reflect.getProperty;
 
 public class ModularScenarios extends CoreSteps {
@@ -48,6 +49,7 @@ public class ModularScenarios extends CoreSteps {
         filterAndExecutePickles(maps);
     }
 
+    static final @Language("RegExp") String tagRegexReplacement = "(?<!@)("+ COMPONENT_TAG_META_CHAR + "[A-Za-z])";
 
     public static void filterAndExecutePickles(List<Map<String, String>> maps, String... messageString) {
         System.out.println("@@runScenarios - " + maps);
@@ -56,7 +58,8 @@ public class ModularScenarios extends CoreSteps {
 
         for (Map<String, String> map : maps) {
             String tagString = map.getOrDefault("Tags", "");
-            tagString = tagString.replaceAll(COMPONENT_TAG_META_CHAR, COMPONENT_TAG_PREFIX);
+            tagString = tagString.replaceAll(tagRegexReplacement, "@$1");
+            System.out.println("@@tagString: " + tagString);
             List<Pickle> pickles = CucumberScanUtil.listPicklesByTags(tagString);
 
             ScenarioStep currentScenarioNameStep;
