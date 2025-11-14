@@ -7,6 +7,7 @@ import io.cucumber.docstring.DocString;
 import io.cucumber.plugin.event.Result;
 
 import tools.dscode.common.annotations.DefinitionFlag;
+import tools.dscode.common.mappings.JsonPathUtil;
 import tools.dscode.common.mappings.StepMapping;
 import tools.dscode.coredefinitions.GeneralSteps;
 
@@ -29,8 +30,8 @@ public abstract class StepData extends StepMapping {
     public StepData previousSibling;
     public StepData nextSibling;
     public String overrideLoggingText = null;
-    List<Argument> arguments = pickleStepTestStep.getDefinitionMatch().getArguments();
-
+    List<Argument> arguments;
+    public Object argument;
     public int getNestingLevel() {
         return nestingLevel;
     }
@@ -86,6 +87,7 @@ public abstract class StepData extends StepMapping {
 
     public DocString docString;
     public DataTable dataTable;
+
 
     public enum ConditionalStates {
         SKIP, FALSE, TRUE
@@ -147,6 +149,11 @@ public abstract class StepData extends StepMapping {
         if (codeLocation == null)
             codeLocation = "";
         isCoreStep = codeLocation.startsWith(corePackagePath);
+
+        arguments = pickleStepTestStep == null || pickleStepTestStep.getDefinitionMatch() == null? new ArrayList<>() : pickleStepTestStep.getDefinitionMatch().getArguments();
+        argument = arguments.isEmpty()? null: arguments.getLast().getValue();
+        System.out.println("@@arguments.size(): " + arguments.size());
+        System.out.println("@@argument: " + argument);
     }
 
     public abstract Result run();

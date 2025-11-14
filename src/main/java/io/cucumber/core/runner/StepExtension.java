@@ -59,7 +59,6 @@ public class StepExtension extends StepData {
         setNestingLevel((int) matcher.replaceAll("").chars().filter(ch -> ch == ':').count());
 
 
-
         if (isCoreStep && methodName.equals("docString")) {
 //            List<Argument> args = pickleStepTestStep.getDefinitionMatch().getArguments();
             String docStringName = (String) arguments.getFirst().getValue();

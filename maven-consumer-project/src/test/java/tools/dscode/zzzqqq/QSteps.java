@@ -2,9 +2,11 @@ package tools.dscode.zzzqqq;
 
 import io.cucumber.core.runner.PickleStepTestStep;
 import io.cucumber.datatable.DataTable;
+import io.cucumber.docstring.DocString;
 import io.cucumber.java.BeforeAll;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.ReturnStep;
+import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import org.openqa.selenium.edge.EdgeDriver;
 
@@ -49,11 +51,19 @@ public class QSteps {
         System.out.println("@@qqq1");
     }
 
+    @Given("get browser {returnStepParameter}")
+    public void chrometest1(Object param, String docString) {
+        System.out.println("@@param class = " + param.getClass());
+        System.out.println("@@param value = " + param);
+        System.out.println("@@docString--" + docString + "--");
+    }
+
     @Given("^xQQQ2(.*)$")
-    public void qqq2(String arg0) {
+    public void qqq2(String arg0 ) {
         System.out.println("@@arg0: " + arg0.getClass());
         System.out.println("@@zzzzzzzzzzzzzqqq2--" + arg0+"--");
     }
+
 
     @Given("^zdatatable (.*)$")
     public void dataTable(String arg0, DataTable table) {

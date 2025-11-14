@@ -5,6 +5,7 @@ import io.cucumber.java.ParameterType;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.ReturnStep;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import org.openqa.selenium.edge.EdgeDriver;
 import tools.dscode.common.CoreSteps;
@@ -14,6 +15,9 @@ import tools.dscode.common.status.SoftRuntimeException;
 import tools.dscode.common.treeparsing.DictionaryA;
 import tools.dscode.common.treeparsing.LineExecution;
 
+import java.util.Map;
+import java.util.Objects;
+
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.GlobalConstants.INFO_STEP;
@@ -22,19 +26,75 @@ import static tools.dscode.common.GlobalConstants.ROOT_STEP;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.GlobalConstants.SOFT_ERROR_STEP;
 import static tools.dscode.common.domoperations.DriverFactory.createChromeDriver;
+import static tools.dscode.registry.GlobalRegistry.getLocal;
+import static tools.dscode.registry.GlobalRegistry.putLocal;
+import static tools.dscode.registry.GlobalRegistry.registerLocal;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.cucumber.java.en.Given;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
 
 public class GeneralSteps extends CoreSteps {
 
-    @ReturnStep("^@(.*)-(.*)$")
-    public void test(String stepText) {
-        // step body here
+//    @ReturnStep("^@(.*)-(.*)$")
+//    public void test(String stepText) {
+//        // step body here
+//    }
+
+    @ParameterType("\\$\\(([^()]+)\\)")
+    public Object returnStepParameter(String stepText) {
+        System.out.println("@@stepText1: " + stepText);
+        String getKey = "";
+        String putKey = "";
+        if (stepText.contains(":")) {
+            getKey = stepText.substring(0, stepText.indexOf(":"));
+            Object existingObject = getLocal(getKey);
+            if (existingObject != null) return existingObject;
+            stepText = stepText.substring(stepText.indexOf(":") + 2);
+        } else if (stepText.contains("=")) {
+            putKey = stepText.substring(0, stepText.indexOf("="));
+            stepText = stepText.substring(stepText.indexOf(":") + 2);
+        }
+        stepText = "$" + stepText;
+        System.out.println("@@stepText2: " + stepText);
+        StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
+        System.out.println("@@currentStep: " + currentStep);
+        StepExtension modifiedStep = currentStep.modifyStepExtension(stepText);
+        System.out.println("@@currentStep.argument== " + currentStep.argument);
+        System.out.println("@@modifiedStep.argument== " + modifiedStep.argument);
+        modifiedStep.argument = currentStep.argument;
+
+        System.out.println("@@modifiedStep: " + modifiedStep);
+        Object returnValue = modifiedStep.runAndGetReturnValue();
+        System.out.println("@@--returnValue: " + returnValue.getClass());
+        if (!putKey.isEmpty()) {
+            putLocal(putKey, returnValue);
+            return returnValue;
+        }
+        if (getKey.isEmpty()) return returnValue;
+
+        putLocal(getKey, returnValue);
+        return returnValue;
     }
 
-    @ParameterType("^(@\\(.*)\\)$")
-    public Object returnStepParameter(String stepText) {
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+//    @Given("(?i)^@chrome$")
+    @Given("$CHROME")
+    public ChromeDriver getChrome() throws Exception {
+        System.out.println("@@getChrome");
         StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
-        StepExtension modifiedStep = currentStep.modifyStepExtension(stepText);
-        return modifiedStep.runAndGetReturnValue();
+        System.out.println("@@currentStep: " + currentStep);
+        System.out.println("@@currentStep.argument.: " + currentStep.argument);
+        String json = currentStep.argument.toString();
+        System.out.println("@@json: " + json);
+        Map<String, Object> config = MAPPER.readValue(json, Map.class);
+
+        ChromeOptions options = new ChromeOptions();
+        options.setCapability("goog:chromeOptions", config);
+
+        ChromeDriver chromeDriver = new ChromeDriver(options);
+        putLocal("chrome", chromeDriver);
+        return chromeDriver;
     }
 
 

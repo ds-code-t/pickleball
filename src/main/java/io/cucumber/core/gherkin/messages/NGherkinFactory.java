@@ -31,14 +31,12 @@ public class NGherkinFactory {
     // text to Step
 
 
-
-
     public static GherkinMessagesPickle createGherkinMessagesPickle(String keyword, String stepText, String argument) {
         StringBuilder featureSrc = new StringBuilder()
                 .append("Feature: Virtual Feature\n")
                 .append("  Scenario: Virtual Scenario\n")
                 .append("    ").append(keyword).append(stepText).append("\n");
-
+        System.out.println("@@featureSrc" + featureSrc);
 // --- decide how to render the argument ---
         if (argument != null && !argument.isBlank()) {
             // Heuristic: every non-blank line starts and ends with a pipe -> treat as DataTable
@@ -46,27 +44,29 @@ public class NGherkinFactory {
                     .map(String::stripTrailing)
                     .filter(l -> !l.isBlank())
                     .toList();
-
+            System.out.println("@@lines" + lines);
             boolean looksLikeTable = !lines.isEmpty()
                     && lines.stream().allMatch(l -> {
                 String t = l.strip();
                 return t.startsWith("|") && t.endsWith("|");
             });
-
+            System.out.println("@@looksLikeTable: " + looksLikeTable);
             if (looksLikeTable) {
                 // Emit a real Gherkin DataTable (no docstring fence)
                 for (String l : lines) {
                     featureSrc.append("      ").append(l.strip()).append("\n");
                 }
             } else {
+                featureSrc.append(argument.replace("\r\n", "\n").replace("\r", "\n")).append("\n");
+
                 // Emit as DocString
-                featureSrc.append("      \"\"\"\n")
-                        .append(argument.replace("\r\n", "\n").replace("\r", "\n")).append("\n")
-                        .append("      \"\"\"\n");
+//                featureSrc.append("      \"\"\"\n")
+//                        .append(argument.replace("\r\n", "\n").replace("\r", "\n")).append("\n")
+//                        .append("      \"\"\"\n");
             }
         }
 
-
+        System.out.println("@@featureSrc: " + featureSrc);
         byte[] bytes = featureSrc.toString().getBytes(StandardCharsets.UTF_8);
         try (InputStream in = new ByteArrayInputStream(bytes)) {
             GherkinMessagesFeatureParser parser = new GherkinMessagesFeatureParser();
@@ -76,7 +76,7 @@ public class NGherkinFactory {
             GherkinMessagesFeature feature =
                     (GherkinMessagesFeature) parsed.orElseThrow(
                             () -> new IllegalStateException("No feature parsed from generated source"));
-
+            System.out.println("@@feature: " + feature);
             return (GherkinMessagesPickle) feature.getPickles()
                     .stream()
                     .findFirst()
@@ -85,7 +85,6 @@ public class NGherkinFactory {
             throw new IllegalStateException("Error creating pickle", e);
         }
     }
-
 
 
     // step to text
@@ -130,18 +129,6 @@ public class NGherkinFactory {
 
         return "";
     }
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 }

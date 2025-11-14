@@ -1,7 +1,17 @@
 Feature: Addition
 
   Scenario: b test2
-    * rrr
+    Given get browser $(CHROME)
+    """
+    {
+      "args": ["--headless=new", "--window-size=1280,720"],
+      "prefs": {
+        "download.default_directory": "C:/temp"
+      },
+      "excludeSwitches": ["enable-automation"]
+    }
+    """
+
 #    * I open Chrome
 #    * chromium edge
 #    * chrome Chrome
