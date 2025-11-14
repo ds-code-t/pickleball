@@ -25,7 +25,7 @@ public class NodeMap {
         return root;
     }
 
-    private final ObjectNode root;
+    protected final ObjectNode root;
 
     @Override
     public String toString() {

@@ -486,16 +486,50 @@ public final class CucumberOptionResolver {
         map.computeIfAbsent(key, k -> new ArrayList<>()).add(val);
     }
 
+    /**
+     * Normalizes paths/values for all known keys.
+     *
+     * For cucumber.features:
+     *   - keeps classpath: URIs, but normalizes redundant slashes (existing behavior).
+     *
+     * For cucumber.glue:
+     *   - converts any classpath-style or path-style value into a package-style string.
+     *     e.g. "classpath:/tools/dscode/steps" -> "tools.dscode.steps"
+     *          "tools/dscode/steps"            -> "tools.dscode.steps"
+     *          "tools.dscode.steps"            -> "tools.dscode.steps" (unchanged)
+     */
     private static Map<String, List<String>> normalizePaths(Map<String, List<String>> in) {
         Map<String, List<String>> out = new LinkedHashMap<>();
         in.forEach((k, v) -> {
             List<String> cleaned = v.stream()
-                    .map(s -> s.replaceFirst("^classpath:/*", "classpath:"))
+                    .map(s -> normalizeValue(k, s))
                     .distinct()
                     .toList();
             out.put(k, new ArrayList<>(cleaned));
         });
         return out;
+    }
+
+    private static String normalizeValue(String key, String value) {
+        if (value == null || value.isBlank()) return value;
+        String s = value.trim();
+
+        // First, normalize any classpath: prefix to a single form
+        s = s.replaceFirst("^classpath:/*", "classpath:");
+
+        // Special handling for glue: prefer package-style notation
+        if ("cucumber.glue".equals(key)) {
+            // Strip classpath: if present
+            if (s.startsWith("classpath:")) {
+                s = s.substring("classpath:".length());
+            }
+            // Remove leading slashes
+            s = s.replaceFirst("^/*", "");
+            // Convert path separators to package separators
+            s = s.replace('/', '.');
+        }
+
+        return s;
     }
 
     public static List<String> glue()     { return getAllOptions().getOrDefault("cucumber.glue", List.of()); }

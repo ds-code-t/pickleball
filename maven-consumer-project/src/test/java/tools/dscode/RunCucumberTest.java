@@ -13,6 +13,6 @@ import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
 @SelectPackages("features") // <-- instead of @SelectClasspathResource("features")
 @ConfigurationParameter(
         key = GLUE_PROPERTY_NAME,
-        value = "tools.dscode.steps,tools.dscode.zzzqqq,tools.dscode.ereaaa")
+        value = "tools.dscode.steps,tools.dscode.zzzqqq")
 @ConfigurationParameter(key = FILTER_TAGS_PROPERTY_NAME, value = "@Tag3")
 public class RunCucumberTest {}

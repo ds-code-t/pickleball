@@ -8,6 +8,7 @@ import io.cucumber.plugin.event.Result;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.ParsingMap;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -57,22 +58,40 @@ public class StepExtension extends StepData {
         stepTags.stream().filter(t -> t.startsWith("REF:")).forEach(t -> bookmarks.add(t.replaceFirst("REF:", "")));
         setNestingLevel((int) matcher.replaceAll("").chars().filter(ch -> ch == ':').count());
 
-        List<Argument> argstests = pickleStepTestStep.getDefinitionMatch().getArguments();
+
 
         if (isCoreStep && methodName.equals("docString")) {
-            List<Argument> args = pickleStepTestStep.getDefinitionMatch().getArguments();
-            String docStringName = (String) args.getFirst().getValue();
-            docString = (DocString) args.getLast().getValue();
+//            List<Argument> args = pickleStepTestStep.getDefinitionMatch().getArguments();
+            String docStringName = (String) arguments.getFirst().getValue();
+            docString = (DocString) arguments.getLast().getValue();
             if (docStringName != null && !docStringName.isBlank()) {
                 getCurrentScenarioState().getParsingMap().getRootSingletonMap().put("DOCSTRING." + docStringName.trim(), docString);
             }
         } else if (isCoreStep && methodName.equals("dataTable")) {
-            List<Argument> args = pickleStepTestStep.getDefinitionMatch().getArguments();
-            String tableName = (String) args.getFirst().getValue();
-            dataTable = (DataTable) args.getLast().getValue();
+//            List<Argument> args = pickleStepTestStep.getDefinitionMatch().getArguments();
+            String tableName = (String) arguments.getFirst().getValue();
+            dataTable = (DataTable) arguments.getLast().getValue();
             if (tableName != null && !tableName.isBlank()) {
                 getCurrentScenarioState().getParsingMap().getRootSingletonMap().put("DATATABLE." + tableName.trim(), dataTable);
             }
+        }
+    }
+
+    public Object runAndGetReturnValue() {
+        Object instanceOrNull = null;
+        try {
+            instanceOrNull = method.getDeclaringClass().getDeclaredConstructor().newInstance();
+        } catch (InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
+            throw new RuntimeException(e);
+        }
+        Object target = java.lang.reflect.Modifier.isStatic(method.getModifiers())
+                ? null
+                : instanceOrNull;
+
+        try {
+            return method.invoke(target, arguments.stream().map(arg -> arg.getValue()).toArray());
+        } catch (IllegalAccessException | InvocationTargetException e) {
+            throw new RuntimeException(e);
         }
     }
 

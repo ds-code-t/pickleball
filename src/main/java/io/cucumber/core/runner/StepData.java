@@ -1,6 +1,7 @@
 package io.cucumber.core.runner;
 
 
+import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.plugin.event.Result;
@@ -28,6 +29,7 @@ public abstract class StepData extends StepMapping {
     public StepData previousSibling;
     public StepData nextSibling;
     public String overrideLoggingText = null;
+    List<Argument> arguments = pickleStepTestStep.getDefinitionMatch().getArguments();
 
     public int getNestingLevel() {
         return nestingLevel;

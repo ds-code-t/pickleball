@@ -1,5 +1,7 @@
 package tools.dscode.common.mappings;
 
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -12,10 +14,13 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  */
 public class GlobalMappings extends NodeMap {
 
+    static final String rootDirectory = "configs";
+
     public final static GlobalMappings GLOBALS = new GlobalMappings();
 
-    public GlobalMappings() {
-        setMapType(MapConfigurations.MapType.GLOBAL_NODE);
+    private GlobalMappings() {
+        super(MapConfigurations.MapType.GLOBAL_NODE);
+        root.set(rootDirectory, FileAndDataParsing.buildJsonFromPath(rootDirectory));
     }
 
     private final ReadWriteLock rw = new ReentrantReadWriteLock();

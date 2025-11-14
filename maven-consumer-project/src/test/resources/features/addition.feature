@@ -1,5 +1,12 @@
 Feature: Addition
 
+  Scenario: b test2
+    * rrr
+#    * I open Chrome
+#    * chromium edge
+#    * chrome Chrome
+
+
   Scenario: nestTest
     * zprint printing== <A>
   : * zprint printing== <A>
@@ -37,7 +44,11 @@ Feature: Addition
       | https://example.com |
     * , I click "Learn more" Link
 
-
+  Scenario: tes targ
+    Given xQQQ2sss2
+#
+    Then print Arrrrrrrrr
+    Given zargt1 333
 
   Scenario: sStart Run component
     Then print Arrrrrrrrr
@@ -63,11 +74,11 @@ Feature: Addition
     @sc2
     Examples:
       | Scenario Tags | B  |
-      | @t1estz3q2        | 22 |
+      | @t1estz3q2    | 22 |
 
 
-    @%t1est3q2
-    Scenario: qq
+  @%t1est3q2
+  Scenario: qq
     Given I have numbers 2 and 3
     Given QQQ
     Given QQQ2ss2
