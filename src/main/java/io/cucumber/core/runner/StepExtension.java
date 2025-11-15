@@ -5,10 +5,12 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.messages.types.PickleStepArgument;
 import io.cucumber.plugin.event.Result;
+import io.cucumber.plugin.event.Status;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.ParsingMap;
 
 import java.lang.reflect.InvocationTargetException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -23,6 +25,7 @@ import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleStepTestStep;
 import static tools.dscode.common.util.Reflect.invokeAnyMethod;
+import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
 
 public class StepExtension extends StepData {
     private static final Pattern pattern = Pattern.compile("@:([A-Z]+:[A-Z-a-z0-9]+)");
@@ -80,8 +83,10 @@ public class StepExtension extends StepData {
         Object instanceOrNull = null;
         try {
             instanceOrNull = method.getDeclaringClass().getDeclaredConstructor().newInstance();
-        } catch (InstantiationException | IllegalAccessException | NoSuchMethodException | InvocationTargetException e) {
-            throw new RuntimeException(e);
+        } catch (Throwable t) {
+            Throwable cause = t instanceof InvocationTargetException ? t.getCause() : t;
+            cause.printStackTrace();
+            throw new RuntimeException(cause);
         }
         Object target = java.lang.reflect.Modifier.isStatic(method.getModifiers())
                 ? null
@@ -89,28 +94,34 @@ public class StepExtension extends StepData {
 
         try {
             return method.invoke(target, arguments.stream().map(arg -> arg.getValue()).toArray());
-        } catch (IllegalAccessException | InvocationTargetException e) {
-            throw new RuntimeException(e);
+        } catch (Throwable t) {
+            Throwable cause = t instanceof InvocationTargetException ? t.getCause() : t;
+            cause.printStackTrace();
+            throw new RuntimeException(cause);
         }
     }
 
     public Result run() {
-        executingPickleStepTestStep = resolveAndClone(getStepParsingMap());
-        executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
-        executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
-        io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep);
-        return result;
+        try {
+            executingPickleStepTestStep = resolveAndClone(getStepParsingMap());
+            executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
+            executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
+            io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep);
+            return result;
+        } catch (Throwable t) {
+            Throwable cause = t instanceof InvocationTargetException ? t.getCause() : t;
+            cause.printStackTrace();
+            throw new RuntimeException(cause);
+        }
     }
 
     public Result execute(io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep) {
         try {
-            Object r = invokeAnyMethod(executionPickleStepTestStep, "run", getTestCase(), getEventBus(), getTestCaseState(), ExecutionMode.RUN);
-//            System.out.println("@@pickleStepTestStep._lastResult : " + pickleStepTestStep._lastResult);
-            TestStep testStep = executionPickleStepTestStep;
-        } catch (Throwable t) {
-            System.out.println("@@catch t: " + t.getMessage() + " " + t.getCause());
-            t.printStackTrace();
+            Object r = invokeAnyMethodOrThrow(executionPickleStepTestStep, "run", getTestCase(), getEventBus(), getTestCaseState(), ExecutionMode.RUN);
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
         }
+
         return executionPickleStepTestStep.getLastResult();
     }
 
@@ -147,7 +158,6 @@ public class StepExtension extends StepData {
         System.out.println("\n@@resolveAndClone: " + pickleStepTestStep.getUri());
         System.out.println("@@getLine: " + pickleStepTestStep.getStep().getLocation().getLine());
         System.out.println("@@getStepLine: " + pickleStepTestStep.getStepLine());
-        pickleStepTestStep.getDefinitionMatch().getArguments().stream().map(Argument::getValue).forEach(System.out::println);
         PickleStepTestStep clonePickleStepTestStep = resolvePickleStepTestStep(pickleStepTestStep, parsingMap);
         System.out.println("\n@@clonePickleStepTestStep-- resolveAndClone: " + clonePickleStepTestStep.getUri());
         System.out.println("@@getLine: " + clonePickleStepTestStep.getStep().getLocation().getLine());

@@ -29,6 +29,7 @@ import static tools.dscode.common.domoperations.DriverFactory.createChromeDriver
 import static tools.dscode.registry.GlobalRegistry.getLocal;
 import static tools.dscode.registry.GlobalRegistry.putLocal;
 import static tools.dscode.registry.GlobalRegistry.registerLocal;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cucumber.java.en.Given;
 import org.openqa.selenium.chrome.ChromeDriver;
@@ -44,6 +45,7 @@ public class GeneralSteps extends CoreSteps {
     @ParameterType("\\$\\(([^()]+)\\)")
     public Object returnStepParameter(String stepText) {
         System.out.println("@@stepText1: " + stepText);
+
         String getKey = "";
         String putKey = "";
         if (stepText.contains(":")) {
@@ -78,15 +80,17 @@ public class GeneralSteps extends CoreSteps {
     }
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-//    @Given("(?i)^@chrome$")
+
+    //    @Given("(?i)^@chrome$")
     @Given("$CHROME")
     public ChromeDriver getChrome() throws Exception {
         System.out.println("@@getChrome");
         StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
         System.out.println("@@currentStep: " + currentStep);
         System.out.println("@@currentStep.argument.: " + currentStep.argument);
-        String json = currentStep.argument.toString();
+        String json = currentStep.argument == null ? (String) currentStep.getStepParsingMap().getAndResolve("configs.chrome") : currentStep.argument.getValue().toString();
         System.out.println("@@json: " + json);
+        if (Objects.isNull(json)) throw new RuntimeException("Chrome Driver Configuration not found");
         Map<String, Object> config = MAPPER.readValue(json, Map.class);
 
         ChromeOptions options = new ChromeOptions();

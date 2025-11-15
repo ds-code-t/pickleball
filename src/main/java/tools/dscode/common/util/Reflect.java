@@ -3,6 +3,7 @@ package tools.dscode.common.util;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -591,6 +592,111 @@ public final class Reflect {
         }
         return null;
     }
+
+    /**
+     * Like {@link #invokeAnyMethod(Object, String, Object...)} but:
+     * - unwraps InvocationTargetException to rethrow the original cause
+     * - does NOT suppress any Throwable
+     *
+     * @throws Throwable the original exception thrown by the target method
+     */
+    public static Object invokeAnyMethodOrThrow(Object target, String methodName, Object... args) throws Throwable {
+        if (target == null || methodName == null || methodName.isEmpty())
+            return null;
+        final Object[] a = (args == null) ? new Object[0] : args;
+
+        final boolean staticCall = (target instanceof Class<?>);
+        final Class<?> clazz = staticCall ? (Class<?>) target : target.getClass();
+        final Object receiver = staticCall ? null : target;
+
+        // Collect candidates by name, preferring instance methods first for
+        // instance calls.
+        List<Method> instanceNamed = new ArrayList<>();
+        List<Method> staticNamed = new ArrayList<>();
+
+        for (Class<?> k = clazz; k != null; k = k.getSuperclass()) {
+            for (Method m : k.getDeclaredMethods()) {
+                if (!m.getName().equals(methodName))
+                    continue;
+                if (Modifier.isStatic(m.getModifiers())) {
+                    staticNamed.add(m);
+                } else {
+                    instanceNamed.add(m);
+                }
+            }
+        }
+
+        List<Method> named = new ArrayList<>();
+        if (staticCall) {
+            // Static target: only consider static methods.
+            named.addAll(staticNamed);
+        } else {
+            // Instance target: prefer instance methods; fallback to static if
+            // needed.
+            named.addAll(instanceNamed);
+            if (named.isEmpty())
+                named.addAll(staticNamed);
+        }
+
+        if (named.isEmpty())
+            return null;
+
+        // Fast path: a single candidate → try it.
+        if (named.size() == 1) {
+            return tryInvokeOrThrow(receiver, named.get(0), a);
+        }
+
+        // Filter by parameter count (respecting varargs)
+        List<Method> byCount = new ArrayList<>();
+        for (Method m : named) {
+            if (acceptsArgCount(m, a.length)) {
+                byCount.add(m);
+            }
+        }
+        if (byCount.isEmpty()) {
+            // No exact/vararg count match; fall back to first by name (may
+            // still succeed)
+            return tryInvokeOrThrow(receiver, named.get(0), a);
+        }
+        if (byCount.size() == 1) {
+            return tryInvokeOrThrow(receiver, byCount.get(0), a);
+        }
+
+        // Choose best by assignability score
+        Method best = null;
+        int bestScore = Integer.MIN_VALUE;
+        for (Method m : byCount) {
+            int score = applicabilityScore(m, a);
+            if (score > bestScore) {
+                bestScore = score;
+                best = m;
+            }
+        }
+        if (best == null)
+            best = byCount.get(0);
+
+        return tryInvokeOrThrow(receiver, best, a);
+    }
+
+    public static Object tryInvokeOrThrow(Object receiver, Method m, Object[] args) throws Throwable {
+        makeAccessible(m, receiver);
+        Object[] callArgs = prepareArgsForVarargs(m, args);
+        // For static methods, receiver may be null (that's fine).
+        return invokeAndUnwrap(m, receiver, callArgs);
+    }
+
+    private static Object invokeAndUnwrap(Method method, Object target, Object... args) throws Throwable {
+        try {
+            return method.invoke(target, args);
+        } catch (InvocationTargetException e) {
+            // Rethrow the *original* exception thrown by the target method
+            throw e.getCause();
+        } catch (Throwable t) {
+            // Any other Throwable (IllegalAccessException, etc.) → propagate as-is
+            throw t;
+        }
+    }
+
 
     private Reflect() {
     }

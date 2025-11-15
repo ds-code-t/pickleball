@@ -12,6 +12,10 @@ import static tools.dscode.common.domoperations.XPathyMini.applyTextOp;
 import static tools.dscode.common.domoperations.XPathyRegistry.orAll;
 
 public class LineData {
+    public enum ElementType {
+        HTML, ALERT, BROWSER, BROWSER_TAB, URL, VALUE
+    }
+
 
     List<Phrase> phrases = new ArrayList<>();
 
@@ -52,7 +56,7 @@ public class LineData {
             valueNode = (MatchNode) phraseNode.getChild("value");
             MatchNode assertionTypeNode;
             if ((context = phraseNode.getChild("context")) == null) {
-                if ((action =  phraseNode.getChild("action")) == null) {
+                if ((action = phraseNode.getChild("action")) == null) {
                     if ((assertionTypeNode = phraseNode.getChild("assertionType")) != null) {
                         assertionType = assertionTypeNode.modifiedText();
                         assertion = phraseNode.getFromLocalState("assertion").toString();
@@ -78,11 +82,20 @@ public class LineData {
         String type;
         Attribute attribute;
         XPathy xPathy;
+        ElementType elementType;
 
         public Element(MatchNode elementNode) {
             this.text = (String) elementNode.getFromLocalState("text");
             this.type = (String) elementNode.getFromLocalState("type");
 
+            try {
+                this.elementType = ElementType.valueOf(type.toUpperCase());
+            } catch (IllegalArgumentException ignored) {
+                this.elementType = ElementType.HTML;
+            }
+
+            if (!this.elementType.equals(ElementType.HTML))
+                return;
 
             XPathyRegistry.Op textOp = text == null ? null : XPathyRegistry.Op.EQUALS;
             xPathy = orAll(type, text, textOp).orElse(XPathy.from(Tag.any));

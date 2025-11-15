@@ -2,6 +2,7 @@ package io.cucumber.core.runner;
 
 
 import io.cucumber.core.stepexpression.Argument;
+import io.cucumber.core.stepexpression.ExpressionArgument;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.plugin.event.Result;
@@ -31,7 +32,7 @@ public abstract class StepData extends StepMapping {
     public StepData nextSibling;
     public String overrideLoggingText = null;
     List<Argument> arguments;
-    public Object argument;
+    public Argument argument;
     public int getNestingLevel() {
         return nestingLevel;
     }
@@ -151,7 +152,7 @@ public abstract class StepData extends StepMapping {
         isCoreStep = codeLocation.startsWith(corePackagePath);
 
         arguments = pickleStepTestStep == null || pickleStepTestStep.getDefinitionMatch() == null? new ArrayList<>() : pickleStepTestStep.getDefinitionMatch().getArguments();
-        argument = arguments.isEmpty()? null: arguments.getLast().getValue();
+        argument = arguments.isEmpty() || arguments.getLast() instanceof ExpressionArgument ? null: arguments.getLast();
         System.out.println("@@arguments.size(): " + arguments.size());
         System.out.println("@@argument: " + argument);
     }

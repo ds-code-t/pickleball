@@ -19,21 +19,28 @@ import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
  */
 public class DictionaryA extends NodeDictionary {
     static {
-        XPathyRegistry.add("Button", (v, op) ->
-                orMap(
-                        textOp(op, v),
-                        () -> XPathy.from(Tag.button),                                       // //button[…]
-                        () -> XPathy.from(Tag.img).byAttribute(role).equals("button") // //img[@role='button'][…]
-                )
-        );
 
-        XPathyRegistry.add("Link", (v, op) ->
-                orMap(
-                        textOp(op, v),
-                        () -> XPathy.from(Tag.img).byAttribute(role).equals("link"),                            // //button[…]
-                        () -> XPathy.from(Tag.a)                                       // //button[…]
-                )
-        );
+        XPathyRegistry.add("*", (category, v, op) -> orMap(
+                textOp(op, v),
+                () -> XPathy.from(category),
+                () -> XPathy.from(Tag.any).byAttribute(role).equals(category),
+                () -> XPathy.from(Tag.any).byAttribute(name).equals(category),
+                () -> XPathy.from(Tag.any).byAttribute(aria_label).equals(category)
+        ));
+
+
+        XPathyRegistry.add("Button", (category, v, op) -> orMap(
+                textOp(op, v),
+                () -> XPathy.from(Tag.button),
+                () -> XPathy.from(Tag.img).byAttribute(role).equals("button")
+        ));
+
+        XPathyRegistry.add("Link", (category, v, op) -> orMap(
+                textOp(op, v),
+                () -> XPathy.from(Tag.img).byAttribute(role).equals("link"),
+                () -> XPathy.from(Tag.a)
+        ));
+
     }
 
     public static void main(String[] args) {

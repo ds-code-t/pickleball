@@ -1,7 +1,10 @@
 package tools.dscode.common.annotations;
 
 public enum Phase {
-    BEFORE_RUN,
-    AFTER_RUN,
-    ON_ERROR
+    BEFORE_CUCUMBER_RUN,
+    AFTER_CUCUMBER_RUN,
+    BEFORE_SCENARIO_RUN,
+    AFTER_SCENARIO_RUN,
+    AFTER_SCENARIO_FAIL,
+    AFTER_SCENARIO_PASS,
 }

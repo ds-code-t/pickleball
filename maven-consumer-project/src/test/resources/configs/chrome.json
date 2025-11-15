@@ -1,0 +1,7 @@
+{
+  "args": ["--headless=new", "--window-size=1280,720"],
+  "prefs": {
+    "download.default_directory": "C:/temp"
+  },
+  "excludeSwitches": ["enable-automation"]
+}

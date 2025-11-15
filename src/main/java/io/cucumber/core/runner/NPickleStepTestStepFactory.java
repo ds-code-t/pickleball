@@ -30,6 +30,7 @@ public class NPickleStepTestStepFactory {
     }
 
     public static PickleStepTestStep createPickleStepTestStep(URI uri, Step step, PickleStepDefinitionMatch pickleStepDefinitionMatch) {
+        System.out.println("@@PickleStepDefinitionMatch-for: " + step.getText());
         return new PickleStepTestStep(UUID.randomUUID(), toAbsoluteFileUri(uri), step, updatePickleStepDefinitionMatch(pickleStepDefinitionMatch));
     }
 

@@ -5,6 +5,8 @@ import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import tools.dscode.common.annotations.DefinitionFlag;
+import tools.dscode.common.annotations.LifecycleManager;
+import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
@@ -45,13 +47,16 @@ public class CurrentScenarioState extends ScenarioMapping {
         this.stepExtensions = (List<StepExtension>) getProperty(testCase, "stepExtensions");
     }
 
+    private final LifecycleManager lifecycle = new LifecycleManager();
 
     public void startScenarioRun() {
-           StepExtension rootScenarioStep = testCase.getRootScenarioStep();
+        lifecycle.fire(Phase.BEFORE_SCENARIO_RUN);
+
+        StepExtension rootScenarioStep = testCase.getRootScenarioStep();
         Pickle gherkinMessagesPickle = (Pickle) getProperty(testCase, "pickle");
         io.cucumber.messages.types.Pickle pickle = (io.cucumber.messages.types.Pickle) getProperty(gherkinMessagesPickle, "pickle");
         rootScenarioStep.setStepParsingMap(getParsingMap());
-        if(pickle.getValueRow()!=null && !pickle.getValueRow().isEmpty()) {
+        if (pickle.getValueRow() != null && !pickle.getValueRow().isEmpty()) {
             NodeMap examples = new NodeMap(MapConfigurations.MapType.EXAMPLE_MAP);
             examples.merge(pickle.getHeaderRow(), pickle.getValueRow());
             rootScenarioStep.getStepParsingMap().addMaps(examples);
@@ -59,7 +64,16 @@ public class CurrentScenarioState extends ScenarioMapping {
 //        rootScenarioStep.addDefinitionFlag(DefinitionFlag.NO_LOGGING);
         testCaseState = getTestCaseState();
         rootScenarioStep.runMethodDirectly = true;
-        runStep(rootScenarioStep);
+        try {
+            runStep(rootScenarioStep);
+            if (isScenarioFailed())
+                lifecycle.fire(Phase.AFTER_SCENARIO_FAIL);
+            else
+                lifecycle.fire(Phase.AFTER_SCENARIO_PASS);
+        } catch (Throwable t) {
+            lifecycle.fire(Phase.AFTER_SCENARIO_FAIL);
+        }
+        lifecycle.fire(Phase.AFTER_SCENARIO_RUN);
     }
 
     public void runStep(StepExtension stepExtension) {

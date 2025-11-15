@@ -36,10 +36,7 @@ public class LineExecution extends LineData {
                     case "banana" -> System.out.println("It's a banana!");
                     default -> System.out.println("Something else: " + action);
                 }
-
             }
-
-
         }
 
         return true;

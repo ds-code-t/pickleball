@@ -10,6 +10,10 @@ import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import org.openqa.selenium.edge.EdgeDriver;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -51,8 +55,37 @@ public class QSteps {
         System.out.println("@@qqq1");
     }
 
+
+
+
+    @Given("map")
+    public void mapTest(Map<String, String> map) {
+        System.out.println("@@map::: " + map);
+    }
+
+    @Given("list")
+    public void listTest(List<String> list) {
+        System.out.println("@@map::: " + list);
+    }
+
+    @Given("set")
+    public void setTest(Set<String> set) {
+        System.out.println("@@set::: " + set);
+    }
+
+    @Given("string")
+    public void stringTest(String string) {
+        System.out.println("@@string::: " + string);
+    }
+    @Given("dataTable")
+    public void dataTableTest(DataTable dataTable) {
+        System.out.println("@@dataTable::: " + dataTable);
+    }
+
+
+
     @Given("get browser {returnStepParameter}")
-    public void chrometest1(Object param, String docString) {
+    public void chrometest1(Object param, DocString docString) {
         System.out.println("@@param class = " + param.getClass());
         System.out.println("@@param value = " + param);
         System.out.println("@@docString--" + docString + "--");

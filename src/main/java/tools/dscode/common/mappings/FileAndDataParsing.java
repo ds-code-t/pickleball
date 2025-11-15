@@ -210,7 +210,9 @@ public final class FileAndDataParsing {
                         if (p.equals(root))
                             return;
                         String key = p.getFileName().toString();
-                        dir.set(key, buildFromRoot(p));
+                        JsonNode child = buildFromRoot(p);
+                        // key derived from directory name
+                        setWithLowercaseAlias(dir, key, child);
                     } else {
                         String fileName = p.getFileName().toString();
                         String ext = getExtensionLower(fileName);
@@ -226,7 +228,8 @@ public final class FileAndDataParsing {
                         String base = getBaseFileName(fileName);
                         String content = Files.readString(p, StandardCharsets.UTF_8);
                         JsonNode parsed = parseSingleFile(content, fileName);
-                        dir.set(base, parsed); // base-name collisions will overwrite
+                        // base derived from file name (without extension)
+                        setWithLowercaseAlias(dir, base, parsed); // base-name collisions will overwrite
                     }
                 } catch (IOException ioe) {
                     System.out.println("Failed to read file: " + p + " (" + ioe.getMessage() + ")");
@@ -234,6 +237,19 @@ public final class FileAndDataParsing {
             });
         }
         return dir;
+    }
+
+    /**
+     * Sets the key on the given ObjectNode and, if the key is not lowercase,
+     * also creates a lowercase alias pointing to the same JsonNode instance.
+     * No alias is created if the lowercase key already exists.
+     */
+    private static void setWithLowercaseAlias(ObjectNode target, String key, JsonNode value) {
+        target.set(key, value);
+        String lower = key.toLowerCase();
+        if (!key.equals(lower) && !target.has(lower)) {
+            target.set(lower, value);
+        }
     }
 
     private static JsonNode parseCsv(String content) {

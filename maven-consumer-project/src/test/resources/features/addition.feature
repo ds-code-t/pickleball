@@ -1,16 +1,57 @@
 Feature: Addition
 
+  Scenario: parm test 7
+    * dataTable
+    * string
+        """
+    aa
+    """
+    * string
+
+    * map
+      | A | bqqw  |
+      | 1 | qqqw1 |
+
+    * map
+
+
+    * list
+      | Alice |
+      | Bob   |
+      | Carol |
+    * list
+
+
+
+  Scenario: parm test 6
+    * dataTable
+      | A | bqqw  |
+      | 1 | qqqw1 |
+    * string
+    """
+    aa
+    """
+    * map
+      | A | bqqw  |
+      | 1 | qqqw1 |
+    * list
+      | Alice |
+      | Bob   |
+      | Carol |
+
   Scenario: b test2
+    Then print aaa
     Given get browser $(CHROME)
-    """
-    {
-      "args": ["--headless=new", "--window-size=1280,720"],
-      "prefs": {
-        "download.default_directory": "C:/temp"
-      },
-      "excludeSwitches": ["enable-automation"]
-    }
-    """
+    Then print bbb
+#    """
+#    {
+#      "args": ["--headless=new", "--window-size=1280,720"],
+#      "prefs": {
+#        "download.default_directory": "C:/temp"
+#      },
+#      "excludeSwitches": ["enable-automation"]
+#    }
+#    """
 
 #    * I open Chrome
 #    * chromium edge

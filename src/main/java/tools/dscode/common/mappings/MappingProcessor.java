@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 
 import static tools.dscode.common.evaluations.AviatorUtil.eval;
 import static tools.dscode.common.evaluations.AviatorUtil.evalToBoolean;
+import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.mappings.NodeMap.MAPPER;
 import static tools.dscode.common.util.StringUtilities.decodeBackToText;
 import static tools.dscode.common.util.StringUtilities.encodeToPlaceHolders;
@@ -54,14 +55,15 @@ public abstract class MappingProcessor implements Map<String, Object> {
         // Defensive copy to make key order immutable
         addMaps(new NodeMap(MapConfigurations.MapType.RUN_MAP));
         addMaps(new NodeMap(MapConfigurations.MapType.SINGLETON));
+        addMaps(GLOBALS);
         this.keyOrder.addAll(Arrays.asList(MapConfigurations.MapType.OVERRIDE_MAP,
                 MapConfigurations.MapType.PASSED_MAP, MapConfigurations.MapType.EXAMPLE_MAP, MapConfigurations.MapType.STEP_MAP,
                 MapConfigurations.MapType.RUN_MAP, MapConfigurations.MapType.SINGLETON,
                 MapConfigurations.MapType.GLOBAL_NODE, MapConfigurations.MapType.DEFAULT));
         this.singletonOrder.addAll(Arrays.asList(MapConfigurations.MapType.OVERRIDE_MAP,
-                MapConfigurations.MapType.SINGLETON, MapConfigurations.MapType.PASSED_MAP,
+                MapConfigurations.MapType.SINGLETON, MapConfigurations.MapType.GLOBAL_NODE, MapConfigurations.MapType.PASSED_MAP,
                 MapConfigurations.MapType.EXAMPLE_MAP, MapConfigurations.MapType.STEP_MAP, MapConfigurations.MapType.RUN_MAP,
-                MapConfigurations.MapType.GLOBAL_NODE, MapConfigurations.MapType.DEFAULT));
+                MapConfigurations.MapType.DEFAULT));
     }
 
     public NodeMap getPrimaryRunMap() {
@@ -275,11 +277,13 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     @Override
     public Object get(Object key) {
+        System.out.println("@@get: " + key + "");
         if (key == null)
             throw new RuntimeException("key cannot be null");
         if (key instanceof String stringKey)
             return get(stringKey);
         for (NodeMap map : maps.values()) {
+            System.out.println("@@map: " + map + "");
             Object returnObj = map.get(String.valueOf(key));
             if (returnObj != null)
                 return returnObj;
@@ -287,9 +291,24 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return null;
     }
 
+
+    public Object getAndResolve(Object key) {
+        System.out.println("@@getAndResolve: " + key + "");
+        if (key == null)
+            throw new RuntimeException("key cannot be null");
+        Object returnObj = get(key);
+        System.out.println("@@returnObj: " + returnObj + "");
+
+        return resolveWholeText(getStringValue(returnObj));
+
+
+    }
+
     public Object get(String key) {
+        System.out.println("@@getStringkey: " + key + "");
         Tokenized tokenized = new Tokenized(key);
         for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
+            System.out.println("@@map: " + map + "");
             if (map == null)
                 continue;
             Object replacement = map.get(tokenized);
