@@ -154,7 +154,7 @@ public class StepExtension extends StepData {
 
 
     public PickleStepTestStep resolveAndClone(ParsingMap parsingMap) {
-        System.out.println("\n@@resolveAndClone: " + pickleStepTestStep.getUri());
+        System.out.println("@@resolveAndClone: " + pickleStepTestStep.getUri());
         PickleStepTestStep clonePickleStepTestStep = resolvePickleStepTestStep(pickleStepTestStep, parsingMap);
         printDebug("@@getStepLine: " + clonePickleStepTestStep.getStepLine());
         return clonePickleStepTestStep;
