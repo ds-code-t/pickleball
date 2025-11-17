@@ -6,8 +6,8 @@ import tools.dscode.pickleruntime.CucumberOptionResolver;
 import java.net.URI;
 import java.net.URISyntaxException;
 
+import static tools.dscode.common.util.DebugUtils.printDebug;
 import static tools.dscode.pickleruntime.CucumberOptionResolver.glueDistinct;
-import static tools.dscode.pickleruntime.CucumberOptionResolver.toClasspathUriStrict;
 
 public aspect JavaBackend_LoadGlue_Mutator {
 
@@ -21,12 +21,12 @@ public aspect JavaBackend_LoadGlue_Mutator {
 
         java.util.List modified = new java.util.ArrayList();
         java.util.List globalPaths =  glueDistinct();
-        System.out.println("@@old gluePaths: " + gluePaths);
+        printDebug("@@old gluePaths: " + gluePaths);
 
 //        modified.remove("classpath:");
 //        modified.remove("classpath:/");
         for (Object o : globalPaths) {
-            System.out.println("@@gluePath1: " + o + "");
+            printDebug("@@gluePath1: " + o + "");
             java.net.URI uri = null;
             try {
                 uri = CucumberOptionResolver.toClasspathUriStrict((String) o);
@@ -37,7 +37,7 @@ public aspect JavaBackend_LoadGlue_Mutator {
 
             if (text.startsWith("classpath:/tools/dscode/coredefinitions")) continue;
             if (text.equals("classpath:") || text.equals("classpath:/")) continue;
-            System.out.println("@@gluePath11: " + uri + "");
+            printDebug("@@gluePath11: " + uri + "");
             modified.add(uri);
         }
 
@@ -46,7 +46,7 @@ public aspect JavaBackend_LoadGlue_Mutator {
         }
 
         for (Object o : gluePaths) {
-            System.out.println("@@gluePath2: " + o + "");
+            printDebug("@@gluePath2: " + o + "");
             java.net.URI uri = (java.net.URI) o;
             if (modified.contains(uri)) continue;
             modified.add(uri);
@@ -56,7 +56,7 @@ public aspect JavaBackend_LoadGlue_Mutator {
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
-        System.out.println("@@modified gluePaths: " + modified);
+        printDebug("@@modified gluePaths: " + modified);
         proceed(glue, modified);
     }
 }

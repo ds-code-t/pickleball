@@ -1,10 +1,8 @@
 package tools.dscode.coredefinitions;
 
-import io.cucumber.java.en.When;
 import io.cucumber.datatable.DataTable;
+import io.cucumber.java.en.When;
 import org.openqa.selenium.chrome.ChromeDriver;
-
-import java.util.List;
 
 public class NavigationSteps {
 

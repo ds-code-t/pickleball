@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static tools.dscode.common.mappings.NodeMap.MAPPER;
+import static tools.dscode.common.mappings.NodeMap.toSafeJsonNode;
 
 public class QueryOperations {
 
@@ -86,10 +87,10 @@ public class QueryOperations {
 
                 if (child instanceof ArrayNode childArray) {
                     if (arrayIndex == null) {
-                        childArray.add(MAPPER.valueToTree(value));
+                        childArray.add(toSafeJsonNode(value));
                         valueSet = true;
                     } else {
-                        ensureIndex(childArray, arrayIndex, MAPPER.valueToTree(value));
+                        ensureIndex(childArray, arrayIndex, toSafeJsonNode(value));
                         valueSet = true;
                     }
                 } else {
@@ -97,14 +98,14 @@ public class QueryOperations {
                         throw new RuntimeException(
                             "'" + fieldName + "' is not an Array but is trying to be set as an Array");
                     }
-                    parentObject.set(fieldName, MAPPER.valueToTree(value));
+                    parentObject.set(fieldName, toSafeJsonNode(value));
                     valueSet = true;
                 }
 
             } else if (parent instanceof ArrayNode parentArray) {
                 // (intentional) if parent resolves to an array directly, just
                 // append
-                parentArray.add(MAPPER.valueToTree(value));
+                parentArray.add(toSafeJsonNode(value));
                 valueSet = true;
 
             } else if (parent == null) {
@@ -129,14 +130,14 @@ public class QueryOperations {
                 JsonNode obj = pair.current();
                 if (obj instanceof ArrayNode childArray) {
                     if (arrayIndex == null) {
-                        childArray.add(MAPPER.valueToTree(value));
+                        childArray.add(toSafeJsonNode(value));
                         valueSet = true;
                     } else {
-                        ensureIndex(childArray, arrayIndex, MAPPER.valueToTree(value));
+                        ensureIndex(childArray, arrayIndex, toSafeJsonNode(value));
                         valueSet = true;
                     }
                 } else {
-                    pair.parent().set(fieldName, MAPPER.valueToTree(value));
+                    pair.parent().set(fieldName, toSafeJsonNode(value));
                     valueSet = true;
                 }
             }
@@ -195,7 +196,7 @@ public class QueryOperations {
     //
     // if (!(jsonNode instanceof ArrayNode)) {
     // ArrayNode newArray = MAPPER.createArrayNode();
-    // newArray.add(MAPPER.valueToTree(jsonNode));
+    // newArray.add(toSafeJsonNode(jsonNode));
     // root
     // }
     // }
@@ -211,7 +212,7 @@ public class QueryOperations {
     //
     // if (!(jsonNode instanceof ArrayNode)) {
     // ArrayNode newArray = MAPPER.createArrayNode();
-    // newArray.add(MAPPER.valueToTree(jsonNode));
+    // newArray.add(toSafeJsonNode(jsonNode));
     // root.set(topLevelProperty, newArray);
     // }
     // }

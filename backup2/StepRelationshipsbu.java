@@ -98,17 +98,17 @@
 //    }
 //
 //    public void setStepParsingMap(ParsingMap stepParsingMap) {
-//        System.out.println("@@setStepParsingMap for " + this);
+//        printDebug("@@setStepParsingMap for " + this);
 //        this.stepParsingMap.copyParsingMap(stepParsingMap);
 //        // this.stepParsingMap = stepParsingMap;
 //        this.stepParsingMap.addMaps(stepNodeMap);
-//        System.out.println("@@setStepParsingMap " + stepParsingMap);
+//        printDebug("@@setStepParsingMap " + stepParsingMap);
 //    }
 //
 //    public void addToStepParsingMap(NodeMap... nodes) {
-//        System.out.println("@@this.stepParsingMap1: " + this.stepParsingMap);
+//        printDebug("@@this.stepParsingMap1: " + this.stepParsingMap);
 //        this.stepParsingMap.addMaps(nodes);
-//        System.out.println("@@this.stepParsingMap2: " + this.stepParsingMap);
+//        printDebug("@@this.stepParsingMap2: " + this.stepParsingMap);
 //
 //    }
 //
@@ -119,18 +119,18 @@
 //    private final ParsingMap stepParsingMap = new ParsingMap();
 //
 //    public void initializeChildSteps() {
-//        // System.out.println("@@parent: " + this);
-//        System.out.println("@@parent-stepParsingMap: " + stepParsingMap);
+//        // printDebug("@@parent: " + this);
+//        printDebug("@@parent-stepParsingMap: " + stepParsingMap);
 //        childSteps.forEach(this::initializeChildStep);
 //    }
 //
 //    public void initializeChildStep(StepRelationships child) {
-//        System.out.println("@@parent## " + this);
-//        System.out.println("@@parent##--stepParsingMap: " + stepParsingMap);
+//        printDebug("@@parent## " + this);
+//        printDebug("@@parent##--stepParsingMap: " + stepParsingMap);
 //        // if (child.inheritFromParent)
 //        // child.setStepParsingMap(new ParsingMap(stepParsingMap));
-//        // System.out.println("@@child: " + child);
-//        // System.out.println("@@child-stepParsingMap: " +
+//        // printDebug("@@child: " + child);
+//        // printDebug("@@child-stepParsingMap: " +
 //        // child.getStepParsingMap());
 //    }
 //
@@ -148,13 +148,13 @@
 //    }
 //
 //    public void addChildStep(StepRelationships child) {
-//        System.out.println("@@addChildStep-currentChildren: " + childSteps.size());
-//        System.out.println("@@addChildStep-getStepParsingMap: " + child.getStepParsingMap());
+//        printDebug("@@addChildStep-currentChildren: " + childSteps.size());
+//        printDebug("@@addChildStep-getStepParsingMap: " + child.getStepParsingMap());
 //        child.setParentStep((StepExtension) this);
 //        childSteps.add(child);
 //        if (isFlagStep) {
-//            System.out.println("@@flag-step: " + this);
-//            System.out.println("@@flag-child-step: " + child);
+//            printDebug("@@flag-step: " + this);
+//            printDebug("@@flag-child-step: " + child);
 //            child.stepFlags.addAll(stepFlags);
 //        }
 //    }
@@ -188,9 +188,9 @@
 //    }
 //
 //    public static void pairSiblings(StepRelationships sibling1, StepRelationships sibling2) {
-//        System.out.println("@@pairSiblings: ");
-//        System.out.println("@@sibling1: " + sibling1);
-//        System.out.println("@@sibling2: " + sibling2);
+//        printDebug("@@pairSiblings: ");
+//        printDebug("@@sibling1: " + sibling1);
+//        printDebug("@@sibling2: " + sibling2);
 //        sibling1.setNextSibling(sibling2);
 //        sibling2.setPreviousSibling(sibling1);
 //    }
@@ -207,13 +207,13 @@
 //        StepRelationships originalNextSibling = getNextSibling();
 //        if (originalNextSibling != null)
 //            insertNextSibling.setNextSibling(originalNextSibling);
-//        System.out.println("@@nextSibling11: " + originalNextSibling);
+//        printDebug("@@nextSibling11: " + originalNextSibling);
 //        setNextSibling(insertNextSibling);
 //        if (parentStep != null) {
 //            insertNextSibling.setParentStep(parentStep);
 //            // insertNextSibling.setStepParsingMap(new
 //            // ParsingMap(parentStep.getStepParsingMap()));
-//            System.out.println("@@nextSibling22: " + originalNextSibling);
+//            printDebug("@@nextSibling22: " + originalNextSibling);
 //            if (originalNextSibling == null)
 //                parentStep.getChildSteps().add(insertNextSibling);
 //            else

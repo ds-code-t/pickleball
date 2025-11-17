@@ -1,24 +1,15 @@
 package tools.dscode.common.domoperations;
 
 
-import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import tools.dscode.common.status.SoftRuntimeException;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.PhraseExecution;
-import tools.dscode.common.treeparsing.PhraseExecution.*;
-
-import java.util.List;
+import tools.dscode.common.treeparsing.PhraseExecution.Component;
+import tools.dscode.common.treeparsing.PhraseExecution.ElementMatch;
 
 import static tools.dscode.common.domoperations.DomChecks.equalsNormalized;
 import static tools.dscode.common.domoperations.DomChecks.hasAny;
-import static tools.dscode.common.domoperations.HumanInteractions.clearAndType;
-import static tools.dscode.common.domoperations.HumanInteractions.click;
-import static tools.dscode.common.domoperations.HumanInteractions.contextClick;
-import static tools.dscode.common.domoperations.HumanInteractions.doubleClick;
-import static tools.dscode.common.domoperations.HumanInteractions.typeText;
-import static tools.dscode.common.domoperations.HumanInteractions.wheelScrollBy;
-import static tools.dscode.common.domoperations.SeleniumUtils.explicitWait;
 
 
 public class ParsedAssertions {

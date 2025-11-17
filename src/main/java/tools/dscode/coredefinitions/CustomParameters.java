@@ -1,11 +1,8 @@
 package tools.dscode.coredefinitions;
 
 import io.cucumber.java.ParameterType;
-import io.cucumber.java.en.Given;
 import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chromium.ChromiumDriver;
 import org.openqa.selenium.edge.EdgeDriver;
-import tools.dscode.common.treeparsing.DictionaryA;
 
 public class CustomParameters {
 

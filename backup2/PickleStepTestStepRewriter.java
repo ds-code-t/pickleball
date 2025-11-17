@@ -242,7 +242,7 @@
 //
 //    // Uses your global accessor pattern (RunnerRuntimeRegistry cache)
 //    private static RunnerRuntimeContext getGlobalContext(String[] cliArgs) {
-//        System.out.println("@cliArgs: " + Arrays.toString(cliArgs));
+//        printDebug("@cliArgs: " + Arrays.toString(cliArgs));
 //        if (cliArgs == null || cliArgs.length == 0)
 //            return CucumberOptionResolver.getGlobalContext();
 //        return RunnerRuntimeRegistry.getOrInit(cliArgs);

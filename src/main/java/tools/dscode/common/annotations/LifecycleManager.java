@@ -1,12 +1,16 @@
 package tools.dscode.common.annotations;
 
-import io.github.classgraph.*;
-import tools.dscode.common.annotations.LifecycleHandler;
-import tools.dscode.common.annotations.LifecycleHook;
-import tools.dscode.common.annotations.Phase;
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ClassInfo;
+import io.github.classgraph.ClassInfoList;
+import io.github.classgraph.MethodInfo;
+import io.github.classgraph.ScanResult;
 
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 
 public class LifecycleManager {
 

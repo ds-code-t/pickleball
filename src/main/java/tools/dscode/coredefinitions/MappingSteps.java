@@ -16,10 +16,10 @@ import java.util.Arrays;
 import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
-import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.util.TableUtils.toFlatMultimap;
 import static io.cucumber.core.runner.util.TableUtils.toRowsMultimap;
 import static tools.dscode.common.GlobalConstants.MATCH_START;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
 
 public class MappingSteps extends CoreSteps {
@@ -28,10 +28,10 @@ public class MappingSteps extends CoreSteps {
     // @NoLogging
     @Given("^For every ROW in (:?\"(.*)\"\\s+)?DATA TABLE$")
     public static void forEveryRow(String tableName) {
-        System.out.println("@@forEverRow!!");
+        printDebug("@@forEverRow!!");
 
         StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
-        System.out.println("@@getCurrentStep: " + currentStep);
+        printDebug("@@getCurrentStep: " + currentStep);
         DataTable dataTable = currentStep.getDataTable();
         tableName = tableName == null || tableName.isBlank() ? "" : tableName.trim();
         if (tableName.isEmpty()) {

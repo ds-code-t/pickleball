@@ -40,11 +40,11 @@
 //    public static PickleStepTestStep createStepFromText(String stepText, String... gluePaths) {
 //        Objects.requireNonNull(stepText, "stepText");
 //        String feature = minimalFeatureWithSingleStep(stepText);
-//        System.out.println("@@feature : " + feature);
+//        printDebug("@@feature : " + feature);
 //        RunnerRuntimeContext ctx = contextForFeatureSource(feature, gluePaths);
 //        Pickle pickle = ctx.firstPickle();
-//        System.out.println("@@pickle : " + pickle.getName());
-//        System.out.println("@@pickle.getSteps().size() : " + pickle.getSteps().size());
+//        printDebug("@@pickle : " + pickle.getName());
+//        printDebug("@@pickle.getSteps().size() : " + pickle.getSteps().size());
 //        return ctx.createStepFromText(pickle, rawStepText(stepText));
 //    }
 //

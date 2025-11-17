@@ -34,7 +34,7 @@
 //
 //
 //    public static GherkinMessagesPickle createGherkinMessagesPickle(String stepText, String argument) {
-//        System.out.println("@@createGherkinMessagesPickle1: " + stepText);
+//        printDebug("@@createGherkinMessagesPickle1: " + stepText);
 //        StringBuilder featureSrc = new StringBuilder()
 //                .append("Feature: Virtual Feature\n")
 //                .append("  Scenario: Virtual Scenario\n")
@@ -56,7 +56,7 @@
 //                    (GherkinMessagesFeature) parsed.orElseThrow(
 //                            () -> new IllegalStateException("No feature parsed from generated source"));
 //
-//            System.out.println("@@createGherkinMessagesPickle2: @@feature::: " + feature.getSource());
+//            printDebug("@@createGherkinMessagesPickle2: @@feature::: " + feature.getSource());
 //
 //            return (GherkinMessagesPickle) feature.getPickles()
 //                    .stream()

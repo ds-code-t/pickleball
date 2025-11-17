@@ -1,18 +1,17 @@
 package tools.dscode.coredefinitions;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cucumber.core.runner.StepExtension;
+import io.cucumber.core.stepexpression.DocStringArgument;
 import io.cucumber.java.ParameterType;
 import io.cucumber.java.en.Given;
-import io.cucumber.java.en.ReturnStep;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.chromium.ChromiumDriver;
-import org.openqa.selenium.edge.EdgeDriver;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.DefinitionFlags;
 import tools.dscode.common.status.SoftRuntimeException;
-
 
 import java.time.Duration;
 import java.util.List;
@@ -20,6 +19,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import static io.cucumber.core.runner.CurrentScenarioState.getScenarioObject;
+import static io.cucumber.core.runner.CurrentScenarioState.normalizeRegistryKey;
 import static io.cucumber.core.runner.CurrentScenarioState.registerScenarioObject;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
@@ -27,11 +27,9 @@ import static tools.dscode.common.GlobalConstants.INFO_STEP;
 import static tools.dscode.common.GlobalConstants.ROOT_STEP;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.GlobalConstants.SOFT_ERROR_STEP;
-
 import static tools.dscode.common.domoperations.LeanWaits.waitForPageReady;
-
-
-import com.fasterxml.jackson.databind.ObjectMapper;
+import static tools.dscode.common.domoperations.SeleniumUtils.portFromString;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
 
 public class GeneralSteps extends CoreSteps {
@@ -54,39 +52,35 @@ public class GeneralSteps extends CoreSteps {
 
     @ParameterType("\\$\\(([^()]+)\\)")
     public static Object returnStepParameter(String stepText) {
-        System.out.println("@@stepText1: " + stepText);
+        printDebug("@@stepText1: " + stepText);
 
         String getKey = "";
-        String putKey = "";
         if (stepText.contains(":")) {
             getKey = stepText.substring(0, stepText.indexOf(":"));
             stepText = stepText.substring(stepText.indexOf(":") + 1);
-            Object existingObject2 = getScenarioObject(getKey);
-            if (existingObject2 != null) return existingObject2;
-        } else if (stepText.contains("=")) {
-            putKey = stepText.substring(0, stepText.indexOf("="));
-            stepText = stepText.substring(stepText.indexOf("=") + 1);
+            Object existingObject = getScenarioObject(getKey);
+            if (existingObject != null) return existingObject;
         }
         else {
-            Object existingObject1 = getScenarioObject(stepText);
-            if (existingObject1 != null) return existingObject1;
+            Object existingObject = getScenarioObject(stepText);
+            if (existingObject != null) return existingObject;
         }
         stepText = "$" + stepText;
-        System.out.println("@@stepText2: " + stepText);
+        printDebug("@@stepText2: " + stepText);
         StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
-        System.out.println("@@currentStep: " + currentStep);
+        printDebug("@@currentStep: " + currentStep);
         StepExtension modifiedStep = currentStep.modifyStepExtension(stepText);
-        System.out.println("@@currentStep.argument== " + currentStep.argument);
-        System.out.println("@@modifiedStep.argument== " + modifiedStep.argument);
+        printDebug("@@currentStep.argument== " + currentStep.argument);
+        printDebug("@@modifiedStep.argument== " + modifiedStep.argument);
         modifiedStep.argument = currentStep.argument;
+        if(!getKey.isEmpty())
+            modifiedStep.put("_getKey" , normalizeRegistryKey(getKey));
 
-        System.out.println("@@modifiedStep: " + modifiedStep);
+        printDebug("@@modifiedStep: " + modifiedStep);
         Object returnValue = modifiedStep.runAndGetReturnValue();
-        System.out.println("@@--returnValue: " + returnValue.getClass());
-        if (!putKey.isEmpty()) {
-            registerScenarioObject(putKey, returnValue);
-            return returnValue;
-        }
+        printDebug("@@--returnValue: " + returnValue.getClass());
+        registerScenarioObject(stepText, returnValue);
+
         if (getKey.isEmpty()) return returnValue;
 
         registerScenarioObject(getKey, returnValue);
@@ -98,24 +92,32 @@ public class GeneralSteps extends CoreSteps {
     //    @Given("(?i)^@chrome$")
     @Given("$CHROME")
     public ChromeDriver getChrome() throws Exception {
-        System.out.println("@@getChrome");
+        printDebug("@@getChrome");
         StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
-        System.out.println("@@currentStep: " + currentStep);
-        System.out.println("@@currentStep.argument.: " + currentStep.argument);
-        String json = currentStep.argument == null ? (String) currentStep.getStepParsingMap().getAndResolve("configs.chrome") : currentStep.argument.getValue().toString();
-        System.out.println("@@json: " + json);
+        printDebug("@@currentStep: " + currentStep);
+        printDebug("@@currentStep.argument.: " + currentStep.argument);
+        String json = currentStep.argument == null || !(currentStep.argument instanceof DocStringArgument) ? (String) currentStep.getStepParsingMap().getAndResolve("configs.chrome") : currentStep.argument.getValue().toString();
+        printDebug("@@json: " + json);
         if (Objects.isNull(json)) throw new RuntimeException("Chrome Driver Configuration not found");
         Map<String, Object> config = MAPPER.readValue(json, Map.class);
-        System.out.println("@@config: " + config);
+        printDebug("@@config: " + config);
         ChromeOptions options = new ChromeOptions();
         options.setCapability("goog:chromeOptions", config);
 
+        if(getCurrentScenarioState().debugBrowser) {
+            String port = (String) currentStep.getStepNodeMap().get("_getKey");
+            if(port == null) port = "chrome";
+            options.setExperimentalOption("debuggerAddress", "127.0.0.1:" + portFromString(port));
+            options.setExperimentalOption("detach", true);   // keep browser open after test
+            options.setCapability("dontQuit", true);
+        }
+
         ChromeDriver chromeDriver = new ChromeDriver(options);
-        System.out.println("@@chromeDriver1: " + chromeDriver);
+        printDebug("@@chromeDriver1: " + chromeDriver);
 //        registerScenarioObject("chrome", chromeDriver);
-        System.out.println("@@11");
+        printDebug("@@11");
         registerScenarioObject("browser", chromeDriver);
-        System.out.println("@@chromeDriver2: " + chromeDriver);
+        printDebug("@@chromeDriver2: " + chromeDriver);
         return chromeDriver;
     }
 

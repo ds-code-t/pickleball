@@ -1,5 +1,6 @@
 package tools.dscode.pickleruntime;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.annotation.Annotation;
@@ -7,9 +8,20 @@ import java.lang.reflect.Method;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.io.File;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
+
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
 /**
  * Resolves Cucumber options from multiple sources and can bootstrap a global Runner
@@ -93,7 +105,7 @@ public final class CucumberOptionResolver {
         if (CACHE.isEmpty()) {
             Map<String, List<String>> merged = new LinkedHashMap<>();
 
-            System.out.println("@@CucumberOptionResolver: resolving global options…");
+            printDebug("@@CucumberOptionResolver: resolving global options…");
             var tccl = Thread.currentThread().getContextClassLoader();
             dbg("TCCL         = %s", loaderName(tccl));
             dbg("Self loader  = %s", loaderName(CucumberOptionResolver.class.getClassLoader()));
@@ -216,7 +228,7 @@ public final class CucumberOptionResolver {
                 }
             }
         } catch (Throwable t) {
-            System.out.println("@@CucumberOptionResolver: JUnit5 suite scan failed: " + t);
+            printDebug("@@CucumberOptionResolver: JUnit5 suite scan failed: " + t);
             if (DEBUG) t.printStackTrace(System.out);
         }
     }

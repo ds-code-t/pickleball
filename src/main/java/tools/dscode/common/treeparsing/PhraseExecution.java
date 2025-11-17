@@ -9,7 +9,6 @@ import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.domoperations.XPathyRegistry;
 
-import java.awt.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -28,6 +27,7 @@ import static tools.dscode.common.domoperations.XPathyUtils.beforeOf;
 import static tools.dscode.common.domoperations.XPathyUtils.inBetweenOf;
 import static tools.dscode.common.domoperations.XPathyUtils.insideOf;
 import static tools.dscode.common.domoperations.XPathyUtils.refine;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 import static tools.dscode.coredefinitions.GeneralSteps.getBrowser;
 
 public class PhraseExecution {
@@ -63,9 +63,9 @@ public class PhraseExecution {
     }
 
     public PhraseExecution initiateNextPhraseExecution(MatchNode phraseNode) {
-        System.out.println("@@initiateNextPhraseExecution: " + phraseNode.modifiedText());
-        System.out.println("@@phraseType-initial : " + text);
-        System.out.println("@@phraseType-initialphraseType  : " + phraseType);
+        printDebug("@@initiateNextPhraseExecution: " + phraseNode.modifiedText());
+        printDebug("@@phraseType-initial : " + text);
+        printDebug("@@phraseType-initialphraseType  : " + phraseType);
         PhraseExecution pe = new PhraseExecution(phraseNode);
         if (phraseType != null && !phraseType.equals(PhraseType.INITIAL)) {
             pe.executedPhrases.addAll(executedPhrases);
@@ -80,8 +80,8 @@ public class PhraseExecution {
                 pe.passedXPathy = pe.contextXPathy;
             }
         }
-        System.out.println("@@pe.text: " + pe.text);
-        System.out.println("@@pe.phraseType: " + pe.phraseType);
+        printDebug("@@pe.text: " + pe.text);
+        printDebug("@@pe.phraseType: " + pe.phraseType);
         if (pe.phraseType.equals(PhraseType.ASSERTION) || pe.phraseType.equals(PhraseType.ACTION))
             pe.runPhrase();
 
@@ -98,13 +98,13 @@ public class PhraseExecution {
 //        this.previousPhraseNode = previousPhraseNode;
         this.phraseNode = phraseNode;
         text = phraseNode.toString();
-        System.out.println("@@PhraseExecution-text: " + text);
+        printDebug("@@PhraseExecution-text: " + text);
 
         conjunction = phraseNode.resolvedGroupText("conjunctions");
         termination = phraseNode.resolvedGroupText("termination");
 
         context = phraseNode.resolvedGroupText("context");
-        if (context == null || context.isEmpty())
+        if (context.isEmpty())
             context = " ";
 
         if (!context.isBlank()) {
@@ -135,11 +135,11 @@ public class PhraseExecution {
             }
         }
 
-        System.out.println("@@PhraseExecutipn-text:  " + text);
-        System.out.println("@@action:  " + action);
-        System.out.println("@@phraseType:  " + phraseType);
-        System.out.println("@@context:  " + context);
-        System.out.println("@@assertionType:  " + assertionType);
+        printDebug("@@PhraseExecutipn-text:  " + text);
+        printDebug("@@action:  " + action);
+        printDebug("@@phraseType:  " + phraseType);
+        printDebug("@@context:  " + context);
+        printDebug("@@assertionType:  " + assertionType);
 
         components = phraseNode.getOrderedChildren("elementMatch", "valueMatch").stream().map(m -> {
             if (m.name().equals("valueMatch"))
@@ -239,11 +239,14 @@ public class PhraseExecution {
 
         public ElementMatch(MatchNode elementNode) {
             super(elementNode);
+
             this.text = elementNode.resolvedGroupText("text");
             this.type = elementNode.resolvedGroupText("type");
             this.elementPosition = elementNode.resolvedGroupText("elementPosition");
             this.selectionType = elementNode.resolvedGroupText("selectionType");
-
+            printDebug("@@elementNode: " + this);
+            printDebug("@@elementNode text: " +  text);
+            printDebug("@@elementNode type: " +  type);
             try {
                 this.elementType = ElementType.valueOf(type.toUpperCase());
             } catch (IllegalArgumentException ignored) {
@@ -253,7 +256,7 @@ public class PhraseExecution {
             if (!this.elementType.equals(ElementType.HTML))
                 return;
 
-            XPathyRegistry.Op textOp = text == null ? null : XPathyRegistry.Op.EQUALS;
+            XPathyRegistry.Op textOp = text.isBlank() ? null : XPathyRegistry.Op.EQUALS;
             xPathy = orAll(type, text, textOp).orElse(XPathy.from(Tag.any));
             MatchNode predicateNode = (MatchNode) elementNode.getFromGlobalState((String) elementNode.getFromLocalState("predicate"));
 
@@ -268,17 +271,17 @@ public class PhraseExecution {
                     case String s when s.startsWith("start") -> XPathyRegistry.Op.STARTS_WITH;
                     default -> null;
                 };
-                System.out.println("@@interXPathy: " + xPathy + "  -op: " + op + "  -attribute: " + attribute + "");
+                printDebug("@@interXPathy: " + xPathy + "  -op: " + op + "  -attribute: " + attribute + "");
                 if (attribute.attrName.equals("TEXT"))
                     xPathy = applyTextOp(xPathy, op, text);
                 else
                     xPathy = applyAttrOp(xPathy, com.xpathy.Attribute.custom(attribute.attrName), op, attribute.predicateVal);
             }
 
-            if (elementPosition != null) {
+            if (!elementPosition.isBlank()) {
                 if (elementPosition.equals("last"))
                     xPathy = xPathy.last();
-                else {
+                else  {
                     elementIndex = Integer.parseInt(elementPosition);
                     xPathy = xPathy.nth(elementIndex);
                 }

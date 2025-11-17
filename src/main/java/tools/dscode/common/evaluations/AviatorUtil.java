@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static tools.dscode.common.evaluations.AviatorFunctions.processTernaryExpression;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 
 public final class AviatorUtil {
@@ -89,7 +90,7 @@ public final class AviatorUtil {
     }
 
     public static void main(String[] args) {
-        System.out.println("@@eval: " + eval("true ? 1 : 0"));
+        printDebug("@@eval: " + eval("true ? 1 : 0"));
     }
 
     public static Object eval(Object expr) {

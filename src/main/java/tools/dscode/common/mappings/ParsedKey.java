@@ -14,6 +14,7 @@ import java.util.regex.Pattern;
 
 import static java.util.Arrays.asList;
 import static tools.dscode.common.mappings.NodeMap.MAPPER;
+import static tools.dscode.common.mappings.NodeMap.toSafeJsonNode;
 
 public class ParsedKey {
 
@@ -82,7 +83,7 @@ public class ParsedKey {
                 if (!(jsonNode instanceof ArrayNode)) {
                     newArrayNode = MAPPER.createArrayNode();
                     if (jsonNode != null)
-                        newArrayNode.add(MAPPER.valueToTree(jsonNode));
+                        newArrayNode.add(toSafeJsonNode(jsonNode));
                     root.set(key.topLevelFieldName, newArrayNode);
                 } else {
                     newArrayNode = (ArrayNode) jsonNode;
@@ -90,7 +91,7 @@ public class ParsedKey {
                 int topArrayIndex = key.topArrayIndex == null ? 0 : key.topArrayIndex;
 
                 if (key.tokenCount == 1) {
-                    ensureIndex(newArrayNode, topArrayIndex, MAPPER.valueToTree(value), true);
+                    ensureIndex(newArrayNode, topArrayIndex, toSafeJsonNode(value), true);
                 }
                 ObjectNode topProperty = (ObjectNode) ensureIndex(newArrayNode, topArrayIndex,
                     MAPPER.createObjectNode(), false);
@@ -103,21 +104,21 @@ public class ParsedKey {
 
                 if (lastProperty instanceof ArrayNode lastArrayNode) {
                     int lastArrayIndex = key.lastArrayIndex == null ? 0 : key.lastArrayIndex;
-                    ensureIndex(lastArrayNode, lastArrayIndex, MAPPER.valueToTree(value), true);
+                    ensureIndex(lastArrayNode, lastArrayIndex, toSafeJsonNode(value), true);
                 } else {
                     if (key.lastArrayIndex != null)
                         throw new RuntimeException(
                             "," + key.lastFieldName + "' is not an Array but attempted to set it as an Array");
-                    topProperty.set(key.lastFieldName, MAPPER.valueToTree(value));
+                    topProperty.set(key.lastFieldName, toSafeJsonNode(value));
                 }
 
             } else {
                 JsonNode node = getWithExpression(root, key.fullPath);
                 if (node instanceof ArrayNode arrayNode) {
-                    arrayNode.add(MAPPER.valueToTree(value));
+                    arrayNode.add(toSafeJsonNode(value));
                 } else {
                     ObjectNode parentNode = (ObjectNode) getWithExpression(root, key.parentPath);
-                    parentNode.set(key.lastFieldName, MAPPER.valueToTree(value));
+                    parentNode.set(key.lastFieldName, toSafeJsonNode(value));
                 }
             }
         }

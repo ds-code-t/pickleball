@@ -41,9 +41,9 @@ Feature: Addition
   Scenario: b test2
     Then print aaa
     Given get browser $(CHROME)
-    Then navigate $(CHROME)
+    @[DEBUG] Then navigate $(CHROME)
       | http://google.com |
-    Then , click "Gmail" Link
+    Then , click "Gmail" Link, and wait 1 seconds
 
 
   Scenario: nestTest

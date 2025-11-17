@@ -1,11 +1,10 @@
 package io.cucumber.core.runner;
 
 import io.cucumber.core.gherkin.Pickle;
-import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import org.openqa.selenium.WebDriver;
-import tools.dscode.common.annotations.DefinitionFlag;
+import org.openqa.selenium.chromium.ChromiumDriver;
 import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.mappings.MapConfigurations;
@@ -18,8 +17,6 @@ import java.time.Duration;
 import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
-import static io.cucumber.core.runner.GlobalState.getGherkinMessagesPickle;
-import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FAILED;
@@ -27,6 +24,7 @@ import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_HARD_FAILED;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_PASSING;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
 import static tools.dscode.common.annotations.DefinitionFlag.SKIP_CHILDREN;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
 
@@ -35,6 +33,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     public final TestCase testCase;
     public final Pickle pickle;
     List<StepExtension> stepExtensions;
+    StepExtension startStep;
     private TestCaseState testCaseState;
 
     public StepExtension getCurrentStep() {
@@ -43,33 +42,37 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     private StepExtension currentStep;
 
+    public boolean debugBrowser = false;
+
 //    public ScenarioStep rootScenarioStep;
 
     public CurrentScenarioState(TestCase testCase) {
         this.testCase = testCase;
         this.pickle = (Pickle) getProperty(testCase, "pickle");
-        this.stepExtensions = (List<StepExtension>) getProperty(testCase, "stepExtensions");
+
     }
 
     private final LifecycleManager lifecycle = new LifecycleManager();
 
     public void startScenarioRun() {
         lifecycle.fire(Phase.BEFORE_SCENARIO_RUN);
-
-        StepExtension rootScenarioStep = testCase.getRootScenarioStep();
+        this.stepExtensions = (List<StepExtension>) getProperty(testCase, "stepExtensions");
+        startStep = stepExtensions.stream().filter(s -> s.debugStartStep).findFirst().orElse(testCase.getRootScenarioStep());
+        testCase.getRootScenarioStep().runMethodDirectly = true;
+//        StepExtension rootScenarioStep = testCase.getRootScenarioStep();
         Pickle gherkinMessagesPickle = (Pickle) getProperty(testCase, "pickle");
         io.cucumber.messages.types.Pickle pickle = (io.cucumber.messages.types.Pickle) getProperty(gherkinMessagesPickle, "pickle");
-        rootScenarioStep.setStepParsingMap(getParsingMap());
+        startStep.setStepParsingMap(getParsingMap());
         if (pickle.getValueRow() != null && !pickle.getValueRow().isEmpty()) {
             NodeMap examples = new NodeMap(MapConfigurations.MapType.EXAMPLE_MAP);
             examples.merge(pickle.getHeaderRow(), pickle.getValueRow());
-            rootScenarioStep.getStepParsingMap().addMaps(examples);
+            startStep.getStepParsingMap().addMaps(examples);
         }
 //        rootScenarioStep.addDefinitionFlag(DefinitionFlag.NO_LOGGING);
         testCaseState = getTestCaseState();
-        rootScenarioStep.runMethodDirectly = true;
+//        rootScenarioStep.runMethodDirectly = true;
         try {
-            runStep(rootScenarioStep);
+            runStep(startStep);
             if (isScenarioFailed())
                 lifecycle.fire(Phase.AFTER_SCENARIO_FAIL);
             else
@@ -85,13 +88,19 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void scenarioRunCleanUp() {
-        System.out.println("@scenarioRunCleanUp");
+        printDebug("@@scenarioRunCleanUp");
         for (WebDriver driver : getScenarioWebDrivers()) {
-            System.out.println("@@Driver: " + driver);
+            printDebug("@@Driver: " + driver);
             if (driver == null) continue;
-            try {
-                driver.quit();
-            } catch (Exception ignored) {}
+            boolean dontQuit = driver instanceof ChromiumDriver chromiumDriver ?
+                    Boolean.TRUE.equals(chromiumDriver.getCapabilities().getCapability("dontQuit")) : false;
+
+            if (!dontQuit) {
+                try {
+                    driver.quit();
+                } catch (Exception ignored) {
+                }
+            }
         }
     }
 
@@ -178,15 +187,27 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     //Singleton registration of object in both step nodes, and local register.
     public static void registerScenarioObject(String key, Object value) {
-        getCurrentScenarioState().getCurrentStep().getStepNodeMap().put(key.toLowerCase(), value);
+        key = normalizeRegistryKey(key);
+        printDebug("@@registerScenarioObject: " + key + "");
+        printDebug("@@value: " + value + "");
+        getCurrentScenarioState().getCurrentStep().getStepNodeMap().put(key, value);
         GlobalRegistry.putLocal(key, value);
     }
 
 
     public static Object getScenarioObject(String key) {
-       Object returnObject = getCurrentScenarioState().getCurrentStep().getStepParsingMap().get(key);
-       return returnObject == null ? GlobalRegistry.getLocal(key.toLowerCase()) : returnObject;
+        key = normalizeRegistryKey(key);
+        printDebug("@@getScenarioObject: " + key + "");
+        Object returnObject = getCurrentScenarioState().getCurrentStep().getStepParsingMap().get(key);
+        return returnObject == null ? GlobalRegistry.getLocal(key) : returnObject;
     }
 
+    public static String normalizeRegistryKey(String s) {
+        if (s == null) return null;
+        return s.strip()                       // remove leading/trailing whitespace
+                .replaceAll("\\s+", " ")       // collapse consecutive whitespace
+                .toLowerCase()                 // lowercase
+                .replaceAll("[^a-z0-9._ ]", ""); // remove non-allowed chars
+    }
 
 }

@@ -1,18 +1,14 @@
 package io.cucumber.core.runner;
 
-import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.messages.types.PickleStepArgument;
 import io.cucumber.plugin.event.Result;
-import io.cucumber.plugin.event.Status;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.ParsingMap;
 
 import java.lang.reflect.InvocationTargetException;
-import java.time.Duration;
 import java.util.Arrays;
-import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -24,13 +20,15 @@ import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleStepTestStep;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
 
 public class StepExtension extends StepData {
-    private static final Pattern pattern = Pattern.compile("@:([A-Z]+:[A-Z-a-z0-9]+)");
+    private static final Pattern pattern = Pattern.compile("@\\[([^\\[\\]]*)\\]");
     boolean runMethodDirectly = false;
 
+    public boolean debugStartStep = false;
 
     public StepExtension(io.cucumber.core.runner.TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
         super(testCase, pickleStepTestStep);
@@ -55,10 +53,11 @@ public class StepExtension extends StepData {
         Matcher matcher = pattern.matcher(metaText);
 
         while (matcher.find()) {
-            stepTags.add(matcher.group().substring(1).replaceAll("@:", ""));
+            stepTags.add(matcher.group(1));
         }
 
         stepTags.stream().filter(t -> t.startsWith("REF:")).forEach(t -> bookmarks.add(t.replaceFirst("REF:", "")));
+        debugStartStep = stepTags.stream().anyMatch(t -> t.startsWith("DEBUG"));
         setNestingLevel((int) matcher.replaceAll("").chars().filter(ch -> ch == ':').count());
 
 
@@ -136,7 +135,7 @@ public class StepExtension extends StepData {
 
     @Override
     public void addDefinitionFlag(DefinitionFlag... flags) {
-        Arrays.stream(flags).toList().forEach(f -> System.out.println("@@flag: " + f + ""));
+        Arrays.stream(flags).toList().forEach(f -> printDebug("@@flag: " + f + ""));
         for (DefinitionFlag flag : flags) {
             if (flag == DefinitionFlag.NO_LOGGING)
                 pickleStepTestStep.setNoLogging(true);
@@ -157,7 +156,7 @@ public class StepExtension extends StepData {
     public PickleStepTestStep resolveAndClone(ParsingMap parsingMap) {
         System.out.println("\n@@resolveAndClone: " + pickleStepTestStep.getUri());
         PickleStepTestStep clonePickleStepTestStep = resolvePickleStepTestStep(pickleStepTestStep, parsingMap);
-        System.out.println("@@getStepLine: " + clonePickleStepTestStep.getStepLine());
+        printDebug("@@getStepLine: " + clonePickleStepTestStep.getStepLine());
         return clonePickleStepTestStep;
     }
 

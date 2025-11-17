@@ -1,12 +1,12 @@
 package io.cucumber.core.runner;
 
 //import io.cucumber.messages.types.Pickle;
+
 import io.cucumber.core.gherkin.Pickle;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 
 import static io.cucumber.core.runner.GlobalState.getGivenKeyword;
 import static io.cucumber.core.runner.GlobalState.getTestCase;

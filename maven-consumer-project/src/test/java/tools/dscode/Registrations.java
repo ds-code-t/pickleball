@@ -9,11 +9,12 @@ import tools.dscode.common.domoperations.XPathyRegistry;
 import static com.xpathy.Attribute.role;
 import static tools.dscode.common.domoperations.XPathyMini.orMap;
 import static tools.dscode.common.domoperations.XPathyMini.textOp;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public class Registrations {
     @LifecycleHook(Phase.BEFORE_CUCUMBER_RUN)
     public static void beforeRun() {
-        System.out.println("@@=--- beforeRun");
+        printDebug("@@=--- beforeRun");
 
 //        XPathyRegistry.add("Zaaa", (v, op) ->
 //                orMap(
@@ -26,26 +27,26 @@ public class Registrations {
 
     @LifecycleHook(Phase.AFTER_CUCUMBER_RUN)
     public static void afterRun() {
-        System.out.println("@@=--- afterRun");
+        printDebug("@@=--- afterRun");
     }
 
     @LifecycleHook(Phase.BEFORE_SCENARIO_RUN)
     public static void beforeScenario() {
-        System.out.println("@@=--- beforeScenario");
+        printDebug("@@=--- beforeScenario");
     }
 
     @LifecycleHook(Phase.AFTER_SCENARIO_RUN)
     public static void afterScenario() {
-        System.out.println("@@=--- afterScenario");
+        printDebug("@@=--- afterScenario");
     }
     
     @LifecycleHook(Phase.AFTER_SCENARIO_FAIL)
     public static void afterScenarioFail() {
-        System.out.println("@@=--- afterScenarioFail");
+        printDebug("@@=--- afterScenarioFail");
     }
 
     @LifecycleHook(Phase.AFTER_SCENARIO_PASS)
     public static void afterScenarioPass() {
-        System.out.println("@@=--- afterScenarioPass");
+        printDebug("@@=--- afterScenarioPass");
     }
 }

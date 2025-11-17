@@ -2,9 +2,12 @@ package io.cucumber.core.runner;
 
 import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.plugin.event.TestCase;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
 /**
  * Adds a noLogging flag to TestStep. When true, suppresses event emission
@@ -66,8 +69,8 @@ public privileged aspect TestStepNoLoggingAspect {
                 Instant start)
             : emitStartedExec(step, tc, bus, execId, start)
             {
-                System.out.println("@@emitStartedExec: " + ((io.cucumber.core.runner.PickleStepTestStep) step).getStepText() + "");
-                System.out.println("@@step.noLogging: " + step.noLogging);
+                printDebug("@@emitStartedExec: " + ((io.cucumber.core.runner.PickleStepTestStep) step).getStepText() + "");
+                printDebug("@@step.noLogging: " + step.noLogging);
                 if (step.noLogging) {
                     return; // suppressed
                 }
@@ -83,8 +86,8 @@ public privileged aspect TestStepNoLoggingAspect {
                 io.cucumber.plugin.event.Result result)
             : emitFinishedExec(step, tc, bus, execId, stop, duration, result)
             {
-                System.out.println("@@emitFinishedExec: " + ((io.cucumber.core.runner.PickleStepTestStep) step).getStepText() + "");
-                System.out.println("@@step.noLogging: " + step.noLogging);
+                printDebug("@@emitFinishedExec: " + ((io.cucumber.core.runner.PickleStepTestStep) step).getStepText() + "");
+                printDebug("@@step.noLogging: " + step.noLogging);
 
                 if (step.noLogging) {
                     return; // suppressed

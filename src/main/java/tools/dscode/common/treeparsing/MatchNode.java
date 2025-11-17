@@ -207,11 +207,15 @@ public final class MatchNode {
     }
 
     public String resolvedGroupText(String groupName) {
-        return unmask(groups().get(groupName));
+        String returnString = unmask(groups().get(groupName));
+        if (returnString == null) returnString = "";
+        return returnString;
     }
 
     public String resolvedGroupText(int groupNum) {
-        return unmask(groups().get(groupNum));
+        String returnString = unmask(groups().get(groupNum));
+        if (returnString == null) returnString = "";
+        return returnString;
     }
 
 

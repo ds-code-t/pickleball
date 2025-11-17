@@ -16,13 +16,16 @@ import java.util.Set;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static org.assertj.core.api.Assertions.assertThat;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public class QSteps {
     private int a, b, result;
 
+
+
     @ReturnStep("rrr")
     public void runInternal() {
-        System.out.println("@@run runInternal");
+        printDebug("@@run runInternal");
     }
 
     @Given("I open {browser}")
@@ -46,13 +49,13 @@ public class QSteps {
 
     @Given("^zargt1 (.*)$")
     public void arg1(Integer z) {
-        System.out.println("@@argt dd- "  + z.getClass());
-        System.out.println("@@argt999- "  + z);
+        printDebug("@@argt dd- "  + z.getClass());
+        printDebug("@@argt999- "  + z);
     }
 
     @Given("QQQ")
     public void qqq1() {
-        System.out.println("@@qqq1");
+        printDebug("@@qqq1");
     }
 
 
@@ -60,48 +63,48 @@ public class QSteps {
 
     @Given("map")
     public void mapTest(Map<String, String> map) {
-        System.out.println("@@map::: " + map);
+        printDebug("@@map::: " + map);
     }
 
     @Given("list")
     public void listTest(List<String> list) {
-        System.out.println("@@map::: " + list);
+        printDebug("@@map::: " + list);
     }
 
     @Given("set")
     public void setTest(Set<String> set) {
-        System.out.println("@@set::: " + set);
+        printDebug("@@set::: " + set);
     }
 
     @Given("string")
     public void stringTest(String string) {
-        System.out.println("@@string::: " + string);
+        printDebug("@@string::: " + string);
     }
     @Given("dataTable")
     public void dataTableTest(DataTable dataTable) {
-        System.out.println("@@dataTable::: " + dataTable);
+        printDebug("@@dataTable::: " + dataTable);
     }
 
 
 
     @Given("get browser {returnStepParameter}")
     public void chrometest1(Object param, DocString docString) {
-        System.out.println("@@param class = " + param.getClass());
-        System.out.println("@@param value = " + param);
-        System.out.println("@@docString--" + docString + "--");
+        printDebug("@@param class = " + param.getClass());
+        printDebug("@@param value = " + param);
+        printDebug("@@docString--" + docString + "--");
     }
 
     @Given("^xQQQ2(.*)$")
     public void qqq2(String arg0 ) {
-        System.out.println("@@arg0: " + arg0.getClass());
-        System.out.println("@@zzzzzzzzzzzzzqqq2--" + arg0+"--");
+        printDebug("@@arg0: " + arg0.getClass());
+        printDebug("@@zzzzzzzzzzzzzqqq2--" + arg0+"--");
     }
 
 
     @Given("^zdatatable (.*)$")
     public void dataTable(String arg0, DataTable table) {
-        System.out.println("@@arg0: " + arg0);
-        System.out.println("@@table: " + table);
+        printDebug("@@arg0: " + arg0);
+        printDebug("@@table: " + table);
     }
 
     @Given("^zprint (.*)$")

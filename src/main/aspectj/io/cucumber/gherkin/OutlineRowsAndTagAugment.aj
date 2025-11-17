@@ -1,16 +1,16 @@
 package io.cucumber.gherkin;
 
+import io.cucumber.messages.types.Location;
+import io.cucumber.messages.types.Pickle;
+import io.cucumber.messages.types.TableCell;
+import io.cucumber.messages.types.TableRow;
+import io.cucumber.messages.types.Tag;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.stream.Collectors;
-
-import io.cucumber.messages.types.Pickle;
-import io.cucumber.messages.types.TableCell;
-import io.cucumber.messages.types.TableRow;
-import io.cucumber.messages.types.Tag;
-import io.cucumber.messages.types.Location;
 
 import static tools.dscode.common.GlobalConstants.COMPONENT_TAG_META_CHAR;
 //import static tools.dscode.common.GlobalConstants.COMPONENT_TAG_PREFIX;

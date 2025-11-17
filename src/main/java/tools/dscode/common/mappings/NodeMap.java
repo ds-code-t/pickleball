@@ -2,7 +2,6 @@ package tools.dscode.common.mappings;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.guava.GuavaModule;
 import com.google.common.collect.LinkedListMultimap;
@@ -20,13 +19,12 @@ import java.util.stream.IntStream;
 import static tools.dscode.common.GlobalConstants.META_FLAG;
 
 
-public class NodeMap {
+public class NodeMap  extends ValueFormatting{
 
     public ObjectNode getRoot() {
         return root;
     }
 
-    protected final ObjectNode root;
 
     @Override
     public String toString() {
@@ -52,7 +50,7 @@ public class NodeMap {
 
     public void setMapType(MapConfigurations.MapType mapType) {
         this.mapType = mapType;
-        this.root.set(MapTypeKey, MAPPER.valueToTree(mapType));
+        this.root.set(MapTypeKey, toSafeJsonNode(mapType));
     }
 
     private MapConfigurations.MapType mapType = MapConfigurations.MapType.DEFAULT;
@@ -69,22 +67,22 @@ public class NodeMap {
     }
 
     public NodeMap(MapConfigurations.MapType mapType) {
-        this.root = MAPPER.createObjectNode();
+        super(MAPPER.createObjectNode());
         setMapType(mapType);
     }
 
     public NodeMap() {
-        this.root = MAPPER.createObjectNode();
+        super(MAPPER.createObjectNode());
         setMapType(mapType);
     }
 
     public NodeMap(Map<?, ?> map) {
-        this.root = toObjectNode(map);
+        super(toObjectNode(map));
         setMapType(mapType);
     }
 
     public NodeMap(LinkedListMultimap<?, ?> multimap) {
-        this.root = toObjectNode(multimap);
+        super(toObjectNode(multimap));
         setMapType(mapType);
     }
 
@@ -153,7 +151,7 @@ public class NodeMap {
     private static ObjectNode toObjectNode(Map<?, ?> map) {
         if (map == null)
             return MAPPER.createObjectNode();
-        JsonNode n = MAPPER.valueToTree(map);
+        JsonNode n = toSafeJsonNode(map);
         if (n != null && n.isObject())
             return (ObjectNode) n;
         throw new IllegalArgumentException("Map did not serialize to an ObjectNode");
@@ -164,54 +162,13 @@ public class NodeMap {
             return MAPPER.createObjectNode();
         Map<Object, Collection<Object>> tmp = new LinkedHashMap<>();
         mm.asMap().forEach((k, coll) -> tmp.put(k, new ArrayList<>(coll)));
-        JsonNode n = MAPPER.valueToTree(tmp);
+        JsonNode n = toSafeJsonNode(tmp);
         if (n != null && n.isObject())
             return (ObjectNode) n;
         throw new IllegalArgumentException("Multimap did not serialize to an ObjectNode");
     }
 
 
-    public static JsonNode toSafeJsonNode(Object obj) {
-        if (obj == null) {
-            return JsonNodeFactory.instance.nullNode();
-        }
-
-        // Already a JsonNode → leave it alone
-        if (obj instanceof JsonNode node) {
-            return node;
-        }
-
-        // If the type belongs to a “safe” package → use Jackson
-        if (isFromSafePackage(obj)) {
-            try {
-                return MAPPER.valueToTree(obj);
-            } catch (Exception ignored) {
-                // Fall through to POJO fallback
-            }
-        }
-
-        // Everything else → POJONode (NO introspection, NO Selenium errors)
-        return JsonNodeFactory.instance.pojoNode(obj);
-    }
-
-    private static final String[] SAFE_PACKAGE_PREFIXES = {
-            "java.",
-            "javax.",
-            "com.google.common.",     // Guava
-            "com.fasterxml.jackson.", // Jackson
-            "org.json.",
-            "org.yaml."
-    };
-
-    private static boolean isFromSafePackage(Object obj) {
-        Package p = obj.getClass().getPackage();
-        if (p == null) return false;
-        String pkg = p.getName();
-        for (String prefix : SAFE_PACKAGE_PREFIXES) {
-            if (pkg.startsWith(prefix)) return true;
-        }
-        return false;
-    }
 
 
 }

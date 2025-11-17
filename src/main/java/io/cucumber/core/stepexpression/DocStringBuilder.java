@@ -4,9 +4,7 @@ import io.cucumber.core.backend.ParameterInfo;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.datatable.DataTableTypeRegistryTableConverter;
 import io.cucumber.docstring.DocString;
-import io.cucumber.docstring.DocStringType;
 import io.cucumber.docstring.DocStringTypeRegistryDocStringConverter;
-import io.cucumber.java.DefaultDataTableCellTransformer;
 
 import java.lang.reflect.Type;
 import java.util.List;

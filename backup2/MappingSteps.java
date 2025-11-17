@@ -21,7 +21,7 @@
 //    // @NoLogging
 //    @Given("^For every ROW in (:?\"(.*)\"\\s+)?DATA TABLE$")
 //    public static void forEverRow(String tableName) {
-//        System.out.println("@@forEverRow!!");
+//        printDebug("@@forEverRow!!");
 //
 //        StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
 //        DataTable dataTable = null;
@@ -37,30 +37,30 @@
 //            throw new RuntimeException("Data Table not defined");
 //
 //        LinkedListMultimap<String, LinkedListMultimap<String, String>> rowMap = toRowsMultimap(dataTable);
-//        System.out.println("@@rowMap:::::: " + rowMap);
+//        printDebug("@@rowMap:::::: " + rowMap);
 //        // if (!tableName.isEmpty())
 //        // currentStep.getStepNodeMap().put(tableName.trim(), rowMap);
 //        // else
 //        // currentStep.getStepNodeMap().merge(rowMap);
 //
-//        System.out.println("@@currentStep.getStepParsingMap:: " + currentStep.getStepParsingMap());
+//        printDebug("@@currentStep.getStepParsingMap:: " + currentStep.getStepParsingMap());
 //
 //        List<LinkedListMultimap<String, String>> rows = rowMap.get("ROWS");
 //        currentStep.put("ROWS=", rows);
-//        System.out.println("@@rowss: " + rows);
-//        System.out.println("@currentStepgetStepParsingMap " + currentStep.getStepParsingMap());
+//        printDebug("@@rowss: " + rows);
+//        printDebug("@currentStepgetStepParsingMap " + currentStep.getStepParsingMap());
 //        System.out
 //                .println("@currentStepgetStepParsingMap get(\"ROWS\") " + currentStep.getStepParsingMap().get("ROWS"));
 //        StepExtension lastSibling = null;
 //        List<StepData> children = currentStep.getChildSteps();
 //        currentStep.clearChildSteps();
 //
-//        System.out.println("@@rows.size(): " + rows.size());
+//        printDebug("@@rows.size(): " + rows.size());
 //        for (int r = 0; r < rows.size(); r++) {
 //            LinkedListMultimap<String, String> row = rows.get(r);
 //            StepExtension nextSibling = currentStep.modifyStep("-" + r + "- " + currentStep.getStepText());
 //            nextSibling.setStepParsingMap(currentStep.getStepParsingMap());
-//            System.out.println("@@row: " + row);
+//            printDebug("@@row: " + row);
 //            nextSibling.mergeToStepMap(row);
 //            nextSibling.put("ROW", row);
 //            if (!tableName.isEmpty())
@@ -70,7 +70,7 @@
 //            if (lastSibling != null)
 //                pairSiblings(lastSibling, nextSibling);
 //            else
-//                System.out.println("@@nextSibling getNextSibling: " + nextSibling.getNextSibling());
+//                printDebug("@@nextSibling getNextSibling: " + nextSibling.getNextSibling());
 //
 //            lastSibling = nextSibling;
 //            System.out.println("\n\n@@nextSibling parsaing33:\n" + nextSibling.getStepParsingMap());
@@ -80,8 +80,8 @@
 //
 //    @Given("^-(\\d+)-( For .*)")
 //    public static void loop(String count, String stepText) {
-//        System.out.println("@@@LOOP _ " + count + "  -  " + stepText);
-//        System.out.println("@@@LOOP _ passing mpa: " + getCurrentStep().getStepParsingMap());
+//        printDebug("@@@LOOP _ " + count + "  -  " + stepText);
+//        printDebug("@@@LOOP _ passing mpa: " + getCurrentStep().getStepParsingMap());
 //    }
 //
 //    @Given("^(:?\"(.*)\"\\s+)?DATA TABLE$")

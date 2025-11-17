@@ -6,9 +6,7 @@ import io.cucumber.core.stepexpression.ExpressionArgument;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.plugin.event.Result;
-
 import tools.dscode.common.annotations.DefinitionFlag;
-import tools.dscode.common.mappings.JsonPathUtil;
 import tools.dscode.common.mappings.StepMapping;
 import tools.dscode.coredefinitions.GeneralSteps;
 

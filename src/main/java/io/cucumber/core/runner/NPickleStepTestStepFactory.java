@@ -18,6 +18,7 @@ import static io.cucumber.core.runner.ArgStepFunctions.updatePickleStepDefinitio
 import static io.cucumber.core.runner.GlobalState.getCachingGlue;
 import static io.cucumber.core.runner.GlobalState.getGherkinDialect;
 import static io.cucumber.core.runner.modularexecutions.FilePathResolver.toAbsoluteFileUri;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 
@@ -30,7 +31,7 @@ public class NPickleStepTestStepFactory {
     }
 
     public static PickleStepTestStep createPickleStepTestStep(URI uri, Step step, PickleStepDefinitionMatch pickleStepDefinitionMatch) {
-        System.out.println("@@PickleStepDefinitionMatch-for: " + step.getText());
+        printDebug("@@PickleStepDefinitionMatch-for: " + step.getText());
         return new PickleStepTestStep(UUID.randomUUID(), toAbsoluteFileUri(uri), step, updatePickleStepDefinitionMatch(pickleStepDefinitionMatch));
     }
 

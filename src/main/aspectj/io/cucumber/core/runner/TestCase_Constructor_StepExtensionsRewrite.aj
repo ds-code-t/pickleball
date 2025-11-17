@@ -1,11 +1,13 @@
 package io.cucumber.core.runner;
 
 import io.cucumber.core.gherkin.Pickle;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 import static io.cucumber.core.runner.PredefinedSteps.getRootStep;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
 /**
  * Rewrites TestCase construction so that:
@@ -46,17 +48,17 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
         GlobalState.language = pickle.getLanguage();
         List original = testSteps;
 
-        System.out.println("@@TestCase_Constructor_StepExtensionsRewrite: Original Steps = " + original.size());
+        printDebug("@@TestCase_Constructor_StepExtensionsRewrite: Original Steps = " + original.size());
 
         // Replace Cucumber runtime execution list with rootStep only
         List replaced = new ArrayList(1);
         replaced.add(getRootStep() );
 
-        System.out.println("@@dryRun: " + dryRun);
+        printDebug("@@dryRun: " + dryRun);
         // Build TestCase normally but with replaced list
         TestCase tc = (TestCase) proceed(id, replaced, beforeHooks, afterHooks, pickle, dryRun);
 
-        System.out.println("@@tc.name: " + tc.getName());
+        printDebug("@@tc.name: " + tc.getName());
 
         // Build extension list
         List<StepExtension> extensions = new ArrayList<>(original.size());
@@ -69,14 +71,14 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
         }
 
         tc.stepExtensions = extensions;
-        System.out.println("@@stepExtensions: " + extensions.size());
+        printDebug("@@stepExtensions: " + extensions.size());
 
         // ✅ New — assign CurrentScenarioState bound to this TestCase
         tc.currentScenarioState = new CurrentScenarioState(tc);
         tc.rootScenarioStep = ScenarioStep.createRootScenarioStep(tc);
-        System.out.println("@@tc.rootScenarioStep: " + tc.rootScenarioStep);
-        System.out.println("@@tc.getTestSteps().size(): " + tc.getTestSteps().size());
-        System.out.println("@tc.getTestSteps().getFirst().getStepText(): " + ((io.cucumber.plugin.event.PickleStepTestStep)tc.getTestSteps().getFirst()).getStepText());
+        printDebug("@@tc.rootScenarioStep: " + tc.rootScenarioStep);
+        printDebug("@@tc.getTestSteps().size(): " + tc.getTestSteps().size());
+        printDebug("@tc.getTestSteps().getFirst().getStepText(): " + ((io.cucumber.plugin.event.PickleStepTestStep)tc.getTestSteps().getFirst()).getStepText());
         return tc;
     }
 }

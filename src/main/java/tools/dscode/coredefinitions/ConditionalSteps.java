@@ -14,13 +14,14 @@ import tools.dscode.common.CoreSteps;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.annotations.DefinitionFlag.SKIP_CHILDREN;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
 
 public class ConditionalSteps extends CoreSteps {
 
     @Given("^((?:IF:|ELSE:|ELSE-IF:|THEN:).*)$")
     public static void runConditional(String inputString) {
-        System.out.println("@@runConditional: " + inputString);
+        printDebug("@@runConditional: " + inputString);
         StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
         if (inputString.startsWith("ELSE")) {
             if (!currentStep.previousSibling.getConditionalStates()
@@ -39,9 +40,9 @@ public class ConditionalSteps extends CoreSteps {
                     inputString = inputString.replaceFirst("ELSE-IF:", "IF: ");
             }
         }
-        System.out.println("@@runConditional: " + inputString);
+        printDebug("@@runConditional: " + inputString);
         String evaluatedString = currentStep.evalWithStepMaps(inputString);
-        System.out.println("@@evaluatedString: " + evaluatedString);
+        printDebug("@@evaluatedString: " + evaluatedString);
         if (evaluatedString.equals("false")) {
             currentStep.addConditionalStates(StepData.ConditionalStates.FALSE);
             currentStep.addDefinitionFlag(SKIP_CHILDREN);
@@ -52,7 +53,7 @@ public class ConditionalSteps extends CoreSteps {
         } else {
             currentStep.addDefinitionFlag(SKIP_CHILDREN);
             StepExtension modifiedStep = currentStep.modifyStepExtension(evaluatedString);
-            System.out.println("@@modifiedStep: " + modifiedStep);
+            printDebug("@@modifiedStep: " + modifiedStep);
             modifiedStep.addConditionalStates(StepData.ConditionalStates.TRUE);
             currentStep.attachedSteps.add(modifiedStep);
         }

@@ -19,7 +19,7 @@
 //     */
 //    protected SelfRegistering() {
 //        String key = keyFor(getClass());
-//        System.out.println("@@keyfor: " + key);
+//        printDebug("@@keyfor: " + key);
 //        GLOBAL.putIfAbsent(key, this); // first-wins; use put(...) for last-wins
 //        LOCAL.get().putIfAbsent(key, this);
 //    }

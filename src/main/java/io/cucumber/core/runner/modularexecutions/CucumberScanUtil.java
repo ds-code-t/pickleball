@@ -24,9 +24,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.modularexecutions.FilePathResolver.findFileDirectoryPaths;
-import static io.cucumber.core.runner.modularexecutions.FilePathResolver.toAbsoluteFileUri;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 import static tools.dscode.pickleruntime.CucumberOptionResolver.features;
 
 public final class CucumberScanUtil {
@@ -39,7 +38,7 @@ public final class CucumberScanUtil {
     public static synchronized String getGlobalFeaturePathsString() {
         if (globalFeaturePathsString == null) {
             List<String> features = features().stream().map(FilePathResolver::toAbsoluteFileUri).toList();
-            System.out.println("@@features: " + features + "");
+            printDebug("@@features: " + features + "");
             globalFeaturePathsString = features.isEmpty() ? normalizeKey(List.of(DEFAULT_FEATURE_DIRS)) : normalizeKey(features);
         }
         return globalFeaturePathsString;
@@ -57,7 +56,7 @@ public final class CucumberScanUtil {
 
     public static List<Pickle> listPicklesByTags(String tagString) {
         String featurePathsOption = getGlobalFeaturePathsString();
-        System.out.println("@@featurePathsOption: " + featurePathsOption + "");
+        printDebug("@@featurePathsOption: " + featurePathsOption + "");
         List<Feature> features = FEATURE_CACHE.computeIfAbsent(featurePathsOption, k ->
         {
             Map<String, String> featureOptions = new HashMap<>();
@@ -70,7 +69,7 @@ public final class CucumberScanUtil {
         RuntimeOptions cucumberOptions = new CucumberPropertiesParser().parse(cucumberProps).build();
         Filters filters = new Filters(cucumberOptions);
         features.stream()
-                .flatMap(f -> f.getPickles().stream()).forEach(pickle -> System.out.println("@@pickle.getTags(): " + pickle.getTags()));
+                .flatMap(f -> f.getPickles().stream()).forEach(pickle -> printDebug("@@pickle.getTags(): " + pickle.getTags()));
         return features.stream()
                 .flatMap(f -> f.getPickles().stream())
                 .filter(filters::test)

@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import tools.dscode.common.mappings.MapConfigurations;
+import tools.dscode.common.mappings.ValueFormatting;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -21,6 +22,9 @@ import java.util.stream.IntStream;
 import static tools.dscode.common.GlobalConstants.META_FLAG;
 import static tools.dscode.common.mappings.NodeMap.MAPPER;
 import static tools.dscode.common.mappings.NodeMap.MapTypeKey;
+import static tools.dscode.common.mappings.NodeMap.toSafeJsonNode;
+import static tools.dscode.common.mappings.ValueFormatting.fromSafeJsonNode;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public final class Tokenized {
 
@@ -113,10 +117,10 @@ public final class Tokenized {
         if (suffix == null) {
             if (list.isEmpty())
                 return null;
-            return list.getLast();
+            return fromSafeJsonNode(list.getLast());
         }
         if (suffix.equals("as-LIST"))
-            return list;
+            return list.stream().map(ValueFormatting::fromSafeJsonNode).toList();
         return null;
     }
 
@@ -189,8 +193,10 @@ public final class Tokenized {
             for (int i = 0; i < tokenCount; i++) {
                 String token = tokens.get(i);
                 String nextToken = i + 1 < tokenCount ? tokens.get(i + 1) : null;
-                Object valueToSet = nextToken == null ? MAPPER.valueToTree(value)
+                printDebug("@@value: " + value);
+                Object valueToSet = nextToken == null ? toSafeJsonNode(value)
                         : processTopArrayFlag || nextToken.startsWith("[") ? ArrayNode.class : ObjectNode.class;
+                printDebug("@@valueToSet: " + valueToSet);
 
                 // if (isValueAssignmentKey && i == (tokenCount - 1)) {
                 //
@@ -224,17 +230,17 @@ public final class Tokenized {
                     if (lastToken.startsWith("[")) {
                         if (lastToken.equals("[*]")) {
                             IntStream.range(0, arrayNode.size())
-                                    .forEach(i -> arrayNode.set(i, MAPPER.valueToTree(value)));
+                                    .forEach(i -> arrayNode.set(i, toSafeJsonNode(value)));
                         } else if (lastToken.equals("[]")) {
-                            arrayNode.add(MAPPER.valueToTree(value));
+                            arrayNode.add(toSafeJsonNode(value));
                         } else if (lastToken.startsWith("[")) {
-                            arrayNode.set(arrayNode.size() - 1, MAPPER.valueToTree(value));
+                            arrayNode.set(arrayNode.size() - 1, toSafeJsonNode(value));
                         }
                     }
                 } else if (parent instanceof ObjectNode objectNode) {
                     if (!lastToken.startsWith("[")) {
                         if (objectNode.has(lastToken)) {
-                            objectNode.set(lastToken, MAPPER.valueToTree(value));
+                            objectNode.set(lastToken, toSafeJsonNode(value));
                         }
                     }
                 }

@@ -5,7 +5,6 @@ import io.cucumber.gherkin.GherkinDialect;
 import io.cucumber.gherkin.GherkinDialects;
 import io.cucumber.plugin.event.PickleStepTestStep;
 
-
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.registry.GlobalRegistry.localOrGlobalOf;
 

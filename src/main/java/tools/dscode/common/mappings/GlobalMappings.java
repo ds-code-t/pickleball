@@ -1,7 +1,5 @@
 package tools.dscode.common.mappings;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
-
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;

@@ -4,6 +4,7 @@ import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
 
 import static tools.dscode.common.GlobalConstants.defaultMatchFlag;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
 //import static tools.dscode.tools.dscode.coredefinitions.MetaSteps.defaultMatchFlag;
 
@@ -13,14 +14,14 @@ public class MetaSteps  extends CoreSteps {
 
     @Given("^" + RUN_SCENARIO + "(.*)$")
     public static void runScenario(String scenarioName) {
-        System.out.println("@@scenarioName: " + scenarioName);
+        printDebug("@@scenarioName: " + scenarioName);
         // place Holder
     }
 
 
     @Given("^" + defaultMatchFlag + "(.*)$")
     public static void matchDefault(String text) {
-        System.out.println("@@DEFAULT_DEFINITION_text:: " + text);
+        printDebug("@@DEFAULT_DEFINITION_text:: " + text);
     }
 
 }

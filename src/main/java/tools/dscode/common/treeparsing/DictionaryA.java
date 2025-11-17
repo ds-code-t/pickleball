@@ -3,19 +3,18 @@ package tools.dscode.common.treeparsing;
 import com.xpathy.Tag;
 import com.xpathy.XPathy;
 import org.intellij.lang.annotations.Language;
-import org.openqa.selenium.chromium.ChromiumDriver;
 import tools.dscode.common.domoperations.XPathyRegistry;
 
 import static com.xpathy.Attribute.aria_label;
 import static com.xpathy.Attribute.name;
 import static com.xpathy.Attribute.role;
-import static tools.dscode.common.domoperations.DriverFactory.createChromeDriver;
 import static tools.dscode.common.domoperations.XPathyMini.orMap;
 import static tools.dscode.common.domoperations.XPathyMini.textOp;
 import static tools.dscode.common.treeparsing.PhraseExecution.initiateFirstPhraseExecution;
 import static tools.dscode.common.treeparsing.RegexUtil.betweenWithEscapes;
 import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
 /**
  * A small palette of nodes used by tests.
@@ -40,7 +39,7 @@ public class DictionaryA extends NodeDictionary {
 
         XPathyRegistry.add("Link", (category, v, op) -> orMap(
                 textOp(op, v),
-                () -> XPathy.from(Tag.any).byAttribute(role).equals("link"),
+                () -> XPathy.from(Tag.any).byAttribute(role).equals("link").or().byAttribute(aria_label).equals("link"),
                 () -> XPathy.from(Tag.a)
         ));
 
@@ -107,7 +106,7 @@ public class DictionaryA extends NodeDictionary {
     ParseNode phrase = new ParseNode("(?<conjunction>\\b(?:and|or)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>[^" + punc + "]+)(?<punc>[" + punc + "])?") {
         @Override
         public String onCapture(MatchNode self) {
-            System.out.println("@@phrase onCapture: " + self.originalText());
+            printDebug("@@phrase onCapture: " + self.originalText());
             self.putToLocalState("context", self.resolvedGroupText("context"));
             self.putToLocalState("conjunctions", self.resolvedGroupText("conjunctions"));
             String termination = self.resolvedGroupText("punc");
@@ -162,13 +161,12 @@ public class DictionaryA extends NodeDictionary {
     };
 
 
-    ParseNode valueMatch = new ParseNode("\\s(?<count>\\d+|<<quoteMask>>)(?<unitMatch>\\s+(?<unit>minute|second|number|text)s?\\b)?") {
+    ParseNode valueMatch = new ParseNode("\\s(?<value>\\d+|<<quoteMask>>)(?<unitMatch>\\s+(?<unit>minute|second|number|text)s?\\b)?") {
         @Override
         public String onSubstitute(MatchNode self) {
-//            self.getAncestor("phrase").putToLocalState("valueMatch", self);
-            String count = self.resolvedGroupText("count");
+            String count = self.resolvedGroupText("value");
             String unit = self.resolvedGroupText("unit");
-            self.putToLocalState("count", count);
+            self.putToLocalState("value", count);
             self.putToLocalState("unit", unit);
             return self.originalText();
         }

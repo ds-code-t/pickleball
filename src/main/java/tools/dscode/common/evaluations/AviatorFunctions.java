@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 import static tools.dscode.common.evaluations.AviatorUtil.isTruthy;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public class AviatorFunctions {
 
@@ -97,7 +98,7 @@ public class AviatorFunctions {
 
         @Override
         public AviatorObject variadicCall(Map<String, Object> env, AviatorObject... args) {
-            System.out.println("@@GetBool " + Arrays.stream(args).toList());
+            printDebug("@@GetBool " + Arrays.stream(args).toList());
             if (args == null || args.length == 0) {
                 return AviatorBoolean.FALSE;
             }
@@ -133,7 +134,7 @@ public class AviatorFunctions {
     }
 
     private static String processTernaryString(String input) {
-        System.out.println("@@processTernaryString2: " + input);
+        printDebug("@@processTernaryString2: " + input);
         if (!input.contains(operatorFlag))
             return input;
         input = input.replaceAll("^([^" + operatorFlag + "]*)" + "(" + ELSE + "|" + ELSEIF + ")",

@@ -47,7 +47,7 @@
 //     * Convenience: forwards to the package-private TestCase#run(EventBus).
 //     */
 //    public void run(EventBus bus) {
-//        System.out.println("@@runTextCaseExtension");
+//        printDebug("@@runTextCaseExtension");
 //        ExecutionMode nextExecutionMode = delegate.executionMode;
 //        emitTestCaseMessage(bus);
 //
@@ -61,19 +61,19 @@
 //                    .next(nextExecutionMode);
 //        }
 //
-//        System.out.println("@@testCaseState: " + testCaseState);
-//        System.out.println("@@getTestCaseState(): " + getTestCaseState());
+//        printDebug("@@testCaseState: " + testCaseState);
+//        printDebug("@@getTestCaseState(): " + getTestCaseState());
 //        ScenarioStep root = createScenarioStep(this, true);
-//        System.out.println("@@root-newPickleStepTestStep1: " + root.getStepText());
-//        System.out.println("@@root-newPickleStepTestStep2: " + ((GherkinMessagesStep) root.step).getText());
-//        System.out.println("@@root-newPickleStepTestStep3: " + ((GherkinMessagesStep) root.step).pickleStep.text);
+//        printDebug("@@root-newPickleStepTestStep1: " + root.getStepText());
+//        printDebug("@@root-newPickleStepTestStep2: " + ((GherkinMessagesStep) root.step).getText());
+//        printDebug("@@root-newPickleStepTestStep3: " + ((GherkinMessagesStep) root.step).pickleStep.text);
 //
-//        System.out.println("@@root nextExecutionMode: " + nextExecutionMode);
-//        System.out.println("@@g root.getClass(): " + root.getClass());
-//        System.out.println("@@g root.delegate.getClass(): " + root.delegate.getClass());
-//        System.out.println("@@root: " + root.getStepText());
-//        System.out.println("@@root delgate " + root.delegate.getStepText());
-//        System.out.println("@@root definitionMatch " + root.definitionMatch);
+//        printDebug("@@root nextExecutionMode: " + nextExecutionMode);
+//        printDebug("@@g root.getClass(): " + root.getClass());
+//        printDebug("@@g root.delegate.getClass(): " + root.delegate.getClass());
+//        printDebug("@@root: " + root.getStepText());
+//        printDebug("@@root delgate " + root.delegate.getStepText());
+//        printDebug("@@root definitionMatch " + root.definitionMatch);
 //        // root.executeStep(delegate, bus, testCaseState, nextExecutionMode);
 //        // root.putOverride(StepExtension.KEY_STEP_TEXT, ROOT_STEP);
 //        testSteps.get(2).run(delegate, bus, testCaseState, nextExecutionMode);

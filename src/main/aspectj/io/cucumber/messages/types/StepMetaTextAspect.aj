@@ -62,14 +62,14 @@
 //        final String flag = PARSER_FLAG;
 //        if (text != null && flag != null && !flag.isEmpty()) {
 //            int idx = text.indexOf(flag);
-//            System.out.println("@@idx:: " + idx);
-//            System.out.println("@text- idx:: " + text);
+//            printDebug("@@idx:: " + idx);
+//            printDebug("@text- idx:: " + text);
 //            if (idx >= 0) {
 //                // Split on the first occurrence only
 //                String left  = text.substring(0, idx);
 //                String right = text.substring(idx + flag.length());
-//                System.out.println("@@left:::: " + left);
-//                System.out.println("@@right:::: " + right);
+//                printDebug("@@left:::: " + left);
+//                printDebug("@@right:::: " + right);
 //                // Proceed with 'left' as the actual step text
 //                Step step = (Step) proceed(location, keyword, keywordType, left, docString, dataTable, id);
 //                // Store the right-hand part in our introduced field

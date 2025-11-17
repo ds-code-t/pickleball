@@ -9,16 +9,12 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.FluentWait;
-import tools.dscode.common.annotations.Phase;
-import tools.dscode.common.treeparsing.MatchNode;
-import tools.dscode.common.treeparsing.PhraseExecution.*;
-import tools.dscode.common.treeparsing.*;
+import tools.dscode.common.treeparsing.PhraseExecution;
+import tools.dscode.common.treeparsing.PhraseExecution.ElementMatch;
 
 import java.time.Duration;
 import java.util.List;
 import java.util.function.Function;
-
-import static java.util.Arrays.stream;
 
 public final class LeanWaits {
 

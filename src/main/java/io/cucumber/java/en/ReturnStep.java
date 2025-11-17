@@ -1,7 +1,6 @@
 package io.cucumber.java.en;
 
 
-import io.cucumber.java.StepDefinitionAnnotation;
 import org.apiguardian.api.API;
 import org.apiguardian.api.API.Status;
 

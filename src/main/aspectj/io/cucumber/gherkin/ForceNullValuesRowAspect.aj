@@ -1,7 +1,8 @@
 package io.cucumber.gherkin;
 
-import java.util.List;
 import io.cucumber.messages.types.TableCell;
+
+import java.util.List;
 
 /**
  * Disables placeholder substitution ONLY when interpolate(...) executes

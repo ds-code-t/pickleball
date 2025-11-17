@@ -12,6 +12,7 @@ import java.util.regex.Pattern;
 import static tools.dscode.common.treeparsing.MatchNode.createMatchNode;
 import static tools.dscode.common.treeparsing.RegexUtil.TOKEN_END;
 import static tools.dscode.common.treeparsing.RegexUtil.TOKEN_START;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
 
 public class ParseNode {
@@ -159,10 +160,10 @@ public class ParseNode {
         if (!skipAllChildren.isEmpty() && String.valueOf(skipAllChildren.getLast()).equalsIgnoreCase("true")) return;
         for (ParseNode childDef : parentDef.parseChildren) {
 //            Object obj = parentMatch.getFromLocalState("skip:"+childDef.getName());
-//            System.out.println("@@parentMatch: " + parentMatch.localState());
+//            printDebug("@@parentMatch: " + parentMatch.localState());
 //            if(obj != null) {
-//                System.out.println("@@parentMatch: " + parentMatch);
-//                System.out.println("@@childDef: " + childDef);
+//                printDebug("@@parentMatch: " + parentMatch);
+//                printDebug("@@childDef: " + childDef);
 //            }
             if (parentMatch.localStateBoolean("skip:" + childDef.getName())) continue;
 
@@ -177,9 +178,9 @@ public class ParseNode {
             StringBuilder newMasked = new StringBuilder(parentSnapshot.length());
             int lastEnd = 0;
             int occurrence = 1;
-            System.out.println("@@Attempting child " + childDef.getName() + " regex=" + childDef.getRegexPattern() + " against=\"" + parentSnapshot + "\"");
+            printDebug("@@Attempting child " + childDef.getName() + " regex=" + childDef.getRegexPattern() + " against=\"" + parentSnapshot + "\"");
             while (m.find()) {
-                System.out.println("@@Matched " + childDef.getName() + ": \"" + m.group() + "\"");
+                printDebug("@@Matched " + childDef.getName() + ": \"" + m.group() + "\"");
                 if (m.start() > lastEnd) {
                     newMasked.append(parentSnapshot, lastEnd, m.start());
                 }
