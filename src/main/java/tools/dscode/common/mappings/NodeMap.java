@@ -2,6 +2,7 @@ package tools.dscode.common.mappings;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.guava.GuavaModule;
 import com.google.common.collect.LinkedListMultimap;
@@ -168,5 +169,49 @@ public class NodeMap {
             return (ObjectNode) n;
         throw new IllegalArgumentException("Multimap did not serialize to an ObjectNode");
     }
+
+
+    public static JsonNode toSafeJsonNode(Object obj) {
+        if (obj == null) {
+            return JsonNodeFactory.instance.nullNode();
+        }
+
+        // Already a JsonNode → leave it alone
+        if (obj instanceof JsonNode node) {
+            return node;
+        }
+
+        // If the type belongs to a “safe” package → use Jackson
+        if (isFromSafePackage(obj)) {
+            try {
+                return MAPPER.valueToTree(obj);
+            } catch (Exception ignored) {
+                // Fall through to POJO fallback
+            }
+        }
+
+        // Everything else → POJONode (NO introspection, NO Selenium errors)
+        return JsonNodeFactory.instance.pojoNode(obj);
+    }
+
+    private static final String[] SAFE_PACKAGE_PREFIXES = {
+            "java.",
+            "javax.",
+            "com.google.common.",     // Guava
+            "com.fasterxml.jackson.", // Jackson
+            "org.json.",
+            "org.yaml."
+    };
+
+    private static boolean isFromSafePackage(Object obj) {
+        Package p = obj.getClass().getPackage();
+        if (p == null) return false;
+        String pkg = p.getName();
+        for (String prefix : SAFE_PACKAGE_PREFIXES) {
+            if (pkg.startsWith(prefix)) return true;
+        }
+        return false;
+    }
+
 
 }

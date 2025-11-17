@@ -1,6 +1,9 @@
 // src/main/java/tools/dscode/registry/GlobalRegistry.java
 package tools.dscode.registry;
 
+import org.openqa.selenium.WebDriver;
+
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -115,4 +118,9 @@ public final class GlobalRegistry {
     public static void removeLocal() {
         LOCAL.remove();
     }
+
+    public static List<WebDriver> getScenarioWebDrivers() {
+        return LOCAL.get().values().stream().filter(WebDriver.class::isInstance).map(WebDriver.class::cast).toList();
+    }
+
 }

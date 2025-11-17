@@ -61,7 +61,6 @@ public final class MatchNode {
         String token = TOKEN_START + "_" + baseToken + "_" + occurrence + "_" + size + "_" + TOKEN_END;
         MatchNode matchNode = new MatchNode(start, ends, parseNode, parent, originalText, token, globalState);
         globalState.put(baseToken, matchNode);
-        System.out.println("@@globalState.get(\"_MatchNodeMap\").size: " + globalState.get("_MatchNodeMap").size());
         if (parent != null)
             ((Map<String, MatchNode>) globalState.get("_MatchNodeMap").getFirst()).put(token, matchNode);
         return matchNode;
@@ -130,8 +129,6 @@ public final class MatchNode {
     }
 
     public void addChildMatchNode(MatchNode child) {
-        System.out.println("\n@@addChildMatchNode: " + name() + "");
-        System.out.println("@@child: " + child.name() + "");
         children.put(child.name(), child);
     }
 
@@ -191,7 +188,7 @@ public final class MatchNode {
      * Iterate global replacements until fixed point so sibling tokens inside expansions are handled.
      */
     private String unmask(String s) {
-        if(s == null) return null;
+        if (s == null) return null;
         Map<String, MatchNode> matchNodeMap = ((Map<String, MatchNode>) globalState.get("_MatchNodeMap").getFirst());
         if (s.isEmpty() || matchNodeMap.isEmpty()) return s;
         String prev;
@@ -199,7 +196,7 @@ public final class MatchNode {
         do {
             prev = cur;
             for (Map.Entry<String, MatchNode> m : matchNodeMap.entrySet()) {
-                if(m.getValue().modifiedText == null) continue;
+                if (m.getValue().modifiedText == null) continue;
                 cur = cur.replaceAll(
                         Pattern.quote(m.getKey()),
                         Matcher.quoteReplacement(m.getValue().modifiedText)
@@ -302,6 +299,15 @@ public final class MatchNode {
         return out; // already nearest -> farthest
     }
 
+    public List<MatchNode> getOrderedChildren(String... names) {
+        var allow = nameFilter(names);
+        var out = new ArrayList<MatchNode>();
+        for (MatchNode n : sortedChildren) {
+            if (allow.test(n)) out.add(n);
+        }
+        return out; // already nearest -> farthest
+    }
+
     private static Predicate<MatchNode> nameFilter(String... names) {
         if (names == null || names.length == 0) return mn -> true;
 
@@ -309,13 +315,10 @@ public final class MatchNode {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toUnmodifiableSet());
 
-        System.out.println("@@nameFilter: " + set);
 
         return mn -> {
             if (mn == null) return false;
-            System.out.println("   mn.name = " + mn.name());
             boolean match = mn.name() != null && set.contains(mn.name());
-            System.out.println("   => result = " + match);
             return match;
         };
     }

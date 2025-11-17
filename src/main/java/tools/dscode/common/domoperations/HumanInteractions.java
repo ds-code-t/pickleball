@@ -1,6 +1,8 @@
 package tools.dscode.common.domoperations;
 
-import org.openqa.selenium.*;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.Keys;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import org.openqa.selenium.interactions.Actions;
 
@@ -22,10 +24,12 @@ public final class HumanInteractions {
     public static void click(ChromiumDriver driver, WebElement el) {
         Objects.requireNonNull(el);
         try {
-            centerScroll(driver, el);
+//            scrollElementNearTop(driver, el);
             new Actions(driver)
-                    .moveToElement(el).pause(SHORT)
-                    .click().pause(SHORT)
+                    .moveToElement(el)
+                    .pause(SHORT)
+                    .click()
+                    .pause(SHORT)
                     .build().perform();
         } catch (RuntimeException e) {
             jsClick(driver, el);
@@ -36,7 +40,7 @@ public final class HumanInteractions {
     public static void doubleClick(ChromiumDriver driver, WebElement el) {
         Objects.requireNonNull(el);
         try {
-            centerScroll(driver, el);
+//            scrollElementNearTop(driver, el);
             new Actions(driver)
                     .moveToElement(el).pause(SHORT)
                     .doubleClick().pause(SHORT)
@@ -50,7 +54,7 @@ public final class HumanInteractions {
     public static void contextClick(ChromiumDriver driver, WebElement el) {
         Objects.requireNonNull(el);
         try {
-            centerScroll(driver, el);
+//            scrollElementNearTop(driver, el);
             new Actions(driver)
                     .moveToElement(el).pause(MID)
                     .contextClick().pause(SHORT)
@@ -64,7 +68,7 @@ public final class HumanInteractions {
     public static void hover(ChromiumDriver driver, WebElement el) {
         Objects.requireNonNull(el);
         try {
-            centerScroll(driver, el);
+//            scrollElementNearTop(driver, el);
             new Actions(driver)
                     .moveToElement(el).pause(Duration.ofMillis(250))
                     .build().perform();
@@ -108,6 +112,9 @@ public final class HumanInteractions {
     }
 
     /** Wheel-scroll the element into view center, then nudge by deltaY pixels. */
+    public static void wheelScrollBy(ChromiumDriver driver, WebElement el) {
+        wheelScrollBy(driver, el, 0);
+    }
     public static void wheelScrollBy(ChromiumDriver driver, WebElement el, int deltaY) {
         Objects.requireNonNull(el);
         try {
@@ -315,4 +322,48 @@ public final class HumanInteractions {
                 fireAt(src,'dragend',startX+dx,startY+dy,dt);
                 """, source, dx, dy);
     }
+
+
+//    public static void scrollElementNearTop(ChromiumDriver driver, WebElement el) {
+//        Objects.requireNonNull(el);
+//
+//        JavascriptExecutor js = (JavascriptExecutor) driver;
+//
+//        // Get viewport height once
+//        long viewportHeight = ((Number) js.executeScript(
+//                "return (window.visualViewport && window.visualViewport.height) || window.innerHeight;"
+//        )).longValue();
+//
+//        // Use a small gap, e.g. 10% of viewport height
+//        long gapPx = Math.round(viewportHeight * 0.10); // 10% gap
+//
+//        // Measure initial element position
+//        long top = ((Number) js.executeScript(
+//                "return arguments[0].getBoundingClientRect().top;", el
+//        )).longValue();
+//
+//        // remaining distance until the element's top is at gapPx
+//        long remaining = top - gapPx;
+//
+//        // If already near the target gap, do nothing
+//        if (Math.abs(remaining) < 5) return;
+//
+//        // Scroll in small steps to mimic real mouse scrolling
+//        while (Math.abs(remaining) > 5) {
+//            int step = Math.toIntExact((int) Math.signum(remaining) * Math.min(80, Math.abs(remaining)));
+//            new Actions(driver)
+//                    .scrollByAmount(0, step)
+//                    .pause(Duration.ofMillis(40))
+//                    .perform();
+//
+//            // Re-measure and update remaining
+//            top = ((Number) js.executeScript(
+//                    "return arguments[0].getBoundingClientRect().top;", el
+//            )).longValue();
+//            remaining = top - gapPx;
+//        }
+//    }
+
+
+
 }

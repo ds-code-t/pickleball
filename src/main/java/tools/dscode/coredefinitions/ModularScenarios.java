@@ -52,18 +52,15 @@ public class ModularScenarios extends CoreSteps {
     static final @Language("RegExp") String tagRegexReplacement = "(?<!@)("+ COMPONENT_TAG_META_CHAR + "[A-Za-z])";
 
     public static void filterAndExecutePickles(List<Map<String, String>> maps, String... messageString) {
-        System.out.println("@@runScenarios - " + maps);
         StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
         StepExtension lastScenarioNameStep = null;
 
         for (Map<String, String> map : maps) {
             String tagString = map.getOrDefault("Tags", "");
             tagString = tagString.replaceAll(tagRegexReplacement, "@$1");
-            System.out.println("@@tagString: " + tagString);
             List<Pickle> pickles = CucumberScanUtil.listPicklesByTags(tagString);
 
             ScenarioStep currentScenarioNameStep;
-            System.out.println("@@pickle/. size: " + pickles.size());
             for (Pickle gherkinMessagesPickle : pickles) {
                 currentScenarioNameStep = createScenarioStep(gherkinMessagesPickle);
                 io.cucumber.messages.types.Pickle pickle = (io.cucumber.messages.types.Pickle) getProperty(gherkinMessagesPickle, "pickle");

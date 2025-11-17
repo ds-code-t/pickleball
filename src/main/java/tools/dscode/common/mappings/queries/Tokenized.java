@@ -85,10 +85,6 @@ public final class Tokenized {
             q = q.substring(0, q.length() - 1);
         query = q;
 
-        if (q.contains("ROWS")) {
-            System.out.println("@@inputQuery: " + inputQuery);
-            System.out.println("@@isValueAssignmentKey? " + isValueAssignmentKey);
-        }
 
         directPath = !query.replaceAll("\\[-?\\d+\\]", "")
                 .replaceAll("\\*|%|\\{|\\(|^|<|>|=|\\.\\.|,|:", "[").contains("\\[");
@@ -177,10 +173,6 @@ public final class Tokenized {
     }
 
     public JsonNode setWithPath(JsonNode root, Object value) {
-        if (query.contains("ROWS")) {
-            System.out.println("@@setWithPath: " + getQuery);
-            System.out.println("@@setWithPath: " + tokens + " , val: " + value);
-        }
         boolean isRootNode = root.has(MapTypeKey);
         boolean containsTopArrayFlag = tokenCount > 1 && tokens.get(1).equals(topArrayFlag);
         boolean processTopArrayFlag = (isRootNode && tokenCount == 2 && containsTopArrayFlag);

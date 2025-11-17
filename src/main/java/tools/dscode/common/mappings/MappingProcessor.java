@@ -277,13 +277,11 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     @Override
     public Object get(Object key) {
-        System.out.println("@@get: " + key + "");
         if (key == null)
             throw new RuntimeException("key cannot be null");
         if (key instanceof String stringKey)
             return get(stringKey);
         for (NodeMap map : maps.values()) {
-            System.out.println("@@map: " + map + "");
             Object returnObj = map.get(String.valueOf(key));
             if (returnObj != null)
                 return returnObj;
@@ -293,11 +291,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
 
     public Object getAndResolve(Object key) {
-        System.out.println("@@getAndResolve: " + key + "");
         if (key == null)
             throw new RuntimeException("key cannot be null");
         Object returnObj = get(key);
-        System.out.println("@@returnObj: " + returnObj + "");
 
         return resolveWholeText(getStringValue(returnObj));
 
@@ -305,10 +301,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     public Object get(String key) {
-        System.out.println("@@getStringkey: " + key + "");
         Tokenized tokenized = new Tokenized(key);
         for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
-            System.out.println("@@map: " + map + "");
             if (map == null)
                 continue;
             Object replacement = map.get(tokenized);

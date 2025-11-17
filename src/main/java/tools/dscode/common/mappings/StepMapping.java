@@ -49,8 +49,6 @@ public class StepMapping {
     }
 
     public void copyParsingMap(ParsingMap parsingMap) {
-        System.out.println("@\n\n==@@copyParsingMap for step: " + this);
-        System.out.println("@@parsingMap.getMaps()11: " +parsingMap.getMaps());
         System.out.println("-------------");
         this.stepParsingMap.clear();
         this.stepParsingMap.keyOrder.clear();

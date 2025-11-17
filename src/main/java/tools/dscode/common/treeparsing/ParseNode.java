@@ -124,13 +124,11 @@ public class ParseNode {
 
 
     public void descendantsResolved(MatchNode self) {
-        System.out.println("\n@@descendantsResolved: " + self.name() + "");
         self.sortedChildren = new ArrayList<>(self.children.values());
         self.sortedChildren.sort(Comparator.comparingInt(m -> m.start));
 
         for (int i = 0; i < self.sortedChildren.size(); i++) {
             var n = self.sortedChildren.get(i);
-            System.out.println("@@child: " + n.name() + "  -position: " + i);
             n.position = i;
             n.previousSibling = (i > 0) ? self.sortedChildren.get(i - 1) : null;
             n.nextSibling = (i + 1 < self.sortedChildren.size()) ? self.sortedChildren.get(i + 1) : null;

@@ -18,7 +18,7 @@ public final class Main {
         // A few sample inputs to exercise the engine
         List<String> samples = List.of(
                 """
-                        click the Button
+                        click the Button , then click the Link 
                         """
 //                """
 //                        , I click the "Submit" Button with name of "finish"

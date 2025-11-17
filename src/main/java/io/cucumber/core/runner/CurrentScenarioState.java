@@ -4,6 +4,7 @@ import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
+import org.openqa.selenium.WebDriver;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
@@ -11,10 +12,12 @@ import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
 import tools.dscode.common.status.SoftExceptionInterface;
+import tools.dscode.registry.GlobalRegistry;
 
 import java.time.Duration;
 import java.util.List;
 
+import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getGherkinMessagesPickle;
 import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
@@ -25,6 +28,7 @@ import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_PASSING;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
 import static tools.dscode.common.annotations.DefinitionFlag.SKIP_CHILDREN;
 import static tools.dscode.common.util.Reflect.getProperty;
+import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
 
 public class CurrentScenarioState extends ScenarioMapping {
 
@@ -74,7 +78,23 @@ public class CurrentScenarioState extends ScenarioMapping {
             lifecycle.fire(Phase.AFTER_SCENARIO_FAIL);
         }
         lifecycle.fire(Phase.AFTER_SCENARIO_RUN);
+
+        scenarioRunCleanUp();
+
+        lifecycle.fire(Phase.AFTER_SCENARIO_CLEANUP);
     }
+
+    public void scenarioRunCleanUp() {
+        System.out.println("@scenarioRunCleanUp");
+        for (WebDriver driver : getScenarioWebDrivers()) {
+            System.out.println("@@Driver: " + driver);
+            if (driver == null) continue;
+            try {
+                driver.quit();
+            } catch (Exception ignored) {}
+        }
+    }
+
 
     public void runStep(StepExtension stepExtension) {
         currentStep = stepExtension;
@@ -153,6 +173,19 @@ public class CurrentScenarioState extends ScenarioMapping {
         if (stepExtension.stepFlags.contains(RUN_IF_SCENARIO_PASSING))
             return !isScenarioFailed();
         return !stepExtension.skipped;
+    }
+
+
+    //Singleton registration of object in both step nodes, and local register.
+    public static void registerScenarioObject(String key, Object value) {
+        getCurrentScenarioState().getCurrentStep().getStepNodeMap().put(key.toLowerCase(), value);
+        GlobalRegistry.putLocal(key, value);
+    }
+
+
+    public static Object getScenarioObject(String key) {
+       Object returnObject = getCurrentScenarioState().getCurrentStep().getStepParsingMap().get(key);
+       return returnObject == null ? GlobalRegistry.getLocal(key.toLowerCase()) : returnObject;
     }
 
 

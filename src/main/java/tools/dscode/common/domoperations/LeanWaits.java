@@ -1,16 +1,48 @@
 package tools.dscode.common.domoperations;
 
-import org.openqa.selenium.*;
+import org.openqa.selenium.ElementClickInterceptedException;
+import org.openqa.selenium.JavascriptException;
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.StaleElementReferenceException;
+import org.openqa.selenium.WebDriverException;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.FluentWait;
+import tools.dscode.common.annotations.Phase;
+import tools.dscode.common.treeparsing.MatchNode;
+import tools.dscode.common.treeparsing.PhraseExecution.*;
+import tools.dscode.common.treeparsing.*;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.function.Function;
+
+import static java.util.Arrays.stream;
 
 public final class LeanWaits {
 
     private LeanWaits() {}
+
+
+
+
+
+    public static void waitForPhraseEntities(ChromiumDriver driver, PhraseExecution parsingPhrase) {
+        waitForPageReady(driver, Duration.ofSeconds(60));
+        List<ElementMatch> elementMatches = parsingPhrase.getNextComponents(-1, "elementMatch").stream()
+                .map(c -> (ElementMatch)c)
+                .toList();
+
+        for(ElementMatch elementMatch : elementMatches){
+           elementMatch.findWebElements(driver);
+            for(WebElement element : elementMatch.matchedElements){
+                waitForElementReady(driver, element, Duration.ofSeconds(60));
+            }
+        }
+    }
+
+
 
     /**
      * Concise page readiness:
@@ -20,7 +52,7 @@ public final class LeanWaits {
     public static void waitForPageReady(ChromiumDriver driver, Duration timeout) {
         var wait = new FluentWait<>(driver)
                 .withTimeout(timeout)
-                .pollingEvery(Duration.ofMillis(200))
+                .pollingEvery(Duration.ofMillis(1000))
                 .ignoring(JavascriptException.class)
                 .ignoring(WebDriverException.class);
 
@@ -59,7 +91,7 @@ public final class LeanWaits {
                         "try{arguments[0].scrollIntoView({block:'center',inline:'center'});}catch(e){}", element);
 
                 // Small hover nudge for CSS :hover menus/tooltips
-                new Actions(d).moveToElement(element).pause(Duration.ofMillis(40)).perform();
+                new Actions(d).moveToElement(element).pause(Duration.ofMillis(100)).perform();
 
                 // JS hit-test at center (shadow DOM aware) + style checks
                 Boolean ok = (Boolean) ((JavascriptExecutor) d).executeScript(HIT_TEST_JS, element);

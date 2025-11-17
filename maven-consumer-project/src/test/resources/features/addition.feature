@@ -22,7 +22,6 @@ Feature: Addition
     * list
 
 
-
   Scenario: parm test 6
     * dataTable
       | A | bqqw  |
@@ -42,20 +41,9 @@ Feature: Addition
   Scenario: b test2
     Then print aaa
     Given get browser $(CHROME)
-    Then print bbb
-#    """
-#    {
-#      "args": ["--headless=new", "--window-size=1280,720"],
-#      "prefs": {
-#        "download.default_directory": "C:/temp"
-#      },
-#      "excludeSwitches": ["enable-automation"]
-#    }
-#    """
-
-#    * I open Chrome
-#    * chromium edge
-#    * chrome Chrome
+    Then navigate $(CHROME)
+      | http://google.com |
+    Then , click "Gmail" Link
 
 
   Scenario: nestTest

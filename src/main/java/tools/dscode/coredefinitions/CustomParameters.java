@@ -6,7 +6,6 @@ import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import org.openqa.selenium.edge.EdgeDriver;
 import tools.dscode.common.treeparsing.DictionaryA;
-import tools.dscode.common.treeparsing.LineExecution;
 
 public class CustomParameters {
 

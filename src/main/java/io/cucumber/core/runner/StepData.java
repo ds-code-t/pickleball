@@ -153,8 +153,6 @@ public abstract class StepData extends StepMapping {
 
         arguments = pickleStepTestStep == null || pickleStepTestStep.getDefinitionMatch() == null? new ArrayList<>() : pickleStepTestStep.getDefinitionMatch().getArguments();
         argument = arguments.isEmpty() || arguments.getLast() instanceof ExpressionArgument ? null: arguments.getLast();
-        System.out.println("@@arguments.size(): " + arguments.size());
-        System.out.println("@@argument: " + argument);
     }
 
     public abstract Result run();

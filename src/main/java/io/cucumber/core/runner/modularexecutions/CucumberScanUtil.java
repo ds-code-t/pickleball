@@ -60,15 +60,11 @@ public final class CucumberScanUtil {
         System.out.println("@@featurePathsOption: " + featurePathsOption + "");
         List<Feature> features = FEATURE_CACHE.computeIfAbsent(featurePathsOption, k ->
         {
-            System.out.println("\n@@Resolving " + FEATURE_CACHE);
-            System.out.println("@@featurePathsOption " + featurePathsOption);
-
             Map<String, String> featureOptions = new HashMap<>();
             featureOptions.put("cucumber.features", k);
             RuntimeOptions runtimeOptions = new CucumberPropertiesParser().parse(featureOptions).build();
             return parseFeatures(runtimeOptions);
         });;
-        System.out.println("zz@@features: " + features.size() + "");
         Map<String, String> cucumberProps = new HashMap<>();
         cucumberProps.put("cucumber.filter.tags", tagString);
         RuntimeOptions cucumberOptions = new CucumberPropertiesParser().parse(cucumberProps).build();

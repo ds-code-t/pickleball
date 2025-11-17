@@ -12,28 +12,27 @@ import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.DefinitionFlags;
 import tools.dscode.common.status.SoftRuntimeException;
-import tools.dscode.common.treeparsing.DictionaryA;
-import tools.dscode.common.treeparsing.LineExecution;
 
+
+import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import static io.cucumber.core.runner.CurrentScenarioState.getScenarioObject;
+import static io.cucumber.core.runner.CurrentScenarioState.registerScenarioObject;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.GlobalConstants.INFO_STEP;
-//import static tools.dscode.common.GlobalConstants.RETURN_STEP_FLAG;
 import static tools.dscode.common.GlobalConstants.ROOT_STEP;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.GlobalConstants.SOFT_ERROR_STEP;
-import static tools.dscode.common.domoperations.DriverFactory.createChromeDriver;
-import static tools.dscode.registry.GlobalRegistry.getLocal;
-import static tools.dscode.registry.GlobalRegistry.putLocal;
-import static tools.dscode.registry.GlobalRegistry.registerLocal;
+
+import static tools.dscode.common.domoperations.LeanWaits.waitForPageReady;
+
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.cucumber.java.en.Given;
-import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeOptions;
+
 
 public class GeneralSteps extends CoreSteps {
 
@@ -42,20 +41,35 @@ public class GeneralSteps extends CoreSteps {
 //        // step body here
 //    }
 
+    public static ChromiumDriver getBrowser(String browserName){
+        return (ChromiumDriver) returnStepParameter(browserName);
+    }
+
+    @Given("navigate {returnStepParameter}")
+    public void navigateBrowser(ChromiumDriver driver, List<String> list) {
+        driver.get(list.getFirst());
+        waitForPageReady(driver, Duration.ofSeconds(60));
+    }
+
+
     @ParameterType("\\$\\(([^()]+)\\)")
-    public Object returnStepParameter(String stepText) {
+    public static Object returnStepParameter(String stepText) {
         System.out.println("@@stepText1: " + stepText);
 
         String getKey = "";
         String putKey = "";
         if (stepText.contains(":")) {
             getKey = stepText.substring(0, stepText.indexOf(":"));
-            Object existingObject = getLocal(getKey);
-            if (existingObject != null) return existingObject;
-            stepText = stepText.substring(stepText.indexOf(":") + 2);
+            stepText = stepText.substring(stepText.indexOf(":") + 1);
+            Object existingObject2 = getScenarioObject(getKey);
+            if (existingObject2 != null) return existingObject2;
         } else if (stepText.contains("=")) {
             putKey = stepText.substring(0, stepText.indexOf("="));
-            stepText = stepText.substring(stepText.indexOf(":") + 2);
+            stepText = stepText.substring(stepText.indexOf("=") + 1);
+        }
+        else {
+            Object existingObject1 = getScenarioObject(stepText);
+            if (existingObject1 != null) return existingObject1;
         }
         stepText = "$" + stepText;
         System.out.println("@@stepText2: " + stepText);
@@ -70,12 +84,12 @@ public class GeneralSteps extends CoreSteps {
         Object returnValue = modifiedStep.runAndGetReturnValue();
         System.out.println("@@--returnValue: " + returnValue.getClass());
         if (!putKey.isEmpty()) {
-            putLocal(putKey, returnValue);
+            registerScenarioObject(putKey, returnValue);
             return returnValue;
         }
         if (getKey.isEmpty()) return returnValue;
 
-        putLocal(getKey, returnValue);
+        registerScenarioObject(getKey, returnValue);
         return returnValue;
     }
 
@@ -92,12 +106,16 @@ public class GeneralSteps extends CoreSteps {
         System.out.println("@@json: " + json);
         if (Objects.isNull(json)) throw new RuntimeException("Chrome Driver Configuration not found");
         Map<String, Object> config = MAPPER.readValue(json, Map.class);
-
+        System.out.println("@@config: " + config);
         ChromeOptions options = new ChromeOptions();
         options.setCapability("goog:chromeOptions", config);
 
         ChromeDriver chromeDriver = new ChromeDriver(options);
-        putLocal("chrome", chromeDriver);
+        System.out.println("@@chromeDriver1: " + chromeDriver);
+//        registerScenarioObject("chrome", chromeDriver);
+        System.out.println("@@11");
+        registerScenarioObject("browser", chromeDriver);
+        System.out.println("@@chromeDriver2: " + chromeDriver);
         return chromeDriver;
     }
 
