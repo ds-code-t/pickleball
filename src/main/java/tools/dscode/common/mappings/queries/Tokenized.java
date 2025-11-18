@@ -49,6 +49,23 @@ public final class Tokenized {
 
     public static final List<String> allowedMapNames = Arrays.stream(MapConfigurations.MapType.values()).map(Enum::name)
             .toList();
+    private static final Pattern SEGMENT_WITH_SPACES_PATTERN = Pattern.compile(
+            "(?:(?<=^)|(?<=[.\\]]))" +               // left boundary: BOS or . or ]
+                    "((?=[\\p{L}_][\\p{L}\\p{N}_ ]*[ ][\\p{L}\\p{N}_])[\\p{L}_][\\p{L}\\p{N}_ ]*[\\p{L}\\p{N}_])" +
+                    "(?=(?:$|[.\\[]))"   // right boundary: EOS or . or [
+    );
+
+    public static String wrapSegments(String expr) {
+        Matcher m = SEGMENT_WITH_SPACES_PATTERN.matcher(expr);
+        StringBuffer sb = new StringBuffer();
+
+        while (m.find()) {
+            String segment = m.group(1);
+            m.appendReplacement(sb, "`" + segment + "`");
+        }
+        m.appendTail(sb);
+        return sb.toString();
+    }
 
     public Tokenized(String inputQuery) {
         Matcher m = SUFFIX_PATTERN.matcher(inputQuery);
@@ -87,14 +104,18 @@ public final class Tokenized {
         isValueAssignmentKey = q.endsWith("=");
         if (isValueAssignmentKey)
             q = q.substring(0, q.length() - 1);
-        query = q;
+        query = wrapSegments(q);
 
 
         directPath = !query.replaceAll("\\[-?\\d+\\]", "")
                 .replaceAll("\\*|%|\\{|\\(|^|<|>|=|\\.\\.|,|:", "[").contains("\\[");
+        System.out.println("@@directPath: " + directPath);
         tokens = Arrays.stream(query.replaceAll("(\\[[^\\[\\]]*\\])", ".$1").split("\\.")).collect(Collectors.toList());
+        System.out.println("@@tokens: " + tokens);
         tokenCount = tokens.size();
         getQuery = query.replaceAll("\\." + topArrayFlag, "");
+        System.out.println("@@getQuery: " + getQuery);
+
     }
 
     public static String rewrite(String input) {
@@ -151,7 +172,9 @@ public final class Tokenized {
 
     public static JsonNode getWithPath(JsonNode root, String passedQuery) {
         try {
+            System.out.println("@@passedQuery: " + passedQuery);
             Expressions e = Expressions.parse(passedQuery.replaceAll("\\[\\*\\]", ""));
+            System.out.println("@@e: " + e);
             return e.evaluate(root);
         } catch (ParseException | IOException | EvaluateException ex) {
             return null;
@@ -218,7 +241,7 @@ public final class Tokenized {
                     currentNode = setProperty(objectNode, token, valueToSet);
                 } else {
                     throw new RuntimeException(
-                        "Cannot set '" + currentNode + "'. JsonNode needs to be ArrayNode or ObjectNode");
+                            "Cannot set '" + currentNode + "'. JsonNode needs to be ArrayNode or ObjectNode");
                 }
             }
         } else {

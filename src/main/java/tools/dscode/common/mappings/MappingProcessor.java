@@ -300,10 +300,12 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     public Object get(String key) {
         Tokenized tokenized = new Tokenized(key);
+        System.out.println("@@tokenized: " + tokenized.query);
         for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
             if (map == null)
                 continue;
             Object replacement = map.get(tokenized);
+            System.out.println("@@replacement: " + replacement);
             if (replacement != null) {
                 return replacement;
             }

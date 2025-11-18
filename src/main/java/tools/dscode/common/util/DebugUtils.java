@@ -12,7 +12,7 @@ public class DebugUtils {
 
 
     static {
-//        prefixes.add("@@");
+        prefixes.add("@@");
 
     }
 

@@ -43,7 +43,9 @@ Feature: Addition
     Given get browser $(CHROME)
     @[DEBUG] Then navigate $(CHROME)
       | http://google.com |
-    Then , click "Gmail" Link, and wait 1 seconds
+#    Then , click "Gmail" Link, and wait 1 seconds
+    * navigate to: urls.test A
+    Then , wait 4 seconds
 
 
   Scenario: nestTest
