@@ -14,7 +14,7 @@ import static tools.dscode.coredefinitions.GeneralSteps.getBrowser;
 public class NavigationSteps {
 
     @When("set {returnStepParameter}")
-    public void setBrowser(String config) {
+    public void setObject(Object object, String config) {
     }
 
     @When("^navigate to: (.*)$")
