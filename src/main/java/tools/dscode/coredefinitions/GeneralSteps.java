@@ -5,6 +5,7 @@ import io.cucumber.core.runner.StepExtension;
 import io.cucumber.core.stepexpression.DocStringArgument;
 import io.cucumber.java.ParameterType;
 import io.cucumber.java.en.Given;
+import org.openqa.selenium.MutableCapabilities;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.chromium.ChromiumDriver;
@@ -14,6 +15,7 @@ import tools.dscode.common.annotations.DefinitionFlags;
 import tools.dscode.common.status.SoftRuntimeException;
 
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -28,6 +30,7 @@ import static tools.dscode.common.GlobalConstants.ROOT_STEP;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.GlobalConstants.SOFT_ERROR_STEP;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPageReady;
+import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort;
 import static tools.dscode.common.domoperations.SeleniumUtils.portFromString;
 import static tools.dscode.common.util.DebugUtils.printDebug;
 
@@ -99,22 +102,21 @@ public class GeneralSteps extends CoreSteps {
         String json = currentStep.argument == null || !(currentStep.argument instanceof DocStringArgument) ? (String) currentStep.getStepParsingMap().getAndResolve("configs.chrome") : currentStep.argument.getValue().toString();
         printDebug("@@json: " + json);
         if (Objects.isNull(json)) throw new RuntimeException("Chrome Driver Configuration not found");
-        Map<String, Object> config = MAPPER.readValue(json, Map.class);
-        printDebug("@@config: " + config);
+        Map<String, Object> ChromiumOptions = MAPPER.readValue(json, Map.class);
+        printDebug("@@config: " + ChromiumOptions);
         ChromeOptions options = new ChromeOptions();
-        options.setCapability("goog:chromeOptions", config);
-
+        options.setCapability("goog:chromeOptions", ChromiumOptions);
+        System.out.println("@@getCurrentScenarioState().debugBrowser: " + getCurrentScenarioState().debugBrowser);
         if(getCurrentScenarioState().debugBrowser) {
-            String port = (String) currentStep.getStepNodeMap().get("_getKey");
-            if(port == null) port = "chrome";
-            options.setExperimentalOption("debuggerAddress", "127.0.0.1:" + portFromString(port));
-            options.setExperimentalOption("detach", true);   // keep browser open after test
-            options.setCapability("dontQuit", true);
+            String name = (String) currentStep.getStepNodeMap().get("_getKey");
+            if(name == null) name = "chrome";
+            System.out.println("@@port: " + name);
+            System.out.println("@@port2: " + portFromString(name));
+            options = ensureDevToolsPort(options, name);
         }
 
         ChromeDriver chromeDriver = new ChromeDriver(options);
         printDebug("@@chromeDriver1: " + chromeDriver);
-//        registerScenarioObject("chrome", chromeDriver);
         printDebug("@@11");
         registerScenarioObject("browser", chromeDriver);
         printDebug("@@chromeDriver2: " + chromeDriver);

@@ -5,6 +5,7 @@ import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chromium.ChromiumDriver;
+import org.openqa.selenium.chromium.ChromiumOptions;
 import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.mappings.MapConfigurations;
@@ -57,7 +58,11 @@ public class CurrentScenarioState extends ScenarioMapping {
     public void startScenarioRun() {
         lifecycle.fire(Phase.BEFORE_SCENARIO_RUN);
         this.stepExtensions = (List<StepExtension>) getProperty(testCase, "stepExtensions");
-        startStep = stepExtensions.stream().filter(s -> s.debugStartStep).findFirst().orElse(testCase.getRootScenarioStep());
+        startStep = stepExtensions.stream().filter(s -> s.debugStartStep).findFirst().orElse(null);
+        if (startStep == null)
+            startStep = testCase.getRootScenarioStep();
+        else
+            debugBrowser = true;
         testCase.getRootScenarioStep().runMethodDirectly = true;
 //        StepExtension rootScenarioStep = testCase.getRootScenarioStep();
         Pickle gherkinMessagesPickle = (Pickle) getProperty(testCase, "pickle");
@@ -92,10 +97,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         for (WebDriver driver : getScenarioWebDrivers()) {
             printDebug("@@Driver: " + driver);
             if (driver == null) continue;
-            boolean dontQuit = driver instanceof ChromiumDriver chromiumDriver ?
-                    Boolean.TRUE.equals(chromiumDriver.getCapabilities().getCapability("dontQuit")) : false;
-
-            if (!dontQuit) {
+            if (!debugBrowser) {
                 try {
                     driver.quit();
                 } catch (Exception ignored) {
