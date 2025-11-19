@@ -12,8 +12,8 @@ public class DebugUtils {
 
 
     static {
-        prefixes.add("@@");
-
+//        prefixes.add("@@");
+        substrings.add("@@##");
     }
 
     public static void printDebug(String message) {

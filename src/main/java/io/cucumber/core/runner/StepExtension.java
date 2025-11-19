@@ -149,14 +149,14 @@ public class StepExtension extends StepData {
     }
 
     public StepExtension modifyStepExtension(String newText) {
-        return new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep, pickleStepTestStep.getStep().getKeyword(), newText, getGherkinArgumentText(pickleStepTestStep.getStep())));
+        StepExtension modifiedStep = new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep, pickleStepTestStep.getStep().getKeyword(), newText, getGherkinArgumentText(pickleStepTestStep.getStep())));
+        modifiedStep.setStepParsingMap(getStepParsingMap());
+        return modifiedStep;
     }
 
 
     public PickleStepTestStep resolveAndClone(ParsingMap parsingMap) {
-        System.out.println("@@resolveAndClone: " + pickleStepTestStep.getUri());
         PickleStepTestStep clonePickleStepTestStep = resolvePickleStepTestStep(pickleStepTestStep, parsingMap);
-        printDebug("@@getStepLine: " + clonePickleStepTestStep.getStepLine());
         return clonePickleStepTestStep;
     }
 
@@ -169,11 +169,15 @@ public class StepExtension extends StepData {
     }
 
     public StepExtension cloneWithOverrides(String newText, PickleStepArgument newPickleStepArgument) {
-        return new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep.getStep().getKeyword(), newText, argumentToGherkinText(newPickleStepArgument)));
+        StepExtension modifiedStep = new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep.getStep().getKeyword(), newText, argumentToGherkinText(newPickleStepArgument)));
+        modifiedStep.setStepParsingMap(getStepParsingMap());
+        return modifiedStep;
     }
 
     public StepExtension cloneWithOverrides(String newText) {
-        return new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep.getStep().getKeyword(), newText, argumentToGherkinText(pickleStepTestStep.getPickleStep().getArgument().orElse(null))));
+        StepExtension modifiedStep = new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep.getStep().getKeyword(), newText, argumentToGherkinText(pickleStepTestStep.getPickleStep().getArgument().orElse(null))));
+        modifiedStep.setStepParsingMap(getStepParsingMap());
+        return modifiedStep;
     }
 
 //    public  PickleStepTestStep resolveAndClone(String stepText,  ParsingMap parsingMap) {

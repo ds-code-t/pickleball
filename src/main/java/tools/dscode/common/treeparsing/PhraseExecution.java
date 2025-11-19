@@ -63,9 +63,6 @@ public class PhraseExecution {
     }
 
     public PhraseExecution initiateNextPhraseExecution(MatchNode phraseNode) {
-        printDebug("@@initiateNextPhraseExecution: " + phraseNode.modifiedText());
-        printDebug("@@phraseType-initial : " + text);
-        printDebug("@@phraseType-initialphraseType  : " + phraseType);
         PhraseExecution pe = new PhraseExecution(phraseNode);
         if (phraseType != null && !phraseType.equals(PhraseType.INITIAL)) {
             pe.executedPhrases.addAll(executedPhrases);
@@ -80,8 +77,6 @@ public class PhraseExecution {
                 pe.passedXPathy = pe.contextXPathy;
             }
         }
-        printDebug("@@pe.text: " + pe.text);
-        printDebug("@@pe.phraseType: " + pe.phraseType);
         if (pe.phraseType.equals(PhraseType.ASSERTION) || pe.phraseType.equals(PhraseType.ACTION))
             pe.runPhrase();
 
@@ -98,7 +93,6 @@ public class PhraseExecution {
 //        this.previousPhraseNode = previousPhraseNode;
         this.phraseNode = phraseNode;
         text = phraseNode.toString();
-        printDebug("@@PhraseExecution-text: " + text);
 
         conjunction = phraseNode.resolvedGroupText("conjunctions");
         termination = phraseNode.resolvedGroupText("termination");
@@ -135,11 +129,6 @@ public class PhraseExecution {
             }
         }
 
-        printDebug("@@PhraseExecutipn-text:  " + text);
-        printDebug("@@action:  " + action);
-        printDebug("@@phraseType:  " + phraseType);
-        printDebug("@@context:  " + context);
-        printDebug("@@assertionType:  " + assertionType);
 
         components = phraseNode.getOrderedChildren("elementMatch", "valueMatch").stream().map(m -> {
             if (m.name().equals("valueMatch"))
@@ -244,9 +233,6 @@ public class PhraseExecution {
             this.type = elementNode.resolvedGroupText("type");
             this.elementPosition = elementNode.resolvedGroupText("elementPosition");
             this.selectionType = elementNode.resolvedGroupText("selectionType");
-            printDebug("@@elementNode: " + this);
-            printDebug("@@elementNode text: " +  text);
-            printDebug("@@elementNode type: " +  type);
             try {
                 this.elementType = ElementType.valueOf(type.toUpperCase());
             } catch (IllegalArgumentException ignored) {
@@ -271,7 +257,6 @@ public class PhraseExecution {
                     case String s when s.startsWith("start") -> XPathyRegistry.Op.STARTS_WITH;
                     default -> null;
                 };
-                printDebug("@@interXPathy: " + xPathy + "  -op: " + op + "  -attribute: " + attribute + "");
                 if (attribute.attrName.equals("TEXT"))
                     xPathy = applyTextOp(xPathy, op, text);
                 else

@@ -21,7 +21,6 @@ public class ConditionalSteps extends CoreSteps {
 
     @Given("^((?:IF:|ELSE:|ELSE-IF:|THEN:).*)$")
     public static void runConditional(String inputString) {
-        printDebug("@@runConditional: " + inputString);
         StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
         if (inputString.startsWith("ELSE")) {
             if (!currentStep.previousSibling.getConditionalStates()
@@ -40,9 +39,7 @@ public class ConditionalSteps extends CoreSteps {
                     inputString = inputString.replaceFirst("ELSE-IF:", "IF: ");
             }
         }
-        printDebug("@@runConditional: " + inputString);
         String evaluatedString = currentStep.evalWithStepMaps(inputString);
-        printDebug("@@evaluatedString: " + evaluatedString);
         if (evaluatedString.equals("false")) {
             currentStep.addConditionalStates(StepData.ConditionalStates.FALSE);
             currentStep.addDefinitionFlag(SKIP_CHILDREN);
@@ -53,7 +50,6 @@ public class ConditionalSteps extends CoreSteps {
         } else {
             currentStep.addDefinitionFlag(SKIP_CHILDREN);
             StepExtension modifiedStep = currentStep.modifyStepExtension(evaluatedString);
-            printDebug("@@modifiedStep: " + modifiedStep);
             modifiedStep.addConditionalStates(StepData.ConditionalStates.TRUE);
             currentStep.attachedSteps.add(modifiedStep);
         }

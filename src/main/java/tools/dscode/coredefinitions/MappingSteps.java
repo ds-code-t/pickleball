@@ -28,10 +28,8 @@ public class MappingSteps extends CoreSteps {
     // @NoLogging
     @Given("^For every ROW in (:?\"(.*)\"\\s+)?DATA TABLE$")
     public static void forEveryRow(String tableName) {
-        printDebug("@@forEverRow!!");
 
         StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
-        printDebug("@@getCurrentStep: " + currentStep);
         DataTable dataTable = currentStep.getDataTable();
         tableName = tableName == null || tableName.isBlank() ? "" : tableName.trim();
         if (tableName.isEmpty()) {
@@ -53,8 +51,7 @@ public class MappingSteps extends CoreSteps {
 
         List<LinkedListMultimap<String, String>> rows = rowMap.get("ROWS");
         currentStep.put("ROWS=", rows);
-        System.out
-                .println("@currentStepgetStepParsingMap get(\"ROWS\") " + currentStep.getStepParsingMap().get("ROWS"));
+
         StepExtension lastSibling = null;
         StepExtension currentSibling = null;
 

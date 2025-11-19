@@ -22,9 +22,6 @@ public privileged aspect StepResultCapture {
 
     // After the Result is created, stash it on the step instance
     after(TestStep step) returning (Result r) : mapToResult(step) {
-        printDebug("@@mapToResult: " + ((io.cucumber.core.runner.PickleStepTestStep) step).getStepText() + "");
-        printDebug("@@_lastResult: " + r);
-
         step._lastResult = r;
     }
 }

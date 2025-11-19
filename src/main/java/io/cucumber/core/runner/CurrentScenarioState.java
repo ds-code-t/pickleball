@@ -4,8 +4,6 @@ import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.chromium.ChromiumDriver;
-import org.openqa.selenium.chromium.ChromiumOptions;
 import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.mappings.MapConfigurations;
@@ -58,26 +56,34 @@ public class CurrentScenarioState extends ScenarioMapping {
     public void startScenarioRun() {
         lifecycle.fire(Phase.BEFORE_SCENARIO_RUN);
         this.stepExtensions = (List<StepExtension>) getProperty(testCase, "stepExtensions");
+        StepExtension rootScenarioStep = testCase.getRootScenarioStep();
+        rootScenarioStep.setStepParsingMap(getParsingMap());
         startStep = stepExtensions.stream().filter(s -> s.debugStartStep).findFirst().orElse(null);
-        if (startStep == null)
-            startStep = testCase.getRootScenarioStep();
-        else
+        if (startStep != null) {
+            rootScenarioStep.childSteps.clear();
+            StepExtension currentStep = startStep;
+            while (currentStep != null) {
+                rootScenarioStep.childSteps.add(currentStep);
+                currentStep = (StepExtension) currentStep.nextSibling;
+            }
             debugBrowser = true;
+        }
         testCase.getRootScenarioStep().runMethodDirectly = true;
-//        StepExtension rootScenarioStep = testCase.getRootScenarioStep();
         Pickle gherkinMessagesPickle = (Pickle) getProperty(testCase, "pickle");
         io.cucumber.messages.types.Pickle pickle = (io.cucumber.messages.types.Pickle) getProperty(gherkinMessagesPickle, "pickle");
-        startStep.setStepParsingMap(getParsingMap());
+        put("@@startFlag", "startFlag!");
+//
         if (pickle.getValueRow() != null && !pickle.getValueRow().isEmpty()) {
             NodeMap examples = new NodeMap(MapConfigurations.MapType.EXAMPLE_MAP);
             examples.merge(pickle.getHeaderRow(), pickle.getValueRow());
-            startStep.getStepParsingMap().addMaps(examples);
+            rootScenarioStep.getStepParsingMap().addMaps(examples);
         }
+
 //        rootScenarioStep.addDefinitionFlag(DefinitionFlag.NO_LOGGING);
         testCaseState = getTestCaseState();
 //        rootScenarioStep.runMethodDirectly = true;
         try {
-            runStep(startStep);
+            runStep(rootScenarioStep);
             if (isScenarioFailed())
                 lifecycle.fire(Phase.AFTER_SCENARIO_FAIL);
             else
@@ -93,9 +99,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void scenarioRunCleanUp() {
-        printDebug("@@scenarioRunCleanUp");
         for (WebDriver driver : getScenarioWebDrivers()) {
-            printDebug("@@Driver: " + driver);
             if (driver == null) continue;
             if (!debugBrowser) {
                 try {
@@ -108,6 +112,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
     public void runStep(StepExtension stepExtension) {
+        System.out.println("Running " + stepExtension);
         currentStep = stepExtension;
         if (!shouldRun(stepExtension)) return;
 
@@ -190,8 +195,6 @@ public class CurrentScenarioState extends ScenarioMapping {
     //Singleton registration of object in both step nodes, and local register.
     public static void registerScenarioObject(String key, Object value) {
         key = normalizeRegistryKey(key);
-        printDebug("@@registerScenarioObject: " + key + "");
-        printDebug("@@value: " + value + "");
         getCurrentScenarioState().getCurrentStep().getStepNodeMap().put(key, value);
         GlobalRegistry.putLocal(key, value);
     }

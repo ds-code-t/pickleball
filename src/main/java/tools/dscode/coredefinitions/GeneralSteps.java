@@ -55,7 +55,6 @@ public class GeneralSteps extends CoreSteps {
 
     @ParameterType("\\$\\(([^()]+)\\)")
     public static Object returnStepParameter(String stepText) {
-        printDebug("@@stepText1: " + stepText);
 
         String getKey = "";
         if (stepText.contains(":")) {
@@ -69,19 +68,13 @@ public class GeneralSteps extends CoreSteps {
             if (existingObject != null) return existingObject;
         }
         stepText = "$" + stepText;
-        printDebug("@@stepText2: " + stepText);
         StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
-        printDebug("@@currentStep: " + currentStep);
         StepExtension modifiedStep = currentStep.modifyStepExtension(stepText);
-        printDebug("@@currentStep.argument== " + currentStep.argument);
-        printDebug("@@modifiedStep.argument== " + modifiedStep.argument);
         modifiedStep.argument = currentStep.argument;
         if(!getKey.isEmpty())
             modifiedStep.put("_getKey" , normalizeRegistryKey(getKey));
 
-        printDebug("@@modifiedStep: " + modifiedStep);
         Object returnValue = modifiedStep.runAndGetReturnValue();
-        printDebug("@@--returnValue: " + returnValue.getClass());
         registerScenarioObject(stepText, returnValue);
 
         if (getKey.isEmpty()) return returnValue;
@@ -95,31 +88,20 @@ public class GeneralSteps extends CoreSteps {
     //    @Given("(?i)^@chrome$")
     @Given("$CHROME")
     public ChromeDriver getChrome() throws Exception {
-        printDebug("@@getChrome");
         StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
-        printDebug("@@currentStep: " + currentStep);
-        printDebug("@@currentStep.argument.: " + currentStep.argument);
         String json = currentStep.argument == null || !(currentStep.argument instanceof DocStringArgument) ? (String) currentStep.getStepParsingMap().getAndResolve("configs.chrome") : currentStep.argument.getValue().toString();
-        printDebug("@@json: " + json);
         if (Objects.isNull(json)) throw new RuntimeException("Chrome Driver Configuration not found");
         Map<String, Object> ChromiumOptions = MAPPER.readValue(json, Map.class);
-        printDebug("@@config: " + ChromiumOptions);
         ChromeOptions options = new ChromeOptions();
         options.setCapability("goog:chromeOptions", ChromiumOptions);
-        System.out.println("@@getCurrentScenarioState().debugBrowser: " + getCurrentScenarioState().debugBrowser);
         if(getCurrentScenarioState().debugBrowser) {
             String name = (String) currentStep.getStepNodeMap().get("_getKey");
             if(name == null) name = "chrome";
-            System.out.println("@@port: " + name);
-            System.out.println("@@port2: " + portFromString(name));
             options = ensureDevToolsPort(options, name);
         }
 
         ChromeDriver chromeDriver = new ChromeDriver(options);
-        printDebug("@@chromeDriver1: " + chromeDriver);
-        printDebug("@@11");
         registerScenarioObject("browser", chromeDriver);
-        printDebug("@@chromeDriver2: " + chromeDriver);
         return chromeDriver;
     }
 

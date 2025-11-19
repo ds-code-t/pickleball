@@ -4,6 +4,8 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+import static tools.dscode.common.util.DebugUtils.printDebug;
+
 /**
  * GlobalMappings Identical to NodeMap, but the public getters/setters are made
  * thread-safe: - put(...): write-locked - get(...), getPojo(...): read-locked
@@ -19,7 +21,7 @@ public class GlobalMappings extends NodeMap {
     private GlobalMappings() {
         super(MapConfigurations.MapType.GLOBAL_NODE);
         root.set(rootDirectory, FileAndDataParsing.buildJsonFromPath(rootDirectory));
-        System.out.println("@@GLOBALS: " + root);
+        printDebug("@@GLOBALS: " + root);
     }
 
     private final ReadWriteLock rw = new ReentrantReadWriteLock();

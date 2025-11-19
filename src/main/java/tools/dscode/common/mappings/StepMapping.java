@@ -9,6 +9,7 @@ import java.util.Set;
 
 import static tools.dscode.common.evaluations.AviatorUtil.eval;
 import static tools.dscode.common.mappings.MapConfigurations.MapType.STEP_MAP;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public class StepMapping {
 
@@ -35,9 +36,13 @@ public class StepMapping {
     }
 
     public void setStepParsingMap(ParsingMap stepParsingMap) {
+
         copyParsingMap(stepParsingMap);
-        // this.stepParsingMap = stepParsingMap;
+
+
+
         this.stepParsingMap.addMaps(stepNodeMap);
+
     }
 
     public void addToStepParsingMap(NodeMap... nodes) {
@@ -49,7 +54,6 @@ public class StepMapping {
     }
 
     public void copyParsingMap(ParsingMap parsingMap) {
-        System.out.println("-------------");
         this.stepParsingMap.clear();
         this.stepParsingMap.keyOrder.clear();
         if (this instanceof ScenarioStep) {

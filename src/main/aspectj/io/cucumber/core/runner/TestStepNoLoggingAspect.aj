@@ -69,8 +69,6 @@ public privileged aspect TestStepNoLoggingAspect {
                 Instant start)
             : emitStartedExec(step, tc, bus, execId, start)
             {
-                printDebug("@@emitStartedExec: " + ((io.cucumber.core.runner.PickleStepTestStep) step).getStepText() + "");
-                printDebug("@@step.noLogging: " + step.noLogging);
                 if (step.noLogging) {
                     return; // suppressed
                 }
@@ -86,8 +84,6 @@ public privileged aspect TestStepNoLoggingAspect {
                 io.cucumber.plugin.event.Result result)
             : emitFinishedExec(step, tc, bus, execId, stop, duration, result)
             {
-                printDebug("@@emitFinishedExec: " + ((io.cucumber.core.runner.PickleStepTestStep) step).getStepText() + "");
-                printDebug("@@step.noLogging: " + step.noLogging);
 
                 if (step.noLogging) {
                     return; // suppressed

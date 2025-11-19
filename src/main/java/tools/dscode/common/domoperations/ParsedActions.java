@@ -36,11 +36,9 @@ public class ParsedActions {
         if (!action.equals("wait") && nextElements.isEmpty())
             throw new RuntimeException("No elements found for " + action);
 
-        printDebug("@@action: " + action);
         switch (action) {
             case String s when s.contains("click") -> {
                 for (WebElement nextElement : nextElements) {
-                    printDebug("@@click: " + nextElement);
                     click(driver, nextElement);
                 }
             }
@@ -65,7 +63,6 @@ public class ParsedActions {
                 }
             }
             case String s when s.contains("wait") -> {
-                printDebug("@@nextValue.value: " + nextValue.value);
                 explicitWait(Long.parseLong(nextValue.value.replace("\"|'|`", "")));
             }
             case String s when s.contains("overwrite") -> {

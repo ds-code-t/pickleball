@@ -109,12 +109,9 @@ public final class Tokenized {
 
         directPath = !query.replaceAll("\\[-?\\d+\\]", "")
                 .replaceAll("\\*|%|\\{|\\(|^|<|>|=|\\.\\.|,|:", "[").contains("\\[");
-        System.out.println("@@directPath: " + directPath);
         tokens = Arrays.stream(query.replaceAll("(\\[[^\\[\\]]*\\])", ".$1").split("\\.")).collect(Collectors.toList());
-        System.out.println("@@tokens: " + tokens);
         tokenCount = tokens.size();
         getQuery = query.replaceAll("\\." + topArrayFlag, "");
-        System.out.println("@@getQuery: " + getQuery);
 
     }
 
@@ -172,9 +169,7 @@ public final class Tokenized {
 
     public static JsonNode getWithPath(JsonNode root, String passedQuery) {
         try {
-            System.out.println("@@passedQuery: " + passedQuery);
             Expressions e = Expressions.parse(passedQuery.replaceAll("\\[\\*\\]", ""));
-            System.out.println("@@e: " + e);
             return e.evaluate(root);
         } catch (ParseException | IOException | EvaluateException ex) {
             return null;
@@ -216,14 +211,8 @@ public final class Tokenized {
             for (int i = 0; i < tokenCount; i++) {
                 String token = tokens.get(i);
                 String nextToken = i + 1 < tokenCount ? tokens.get(i + 1) : null;
-                printDebug("@@value: " + value);
                 Object valueToSet = nextToken == null ? toSafeJsonNode(value)
                         : processTopArrayFlag || nextToken.startsWith("[") ? ArrayNode.class : ObjectNode.class;
-                printDebug("@@valueToSet: " + valueToSet);
-
-                // if (isValueAssignmentKey && i == (tokenCount - 1)) {
-                //
-                // } else
 
                 if (currentNode instanceof ArrayNode arrayNode) {
                     if (i == 1 && processTopArrayFlag)

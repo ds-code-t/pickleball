@@ -106,7 +106,6 @@ public class DictionaryA extends NodeDictionary {
     ParseNode phrase = new ParseNode("(?<conjunction>\\b(?:and|or)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>[^" + punc + "]+)(?<punc>[" + punc + "])?") {
         @Override
         public String onCapture(MatchNode self) {
-            printDebug("@@phrase onCapture: " + self.originalText());
             self.putToLocalState("context", self.resolvedGroupText("context"));
             self.putToLocalState("conjunctions", self.resolvedGroupText("conjunctions"));
             String termination = self.resolvedGroupText("punc");

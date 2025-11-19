@@ -38,7 +38,6 @@ public final class CucumberScanUtil {
     public static synchronized String getGlobalFeaturePathsString() {
         if (globalFeaturePathsString == null) {
             List<String> features = features().stream().map(FilePathResolver::toAbsoluteFileUri).toList();
-            printDebug("@@features: " + features + "");
             globalFeaturePathsString = features.isEmpty() ? normalizeKey(List.of(DEFAULT_FEATURE_DIRS)) : normalizeKey(features);
         }
         return globalFeaturePathsString;
@@ -56,7 +55,6 @@ public final class CucumberScanUtil {
 
     public static List<Pickle> listPicklesByTags(String tagString) {
         String featurePathsOption = getGlobalFeaturePathsString();
-        printDebug("@@featurePathsOption: " + featurePathsOption + "");
         List<Feature> features = FEATURE_CACHE.computeIfAbsent(featurePathsOption, k ->
         {
             Map<String, String> featureOptions = new HashMap<>();

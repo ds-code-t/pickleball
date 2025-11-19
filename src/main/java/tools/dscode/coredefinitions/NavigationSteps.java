@@ -9,23 +9,21 @@ import org.openqa.selenium.chromium.ChromiumDriver;
 
 import static io.cucumber.core.runner.CurrentScenarioState.getScenarioObject;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 import static tools.dscode.coredefinitions.GeneralSteps.getBrowser;
 
 public class NavigationSteps {
 
     @When("set {returnStepParameter}")
     public void setObject(Object object, String config) {
+
     }
 
     @When("^navigate to: (.*)$")
     public void i_navigate_to(String text) {
         text = "configs." + text;
-        System.out.println("@@i_navigate_to: " + text + "");
         WebDriver driver = (WebDriver) getScenarioObject("browser");
-        System.out.println("@@driver: " + driver + "");
         StepExtension stepExtension = getCurrentScenarioState().getCurrentStep();
-        System.out.println("@@before Get ");
-        System.out.println("@@before Get=getAndResolve " + stepExtension.getStepParsingMap().getAndResolve(text));
         driver.get((String) stepExtension.getStepParsingMap().getAndResolve(text));
     }
 }

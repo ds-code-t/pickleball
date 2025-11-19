@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static tools.dscode.common.util.DebugUtils.printDebug;
+
 
 public abstract class StepData extends StepMapping {
     public io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep;
@@ -31,6 +33,7 @@ public abstract class StepData extends StepMapping {
     public String overrideLoggingText = null;
     List<Argument> arguments;
     public Argument argument;
+
     public int getNestingLevel() {
         return nestingLevel;
     }
@@ -110,6 +113,7 @@ public abstract class StepData extends StepMapping {
             childSteps.addAll(grandChildrenSteps);
             grandChildrenSteps = new ArrayList<>();
         }
+
         StepData lastChild = null;
         for (StepData child : childSteps) {
             child.childSteps.addAll(grandChildrenSteps);
@@ -149,8 +153,8 @@ public abstract class StepData extends StepMapping {
             codeLocation = "";
         isCoreStep = codeLocation.startsWith(corePackagePath);
 
-        arguments = pickleStepTestStep == null || pickleStepTestStep.getDefinitionMatch() == null? new ArrayList<>() : pickleStepTestStep.getDefinitionMatch().getArguments();
-        argument = arguments.isEmpty() || arguments.getLast() instanceof ExpressionArgument ? null: arguments.getLast();
+        arguments = pickleStepTestStep == null || pickleStepTestStep.getDefinitionMatch() == null ? new ArrayList<>() : pickleStepTestStep.getDefinitionMatch().getArguments();
+        argument = arguments.isEmpty() || arguments.getLast() instanceof ExpressionArgument ? null : arguments.getLast();
     }
 
     public abstract Result run();

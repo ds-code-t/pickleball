@@ -41,8 +41,11 @@ Feature: Addition
   Scenario: b test2
     Then print aaa
   @[DEBUG] Then print aaa
+    Then SET TABLE VALUES
+    | suffix |
+    |  usera    |
    Given set $(CHROME)
-  * navigate to: urls.test A
+  * navigate to: URL.test A
      Then print aaa
 #    Given get browser $(CHROME)
 #      | http://google.com |

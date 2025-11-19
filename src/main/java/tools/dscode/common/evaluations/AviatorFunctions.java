@@ -98,7 +98,6 @@ public class AviatorFunctions {
 
         @Override
         public AviatorObject variadicCall(Map<String, Object> env, AviatorObject... args) {
-            printDebug("@@GetBool " + Arrays.stream(args).toList());
             if (args == null || args.length == 0) {
                 return AviatorBoolean.FALSE;
             }

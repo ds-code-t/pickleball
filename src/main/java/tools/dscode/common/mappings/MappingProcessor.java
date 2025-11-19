@@ -19,6 +19,7 @@ import static tools.dscode.common.evaluations.AviatorUtil.eval;
 import static tools.dscode.common.evaluations.AviatorUtil.evalToBoolean;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.mappings.NodeMap.MAPPER;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 import static tools.dscode.common.util.StringUtilities.decodeBackToText;
 import static tools.dscode.common.util.StringUtilities.encodeToPlaceHolders;
 
@@ -224,7 +225,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     private String resolveByMap(String s) {
-
+        printDebug("@@resolveByMap: " + s + "");
         String key = null;
         try {
             Matcher m = ANGLE.matcher(s);
@@ -292,7 +293,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
         if (key == null)
             throw new RuntimeException("key cannot be null");
         Object returnObj = get(key);
-
         return resolveWholeText(getStringValue(returnObj));
 
 
@@ -300,12 +300,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     public Object get(String key) {
         Tokenized tokenized = new Tokenized(key);
-        System.out.println("@@tokenized: " + tokenized.query);
         for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
             if (map == null)
                 continue;
             Object replacement = map.get(tokenized);
-            System.out.println("@@replacement: " + replacement);
             if (replacement != null) {
                 return replacement;
             }

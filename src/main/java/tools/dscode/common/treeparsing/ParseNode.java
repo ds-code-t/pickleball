@@ -178,9 +178,7 @@ public class ParseNode {
             StringBuilder newMasked = new StringBuilder(parentSnapshot.length());
             int lastEnd = 0;
             int occurrence = 1;
-            printDebug("@@Attempting child " + childDef.getName() + " regex=" + childDef.getRegexPattern() + " against=\"" + parentSnapshot + "\"");
             while (m.find()) {
-                printDebug("@@Matched " + childDef.getName() + ": \"" + m.group() + "\"");
                 if (m.start() > lastEnd) {
                     newMasked.append(parentSnapshot, lastEnd, m.start());
                 }
