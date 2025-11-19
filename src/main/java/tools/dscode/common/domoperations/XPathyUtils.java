@@ -283,4 +283,60 @@ public final class XPathyUtils {
 
         return new XPathy(current);
     }
+
+
+    /**
+     * Returns an XPathy that matches any element whose *flattened* text content
+     * (including all descendants) equals the given text, after:
+     *  - converting tabs/newlines/NBSP to spaces
+     *  - collapsing any run of whitespace to a single space
+     *  - trimming leading/trailing whitespace.
+     */
+    public static XPathy deepNormalizedText(String rawText) {
+        if (rawText == null) {
+            throw new IllegalArgumentException("rawText must not be null");
+        }
+
+        // Normalize the expected value the same way we normalize DOM text.
+        // (All whitespace -> single space, then trim.)
+        String expected = rawText.replaceAll("\\s+", " ").strip();
+
+        // Build XPath:
+        //  string(.)          => concatenated text of this node + all descendants
+        //  translate(...)     => map NBSP and usual whitespace to regular spaces
+        //  normalize-space()  => trim + collapse runs of spaces to one space
+        String xpath =
+                "//*[normalize-space(" +
+                        "translate(string(.), ' \t\r\n\u00A0', '     ')" +
+                        ") = " + toXPathLiteral(expected) + "]";
+
+        return XPathy.from(xpath);
+    }
+
+    /**
+     * Safely turns a Java string into an XPath string literal.
+     * Uses '...' where possible, and falls back to concat(...) if the string
+     * contains both single and double quotes.
+     */
+    private static String toXPathLiteral(String s) {
+        if (!s.contains("'")) {
+            return "'" + s + "'";
+        }
+        if (!s.contains("\"")) {
+            return "\"" + s + "\"";
+        }
+
+        // Contains both ' and " → use concat('foo', "'", 'bar')
+        StringBuilder sb = new StringBuilder("concat(");
+        String[] parts = s.split("'", -1); // keep empties
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) {
+                sb.append(", \"'\", ");
+            }
+            sb.append("'").append(parts[i]).append("'");
+        }
+        sb.append(")");
+        return sb.toString();
+    }
+
 }
