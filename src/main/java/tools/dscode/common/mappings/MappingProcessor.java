@@ -187,9 +187,14 @@ public abstract class MappingProcessor implements Map<String, Object> {
             for (var e : parsedObj.entrySetWithoutTripleSingle()) {
                 parsedObj.put(e.getKey(), resolveAll(e.getValue()));
             }
-            return parsedObj.restore();
+            System.out.println("");
+            String resolvedText = parsedObj.restore();
+            System.out.println("Resolved: '" + input + "' -> '" + resolvedText + "'");
+            return resolvedText;
         } catch (Throwable t) {
-            return parsedObj.restore();
+            String resolvedText = parsedObj.restore();
+            System.out.println("Handled exception '" + t.getMessage() + "' when attempting to resolve: '" + input + "' -> '" + resolvedText + "'");
+            return resolvedText;
         }
     }
 

@@ -68,7 +68,7 @@ public class CurrentScenarioState extends ScenarioMapping {
             }
             debugBrowser = true;
         }
-        testCase.getRootScenarioStep().runMethodDirectly = true;
+        rootScenarioStep.runMethodDirectly = true;
         Pickle gherkinMessagesPickle = (Pickle) getProperty(testCase, "pickle");
         io.cucumber.messages.types.Pickle pickle = (io.cucumber.messages.types.Pickle) getProperty(gherkinMessagesPickle, "pickle");
         put("@@startFlag", "startFlag!");

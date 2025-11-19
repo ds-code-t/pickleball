@@ -42,11 +42,11 @@ Feature: Addition
     Then print aaa
   @[DEBUG] Then print aaa
     Then SET TABLE VALUES
-    | suffix |
-    |  usera    |
-   Given set $(CHROME)
-  * navigate to: URL.test A
-     Then print aaa
+      | suffix |
+      | usera  |
+    Given set $(CHROME)
+    * navigate to: URL.test A
+    Then print aaa
 #    Given get browser $(CHROME)
 #      | http://google.com |
 ##    Then , click "Gmail" Link, and wait 1 seconds
