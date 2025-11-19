@@ -33,8 +33,12 @@ public class ParsedActions {
                 new ArrayList<>() : nextElementMatch.matchedElements;
         ValueMatch nextValue = (ValueMatch) phraseExecution.getNextComponents(actionNode.position, "valueMatch").stream().findFirst().orElse(null);
 
-        if (!action.equals("wait") && nextElements.isEmpty())
-            throw new RuntimeException("No elements found for " + action);
+        if (!action.equals("wait") && nextElements.isEmpty()) {
+            String message = "No elements found for " + action;
+            if (nextElementMatch != null && nextElementMatch.xPathy != null)
+                message += " at " + nextElementMatch.xPathy.getXpath();
+            throw new RuntimeException(message);
+        }
 
         switch (action) {
             case String s when s.contains("click") -> {
