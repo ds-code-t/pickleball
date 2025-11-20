@@ -4,6 +4,7 @@ import com.xpathy.Attribute;
 import com.xpathy.Tag;
 import com.xpathy.XPathy;
 
+import java.util.Arrays;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -154,23 +155,47 @@ public final class XPathyMini {
         return base -> applyTextOp(base, op, v);
     }
 
+//    @SafeVarargs
+//    public static XPathy orMap(Function<XPathy, XPathy> mapper, Supplier<XPathy>... bases) {
+//        return java.util.Arrays.stream(bases)
+//                .map(Supplier::get)
+//                .map(mapper)
+//                .reduce(XPathy::or)
+//                .orElseThrow();
+//    }
+//
+//    @SafeVarargs
+//    public static XPathy orMap(Supplier<XPathy>... bases) {
+//        return java.util.Arrays.stream(bases)
+//                .map(Supplier::get)
+//                .reduce(XPathy::or)
+//                .orElseThrow();
+//    }
+
+
     @SafeVarargs
-    public static XPathy orMap(Function<XPathy, XPathy> mapper, Supplier<XPathy>... bases) {
-        return java.util.Arrays.stream(bases)
+    public static XPathy orMap(Function<XPathy, XPathy> mapper,
+                               Supplier<XPathy>... bases) {
+
+        return Arrays.stream(bases)
                 .map(Supplier::get)
                 .map(mapper)
+                .map(XPathyMini::relativize)   // ← HERE
                 .reduce(XPathy::or)
                 .orElseThrow();
     }
-
     @SafeVarargs
     public static XPathy orMap(Supplier<XPathy>... bases) {
-        return java.util.Arrays.stream(bases)
+
+        return Arrays.stream(bases)
                 .map(Supplier::get)
+                .map(XPathyMini::relativize)   // ← HERE
                 .reduce(XPathy::or)
                 .orElseThrow();
     }
-
+    public static XPathy relativize(XPathy xp) {
+        return XPathy.from("(." + xp.getXpath() + ")");
+    }
 
     // 2) Simpler overload when all bases are plain tags
     public static XPathy orTags(Function<XPathy, XPathy> mapper, Tag... tags) {
@@ -187,4 +212,7 @@ public final class XPathyMini {
                 .reduce(XPathy::or)
                 .orElseThrow();
     }
+
+
+
 }
