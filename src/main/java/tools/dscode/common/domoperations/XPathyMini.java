@@ -163,6 +163,15 @@ public final class XPathyMini {
                 .orElseThrow();
     }
 
+    @SafeVarargs
+    public static XPathy orMap(Supplier<XPathy>... bases) {
+        return java.util.Arrays.stream(bases)
+                .map(Supplier::get)
+                .reduce(XPathy::or)
+                .orElseThrow();
+    }
+
+
     // 2) Simpler overload when all bases are plain tags
     public static XPathy orTags(Function<XPathy, XPathy> mapper, Tag... tags) {
         return java.util.Arrays.stream(tags)
