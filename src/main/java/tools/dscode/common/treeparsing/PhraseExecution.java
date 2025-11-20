@@ -394,7 +394,9 @@ public class PhraseExecution {
         }
 
         public List<WebElement> findWebElements(WebDriver driver) {
-            matchedElements = resolveXPathChain(driver, getElementXPathy());
+            List<XPathData> xpathDataList = getElementXPathy();
+            System.out.println("Finding Elements at: " + xpathDataList);
+            matchedElements = resolveXPathChain(driver, xpathDataList);
             return matchedElements;
         }
     }

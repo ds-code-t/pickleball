@@ -16,13 +16,14 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.domoperations.XPathyUtils.deepNormalizedText;
+import static tools.dscode.common.domoperations.XPathyUtils.deepNormalizedTextWrapped;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
 
 public class CalculatorSteps {
     private int a, b, result;
     public static void main(String[] args) {
-        XPathy locator =deepNormalizedText("User Name");
+        XPathy locator =deepNormalizedTextWrapped("User Name");
         System.out.println(locator.getXpath());
     }
     @Given("I have numbers {int} and {int}")
