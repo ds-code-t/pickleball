@@ -1,5 +1,7 @@
 package tools.dscode.common.domoperations;
 
+import com.xpathy.Attribute;
+import com.xpathy.Tag;
 import com.xpathy.XPathy;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
@@ -7,6 +9,8 @@ import org.openqa.selenium.chromium.ChromiumDriver;
 
 import java.util.List;
 import java.util.Objects;
+
+import static tools.dscode.common.domoperations.XPathyUtils.deepNormalizedText;
 
 /**
  * Concise DOM check helpers for XPathy + Selenium.
@@ -16,6 +20,7 @@ import java.util.Objects;
  *   - describe what was found
  */
 public final class DomChecks {
+
 
     private DomChecks() {}
 

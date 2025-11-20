@@ -1,5 +1,6 @@
 package tools.dscode.steps;
 
+import com.xpathy.XPathy;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.Before;
 import io.cucumber.java.BeforeAll;
@@ -14,12 +15,16 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
+import static tools.dscode.common.domoperations.XPathyUtils.deepNormalizedText;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
 
 public class CalculatorSteps {
     private int a, b, result;
-
+    public static void main(String[] args) {
+        XPathy locator =deepNormalizedText("User Name");
+        System.out.println(locator.getXpath());
+    }
     @Given("I have numbers {int} and {int}")
     public void i_have_numbers_and(int x, int y) {
         a = x; b = y;

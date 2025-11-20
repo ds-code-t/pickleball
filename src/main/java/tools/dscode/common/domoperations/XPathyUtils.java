@@ -284,6 +284,15 @@ public final class XPathyUtils {
         return new XPathy(current);
     }
 
+    public static XPathy deepNormalizedTextWrapped(String rawText) {
+        // Get predicate from your existing method
+        XPathy inner = deepNormalizedText(rawText);   // e.g. "(normalize-space(...) = 'User Name')"
+
+        // Wrap exactly as requested: *[(predicate)]
+        String wrapped = "*[" + inner.getXpath() + "]";
+
+        return XPathy.from(wrapped);
+    }
 
     public static XPathy deepNormalizedText(String rawText) {
         if (rawText == null) {
