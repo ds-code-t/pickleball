@@ -36,6 +36,44 @@ public class SeleniumUtils {
 
     private static final String HOST = "127.0.0.1";
 
+    public static Map<String, Object> ensureDevToolsPort(
+            Map<String, Object> capsMap, String browserName) {
+
+        return ensureDevToolsPort(capsMap, portFromString(browserName));
+    }
+    public static Map<String, Object> ensureDevToolsPort(
+            Map<String, Object> capsMap, int port) {
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> chromeOptions =
+                (Map<String, Object>) capsMap.get("goog:chromeOptions");
+
+        if (chromeOptions == null) {
+            chromeOptions = new HashMap<>();
+            capsMap.put("goog:chromeOptions", chromeOptions);
+        }
+
+        if (isDevToolsListening(HOST, port)) {
+            // Attach to existing browser through debuggerAddress
+            chromeOptions.put("debuggerAddress", HOST + ":" + port);
+        } else {
+            // Configure Chrome to start with that DevTools port
+            @SuppressWarnings("unchecked")
+            List<String> args = (List<String>) chromeOptions.get("args");
+
+            if (args == null) {
+                args = new ArrayList<>();
+                chromeOptions.put("args", args);
+            }
+
+            args.add("--remote-debugging-port=" + port);
+        }
+
+        return capsMap;
+    }
+
+
+
     public static MutableCapabilities ensureDevToolsPort(MutableCapabilities caps, String browserName) {
         return ensureDevToolsPort(caps, portFromString(browserName));
     }
