@@ -285,49 +285,27 @@ public final class XPathyUtils {
     }
 
 
-    /**
-     * Returns an XPathy that represents a *condition template* for "deep" text
-     * matching, suitable for use with byHaving(...) / byHaving().descendant(...).
-     *
-     * Semantics:
-     *  - string(.) concatenates all descendant text of the candidate element
-     *  - translate(...) maps tabs/newlines/NBSP to regular spaces
-     *  - normalize-space(...) collapses runs of spaces and trims ends
-     *
-     * IMPORTANT: The returned XPath has the form:
-     *     //*[ <condition on string(.)> ]
-     * This is intentional: the Having transformer strips off the leading
-     * '//*[' and trailing ']' and uses only the condition part.
-     */
     public static XPathy deepNormalizedText(String rawText) {
         if (rawText == null) {
             throw new IllegalArgumentException("rawText must not be null");
         }
 
-        // Normalize the expected value the same way we normalize DOM text:
-        // Collapse all whitespace to a single space, then trim.
+        // Normalize the expected value the same way we will normalize DOM text.
         String expected = rawText.replaceAll("\\s+", " ").strip();
 
-        // This is the *condition* we care about:
-        //   normalize-space(translate(string(.), ' \t\r\n\u00A0', '     '))
-        //     = '<expected>'
-        String condition =
+        // Just the predicate condition — NO leading //, NO wrapping //*[].
+        String predicate =
                 "normalize-space(" +
                         "translate(string(.), ' \t\r\n\u00A0', '     ')" +
                         ") = " + toXPathLiteral(expected);
 
-        // Wrap it in the "//*[...]" template that Having expects.
-        // Having code will later do substring(4, len-1) to extract just `condition`.
-        String xpath = "//*[" + condition + "]";
-
-        return XPathy.from(xpath);
+        // Return relative XPathy containing just the predicate.
+        // This produces XPathy("(normalize-space(...) = 'expected')")
+        return XPathy.from("(" + predicate + ")");
     }
 
-    /**
-     * Safely turns a Java string into an XPath string literal.
-     * Uses '...' where possible, and falls back to concat(...) if the string
-     * contains both single and double quotes.
-     */
+
+
     private static String toXPathLiteral(String s) {
         if (!s.contains("'")) {
             return "'" + s + "'";
