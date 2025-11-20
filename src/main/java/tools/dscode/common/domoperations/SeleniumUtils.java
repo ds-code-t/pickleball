@@ -11,14 +11,14 @@ import java.time.Duration;
 import java.util.Objects;
 
 public class SeleniumUtils {
-    public static void explicitWait(int seconds) {
-        long l = seconds;
-        explicitWait(l);
+    public static void waitSeconds(int seconds) {
+        long l = seconds * 1000;
+        waitMilliseconds(l);
     }
 
-    public static void explicitWait(long seconds) {
+    public static void waitMilliseconds(long milliseconds) {
         try {
-            Thread.sleep(seconds * 1000L);
+            Thread.sleep(milliseconds);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }

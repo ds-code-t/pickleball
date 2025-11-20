@@ -1,5 +1,22 @@
 Feature: Addition
 
+
+  Scenario: b test2
+    Then print aaa
+  @[DEBUG] Then print aaa
+#    Then SET TABLE VALUES
+#      | suffix |
+#      | usera  |
+    Given set $(CHROME)
+    * navigate to: URL.google
+    Then , click "Gmail" Link, and wait 1 seconds
+
+    Then print aaa
+#    Given get browser $(CHROME)
+#      | http://google.com |
+#    Then , wait 4 seconds
+
+
   Scenario: parm test 7
     * dataTable
     * string
@@ -38,19 +55,6 @@ Feature: Addition
       | Bob   |
       | Carol |
 
-  Scenario: b test2
-    Then print aaa
-  @[DEBUG] Then print aaa
-    Then SET TABLE VALUES
-      | suffix |
-      | usera  |
-    Given set $(CHROME)
-    * navigate to: URL.test A
-    Then print aaa
-#    Given get browser $(CHROME)
-#      | http://google.com |
-##    Then , click "Gmail" Link, and wait 1 seconds
-#    Then , wait 4 seconds
 
 
   Scenario: nestTest

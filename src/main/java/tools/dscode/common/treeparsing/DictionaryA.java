@@ -106,7 +106,11 @@ public class DictionaryA extends NodeDictionary {
     ParseNode phrase = new ParseNode("(?<conjunction>\\b(?:and|or)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>[^" + punc + "]+)(?<punc>[" + punc + "])?") {
         @Override
         public String onCapture(MatchNode self) {
-            self.putToLocalState("context", self.resolvedGroupText("context"));
+            String context = self.resolvedGroupText("context");
+
+            if (!context.isEmpty() && Character.isUpperCase(context.charAt(0)))
+                self.putToLocalState("newContext", true);
+            self.putToLocalState("context", context.toLowerCase());
             self.putToLocalState("conjunctions", self.resolvedGroupText("conjunctions"));
             String termination = self.resolvedGroupText("punc");
             if (termination == null || termination.isBlank()) termination = "";
@@ -124,9 +128,14 @@ public class DictionaryA extends NodeDictionary {
         @Override
         public String onSubstitute(MatchNode self) {
             PhraseExecution lastPhraseExecution = (PhraseExecution) self.getFromGlobalState("lastPhraseExecution");
+            printDebug("lastPhraseExecution: " + lastPhraseExecution);
+            if (lastPhraseExecution != null && (!(lastPhraseExecution.termination.equals(";") || lastPhraseExecution.termination.equals(","))))
+                self.putToLocalState("newContext", true);
+
             if (lastPhraseExecution == null)
                 lastPhraseExecution = initiateFirstPhraseExecution(self);
 
+            self.putToLocalState("context", self.resolvedGroupText("context"));
             self.putToGlobalState("lastPhraseExecution", lastPhraseExecution.initiateNextPhraseExecution(self));
             return self.token();
         }

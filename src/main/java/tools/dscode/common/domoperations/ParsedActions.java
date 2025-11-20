@@ -16,8 +16,7 @@ import static tools.dscode.common.domoperations.HumanInteractions.contextClick;
 import static tools.dscode.common.domoperations.HumanInteractions.doubleClick;
 import static tools.dscode.common.domoperations.HumanInteractions.typeText;
 import static tools.dscode.common.domoperations.HumanInteractions.wheelScrollBy;
-import static tools.dscode.common.domoperations.SeleniumUtils.explicitWait;
-import static tools.dscode.common.util.DebugUtils.printDebug;
+import static tools.dscode.common.domoperations.SeleniumUtils.waitSeconds;
 
 
 public class ParsedActions {
@@ -28,12 +27,14 @@ public class ParsedActions {
         MatchNode actionNode = phraseExecution.phraseNode.getChild("action");
         String action = actionNode.modifiedText();
 
-        ElementMatch nextElementMatch = (ElementMatch) phraseExecution.getNextComponents(actionNode.position, "elementMatch").stream().findFirst().orElse(null);
+        List<ElementMatch> nextElementMatches = phraseExecution.getNextComponents(actionNode.position, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
+        ElementMatch nextElementMatch = nextElementMatches .isEmpty() ? null : nextElementMatches.getFirst();
+
         List<WebElement> nextElements = nextElementMatch == null || nextElementMatch.matchedElements == null ?
                 new ArrayList<>() : nextElementMatch.matchedElements;
         ValueMatch nextValue = (ValueMatch) phraseExecution.getNextComponents(actionNode.position, "valueMatch").stream().findFirst().orElse(null);
 
-        if (!action.equals("wait") && nextElements.isEmpty()) {
+        if (!action.equals("wait") && (nextElementMatches.isEmpty() || nextElements.isEmpty())) {
             String message = "No elements found for " + action;
             if (nextElementMatch != null && nextElementMatch.xPathy != null)
                 message += " at " + nextElementMatch.xPathy.getXpath();
@@ -67,7 +68,7 @@ public class ParsedActions {
                 }
             }
             case String s when s.contains("wait") -> {
-                explicitWait(Long.parseLong(nextValue.value.replace("\"|'|`", "")));
+                waitSeconds(Integer.parseInt(nextValue.value.replace("\"|'|`", "")));
             }
             case String s when s.contains("overwrite") -> {
                 for (WebElement nextElement : nextElements) {
