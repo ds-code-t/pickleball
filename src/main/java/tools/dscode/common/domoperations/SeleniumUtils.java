@@ -35,81 +35,55 @@ public class SeleniumUtils {
     }
 
     private static final String HOST = "127.0.0.1";
+    private static final String CHROME_VENDOR_KEY = "goog:chromeOptions";
+    private static final String EDGE_VENDOR_KEY   = "ms:edgeOptions";
 
-    public static Map<String, Object> ensureDevToolsPort(
-            Map<String, Object> capsMap, String browserName) {
-
-        return ensureDevToolsPort(capsMap, portFromString(browserName));
+    public static <T extends ChromiumOptions<T>> T ensureDevToolsPort(T options, String browserName) {
+        return ensureDevToolsPort(options, portFromString(browserName));
     }
-    public static Map<String, Object> ensureDevToolsPort(
-            Map<String, Object> capsMap, int port) {
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> chromeOptions =
-                (Map<String, Object>) capsMap.get("goog:chromeOptions");
-
-        if (chromeOptions == null) {
-            chromeOptions = new HashMap<>();
-            capsMap.put("goog:chromeOptions", chromeOptions);
-        }
+    public static <T extends ChromiumOptions<T>> T ensureDevToolsPort(T options, int port) {
+        Objects.requireNonNull(options, "options must not be null");
 
         if (isDevToolsListening(HOST, port)) {
-            // Attach to existing browser through debuggerAddress
-            chromeOptions.put("debuggerAddress", HOST + ":" + port);
+            // Attach to existing browser
+            options.setExperimentalOption("debuggerAddress", HOST + ":" + port);
         } else {
-            // Configure Chrome to start with that DevTools port
-            @SuppressWarnings("unchecked")
-            List<String> args = (List<String>) chromeOptions.get("args");
-
-            if (args == null) {
-                args = new ArrayList<>();
-                chromeOptions.put("args", args);
-            }
-
-            args.add("--remote-debugging-port=" + port);
+            // Start new browser with that DevTools port
+            options.addArguments("--remote-debugging-port=" + port);
         }
 
-        return capsMap;
+        return options;
     }
 
 
-
-    public static MutableCapabilities ensureDevToolsPort(MutableCapabilities caps, String browserName) {
-        return ensureDevToolsPort(caps, portFromString(browserName));
-    }
-
-    public static MutableCapabilities ensureDevToolsPort(MutableCapabilities caps, int port) {
-        @SuppressWarnings("unchecked")
-        Map<String, Object> chromeOptions =
-                (Map<String, Object>) caps.getCapability("goog:chromeOptions");
-
-        if (chromeOptions == null) {
-            chromeOptions = new HashMap<>();
-            caps.setCapability("goog:chromeOptions", chromeOptions);
+    private static String resolveVendorKey(Map<String, Object> capsMap, String browserName) {
+        // Prefer what's already present in capabilities
+        if (capsMap.containsKey(CHROME_VENDOR_KEY)) {
+            return CHROME_VENDOR_KEY;
+        }
+        if (capsMap.containsKey(EDGE_VENDOR_KEY)) {
+            return EDGE_VENDOR_KEY;
         }
 
-        if (isDevToolsListening(HOST, port)) {
-            // Attach to an existing browser via debuggerAddress
-            chromeOptions.put("debuggerAddress", HOST + ":" + port);
-        } else {
-            // Start new browser with specified DevTools port
-            List<String> args = (List<String>) chromeOptions.get("args");
-            if (args == null) {
-                args = new ArrayList<>();
-                chromeOptions.put("args", args);
-            }
-            args.add("--remote-debugging-port=" + port);
+        // Fall back to browserName hint
+        String name = browserName == null ? "" : browserName.toLowerCase();
+        if (name.contains("edge")) {
+            return EDGE_VENDOR_KEY;
         }
 
-        return caps;
+        // Default to Chrome-style options
+        return CHROME_VENDOR_KEY;
     }
+
+
 
 
     private static boolean isDevToolsListening(String host, int port) {
         HttpClient client = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(300))
                 .build();
-
+        System.out.println("@@client: " + client);
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://" + host + ":" + port + "/json/version"))
                 .timeout(Duration.ofMillis(500))

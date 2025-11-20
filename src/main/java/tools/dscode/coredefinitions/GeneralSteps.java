@@ -93,13 +93,18 @@ public class GeneralSteps extends CoreSteps {
         String json = currentStep.argument == null || !(currentStep.argument instanceof DocStringArgument) ? (String) currentStep.getStepParsingMap().getAndResolve("configs.chrome") : currentStep.argument.getValue().toString();
         if (Objects.isNull(json)) throw new RuntimeException("Chrome Driver Configuration not found");
         Map<String, Object> map = MAPPER.readValue(json, Map.class);
-        if(getCurrentScenarioState().debugBrowser) {
-            String name = (String) currentStep.getStepNodeMap().get("_getKey");
-            if(name == null) name = "chrome";
-            map = ensureDevToolsPort(map, name);
-        }
+        System.out.println("@@##json: " + json);
+        System.out.println("@@##map1: " + map);
+
+        System.out.println("@@##map2: " + map);
         ChromeOptions options = new ChromeOptions();
         map.forEach(options::setCapability);
+        if (getCurrentScenarioState().debugBrowser) {
+            String name = (String) currentStep.getStepNodeMap().get("_getKey");
+            if (name == null) name = "chrome";
+
+            ensureDevToolsPort(options, name);   // <— use the ChromiumOptions overload here
+        }
         ChromeDriver chromeDriver = new ChromeDriver(options);
         registerScenarioObject("browser", chromeDriver);
         return chromeDriver;
