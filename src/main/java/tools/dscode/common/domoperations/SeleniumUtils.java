@@ -1,5 +1,6 @@
 package tools.dscode.common.domoperations;
 
+import org.openqa.selenium.MutableCapabilities;
 import org.openqa.selenium.chromium.ChromiumOptions;
 
 import java.io.IOException;
@@ -8,6 +9,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 public class SeleniumUtils {
@@ -31,23 +36,36 @@ public class SeleniumUtils {
 
     private static final String HOST = "127.0.0.1";
 
-    public static <T extends ChromiumOptions<T>> T ensureDevToolsPort(T options, String browserName) {
-        return ensureDevToolsPort(options, portFromString(browserName));
+    public static MutableCapabilities ensureDevToolsPort(MutableCapabilities caps, String browserName) {
+        return ensureDevToolsPort(caps, portFromString(browserName));
     }
 
-    public static <T extends ChromiumOptions<T>> T ensureDevToolsPort(T options, int port) {
-        Objects.requireNonNull(options, "options must not be null");
+    public static MutableCapabilities ensureDevToolsPort(MutableCapabilities caps, int port) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> chromeOptions =
+                (Map<String, Object>) caps.getCapability("goog:chromeOptions");
 
-        if (isDevToolsListening(HOST, port)) {
-            // Attach to existing browser
-            options.setExperimentalOption("debuggerAddress", HOST + ":" + port);
-        } else {
-            // Start a new browser with that DevTools port when the driver is created
-            options.addArguments("--remote-debugging-port=" + port);
+        if (chromeOptions == null) {
+            chromeOptions = new HashMap<>();
+            caps.setCapability("goog:chromeOptions", chromeOptions);
         }
 
-        return options;
+        if (isDevToolsListening(HOST, port)) {
+            // Attach to an existing browser via debuggerAddress
+            chromeOptions.put("debuggerAddress", HOST + ":" + port);
+        } else {
+            // Start new browser with specified DevTools port
+            List<String> args = (List<String>) chromeOptions.get("args");
+            if (args == null) {
+                args = new ArrayList<>();
+                chromeOptions.put("args", args);
+            }
+            args.add("--remote-debugging-port=" + port);
+        }
+
+        return caps;
     }
+
 
     private static boolean isDevToolsListening(String host, int port) {
         HttpClient client = HttpClient.newBuilder()

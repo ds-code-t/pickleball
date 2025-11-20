@@ -5,6 +5,7 @@ import io.cucumber.core.runner.StepExtension;
 import io.cucumber.core.stepexpression.DocStringArgument;
 import io.cucumber.java.ParameterType;
 import io.cucumber.java.en.Given;
+import org.openqa.selenium.Capabilities;
 import org.openqa.selenium.MutableCapabilities;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
@@ -91,15 +92,14 @@ public class GeneralSteps extends CoreSteps {
         StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
         String json = currentStep.argument == null || !(currentStep.argument instanceof DocStringArgument) ? (String) currentStep.getStepParsingMap().getAndResolve("configs.chrome") : currentStep.argument.getValue().toString();
         if (Objects.isNull(json)) throw new RuntimeException("Chrome Driver Configuration not found");
-        Map<String, Object> ChromiumOptions = MAPPER.readValue(json, Map.class);
-        ChromeOptions options = new ChromeOptions();
-        options.setCapability("goog:chromeOptions", ChromiumOptions);
+        MutableCapabilities caps = new MutableCapabilities(MAPPER.readValue(json, Map.class));;
         if(getCurrentScenarioState().debugBrowser) {
             String name = (String) currentStep.getStepNodeMap().get("_getKey");
             if(name == null) name = "chrome";
-            options = ensureDevToolsPort(options, name);
+            caps = ensureDevToolsPort(caps, name);
         }
-
+        ChromeOptions options = new ChromeOptions();
+        options.merge(caps);
         ChromeDriver chromeDriver = new ChromeDriver(options);
         registerScenarioObject("browser", chromeDriver);
         return chromeDriver;

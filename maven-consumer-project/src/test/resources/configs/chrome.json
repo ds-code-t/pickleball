@@ -1,3 +1,28 @@
 {
-  "args": ["--window-size=1280,720"]
+  "browser": "chrome",
+  "remoteUrl": null,
+
+  "w3c": {
+    "browserName": "chrome",
+    "acceptInsecureCerts": true,
+    "pageLoadStrategy": "normal",
+    "timeouts": {
+      "implicit": 0,
+      "pageLoad": 300000,
+      "script": 30000
+    }
+  },
+
+  "chromium": {
+    "args": [
+      "--ignore-certificate-errors",
+      "--allow-insecure-localhost"
+    ],
+    "binary": null,
+    "experimentalOptions": {
+      "prefs": {
+        "download.default_directory": "/tmp/downloads"
+      }
+    }
+  }
 }
