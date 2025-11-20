@@ -8,8 +8,9 @@ Feature: Addition
 #      | suffix |
 #      | usera  |
     Given set $(CHROME)
-    * navigate to: URL.google
-    Then , click "Gmail" Link, and wait 1 seconds
+#    * navigate to: URL.google
+    * navigate to: URL.bad
+#    Then , click "Gmail" Link, and wait 1 seconds
 
     Then print aaa
 #    Given get browser $(CHROME)

@@ -99,6 +99,7 @@ public class GeneralSteps extends CoreSteps {
             caps = ensureDevToolsPort(caps, name);
         }
         ChromeOptions options = new ChromeOptions();
+        options.setAcceptInsecureCerts(true);
         options.merge(caps);
         ChromeDriver chromeDriver = new ChromeDriver(options);
         registerScenarioObject("browser", chromeDriver);
