@@ -286,29 +286,39 @@ public final class XPathyUtils {
 
 
     /**
-     * Returns an XPathy that matches any element whose *flattened* text content
-     * (including all descendants) equals the given text, after:
-     *  - converting tabs/newlines/NBSP to spaces
-     *  - collapsing any run of whitespace to a single space
-     *  - trimming leading/trailing whitespace.
+     * Returns an XPathy that represents a *condition template* for "deep" text
+     * matching, suitable for use with byHaving(...) / byHaving().descendant(...).
+     *
+     * Semantics:
+     *  - string(.) concatenates all descendant text of the candidate element
+     *  - translate(...) maps tabs/newlines/NBSP to regular spaces
+     *  - normalize-space(...) collapses runs of spaces and trims ends
+     *
+     * IMPORTANT: The returned XPath has the form:
+     *     //*[ <condition on string(.)> ]
+     * This is intentional: the Having transformer strips off the leading
+     * '//*[' and trailing ']' and uses only the condition part.
      */
     public static XPathy deepNormalizedText(String rawText) {
         if (rawText == null) {
             throw new IllegalArgumentException("rawText must not be null");
         }
 
-        // Normalize the expected value the same way we normalize DOM text.
-        // (All whitespace -> single space, then trim.)
+        // Normalize the expected value the same way we normalize DOM text:
+        // Collapse all whitespace to a single space, then trim.
         String expected = rawText.replaceAll("\\s+", " ").strip();
 
-        // Build XPath:
-        //  string(.)          => concatenated text of this node + all descendants
-        //  translate(...)     => map NBSP and usual whitespace to regular spaces
-        //  normalize-space()  => trim + collapse runs of spaces to one space
-        String xpath =
-                "//*[normalize-space(" +
+        // This is the *condition* we care about:
+        //   normalize-space(translate(string(.), ' \t\r\n\u00A0', '     '))
+        //     = '<expected>'
+        String condition =
+                "normalize-space(" +
                         "translate(string(.), ' \t\r\n\u00A0', '     ')" +
-                        ") = " + toXPathLiteral(expected) + "]";
+                        ") = " + toXPathLiteral(expected);
+
+        // Wrap it in the "//*[...]" template that Having expects.
+        // Having code will later do substring(4, len-1) to extract just `condition`.
+        String xpath = "//*[" + condition + "]";
 
         return XPathy.from(xpath);
     }
@@ -338,5 +348,6 @@ public final class XPathyUtils {
         sb.append(")");
         return sb.toString();
     }
+
 
 }
