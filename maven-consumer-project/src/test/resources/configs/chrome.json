@@ -1,28 +1,22 @@
 {
-  "browser": "chrome",
-  "remoteUrl": null,
-
-  "w3c": {
-    "browserName": "chrome",
-    "acceptInsecureCerts": true,
-    "pageLoadStrategy": "normal",
-    "timeouts": {
-      "implicit": 0,
-      "pageLoad": 300000,
-      "script": 30000
-    }
+  "browserName": "chrome",
+  "acceptInsecureCerts": true,
+  "pageLoadStrategy": "normal",
+  "timeouts": {
+    "implicit": 0,
+    "pageLoad": 300000,
+    "script": 30000
   },
 
-  "chromium": {
+  "goog:chromeOptions": {
     "args": [
+      "--test-type",
       "--ignore-certificate-errors",
+      "--ignore-certificate-errors-spki-list=",
       "--allow-insecure-localhost"
     ],
-    "binary": null,
-    "experimentalOptions": {
-      "prefs": {
-        "download.default_directory": "/tmp/downloads"
-      }
+    "prefs": {
+      "download.default_directory": "/tmp/downloads"
     }
   }
 }
