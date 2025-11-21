@@ -7,6 +7,9 @@ import com.xpathy.XPathy;
 import java.util.Arrays;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
+
+import static tools.dscode.common.domoperations.VisibilityConditions.visible;
 
 public final class XPathyMini {
     private XPathyMini() {}
@@ -177,24 +180,79 @@ public final class XPathyMini {
     public static XPathy orMap(Function<XPathy, XPathy> mapper,
                                Supplier<XPathy>... bases) {
 
-        return Arrays.stream(bases)
+        // 1. Build: self::input[@class='A'] or self::div ...
+        String bundled = Arrays.stream(bases)
                 .map(Supplier::get)
-                .map(mapper)
-                .map(XPathyMini::relativize)   // ← HERE
-                .reduce(XPathy::or)
-                .orElseThrow();
+                .map(x -> toSelfStep(x.getXpath()))
+                .collect(Collectors.joining(" or "));
+
+        // 2. Apply mapper ONCE to the whole combined expression
+        XPathy mapped = mapper.apply(XPathy.from("//*[" + bundled + "]"));
+
+        // 3. Extract mapper predicate from the XPathy object
+        String mapperPredicate = toSelfStep(mapped.getXpath());
+
+        // 4. Combine base and mapper predicate
+        return XPathy.from("//*[" + bundled + " and " + mapperPredicate + "]").byCondition(visible());
     }
+
     @SafeVarargs
     public static XPathy orMap(Supplier<XPathy>... bases) {
 
-        return Arrays.stream(bases)
+        String predicate = Arrays.stream(bases)
                 .map(Supplier::get)
-                .map(XPathyMini::relativize)   // ← HERE
-                .reduce(XPathy::or)
-                .orElseThrow();
+                .map(x -> toSelfStep(x.getXpath()))
+                .collect(Collectors.joining(" or "));
+
+        // Result: //*[(self::input[@class='A'] or self::div)]
+        return XPathy.from("//*[" + predicate + "]").byCondition(visible());
     }
-    public static XPathy relativize(XPathy xp) {
-        return XPathy.from("(." + xp.getXpath() + ")");
+
+    @SafeVarargs
+    public static XPathy andMap(Function<XPathy, XPathy> mapper,
+                                Supplier<XPathy>... bases) {
+
+        // 1. Build: self::input[@class='A'] and self::div ...
+        String bundled = Arrays.stream(bases)
+                .map(Supplier::get)
+                .map(x -> toSelfStep(x.getXpath()))
+                .collect(Collectors.joining(" and "));
+
+        // 2. Apply mapper ONCE to the whole combined expression
+        XPathy mapped = mapper.apply(XPathy.from("//*[" + bundled + "]"));
+
+        // 3. Extract its predicate part
+        String mapperPredicate = toSelfStep(mapped.getXpath());
+
+        // 4. Combine base and mapper predicate
+        return XPathy.from("//*[" + bundled + " and " + mapperPredicate + "]").byCondition(visible());
+    }
+
+
+    @SafeVarargs
+    public static XPathy andMap(Supplier<XPathy>... bases) {
+
+        String predicate = Arrays.stream(bases)
+                .map(Supplier::get)
+                .map(x -> toSelfStep(x.getXpath()))
+                .collect(Collectors.joining(" and "));
+
+        // Result: //*[(self::input[@class='A'] and self::div and ...)]
+        return XPathy.from("//*[" + predicate + "]").byCondition(visible());
+    }
+
+
+    private static String toSelfStep(String xpath) {
+        String s = xpath.trim();
+
+        // Strip leading //, .//, /, ./ etc.
+        s = s.replaceFirst("^\\.?/+", "");
+
+        // Keep only the last step (e.g. "input[@class='A']" from "div/span/input[@class='A']")
+        int lastSlash = s.lastIndexOf('/');
+        String step = (lastSlash >= 0) ? s.substring(lastSlash + 1) : s;
+
+        return "self::" + step;
     }
 
     // 2) Simpler overload when all bases are plain tags

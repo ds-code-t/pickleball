@@ -29,6 +29,7 @@ import static tools.dscode.common.domoperations.XPathyRegistry.getHtmlTypes;
 import static tools.dscode.common.domoperations.XPathyRegistry.orAll;
 import static tools.dscode.common.domoperations.XPathyUtils.afterOf;
 import static tools.dscode.common.domoperations.XPathyUtils.beforeOf;
+import static tools.dscode.common.domoperations.XPathyUtils.everyNth;
 import static tools.dscode.common.domoperations.XPathyUtils.inBetweenOf;
 import static tools.dscode.common.domoperations.XPathyUtils.insideOf;
 import static tools.dscode.common.domoperations.XPathyUtils.refine;
@@ -46,6 +47,7 @@ public class PhraseExecution {
         public XPathData(XPathData xPathData, XPathy modifiedXPathy) {
             this(xPathData.context, modifiedXPathy, xPathData.isFrom, xPathData.isNewContext);
         }
+
         public XPathData(ElementMatch elementMatch) {
             this("", elementMatch.xPathy, false, false);
         }
@@ -80,7 +82,7 @@ public class PhraseExecution {
             this.contextXPathDataList.addAll(passedXPathDataList);
             return;
         }
-        this.contextXPathDataList.addAll(updateXPathData(passedXPathDataList,new XPathData(this)));
+        this.contextXPathDataList.addAll(updateXPathData(passedXPathDataList, new XPathData(this)));
     }
 
 
@@ -139,7 +141,7 @@ public class PhraseExecution {
     boolean newContext;
     String context;
     List<ElementMatch> elements;
-//    XPathy contextXPathy;
+    //    XPathy contextXPathy;
     //    XPathy executionXPathy;
     XPathy fullXPathy;
     String conjunction;
@@ -189,7 +191,7 @@ public class PhraseExecution {
         components = phraseNode.getOrderedChildren("elementMatch", "valueMatch").stream().map(m -> {
             if (m.name().equals("valueMatch"))
                 return new ValueMatch(m);
-            ElementMatch newElementMatch  = new ElementMatch(m);
+            ElementMatch newElementMatch = new ElementMatch(m);
             newElementMatch.parentPhrase = this;
             return newElementMatch;
         }).toList();
@@ -221,8 +223,6 @@ public class PhraseExecution {
                 }
             }
         }
-
-
 
 
     }
@@ -311,7 +311,7 @@ public class PhraseExecution {
     public static class ElementMatch extends Component {
         String text;
         String category;
-        String selectionType;
+        public String selectionType;
         String elementPosition;
         Attribute attribute;
         public XPathy xPathy;
@@ -319,6 +319,7 @@ public class PhraseExecution {
         public List<WebElement> matchedElements;
         public Set<XPathyRegistry.HtmlType> htmlTypes;
         public PhraseExecution parentPhrase;
+
         public enum ElementType {
             HTML, ALERT, BROWSER, BROWSER_WINDOW, BROWSER_TAB, URL, VALUE;
 
@@ -334,7 +335,7 @@ public class PhraseExecution {
 
         int elementIndex;
 
-        public List<XPathData> getElementXPathy(){
+        public List<XPathData> getElementXPathy() {
             return updateXPathData(parentPhrase.contextXPathDataList, new XPathData(this));
         }
 
@@ -345,7 +346,8 @@ public class PhraseExecution {
             this.category = elementNode.resolvedGroupText("type");
             this.elementPosition = elementNode.resolvedGroupText("elementPosition");
             this.selectionType = elementNode.resolvedGroupText("selectionType");
-
+//            if(selectionType.isEmpty())
+//                selectionType = "single";
             for (ElementType et : ElementType.values()) {
                 if (this.category.startsWith(et.name())) {
                     this.elementType = et;
@@ -383,14 +385,23 @@ public class PhraseExecution {
                     xPathy = applyAttrOp(xPathy, com.xpathy.Attribute.custom(attribute.attrName), op, attribute.predicateVal);
             }
 
-            if (!elementPosition.isBlank()) {
-                if (elementPosition.equals("last"))
-                    xPathy = xPathy.last();
-                else {
-                    elementIndex = Integer.parseInt(elementPosition);
-                    xPathy = xPathy.nth(elementIndex);
-                }
+            if (!selectionType.isEmpty()) {
+
             }
+
+            if (elementPosition.isEmpty())
+                elementPosition = "1";
+            if (elementPosition.equals("last")) {
+                xPathy = xPathy.last();
+            } else {
+                elementIndex = Integer.parseInt(elementPosition);
+                if (selectionType.isEmpty())
+                    xPathy = xPathy.nth(elementIndex);
+                else
+                    xPathy = everyNth(xPathy, elementIndex);
+            }
+
+
         }
 
         public List<WebElement> findWebElements(WebDriver driver) {

@@ -32,6 +32,9 @@ public final class LeanWaits {
 
         for(ElementMatch elementMatch : elementMatches){
            elementMatch.findWebElements(driver);
+           if(!elementMatch.selectionType.equals("any") && elementMatch.matchedElements.isEmpty())
+               throw new RuntimeException("No elements found for " + elementMatch);
+
             for(WebElement element : elementMatch.matchedElements){
                 waitForElementReady(driver, element, Duration.ofSeconds(60));
             }

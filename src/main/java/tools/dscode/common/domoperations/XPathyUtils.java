@@ -11,86 +11,7 @@ public final class XPathyUtils {
         // utility class
     }
 
-    /**
-     * Combines all ElementMatch.xPathy into a single union XPath:
-     * xpath1 | xpath2 | xpath3 ...
-     */
-    public static XPathy orAllElements(List<ElementMatch> elements) {
-        if (elements == null || elements.isEmpty()) {
-            throw new IllegalArgumentException("Need at least one ElementMatch");
-        }
 
-        StringBuilder sb = new StringBuilder();
-        boolean first = true;
-
-        for (ElementMatch el : elements) {
-            if (el == null || el.xPathy == null) {
-                continue;
-            }
-
-            String xpath = el.xPathy.getXpath();
-            if (xpath == null || xpath.isBlank()) {
-                continue;
-            }
-
-            if (!first) {
-                sb.append(" | ");
-            } else {
-                first = false;
-            }
-            sb.append(xpath);
-        }
-
-        if (first) {
-            // never appended anything
-            throw new IllegalArgumentException("All ElementMatch instances had null/blank XPathy");
-        }
-
-        return new XPathy(sb.toString());
-    }
-
-    /**
-     * Combines all ElementMatch.xPathy into a boolean AND expression:
-     * (xpath1) and (xpath2) and (xpath3) ...
-     * <p>
-     * This is a boolean expression, not a standalone location path.
-     * Use it where a boolean XPath expression is valid (e.g. inside predicates).
-     */
-    public static XPathy andAllElements(List<ElementMatch> elements) {
-        if (elements == null || elements.isEmpty()) {
-            throw new IllegalArgumentException("Need at least one ElementMatch");
-        }
-
-        StringBuilder sb = new StringBuilder();
-        boolean first = true;
-
-        for (ElementMatch el : elements) {
-            if (el == null || el.xPathy == null) {
-                continue;
-            }
-
-            String xpath = el.xPathy.getXpath();
-            if (xpath == null || xpath.isBlank()) {
-                continue;
-            }
-
-            if (!first) {
-                sb.append(" and ");
-            } else {
-                first = false;
-            }
-
-            // Wrap each expression so any internal "and/or" stays grouped correctly
-            sb.append('(').append(xpath).append(')');
-        }
-
-        if (first) {
-            // never appended anything
-            throw new IllegalArgumentException("All ElementMatch instances had null/blank XPathy");
-        }
-
-        return new XPathy(sb.toString());
-    }
 
     private static XPathy wrapWithPredicate(XPathy xp, String predicate) {
         if (xp == null) {
@@ -335,6 +256,94 @@ public final class XPathyUtils {
         sb.append(")");
         return sb.toString();
     }
+
+
+
+
+
+
+
+   //**
+     //     * Combines all ElementMatch.xPathy into a single union XPath:
+     //     * xpath1 | xpath2 | xpath3 ...
+     //     */
+//    public static XPathy orAllElements(List<ElementMatch> elements) {
+//        if (elements == null || elements.isEmpty()) {
+//            throw new IllegalArgumentException("Need at least one ElementMatch");
+//        }
+//
+//        StringBuilder sb = new StringBuilder();
+//        boolean first = true;
+//
+//        for (ElementMatch el : elements) {
+//            if (el == null || el.xPathy == null) {
+//                continue;
+//            }
+//
+//            String xpath = el.xPathy.getXpath();
+//            if (xpath == null || xpath.isBlank()) {
+//                continue;
+//            }
+//
+//            if (!first) {
+//                sb.append(" | ");
+//            } else {
+//                first = false;
+//            }
+//            sb.append(xpath);
+//        }
+//
+//        if (first) {
+//            // never appended anything
+//            throw new IllegalArgumentException("All ElementMatch instances had null/blank XPathy");
+//        }
+//
+//        return new XPathy(sb.toString());
+//    }
+//
+//    /**
+//     * Combines all ElementMatch.xPathy into a boolean AND expression:
+//     * (xpath1) and (xpath2) and (xpath3) ...
+//     * <p>
+//     * This is a boolean expression, not a standalone location path.
+//     * Use it where a boolean XPath expression is valid (e.g. inside predicates).
+//     */
+//    public static XPathy andAllElements(List<ElementMatch> elements) {
+//        if (elements == null || elements.isEmpty()) {
+//            throw new IllegalArgumentException("Need at least one ElementMatch");
+//        }
+//
+//        StringBuilder sb = new StringBuilder();
+//        boolean first = true;
+//
+//        for (ElementMatch el : elements) {
+//            if (el == null || el.xPathy == null) {
+//                continue;
+//            }
+//
+//            String xpath = el.xPathy.getXpath();
+//            if (xpath == null || xpath.isBlank()) {
+//                continue;
+//            }
+//
+//            if (!first) {
+//                sb.append(" and ");
+//            } else {
+//                first = false;
+//            }
+//
+//            // Wrap each expression so any internal "and/or" stays grouped correctly
+//            sb.append('(').append(xpath).append(')');
+//        }
+//
+//        if (first) {
+//            // never appended anything
+//            throw new IllegalArgumentException("All ElementMatch instances had null/blank XPathy");
+//        }
+//
+//        return new XPathy(sb.toString());
+//    }
+
 
 
 }

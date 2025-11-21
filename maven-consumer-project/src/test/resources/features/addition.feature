@@ -1,4 +1,10 @@
 Feature: Addition
+  Scenario: ss2
+    Then print aaa
+  @[DEBUG] Then print aaa
+    * configs
+    Given set $(CHROME)
+    * , click Qqq
 
 
   Scenario: b test2
@@ -9,10 +15,10 @@ Feature: Addition
 #      | usera  |
     Given set $(CHROME)
 #    * navigate to: URL.google
-    * navigate to: URL.bad
+#    * navigate to: URL.bad
 #    Then , click "Gmail" Link, and wait 1 seconds
 
-    Then print aaa
+#    Then print aaa
 #    Given get browser $(CHROME)
 #      | http://google.com |
 #    Then , wait 4 seconds
