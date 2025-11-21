@@ -47,7 +47,7 @@ public class CalculatorSteps {
     public static void configs() {
         XPathyRegistry.add("Qqq", (category, v, op) -> orMap(
                 () -> XPathy.from(Tag.any).byAttribute(role).equals("link").or().byAttribute(aria_label).equals("link"),
-                () -> XPathy.from(Tag.a).byAttribute(role).equals("ee")
+                () -> XPathy.from(Tag.a)
         ));
     }
     @Given("I have numbers {int} and {int}")

@@ -4,7 +4,7 @@ Feature: Addition
   @[DEBUG] Then print aaa
     * configs
     Given set $(CHROME)
-    * , click Qqq
+    * , click "Essential QA Service" Qqq
 
 
   Scenario: b test2

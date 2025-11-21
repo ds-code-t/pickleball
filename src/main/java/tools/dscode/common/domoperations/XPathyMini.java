@@ -1,6 +1,7 @@
 package tools.dscode.common.domoperations;
 
 import com.xpathy.Attribute;
+import com.xpathy.Condition;
 import com.xpathy.Tag;
 import com.xpathy.XPathy;
 
@@ -176,6 +177,7 @@ public final class XPathyMini {
 //    }
 
 
+
     @SafeVarargs
     public static XPathy orMap(Function<XPathy, XPathy> mapper,
                                Supplier<XPathy>... bases) {
@@ -192,8 +194,13 @@ public final class XPathyMini {
         // 3. Extract mapper predicate from the XPathy object
         String mapperPredicate = toSelfStep(mapped.getXpath());
 
-        // 4. Combine base and mapper predicate
-        return XPathy.from("//*[" + bundled + " and " + mapperPredicate + "]").byCondition(visible());
+        // 4. Combine base + mapper predicate
+        String baseAndMapper = bundled + " and " + mapperPredicate;
+
+        // 5. Append "no ancestor-or-self is invisible" predicate
+        String fullPredicate = withNoInvisibleAncestorOrSelf(baseAndMapper);
+
+        return XPathy.from("//*[" + fullPredicate + "]");
     }
 
     @SafeVarargs
@@ -204,8 +211,11 @@ public final class XPathyMini {
                 .map(x -> toSelfStep(x.getXpath()))
                 .collect(Collectors.joining(" or "));
 
-        // Result: //*[(self::input[@class='A'] or self::div)]
-        return XPathy.from("//*[" + predicate + "]").byCondition(visible());
+        // Result before: //*[(self::input[@class='A'] or self::div)]
+        // Now:          //*[(self::... or ...) and not(ancestor-or-self::*[invisible])]
+        String fullPredicate = withNoInvisibleAncestorOrSelf(predicate);
+
+        return XPathy.from("//*[" + fullPredicate + "]");
     }
 
     @SafeVarargs
@@ -225,9 +235,13 @@ public final class XPathyMini {
         String mapperPredicate = toSelfStep(mapped.getXpath());
 
         // 4. Combine base and mapper predicate
-        return XPathy.from("//*[" + bundled + " and " + mapperPredicate + "]").byCondition(visible());
-    }
+        String baseAndMapper = bundled + " and " + mapperPredicate;
 
+        // 5. Append "no ancestor-or-self is invisible" predicate
+        String fullPredicate = withNoInvisibleAncestorOrSelf(baseAndMapper);
+
+        return XPathy.from("//*[" + fullPredicate + "]");
+    }
 
     @SafeVarargs
     public static XPathy andMap(Supplier<XPathy>... bases) {
@@ -237,8 +251,69 @@ public final class XPathyMini {
                 .map(x -> toSelfStep(x.getXpath()))
                 .collect(Collectors.joining(" and "));
 
-        // Result: //*[(self::input[@class='A'] and self::div and ...)]
-        return XPathy.from("//*[" + predicate + "]").byCondition(visible());
+        // Result before: //*[(self::input[@class='A'] and self::div and ...)]
+        // Now:           //*[(self::... and ...) and not(ancestor-or-self::*[invisible])]
+        String fullPredicate = withNoInvisibleAncestorOrSelf(predicate);
+
+        return XPathy.from("//*[" + fullPredicate + "]");
+    }
+
+    // ---------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------
+
+    /**
+     * Take an existing predicate (e.g. "self::a and @foo")
+     * and append "and not(ancestor-or-self::*[invisible()])" to it,
+     * where invisible() is defined as NOT visible().
+     */
+    private static String withNoInvisibleAncestorOrSelf(String predicate) {
+        String ancestorNotInvisible = buildAncestorNotInvisiblePredicate();
+        return predicate + " and " + ancestorNotInvisible;
+    }
+
+    /**
+     * Build:
+     *   not(ancestor-or-self::*[ <invisible-body> ])
+     *
+     * where <invisible-body> is derived from the XPath that XPathy
+     * generates for:
+     *
+     *   .byCondition( Condition.not( visible() ) )
+     *
+     * This reuses ALL existing visibility logic without duplicating it.
+     */
+    private static String buildAncestorNotInvisiblePredicate() {
+        // Build a temporary XPath that uses NOT visible() as a predicate
+        XPathy tmp = XPathy.from("//*").byCondition(
+                Condition.not(VisibilityConditions.visible())
+        );
+        String xpath = tmp.getXpath();
+
+        // Extract the predicate body between the outer [ ... ]
+        String invisibleBody = extractPredicateBody(xpath);
+
+        // Wrap it as an ancestor-or-self check:
+        // not(ancestor-or-self::*[ <invisibleBody> ])
+        return "not(ancestor-or-self::*[" + invisibleBody + "])";
+    }
+
+    /**
+     * Given an XPath like:
+     *   //*[( not(contains(...)) and ... )]
+     *
+     * return the string inside the outer [ and ], e.g.:
+     *   ( not(contains(...)) and ... )
+     */
+    private static String extractPredicateBody(String xpath) {
+        int open = xpath.indexOf('[');
+        int close = xpath.lastIndexOf(']');
+        if (open < 0 || close <= open + 1) {
+            throw new IllegalStateException(
+                    "Unexpected XPath format when extracting predicate: " + xpath
+            );
+        }
+        return xpath.substring(open + 1, close);
     }
 
 
