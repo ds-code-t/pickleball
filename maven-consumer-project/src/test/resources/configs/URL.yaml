@@ -1,3 +1,4 @@
 test A: http://google.com/<configs.USER.<suffix>>
 google: http://google.com/
 bad: https://expired.badssl.com/
+w3: https://www.w3schools.com/tags/tryit.asp?filename=tryhtml_input_test

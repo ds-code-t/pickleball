@@ -17,7 +17,9 @@ import tools.dscode.registry.GlobalRegistry;
 import java.util.List;
 
 import static com.xpathy.Attribute.aria_label;
+import static com.xpathy.Attribute.placeholder;
 import static com.xpathy.Attribute.role;
+import static com.xpathy.Attribute.type;
 import static org.assertj.core.api.Assertions.assertThat;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.domoperations.XPathyMini.orMap;
@@ -45,6 +47,12 @@ public class CalculatorSteps {
 
     @Given("configs")
     public static void configs() {
+
+        XPathyRegistry.add("Textbox", (category, v, op) -> orMap(
+                () -> Tag.input.byAttribute(type).equals("text").and().byAttribute(placeholder).equals(v.toString()),
+                () -> Tag.input.byAttribute(type).equals("text").$parent().$descendant().byHaving(deepNormalizedText(v.toString()))
+        ));
+
         XPathyRegistry.add("Qqq", (category, v, op) -> orMap(
                 () -> XPathy.from(Tag.any).byAttribute(role).equals("link").or().byAttribute(aria_label).equals("link"),
                 () -> XPathy.from(Tag.a)

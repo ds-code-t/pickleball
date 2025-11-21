@@ -159,22 +159,6 @@ public final class XPathyMini {
         return base -> applyTextOp(base, op, v);
     }
 
-//    @SafeVarargs
-//    public static XPathy orMap(Function<XPathy, XPathy> mapper, Supplier<XPathy>... bases) {
-//        return java.util.Arrays.stream(bases)
-//                .map(Supplier::get)
-//                .map(mapper)
-//                .reduce(XPathy::or)
-//                .orElseThrow();
-//    }
-//
-//    @SafeVarargs
-//    public static XPathy orMap(Supplier<XPathy>... bases) {
-//        return java.util.Arrays.stream(bases)
-//                .map(Supplier::get)
-//                .reduce(XPathy::or)
-//                .orElseThrow();
-//    }
 
 
 
@@ -182,25 +166,43 @@ public final class XPathyMini {
     public static XPathy orMap(Function<XPathy, XPathy> mapper,
                                Supplier<XPathy>... bases) {
 
-        // 1. Build: self::input[@class='A'] or self::div ...
+        // 1. Build: self::input[@class='A'] or descendant::*...
         String bundled = Arrays.stream(bases)
                 .map(Supplier::get)
-                .map(x -> toSelfStep(x.getXpath()))
+                .map(x -> {
+                    String xp = x.getXpath();
+                    System.out.println("## orMap(mapper) base xpath: " + xp);
+                    String step = toSelfStep(xp);
+                    System.out.println("## orMap(mapper) toSelfStep -> " + step);
+                    return step;
+                })
                 .collect(Collectors.joining(" or "));
 
+        System.out.println("## orMap(mapper) bundled predicate: " + bundled);
+
         // 2. Apply mapper ONCE to the whole combined expression
-        XPathy mapped = mapper.apply(XPathy.from("//*[" + bundled + "]"));
+        XPathy baseForMapper = XPathy.from("//*[" + bundled + "]");
+        System.out.println("## orMap(mapper) baseForMapper: " + baseForMapper.getXpath());
+
+        XPathy mapped = mapper.apply(baseForMapper);
+        System.out.println("## orMap(mapper) mapped xpath: " + mapped.getXpath());
 
         // 3. Extract mapper predicate from the XPathy object
         String mapperPredicate = toSelfStep(mapped.getXpath());
+        System.out.println("## orMap(mapper) mapperPredicate (self-step): " + mapperPredicate);
 
         // 4. Combine base + mapper predicate
         String baseAndMapper = bundled + " and " + mapperPredicate;
+        System.out.println("## orMap(mapper) baseAndMapper: " + baseAndMapper);
 
         // 5. Append "no ancestor-or-self is invisible" predicate
         String fullPredicate = withNoInvisibleAncestorOrSelf(baseAndMapper);
+        System.out.println("## orMap(mapper) fullPredicate: " + fullPredicate);
 
-        return XPathy.from("//*[" + fullPredicate + "]");
+        String finalXpath = "//*[" + fullPredicate + "]";
+        System.out.println("## orMap(mapper) FINAL XPATH: " + finalXpath);
+
+        return XPathy.from(finalXpath);
     }
 
     @SafeVarargs
@@ -208,39 +210,69 @@ public final class XPathyMini {
 
         String predicate = Arrays.stream(bases)
                 .map(Supplier::get)
-                .map(x -> toSelfStep(x.getXpath()))
+                .map(x -> {
+                    String xp = x.getXpath();
+                    System.out.println("## orMap base xpath: " + xp);
+                    String step = toSelfStep(xp);
+                    System.out.println("## orMap toSelfStep -> " + step);
+                    return step;
+                })
                 .collect(Collectors.joining(" or "));
+
+        System.out.println("## orMap bundled predicate: " + predicate);
 
         // Result before: //*[(self::input[@class='A'] or self::div)]
         // Now:          //*[(self::... or ...) and not(ancestor-or-self::*[invisible])]
         String fullPredicate = withNoInvisibleAncestorOrSelf(predicate);
+        System.out.println("## orMap fullPredicate: " + fullPredicate);
 
-        return XPathy.from("//*[" + fullPredicate + "]");
+        String finalXpath = "//*[" + fullPredicate + "]";
+        System.out.println("## orMap FINAL XPATH: " + finalXpath);
+
+        return XPathy.from(finalXpath);
     }
 
     @SafeVarargs
     public static XPathy andMap(Function<XPathy, XPathy> mapper,
                                 Supplier<XPathy>... bases) {
 
-        // 1. Build: self::input[@class='A'] and self::div ...
+        // 1. Build: self::input[@class='A'] and descendant::* ...
         String bundled = Arrays.stream(bases)
                 .map(Supplier::get)
-                .map(x -> toSelfStep(x.getXpath()))
+                .map(x -> {
+                    String xp = x.getXpath();
+                    System.out.println("## andMap(mapper) base xpath: " + xp);
+                    String step = toSelfStep(xp);
+                    System.out.println("## andMap(mapper) toSelfStep -> " + step);
+                    return step;
+                })
                 .collect(Collectors.joining(" and "));
 
+        System.out.println("## andMap(mapper) bundled predicate: " + bundled);
+
         // 2. Apply mapper ONCE to the whole combined expression
-        XPathy mapped = mapper.apply(XPathy.from("//*[" + bundled + "]"));
+        XPathy baseForMapper = XPathy.from("//*[" + bundled + "]");
+        System.out.println("## andMap(mapper) baseForMapper: " + baseForMapper.getXpath());
+
+        XPathy mapped = mapper.apply(baseForMapper);
+        System.out.println("## andMap(mapper) mapped xpath: " + mapped.getXpath());
 
         // 3. Extract its predicate part
         String mapperPredicate = toSelfStep(mapped.getXpath());
+        System.out.println("## andMap(mapper) mapperPredicate (self-step): " + mapperPredicate);
 
         // 4. Combine base and mapper predicate
         String baseAndMapper = bundled + " and " + mapperPredicate;
+        System.out.println("## andMap(mapper) baseAndMapper: " + baseAndMapper);
 
         // 5. Append "no ancestor-or-self is invisible" predicate
         String fullPredicate = withNoInvisibleAncestorOrSelf(baseAndMapper);
+        System.out.println("## andMap(mapper) fullPredicate: " + fullPredicate);
 
-        return XPathy.from("//*[" + fullPredicate + "]");
+        String finalXpath = "//*[" + fullPredicate + "]";
+        System.out.println("## andMap(mapper) FINAL XPATH: " + finalXpath);
+
+        return XPathy.from(finalXpath);
     }
 
     @SafeVarargs
@@ -248,63 +280,59 @@ public final class XPathyMini {
 
         String predicate = Arrays.stream(bases)
                 .map(Supplier::get)
-                .map(x -> toSelfStep(x.getXpath()))
+                .map(x -> {
+                    String xp = x.getXpath();
+                    System.out.println("## andMap base xpath: " + xp);
+                    String step = toSelfStep(xp);
+                    System.out.println("## andMap toSelfStep -> " + step);
+                    return step;
+                })
                 .collect(Collectors.joining(" and "));
+
+        System.out.println("## andMap bundled predicate: " + predicate);
 
         // Result before: //*[(self::input[@class='A'] and self::div and ...)]
         // Now:           //*[(self::... and ...) and not(ancestor-or-self::*[invisible])]
         String fullPredicate = withNoInvisibleAncestorOrSelf(predicate);
+        System.out.println("## andMap fullPredicate: " + fullPredicate);
 
-        return XPathy.from("//*[" + fullPredicate + "]");
+        String finalXpath = "//*[" + fullPredicate + "]";
+        System.out.println("## andMap FINAL XPATH: " + finalXpath);
+
+        return XPathy.from(finalXpath);
     }
 
     // ---------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------
 
-    /**
-     * Take an existing predicate (e.g. "self::a and @foo")
-     * and append "and not(ancestor-or-self::*[invisible()])" to it,
-     * where invisible() is defined as NOT visible().
-     */
     private static String withNoInvisibleAncestorOrSelf(String predicate) {
+        System.out.println("## withNoInvisibleAncestorOrSelf IN: " + predicate);
         String ancestorNotInvisible = buildAncestorNotInvisiblePredicate();
-        return predicate + " and " + ancestorNotInvisible;
+        System.out.println("## withNoInvisibleAncestorOrSelf ancestorNotInvisible: " + ancestorNotInvisible);
+
+        String out = "(" + predicate + ") and " + ancestorNotInvisible;
+        System.out.println("## withNoInvisibleAncestorOrSelf OUT: " + out);
+        return out;
     }
 
-    /**
-     * Build:
-     *   not(ancestor-or-self::*[ <invisible-body> ])
-     *
-     * where <invisible-body> is derived from the XPath that XPathy
-     * generates for:
-     *
-     *   .byCondition( Condition.not( visible() ) )
-     *
-     * This reuses ALL existing visibility logic without duplicating it.
-     */
     private static String buildAncestorNotInvisiblePredicate() {
         // Build a temporary XPath that uses NOT visible() as a predicate
         XPathy tmp = XPathy.from("//*").byCondition(
                 Condition.not(VisibilityConditions.visible())
         );
         String xpath = tmp.getXpath();
+        System.out.println("## buildAncestorNotInvisiblePredicate tmp xpath: " + xpath);
 
         // Extract the predicate body between the outer [ ... ]
         String invisibleBody = extractPredicateBody(xpath);
+        System.out.println("## buildAncestorNotInvisiblePredicate invisibleBody: " + invisibleBody);
 
-        // Wrap it as an ancestor-or-self check:
-        // not(ancestor-or-self::*[ <invisibleBody> ])
-        return "not(ancestor-or-self::*[" + invisibleBody + "])";
+        String ancestor = "not(ancestor-or-self::*[" + invisibleBody + "])";
+        System.out.println("## buildAncestorNotInvisiblePredicate ancestor predicate: " + ancestor);
+        return ancestor;
     }
 
-    /**
-     * Given an XPath like:
-     *   //*[( not(contains(...)) and ... )]
-     *
-     * return the string inside the outer [ and ], e.g.:
-     *   ( not(contains(...)) and ... )
-     */
     private static String extractPredicateBody(String xpath) {
         int open = xpath.indexOf('[');
         int close = xpath.lastIndexOf(']');
@@ -313,22 +341,53 @@ public final class XPathyMini {
                     "Unexpected XPath format when extracting predicate: " + xpath
             );
         }
-        return xpath.substring(open + 1, close);
+        String body = xpath.substring(open + 1, close);
+        System.out.println("## extractPredicateBody from: " + xpath);
+        System.out.println("## extractPredicateBody body: " + body);
+        return body;
     }
 
-
     private static String toSelfStep(String xpath) {
+        System.out.println("\n@@toSelfStep IN: " + xpath);
+
         String s = xpath.trim();
 
         // Strip leading //, .//, /, ./ etc.
         s = s.replaceFirst("^\\.?/+", "");
 
-        // Keep only the last step (e.g. "input[@class='A']" from "div/span/input[@class='A']")
+        // Keep only the last step (e.g. "input[@class='A']" from "div/span/input[@class='A']").
         int lastSlash = s.lastIndexOf('/');
         String step = (lastSlash >= 0) ? s.substring(lastSlash + 1) : s;
+        System.out.println("@@  raw step: [" + step + "]");
 
-        return "self::" + step;
+        // 1) If it ALREADY has an axis anywhere (e.g. "descendant::*[...]",
+        //    "ancestor::*[@hidden]", "following-sibling::a[@x]"),
+        //    DO NOT touch it. Just return as-is.
+        //
+        //    This also covers the bad "self::descendant::*" if it ever sneaks in
+        //    from upstream – we won't add another "self::" in front of it.
+        if (step.contains("::")) {
+            System.out.println("@@  step contains '::', returning as-is: [" + step + "]");
+            return step;
+        }
+
+        // 2) Otherwise, prepend self:: (original behavior).
+        String result = "self::" + step;
+        System.out.println("@@  default -> [" + result + "]");
+        return result;
     }
+
+
+
+    // ---------------------------------------------------------------------
+    // Helpers
+    // ---------------------------------------------------------------------
+
+
+
+
+
+
 
     // 2) Simpler overload when all bases are plain tags
     public static XPathy orTags(Function<XPathy, XPathy> mapper, Tag... tags) {

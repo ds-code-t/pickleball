@@ -1,10 +1,13 @@
 Feature: Addition
+
   Scenario: ss2
     Then print aaa
   @[DEBUG] Then print aaa
     * configs
     Given set $(CHROME)
-    * , click "Essential QA Service" Qqq
+#    * navigate to: URL.w3
+    * , I enter "dd" in the "Last name:" Textbox
+#    * , click "Essential QA Service" Qqq
 
 
   Scenario: b test2
@@ -61,7 +64,6 @@ Feature: Addition
       | Alice |
       | Bob   |
       | Carol |
-
 
 
   Scenario: nestTest
