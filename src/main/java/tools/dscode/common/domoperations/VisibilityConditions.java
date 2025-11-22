@@ -1,12 +1,18 @@
 package tools.dscode.common.domoperations;
 
 import com.xpathy.Condition;
+import com.xpathy.Tag;
+import com.xpathy.XPathy;
 
+import static com.xpathy.Attribute.style;
 import static com.xpathy.Style.*;
 import static com.xpathy.Attribute.*;
 import static com.xpathy.Style.height;
 import static com.xpathy.Style.width;
+import com.xpathy.XPathy;
 
+import static com.xpathy.Tag.*;  // needed for wildcard tag: all tags → Tag.STAR if available
+import static com.xpathy.Condition.*;
 /**
  * Reusable XPathy conditions related to "visibility".
  *
@@ -32,15 +38,75 @@ import static com.xpathy.Style.width;
  *    to allow raw XPath like `ancestor-or-self::*[...]`. That is not done
  *    here, because it cannot be implemented solely in this helper class.
  */
+import com.xpathy.XPathy;
+// existing imports...
+// import com.xpathy.Condition;
+// import static com.xpathy.Style.*;
+// import static com.xpathy.Attribute.*;
+// etc.
+
 public final class VisibilityConditions {
+
+
 
     private VisibilityConditions() {
         // utility class
     }
 
     public static Condition invisible() {
-        return Condition.not( visible() );
+        return Condition.not(visible());
     }
+
+    // ... your existing visible() here ...
+
+    /**
+     * XPathy locator for:
+     *  - any tag that is visible according to visible()
+     *  - AND has no ancestor that is invisible() according to the same rules.
+     */
+    public static XPathy visibleElement() {
+
+        // Base "any element" XPathy, i.e. //*
+        XPathy any = new XPathy();
+
+        // Reuse the existing visibility conditions to let XPathy generate
+        // the *self* predicates for us.
+        XPathy selfVisible = any.byCondition(visible());
+        XPathy selfInvisible = any.byCondition(invisible());
+
+        String base = any.getXpath();               // "//*"
+        String selfVisibleXpath = selfVisible.getXpath();     // "//*[<visible predicate>]"
+        String selfInvisibleXpath = selfInvisible.getXpath(); // "//*[<invisible predicate>]"
+
+        String visiblePredicate = extractPredicate(base, selfVisibleXpath);
+        String invisiblePredicate = extractPredicate(base, selfInvisibleXpath);
+
+        // Build final XPath string:
+        //
+        // //*[
+        //    <visiblePredicate>
+        //    and not(ancestor::*[<invisiblePredicate>])
+        // ]
+        String finalXpath =
+                base + "[" +
+                        visiblePredicate +
+                        " and not(ancestor::*[" +
+                        invisiblePredicate +
+                        "])]";
+
+        return new XPathy(finalXpath);
+    }
+
+    // Helper: given "//*" and "//*[(...)]" return "(...)"
+    private static String extractPredicate(String base, String xpathWithPredicate) {
+        // Expect pattern: base + "[" + predicate + "]"
+        if (!xpathWithPredicate.startsWith(base + "[") || !xpathWithPredicate.endsWith("]")) {
+            throw new IllegalArgumentException("Unexpected XPath format: " + xpathWithPredicate);
+        }
+        return xpathWithPredicate.substring(base.length() + 1, xpathWithPredicate.length() - 1);
+    }
+
+
     /**
      * Condition that can be plugged into any XPathy via .byCondition(...).
      *

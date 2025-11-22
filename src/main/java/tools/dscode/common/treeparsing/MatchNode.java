@@ -157,6 +157,11 @@ public final class MatchNode {
         return globalState.put(key, value);
     }
 
+    public String getStringFromLocalState(String key) {
+        Object o = getFromLocalState(key);
+        if (o == null) return "";
+        return o.toString();
+    }
 
     public Object getFromLocalState(String key) {
         List<Object> list = localState.get(key);

@@ -220,17 +220,57 @@ public final class XPathyUtils {
             throw new IllegalArgumentException("rawText must not be null");
         }
 
-        // Normalize the expected value the same way we will normalize DOM text.
+        // Normalize the expected Java value the same way.
         String expected = rawText.replaceAll("\\s+", " ").strip();
 
-        // Just the predicate condition — NO leading //, NO wrapping //*[].
+        // IMPORTANT:
+        // Build the translate() FROM string as a literal containing ALL weird whitespace chars.
+        // These chars are *actual literal Unicode characters*, NOT Java escapes inside XPath.
+        // Java string will contain real codepoints, but XPath will see them correctly.
+        String from = ""
+                + "\u0020"  // space
+                + "\u0009"  // tab
+                + ((char) 0x000A)  // LF
+                + ((char) 0x000D)  // CR
+                + "\u00A0"  // NBSP
+
+                + "\u200B"  // ZWSP
+                + "\u200C"  // ZWNJ
+                + "\u200D"  // ZWJ
+                + "\uFEFF"  // ZERO WIDTH NBSP/BOM
+
+                + "\u1680"  // OGHAM SPACE MARK
+                + "\u180E"  // MONGOLIAN VOWEL SEPARATOR (deprecated but still found)
+                + "\u2000"  // EN QUAD
+                + "\u2001"  // EM QUAD
+                + "\u2002"  // EN SPACE
+                + "\u2003"  // EM SPACE
+                + "\u2004"  // THREE-PER-EM SPACE
+                + "\u2005"  // FOUR-PER-EM SPACE
+                + "\u2006"  // SIX-PER-EM SPACE
+                + "\u2007"  // FIGURE SPACE
+                + "\u2008"  // PUNCTUATION SPACE
+                + "\u2009"  // THIN SPACE
+                + "\u200A"  // HAIR SPACE
+                + "\u2028"  // LINE SEPARATOR
+                + "\u2029"  // PARAGRAPH SEPARATOR
+                + "\u202F"  // NARROW NBSP
+                + "\u205F"  // MMSP
+                + "\u3000"; // IDEOGRAPHIC SPACE
+
+        // Build TO string: same number of spaces
+        String to = " ".repeat(from.length());
+
+        // Build predicate
         String predicate =
                 "normalize-space(" +
-                        "translate(string(.), ' \t\r\n\u00A0', '     ')" +
+                        "translate(string(.), " +
+                        toXPathLiteral(from) + ", " +
+                        toXPathLiteral(to) +
+                        ")" +
                         ") = " + toXPathLiteral(expected);
 
-        // Return relative XPathy containing just the predicate.
-        // This produces XPathy("(normalize-space(...) = 'expected')")
+        // Return a relative XPathy node predicate
         return XPathy.from("(" + predicate + ")");
     }
 

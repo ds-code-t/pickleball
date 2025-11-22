@@ -30,8 +30,8 @@ public class ParsedActions {
         List<ElementMatch> nextElementMatches = phraseExecution.getNextComponents(actionNode.position, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
         ElementMatch nextElementMatch = nextElementMatches .isEmpty() ? null : nextElementMatches.getFirst();
 
-        List<WebElement> nextElements = nextElementMatch == null || nextElementMatch.matchedElements == null ?
-                new ArrayList<>() : nextElementMatch.matchedElements;
+        List<WrappedWebElement> nextElements = nextElementMatch == null || nextElementMatch.matchedElements == null ?
+                new ArrayList<>() : nextElementMatch.matchedElements.getWrappers();
         ValueMatch nextValue = (ValueMatch) phraseExecution.getNextComponents(actionNode.position, "valueMatch").stream().findFirst().orElse(null);
 
         if (!action.equals("wait") && (nextElementMatches.isEmpty() || nextElements.isEmpty())) {

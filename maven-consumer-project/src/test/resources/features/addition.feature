@@ -6,7 +6,7 @@ Feature: Addition
     * configs
     Given set $(CHROME)
 #    * navigate to: URL.w3
-    * , I enter "dd" in the "Last name:" Textbox
+    * , from the IframeResult, I enter "dd" in the "Last name:" Textbox
 #    * , click "Essential QA Service" Qqq
 
 

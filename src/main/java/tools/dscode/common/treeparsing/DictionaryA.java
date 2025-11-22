@@ -1,5 +1,6 @@
 package tools.dscode.common.treeparsing;
 
+import com.xpathy.Attribute;
 import com.xpathy.Tag;
 import com.xpathy.XPathy;
 import org.intellij.lang.annotations.Language;
@@ -8,6 +9,9 @@ import tools.dscode.common.domoperations.XPathyRegistry;
 import static com.xpathy.Attribute.aria_label;
 import static com.xpathy.Attribute.name;
 import static com.xpathy.Attribute.role;
+import static com.xpathy.Attribute.id;
+import static com.xpathy.Attribute.title;
+import static com.xpathy.Case.LOWER;
 import static tools.dscode.common.domoperations.XPathyMini.orMap;
 import static tools.dscode.common.domoperations.XPathyMini.textOp;
 import static tools.dscode.common.treeparsing.PhraseExecution.initiateFirstPhraseExecution;
@@ -25,9 +29,11 @@ public class DictionaryA extends NodeDictionary {
         XPathyRegistry.add("*", (category, v, op) -> orMap(
                 textOp(op, v),
                 () -> XPathy.from(category),
-                () -> XPathy.from(Tag.any).byAttribute(role).equals(category),
-                () -> XPathy.from(Tag.any).byAttribute(name).equals(category),
-                () -> XPathy.from(Tag.any).byAttribute(aria_label).equals(category)
+                () -> XPathy.from(Tag.any).byAttribute(role).withCase(LOWER).equals(category.toLowerCase()),
+                () -> XPathy.from(Tag.any).byAttribute(title).withCase(LOWER).equals(category.toLowerCase()),
+                () -> XPathy.from(Tag.any).byAttribute(id).withCase(LOWER).equals(category.toLowerCase()),
+                () -> XPathy.from(Tag.any).byAttribute(name).withCase(LOWER).equals(category.toLowerCase()),
+                () -> XPathy.from(Tag.any).byAttribute(aria_label).withCase(LOWER).equals(category.toLowerCase())
         ));
 
 
@@ -107,13 +113,14 @@ public class DictionaryA extends NodeDictionary {
         @Override
         public String onCapture(MatchNode self) {
             String context = self.resolvedGroupText("context");
-
+            printDebug("@@##context: " + context);
             if (!context.isEmpty() && Character.isUpperCase(context.charAt(0)))
                 self.putToLocalState("newContext", true);
             self.putToLocalState("context", context.toLowerCase());
-            self.putToLocalState("conjunctions", self.resolvedGroupText("conjunctions"));
+            self.putToLocalState("conjunction", self.resolvedGroupText("conjunction"));
             String termination = self.resolvedGroupText("punc");
             if (termination == null || termination.isBlank()) termination = "";
+            printDebug("@@##termination: " + termination);
             self.putToLocalState("termination", termination);
             if (self.localStateBoolean("context")) {
                 self.localState().put("skip:action", "true");
@@ -128,12 +135,19 @@ public class DictionaryA extends NodeDictionary {
         @Override
         public String onSubstitute(MatchNode self) {
             PhraseExecution lastPhraseExecution = (PhraseExecution) self.getFromGlobalState("lastPhraseExecution");
-            printDebug("lastPhraseExecution: " + lastPhraseExecution);
-            if (lastPhraseExecution != null && (!(lastPhraseExecution.termination.equals(";") || lastPhraseExecution.termination.equals(","))))
-                self.putToLocalState("newContext", true);
+            printDebug("@@##lastPhraseExecution: " + lastPhraseExecution);
+            if (lastPhraseExecution == null) {
+                lastPhraseExecution = initiateFirstPhraseExecution();
+            }
+            else {
+                printDebug("@@##lastPhraseExecution.text: " + lastPhraseExecution.text);
+                printDebug("@@##lastPhraseExecution.termination: " + lastPhraseExecution.termination);
+                if ((!(lastPhraseExecution.termination.equals(";") || lastPhraseExecution.termination.equals(",")))) {
+                    printDebug("@@##setting newContext to true.   " + lastPhraseExecution);
+                    self.putToLocalState("newContext", true);
+                }
+            }
 
-            if (lastPhraseExecution == null)
-                lastPhraseExecution = initiateFirstPhraseExecution(self);
 
             self.putToLocalState("context", self.resolvedGroupText("context"));
             self.putToGlobalState("lastPhraseExecution", lastPhraseExecution.initiateNextPhraseExecution(self));
@@ -151,7 +165,7 @@ public class DictionaryA extends NodeDictionary {
     };
 
 
-    ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-z]+\\b\\s*)+)(?<elPredicate>(?:with\\s+(?<attrName>[a-z]+)?)?\\s+(?<predicate><<predicate>>))?") {
+    ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?:with\\s+(?<attrName>[a-z]+)?)?\\s+(?<predicate><<predicate>>))?") {
         @Override
         public String onSubstitute(MatchNode self) {
 //            self.getAncestor("phrase").putToLocalState("elementMatch", self);
@@ -185,7 +199,8 @@ public class DictionaryA extends NodeDictionary {
     ParseNode assertionType = new ParseNode("\\b(ensure|verify)\\b") {
         @Override
         public String onSubstitute(MatchNode self) {
-            self.localState().put("skip:action", "true");
+            self.parent().putToLocalState("assertionType", self.originalText());
+            self.parent().localState().put("skip:action", "true");
             return self.originalText();
         }
     };
@@ -206,8 +221,13 @@ public class DictionaryA extends NodeDictionary {
     };
 
     //    ParseNode assertion = new ParseNode("\\b(?<base>equal|less(?:er)?|greater|less|is)(?=\\s+(?:<<quoteMask>>|<<valueMatch>>|<<elementMatch>>)(s|ed|ing|es)?)\\b")
-    ParseNode assertion = new ParseNode("\\b(?:displayed|equal|less(?:er)?|greater|less)\\b");
-
+    ParseNode assertion = new ParseNode("\\b(?:displayed|equal|less(?:er)?|greater|less)\\b") {
+        @Override
+        public String onCapture(MatchNode self) {
+            self.parent().putToLocalState("assertion", self.originalText());
+            return self.originalText();
+        }
+    };
     // Build the hierarchy AFTER the nodes above exist
     ParseNode root = buildFromYaml("""
             line:

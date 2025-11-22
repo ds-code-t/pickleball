@@ -1,6 +1,7 @@
 package tools.dscode.steps;
 
 import com.xpathy.Attribute;
+import com.xpathy.Condition;
 import com.xpathy.Tag;
 import com.xpathy.XPathy;
 import io.cucumber.datatable.DataTable;
@@ -37,10 +38,10 @@ public class CalculatorSteps {
 
 //        XPathy locator =deepNormalizedTextWrapped("User Name");
 //        System.out.println(locator.getXpath());
-        System.out.println("@@Tag.button: " +   Tag.button);
-        System.out.println("@@Tag.button: " +   Tag.button.byAttribute(Attribute.placeholder));
-        System.out.println("@@Tag.button: " +   Tag.button.byAttribute(Attribute.placeholder).equals("SS").or().tag(Tag.input));
-        System.out.println("@@Tag.button: " +   Tag.button.byAttribute(Attribute.placeholder).equals("SS").or().tag(Tag.input).byAttribute(Attribute.type).equals("password"));
+        System.out.println("@@Tag.button: " + Tag.button);
+        System.out.println("@@Tag.button: " + Tag.button.byAttribute(Attribute.placeholder));
+        System.out.println("@@Tag.button: " + Tag.button.byAttribute(Attribute.placeholder).equals("SS").or().tag(Tag.input));
+        System.out.println("@@Tag.button: " + Tag.button.byAttribute(Attribute.placeholder).equals("SS").or().tag(Tag.input).byAttribute(Attribute.type).equals("password"));
 
     }
 
@@ -50,7 +51,13 @@ public class CalculatorSteps {
 
         XPathyRegistry.add("Textbox", (category, v, op) -> orMap(
                 () -> Tag.input.byAttribute(type).equals("text").and().byAttribute(placeholder).equals(v.toString()),
-                () -> Tag.input.byAttribute(type).equals("text").$parent().$descendant().byHaving(deepNormalizedText(v.toString()))
+                () -> Tag.input
+                        .byAttribute(type).equals("text")
+                        .byHaving(
+                                XPathy.from("../descendant::*")
+                                        .byHaving(deepNormalizedText(v.toString()))
+                        )
+
         ));
 
         XPathyRegistry.add("Qqq", (category, v, op) -> orMap(
@@ -58,9 +65,11 @@ public class CalculatorSteps {
                 () -> XPathy.from(Tag.a)
         ));
     }
+
     @Given("I have numbers {int} and {int}")
     public void i_have_numbers_and(int x, int y) {
-        a = x; b = y;
+        a = x;
+        b = y;
 
         io.cucumber.core.feature.FeatureParser featureParser = GlobalRegistry.globalOf(io.cucumber.core.feature.FeatureParser.class);
         io.cucumber.core.runtime.FeaturePathFeatureSupplier featurePathFeatureSupplier = GlobalRegistry.localOf(io.cucumber.core.runtime.FeaturePathFeatureSupplier.class);
@@ -80,8 +89,6 @@ public class CalculatorSteps {
     public void the_result_should_be(int expected) {
         assertThat(result).isEqualTo(expected);
     }
-
-
 
 
 }

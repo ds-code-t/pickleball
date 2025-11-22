@@ -6,6 +6,8 @@ import tools.dscode.common.treeparsing.PhraseExecution;
 import java.util.ArrayList;
 import java.util.List;
 
+import static tools.dscode.common.util.DebugUtils.printDebug;
+
 public class XPathChainResolver {
 
     /**
@@ -14,7 +16,7 @@ public class XPathChainResolver {
      */
     public static List<WebElement> resolveXPathChain(
             WebDriver driver,
-            List<PhraseExecution.XPathData> xPathDataList
+            List<XPathData> xPathDataList
     ) {
         if (xPathDataList == null || xPathDataList.isEmpty()) {
             return List.of();
@@ -34,18 +36,24 @@ public class XPathChainResolver {
      */
     private static List<WebElement> resolveStep(
             WebDriver driver,
-            List<PhraseExecution.XPathData> steps,
+            List<XPathData> steps,
             int index,
             List<? extends SearchContext> currentContexts
     ) {
-        PhraseExecution.XPathData current = steps.get(index);
-
+        printDebug("@@##resolveStep: " + index + " / " + steps.size() + " / " + currentContexts.size());
+        XPathData current = steps.get(index);
+        printDebug("@@##current: " + current);
         // 1. Find elements for current XPathData in all contexts
         List<WebElement> found = new ArrayList<>();
         for (SearchContext context : currentContexts) {
-            // Any StaleElementReferenceException (or similar) from here will propagate
             found.addAll(context.findElements(current.xPathy().getLocator()));
         }
+
+        // Deduplicate now
+        found = found.stream().distinct().toList();
+
+        printDebug("@@##found: " + found.size());
+        if(!found.isEmpty()) printDebug("@@##found: " + found.getFirst().getTagName());
 
         // If this is the last step, we're done: return what we found
         if (index == steps.size() - 1) {
@@ -73,10 +81,12 @@ public class XPathChainResolver {
      */
     private static List<WebElement> handleFromStep(
             WebDriver driver,
-            List<PhraseExecution.XPathData> steps,
+            List<XPathData> steps,
             int currentIndex,
             List<WebElement> found
     ) {
+        System.out.println("@@steps.size: " + steps.size());
+        System.out.println("@@steps: " + steps);
         List<WebElement> finalResults = new ArrayList<>();
         List<SearchContext> normalNextContexts = new ArrayList<>();
 
@@ -87,33 +97,38 @@ public class XPathChainResolver {
 
             // 1. IFRAME / FRAME case
             String tagName = element.getTagName(); // stale here will propagate
+            printDebug("@@##tagName: " + tagName);
             if ("iframe".equalsIgnoreCase(tagName) || "frame".equalsIgnoreCase(tagName)) {
                 handledSpecial = true;
-
+                printDebug("@@##handling iframe/frame: " + element);
                 try {
                     // stale during switch will propagate out of resolveXPathChain
                     driver.switchTo().frame(element);
                     try {
+                        printDebug("@@##iframeContext");
                         finalResults.addAll(
                                 resolveStep(driver, steps, nextIndex, List.of(driver))
                         );
                     } finally {
-                        driver.switchTo().defaultContent();
+                        printDebug("@@##defaultContent Context");
+//                        driver.switchTo().defaultContent();
                     }
                 } catch (NoSuchFrameException ignored) {
                     // Frame not available – skip this element as a frame context
                     // (Other exceptions, including stale, are not suppressed.)
                 }
             }
+            else {
 
-            // 2. Shadow root case (Selenium 4+)
-            SearchContext shadowRoot = getShadowRootIfAvailable(element);
-            if (shadowRoot != null) {
-                handledSpecial = true;
-                // Any stale from inside this resolveStep will propagate
-                finalResults.addAll(
-                        resolveStep(driver, steps, nextIndex, List.of(shadowRoot))
-                );
+                // 2. Shadow root case (Selenium 4+)
+                SearchContext shadowRoot = getShadowRootIfAvailable(element);
+                if (shadowRoot != null) {
+                    handledSpecial = true;
+                    // Any stale from inside this resolveStep will propagate
+                    finalResults.addAll(
+                            resolveStep(driver, steps, nextIndex, List.of(shadowRoot))
+                    );
+                }
             }
 
             // 3. If neither iframe/frame nor shadow root, treat element as normal context
@@ -139,7 +154,7 @@ public class XPathChainResolver {
     private static SearchContext getShadowRootIfAvailable(WebElement element) {
         try {
             return element.getShadowRoot();
-        } catch (UnsupportedOperationException e) {
+        } catch (UnsupportedOperationException | NoSuchShadowRootException e) {
             // Driver does not support shadow DOM; treat as "no shadow root"
             return null;
         }

@@ -7,9 +7,12 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
+import tools.dscode.common.domoperations.XPathChainResult;
+import tools.dscode.common.domoperations.XPathData;
 import tools.dscode.common.domoperations.XPathyRegistry;
 
 import java.awt.*;
+import java.lang.annotation.ElementType;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -33,45 +36,42 @@ import static tools.dscode.common.domoperations.XPathyUtils.everyNth;
 import static tools.dscode.common.domoperations.XPathyUtils.inBetweenOf;
 import static tools.dscode.common.domoperations.XPathyUtils.insideOf;
 import static tools.dscode.common.domoperations.XPathyUtils.refine;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 import static tools.dscode.coredefinitions.GeneralSteps.getBrowser;
 
 public class PhraseExecution {
     List<XPathData> contextXPathDataList = new ArrayList<>();
     List<XPathData> executionXPathDataList = new ArrayList<>();
 
-    public record XPathData(String context, XPathy xPathy, boolean isFrom, boolean isNewContext) {
-        public XPathData(PhraseExecution pe) {
-            this(pe.context, getXPathyContext(pe.context, pe.elements), pe.context.equals("from"), pe.newContext);
-        }
 
-        public XPathData(XPathData xPathData, XPathy modifiedXPathy) {
-            this(xPathData.context, modifiedXPathy, xPathData.isFrom, xPathData.isNewContext);
-        }
-
-        public XPathData(ElementMatch elementMatch) {
-            this("", elementMatch.xPathy, false, false);
-        }
-    }
 
 
     public static List<XPathData> updateXPathData(List<XPathData> inputList, XPathData newXPathData) {
+        printDebug("@@##updateXPathData: " + newXPathData);
         List<XPathData> returnList = new ArrayList<>();
         XPathData lastXPathData = inputList.isEmpty() ? null : inputList.getLast();
+        printDebug("@@##lastXPathData: " + lastXPathData);
         if (lastXPathData == null) {
             returnList.add(newXPathData);
         } else {
-            if (lastXPathData.isFrom) {
+            printDebug("@@##lastXPathData.isFrom: " + lastXPathData.isFrom());
+
+            if (lastXPathData.isFrom()) {
                 returnList.addAll(inputList);
                 returnList.add(newXPathData);
             } else {
                 returnList.addAll(new ArrayList<>(inputList.subList(0, inputList.size() - 1)));
-                returnList.add(new XPathData(newXPathData, refine(lastXPathData.xPathy, newXPathData.xPathy)));
+                returnList.add(new XPathData(newXPathData, refine(lastXPathData.xPathy(), newXPathData.xPathy())));
             }
         }
         return returnList;
     }
 
     public void mergeXPathDataList(List<XPathData> passedXPathDataList) {
+        printDebug("@@##mergeXPathDataList: " + this.text);
+        printDebug("@@##newContext: " + newContext);
+        printDebug("@@##phraseType: " + phraseType);
+        printDebug("@@##passedXPathDataList: " + passedXPathDataList);
         if (newContext) {
             this.contextXPathDataList = new ArrayList<>();
             if (phraseType == PhraseType.CONTEXT)
@@ -86,61 +86,12 @@ public class PhraseExecution {
     }
 
 
-//    public void mergeXPathDataList(List<XPathData> passedXPathDataList) {
-//        if (elements.isEmpty()) {
-//            if (!newContext)
-//                this.contextXPathDataList.addAll(passedXPathDataList);
-//            return;
-//        }
-//
-//        XPathData currentXPathData = new XPathData(this);
-//
-//        if (phraseType == PhraseType.CONTEXT) {
-//
-//            if (currentXPathData.isNewContext) {
-//                this.contextXPathDataList.add(currentXPathData);
-//                return;
-//            }
-//
-//            XPathData lastXPathData = !passedXPathDataList.isEmpty() ? null : this.contextXPathDataList.getLast();
-//            if (lastXPathData == null) {
-//                this.contextXPathDataList.add(currentXPathData);
-//                return;
-//            } else {
-//                if (lastXPathData.isFrom) {
-//                    this.contextXPathDataList.addAll(passedXPathDataList);
-//                    this.contextXPathDataList.add(currentXPathData);
-//                } else {
-//                    this.contextXPathDataList.addAll(new ArrayList<>(passedXPathDataList.subList(0, passedXPathDataList.size() - 1)));
-//                    this.contextXPathDataList.add(new XPathData(currentXPathData, refine(lastXPathData.xPathy, contextXPathy)));
-//                }
-//            }
-//        } else {
-//            if (!newContext) {
-//                this.contextXPathDataList.addAll(passedXPathDataList);
-//            }
-//            XPathData finalXPathData = !contextXPathDataList.isEmpty() ? null : this.contextXPathDataList.getLast();
-//            if (finalXPathData == null) {
-//                this.executionXPathDataList.add(currentXPathData);
-//                return;
-//            } else {
-//                if (finalXPathData.isFrom) {
-//                    this.executionXPathDataList.addAll(contextXPathDataList);
-//                    this.executionXPathDataList.add(currentXPathData);
-//                } else {
-//                    this.executionXPathDataList.addAll(new ArrayList<>(contextXPathDataList.subList(0, contextXPathDataList.size() - 1)));
-//                    this.executionXPathDataList.add(new XPathData(currentXPathData, refine(finalXPathData.xPathy, contextXPathy)));
-//                }
-//            }
-//        }
-//    }
-
 
     String text;
     public final MatchNode phraseNode;
-    boolean newContext;
-    String context;
-    List<ElementMatch> elements;
+    public boolean newContext;
+    public String context;
+    public List<ElementMatch> elements;
     //    XPathy contextXPathy;
     //    XPathy executionXPathy;
     XPathy fullXPathy;
@@ -158,20 +109,19 @@ public class PhraseExecution {
         INITIAL, CONTEXT, ACTION, ASSERTION
     }
 
-    public static PhraseExecution initiateFirstPhraseExecution(MatchNode phraseNode) {
-        PhraseExecution pe = new PhraseExecution(phraseNode);
-        pe.phraseType = PhraseType.INITIAL;
-        return pe;
+    public static PhraseExecution initiateFirstPhraseExecution() {
+        return new PhraseExecution();
     }
 
-    public static PhraseExecution initiateFirstPhraseExecution(PhraseExecution passedPhraseExecution) {
-        PhraseExecution pe = new PhraseExecution(passedPhraseExecution);
-        return pe;
-    }
+//    public static PhraseExecution initiateFirstPhraseExecution(PhraseExecution passedPhraseExecution) {
+//        PhraseExecution pe = new PhraseExecution(passedPhraseExecution);
+//        return pe;
+//    }
 
     public PhraseExecution initiateNextPhraseExecution(MatchNode phraseNode) {
+        printDebug("@@##initiateNextPhraseExecution: " + phraseType + " : " + phraseNode.modifiedText());
         PhraseExecution pe = new PhraseExecution(phraseNode);
-        if (phraseType != null && !phraseType.equals(PhraseType.INITIAL)) {
+        if (pe.phraseType != null && !pe.phraseType.equals(PhraseType.INITIAL)) {
             pe.executedPhrases.addAll(executedPhrases);
             pe.mergeXPathDataList(contextXPathDataList);
         }
@@ -181,12 +131,17 @@ public class PhraseExecution {
         return pe;
     }
 
-    private PhraseExecution(PhraseExecution passedPhraseExecution) {
-        phraseNode = passedPhraseExecution == null ? null : passedPhraseExecution.phraseNode;
+//    private PhraseExecution(PhraseExecution passedPhraseExecution) {
+//        phraseNode = passedPhraseExecution == null ? null : passedPhraseExecution.phraseNode;
+//        phraseType = PhraseType.INITIAL;
+//        termination = "";
+//    }
+
+    private PhraseExecution() {
+        phraseNode = null;
         phraseType = PhraseType.INITIAL;
         termination = "";
     }
-
     private PhraseExecution(MatchNode phraseNode) {
         components = phraseNode.getOrderedChildren("elementMatch", "valueMatch").stream().map(m -> {
             if (m.name().equals("valueMatch"))
@@ -198,13 +153,14 @@ public class PhraseExecution {
         elements = getNextComponents(-1, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
         this.phraseNode = phraseNode;
         text = phraseNode.toString();
+        printDebug("@@##text----: " + text);
+        printDebug("@@##phraseNode.localStateBoolean(\"newContext\"): " + phraseNode.localStateBoolean("newContext"));
         newContext = phraseNode.localStateBoolean("newContext");
-        conjunction = phraseNode.resolvedGroupText("conjunctions");
-        termination = phraseNode.resolvedGroupText("termination");
+        conjunction = phraseNode.getStringFromLocalState("conjunction");
+        termination =   phraseNode.getStringFromLocalState("termination");
 
-        context = phraseNode.resolvedGroupText("context");
-        if (context.isEmpty())
-            context = " ";
+        context = phraseNode.getStringFromLocalState("context");
+        printDebug("@@##context2: " + context);
 
         if (!context.isBlank()) {
 //            List<ElementMatch> elements = getNextComponents(-1, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
@@ -216,9 +172,9 @@ public class PhraseExecution {
             if (action != null) {
                 phraseType = PhraseType.ACTION;
             } else {
-                assertionType = phraseNode.resolvedGroupText("assertionType");
+                assertionType = phraseNode.getStringFromLocalState("assertionType");
                 if (assertionType != null) {
-                    assertion = phraseNode.resolvedGroupText("assertion");
+                    assertion = phraseNode.getStringFromLocalState("assertion");
                     phraseType = PhraseType.ASSERTION;
                 }
             }
@@ -228,6 +184,9 @@ public class PhraseExecution {
     }
 
     public static XPathy getXPathyContext(String context, List<ElementMatch> elements) {
+        printDebug("@@##getXPathyContext: " + context);
+        printDebug("@@##elements: " + elements);
+        if(elements.isEmpty()) return null;
         XPathy xPathy = elements.getFirst().xPathy;
         return switch (context.toLowerCase()) {
             case String s when s.startsWith("from") -> xPathy;
@@ -301,10 +260,9 @@ public class PhraseExecution {
 
         public ValueMatch(MatchNode valueNode) {
             super(valueNode);
-            this.value = valueNode.resolvedGroupText("value");
-            this.unit = valueNode.resolvedGroupText("unit");
+            this.value = valueNode.getStringFromLocalState("value");
+            this.unit = valueNode.getStringFromLocalState("unit");
         }
-
     }
 
 
@@ -316,10 +274,12 @@ public class PhraseExecution {
         Attribute attribute;
         public XPathy xPathy;
         ElementType elementType;
-        public List<WebElement> matchedElements;
+        public XPathChainResult matchedElements;
         public Set<XPathyRegistry.HtmlType> htmlTypes;
         public PhraseExecution parentPhrase;
-
+        public String toString() {
+            return   (selectionType.isEmpty() ? "" : selectionType+ " ") +  (elementPosition.isEmpty() ? "" : elementPosition+ " ") + (text.isEmpty() ? "" :"'" + text + "' ") + category + "\n"+ xPathy.getXpath();
+        }
         public enum ElementType {
             HTML, ALERT, BROWSER, BROWSER_WINDOW, BROWSER_TAB, URL, VALUE;
 
@@ -342,10 +302,10 @@ public class PhraseExecution {
         public ElementMatch(MatchNode elementNode) {
             super(elementNode);
 
-            this.text = elementNode.resolvedGroupText("text");
-            this.category = elementNode.resolvedGroupText("type");
-            this.elementPosition = elementNode.resolvedGroupText("elementPosition");
-            this.selectionType = elementNode.resolvedGroupText("selectionType");
+            this.text = elementNode.getStringFromLocalState("text");
+            this.category = elementNode.getStringFromLocalState("type");
+            this.elementPosition = elementNode.getStringFromLocalState("elementPosition");
+            this.selectionType = elementNode.getStringFromLocalState("selectionType");
 //            if(selectionType.isEmpty())
 //                selectionType = "single";
             for (ElementType et : ElementType.values()) {
@@ -404,10 +364,11 @@ public class PhraseExecution {
 
         }
 
-        public List<WebElement> findWebElements(WebDriver driver) {
+        public XPathChainResult findWebElements(WebDriver driver) {
             List<XPathData> xpathDataList = getElementXPathy();
+            System.out.println(this);
             System.out.println("Finding Elements at: " + xpathDataList);
-            matchedElements = resolveXPathChain(driver, xpathDataList);
+            matchedElements = new XPathChainResult(driver, xpathDataList);
             return matchedElements;
         }
     }

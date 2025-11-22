@@ -16,6 +16,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.function.Function;
 
+import static tools.dscode.common.util.DebugUtils.printDebug;
+
 public final class LeanWaits {
 
     private LeanWaits() {}
@@ -25,17 +27,21 @@ public final class LeanWaits {
 
 
     public static void waitForPhraseEntities(ChromiumDriver driver, PhraseExecution parsingPhrase) {
+        driver.switchTo().defaultContent();
         waitForPageReady(driver, Duration.ofSeconds(60));
         List<ElementMatch> elementMatches = parsingPhrase.getNextComponents(-1, "elementMatch").stream()
                 .map(c -> (ElementMatch)c)
                 .toList();
 
+        printDebug("@@##elementMatches.size: " + elementMatches.size());
+        printDebug("@@##elementMatches: " + elementMatches);
         for(ElementMatch elementMatch : elementMatches){
            elementMatch.findWebElements(driver);
+            System.out.println("@@elementMatch.matchedElements..getWrappers().size() "+ elementMatch.matchedElements.getWrappers().size());
            if(!elementMatch.selectionType.equals("any") && elementMatch.matchedElements.isEmpty())
                throw new RuntimeException("No elements found for " + elementMatch);
 
-            for(WebElement element : elementMatch.matchedElements){
+            for(WrappedWebElement element : elementMatch.matchedElements.getWrappers()){
                 waitForElementReady(driver, element, Duration.ofSeconds(60));
             }
         }
@@ -71,29 +77,39 @@ public final class LeanWaits {
      *
      *  NOTE: If the passed WebElement goes stale, re-locate it before calling this.
      */
-    public static WebElement waitForElementReady(ChromiumDriver driver, WebElement element, Duration timeout) {
+    public static WrappedWebElement waitForElementReady(ChromiumDriver driver, WrappedWebElement element, Duration timeout) {
+        printDebug("@@##waitForElementReady ");
+//        printDebug("@@##element.getText(): " + element.getText() + "");
         var wait = new FluentWait<>(driver)
                 .withTimeout(timeout)
                 .pollingEvery(Duration.ofMillis(150))
                 .ignoring(ElementClickInterceptedException.class)
                 .ignoring(JavascriptException.class)
                 .ignoring(WebDriverException.class);
-
+        printDebug("@@##wait: " + wait);
         return wait.until(d -> {
             try {
                 // Basic Selenium checks first
+                printDebug("@@##element before ");
+                printDebug("@@##element: " + element);
+                printDebug("@@##element.getTagName: " + element.getTagName());
+                printDebug("@@##element.getText: " + element.getText());
+                printDebug("@@##element.isDisplayed(): " + element.isDisplayed());
+                printDebug("@@##element.isEnabled(): " + element.isEnabled());
+                printDebug("@@##element after ");
                 if (element == null) return null;
                 if (!element.isDisplayed() || !element.isEnabled()) return null;
-
+                printDebug("@@##element isDisplayed and isEnabled");
                 // Center into viewport to avoid sticky headers/partial visibility
                 ((JavascriptExecutor) d).executeScript(
                         "try{arguments[0].scrollIntoView({block:'center',inline:'center'});}catch(e){}", element);
-
+                printDebug("@@##element executeScript");
                 // Small hover nudge for CSS :hover menus/tooltips
                 new Actions(d).moveToElement(element).pause(Duration.ofMillis(100)).perform();
-
+                printDebug("@@##Actions Actions");
                 // JS hit-test at center (shadow DOM aware) + style checks
                 Boolean ok = (Boolean) ((JavascriptExecutor) d).executeScript(HIT_TEST_JS, element);
+                printDebug("@@##ok ok");
                 return Boolean.TRUE.equals(ok) ? element : null;
 
             } catch (StaleElementReferenceException stale) {
