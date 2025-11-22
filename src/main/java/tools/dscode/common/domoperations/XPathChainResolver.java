@@ -1,8 +1,6 @@
 package tools.dscode.common.domoperations;
 
 import org.openqa.selenium.*;
-import tools.dscode.common.treeparsing.PhraseExecution;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -43,6 +41,7 @@ public class XPathChainResolver {
         printDebug("@@##resolveStep: " + index + " / " + steps.size() + " / " + currentContexts.size());
         XPathData current = steps.get(index);
         printDebug("@@##current: " + current);
+
         // 1. Find elements for current XPathData in all contexts
         List<WebElement> found = new ArrayList<>();
         for (SearchContext context : currentContexts) {
@@ -53,7 +52,13 @@ public class XPathChainResolver {
         found = found.stream().distinct().toList();
 
         printDebug("@@##found: " + found.size());
-        if(!found.isEmpty()) printDebug("@@##found: " + found.getFirst().getTagName());
+        if (!found.isEmpty()) {
+            try {
+                printDebug("@@##firstFoundTag: " + found.get(0).getTagName());
+            } catch (StaleElementReferenceException ignored) {
+                // best-effort debug only
+            }
+        }
 
         // If this is the last step, we're done: return what we found
         if (index == steps.size() - 1) {
@@ -66,18 +71,24 @@ public class XPathChainResolver {
         }
 
         if (current.isFrom()) {
+            // Special "from" semantics: only use the FIRST element in 'found'
             return handleFromStep(driver, steps, index, found);
         } else {
-            // Simple case: next step runs relative to the elements found in this step
+            // Simple case: next step runs relative to ALL elements found in this step
             return resolveStep(driver, steps, index + 1, found);
         }
     }
 
     /**
      * Special handling when current XPathData.isFrom == true.
-     * - If elements are iframes/frames: run the remaining steps inside each frame.
-     * - If elements have a shadow root: run the remaining steps inside the shadow root.
-     * - Otherwise: run the remaining steps with the element itself as context.
+     *
+     * With the new semantics:
+     * - Only the FIRST WebElement in 'found' is considered; others are discarded.
+     * - If that element is an iframe/frame: we switch into it ONCE and do NOT switch back
+     *   to defaultContent(), so the WebDriver remains in that frame context for the rest
+     *   of the chain.
+     * - If the element has a shadow root: run remaining steps inside that shadow root.
+     * - Otherwise: run remaining steps with the element itself as the search context.
      */
     private static List<WebElement> handleFromStep(
             WebDriver driver,
@@ -85,66 +96,57 @@ public class XPathChainResolver {
             int currentIndex,
             List<WebElement> found
     ) {
-        System.out.println("@@steps.size: " + steps.size());
-        System.out.println("@@steps: " + steps);
-        List<WebElement> finalResults = new ArrayList<>();
-        List<SearchContext> normalNextContexts = new ArrayList<>();
+        printDebug("@@##handleFromStep: index=" + currentIndex + ", steps.size=" + steps.size());
+        printDebug("@@##handleFromStep: found.size=" + found.size());
+
+        if (found.isEmpty()) {
+            return List.of();
+        }
 
         int nextIndex = currentIndex + 1;
 
-        for (WebElement element : found) {
-            boolean handledSpecial = false;
+        // NEW: Only take the FIRST element and discard all others
+        WebElement element = found.get(0);
+        printDebug("@@##handleFromStep:firstElement=" + element);
 
-            // 1. IFRAME / FRAME case
-            String tagName = element.getTagName(); // stale here will propagate
-            printDebug("@@##tagName: " + tagName);
-            if ("iframe".equalsIgnoreCase(tagName) || "frame".equalsIgnoreCase(tagName)) {
+        boolean handledSpecial = false;
+
+        // 1. IFRAME / FRAME case
+        String tagName = element.getTagName(); // stale here will propagate
+        printDebug("@@##tagName: " + tagName);
+        if ("iframe".equalsIgnoreCase(tagName) || "frame".equalsIgnoreCase(tagName)) {
+            handledSpecial = true;
+            printDebug("@@##handling iframe/frame: " + element);
+            try {
+                // stale during switch will propagate out of resolveXPathChain
+                driver.switchTo().frame(element);
+
+                // NEW: No switch back to defaultContent() here.
+                // We stay in this frame context for all subsequent steps.
+                printDebug("@@##iframeContext (staying inside frame)");
+                return resolveStep(driver, steps, nextIndex, List.of(driver));
+
+            } catch (NoSuchFrameException ignored) {
+                // Frame not available – fall through and treat as non-special
+                printDebug("@@##NoSuchFrameException - treating as non-special context");
+                handledSpecial = false;
+            }
+        }
+
+        // 2. Shadow root case (Selenium 4+)
+        if (!handledSpecial) {
+            SearchContext shadowRoot = getShadowRootIfAvailable(element);
+            if (shadowRoot != null) {
                 handledSpecial = true;
-                printDebug("@@##handling iframe/frame: " + element);
-                try {
-                    // stale during switch will propagate out of resolveXPathChain
-                    driver.switchTo().frame(element);
-                    try {
-                        printDebug("@@##iframeContext");
-                        finalResults.addAll(
-                                resolveStep(driver, steps, nextIndex, List.of(driver))
-                        );
-                    } finally {
-                        printDebug("@@##defaultContent Context");
-//                        driver.switchTo().defaultContent();
-                    }
-                } catch (NoSuchFrameException ignored) {
-                    // Frame not available – skip this element as a frame context
-                    // (Other exceptions, including stale, are not suppressed.)
-                }
-            }
-            else {
-
-                // 2. Shadow root case (Selenium 4+)
-                SearchContext shadowRoot = getShadowRootIfAvailable(element);
-                if (shadowRoot != null) {
-                    handledSpecial = true;
-                    // Any stale from inside this resolveStep will propagate
-                    finalResults.addAll(
-                            resolveStep(driver, steps, nextIndex, List.of(shadowRoot))
-                    );
-                }
-            }
-
-            // 3. If neither iframe/frame nor shadow root, treat element as normal context
-            if (!handledSpecial) {
-                normalNextContexts.add(element);
+                printDebug("@@##handling shadowRoot: " + element);
+                // Any stale from inside this resolveStep will propagate
+                return resolveStep(driver, steps, nextIndex, List.of(shadowRoot));
             }
         }
 
-        // If there are any "plain" elements, continue chain relative to them too
-        if (!normalNextContexts.isEmpty()) {
-            finalResults.addAll(
-                    resolveStep(driver, steps, nextIndex, normalNextContexts)
-            );
-        }
-
-        return finalResults;
+        // 3. If neither iframe/frame nor shadow root, treat element as normal context
+        printDebug("@@##handling as normal context: " + element);
+        return resolveStep(driver, steps, nextIndex, List.of(element));
     }
 
     /**

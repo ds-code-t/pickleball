@@ -219,11 +219,11 @@ public class PhraseExecution {
     private final LifecycleManager lifecycle = new LifecycleManager();
 
     public void runPhrase() {
-        waitSeconds(1);
+        waitMilliseconds(1000);
         lifecycle.fire(Phase.BEFORE_DOM_LOAD_CHECK);
         ChromiumDriver driver = getBrowser("CHROME");
         waitForPhraseEntities(driver, this);
-        waitMilliseconds(300);
+        waitMilliseconds(100);
         lifecycle.fire(Phase.BEFORE_DOM_INTERACTION);
 
         if (phraseType.equals(PhraseType.ASSERTION)) {
