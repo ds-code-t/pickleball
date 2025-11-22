@@ -133,7 +133,7 @@ public final class XPathyMini {
     //  toSelfStep (core of structural correctness)
     // =====================================================================
 
-    private static String toSelfStep(String xpath) {
+    public static String toSelfStep(String xpath) {
 
         if (xpath == null) {
             return "self::*";

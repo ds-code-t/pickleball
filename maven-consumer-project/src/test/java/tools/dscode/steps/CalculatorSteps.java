@@ -49,21 +49,20 @@ public class CalculatorSteps {
     @Given("configs")
     public static void configs() {
 
-        XPathyRegistry.add("Textbox", (category, v, op) -> orMap(
-                () -> Tag.input.byAttribute(type).equals("text").and().byAttribute(placeholder).equals(v.toString()),
-                () -> Tag.input
+        XPathyRegistry.registerOrBuilder("Textbox",
+                (category, v, op) -> Tag.input.byAttribute(type).equals("text").and().byAttribute(placeholder).equals(v.toString()),
+                (category, v, op)  -> Tag.input
                         .byAttribute(type).equals("text")
                         .byHaving(
                                 XPathy.from("../descendant::*")
                                         .byHaving(deepNormalizedText(v.toString()))
                         )
+        );
 
-        ));
-
-        XPathyRegistry.add("Qqq", (category, v, op) -> orMap(
-                () -> XPathy.from(Tag.any).byAttribute(role).equals("link").or().byAttribute(aria_label).equals("link"),
-                () -> XPathy.from(Tag.a)
-        ));
+        XPathyRegistry.registerOrBuilder("Qqq",
+                (category, v, op) -> XPathy.from(Tag.any).byAttribute(role).equals("link").or().byAttribute(aria_label).equals("link"),
+                (category, v, op)-> XPathy.from(Tag.a)
+        );
     }
 
     @Given("I have numbers {int} and {int}")

@@ -26,7 +26,7 @@ import static tools.dscode.common.util.DebugUtils.printDebug;
 public class DictionaryA extends NodeDictionary {
     static {
 
-        XPathyRegistry.add("*", (category, v, op) -> orMap(
+        XPathyRegistry.registerOrBuilder("*", (category, v, op) -> orMap(
                 textOp(op, v),
                 () -> XPathy.from(category),
                 () -> XPathy.from(Tag.any).byAttribute(role).withCase(LOWER).equals(category.toLowerCase()),
@@ -37,13 +37,13 @@ public class DictionaryA extends NodeDictionary {
         ));
 
 
-        XPathyRegistry.add("Button", (category, v, op) -> orMap(
+        XPathyRegistry.registerOrBuilder("Button", (category, v, op) -> orMap(
                 textOp(op, v),
                 () -> XPathy.from(Tag.button),
                 () -> XPathy.from(Tag.img).byAttribute(role).equals("button")
         ));
 
-        XPathyRegistry.add("Link", (category, v, op) -> orMap(
+        XPathyRegistry.registerOrBuilder("Link", (category, v, op) -> orMap(
                 textOp(op, v),
                 () -> XPathy.from(Tag.any).byAttribute(role).equals("link").or().byAttribute(aria_label).equals("link"),
                 () -> XPathy.from(Tag.a)

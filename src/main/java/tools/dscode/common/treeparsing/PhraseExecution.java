@@ -28,7 +28,8 @@ import static tools.dscode.common.domoperations.SeleniumUtils.waitSeconds;
 import static tools.dscode.common.domoperations.XPathChainResolver.resolveXPathChain;
 import static tools.dscode.common.domoperations.XPathyMini.applyAttrOp;
 import static tools.dscode.common.domoperations.XPathyMini.applyTextOp;
-import static tools.dscode.common.domoperations.XPathyRegistry.getHtmlTypes;
+//import static tools.dscode.common.domoperations.XPathyRegistry.getHtmlTypes;
+import static tools.dscode.common.domoperations.XPathyRegistry.andThenOr;
 import static tools.dscode.common.domoperations.XPathyRegistry.orAll;
 import static tools.dscode.common.domoperations.XPathyUtils.afterOf;
 import static tools.dscode.common.domoperations.XPathyUtils.beforeOf;
@@ -275,7 +276,7 @@ public class PhraseExecution {
         public XPathy xPathy;
         ElementType elementType;
         public XPathChainResult matchedElements;
-        public Set<XPathyRegistry.HtmlType> htmlTypes;
+//        public Set<XPathyRegistry.HtmlType> htmlTypes;
         public PhraseExecution parentPhrase;
         public String toString() {
             return   (selectionType.isEmpty() ? "" : selectionType+ " ") +  (elementPosition.isEmpty() ? "" : elementPosition+ " ") + (text.isEmpty() ? "" :"'" + text + "' ") + category + "\n"+ xPathy.getXpath();
@@ -317,15 +318,15 @@ public class PhraseExecution {
             if (elementType == null)
                 elementType = ElementType.HTML;
 
-            htmlTypes = getHtmlTypes(category);
-
-
-            if (this.elementType != ElementType.HTML)
-                return;
+//            htmlTypes = getHtmlTypes(category);
+//
+//
+//            if (this.elementType != ElementType.HTML)
+//                return;
 
 
             XPathyRegistry.Op textOp = text.isBlank() ? null : XPathyRegistry.Op.EQUALS;
-            xPathy = orAll(category, text, textOp).orElse(XPathy.from(Tag.any));
+            xPathy = andThenOr(category, text, textOp);
             MatchNode predicateNode = (MatchNode) elementNode.getFromGlobalState((String) elementNode.getFromLocalState("predicate"));
 
             if (predicateNode != null) {
