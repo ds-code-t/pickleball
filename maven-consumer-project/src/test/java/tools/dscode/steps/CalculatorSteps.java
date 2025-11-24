@@ -53,7 +53,7 @@ public class CalculatorSteps {
 
     @Given("configs")
     public static void configs() {
-        XPathyRegistry.registerAndBuilder("BaseCategory",
+        XPathyRegistry.registerAndBuilder("baseCategory",
                 (category, v, op) -> {
                     if (v == null || v.isBlank())
                         return null;

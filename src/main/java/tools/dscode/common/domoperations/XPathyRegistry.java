@@ -33,7 +33,7 @@ public final class XPathyRegistry {
     //========================================================
 
     // Default base category that *every* category implicitly inherits from
-    private static final String BASE_CATEGORY = "BaseCategory";
+    private static final String BASE_CATEGORY = "baseCategory";
 
     // childCategory -> [parentCategory1, parentCategory2, ...]
     //
@@ -116,8 +116,8 @@ public final class XPathyRegistry {
             }
         }
 
-        // Ensure all categories inherit from BaseCategory by default,
-        // but do not force it for BaseCategory itself.
+        // Ensure all categories inherit from baseCategory by default,
+        // but do not force it for baseCategory itself.
         if (!BASE_CATEGORY.equals(root) && !ordered.contains(BASE_CATEGORY)) {
             ordered.add(BASE_CATEGORY);
         }

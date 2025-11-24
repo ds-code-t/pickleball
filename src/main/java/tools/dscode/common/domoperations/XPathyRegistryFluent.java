@@ -25,7 +25,7 @@ import java.util.Objects;
  *   static {
  *     // Single category
  *     category("Textbox")
- *         .inheritsFrom("BaseCategory", "InputLike")
+ *         .inheritsFrom("baseCategory", "InputLike")
  *         .or(
  *             (cat, v, op) -> /* OR builder 1 *\/ null,
  *             (cat, v, op) -> /* OR builder 2 *\/ null
