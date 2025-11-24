@@ -91,7 +91,7 @@ public class DictionaryA extends NodeDictionary {
                                                     .byHaving(deepNormalizedText(v))
                                     )
                             );
-                        },
+                        }
                 );
 
         category("visibilityCheck")
