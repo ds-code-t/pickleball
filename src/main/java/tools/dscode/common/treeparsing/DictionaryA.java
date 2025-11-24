@@ -76,19 +76,22 @@ public class DictionaryA extends NodeDictionary {
                 );
 
         category("visibleText")
-                .and(        (category, v, op) -> {
-                            XPathy selfInvisible = any.byCondition(invisible());
-                            String invisiblePredicate = extractPredicate("//*", selfInvisible.getXpath());
+                .and(
+                        (category, v, op) -> {
+                            if (v == null || v.isBlank())
+                                return null;
 
-                            XPathy selfVisible = any.byCondition(visible());
-                            String visiblePredicate = extractPredicate("//*", selfVisible.getXpath());
-
-                            return XPathy.from(
-                                    "//*[" +
-                                            visiblePredicate +
-                                            " and not(ancestor::*[" + invisiblePredicate + "])]"
+                            return combineOr(
+                                    any.byHaving(
+                                            XPathy.from("descendant-or-self::*")
+                                                    .byHaving(deepNormalizedText(v))
+                                    ),
+                                    any.byHaving(
+                                            XPathy.from("preceding::*")
+                                                    .byHaving(deepNormalizedText(v))
+                                    )
                             );
-                        }
+                        },
                 );
 
         category("visibilityCheck")
