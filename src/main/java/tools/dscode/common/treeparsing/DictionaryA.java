@@ -142,8 +142,8 @@ public class DictionaryA extends NodeDictionary {
         // Button
         //
         category("Button")
-                .and((category, v, op) -> XPathy.from("descendant-or-self::*")
-                        .byHaving(deepNormalizedText(v)))
+//                .and((category, v, op) -> XPathy.from("descendant-or-self::*")
+//                        .byHaving(deepNormalizedText(v)))
                 .or(
                         (category, v, op) -> XPathy.from(Tag.button),
                         (category, v, op) -> XPathy.from(Tag.img).byAttribute(role).equals("button"),
