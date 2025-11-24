@@ -76,7 +76,7 @@ public class DictionaryA extends NodeDictionary {
                 );
 
         category("visibleText")
-                .and((category, v, op) -> {
+                .and(        (category, v, op) -> {
                             XPathy selfInvisible = any.byCondition(invisible());
                             String invisiblePredicate = extractPredicate("//*", selfInvisible.getXpath());
 
