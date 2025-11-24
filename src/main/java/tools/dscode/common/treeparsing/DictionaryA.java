@@ -96,10 +96,11 @@ public class DictionaryA extends NodeDictionary {
         // Textbox  (two registration blocks preserved exactly)
         //
         category("Textbox")
+                .and((category, v, op) ->
+                        input.byAttribute(type).equals("text").or().byAttribute(type).equals("password").or().byAttribute(type).equals("email"))
                 .or(
                         (category, v, op) ->
-                                input.byAttribute(type).equals("text")
-                                        .and().byAttribute(placeholder).equals(v),
+                                input.byAttribute(placeholder).equals(v),
 
                         (category, v, op) -> {
                             XPathy labelNode =
@@ -111,7 +112,6 @@ public class DictionaryA extends NodeDictionary {
                                     .equals(labelNode.byAttribute(Attribute.for_).toString());
                         }
                 );
-
 
 
         //
@@ -140,9 +140,12 @@ public class DictionaryA extends NodeDictionary {
         // Button
         //
         category("Button")
+                .and((category, v, op) -> XPathy.from("descendant-or-self::*")
+                        .byHaving(deepNormalizedText(v)))
                 .or(
                         (category, v, op) -> XPathy.from(Tag.button),
-                        (category, v, op) -> XPathy.from(Tag.img).byAttribute(role).equals("button")
+                        (category, v, op) -> XPathy.from(Tag.img).byAttribute(role).equals("button"),
+                        (category, v, op) -> XPathy.from(Tag.a).byAttribute(role).equals("button")
                 );
 
         //
@@ -157,8 +160,6 @@ public class DictionaryA extends NodeDictionary {
                         (category, v, op) -> XPathy.from(Tag.a)
                 );
     }
-
-
 
 
 //    public static void main(String[] args) {
