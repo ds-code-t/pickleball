@@ -25,6 +25,7 @@ import static tools.dscode.common.domoperations.XPathyMini.applyTextOp;
 import static tools.dscode.common.domoperations.XPathyMini.orMap;
 import static tools.dscode.common.domoperations.XPathyMini.textOp;
 import static tools.dscode.common.domoperations.XPathyRegistry.combineOr;
+import static tools.dscode.common.domoperations.XPathyRegistryFluent.category;
 import static tools.dscode.common.domoperations.XPathyUtils.deepNormalizedText;
 import static tools.dscode.common.treeparsing.PhraseExecution.initiateFirstPhraseExecution;
 import static tools.dscode.common.treeparsing.RegexUtil.betweenWithEscapes;
@@ -38,92 +39,127 @@ import static tools.dscode.common.util.DebugUtils.printDebug;
 public class DictionaryA extends NodeDictionary {
     static {
 
+        //
+        // Frame
+        //
+        category("Frame")
+                .and(
+                        (category, v, op) ->
+                                XPathy.from(Tag.iframe).byAttribute(id).equals("iframeResult")
+                );
 
-        XPathyRegistry.registerAndBuilder("Frame",
-                (category, v, op) -> XPathy.from(Tag.iframe).byAttribute(id).equals("iframeResult"));
+        //
+        // IframeResult
+        //
+        category("IframeResult")
+                .and(
+                        (category, v, op) ->
+                                XPathy.from(Tag.iframe).byAttribute(id).equals("iframeResult")
+                );
 
-        XPathyRegistry.registerAndBuilder("IframeResult",
-                (category, v, op) -> XPathy.from(Tag.iframe).byAttribute(id).equals("iframeResult"));
+        //
+        // BaseCategory  (both AND builders preserved)
+        //
+        category("BaseCategory")
+                .and(
+                        (category, v, op) -> {
+                            if (v == null || v.isBlank())
+                                return null;
 
-
-        XPathyRegistry.registerAndBuilder("BaseCategory",
-                (category, v, op) -> {
-                    if (v == null || v.isBlank())
-                        return null;
-
-                    return combineOr(
-                            any.byHaving(
-                                    XPathy.from("descendant-or-self::*")
-                                            .byHaving(deepNormalizedText(v))),
-                            any.byHaving(
-                                    XPathy.from("preceding::*")
-                                            .byHaving(deepNormalizedText(v)))
-                    );
-                },
-                (category, v, op) -> {
-                    XPathy selfInvisible = any.byCondition(invisible());
-                    String invisiblePredicate = extractPredicate("//*", selfInvisible.getXpath());
-                    XPathy selfVisible = any.byCondition(visible());
-                    String visiblePredicate = extractPredicate("//*", selfVisible.getXpath());
-                    return XPathy.from(
-                            "//*[" +
-                                    visiblePredicate +
-                                    " and not(ancestor::*[" +
-                                    invisiblePredicate +
-                                    "])]"
+                            return combineOr(
+                                    any.byHaving(
+                                            XPathy.from("descendant-or-self::*")
+                                                    .byHaving(deepNormalizedText(v))
+                                    ),
+                                    any.byHaving(
+                                            XPathy.from("preceding::*")
+                                                    .byHaving(deepNormalizedText(v))
+                                    )
                             );
-                }
-        );
+                        },
+                        (category, v, op) -> {
+                            XPathy selfInvisible = any.byCondition(invisible());
+                            String invisiblePredicate = extractPredicate("//*", selfInvisible.getXpath());
 
-        XPathyRegistry.registerOrBuilder("Textbox",
-                (category, v, op) -> input.byAttribute(type).equals("text").and().byAttribute(placeholder).equals(v),
-                (category, v, op) -> {
-                    XPathy labelNode = label
-                            .byText()
-                            .withNormalizeSpace()
-                            .equals(v);
-                    return input
-                            .byAttribute(id)
-                            .equals(
-                                    labelNode.byAttribute(Attribute.for_).toString()
+                            XPathy selfVisible = any.byCondition(visible());
+                            String visiblePredicate = extractPredicate("//*", selfVisible.getXpath());
+
+                            return XPathy.from(
+                                    "//*[" +
+                                            visiblePredicate +
+                                            " and not(ancestor::*[" + invisiblePredicate + "])]"
                             );
-                }
-        );
+                        }
+                );
 
-        XPathyRegistry.registerOrBuilder("Textbox",
-                (category, v, op) -> input.byAttribute(type).equals("text").and().byAttribute(placeholder).equals(v),
-                (category, v, op) -> input
-                        .byAttribute(type).equals("text")
-                        .byHaving(
-                                XPathy.from("../descendant::*")
-                                        .byHaving(deepNormalizedText(v))
-                        )
-        );
+        //
+        // Textbox  (two registration blocks preserved exactly)
+        //
+        category("Textbox")
+                .or(
+                        (category, v, op) ->
+                                input.byAttribute(type).equals("text")
+                                        .and().byAttribute(placeholder).equals(v),
 
+                        (category, v, op) -> {
+                            XPathy labelNode =
+                                    label.byText()
+                                            .withNormalizeSpace()
+                                            .equals(v);
 
-        XPathyRegistry.registerOrBuilder("*",
-                (category, v, op) -> XPathy.from(category),
-                (category, v, op) -> XPathy.from(any).byAttribute(role).withCase(LOWER).equals(category.toLowerCase()),
-                (category, v, op) -> XPathy.from(any).byAttribute(title).withCase(LOWER).equals(category.toLowerCase()),
-                (category, v, op) -> XPathy.from(any).byAttribute(id).withCase(LOWER).equals(category.toLowerCase()),
-                (category, v, op) -> XPathy.from(any).byAttribute(name).withCase(LOWER).equals(category.toLowerCase()),
-                (category, v, op) -> XPathy.from(any).byAttribute(aria_label).withCase(LOWER).equals(category.toLowerCase())
-        );
-
-
-        XPathyRegistry.registerOrBuilder("Button",
-
-                (category, v, op) -> XPathy.from(Tag.button),
-                (category, v, op) -> XPathy.from(Tag.img).byAttribute(role).equals("button")
-        );
-
-        XPathyRegistry.registerOrBuilder("Link",
-                (category, v, op) -> XPathy.from(any).byAttribute(role).equals("link").or().byAttribute(aria_label).equals("link"),
-                (category, v, op) -> XPathy.from(Tag.a)
-        );
+                            return input.byAttribute(id)
+                                    .equals(labelNode.byAttribute(Attribute.for_).toString());
+                        }
+                );
 
 
+
+        //
+        // "*" fallback OR builders
+        //
+        category("*")
+                .or(
+                        (category, v, op) -> XPathy.from(category),
+                        (category, v, op) ->
+                                XPathy.from(any).byAttribute(role).withCase(LOWER).equals(category.toLowerCase()),
+
+                        (category, v, op) ->
+                                XPathy.from(any).byAttribute(title).withCase(LOWER).equals(category.toLowerCase()),
+
+                        (category, v, op) ->
+                                XPathy.from(any).byAttribute(id).withCase(LOWER).equals(category.toLowerCase()),
+
+                        (category, v, op) ->
+                                XPathy.from(any).byAttribute(name).withCase(LOWER).equals(category.toLowerCase()),
+
+                        (category, v, op) ->
+                                XPathy.from(any).byAttribute(aria_label).withCase(LOWER).equals(category.toLowerCase())
+                );
+
+        //
+        // Button
+        //
+        category("Button")
+                .or(
+                        (category, v, op) -> XPathy.from(Tag.button),
+                        (category, v, op) -> XPathy.from(Tag.img).byAttribute(role).equals("button")
+                );
+
+        //
+        // Link
+        //
+        category("Link")
+                .or(
+                        (category, v, op) ->
+                                XPathy.from(any).byAttribute(role).equals("link")
+                                        .or().byAttribute(aria_label).equals("link"),
+
+                        (category, v, op) -> XPathy.from(Tag.a)
+                );
     }
+
+
+
 
 //    public static void main(String[] args) {
 //

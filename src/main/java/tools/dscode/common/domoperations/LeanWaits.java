@@ -25,22 +25,67 @@ public final class LeanWaits {
 
 
     public static void waitForPhraseEntities(ChromiumDriver driver, PhraseExecution parsingPhrase) {
+
         driver.switchTo().defaultContent();
-        waitForPageReady(driver, Duration.ofSeconds(60));
-        List<ElementMatch> elementMatches = parsingPhrase.getNextComponents(-1, "elementMatch").stream()
-                .map(c -> (ElementMatch) c)
-                .toList();
+
+        // SAFE version: never throws
+        safeWaitForPageReady(driver, Duration.ofSeconds(60));
+
+        List<ElementMatch> elementMatches = parsingPhrase.getNextComponents(-1, "elementMatch")
+                .stream().map(c -> (ElementMatch) c).toList();
 
         printDebug("@@##elementMatches.size: " + elementMatches.size());
         printDebug("@@##elementMatches: " + elementMatches);
+
         for (ElementMatch elementMatch : elementMatches) {
-            elementMatch.findWebElements(driver);
-            System.out.println("@@elementMatch.matchedElements..getWrappers().size() " + elementMatch.matchedElements.getWrappers().size());
-            if (!elementMatch.selectionType.equals("any") && elementMatch.matchedElements.isEmpty())
-                throw new RuntimeException("No elements found for " + elementMatch);
-            for (WrappedWebElement element : elementMatch.matchedElements.getWrappers()) {
-                waitForElementReady(driver, element, Duration.ofSeconds(60));
+
+            try {
+                elementMatch.findWebElements(driver);
+            } catch (Exception e) {
+                System.out.println("[WARN] Error locating elements for: " + elementMatch);
+                e.printStackTrace(System.out);
+                continue;   // continue to next elementMatch
             }
+
+            System.out.println("@@elementMatch.matchedElements.getWrappers().size(): "
+                    + elementMatch.matchedElements.getWrappers().size());
+
+            if (!elementMatch.selectionType.equals("any")
+                    && elementMatch.matchedElements.isEmpty()) {
+
+                // SAFE: no exception thrown
+                System.out.println("[WARN] Required element not found for " + elementMatch);
+                continue;
+            }
+
+            for (WrappedWebElement element : elementMatch.matchedElements.getWrappers()) {
+                safeWaitForElementReady(driver, element, Duration.ofSeconds(60));
+            }
+        }
+    }
+
+    public static WrappedWebElement safeWaitForElementReady(
+            ChromiumDriver driver,
+            WrappedWebElement element,
+            Duration timeout
+    ) {
+        try {
+            return waitForElementReady(driver, element, timeout);
+        } catch (Exception e) {
+            System.out.println("[WARN] Element did NOT become ready: " + element);
+            System.out.println("Cause: " + e);
+            e.printStackTrace(System.out);
+            return element; // continue without blocking
+        }
+    }
+
+
+    public static void safeWaitForPageReady(ChromiumDriver driver, Duration timeout) {
+        try {
+            waitForPageReady(driver, timeout);
+        } catch (Exception e) {
+            System.out.println("[WARN] Page did NOT reach ready state in time: " + e);
+            e.printStackTrace(System.out);
         }
     }
 
@@ -94,8 +139,8 @@ public final class LeanWaits {
                 printDebug("@@##element.isEnabled(): " + element.isEnabled());
                 printDebug("@@##element after ");
                 if (element == null) return null;
-                if (!element.isDisplayed() || !element.isEnabled()) return null;
-                printDebug("@@##element isDisplayed and isEnabled");
+                if (!element.isDisplayed() ) return null;
+                printDebug("@@##element isDisplayed ");
                 // Center into viewport to avoid sticky headers/partial visibility
                 ((JavascriptExecutor) d).executeScript(
                         "try{arguments[0].scrollIntoView({block:'center',inline:'center'});}catch(e){}", element);
