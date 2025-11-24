@@ -423,47 +423,69 @@ public final class XPathyRegistry {
      *
      * Returns a concrete XPathy, or throws if both sides are empty.
      */
+    /**
+     * Combined filter (non-Optional version).
+     * Delegates to andThenOrOptional and unwraps the result.
+     */
     public static XPathy andThenOr(String category, String value, Op op) {
         System.out.println("[XPathyRegistry] andThenOr: category=" + category +
+                ", value=" + value + ", op=" + op);
+
+        Optional<XPathy> result = resolveToXPathy(category, value, op);
+
+        if (result.isEmpty()) {
+            System.out.println("[XPathyRegistry] andThenOr: Optional empty -> returning null");
+            return null;  // or throw if you ever want to change semantics
+        }
+
+        return result.get();
+    }
+
+
+    /**
+     * Optional-returning version of andThenOr.
+     * This allows safe cross-category reuse without forcing a thrown exception.
+     */
+    public static Optional<XPathy> resolveToXPathy(String category, String value, Op op) {
+        System.out.println("[XPathyRegistry] andThenOrOptional: category=" + category +
                 ", value=" + value + ", op=" + op);
 
         Optional<XPathy> andPart = andAll(category, value, op);
         Optional<XPathy> orPart  = orAll(category, value, op);
 
-        System.out.println("[XPathyRegistry] andThenOr: andPartPresent=" + andPart.isPresent() +
+        System.out.println("[XPathyRegistry] andThenOrOptional: andPartPresent=" + andPart.isPresent() +
                 (andPart.isPresent() ? ", andXpath=" + safeXpath(andPart.get()) : ""));
-        System.out.println("[XPathyRegistry] andThenOr: orPartPresent=" + orPart.isPresent() +
+        System.out.println("[XPathyRegistry] andThenOrOptional: orPartPresent=" + orPart.isPresent() +
                 (orPart.isPresent() ? ", orXpath=" + safeXpath(orPart.get()) : ""));
 
         if (andPart.isEmpty() && orPart.isEmpty()) {
-            throw new IllegalStateException(
-                    "[XPathyRegistry] andThenOr: both AND and OR parts empty " +
-                            "for category='" + category + "', value=" + value + ", op=" + op);
+            System.out.println("[XPathyRegistry] andThenOrOptional: both empty -> Optional.empty()");
+            return Optional.empty();
         }
         if (andPart.isEmpty()) {
-            System.out.println("[XPathyRegistry] andThenOr: only orPart present, returning it.");
-            return orPart.get();
+            System.out.println("[XPathyRegistry] andThenOrOptional: only orPart present.");
+            return orPart;
         }
         if (orPart.isEmpty()) {
-            System.out.println("[XPathyRegistry] andThenOr: only andPart present, returning it.");
-            return andPart.get();
+            System.out.println("[XPathyRegistry] andThenOrOptional: only andPart present.");
+            return andPart;
         }
 
         String andStep = toSelfStep(andPart.get().getXpath());
         String orStep  = toSelfStep(orPart.get().getXpath());
 
         String combinedExpr = "(" + andStep + ") and (" + orStep + ")";
-        System.out.println("[XPathyRegistry] andThenOr: combinedExpr=" + combinedExpr);
+        System.out.println("[XPathyRegistry] andThenOrOptional: combinedExpr=" + combinedExpr);
 
-        // Wrap in a selector path as well
         String fullXpath = "//*[" + combinedExpr + "]";
-        System.out.println("[XPathyRegistry] andThenOr: fullXpath=" + fullXpath);
+        System.out.println("[XPathyRegistry] andThenOrOptional: fullXpath=" + fullXpath);
 
         XPathy x = XPathy.from(fullXpath);
-        System.out.println("[XPathyRegistry] andThenOr: final XPathy.getXpath()=" + safeXpath(x));
+        System.out.println("[XPathyRegistry] andThenOrOptional: final XPathy.getXpath()=" + safeXpath(x));
 
-        return x;
+        return Optional.of(x);
     }
+
 
     /**
      * Convenience: OR-combine an initial XPathy with additional XPathy expressions.

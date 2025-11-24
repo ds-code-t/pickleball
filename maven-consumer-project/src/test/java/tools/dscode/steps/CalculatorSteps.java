@@ -9,6 +9,8 @@ import io.cucumber.java.Before;
 import io.cucumber.java.BeforeAll;
 import io.cucumber.java.en.*;
 import org.openqa.selenium.chrome.ChromeDriver;
+import tools.dscode.common.annotations.LifecycleHook;
+import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.domoperations.XPathyRegistry;
 import tools.dscode.coredefinitions.BrowserSteps;
 
@@ -23,6 +25,7 @@ import static com.xpathy.Attribute.role;
 import static com.xpathy.Attribute.type;
 import static com.xpathy.Tag.any;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.catchException;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.domoperations.VisibilityConditions.extractPredicate;
 import static tools.dscode.common.domoperations.VisibilityConditions.invisible;
@@ -30,6 +33,7 @@ import static tools.dscode.common.domoperations.VisibilityConditions.visible;
 import static tools.dscode.common.domoperations.XPathyMini.orMap;
 import static tools.dscode.common.domoperations.XPathyMini.textOp;
 import static tools.dscode.common.domoperations.XPathyRegistry.combineOr;
+import static tools.dscode.common.domoperations.XPathyRegistryFluent.category;
 import static tools.dscode.common.domoperations.XPathyUtils.deepNormalizedText;
 import static tools.dscode.common.domoperations.XPathyUtils.deepNormalizedTextWrapped;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;
@@ -51,41 +55,44 @@ public class CalculatorSteps {
     }
 
 
-    @Given("configs")
+    @LifecycleHook(Phase.BEFORE_CUCUMBER_RUN)
     public static void configs() {
-        XPathyRegistry.registerAndBuilder("baseCategory",
-                (category, v, op) -> {
-                    if (v == null || v.isBlank())
-                        return null;
 
-                    return combineOr(
-                            any.byHaving(
-                                    XPathy.from("descendant-or-self::*")
-                                            .byHaving(deepNormalizedText(v))),
-                            any.byHaving(
-                                    XPathy.from("preceding::*")
-                                            .byHaving(deepNormalizedText(v)))
-                    );
-                },
-                (category, v, op) -> {
-                    XPathy selfInvisible = any.byCondition(invisible());
-                    String invisiblePredicate = extractPredicate("//*", selfInvisible.getXpath());
-                    XPathy selfVisible = any.byCondition(visible());
-                    String visiblePredicate = extractPredicate("//*", selfVisible.getXpath());
-                    return XPathy.from(
-                            "//*[" +
-                                    visiblePredicate +
-                                    " and not(ancestor::*[" +
-                                    invisiblePredicate +
-                                    "])]"
-                    );
-                }
-        );
+        category("Button").inheritsFrom("visible","visibleText");
 
-        XPathyRegistry.registerOrBuilder("Qqq",
-                (category, v, op) -> XPathy.from(Tag.any).byAttribute(role).equals("link").or().byAttribute(aria_label).equals("link"),
-                (category, v, op)-> XPathy.from(Tag.a)
-        );
+//        XPathyRegistry.registerAndBuilder("baseCategory",
+//                (category, v, op) -> {
+//                    if (v == null || v.isBlank())
+//                        return null;
+//
+//                    return combineOr(
+//                            any.byHaving(
+//                                    XPathy.from("descendant-or-self::*")
+//                                            .byHaving(deepNormalizedText(v))),
+//                            any.byHaving(
+//                                    XPathy.from("preceding::*")
+//                                            .byHaving(deepNormalizedText(v)))
+//                    );
+//                },
+//                (category, v, op) -> {
+//                    XPathy selfInvisible = any.byCondition(invisible());
+//                    String invisiblePredicate = extractPredicate("//*", selfInvisible.getXpath());
+//                    XPathy selfVisible = any.byCondition(visible());
+//                    String visiblePredicate = extractPredicate("//*", selfVisible.getXpath());
+//                    return XPathy.from(
+//                            "//*[" +
+//                                    visiblePredicate +
+//                                    " and not(ancestor::*[" +
+//                                    invisiblePredicate +
+//                                    "])]"
+//                    );
+//                }
+//        );
+
+//        XPathyRegistry.registerOrBuilder("Qqq",
+//                (category, v, op) -> XPathy.from(Tag.any).byAttribute(role).equals("link").or().byAttribute(aria_label).equals("link"),
+//                (category, v, op)-> XPathy.from(Tag.a)
+//        );
     }
 
     @Given("I have numbers {int} and {int}")

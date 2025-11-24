@@ -3,10 +3,10 @@ Feature: Addition
   Scenario: ss2
     Then print aaa
   @[DEBUG] Then print aaa
-    * configs
     Given set $(CHROME)
 #    * navigate to: URL.w3
-    * , from the IframeResult, I enter "dd" in the "Last name:" Textbox
+    Then , I click the "Log In" Button
+#    * , from the IframeResult, I enter "dd" in the "Last name:" Textbox
 #    * , click "Essential QA Service" Qqq
 
 

@@ -39,6 +39,8 @@ import static tools.dscode.common.util.DebugUtils.printDebug;
 public class DictionaryA extends NodeDictionary {
     static {
 
+
+
         //
         // Frame
         //
@@ -58,6 +60,60 @@ public class DictionaryA extends NodeDictionary {
                 );
 
 
+
+        //
+        // Button
+        //
+        category("Button").inheritsFrom("forLabel")
+//                .and((category, v, op) -> XPathy.from("descendant-or-self::*")
+//                        .byHaving(deepNormalizedText(v)))
+                .or(
+                        (category, v, op) -> XPathy.from(Tag.button),
+                        (category, v, op) -> XPathy.from(Tag.img).byAttribute(role).equals("button"),
+                        (category, v, op) -> XPathy.from(Tag.a).byAttribute(role).equals("button")
+                );
+
+        //
+        // Link
+        //
+        category("Link")
+                .or(
+                        (category, v, op) ->
+                                XPathy.from(any).byAttribute(role).equals("link")
+                                        .or().byAttribute(aria_label).equals("link"),
+
+                        (category, v, op) -> XPathy.from(Tag.a)
+                );
+
+
+
+        category("DropDown").inheritsFrom("forLabel");
+
+        //
+        // Textbox  (two registration blocks preserved exactly)
+        //
+        category("Textbox").inheritsFrom("forLabel")
+                .and((category, v, op) ->
+                        input.byAttribute(type).equals("text").or().byAttribute(type).equals("password").or().byAttribute(type).equals("email"))
+                .or(
+                        (category, v, op) ->
+                                input.byAttribute(placeholder).equals(v)
+                );
+
+
+
+
+
+
+
+
+
+
+
+
+
+        category("baseCategory").inheritsFrom("visible");
+
         category("visible")
                 .and(
                         (category, v, op) -> {
@@ -74,6 +130,7 @@ public class DictionaryA extends NodeDictionary {
                             );
                         }
                 );
+
 
         category("visibleText")
                 .and(
@@ -94,29 +151,29 @@ public class DictionaryA extends NodeDictionary {
                         }
                 );
 
-        category("visibilityCheck")
-                .inheritsFrom("visible", "visibleText");
 
-        //
-        // Textbox  (two registration blocks preserved exactly)
-        //
-        category("Textbox")
-                .and((category, v, op) ->
-                        input.byAttribute(type).equals("text").or().byAttribute(type).equals("password").or().byAttribute(type).equals("email"))
-                .or(
-                        (category, v, op) ->
-                                input.byAttribute(placeholder).equals(v),
+        category("forLabel")
+                .or((category, v, op) -> {
+                    if (v == null || v.isBlank()) {
+                        return null; // no label text to match, skip this builder
+                    }
 
-                        (category, v, op) -> {
-                            XPathy labelNode =
-                                    label.byText()
-                                            .withNormalizeSpace()
-                                            .equals(v);
+                    // original expensive label-based logic
+                    XPathy labelNode =
+                            label.byText()
+                                    .withNormalizeSpace()
+                                    .equals(v);
 
-                            return input.byAttribute(id)
+                    XPathy matchLabelForInput =
+                            input.byAttribute(id)
                                     .equals(labelNode.byAttribute(Attribute.for_).toString());
-                        }
-                );
+
+                    return XPathyRegistry.combineAnd(id.haveIt(), matchLabelForInput);
+                });
+
+
+
+
 
 
         //
@@ -141,29 +198,7 @@ public class DictionaryA extends NodeDictionary {
                                 XPathy.from(any).byAttribute(aria_label).withCase(LOWER).equals(category.toLowerCase())
                 );
 
-        //
-        // Button
-        //
-        category("Button")
-//                .and((category, v, op) -> XPathy.from("descendant-or-self::*")
-//                        .byHaving(deepNormalizedText(v)))
-                .or(
-                        (category, v, op) -> XPathy.from(Tag.button),
-                        (category, v, op) -> XPathy.from(Tag.img).byAttribute(role).equals("button"),
-                        (category, v, op) -> XPathy.from(Tag.a).byAttribute(role).equals("button")
-                );
 
-        //
-        // Link
-        //
-        category("Link")
-                .or(
-                        (category, v, op) ->
-                                XPathy.from(any).byAttribute(role).equals("link")
-                                        .or().byAttribute(aria_label).equals("link"),
-
-                        (category, v, op) -> XPathy.from(Tag.a)
-                );
     }
 
 
