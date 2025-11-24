@@ -19,25 +19,23 @@ import java.util.function.Supplier;
  *     getLocation, getSize, getRect, getCssValue.
  *
  * - Active operations (click, sendKeys, clear, submit, findElement(s),
- *   getScreenshotAs) still use the live delegate via withFreshElement(...),
- *   which may trigger a full refresh on the parent and retry.
+ *   getScreenshotAs) prefer the cached delegate first. If that fails with a
+ *   stale / not-found error, they delegate to withFreshElement(...), which will:
+ *     - obtain a fresh delegate from the parent,
+ *     - recapture the snapshot from that delegate,
+ *     - retry the operation once after a refresh.
  */
 public final class WrappedWebElement implements WebElement, WrapsElement {
 
-    @Override
-    public WebElement getWrappedElement() {
-        // Return the live delegate for JS/Actions use
-        WrappedWebElement currentWrapper = resolveCurrent();
-        if (currentWrapper == null) {
-            throw new NoSuchElementException(
-                    "Element at index " + index + " no longer exists after refresh"
-            );
-        }
-        return parent.getDelegate(currentWrapper.index);
-    }
+    // ---------------------------------------------------------------------
+    // Core linkage
+    // ---------------------------------------------------------------------
 
     private final XPathChainResult parent;
     private final int index;
+
+    /** Cached live delegate. Prefer this for direct DOM interactions. */
+    private WebElement delegate;
 
     // linked list within one generation (optional but handy)
     private WrappedWebElement previous;
@@ -49,18 +47,18 @@ public final class WrappedWebElement implements WebElement, WrapsElement {
     private WrappedWebElement current;
 
     // ---- snapshot fields ----
-    private final String snapshotTagName;
-    private final String snapshotText;
-    private final boolean snapshotDisplayed;
-    private final boolean snapshotEnabled;
-    private final boolean snapshotSelected;
+    private String snapshotTagName;
+    private String snapshotText;
+    private boolean snapshotDisplayed;
+    private boolean snapshotEnabled;
+    private boolean snapshotSelected;
 
     private final Map<String, String> attributeSnapshot = new HashMap<>();
     private final Map<String, String> cssSnapshot       = new HashMap<>();
 
-    private final Point snapshotLocation;
-    private final Dimension snapshotSize;
-    private final Rectangle snapshotRect;
+    private Point snapshotLocation;
+    private Dimension snapshotSize;
+    private Rectangle snapshotRect;
 
     // a finite list of attributes we consider "major" for caching
     private static final List<String> COMMON_ATTRIBUTES = List.of(
@@ -76,41 +74,18 @@ public final class WrappedWebElement implements WebElement, WrapsElement {
     );
 
     WrappedWebElement(XPathChainResult parent, int index, WebElement delegate) {
-        this.parent = parent;
-        this.index  = index;
+        this.parent  = parent;
+        this.index   = index;
         this.current = this;
+        this.delegate = delegate;
 
-        // basic passive data
-        this.snapshotTagName   = safeString(delegate::getTagName);
-        this.snapshotText      = safeString(delegate::getText);
-        this.snapshotDisplayed = safeBoolean(delegate::isDisplayed);
-        this.snapshotEnabled   = safeBoolean(delegate::isEnabled);
-        this.snapshotSelected  = safeBoolean(delegate::isSelected);
-
-        // common attributes
-        for (String name : COMMON_ATTRIBUTES) {
-            String value = safeString(() -> delegate.getAttribute(name));
-            if (!value.isEmpty()) {
-                attributeSnapshot.put(name, value);
-            }
-        }
-
-        // allow callers to see the full map if needed
-        // (they can still ask getAttribute("foo") for keys we didn't pre-fill; that returns "")
-
-        // snapshot some basic geometry
-        this.snapshotLocation = safePoint(delegate::getLocation);
-        this.snapshotSize     = safeDimension(delegate::getSize);
-        this.snapshotRect     = safeRect(delegate::getRect);
-
-        // a small set of CSS properties
-        for (String prop : COMMON_CSS_PROPS) {
-            String value = safeString(() -> delegate.getCssValue(prop));
-            if (!value.isEmpty()) {
-                cssSnapshot.put(prop, value);
-            }
-        }
+        // one place that populates all snapshot state
+        captureSnapshotFrom(delegate);
     }
+
+    // ---------------------------------------------------------------------
+    // Neighbor & generation wiring
+    // ---------------------------------------------------------------------
 
     void setNeighbors(WrappedWebElement previous, WrappedWebElement next) {
         this.previous = previous;
@@ -142,6 +117,52 @@ public final class WrappedWebElement implements WebElement, WrapsElement {
     }
 
     // ---------------------------------------------------------------------
+    // WrapsElement
+    // ---------------------------------------------------------------------
+
+    @Override
+    public WebElement getWrappedElement() {
+        // Return the live delegate for JS/Actions use
+        WrappedWebElement currentWrapper = resolveCurrent();
+        if (currentWrapper == null) {
+            throw new NoSuchElementException(
+                    "Element at index " + index + " no longer exists after refresh"
+            );
+        }
+
+        // Prefer the cached delegate if present; otherwise lazily obtain one
+        if (currentWrapper.delegate == null) {
+            WebElement fresh = parent.getDelegate(currentWrapper.index);
+            currentWrapper.delegate = fresh;
+            // Optional: you could re-snapshot here as well
+            // captureSnapshotFrom(fresh);
+        }
+
+        return currentWrapper.delegate;
+    }
+
+    /**
+     * Returns a WebElement that is guaranteed to be non-stale at the time
+     * of return (or throws if the element no longer exists).
+     *
+     * It first tries the currently wrapped element, and if that is stale
+     * or missing, it refreshes via withFreshElement(...) and returns the
+     * fresh delegate.
+     */
+    public WebElement getNonStaleWrappedElement() {
+        try {
+            WebElement el = getWrappedElement();
+            // Lightweight ping to ensure it's not stale
+            el.isEnabled();  // or el.getTagName();
+            return el;
+        } catch (StaleElementReferenceException | NoSuchElementException e) {
+            // Fallback: refresh using existing logic and return the fresh delegate
+            return withFreshElement(element -> element);
+        }
+    }
+
+
+    // ---------------------------------------------------------------------
     // internal helpers
     // ---------------------------------------------------------------------
 
@@ -154,7 +175,68 @@ public final class WrappedWebElement implements WebElement, WrapsElement {
         return (w.current == null) ? null : w;
     }
 
-    /** Core helper for active operations: run with live delegate; heal on stale. */
+    /**
+     * Capture all snapshot fields from the given delegate.
+     * This is used both in the constructor and after a delegate refresh.
+     */
+    private void captureSnapshotFrom(WebElement delegate) {
+        // basic passive data
+        this.snapshotTagName   = safeString(delegate::getTagName);
+        this.snapshotText      = safeString(delegate::getText);
+        this.snapshotDisplayed = safeBoolean(delegate::isDisplayed);
+        this.snapshotEnabled   = safeBoolean(delegate::isEnabled);
+        this.snapshotSelected  = safeBoolean(delegate::isSelected);
+
+        // common attributes
+        attributeSnapshot.clear();
+        for (String name : COMMON_ATTRIBUTES) {
+            String value = safeString(() -> delegate.getAttribute(name));
+            if (!value.isEmpty()) {
+                attributeSnapshot.put(name, value);
+            }
+        }
+
+        // snapshot some basic geometry
+        this.snapshotLocation = safePoint(delegate::getLocation);
+        this.snapshotSize     = safeDimension(delegate::getSize);
+        this.snapshotRect     = safeRect(delegate::getRect);
+
+        // a small set of CSS properties
+        cssSnapshot.clear();
+        for (String prop : COMMON_CSS_PROPS) {
+            String value = safeString(() -> delegate.getCssValue(prop));
+            if (!value.isEmpty()) {
+                cssSnapshot.put(prop, value);
+            }
+        }
+    }
+
+    /**
+     * Run an operation against the currently cached delegate
+     * (on the latest-generation wrapper). Does NOT refresh.
+     */
+    private <R> R withStoredElement(ElementOp<R> op) {
+        WrappedWebElement currentWrapper = resolveCurrent();
+        if (currentWrapper == null) {
+            throw new NoSuchElementException(
+                    "Element at index " + index + " no longer exists after refresh");
+        }
+
+        WebElement live = currentWrapper.delegate;
+        if (live == null) {
+            // Treat as stale / missing so caller can decide to refresh.
+            throw new StaleElementReferenceException(
+                    "No cached delegate available for element at index " + index);
+        }
+
+        return op.apply(live);
+    }
+
+    /**
+     * Core helper for active operations: get a fresh delegate from the parent,
+     * recapture snapshot from it, and run the op. If the delegate appears stale,
+     * it triggers a full refresh on the parent and retries once.
+     */
     private <R> R withFreshElement(ElementOp<R> op) {
         WrappedWebElement currentWrapper = resolveCurrent();
         if (currentWrapper == null) {
@@ -162,9 +244,11 @@ public final class WrappedWebElement implements WebElement, WrapsElement {
                     "Element at index " + index + " no longer exists after refresh");
         }
 
-        WebElement delegate = parent.getDelegate(currentWrapper.index);
         try {
-            return op.apply(delegate);
+            WebElement live = parent.getDelegate(currentWrapper.index);
+            currentWrapper.delegate = live;
+            currentWrapper.captureSnapshotFrom(live);
+            return op.apply(live);
         } catch (StaleElementReferenceException | NoSuchElementException e) {
             // auto refresh whole chain; retry once
             parent.refreshAllWithRetry(3);
@@ -173,8 +257,22 @@ public final class WrappedWebElement implements WebElement, WrapsElement {
                 throw new NoSuchElementException(
                         "Element at index " + index + " no longer exists after refresh");
             }
-            delegate = parent.getDelegate(currentWrapper.index);
-            return op.apply(delegate);
+            WebElement live = parent.getDelegate(currentWrapper.index);
+            currentWrapper.delegate = live;
+            currentWrapper.captureSnapshotFrom(live);
+            return op.apply(live);
+        }
+    }
+
+    /**
+     * Wrapper for active operations: try cached delegate first, then fall back
+     * to withFreshElement on stale / no-such-element.
+     */
+    private <R> R doActiveOp(ElementOp<R> op) {
+        try {
+            return withStoredElement(op);
+        } catch (StaleElementReferenceException | NoSuchElementException e) {
+            return withFreshElement(op);
         }
     }
 
@@ -288,42 +386,43 @@ public final class WrappedWebElement implements WebElement, WrapsElement {
     }
 
     // ---------------------------------------------------------------------
-    // WebElement implementation – active operations use live delegate
+    // WebElement implementation – active operations use cached delegate
+    // with fallback to refreshed delegate
     // ---------------------------------------------------------------------
 
     @Override
     public void click() {
-        withFreshElement(el -> { el.click(); return null; });
+        doActiveOp(el -> { el.click(); return null; });
     }
 
     @Override
     public void submit() {
-        withFreshElement(el -> { el.submit(); return null; });
+        doActiveOp(el -> { el.submit(); return null; });
     }
 
     @Override
     public void sendKeys(CharSequence... keysToSend) {
-        withFreshElement(el -> { el.sendKeys(keysToSend); return null; });
+        doActiveOp(el -> { el.sendKeys(keysToSend); return null; });
     }
 
     @Override
     public void clear() {
-        withFreshElement(el -> { el.clear(); return null; });
+        doActiveOp(el -> { el.clear(); return null; });
     }
 
     @Override
-    public java.util.List<WebElement> findElements(By by) {
-        return withFreshElement(el -> el.findElements(by));
+    public List<WebElement> findElements(By by) {
+        return doActiveOp(el -> el.findElements(by));
     }
 
     @Override
     public WebElement findElement(By by) {
-        return withFreshElement(el -> el.findElement(by));
+        return doActiveOp(el -> el.findElement(by));
     }
 
     @Override
     public <X> X getScreenshotAs(OutputType<X> target) throws WebDriverException {
         // treated as "active": this still talks to the browser directly
-        return withFreshElement(el -> el.getScreenshotAs(target));
+        return doActiveOp(el -> el.getScreenshotAs(target));
     }
 }

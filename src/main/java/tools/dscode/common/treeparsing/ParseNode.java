@@ -175,6 +175,8 @@ public class ParseNode {
             Pattern pattern = Pattern.compile(childDef.getRegexPattern(), Pattern.DOTALL);
             Matcher m = pattern.matcher(parentSnapshot);
 
+            printDebug("@@-AttemptingMatch: " + pattern + "  ::  " + parentSnapshot);
+
             StringBuilder newMasked = new StringBuilder(parentSnapshot.length());
             int lastEnd = 0;
             int occurrence = 1;

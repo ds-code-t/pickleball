@@ -48,15 +48,11 @@ public class PhraseExecution {
 
 
     public static List<XPathData> updateXPathData(List<XPathData> inputList, XPathData newXPathData) {
-        printDebug("@@##updateXPathData: " + newXPathData);
         List<XPathData> returnList = new ArrayList<>();
         XPathData lastXPathData = inputList.isEmpty() ? null : inputList.getLast();
-        printDebug("@@##lastXPathData: " + lastXPathData);
         if (lastXPathData == null) {
             returnList.add(newXPathData);
         } else {
-            printDebug("@@##lastXPathData.isFrom: " + lastXPathData.isFrom());
-
             if (lastXPathData.isFrom()) {
                 returnList.addAll(inputList);
                 returnList.add(newXPathData);
@@ -69,10 +65,6 @@ public class PhraseExecution {
     }
 
     public void mergeXPathDataList(List<XPathData> passedXPathDataList) {
-        printDebug("@@##mergeXPathDataList: " + this.text);
-        printDebug("@@##newContext: " + newContext);
-        printDebug("@@##phraseType: " + phraseType);
-        printDebug("@@##passedXPathDataList: " + passedXPathDataList);
         if (newContext) {
             this.contextXPathDataList = new ArrayList<>();
             if (phraseType == PhraseType.CONTEXT)
@@ -88,19 +80,19 @@ public class PhraseExecution {
 
 
 
-    String text;
+    public String text;
     public final MatchNode phraseNode;
     public boolean newContext;
     public String context;
     public List<ElementMatch> elements;
     //    XPathy contextXPathy;
     //    XPathy executionXPathy;
-    XPathy fullXPathy;
-    String conjunction;
-    String termination;
-    String action;
-    String assertion;
-    String assertionType;
+//    XPathy fullXPathy;
+    public String conjunction;
+    public String termination;
+    public String action;
+    public String assertion;
+    public String assertionType;
     public List<Component> components;
     public List<PhraseExecution> executedPhrases = new ArrayList<>();
 
@@ -120,7 +112,6 @@ public class PhraseExecution {
 //    }
 
     public PhraseExecution initiateNextPhraseExecution(MatchNode phraseNode) {
-        printDebug("@@##initiateNextPhraseExecution: " + phraseType + " : " + phraseNode.modifiedText());
         PhraseExecution pe = new PhraseExecution(phraseNode);
         if (pe.phraseType != null && !pe.phraseType.equals(PhraseType.INITIAL)) {
             pe.executedPhrases.addAll(executedPhrases);
@@ -154,14 +145,11 @@ public class PhraseExecution {
         elements = getNextComponents(-1, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
         this.phraseNode = phraseNode;
         text = phraseNode.toString();
-        printDebug("@@##text----: " + text);
-        printDebug("@@##phraseNode.localStateBoolean(\"newContext\"): " + phraseNode.localStateBoolean("newContext"));
         newContext = phraseNode.localStateBoolean("newContext");
         conjunction = phraseNode.getStringFromLocalState("conjunction");
         termination =   phraseNode.getStringFromLocalState("termination");
 
         context = phraseNode.getStringFromLocalState("context");
-        printDebug("@@##context2: " + context);
 
         if (!context.isBlank()) {
 //            List<ElementMatch> elements = getNextComponents(-1, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
@@ -169,7 +157,8 @@ public class PhraseExecution {
 //            contextXPathy = getXPathyContext(context, elements);
             //            contextElementMatch = new ElementMatch(phraseNode.getChild("elementMatch"));
         } else {
-            action = phraseNode.getChild("action").toString();
+            action = phraseNode.getStringFromLocalState("action");
+            System.out.println("@@actionSet to: " + action);
             if (action != null) {
                 phraseType = PhraseType.ACTION;
             } else {
@@ -368,7 +357,8 @@ public class PhraseExecution {
         public XPathChainResult findWebElements(WebDriver driver) {
             List<XPathData> xpathDataList = getElementXPathy();
             System.out.println(this);
-            System.out.println("Finding Elements at: " + xpathDataList);
+            System.out.println("\n===============\nFinding Elements at: " + xpathDataList);
+            System.out.println("\n---------------\n");
             matchedElements = new XPathChainResult(driver, xpathDataList);
             return matchedElements;
         }

@@ -38,10 +38,7 @@ public class XPathChainResolver {
             int index,
             List<? extends SearchContext> currentContexts
     ) {
-        printDebug("@@##resolveStep: " + index + " / " + steps.size() + " / " + currentContexts.size());
         XPathData current = steps.get(index);
-        printDebug("@@##current: " + current);
-
         // 1. Find elements for current XPathData in all contexts
         List<WebElement> found = new ArrayList<>();
         for (SearchContext context : currentContexts) {
@@ -50,15 +47,7 @@ public class XPathChainResolver {
 
         // Deduplicate now
         found = found.stream().distinct().toList();
-
-        printDebug("@@##found: " + found.size());
-        if (!found.isEmpty()) {
-            try {
-                printDebug("@@##firstFoundTag: " + found.get(0).getTagName());
-            } catch (StaleElementReferenceException ignored) {
-                // best-effort debug only
-            }
-        }
+        System.out.println("Found " + found.size() + " elements for " + current);
 
         // If this is the last step, we're done: return what we found
         if (index == steps.size() - 1) {
@@ -70,10 +59,13 @@ public class XPathChainResolver {
             return List.of(); // nothing to continue with
         }
 
+        System.out.println("Attempting to find: " + current);
         if (current.isFrom()) {
+            System.out.println("handleFromStep");
             // Special "from" semantics: only use the FIRST element in 'found'
             return handleFromStep(driver, steps, index, found);
         } else {
+            System.out.println("resolveStep");
             // Simple case: next step runs relative to ALL elements found in this step
             return resolveStep(driver, steps, index + 1, found);
         }
@@ -96,8 +88,6 @@ public class XPathChainResolver {
             int currentIndex,
             List<WebElement> found
     ) {
-        printDebug("@@##handleFromStep: index=" + currentIndex + ", steps.size=" + steps.size());
-        printDebug("@@##handleFromStep: found.size=" + found.size());
 
         if (found.isEmpty()) {
             return List.of();
@@ -107,28 +97,25 @@ public class XPathChainResolver {
 
         // NEW: Only take the FIRST element and discard all others
         WebElement element = found.get(0);
-        printDebug("@@##handleFromStep:firstElement=" + element);
-
         boolean handledSpecial = false;
 
         // 1. IFRAME / FRAME case
         String tagName = element.getTagName(); // stale here will propagate
-        printDebug("@@##tagName: " + tagName);
+        System.out.println("Matched: " + tagName );
         if ("iframe".equalsIgnoreCase(tagName) || "frame".equalsIgnoreCase(tagName)) {
             handledSpecial = true;
-            printDebug("@@##handling iframe/frame: " + element);
             try {
                 // stale during switch will propagate out of resolveXPathChain
+                System.out.println("Switching to iframe/frame");
                 driver.switchTo().frame(element);
 
                 // NEW: No switch back to defaultContent() here.
                 // We stay in this frame context for all subsequent steps.
-                printDebug("@@##iframeContext (staying inside frame)");
                 return resolveStep(driver, steps, nextIndex, List.of(driver));
 
             } catch (NoSuchFrameException ignored) {
+                ignored.printStackTrace();
                 // Frame not available – fall through and treat as non-special
-                printDebug("@@##NoSuchFrameException - treating as non-special context");
                 handledSpecial = false;
             }
         }
@@ -138,14 +125,12 @@ public class XPathChainResolver {
             SearchContext shadowRoot = getShadowRootIfAvailable(element);
             if (shadowRoot != null) {
                 handledSpecial = true;
-                printDebug("@@##handling shadowRoot: " + element);
                 // Any stale from inside this resolveStep will propagate
                 return resolveStep(driver, steps, nextIndex, List.of(shadowRoot));
             }
         }
 
         // 3. If neither iframe/frame nor shadow root, treat element as normal context
-        printDebug("@@##handling as normal context: " + element);
         return resolveStep(driver, steps, nextIndex, List.of(element));
     }
 

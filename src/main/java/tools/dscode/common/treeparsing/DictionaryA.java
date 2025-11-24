@@ -4,6 +4,7 @@ import com.xpathy.Attribute;
 import com.xpathy.Tag;
 import com.xpathy.XPathy;
 import org.intellij.lang.annotations.Language;
+import org.openqa.selenium.chromium.ChromiumDriver;
 import tools.dscode.common.domoperations.XPathyRegistry;
 
 import static com.xpathy.Attribute.aria_label;
@@ -15,9 +16,11 @@ import static com.xpathy.Attribute.id;
 import static com.xpathy.Attribute.title;
 import static com.xpathy.Attribute.type;
 import static com.xpathy.Case.LOWER;
+import static com.xpathy.Condition.attribute;
 import static com.xpathy.Tag.any;
 import static com.xpathy.Tag.input;
 import static com.xpathy.Tag.label;
+import static com.xpathy.Tag.select;
 import static tools.dscode.common.domoperations.VisibilityConditions.extractPredicate;
 import static tools.dscode.common.domoperations.VisibilityConditions.invisible;
 import static tools.dscode.common.domoperations.VisibilityConditions.visible;
@@ -40,7 +43,6 @@ public class DictionaryA extends NodeDictionary {
     static {
 
 
-
         //
         // Frame
         //
@@ -58,7 +60,6 @@ public class DictionaryA extends NodeDictionary {
                         (category, v, op) ->
                                 XPathy.from(Tag.iframe).byAttribute(id).equals("iframeResult")
                 );
-
 
 
         //
@@ -86,8 +87,13 @@ public class DictionaryA extends NodeDictionary {
                 );
 
 
+        category("Dropdown").inheritsFrom("forLabel").and((category, v, op) ->
+                XPathy.from(select)).or(
+                (category, v, op) -> select.byAttribute(id).equals(v),
+                (category, v, op) -> select.byAttribute(title).equals(v),
+                (category, v, op) -> select.byAttribute(name).equals(v)
+        );
 
-        category("DropDown").inheritsFrom("forLabel");
 
         //
         // Textbox  (two registration blocks preserved exactly)
@@ -99,17 +105,6 @@ public class DictionaryA extends NodeDictionary {
                         (category, v, op) ->
                                 input.byAttribute(placeholder).equals(v)
                 );
-
-
-
-
-
-
-
-
-
-
-
 
 
         category("baseCategory").inheritsFrom("visible");
@@ -127,6 +122,18 @@ public class DictionaryA extends NodeDictionary {
                                     "//*[" +
                                             visiblePredicate +
                                             " and not(ancestor::*[" + invisiblePredicate + "])]"
+                            );
+                        }
+                );
+
+        category("containsText")
+                .and(
+                        (category, v, op) -> {
+                            if (v == null || v.isBlank())
+                                return null;
+                            return any.byHaving(
+                                    XPathy.from("descendant-or-self::*")
+                                            .byHaving(deepNormalizedText(v))
                             );
                         }
                 );
@@ -157,23 +164,8 @@ public class DictionaryA extends NodeDictionary {
                     if (v == null || v.isBlank()) {
                         return null; // no label text to match, skip this builder
                     }
-
-                    // original expensive label-based logic
-                    XPathy labelNode =
-                            label.byText()
-                                    .withNormalizeSpace()
-                                    .equals(v);
-
-                    XPathy matchLabelForInput =
-                            input.byAttribute(id)
-                                    .equals(labelNode.byAttribute(Attribute.for_).toString());
-
-                    return XPathyRegistry.combineAnd(id.haveIt(), matchLabelForInput);
+                    return new XPathy("//input[@id][@id = //*[normalize-space(text())='" + v + "']/@for]");
                 });
-
-
-
-
 
 
         //
@@ -200,27 +192,6 @@ public class DictionaryA extends NodeDictionary {
 
 
     }
-
-
-//    public static void main(String[] args) {
-//
-//
-//
-//        ChromiumDriver driver = createChromeDriver();
-//        driver.get("https://www.iana.org/help/example-domains");
-//        DictionaryA dict = new DictionaryA();
-//        String input = """
-//                click the "RFC 2606" Link
-//                """;
-//        LineExecution lineData = dict.getLineExecutionData(input);
-//    }
-//
-//    public LineExecution getLineExecutionData(String input) {
-//        MatchNode lineNode = parse(input);
-//        LineExecution lineExecution = new LineExecution(lineNode);
-//
-//        return lineExecution;
-//    }
 
 
     public static final @Language("RegExp") String punc = ",;\\.\\?!";
@@ -264,14 +235,12 @@ public class DictionaryA extends NodeDictionary {
         @Override
         public String onCapture(MatchNode self) {
             String context = self.resolvedGroupText("context");
-            printDebug("@@##context: " + context);
             if (!context.isEmpty() && Character.isUpperCase(context.charAt(0)))
                 self.putToLocalState("newContext", true);
             self.putToLocalState("context", context.toLowerCase());
             self.putToLocalState("conjunction", self.resolvedGroupText("conjunction"));
             String termination = self.resolvedGroupText("punc");
             if (termination == null || termination.isBlank()) termination = "";
-            printDebug("@@##termination: " + termination);
             self.putToLocalState("termination", termination);
             if (self.localStateBoolean("context")) {
                 self.localState().put("skip:action", "true");
@@ -290,10 +259,7 @@ public class DictionaryA extends NodeDictionary {
             if (lastPhraseExecution == null) {
                 lastPhraseExecution = initiateFirstPhraseExecution();
             } else {
-                printDebug("@@##lastPhraseExecution.text: " + lastPhraseExecution.text);
-                printDebug("@@##lastPhraseExecution.termination: " + lastPhraseExecution.termination);
                 if ((!(lastPhraseExecution.termination.equals(";") || lastPhraseExecution.termination.equals(",")))) {
-                    printDebug("@@##setting newContext to true.   " + lastPhraseExecution);
                     self.putToLocalState("newContext", true);
                 }
             }
@@ -355,9 +321,10 @@ public class DictionaryA extends NodeDictionary {
         }
     };
 
-    ParseNode action = new ParseNode("\\b(?<base>press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite)(?:s|ed|ing|es)?\\b") {
+    ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite)(?:s|ed|ing|es)?\\b") {
         @Override
         public String onCapture(MatchNode self) {
+            self.parent().putToLocalState("action", self.resolvedGroupText("base"));
             return self.resolvedGroupText("base").replaceAll("move", "hover");
         }
     };

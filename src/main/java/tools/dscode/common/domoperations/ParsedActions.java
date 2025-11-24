@@ -14,6 +14,7 @@ import static tools.dscode.common.domoperations.HumanInteractions.clearAndType;
 import static tools.dscode.common.domoperations.HumanInteractions.click;
 import static tools.dscode.common.domoperations.HumanInteractions.contextClick;
 import static tools.dscode.common.domoperations.HumanInteractions.doubleClick;
+import static tools.dscode.common.domoperations.HumanInteractions.selectDropdownByVisibleText;
 import static tools.dscode.common.domoperations.HumanInteractions.typeText;
 import static tools.dscode.common.domoperations.HumanInteractions.wheelScrollBy;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitSeconds;
@@ -25,7 +26,7 @@ public class ParsedActions {
     public static void executeAction(ChromiumDriver driver, PhraseExecution phraseExecution) {
 
         MatchNode actionNode = phraseExecution.phraseNode.getChild("action");
-        String action = actionNode.modifiedText();
+        String action = phraseExecution.action;
 
         List<ElementMatch> nextElementMatches = phraseExecution.getNextComponents(actionNode.position, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
         ElementMatch nextElementMatch = nextElementMatches .isEmpty() ? null : nextElementMatches.getFirst();
@@ -41,29 +42,35 @@ public class ParsedActions {
             throw new RuntimeException(message);
         }
 
+        System.out.println("Attempting " + action);
         switch (action) {
-            case String s when s.contains("click") -> {
-                for (WebElement nextElement : nextElements) {
+            case String s when s.contains("select") -> {
+                for (WrappedWebElement nextElement : nextElements) {
+                    selectDropdownByVisibleText(driver, nextElement, nextValue.value);
+                }
+            }
+             case String s when s.contains("click") -> {
+                for (WrappedWebElement nextElement : nextElements) {
                     click(driver, nextElement);
                 }
             }
             case String s when s.contains("double click") -> {
-                for (WebElement nextElement : nextElements) {
+                for (WrappedWebElement nextElement : nextElements) {
                     doubleClick(driver, nextElement);
                 }
             }
             case String s when s.contains("right click") -> {
-                for (WebElement nextElement : nextElements) {
+                for (WrappedWebElement nextElement : nextElements) {
                     contextClick(driver, nextElement);
                 }
             }
             case String s when s.contains("enter") -> {
-                for (WebElement nextElement : nextElements) {
+                for (WrappedWebElement nextElement : nextElements) {
                     typeText(driver, nextElement, nextValue.value);
                 }
             }
             case String s when s.contains("scroll") -> {
-                for (WebElement nextElement : nextElements) {
+                for (WrappedWebElement nextElement : nextElements) {
                     wheelScrollBy(driver, nextElement);
                 }
             }
@@ -71,7 +78,7 @@ public class ParsedActions {
                 waitSeconds(Integer.parseInt(nextValue.value.replace("\"|'|`", "")));
             }
             case String s when s.contains("overwrite") -> {
-                for (WebElement nextElement : nextElements) {
+                for (WrappedWebElement nextElement : nextElements) {
                     clearAndType(driver, nextElement, nextValue.value);
                 }
             }
