@@ -98,7 +98,7 @@ public final class VisibilityConditions {
     }
 
     // Helper: given "//*" and "//*[(...)]" return "(...)"
-    private static String extractPredicate(String base, String xpathWithPredicate) {
+    public static String extractPredicate(String base, String xpathWithPredicate) {
         // Expect pattern: base + "[" + predicate + "]"
         if (!xpathWithPredicate.startsWith(base + "[") || !xpathWithPredicate.endsWith("]")) {
             throw new IllegalArgumentException("Unexpected XPath format: " + xpathWithPredicate);

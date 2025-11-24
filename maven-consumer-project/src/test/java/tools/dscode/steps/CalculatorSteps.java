@@ -21,10 +21,15 @@ import static com.xpathy.Attribute.aria_label;
 import static com.xpathy.Attribute.placeholder;
 import static com.xpathy.Attribute.role;
 import static com.xpathy.Attribute.type;
+import static com.xpathy.Tag.any;
 import static org.assertj.core.api.Assertions.assertThat;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
+import static tools.dscode.common.domoperations.VisibilityConditions.extractPredicate;
+import static tools.dscode.common.domoperations.VisibilityConditions.invisible;
+import static tools.dscode.common.domoperations.VisibilityConditions.visible;
 import static tools.dscode.common.domoperations.XPathyMini.orMap;
 import static tools.dscode.common.domoperations.XPathyMini.textOp;
+import static tools.dscode.common.domoperations.XPathyRegistry.combineOr;
 import static tools.dscode.common.domoperations.XPathyUtils.deepNormalizedText;
 import static tools.dscode.common.domoperations.XPathyUtils.deepNormalizedTextWrapped;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;
@@ -48,15 +53,33 @@ public class CalculatorSteps {
 
     @Given("configs")
     public static void configs() {
+        XPathyRegistry.registerAndBuilder("BaseCategory",
+                (category, v, op) -> {
+                    if (v == null || v.isBlank())
+                        return null;
 
-        XPathyRegistry.registerOrBuilder("Textbox",
-                (category, v, op) -> Tag.input.byAttribute(type).equals("text").and().byAttribute(placeholder).equals(v.toString()),
-                (category, v, op)  -> Tag.input
-                        .byAttribute(type).equals("text")
-                        .byHaving(
-                                XPathy.from("../descendant::*")
-                                        .byHaving(deepNormalizedText(v.toString()))
-                        )
+                    return combineOr(
+                            any.byHaving(
+                                    XPathy.from("descendant-or-self::*")
+                                            .byHaving(deepNormalizedText(v))),
+                            any.byHaving(
+                                    XPathy.from("preceding::*")
+                                            .byHaving(deepNormalizedText(v)))
+                    );
+                },
+                (category, v, op) -> {
+                    XPathy selfInvisible = any.byCondition(invisible());
+                    String invisiblePredicate = extractPredicate("//*", selfInvisible.getXpath());
+                    XPathy selfVisible = any.byCondition(visible());
+                    String visiblePredicate = extractPredicate("//*", selfVisible.getXpath());
+                    return XPathy.from(
+                            "//*[" +
+                                    visiblePredicate +
+                                    " and not(ancestor::*[" +
+                                    invisiblePredicate +
+                                    "])]"
+                    );
+                }
         );
 
         XPathyRegistry.registerOrBuilder("Qqq",

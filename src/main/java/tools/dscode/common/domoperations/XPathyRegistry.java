@@ -15,7 +15,7 @@ public final class XPathyRegistry {
 
     @FunctionalInterface
     public interface Builder {
-        XPathy build(String category, Object value, Op op);
+        XPathy build(String category, String value, Op op);
     }
 
     public enum Op { EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE }
@@ -44,21 +44,13 @@ public final class XPathyRegistry {
 
     /**
      * Register inheritance relationships for a category.
-     *
-     * Example:
-     *   registerCategoryInheritance("Button.Primary", "Button", "Clickable");
-     *
-     * This means:
-     *   - "Button.Primary" inherits all builders from "Button" and "Clickable"
-     *   - And recursively from *their* parents as well.
-     *
-     * NOTE:
-     *   - Does NOT throw if a parent category never registers any builders.
-     *     Those parents simply contribute nothing.
      */
     public static void registerCategoryInheritance(String category, String... parentCategories) {
         Objects.requireNonNull(category, "category must not be null");
         Objects.requireNonNull(parentCategories, "parentCategories must not be null");
+
+        System.out.println("[XPathyRegistry] registerCategoryInheritance: category=" + category +
+                ", parents=" + Arrays.toString(parentCategories));
 
         for (String parent : parentCategories) {
             if (parent == null) continue;
@@ -68,12 +60,36 @@ public final class XPathyRegistry {
     }
 
     /**
-     * Resolve full inheritance chain for a category, including:
-     *   - The category itself
-     *   - All ancestors (recursively)
-     *   - BASE_CATEGORY (by default) for all categories except BaseCategory itself
+     * Convenience method: declare that MANY categories inherit from ONE parent.
      *
-     * Order is stable and de-duplicated (first occurrence preserved).
+     * Example:
+     *     registerParentOfCategories("Clickable", "Button", "Link", "MenuItem");
+     *
+     * This is equivalent to:
+     *     registerCategoryInheritance("Button", "Clickable");
+     *     registerCategoryInheritance("Link", "Clickable");
+     *     registerCategoryInheritance("MenuItem", "Clickable");
+     */
+    public static void registerParentOfCategories(String parentCategory, String... childCategories) {
+        Objects.requireNonNull(parentCategory, "parentCategory must not be null");
+        Objects.requireNonNull(childCategories, "childCategories must not be null");
+
+        System.out.println("[XPathyRegistry] registerParentOfCategories: parent=" + parentCategory +
+                ", children=" + Arrays.toString(childCategories));
+
+        for (String child : childCategories) {
+            if (child == null) continue;
+            if (child.equals(parentCategory)) continue; // avoid trivial cycle
+
+            // This is just the same as the original operation, but inverted:
+            registerCategoryInheritance(child, parentCategory);
+        }
+    }
+
+
+
+    /**
+     * Resolve full inheritance chain for a category.
      */
     private static List<String> resolveCategoryLineage(String category) {
         String root = (category == null || category.isBlank())
@@ -106,7 +122,10 @@ public final class XPathyRegistry {
             ordered.add(BASE_CATEGORY);
         }
 
-        return new ArrayList<>(ordered);
+        List<String> lineage = new ArrayList<>(ordered);
+        System.out.println("[XPathyRegistry] resolveCategoryLineage: category=" + category +
+                " -> lineage=" + lineage);
+        return lineage;
     }
 
     //========================================================
@@ -116,6 +135,9 @@ public final class XPathyRegistry {
     public static void addHtmlTypes(String category, HtmlType... htmlTypes) {
         Objects.requireNonNull(category, "category must not be null");
         Objects.requireNonNull(htmlTypes, "htmlTypes must not be null");
+
+        System.out.println("[XPathyRegistry] addHtmlTypes: category=" + category +
+                ", htmlTypes=" + Arrays.toString(htmlTypes));
 
         if (htmlTypes.length == 0) {
             return;
@@ -133,14 +155,20 @@ public final class XPathyRegistry {
 
     public static Set<HtmlType> getHtmlTypes(String category) {
         var set = HTML_TYPE_REG.get(category);
-        return (set == null || set.isEmpty())
+        Set<HtmlType> result = (set == null || set.isEmpty())
                 ? Set.of()
                 : Set.copyOf(set);
+        System.out.println("[XPathyRegistry] getHtmlTypes: category=" + category +
+                " -> " + result);
+        return result;
     }
 
     public static boolean hasHtmlType(String category, HtmlType type) {
         var set = HTML_TYPE_REG.get(category);
-        return set != null && set.contains(type);
+        boolean has = set != null && set.contains(type);
+        System.out.println("[XPathyRegistry] hasHtmlType: category=" + category +
+                ", type=" + type + " -> " + has);
+        return has;
     }
 
     // ========================================================
@@ -157,10 +185,6 @@ public final class XPathyRegistry {
 
     /**
      * Register one or more OR-based builders for a single category.
-     *
-     * Usage:
-     *   registerOrBuilder("Button", b1);
-     *   registerOrBuilder("Button", b1, b2, b3);
      */
     public static void registerOrBuilder(String category, Builder... builders) {
         Objects.requireNonNull(category, "category must not be null");
@@ -168,6 +192,10 @@ public final class XPathyRegistry {
         if (builders.length == 0) {
             return;
         }
+
+        System.out.println("[XPathyRegistry] registerOrBuilder: category=" + category +
+                ", builderCount=" + builders.length);
+
         var list = OR_REG.computeIfAbsent(category, k -> new CopyOnWriteArrayList<>());
         for (Builder b : builders) {
             list.add(Objects.requireNonNull(b, "builder must not be null"));
@@ -176,9 +204,6 @@ public final class XPathyRegistry {
 
     /**
      * Convenience: register the same OR-builders for multiple categories.
-     *
-     * Example:
-     *   registerOrForCategories(List.of("Button", "Link"), b1, b2);
      */
     public static void registerOrForCategories(List<String> categories, Builder... builders) {
         Objects.requireNonNull(categories, "categories must not be null");
@@ -186,6 +211,9 @@ public final class XPathyRegistry {
         if (categories.isEmpty() || builders.length == 0) {
             return;
         }
+
+        System.out.println("[XPathyRegistry] registerOrForCategories: categories=" + categories +
+                ", builderCount=" + builders.length);
 
         for (String category : categories) {
             if (category != null && !category.isBlank()) {
@@ -198,10 +226,6 @@ public final class XPathyRegistry {
 
     /**
      * Register one or more AND-based builders for a single category.
-     *
-     * Usage:
-     *   registerAndBuilder("Button", b1);
-     *   registerAndBuilder("Button", b1, b2, b3);
      */
     public static void registerAndBuilder(String category, Builder... builders) {
         Objects.requireNonNull(category, "category must not be null");
@@ -209,6 +233,9 @@ public final class XPathyRegistry {
         if (builders.length == 0) {
             return;
         }
+
+        System.out.println("[XPathyRegistry] registerAndBuilder: category=" + category +
+                ", builderCount=" + builders.length);
 
         var list = AND_REG.computeIfAbsent(category, k -> new CopyOnWriteArrayList<>());
         for (Builder b : builders) {
@@ -218,9 +245,6 @@ public final class XPathyRegistry {
 
     /**
      * Convenience: register the same AND-builders for multiple categories.
-     *
-     * Example:
-     *   registerAndForCategories(List.of("Button", "Clickable"), b1, b2);
      */
     public static void registerAndForCategories(List<String> categories, Builder... builders) {
         Objects.requireNonNull(categories, "categories must not be null");
@@ -228,6 +252,9 @@ public final class XPathyRegistry {
         if (categories.isEmpty() || builders.length == 0) {
             return;
         }
+
+        System.out.println("[XPathyRegistry] registerAndForCategories: categories=" + categories +
+                ", builderCount=" + builders.length);
 
         for (String category : categories) {
             if (category != null && !category.isBlank()) {
@@ -241,66 +268,79 @@ public final class XPathyRegistry {
     //========================================================
 
     /**
-     * Core expansion that honors inheritance.
-     *
-     * For the requested category:
-     *   - Resolve full lineage (category + ancestors + BaseCategory).
-     *   - Accumulate builders from all categories in that lineage.
-     *   - If no builders at all are found, fall back to "*" as before.
-     *
-     * IMPORTANT:
-     *   - Builders are always invoked with the original requested category
-     *     (not the ancestor category name), so existing Builder logic that
-     *     expects the "consumer category" is preserved.
+     * Core expansion that honors inheritance + "*" fallback.
      */
     private static List<XPathy> expandInternal(
             ConcurrentMap<String, CopyOnWriteArrayList<Builder>> map,
             String category,
-            Object value,
+            String value,
             Op op
     ) {
         String requestCategory = (category == null || category.isBlank())
                 ? BASE_CATEGORY
                 : category;
 
-        // Resolve inheritance chain: [requestCategory, parent1, parent2, ..., BaseCategory]
         List<String> lineage = resolveCategoryLineage(requestCategory);
-
         List<Builder> allBuilders = new ArrayList<>();
 
         for (String catKey : lineage) {
             var builders = map.get(catKey);
             if (builders != null && !builders.isEmpty()) {
+                System.out.println("[XPathyRegistry] expandInternal: category=" + requestCategory +
+                        ", map=" + (map == OR_REG ? "OR_REG" : "AND_REG") +
+                        ", catKey=" + catKey + ", buildersCount=" + builders.size());
                 allBuilders.addAll(builders);
             }
         }
 
-        // Preserve old behavior: if nothing found in lineage, fallback to "*"
+        // If nothing found in lineage, fallback to "*"
         if (allBuilders.isEmpty()) {
             var starList = map.get("*");
             if (starList == null || starList.isEmpty()) {
+                System.out.println("[XPathyRegistry] expandInternal: category=" + requestCategory +
+                        ", map=" + (map == OR_REG ? "OR_REG" : "AND_REG") +
+                        " -> no builders found, no '*' fallback.");
                 return List.of();
             }
-
-            // Informative message when we have to use the fallback category.
-            System.out.println(
-                    "XPathyRegistry: no builders found for category '" + requestCategory +
-                            "' (including ancestors). Falling back to '*' category."
-            );
-
+            System.out.println("[XPathyRegistry] expandInternal: category=" + requestCategory +
+                    ", map=" + (map == OR_REG ? "OR_REG" : "AND_REG") +
+                    " -> using '*' fallback, buildersCount=" + starList.size());
             allBuilders.addAll(starList);
         }
 
-        return allBuilders.stream()
-                .map(b -> b.build(requestCategory, value, op))
+        List<XPathy> result = allBuilders.stream()
+                .map(b -> b.build(requestCategory, value, op)).filter(Objects::nonNull)
                 .toList();
+
+        System.out.println("[XPathyRegistry] expandInternal: category=" + requestCategory +
+                ", map=" + (map == OR_REG ? "OR_REG" : "AND_REG") +
+                ", value=" + value + ", op=" + op +
+                " -> produced XPathy count=" + result.size());
+        for (int i = 0; i < result.size(); i++) {
+            XPathy x = result.get(i);
+            System.out.println("    [expandInternal] xpath[" + i + "]=" + safeXpath(x));
+        }
+
+        return result;
     }
 
-    public static List<XPathy> expandOr(String category, Object value, Op op) {
+    private static String safeXpath(XPathy x) {
+        try {
+            return x == null ? "null" : x.getXpath();
+        } catch (Exception e) {
+            return "ERROR_GETTING_XPATH: " + e;
+        }
+    }
+
+    public static List<XPathy> expandOr(String category, String value, Op op) {
+        System.out.println("[XPathyRegistry] expandOr: category=" + category +
+                ", value=" + value + ", op=" + op);
         return expandInternal(OR_REG, category, value, op);
     }
 
-    public static List<XPathy> expandAnd(String category, Object value, Op op) {
+    public static List<XPathy> expandAnd(String category, String value, Op op) {
+        System.out.println("[XPathyRegistry] expandAnd: category=" + category +
+                ", value=" + value + ", op=" + op);
         return expandInternal(AND_REG, category, value, op);
     }
 
@@ -308,45 +348,72 @@ public final class XPathyRegistry {
     // String-based combination helpers
     //========================================================
 
+    /**
+     * Combine a list of XPathy into a single XPathy using "and"/"or".
+     *
+     * We:
+     *   - Sort by heuristic specificity,
+     *   - Convert each to a self:: step,
+     *   - Join them into a boolean expression,
+     *   - Wrap that expression into a valid selector: //*[(... boolean ...)]
+     *
+     * NOTE: This is what fixes invalid selectors like "(self::* or self::*)[1]".
+     */
     private static Optional<XPathy> combine(List<XPathy> list, String joiner) {
-        if (list.isEmpty()) return Optional.empty();
+        System.out.println("[XPathyRegistry] combine: joiner=" + joiner +
+                ", listSize=" + list.size());
+
+        if (list.isEmpty()) {
+            System.out.println("[XPathyRegistry] combine: list empty, returning Optional.empty()");
+            return Optional.empty();
+        }
 
         // Make a defensive copy so we don't mutate caller's list
         List<XPathy> sorted = new ArrayList<>(list);
 
-        // Sort by our heuristic specificity score (lower is "better")
+        // Sort by heuristic specificity score (lower is "better")
         sorted.sort(Comparator.comparingInt(x -> xpathSpecificityScore(x.getXpath())));
 
-        String combined = sorted.stream()
+        System.out.println("[XPathyRegistry] combine: after sort, xpaths=");
+        for (int i = 0; i < sorted.size(); i++) {
+            System.out.println("    [combine] sorted[" + i + "]=" + safeXpath(sorted.get(i)));
+        }
+
+        // Build boolean expression over self::... steps
+        String combinedExpr = sorted.stream()
                 .map(XPathy::getXpath)
                 .map(XPathyRegistry::toSelfStep)
+                .peek(s -> System.out.println("    [combine] selfStep=" + s))
                 .collect(java.util.stream.Collectors.joining(" " + joiner + " "));
 
-        return Optional.of(XPathy.from(combined));
+        System.out.println("[XPathyRegistry] combine: combinedExpr=" + combinedExpr);
+
+        // Wrap into a valid selector path for Selenium: //*[(self::... or self::...)]
+        String fullXpath = "//*[" + combinedExpr + "]";
+        System.out.println("[XPathyRegistry] combine: fullXpath=" + fullXpath);
+
+        XPathy x = XPathy.from(fullXpath);
+        System.out.println("[XPathyRegistry] combine: final XPathy.getXpath()=" + safeXpath(x));
+
+        return Optional.of(x);
     }
 
-    /**
-     * Combine all AND-based XPathy expressions for the given category into a single XPathy.
-     * Assumes that, through fallback "*", there is always at least one builder registered.
-     */
-    public static XPathy andAll(String category, Object value, Op op) {
-        List<XPathy> list = expandAnd(category, value, op);
-        return combine(list, "and")
-                .orElseThrow(() -> new IllegalStateException(
-                        "No XPathy builders registered for category '" + category +
-                                "' or fallback '*' (andAll)."));
+    public static Optional<XPathy> andAll(String category, String value, Op op) {
+        System.out.println("[XPathyRegistry] andAll: category=" + category +
+                ", value=" + value + ", op=" + op);
+        Optional<XPathy> result = combine(expandAnd(category, value, op), "and");
+        System.out.println("[XPathyRegistry] andAll: resultPresent=" + result.isPresent() +
+                (result.isPresent() ? ", xpath=" + safeXpath(result.get()) : ""));
+        return result;
     }
 
-    /**
-     * Combine all OR-based XPathy expressions for the given category into a single XPathy.
-     * Assumes that, through fallback "*", there is always at least one builder registered.
-     */
-    public static XPathy orAll(String category, Object value, Op op) {
-        List<XPathy> list = expandOr(category, value, op);
-        return combine(list, "or")
-                .orElseThrow(() -> new IllegalStateException(
-                        "No XPathy builders registered for category '" + category +
-                                "' or fallback '*' (orAll)."));
+    public static Optional<XPathy> orAll(String category, String value, Op op) {
+        System.out.println("[XPathyRegistry] orAll: category=" + category +
+                ", value=" + value + ", op=" + op);
+        Optional<XPathy> result = combine(expandOr(category, value, op), "or");
+        System.out.println("[XPathyRegistry] orAll: resultPresent=" + result.isPresent() +
+                (result.isPresent() ? ", xpath=" + safeXpath(result.get()) : ""));
+        return result;
     }
 
     /**
@@ -354,40 +421,52 @@ public final class XPathyRegistry {
      *   - First: all AND-based builders must match (intersection).
      *   - Then: at least one OR-based builder must match (union).
      *
-     * Final XPath: (AND part) and (OR part)
-     *
-     * Always returns a non-null XPathy due to the fallback "*" category.
+     * Returns a concrete XPathy, or throws if both sides are empty.
      */
-    public static XPathy andThenOr(String category, Object value, Op op) {
-        // Expand using existing logic (which prints fallback notice if needed)
-        List<XPathy> andList = expandAnd(category, value, op);
-        List<XPathy> orList  = expandOr(category, value, op);
+    public static XPathy andThenOr(String category, String value, Op op) {
+        System.out.println("[XPathyRegistry] andThenOr: category=" + category +
+                ", value=" + value + ", op=" + op);
 
-        // Combine both sides using existing combine() method
-        XPathy andPart = combine(andList, "and")
-                .orElseThrow(() -> new IllegalStateException(
-                        "No AND builders found for category '" + category +
-                                "' or fallback '*', which should be impossible."));
-        XPathy orPart = combine(orList, "or")
-                .orElseThrow(() -> new IllegalStateException(
-                        "No OR builders found for category '" + category +
-                                "' or fallback '*', which should be impossible."));
+        Optional<XPathy> andPart = andAll(category, value, op);
+        Optional<XPathy> orPart  = orAll(category, value, op);
 
-        // Convert both to self:: steps
-        String andStep = toSelfStep(andPart.getXpath());
-        String orStep  = toSelfStep(orPart.getXpath());
+        System.out.println("[XPathyRegistry] andThenOr: andPartPresent=" + andPart.isPresent() +
+                (andPart.isPresent() ? ", andXpath=" + safeXpath(andPart.get()) : ""));
+        System.out.println("[XPathyRegistry] andThenOr: orPartPresent=" + orPart.isPresent() +
+                (orPart.isPresent() ? ", orXpath=" + safeXpath(orPart.get()) : ""));
 
-        // Final combined XPath
-        String combined = "(" + andStep + ") and (" + orStep + ")";
-        return XPathy.from(combined);
+        if (andPart.isEmpty() && orPart.isEmpty()) {
+            throw new IllegalStateException(
+                    "[XPathyRegistry] andThenOr: both AND and OR parts empty " +
+                            "for category='" + category + "', value=" + value + ", op=" + op);
+        }
+        if (andPart.isEmpty()) {
+            System.out.println("[XPathyRegistry] andThenOr: only orPart present, returning it.");
+            return orPart.get();
+        }
+        if (orPart.isEmpty()) {
+            System.out.println("[XPathyRegistry] andThenOr: only andPart present, returning it.");
+            return andPart.get();
+        }
+
+        String andStep = toSelfStep(andPart.get().getXpath());
+        String orStep  = toSelfStep(orPart.get().getXpath());
+
+        String combinedExpr = "(" + andStep + ") and (" + orStep + ")";
+        System.out.println("[XPathyRegistry] andThenOr: combinedExpr=" + combinedExpr);
+
+        // Wrap in a selector path as well
+        String fullXpath = "//*[" + combinedExpr + "]";
+        System.out.println("[XPathyRegistry] andThenOr: fullXpath=" + fullXpath);
+
+        XPathy x = XPathy.from(fullXpath);
+        System.out.println("[XPathyRegistry] andThenOr: final XPathy.getXpath()=" + safeXpath(x));
+
+        return x;
     }
-
 
     /**
      * Convenience: OR-combine an initial XPathy with additional XPathy expressions.
-     *
-     * Example:
-     *   XPathy combined = combineOr(x1, x2, x3);
      */
     public static XPathy combineOr(XPathy first, XPathy... rest) {
         Objects.requireNonNull(first, "first XPathy must not be null");
@@ -400,15 +479,16 @@ public final class XPathyRegistry {
             }
         }
 
-        return combine(list, "or")
-                .orElseThrow(() -> new IllegalStateException("combineOr was given an empty list, which should not happen."));
+        System.out.println("[XPathyRegistry] combineOr: totalCount=" + list.size());
+        Optional<XPathy> result = combine(list, "or");
+        if (result.isEmpty()) {
+            throw new IllegalStateException("combineOr was given an empty list, which should not happen.");
+        }
+        return result.get();
     }
 
     /**
      * Convenience: AND-combine an initial XPathy with additional XPathy expressions.
-     *
-     * Example:
-     *   XPathy combined = combineAnd(x1, x2, x3);
      */
     public static XPathy combineAnd(XPathy first, XPathy... rest) {
         Objects.requireNonNull(first, "first XPathy must not be null");
@@ -421,8 +501,12 @@ public final class XPathyRegistry {
             }
         }
 
-        return combine(list, "and")
-                .orElseThrow(() -> new IllegalStateException("combineAnd was given an empty list, which should not happen."));
+        System.out.println("[XPathyRegistry] combineAnd: totalCount=" + list.size());
+        Optional<XPathy> result = combine(list, "and");
+        if (result.isEmpty()) {
+            throw new IllegalStateException("combineAnd was given an empty list, which should not happen.");
+        }
+        return result.get();
     }
 
     //========================================================
@@ -435,6 +519,15 @@ public final class XPathyRegistry {
         }
 
         String s = xpath.trim();
+
+        // Special-case: patterns like (//*)[...]
+        // We want: self::*[...]
+        if (s.startsWith("(//*)[")) {
+            String tail = s.substring("(//*)".length()); // keep the [...] part
+            String out = "self::*" + tail;
+            System.out.println("[XPathyRegistry] toSelfStep (paren //*): input=" + xpath + " -> " + out);
+            return out;
+        }
 
         // Strip leading //, /, .//, ./ etc.
         s = s.replaceFirst("^\\.?/+", "");
@@ -459,10 +552,13 @@ public final class XPathyRegistry {
 
         // If already starts with an axis ("descendant::", "self::", etc.), keep it
         if (s.matches("^[A-Za-z-]+::.*")) {
+            System.out.println("[XPathyRegistry] toSelfStep: input=" + xpath + " (already axis) -> " + s);
             return s;
         }
 
-        return "self::" + s;
+        String out = "self::" + s;
+        System.out.println("[XPathyRegistry] toSelfStep: input=" + xpath + " -> " + out);
+        return out;
     }
 
     // Heuristic scoring for XPath specificity / efficiency.
@@ -505,7 +601,6 @@ public final class XPathyRegistry {
         }
 
         // 4) Reward custom element tags (web components) as likely rarer = more selective
-        // e.g., //<my-button>, //app-root, etc.
         if (s.matches(".*//[a-zA-Z0-9]+-[a-zA-Z0-9_-]+.*")) {
             score -= 20;
         }
@@ -517,8 +612,10 @@ public final class XPathyRegistry {
             score += 10; // starts with wildcard
         }
 
-        // Don't let it go crazy negative; keep in a reasonable range
         if (score < 0) score = 0;
+
+        System.out.println("[XPathyRegistry] xpathSpecificityScore: xpath=" + xpath +
+                ", score=" + score);
 
         return score;
     }
