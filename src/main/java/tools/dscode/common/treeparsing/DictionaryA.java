@@ -164,7 +164,7 @@ public class DictionaryA extends NodeDictionary {
                     if (v == null || v.isBlank()) {
                         return null; // no label text to match, skip this builder
                     }
-                    return new XPathy("//input[@id][@id = //*[normalize-space(text())='" + v + "']/@for]");
+                    return new XPathy("//*[@id][@id = //*[normalize-space(text())='" + v + "']/@for]");
                 });
 
 
