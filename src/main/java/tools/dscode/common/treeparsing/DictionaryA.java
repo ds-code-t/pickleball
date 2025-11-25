@@ -255,7 +255,9 @@ public class DictionaryA extends NodeDictionary {
     ParseNode phrase = new ParseNode("(?<conjunction>\\b(?:and|or)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>[^" + punc + "]+)(?<punc>[" + punc + "])?") {
         @Override
         public String onCapture(MatchNode self) {
+            System.out.println("@@phrase: " + self.originalText() + "");
             String context = self.resolvedGroupText("context");
+            System.out.println("@@context: " + self.originalText() + "");
             if (!context.isEmpty() && Character.isUpperCase(context.charAt(0)))
                 self.putToLocalState("newContext", true);
             self.putToLocalState("context", context.toLowerCase());
@@ -295,6 +297,7 @@ public class DictionaryA extends NodeDictionary {
     ParseNode predicate = new ParseNode("(?:\\b(?<predicateType>of|starting with|containing)\\s+(?<predicateVal>\\d+|<<quoteMask>>))") {
         @Override
         public String onCapture(MatchNode self) {
+            System.out.println("@@predicate: " + self.originalText() + "");
             self.putToLocalState("predicateType", self.resolvedGroupText("predicateType"));
             self.putToLocalState("predicateVal", self.resolvedGroupText("predicateVal"));
             return self.originalText();
@@ -305,6 +308,7 @@ public class DictionaryA extends NodeDictionary {
     ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?:with\\s+(?<attrName>[a-z]+)?)?\\s+(?<predicate><<predicate>>))?") {
         @Override
         public String onSubstitute(MatchNode self) {
+            System.out.println("@@elementMatch: " + self.originalText() + "");
 //            self.getAncestor("phrase").putToLocalState("elementMatch", self);
             self.putToLocalState("selectionType", self.resolvedGroupText("selectionType"));
             String elementPosition = self.resolvedGroupText("elementPosition");
@@ -323,6 +327,7 @@ public class DictionaryA extends NodeDictionary {
     ParseNode valueMatch = new ParseNode("\\s(?<value>\\d+|<<quoteMask>>)(?<unitMatch>\\s+(?<unit>minute|second|number|text)s?\\b)?") {
         @Override
         public String onSubstitute(MatchNode self) {
+            System.out.println("@@valueMatch: " + self.originalText() + "");
             String count = self.resolvedGroupText("value");
             String unit = self.resolvedGroupText("unit");
             self.putToLocalState("value", count);
@@ -336,6 +341,7 @@ public class DictionaryA extends NodeDictionary {
     ParseNode assertionType = new ParseNode("\\b(ensure|verify)\\b") {
         @Override
         public String onSubstitute(MatchNode self) {
+            System.out.println("@@assertionType: " + self.originalText() + "");
             self.parent().putToLocalState("assertionType", self.originalText());
             self.parent().localState().put("skip:action", "true");
             return self.originalText();
@@ -345,6 +351,7 @@ public class DictionaryA extends NodeDictionary {
     ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite)(?:s|ed|ing|es)?\\b") {
         @Override
         public String onCapture(MatchNode self) {
+            System.out.println("@@action: " + self.originalText() + "");
             self.parent().putToLocalState("action", self.resolvedGroupText("base"));
             return self.resolvedGroupText("base").replaceAll("move", "hover");
         }
@@ -354,6 +361,7 @@ public class DictionaryA extends NodeDictionary {
     ParseNode not = new ParseNode("\\bnot\\b") {
         @Override
         public String onCapture(MatchNode self) {
+            System.out.println("@@not: " + self.originalText() + "");
             return self.originalText();
         }
     };
@@ -362,6 +370,7 @@ public class DictionaryA extends NodeDictionary {
     ParseNode assertion = new ParseNode("\\b(?:displayed|equal|less(?:er)?|greater|less)\\b") {
         @Override
         public String onCapture(MatchNode self) {
+            System.out.println("@@assertion: " + self.originalText() + "");
             self.parent().putToLocalState("assertion", self.originalText());
             return self.originalText();
         }

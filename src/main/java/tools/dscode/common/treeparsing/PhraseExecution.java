@@ -2,6 +2,7 @@ package tools.dscode.common.treeparsing;
 
 import com.xpathy.Tag;
 import com.xpathy.XPathy;
+import io.cucumber.java.ja.且つ;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chromium.ChromiumDriver;
@@ -150,7 +151,6 @@ public class PhraseExecution {
         termination =   phraseNode.getStringFromLocalState("termination");
 
         context = phraseNode.getStringFromLocalState("context");
-
         if (!context.isBlank()) {
 //            List<ElementMatch> elements = getNextComponents(-1, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
             phraseType = PhraseType.CONTEXT;
@@ -169,6 +169,10 @@ public class PhraseExecution {
                 }
             }
         }
+        System.out.println("@@phrase-text: " + text);
+        System.out.println("@@phraseType: " + phraseType);
+        System.out.println("@@context: " + context);
+
 
 
     }
@@ -357,7 +361,7 @@ public class PhraseExecution {
         public XPathChainResult findWebElements(WebDriver driver) {
             List<XPathData> xpathDataList = getElementXPathy();
             System.out.println(this);
-            System.out.println("\n===============\nFinding Elements at: " + xpathDataList);
+            System.out.println("\n===============\nFinding Elements for:" + xpathDataList.size() + "\n" + xpathDataList);
             System.out.println("\n---------------\n");
             matchedElements = new XPathChainResult(driver, xpathDataList);
             return matchedElements;
