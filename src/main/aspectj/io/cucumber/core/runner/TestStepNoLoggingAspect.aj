@@ -1,6 +1,7 @@
 package io.cucumber.core.runner;
 
 import io.cucumber.core.eventbus.EventBus;
+import io.cucumber.plugin.event.Status;
 import io.cucumber.plugin.event.TestCase;
 
 import java.time.Duration;
@@ -85,7 +86,7 @@ public privileged aspect TestStepNoLoggingAspect {
             : emitFinishedExec(step, tc, bus, execId, stop, duration, result)
             {
 
-                if (step.noLogging) {
+                if (step.noLogging && !(result.getStatus().equals(Status.FAILED) || result.getStatus().equals(Status.UNDEFINED))) {
                     return; // suppressed
                 }
                 proceed(step, tc, bus, execId, stop, duration, result);
