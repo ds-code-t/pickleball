@@ -8,6 +8,7 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Given;
 import org.intellij.lang.annotations.Language;
 import tools.dscode.common.CoreSteps;
+import tools.dscode.common.annotations.DefinitionFlags;
 import tools.dscode.common.annotations.NoLogging;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
@@ -20,12 +21,13 @@ import java.util.Map;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.ScenarioStep.createScenarioStep;
 import static tools.dscode.common.GlobalConstants.COMPONENT_TAG_META_CHAR;
+import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
 import static tools.dscode.common.util.Reflect.getProperty;
 
 public class ModularScenarios extends CoreSteps {
 
 
-    @NoLogging
+//    @DefinitionFlags(NO_LOGGING)
     @Given("^RUN SCENARIOS:?(.*)?$")
     public static void runScenarios(String inlineTags, DataTable dataTable) {
         List<Map<String, String>> maps = dataTable.asMaps().stream()
