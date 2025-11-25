@@ -257,7 +257,7 @@ public class DictionaryA extends NodeDictionary {
         public String onCapture(MatchNode self) {
             System.out.println("@@phrase: " + self.originalText() + "");
             String context = self.resolvedGroupText("context");
-            System.out.println("@@context: " + self.originalText() + "");
+            System.out.println("@@context-: " + context + "");
             if (!context.isEmpty() && Character.isUpperCase(context.charAt(0)))
                 self.putToLocalState("newContext", true);
             self.putToLocalState("context", context.toLowerCase());

@@ -55,7 +55,7 @@ public class CalculatorSteps {
     @LifecycleHook(Phase.BEFORE_CUCUMBER_RUN)
     public static void configs() {
 
-        category("Button").inheritsFrom("visible","visibleText");
+//        category("Button").inheritsFrom("visible","visibleText");
 
 //        XPathyRegistry.registerAndBuilder("baseCategory",
 //                (category, v, op) -> {

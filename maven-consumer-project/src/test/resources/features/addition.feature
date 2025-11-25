@@ -1,5 +1,12 @@
 Feature: Addition
 
+
+  Scenario:  test22
+    * print ddd
+    @[DEBUG]
+      Then set $(CHROME)
+    Then , from the Frame, I click the "Create" Button
+
   Scenario: if test
     * IF: "" THEN: ,  select "CheckList" from "We TEddf" Dropdown
 #    * IF: "a" THEN:   print ssss ELSE: print 44

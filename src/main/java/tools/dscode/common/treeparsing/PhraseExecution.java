@@ -272,7 +272,7 @@ public class PhraseExecution {
 //        public Set<XPathyRegistry.HtmlType> htmlTypes;
         public PhraseExecution parentPhrase;
         public String toString() {
-            return   (selectionType.isEmpty() ? "" : selectionType+ " ") +  (elementPosition.isEmpty() ? "" : elementPosition+ " ") + (text.isEmpty() ? "" :"'" + text + "' ") + category + "\n"+ xPathy.getXpath();
+            return   (selectionType.isEmpty() ? "" : selectionType+ " ") +  (elementPosition.isEmpty() ? "" : elementPosition+ " ") + (text.isEmpty() ? "" :"'" + text + "' ") + category +(xPathy == null ? "" :  "\n"+  xPathy.getXpath());
         }
         public enum ElementType {
             HTML, ALERT, BROWSER, BROWSER_WINDOW, BROWSER_TAB, URL, VALUE;
@@ -308,6 +308,9 @@ public class PhraseExecution {
                     break;
                 }
             }
+
+            System.out.println("@@ElementMatch:: " + this);
+            System.out.println("@@elementType:: " + elementType);
             if (elementType == null)
                 elementType = ElementType.HTML;
 
