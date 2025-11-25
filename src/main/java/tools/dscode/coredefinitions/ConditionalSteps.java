@@ -11,6 +11,10 @@ import io.cucumber.core.runner.StepData;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
+import tools.dscode.common.annotations.NoLogging;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.annotations.DefinitionFlag.SKIP_CHILDREN;
@@ -18,7 +22,7 @@ import static tools.dscode.common.util.DebugUtils.printDebug;
 
 
 public class ConditionalSteps extends CoreSteps {
-
+    @NoLogging
     @Given("^((?:IF:|ELSE:|ELSE-IF:|THEN:).*)$")
     public static void runConditional(String inputString) {
         StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
@@ -32,13 +36,15 @@ public class ConditionalSteps extends CoreSteps {
                     currentStep.addConditionalStates(StepData.ConditionalStates.TRUE);
                     return;
                 }
-
                 if (inputString.startsWith("ELSE:"))
                     inputString = inputString.replaceFirst("ELSE:", "IF: true THEN: ");
                 else
                     inputString = inputString.replaceFirst("ELSE-IF:", "IF: ");
             }
         }
+
+        inputString = quoteThenElseSegments(inputString);
+
         String evaluatedString = currentStep.evalWithStepMaps(inputString);
         if (evaluatedString.equals("false")) {
             currentStep.addConditionalStates(StepData.ConditionalStates.FALSE);
@@ -54,16 +60,37 @@ public class ConditionalSteps extends CoreSteps {
             currentStep.attachedSteps.add(modifiedStep);
         }
     }
-    //
-    // @Given("false")
-    // public static void falseStep() {
-    // getCurrentStep().addConditionalStates(StepData.ConditionalStates.SKIP_CHILDREN);
-    // System.out.println("Conditional returned false");
-    // }
-    //
-    // @Given("true")
-    // public static void trueStep() {
-    // System.out.println("Conditional returned true");
-    // }
+
+
+    static Pattern p = Pattern.compile(
+            "\\b(THEN:|ELSE:)\\s*(.*?)\\s*(?=\\b(IF:|ELSE:|ELSE-IF:|THEN:)|$)"
+    );
+
+    public static String quoteThenElseSegments(String input) {
+        if (input == null || input.isEmpty()) {
+            return input;
+        }
+
+
+
+        Matcher m = p.matcher(input);
+        StringBuffer sb = new StringBuffer();
+
+        while (m.find()) {
+            String token = m.group(1);
+            String content = m.group(2).trim();
+
+            // Escape internal quote characters
+            content = content.replace("\"", "\\\\\"");
+
+            // Important: quote the replacement using Matcher.quoteReplacement
+            String replacement = token + " \"" + content + "\" ";
+
+            m.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+        }
+
+        m.appendTail(sb);
+        return sb.toString();
+    }
 
 }

@@ -119,7 +119,7 @@ public class AviatorFunctions {
     static String IF = operatorFlag + "IF:", ELSE = operatorFlag + "ELSE:", ELSEIF = operatorFlag + "ELSEIF:",
             THEN = operatorFlag + "THEN:";
 
-    static String processTernaryExpression(String fullString) {
+    public static String processTernaryExpression(String fullString) {
         fullString = fullString.replaceAll("\\bELSE-IF:", ELSEIF)
                 .replaceAll("\\bIF:", IF)
                 .replaceAll("\\bTHEN:", THEN)

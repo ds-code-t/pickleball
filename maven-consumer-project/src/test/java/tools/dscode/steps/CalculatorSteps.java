@@ -36,6 +36,7 @@ import static tools.dscode.common.domoperations.XPathyRegistry.combineOr;
 import static tools.dscode.common.domoperations.XPathyRegistryFluent.category;
 import static tools.dscode.common.domoperations.XPathyUtils.deepNormalizedText;
 import static tools.dscode.common.domoperations.XPathyUtils.deepNormalizedTextWrapped;
+import static tools.dscode.common.evaluations.AviatorFunctions.processTernaryExpression;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
 
@@ -44,14 +45,10 @@ public class CalculatorSteps {
 
 
     public static void main(String[] args) {
-
-//        XPathy locator =deepNormalizedTextWrapped("User Name");
-//        System.out.println(locator.getXpath());
-        System.out.println("@@Tag.button: " + Tag.button);
-        System.out.println("@@Tag.button: " + Tag.button.byAttribute(Attribute.placeholder));
-        System.out.println("@@Tag.button: " + Tag.button.byAttribute(Attribute.placeholder).equals("SS").or().tag(Tag.input));
-        System.out.println("@@Tag.button: " + Tag.button.byAttribute(Attribute.placeholder).equals("SS").or().tag(Tag.input).byAttribute(Attribute.type).equals("password"));
-
+        String pre = "IF: 1 > 0 THEN:   print A ELSE: print 333";
+        String  post = processTernaryExpression("IF: 1 > 0 THEN:   print A ELSE: print 333");
+        System.out.println("@@pre: " + pre);
+        System.out.println("@@pst: " + post);
     }
 
 

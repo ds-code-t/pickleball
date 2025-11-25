@@ -50,6 +50,7 @@ public class StepMapping {
     }
 
     public String evalWithStepMaps(String expression) {
+        System.out.println("@@evalWithStepMaps: " + expression + "");
         return String.valueOf(eval(expression, getStepParsingMap()));
     }
 

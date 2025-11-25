@@ -102,9 +102,14 @@ public final class AviatorUtil {
      * Aviator.
      */
     public static Object eval(Object expr, Map<String, Object> map) {
+        System.out.println("@@eval: " + expr );
+        System.out.println("@@map: " + map );
         if (expr == null)
             return null;
         String processedExpression = preprocessExpression(expr.toString());
+        System.out.println("@@processedExpression: " + processedExpression );
+        System.out.println("@@AviatorEvaluator.execute(processedExpression, map)1: " + AviatorEvaluator.execute(processedExpression) );
+        System.out.println("@@AviatorEvaluator.execute(processedExpression, map)2: " + AviatorEvaluator.execute(processedExpression, map) );
         if (map == null)
             return AviatorEvaluator.execute(processedExpression);
         return AviatorEvaluator.execute(processedExpression, map);
