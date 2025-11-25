@@ -46,12 +46,15 @@ public class ConditionalSteps extends CoreSteps {
             }
         }
 
-        System.out.println("@@inputString1: "    + inputString);
+        if (!inputString.contains("ELSE:"))
+            inputString = inputString + " ELSE: \"\"";
+        System.out.println("@@inputString1: " + inputString);
         inputString = quoteThenElseSegments(inputString);
-        System.out.println("@@inputString2: "    + inputString);
+        System.out.println("@@inputString2: " + inputString);
 
-        String evaluatedString = currentStep.evalWithStepMaps(inputString);
-        if (evaluatedString.equals("false")) {
+        String evaluatedString = currentStep.evalWithStepMaps(inputString).trim();
+        System.out.println("@@evaluatedString: " + evaluatedString);
+        if (evaluatedString.equals("\"\"") || evaluatedString.equals("false")) {
             currentStep.addConditionalStates(StepData.ConditionalStates.FALSE);
             currentStep.addDefinitionFlag(SKIP_CHILDREN);
             System.out.println("Conditional returned false.  Will skip child steps.");
@@ -76,7 +79,7 @@ public class ConditionalSteps extends CoreSteps {
             return input;
         }
 
-       Matcher m = p.matcher(input);
+        Matcher m = p.matcher(input);
         StringBuffer sb = new StringBuffer();
 
         while (m.find()) {
