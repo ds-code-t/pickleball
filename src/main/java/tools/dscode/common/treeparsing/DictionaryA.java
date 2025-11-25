@@ -49,7 +49,7 @@ public class DictionaryA extends NodeDictionary {
         category("Frame")
                 .and(
                         (category, v, op) ->
-                                XPathy.from(Tag.iframe).byAttribute(id).equals("iframeResult")
+                                XPathy.from(Tag.iframe).byAttribute(title).haveIt()
                 );
 
         //
