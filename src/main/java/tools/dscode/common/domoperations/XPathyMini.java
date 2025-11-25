@@ -167,7 +167,7 @@ public final class XPathyMini {
             return s;
         }
 
-        String out = "self::" + s;
+        String out = "self::" + (s.trim().startsWith("[") ? "*" + s.trim() : s.trim());
         return out;
     }
 
