@@ -5,8 +5,8 @@ Feature: Addition
   @[DEBUG] Then print aaa
     Given set $(CHROME)
 #    * navigate to: URL.w3
-#    Then , I click the "Log In" Button
-    Then , from the IframeResult, I select "Opel" in the "cars" Dropdown
+    Then , click the "Create" Link
+#    Then , from the IframeResult, I select "Opel" in the "cars" Dropdown
 #    * , from the IframeResult, I enter "dd" in the "Last name:" Textbox
 #    * , click "Essential QA Service" Qqq
 
