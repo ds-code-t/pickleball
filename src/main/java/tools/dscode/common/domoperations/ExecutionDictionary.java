@@ -832,4 +832,74 @@ public class ExecutionDictionary {
         }
     }
 
+    public void printDefinitions(String category, String value, Op op) {
+        System.out.println("======================================");
+        System.out.println(" ExecutionDictionary Definitions");
+        System.out.println(" Instance: " + this);
+        System.out.println(" Args -> category='" + category + "', value='" + value + "', op=" + op);
+        System.out.println("======================================");
+
+        // ------ OR Builders ------
+        System.out.println("\n--- OR Builders ---");
+        if (orReg.isEmpty()) {
+            System.out.println("(none)");
+        } else {
+            orReg.forEach((cat, builders) -> {
+                System.out.println("Category: " + cat);
+                for (int i = 0; i < builders.size(); i++) {
+                    Builder b = builders.get(i);
+                    XPathy result = safeInvoke(b, category, value, op);
+                    System.out.println("  OR[" + i + "] -> " + safeXpath(result));
+                }
+            });
+        }
+
+        // ------ AND Builders ------
+        System.out.println("\n--- AND Builders ---");
+        if (andReg.isEmpty()) {
+            System.out.println("(none)");
+        } else {
+            andReg.forEach((cat, builders) -> {
+                System.out.println("Category: " + cat);
+                for (int i = 0; i < builders.size(); i++) {
+                    Builder b = builders.get(i);
+                    XPathy result = safeInvoke(b, category, value, op);
+                    System.out.println("  AND[" + i + "] -> " + safeXpath(result));
+                }
+            });
+        }
+
+        // ------ HTML Types ------
+        System.out.println("\n--- HTML Types ---");
+        if (htmlTypeReg.isEmpty()) {
+            System.out.println("(none)");
+        } else {
+            htmlTypeReg.forEach((cat, types) -> {
+                System.out.println("Category: " + cat + " -> " + types);
+            });
+        }
+
+        // ------ Category Inheritance ------
+        System.out.println("\n--- Category Inheritance ---");
+        if (categoryParents.isEmpty()) {
+            System.out.println("(none)");
+        } else {
+            categoryParents.asMap().forEach((child, parents) -> {
+                System.out.println("Child: " + child + " inherits from -> " + parents);
+            });
+        }
+
+        System.out.println("\n======================================");
+    }
+
+
+
+    private XPathy safeInvoke(Builder builder, String category, String value, Op op) {
+        try {
+            return builder.build(category, value, op);
+        } catch (Exception e) {
+            return XPathy.from("//ERROR[" + e.getClass().getSimpleName() + "]");
+        }
+    }
+
 }
