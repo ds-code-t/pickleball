@@ -25,7 +25,7 @@ import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public class ConditionalSteps extends CoreSteps {
 
-    @DefinitionFlags(NO_LOGGING)
+//    @DefinitionFlags(NO_LOGGING)
     @Given("^((?:IF:|ELSE:|ELSE-IF:|THEN:).*)$")
     public static void runConditional(String inputString) {
         StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
