@@ -1,8 +1,8 @@
 Feature: Addition
 
   Scenario: if test
-    * IF: "" THEN:   print A ELSE: print 333
-    * IF: "a" THEN:   print ssss ELSE: print 44
+    * IF: 3<5 THEN:   print "A" ELSE: print "333"
+#    * IF: "a" THEN:   print ssss ELSE: print 44
 
   Scenario: ss3
     Then print aaa

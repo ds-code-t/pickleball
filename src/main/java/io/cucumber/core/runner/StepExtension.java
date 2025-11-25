@@ -41,7 +41,7 @@ public class StepExtension extends StepData {
         this.methodName = this.method == null ? "" : this.method.getName();
 
         if (definitionFlags.contains(DefinitionFlag.NO_LOGGING))
-            invokeAnyMethod(pickleStepTestStep, "setNoLogging", true);
+            pickleStepTestStep.setNoLogging(true);
 
         if (isCoreStep && methodName.startsWith("flagStep_")) {
             this.isFlagStep = true;
@@ -157,6 +157,8 @@ public class StepExtension extends StepData {
 
     public PickleStepTestStep resolveAndClone(ParsingMap parsingMap) {
         PickleStepTestStep clonePickleStepTestStep = resolvePickleStepTestStep(pickleStepTestStep, parsingMap);
+        if (definitionFlags.contains(DefinitionFlag.NO_LOGGING))
+            clonePickleStepTestStep.setNoLogging(true);
         return clonePickleStepTestStep;
     }
 
