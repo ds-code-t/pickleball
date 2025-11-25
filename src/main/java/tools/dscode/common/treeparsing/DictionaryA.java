@@ -182,19 +182,19 @@ public class DictionaryA extends NodeDictionary {
                 .or(
                         (category, v, op) -> XPathy.from(category),
                         (category, v, op) ->
-                                XPathy.from(any).byAttribute(role).withCase(LOWER).equals(category.toLowerCase()),
+                                XPathy.from(any).byAttribute(role).withCase(LOWER).withNormalizeSpace().equals(category.toLowerCase()),
 
                         (category, v, op) ->
-                                XPathy.from(any).byAttribute(title).withCase(LOWER).equals(category.toLowerCase()),
+                                XPathy.from(any).byAttribute(title).withCase(LOWER).withNormalizeSpace().equals(category.toLowerCase()),
 
                         (category, v, op) ->
-                                XPathy.from(any).byAttribute(id).withCase(LOWER).equals(category.toLowerCase()),
+                                XPathy.from(any).byAttribute(id).withCase(LOWER).withNormalizeSpace().equals(category.toLowerCase()),
 
                         (category, v, op) ->
-                                XPathy.from(any).byAttribute(name).withCase(LOWER).equals(category.toLowerCase()),
+                                XPathy.from(any).byAttribute(name).withCase(LOWER).withNormalizeSpace().equals(category.toLowerCase()),
 
                         (category, v, op) ->
-                                XPathy.from(any).byAttribute(aria_label).withCase(LOWER).equals(category.toLowerCase())
+                                XPathy.from(any).byAttribute(aria_label).withCase(LOWER).withNormalizeSpace().equals(category.toLowerCase())
                 );
 
 
