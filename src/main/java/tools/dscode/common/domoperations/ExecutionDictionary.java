@@ -10,8 +10,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CopyOnWriteArraySet;
 
-public final class XPathyRegistry {
-    private XPathyRegistry() {}
+public class ExecutionDictionary {
 
     @FunctionalInterface
     public interface Builder {
@@ -25,37 +24,61 @@ public final class XPathyRegistry {
         IFRAME
     }
 
-    private static final ConcurrentMap<String, CopyOnWriteArraySet<HtmlType>> HTML_TYPE_REG =
+    //========================================================
+    // Instance state
+    //========================================================
+
+    private final ConcurrentMap<String, CopyOnWriteArraySet<HtmlType>> htmlTypeReg =
             new ConcurrentHashMap<>();
+
+    // childCategory -> [parentCategory1, parentCategory2, ...]
+    private final Multimap<String, String> categoryParents =
+            ArrayListMultimap.create();
+
+    private final ConcurrentMap<String, CopyOnWriteArrayList<Builder>> orReg =
+            new ConcurrentHashMap<>();
+
+    private final ConcurrentMap<String, CopyOnWriteArrayList<Builder>> andReg =
+            new ConcurrentHashMap<>();
+
+    // Default base category that *every* category implicitly inherits from
+    private static final String BASE_CATEGORY = "baseCategory";
+
+    //========================================================
+    // Construction / registration hook
+    //========================================================
+
+    protected ExecutionDictionary() {
+        // Subclasses override register() to populate this dictionary.
+        // This will be called during construction.
+        register();
+    }
+
+    /**
+     * Override in anonymous subclasses to register builders, category inheritance, html types, etc.
+     */
+    protected void register() {
+        // default no-op
+    }
 
     //========================================================
     // Inheritance configuration
     //========================================================
 
-    // Default base category that *every* category implicitly inherits from
-    private static final String BASE_CATEGORY = "baseCategory";
-
-    // childCategory -> [parentCategory1, parentCategory2, ...]
-    //
-    // Multiple inheritance allowed.
-    // Parents do NOT have to be pre-registered; missing ones are just ignored.
-    private static final Multimap<String, String> CATEGORY_PARENTS =
-            ArrayListMultimap.create();
-
     /**
      * Register inheritance relationships for a category.
      */
-    public static void registerCategoryInheritance(String category, String... parentCategories) {
+    public void registerCategoryInheritance(String category, String... parentCategories) {
         Objects.requireNonNull(category, "category must not be null");
         Objects.requireNonNull(parentCategories, "parentCategories must not be null");
 
-        System.out.println("[XPathyRegistry] registerCategoryInheritance: category=" + category +
+        System.out.println("[ExecutionDictionary] registerCategoryInheritance: category=" + category +
                 ", parents=" + Arrays.toString(parentCategories));
 
         for (String parent : parentCategories) {
             if (parent == null) continue;
             if (parent.equals(category)) continue; // avoid trivial self-cycle
-            CATEGORY_PARENTS.put(category, parent);
+            categoryParents.put(category, parent);
         }
     }
 
@@ -64,34 +87,26 @@ public final class XPathyRegistry {
      *
      * Example:
      *     registerParentOfCategories("Clickable", "Button", "Link", "MenuItem");
-     *
-     * This is equivalent to:
-     *     registerCategoryInheritance("Button", "Clickable");
-     *     registerCategoryInheritance("Link", "Clickable");
-     *     registerCategoryInheritance("MenuItem", "Clickable");
      */
-    public static void registerParentOfCategories(String parentCategory, String... childCategories) {
+    public void registerParentOfCategories(String parentCategory, String... childCategories) {
         Objects.requireNonNull(parentCategory, "parentCategory must not be null");
         Objects.requireNonNull(childCategories, "childCategories must not be null");
 
-        System.out.println("[XPathyRegistry] registerParentOfCategories: parent=" + parentCategory +
+        System.out.println("[ExecutionDictionary] registerParentOfCategories: parent=" + parentCategory +
                 ", children=" + Arrays.toString(childCategories));
 
         for (String child : childCategories) {
             if (child == null) continue;
             if (child.equals(parentCategory)) continue; // avoid trivial cycle
 
-            // This is just the same as the original operation, but inverted:
             registerCategoryInheritance(child, parentCategory);
         }
     }
 
-
-
     /**
      * Resolve full inheritance chain for a category.
      */
-    private static List<String> resolveCategoryLineage(String category) {
+    private List<String> resolveCategoryLineage(String category) {
         String root = (category == null || category.isBlank())
                 ? BASE_CATEGORY
                 : category;
@@ -106,7 +121,7 @@ public final class XPathyRegistry {
                 continue; // already visited
             }
 
-            Collection<String> parents = CATEGORY_PARENTS.get(current);
+            Collection<String> parents = categoryParents.get(current);
             if (parents != null) {
                 for (String p : parents) {
                     if (p != null && !p.equals(current)) {
@@ -123,27 +138,27 @@ public final class XPathyRegistry {
         }
 
         List<String> lineage = new ArrayList<>(ordered);
-        System.out.println("[XPathyRegistry] resolveCategoryLineage: category=" + category +
+        System.out.println("[ExecutionDictionary] resolveCategoryLineage: category=" + category +
                 " -> lineage=" + lineage);
         return lineage;
     }
 
     //========================================================
-    // Existing HTML type registration (unchanged)
+    // HTML type registration
     //========================================================
 
-    public static void addHtmlTypes(String category, HtmlType... htmlTypes) {
+    public void addHtmlTypes(String category, HtmlType... htmlTypes) {
         Objects.requireNonNull(category, "category must not be null");
         Objects.requireNonNull(htmlTypes, "htmlTypes must not be null");
 
-        System.out.println("[XPathyRegistry] addHtmlTypes: category=" + category +
+        System.out.println("[ExecutionDictionary] addHtmlTypes: category=" + category +
                 ", htmlTypes=" + Arrays.toString(htmlTypes));
 
         if (htmlTypes.length == 0) {
             return;
         }
 
-        CopyOnWriteArraySet<HtmlType> set = HTML_TYPE_REG.computeIfAbsent(
+        CopyOnWriteArraySet<HtmlType> set = htmlTypeReg.computeIfAbsent(
                 category,
                 k -> new CopyOnWriteArraySet<>()
         );
@@ -153,20 +168,20 @@ public final class XPathyRegistry {
         }
     }
 
-    public static Set<HtmlType> getHtmlTypes(String category) {
-        var set = HTML_TYPE_REG.get(category);
+    public Set<HtmlType> getHtmlTypes(String category) {
+        var set = htmlTypeReg.get(category);
         Set<HtmlType> result = (set == null || set.isEmpty())
                 ? Set.of()
                 : Set.copyOf(set);
-        System.out.println("[XPathyRegistry] getHtmlTypes: category=" + category +
+        System.out.println("[ExecutionDictionary] getHtmlTypes: category=" + category +
                 " -> " + result);
         return result;
     }
 
-    public static boolean hasHtmlType(String category, HtmlType type) {
-        var set = HTML_TYPE_REG.get(category);
+    public boolean hasHtmlType(String category, HtmlType type) {
+        var set = htmlTypeReg.get(category);
         boolean has = set != null && set.contains(type);
-        System.out.println("[XPathyRegistry] hasHtmlType: category=" + category +
+        System.out.println("[ExecutionDictionary] hasHtmlType: category=" + category +
                 ", type=" + type + " -> " + has);
         return has;
     }
@@ -175,28 +190,22 @@ public final class XPathyRegistry {
     // OR / AND builder registries
     // ========================================================
 
-    private static final ConcurrentMap<String, CopyOnWriteArrayList<Builder>> OR_REG =
-            new ConcurrentHashMap<>();
-
-    private static final ConcurrentMap<String, CopyOnWriteArrayList<Builder>> AND_REG =
-            new ConcurrentHashMap<>();
-
     // --- OR builders ---
 
     /**
      * Register one or more OR-based builders for a single category.
      */
-    public static void registerOrBuilder(String category, Builder... builders) {
+    public void registerOrBuilder(String category, Builder... builders) {
         Objects.requireNonNull(category, "category must not be null");
         Objects.requireNonNull(builders, "builders must not be null");
         if (builders.length == 0) {
             return;
         }
 
-        System.out.println("[XPathyRegistry] registerOrBuilder: category=" + category +
+        System.out.println("[ExecutionDictionary] registerOrBuilder: category=" + category +
                 ", builderCount=" + builders.length);
 
-        var list = OR_REG.computeIfAbsent(category, k -> new CopyOnWriteArrayList<>());
+        var list = orReg.computeIfAbsent(category, k -> new CopyOnWriteArrayList<>());
         for (Builder b : builders) {
             list.add(Objects.requireNonNull(b, "builder must not be null"));
         }
@@ -205,14 +214,14 @@ public final class XPathyRegistry {
     /**
      * Convenience: register the same OR-builders for multiple categories.
      */
-    public static void registerOrForCategories(List<String> categories, Builder... builders) {
+    public void registerOrForCategories(List<String> categories, Builder... builders) {
         Objects.requireNonNull(categories, "categories must not be null");
         Objects.requireNonNull(builders, "builders must not be null");
         if (categories.isEmpty() || builders.length == 0) {
             return;
         }
 
-        System.out.println("[XPathyRegistry] registerOrForCategories: categories=" + categories +
+        System.out.println("[ExecutionDictionary] registerOrForCategories: categories=" + categories +
                 ", builderCount=" + builders.length);
 
         for (String category : categories) {
@@ -227,17 +236,17 @@ public final class XPathyRegistry {
     /**
      * Register one or more AND-based builders for a single category.
      */
-    public static void registerAndBuilder(String category, Builder... builders) {
+    public void registerAndBuilder(String category, Builder... builders) {
         Objects.requireNonNull(category, "category must not be null");
         Objects.requireNonNull(builders, "builders must not be null");
         if (builders.length == 0) {
             return;
         }
 
-        System.out.println("[XPathyRegistry] registerAndBuilder: category=" + category +
+        System.out.println("[ExecutionDictionary] registerAndBuilder: category=" + category +
                 ", builderCount=" + builders.length);
 
-        var list = AND_REG.computeIfAbsent(category, k -> new CopyOnWriteArrayList<>());
+        var list = andReg.computeIfAbsent(category, k -> new CopyOnWriteArrayList<>());
         for (Builder b : builders) {
             list.add(Objects.requireNonNull(b, "builder must not be null"));
         }
@@ -246,14 +255,14 @@ public final class XPathyRegistry {
     /**
      * Convenience: register the same AND-builders for multiple categories.
      */
-    public static void registerAndForCategories(List<String> categories, Builder... builders) {
+    public void registerAndForCategories(List<String> categories, Builder... builders) {
         Objects.requireNonNull(categories, "categories must not be null");
         Objects.requireNonNull(builders, "builders must not be null");
         if (categories.isEmpty() || builders.length == 0) {
             return;
         }
 
-        System.out.println("[XPathyRegistry] registerAndForCategories: categories=" + categories +
+        System.out.println("[ExecutionDictionary] registerAndForCategories: categories=" + categories +
                 ", builderCount=" + builders.length);
 
         for (String category : categories) {
@@ -270,7 +279,7 @@ public final class XPathyRegistry {
     /**
      * Core expansion that honors inheritance + "*" fallback.
      */
-    private static List<XPathy> expandInternal(
+    private List<XPathy> expandInternal(
             ConcurrentMap<String, CopyOnWriteArrayList<Builder>> map,
             String category,
             String value,
@@ -286,45 +295,45 @@ public final class XPathyRegistry {
         for (String catKey : lineage) {
             var builders = map.get(catKey);
             if (builders != null && !builders.isEmpty()) {
-                System.out.println("[XPathyRegistry] expandInternal: category=" + requestCategory +
-                        ", map=" + (map == OR_REG ? "OR_REG" : "AND_REG") +
+                System.out.println("[ExecutionDictionary] expandInternal: category=" + requestCategory +
+                        ", map=" + (map == orReg ? "OR_REG" : "AND_REG") +
                         ", catKey=" + catKey + ", buildersCount=" + builders.size());
                 allBuilders.addAll(builders);
             }
         }
 
-// If nothing found in this map for the lineage, decide whether to fallback to "*"
+        // If nothing found in this map for the lineage, decide whether to fallback to "*"
         if (allBuilders.isEmpty()) {
             // Only use "*" fallback if there are NO AND or OR builders
             // anywhere in the lineage (including baseCategory).
             if (!hasAnyRegisteredBuilders(lineage)) {
                 var starList = map.get("*");
                 if (starList == null || starList.isEmpty()) {
-                    System.out.println("[XPathyRegistry] expandInternal: category=" + requestCategory +
-                            ", map=" + (map == OR_REG ? "OR_REG" : "AND_REG") +
+                    System.out.println("[ExecutionDictionary] expandInternal: category=" + requestCategory +
+                            ", map=" + (map == orReg ? "OR_REG" : "AND_REG") +
                             " -> no builders found, no '*' fallback.");
                     return List.of();
                 }
-                System.out.println("[XPathyRegistry] expandInternal: category=" + requestCategory +
-                        ", map=" + (map == OR_REG ? "OR_REG" : "AND_REG") +
+                System.out.println("[ExecutionDictionary] expandInternal: category=" + requestCategory +
+                        ", map=" + (map == orReg ? "OR_REG" : "AND_REG") +
                         " -> using '*' fallback, buildersCount=" + starList.size());
                 allBuilders.addAll(starList);
             } else {
                 // There ARE builders in the other map (AND vs OR), so we skip "*"
-                System.out.println("[XPathyRegistry] expandInternal: category=" + requestCategory +
-                        ", map=" + (map == OR_REG ? "OR_REG" : "AND_REG") +
+                System.out.println("[ExecutionDictionary] expandInternal: category=" + requestCategory +
+                        ", map=" + (map == orReg ? "OR_REG" : "AND_REG") +
                         " -> no builders in this map, but found in other map; skipping '*' fallback.");
                 return List.of();
             }
         }
 
-
         List<XPathy> result = allBuilders.stream()
-                .map(b -> b.build(requestCategory, value, op)).filter(Objects::nonNull)
+                .map(b -> b.build(requestCategory, value, op))
+                .filter(Objects::nonNull)
                 .toList();
 
-        System.out.println("[XPathyRegistry] expandInternal: category=" + requestCategory +
-                ", map=" + (map == OR_REG ? "OR_REG" : "AND_REG") +
+        System.out.println("[ExecutionDictionary] expandInternal: category=" + requestCategory +
+                ", map=" + (map == orReg ? "OR_REG" : "AND_REG") +
                 ", value=" + value + ", op=" + op +
                 " -> produced XPathy count=" + result.size());
         for (int i = 0; i < result.size(); i++) {
@@ -335,7 +344,7 @@ public final class XPathyRegistry {
         return result;
     }
 
-    private static String safeXpath(XPathy x) {
+    private String safeXpath(XPathy x) {
         try {
             return x == null ? "null" : x.getXpath();
         } catch (Exception e) {
@@ -343,16 +352,16 @@ public final class XPathyRegistry {
         }
     }
 
-    public static List<XPathy> expandOr(String category, String value, Op op) {
-        System.out.println("[XPathyRegistry] expandOr: category=" + category +
+    public List<XPathy> expandOr(String category, String value, Op op) {
+        System.out.println("[ExecutionDictionary] expandOr: category=" + category +
                 ", value=" + value + ", op=" + op);
-        return expandInternal(OR_REG, category, value, op);
+        return expandInternal(orReg, category, value, op);
     }
 
-    public static List<XPathy> expandAnd(String category, String value, Op op) {
-        System.out.println("[XPathyRegistry] expandAnd: category=" + category +
+    public List<XPathy> expandAnd(String category, String value, Op op) {
+        System.out.println("[ExecutionDictionary] expandAnd: category=" + category +
                 ", value=" + value + ", op=" + op);
-        return expandInternal(AND_REG, category, value, op);
+        return expandInternal(andReg, category, value, op);
     }
 
     //========================================================
@@ -361,21 +370,13 @@ public final class XPathyRegistry {
 
     /**
      * Combine a list of XPathy into a single XPathy using "and"/"or".
-     *
-     * We:
-     *   - Sort by heuristic specificity,
-     *   - Convert each to a self:: step,
-     *   - Join them into a boolean expression,
-     *   - Wrap that expression into a valid selector: //*[(... boolean ...)]
-     *
-     * NOTE: This is what fixes invalid selectors like "(self::* or self::*)[1]".
      */
-    private static Optional<XPathy> combine(List<XPathy> list, String joiner) {
-        System.out.println("[XPathyRegistry] combine: joiner=" + joiner +
+    private Optional<XPathy> combine(List<XPathy> list, String joiner) {
+        System.out.println("[ExecutionDictionary] combine: joiner=" + joiner +
                 ", listSize=" + list.size());
 
         if (list.isEmpty()) {
-            System.out.println("[XPathyRegistry] combine: list empty, returning Optional.empty()");
+            System.out.println("[ExecutionDictionary] combine: list empty, returning Optional.empty()");
             return Optional.empty();
         }
 
@@ -385,7 +386,7 @@ public final class XPathyRegistry {
         // Sort by heuristic specificity score (lower is "better")
         sorted.sort(Comparator.comparingInt(x -> xpathSpecificityScore(x.getXpath())));
 
-        System.out.println("[XPathyRegistry] combine: after sort, xpaths=");
+        System.out.println("[ExecutionDictionary] combine: after sort, xpaths=");
         for (int i = 0; i < sorted.size(); i++) {
             System.out.println("    [combine] sorted[" + i + "]=" + safeXpath(sorted.get(i)));
         }
@@ -393,92 +394,82 @@ public final class XPathyRegistry {
         // Build boolean expression over self::... steps
         String combinedExpr = sorted.stream()
                 .map(XPathy::getXpath)
-                .map(XPathyRegistry::toSelfStep)
+                .map(this::toSelfStep)
                 .peek(s -> System.out.println("    [combine] selfStep=" + s))
                 .collect(java.util.stream.Collectors.joining(" " + joiner + " "));
 
-        System.out.println("[XPathyRegistry] combine: combinedExpr=" + combinedExpr);
+        System.out.println("[ExecutionDictionary] combine: combinedExpr=" + combinedExpr);
 
-        // Wrap into a valid selector path for Selenium: //*[(self::... or self::...)]
         String fullXpath = "//*[" + combinedExpr + "]";
-        System.out.println("[XPathyRegistry] combine: fullXpath=" + fullXpath);
+        System.out.println("[ExecutionDictionary] combine: fullXpath=" + fullXpath);
 
         XPathy x = XPathy.from(fullXpath);
-        System.out.println("[XPathyRegistry] combine: final XPathy.getXpath()=" + safeXpath(x));
+        System.out.println("[ExecutionDictionary] combine: final XPathy.getXpath()=" + safeXpath(x));
 
         return Optional.of(x);
     }
 
-    public static Optional<XPathy> andAll(String category, String value, Op op) {
-        System.out.println("[XPathyRegistry] andAll: category=" + category +
+    public Optional<XPathy> andAll(String category, String value, Op op) {
+        System.out.println("[ExecutionDictionary] andAll: category=" + category +
                 ", value=" + value + ", op=" + op);
         Optional<XPathy> result = combine(expandAnd(category, value, op), "and");
-        System.out.println("[XPathyRegistry] andAll: resultPresent=" + result.isPresent() +
+        System.out.println("[ExecutionDictionary] andAll: resultPresent=" + result.isPresent() +
                 (result.isPresent() ? ", xpath=" + safeXpath(result.get()) : ""));
         return result;
     }
 
-    public static Optional<XPathy> orAll(String category, String value, Op op) {
-        System.out.println("[XPathyRegistry] orAll: category=" + category +
+    public Optional<XPathy> orAll(String category, String value, Op op) {
+        System.out.println("[ExecutionDictionary] orAll: category=" + category +
                 ", value=" + value + ", op=" + op);
         Optional<XPathy> result = combine(expandOr(category, value, op), "or");
-        System.out.println("[XPathyRegistry] orAll: resultPresent=" + result.isPresent() +
+        System.out.println("[ExecutionDictionary] orAll: resultPresent=" + result.isPresent() +
                 (result.isPresent() ? ", xpath=" + safeXpath(result.get()) : ""));
         return result;
     }
 
     /**
-     * Combined filter:
-     *   - First: all AND-based builders must match (intersection).
-     *   - Then: at least one OR-based builder must match (union).
-     *
-     * Returns a concrete XPathy, or throws if both sides are empty.
-     */
-    /**
      * Combined filter (non-Optional version).
-     * Delegates to andThenOrOptional and unwraps the result.
+     * Delegates to resolveToXPathy and unwraps the result.
      */
-    public static XPathy andThenOr(String category, String value, Op op) {
-        System.out.println("[XPathyRegistry] andThenOr: category=" + category +
+    public XPathy andThenOr(String category, String value, Op op) {
+        System.out.println("[ExecutionDictionary] andThenOr: category=" + category +
                 ", value=" + value + ", op=" + op);
 
         Optional<XPathy> result = resolveToXPathy(category, value, op);
 
         if (result.isEmpty()) {
-            System.out.println("[XPathyRegistry] andThenOr: Optional empty -> returning null");
-            return null;  // or throw if you ever want to change semantics
+            System.out.println("[ExecutionDictionary] andThenOr: Optional empty -> returning null");
+            return null;  // preserve prior semantics
         }
 
         return result.get();
     }
 
-
     /**
      * Optional-returning version of andThenOr.
-     * This allows safe cross-category reuse without forcing a thrown exception.
      */
-    public static Optional<XPathy> resolveToXPathy(String category, String value, Op op) {
-        System.out.println("[XPathyRegistry] andThenOrOptional: category=" + category +
+    public Optional<XPathy> resolveToXPathy(String category, String value, Op op) {
+        System.out.println("[ExecutionDictionary] andThenOrOptional: category=" + category +
                 ", value=" + value + ", op=" + op);
 
         Optional<XPathy> andPart = andAll(category, value, op);
         Optional<XPathy> orPart  = orAll(category, value, op);
 
-        System.out.println("[XPathyRegistry] andThenOrOptional: andPartPresent=" + andPart.isPresent() +
+        System.out.println("[ExecutionDictionary] andThenOrOptional: andPartPresent=" + andPart.isPresent() +
                 (andPart.isPresent() ? ", andXpath=" + safeXpath(andPart.get()) : ""));
-        System.out.println("[XPathyRegistry] andThenOrOptional: orPartPresent=" + orPart.isPresent() +
+        System.out.println("[ExecutionDictionary] andThenOrOptional: orPartPresent=" + orPart.isPresent() +
                 (orPart.isPresent() ? ", orXpath=" + safeXpath(orPart.get()) : ""));
 
         if (andPart.isEmpty() && orPart.isEmpty()) {
-            System.out.println("[XPathyRegistry] andThenOrOptional: both empty -> Optional.empty()");
+            System.out.println("[ExecutionDictionary] andThenOrOptional: both empty -> Optional.empty()");
             return Optional.empty();
         }
         if (andPart.isEmpty()) {
-            System.out.println("[XPathyRegistry] andThenOrOptional: only orPart present.");
+            System.out.println("[ExecutionDictionary] andThenOrOptional: only orPart present.");
             return orPart;
         }
         if (orPart.isEmpty()) {
-            System.out.println("[XPathyRegistry] andThenOrOptional: only andPart present.");
+            System.out.println("[ExecutionDictionary] andThenOrOptional: only andPart present.");
             return andPart;
         }
 
@@ -486,22 +477,21 @@ public final class XPathyRegistry {
         String orStep  = toSelfStep(orPart.get().getXpath());
 
         String combinedExpr = "(" + andStep + ") and (" + orStep + ")";
-        System.out.println("[XPathyRegistry] andThenOrOptional: combinedExpr=" + combinedExpr);
+        System.out.println("[ExecutionDictionary] andThenOrOptional: combinedExpr=" + combinedExpr);
 
         String fullXpath = "//*[" + combinedExpr + "]";
-        System.out.println("[XPathyRegistry] andThenOrOptional: fullXpath=" + fullXpath);
+        System.out.println("[ExecutionDictionary] andThenOrOptional: fullXpath=" + fullXpath);
 
         XPathy x = XPathy.from(fullXpath);
-        System.out.println("[XPathyRegistry] andThenOrOptional: final XPathy.getXpath()=" + safeXpath(x));
+        System.out.println("[ExecutionDictionary] andThenOrOptional: final XPathy.getXpath()=" + safeXpath(x));
 
         return Optional.of(x);
     }
 
-
     /**
      * Convenience: OR-combine an initial XPathy with additional XPathy expressions.
      */
-    public static XPathy combineOr(XPathy first, XPathy... rest) {
+    public XPathy combineOr(XPathy first, XPathy... rest) {
         Objects.requireNonNull(first, "first XPathy must not be null");
         List<XPathy> list = new ArrayList<>();
         list.add(first);
@@ -512,7 +502,7 @@ public final class XPathyRegistry {
             }
         }
 
-        System.out.println("[XPathyRegistry] combineOr: totalCount=" + list.size());
+        System.out.println("[ExecutionDictionary] combineOr: totalCount=" + list.size());
         Optional<XPathy> result = combine(list, "or");
         if (result.isEmpty()) {
             throw new IllegalStateException("combineOr was given an empty list, which should not happen.");
@@ -523,7 +513,7 @@ public final class XPathyRegistry {
     /**
      * Convenience: AND-combine an initial XPathy with additional XPathy expressions.
      */
-    public static XPathy combineAnd(XPathy first, XPathy... rest) {
+    public XPathy combineAnd(XPathy first, XPathy... rest) {
         Objects.requireNonNull(first, "first XPathy must not be null");
         List<XPathy> list = new ArrayList<>();
         list.add(first);
@@ -534,7 +524,7 @@ public final class XPathyRegistry {
             }
         }
 
-        System.out.println("[XPathyRegistry] combineAnd: totalCount=" + list.size());
+        System.out.println("[ExecutionDictionary] combineAnd: totalCount=" + list.size());
         Optional<XPathy> result = combine(list, "and");
         if (result.isEmpty()) {
             throw new IllegalStateException("combineAnd was given an empty list, which should not happen.");
@@ -546,7 +536,7 @@ public final class XPathyRegistry {
     // Utility: normalize an XPath to a "self::" step
     //========================================================
 
-    public static String toSelfStep(String xpath) {
+    public String toSelfStep(String xpath) {
         if (xpath == null) {
             return "self::*";
         }
@@ -554,11 +544,10 @@ public final class XPathyRegistry {
         String s = xpath.trim();
 
         // Special-case: patterns like (//*)[...]
-        // We want: self::*[...]
         if (s.startsWith("(//*)[")) {
             String tail = s.substring("(//*)".length()); // keep the [...] part
             String out = "self::*" + tail;
-            System.out.println("[XPathyRegistry] toSelfStep (paren //*): input=" + xpath + " -> " + out);
+            System.out.println("[ExecutionDictionary] toSelfStep (paren //*): input=" + xpath + " -> " + out);
             return out;
         }
 
@@ -585,18 +574,18 @@ public final class XPathyRegistry {
 
         // If already starts with an axis ("descendant::", "self::", etc.), keep it
         if (s.matches("^[A-Za-z-]+::.*")) {
-            System.out.println("[XPathyRegistry] toSelfStep: input=" + xpath + " (already axis) -> " + s);
+            System.out.println("[ExecutionDictionary] toSelfStep: input=" + xpath + " (already axis) -> " + s);
             return s;
         }
 
         String out = "self::" + s;
-        System.out.println("[XPathyRegistry] toSelfStep: input=" + xpath + " -> " + out);
+        System.out.println("[ExecutionDictionary] toSelfStep: input=" + xpath + " -> " + out);
         return out;
     }
 
     // Heuristic scoring for XPath specificity / efficiency.
-    // Lower score == considered "better" (more specific / likely more selective).
-    private static int xpathSpecificityScore(String xpath) {
+    // Lower score == considered "better"
+    private int xpathSpecificityScore(String xpath) {
         if (xpath == null || xpath.isBlank()) {
             return Integer.MAX_VALUE;
         }
@@ -633,28 +622,28 @@ public final class XPathyRegistry {
             score -= 10;
         }
 
-        // 4) Reward custom element tags (web components) as likely rarer = more selective
+        // 4) Reward custom element tags (web components)
         if (s.matches(".*//[a-zA-Z0-9]+-[a-zA-Z0-9_-]+.*")) {
             score -= 20;
         }
 
         // 5) Reward explicit tag at the root instead of wildcard
         if (s.matches("^\\s*//[a-zA-Z].*")) {
-            score -= 10; // starts with explicit tag
+            score -= 10;
         } else if (s.matches("^\\s*//\\*.*")) {
-            score += 10; // starts with wildcard
+            score += 10;
         }
 
         if (score < 0) score = 0;
 
-        System.out.println("[XPathyRegistry] xpathSpecificityScore: xpath=" + xpath +
+        System.out.println("[ExecutionDictionary] xpathSpecificityScore: xpath=" + xpath +
                 ", score=" + score);
 
         return score;
     }
 
     // Simple helper for counting characters (predicates, etc.)
-    private static int countChar(String s, char c) {
+    private int countChar(String s, char c) {
         int count = 0;
         for (int i = 0; i < s.length(); i++) {
             if (s.charAt(i) == c) count++;
@@ -662,18 +651,185 @@ public final class XPathyRegistry {
         return count;
     }
 
-    private static boolean hasAnyRegisteredBuilders(List<String> lineage) {
+    private boolean hasAnyRegisteredBuilders(List<String> lineage) {
         for (String catKey : lineage) {
-            var orBuilders  = OR_REG.get(catKey);
+            var orBuilders  = orReg.get(catKey);
             if (orBuilders != null && !orBuilders.isEmpty()) {
                 return true;
             }
-            var andBuilders = AND_REG.get(catKey);
+            var andBuilders = andReg.get(catKey);
             if (andBuilders != null && !andBuilders.isEmpty()) {
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Start a fluent definition for a single category on this dictionary instance.
+     */
+    public CategorySpec category(String name) {
+        return new CategorySpec(this, name);
+    }
+
+    /**
+     * Start a fluent definition for multiple categories at once on this dictionary instance.
+     */
+    public CategoriesSpec categories(String... names) {
+        Objects.requireNonNull(names, "names must not be null");
+        return new CategoriesSpec(this, Arrays.asList(names));
+    }
+
+    /**
+     * Start a fluent definition for a parent category whose children inherit from it,
+     * on this dictionary instance.
+     */
+    public ParentSpec parent(String parentName) {
+        return new ParentSpec(this, parentName);
+    }
+
+    // ======================================================
+    // CategorySpec: fluent config for a single category
+    // ======================================================
+
+    public static final class CategorySpec {
+        private final ExecutionDictionary dict;
+        private final String category;
+
+        private CategorySpec(ExecutionDictionary dict, String category) {
+            this.dict = Objects.requireNonNull(dict, "dict must not be null");
+            this.category = Objects.requireNonNull(category, "category must not be null");
+        }
+
+        /**
+         * Register OR-based builders for this category on this dictionary instance.
+         */
+        public CategorySpec or(Builder... builders) {
+            dict.registerOrBuilder(category, builders);
+            return this;
+        }
+
+        /**
+         * Register AND-based builders for this category on this dictionary instance.
+         */
+        public CategorySpec and(Builder... builders) {
+            dict.registerAndBuilder(category, builders);
+            return this;
+        }
+
+        /**
+         * Declare that this category inherits from the given parents, on this dictionary instance.
+         */
+        public CategorySpec inheritsFrom(String... parents) {
+            dict.registerCategoryInheritance(category, parents);
+            return this;
+        }
+
+        /**
+         * Convenience for HTML type registration on this category, on this dictionary instance.
+         */
+        public CategorySpec htmlTypes(HtmlType... htmlTypes) {
+            dict.addHtmlTypes(category, htmlTypes);
+            return this;
+        }
+
+        /**
+         * Expose the category name if needed for further manual wiring.
+         */
+        public String name() {
+            return category;
+        }
+    }
+
+    // ======================================================
+    // CategoriesSpec: fluent config for multiple categories
+    // ======================================================
+
+    public static final class CategoriesSpec {
+        private final ExecutionDictionary dict;
+        private final List<String> categories;
+
+        private CategoriesSpec(ExecutionDictionary dict, List<String> categories) {
+            this.dict = Objects.requireNonNull(dict, "dict must not be null");
+            this.categories = Objects.requireNonNull(categories, "categories must not be null");
+        }
+
+        /**
+         * Register OR-based builders for all categories in this group on this dictionary instance.
+         */
+        public CategoriesSpec or(Builder... builders) {
+            dict.registerOrForCategories(categories, builders);
+            return this;
+        }
+
+        /**
+         * Register AND-based builders for all categories in this group on this dictionary instance.
+         */
+        public CategoriesSpec and(Builder... builders) {
+            dict.registerAndForCategories(categories, builders);
+            return this;
+        }
+
+        /**
+         * Declare that all categories in this group inherit from the given parents,
+         * on this dictionary instance.
+         */
+        public CategoriesSpec inheritFrom(String... parents) {
+            for (String cat : categories) {
+                if (cat == null || cat.isBlank()) continue;
+                dict.registerCategoryInheritance(cat, parents);
+            }
+            return this;
+        }
+
+        /**
+         * Convenience for HTML type registration on all categories in this group,
+         * on this dictionary instance.
+         */
+        public CategoriesSpec htmlTypes(HtmlType... htmlTypes) {
+            for (String cat : categories) {
+                if (cat == null || cat.isBlank()) continue;
+                dict.addHtmlTypes(cat, htmlTypes);
+            }
+            return this;
+        }
+
+        /**
+         * Expose the underlying list of category names.
+         */
+        public List<String> names() {
+            return categories;
+        }
+    }
+
+    // ======================================================
+    // ParentSpec: fluent config for parent → children inheritance
+    // ======================================================
+
+    public static final class ParentSpec {
+        private final ExecutionDictionary dict;
+        private final String parent;
+
+        private ParentSpec(ExecutionDictionary dict, String parent) {
+            this.dict = Objects.requireNonNull(dict, "dict must not be null");
+            this.parent = Objects.requireNonNull(parent, "parent must not be null");
+        }
+
+        /**
+         * Declare that the given child categories inherit from this parent,
+         * on this dictionary instance.
+         */
+        public ParentSpec children(String... childCategories) {
+            dict.registerParentOfCategories(parent, childCategories);
+            return this;
+        }
+
+        /**
+         * Expose the parent category name.
+         */
+        public String name() {
+            return parent;
+        }
     }
 
 }

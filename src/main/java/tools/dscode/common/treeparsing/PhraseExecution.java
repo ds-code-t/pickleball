@@ -1,8 +1,6 @@
 package tools.dscode.common.treeparsing;
 
-import com.xpathy.Tag;
 import com.xpathy.XPathy;
-import io.cucumber.java.ja.且つ;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chromium.ChromiumDriver;
@@ -10,34 +8,27 @@ import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.domoperations.XPathChainResult;
 import tools.dscode.common.domoperations.XPathData;
-import tools.dscode.common.domoperations.XPathyRegistry;
+import tools.dscode.common.domoperations.ExecutionDictionary;
 
-import java.awt.*;
-import java.lang.annotation.ElementType;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.ParsedActions.executeAction;
 import static tools.dscode.common.domoperations.ParsedAssertions.executeAssertions;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
-import static tools.dscode.common.domoperations.SeleniumUtils.waitSeconds;
-import static tools.dscode.common.domoperations.XPathChainResolver.resolveXPathChain;
 import static tools.dscode.common.domoperations.XPathyMini.applyAttrOp;
 import static tools.dscode.common.domoperations.XPathyMini.applyTextOp;
-//import static tools.dscode.common.domoperations.XPathyRegistry.getHtmlTypes;
-import static tools.dscode.common.domoperations.XPathyRegistry.andThenOr;
-import static tools.dscode.common.domoperations.XPathyRegistry.orAll;
 import static tools.dscode.common.domoperations.XPathyUtils.afterOf;
 import static tools.dscode.common.domoperations.XPathyUtils.beforeOf;
 import static tools.dscode.common.domoperations.XPathyUtils.everyNth;
 import static tools.dscode.common.domoperations.XPathyUtils.inBetweenOf;
 import static tools.dscode.common.domoperations.XPathyUtils.insideOf;
 import static tools.dscode.common.domoperations.XPathyUtils.refine;
+import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.util.DebugUtils.printDebug;
 import static tools.dscode.coredefinitions.GeneralSteps.getBrowser;
 
@@ -321,19 +312,19 @@ public class PhraseExecution {
 //                return;
 
 
-            XPathyRegistry.Op textOp = text.isBlank() ? null : XPathyRegistry.Op.EQUALS;
-            xPathy = andThenOr(category, text, textOp);
+            ExecutionDictionary.Op textOp = text.isBlank() ? null : ExecutionDictionary.Op.EQUALS;
+            xPathy = getExecutionDictionary().andThenOr(category, text, textOp);
             MatchNode predicateNode = (MatchNode) elementNode.getFromGlobalState((String) elementNode.getFromLocalState("predicate"));
 
             if (predicateNode != null) {
                 this.attribute = new Attribute((String) elementNode.getFromLocalState("attrName"), (String) predicateNode.getFromLocalState("predicateType"), (String) predicateNode.getFromLocalState("predicateVal"));
 
-                XPathyRegistry.Op op = switch (attribute.predicateType) {
+                ExecutionDictionary.Op op = switch (attribute.predicateType) {
                     case null -> null;
                     case String s when s.isBlank() -> null;
-                    case String s when s.startsWith("equal") -> XPathyRegistry.Op.EQUALS;
-                    case String s when s.startsWith("contain") -> XPathyRegistry.Op.CONTAINS;
-                    case String s when s.startsWith("start") -> XPathyRegistry.Op.STARTS_WITH;
+                    case String s when s.startsWith("equal") -> ExecutionDictionary.Op.EQUALS;
+                    case String s when s.startsWith("contain") -> ExecutionDictionary.Op.CONTAINS;
+                    case String s when s.startsWith("start") -> ExecutionDictionary.Op.STARTS_WITH;
                     default -> null;
                 };
                 if (attribute.attrName.equals("TEXT"))

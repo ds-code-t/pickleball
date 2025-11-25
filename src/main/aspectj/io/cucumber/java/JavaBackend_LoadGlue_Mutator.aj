@@ -1,6 +1,8 @@
 // src/main/aspectj/io/cucumber/java/JavaBackend_LoadGlue_Mutator.aj
 package io.cucumber.java;
 
+import tools.dscode.common.annotations.LifecycleManager;
+import tools.dscode.common.annotations.Phase;
 import tools.dscode.pickleruntime.CucumberOptionResolver;
 
 import java.net.URI;
@@ -13,6 +15,7 @@ public aspect JavaBackend_LoadGlue_Mutator {
 
     private static final java.net.URI CORE_DEFS_URI =
             java.net.URI.create("classpath:/tools/dscode/coredefinitions");
+    private final LifecycleManager lifecycle = new LifecycleManager();
 
     // Loosened signature: match any void loadGlue(..) on JavaBackend and bind the two args
     void around(io.cucumber.core.backend.Glue glue, java.util.List gluePaths):
@@ -22,7 +25,7 @@ public aspect JavaBackend_LoadGlue_Mutator {
         java.util.List modified = new java.util.ArrayList();
         java.util.List globalPaths =  glueDistinct();
         printDebug("@@old gluePaths: " + gluePaths);
-
+        lifecycle.fire(Phase.BEFORE_CUCUMBER_RUN);
 //        modified.remove("classpath:");
 //        modified.remove("classpath:/");
         for (Object o : globalPaths) {

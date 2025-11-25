@@ -68,7 +68,7 @@ public final class XPathyMini {
 
     private static XPathy applyNormalizedOp(
             XPathy base,
-            XPathyRegistry.Op op,
+            ExecutionDictionary.Op op,
             String normExpr,
             String normalizedValue,
             String label
@@ -95,7 +95,7 @@ public final class XPathyMini {
     }
 
 
-    public static XPathy applyAttrOp(XPathy base, Attribute attr, XPathyRegistry.Op op, Object value) {
+    public static XPathy applyAttrOp(XPathy base, Attribute attr, ExecutionDictionary.Op op, Object value) {
         if (attr == null) {
             return base;
         }
@@ -112,7 +112,7 @@ public final class XPathyMini {
     }
 
 
-    public static XPathy applyTextOp(XPathy base, XPathyRegistry.Op op, Object value) {
+    public static XPathy applyTextOp(XPathy base, ExecutionDictionary.Op op, Object value) {
 
         XPathy out = applyNormalizedOp(
                 base,
@@ -125,7 +125,7 @@ public final class XPathyMini {
         return out;
     }
 
-    public static Function<XPathy, XPathy> textOp(XPathyRegistry.Op op, Object v) {
+    public static Function<XPathy, XPathy> textOp(ExecutionDictionary.Op op, Object v) {
         return base -> applyTextOp(base, op, v);
     }
 
