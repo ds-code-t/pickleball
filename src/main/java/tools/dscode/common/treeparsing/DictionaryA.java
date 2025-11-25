@@ -180,7 +180,7 @@ public class DictionaryA extends NodeDictionary {
         //
         category("*")
                 .or(
-                        (category, v, op) -> XPathy.from(category),
+//                        (category, v, op) -> XPathy.from(category),
                         (category, v, op) ->
                                 XPathy.from(any).byAttribute(role).withCase(LOWER).withNormalizeSpace().equals(category.toLowerCase()),
 
