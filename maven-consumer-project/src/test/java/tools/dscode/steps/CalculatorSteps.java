@@ -11,7 +11,6 @@ import io.cucumber.java.en.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import tools.dscode.common.annotations.LifecycleHook;
 import tools.dscode.common.annotations.Phase;
-import tools.dscode.common.domoperations.XPathyRegistry;
 import tools.dscode.coredefinitions.BrowserSteps;
 
 import tools.dscode.coredefinitions.NavigationSteps;
@@ -20,10 +19,14 @@ import tools.dscode.registry.GlobalRegistry;
 import java.util.List;
 
 import static com.xpathy.Attribute.aria_label;
+import static com.xpathy.Attribute.id;
 import static com.xpathy.Attribute.placeholder;
 import static com.xpathy.Attribute.role;
 import static com.xpathy.Attribute.type;
+import static com.xpathy.Attribute.value;
+import static com.xpathy.Case.LOWER;
 import static com.xpathy.Tag.any;
+import static com.xpathy.Tag.input;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchException;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
@@ -32,11 +35,10 @@ import static tools.dscode.common.domoperations.VisibilityConditions.invisible;
 import static tools.dscode.common.domoperations.VisibilityConditions.visible;
 import static tools.dscode.common.domoperations.XPathyMini.orMap;
 import static tools.dscode.common.domoperations.XPathyMini.textOp;
-import static tools.dscode.common.domoperations.XPathyRegistry.combineOr;
-import static tools.dscode.common.domoperations.XPathyRegistryFluent.category;
 import static tools.dscode.common.domoperations.XPathyUtils.deepNormalizedText;
 import static tools.dscode.common.domoperations.XPathyUtils.deepNormalizedTextWrapped;
 import static tools.dscode.common.evaluations.AviatorFunctions.processTernaryExpression;
+import static tools.dscode.common.treeparsing.DefinitionContext.DEFAULT_EXECUTION_DICTIONARY;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
 
@@ -46,15 +48,21 @@ public class CalculatorSteps {
 
     public static void main(String[] args) {
         String pre = "IF: 1 > 0 THEN:   print A ELSE: print 333";
-        String  post = processTernaryExpression("IF: 1 > 0 THEN:   print A ELSE: print 333");
+        String post = processTernaryExpression("IF: 1 > 0 THEN:   print A ELSE: print 333");
         System.out.println("@@pre: " + pre);
         System.out.println("@@pst: " + post);
     }
 
 
-    @LifecycleHook(Phase.BEFORE_CUCUMBER_RUN)
+    @Given("config")
     public static void configs() {
-
+        DEFAULT_EXECUTION_DICTIONARY.category("Button").or(
+                (category, v, op) -> {
+                    if (!v.equalsIgnoreCase("Submit"))
+                        return null;
+                    return input.byAttribute(type).withCase(LOWER).withNormalizeSpace().equals(v);
+                }
+        );
 //        category("Button").inheritsFrom("visible","visibleText");
 
 //        XPathyRegistry.registerAndBuilder("baseCategory",

@@ -4,7 +4,6 @@ import com.xpathy.Tag;
 import com.xpathy.XPathy;
 import tools.dscode.common.annotations.LifecycleHook;
 import tools.dscode.common.annotations.Phase;
-import tools.dscode.common.domoperations.XPathyRegistry;
 
 import static com.xpathy.Attribute.role;
 import static tools.dscode.common.domoperations.XPathyMini.orMap;

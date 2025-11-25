@@ -8,17 +8,18 @@ Feature: Addition
     Then , from the Frame, I click the "Create" Button
 
   Scenario: if test
-    * IF: "" THEN: ,  select "CheckList" from "We TEddf" Dropdown
+    * IF: "" THEN: ,  select "CheckList" from "cars" Dropdown
 #    * IF: "a" THEN:   print ssss ELSE: print 44
 
   Scenario: ss3
     Then print aaa
   @[DEBUG] Then print aaa
     Given set $(CHROME)
+    * config
 #    * navigate to: URL.w3
 #    Then , click the "Create" Link
-    Then , from the Frame, I select "Opel" in the "cars" Dropdown
-#    Then , from the IframeResult, I select "Opel" in the "cars" Dropdown
+#    Then , from the Frame, I select "Opel" in the "cars" Dropdown
+    Then , from the IframeResult, I select "Opel" in the "cars" Dropdown, and click the "Submit" Button
 #    * , from the IframeResult, I enter "dd" in the "Last name:" Textbox
 #    * , click "Essential QA Service" Qqq
 
