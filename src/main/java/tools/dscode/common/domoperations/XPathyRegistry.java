@@ -293,20 +293,31 @@ public final class XPathyRegistry {
             }
         }
 
-        // If nothing found in lineage, fallback to "*"
+// If nothing found in this map for the lineage, decide whether to fallback to "*"
         if (allBuilders.isEmpty()) {
-            var starList = map.get("*");
-            if (starList == null || starList.isEmpty()) {
+            // Only use "*" fallback if there are NO AND or OR builders
+            // anywhere in the lineage (including baseCategory).
+            if (!hasAnyRegisteredBuilders(lineage)) {
+                var starList = map.get("*");
+                if (starList == null || starList.isEmpty()) {
+                    System.out.println("[XPathyRegistry] expandInternal: category=" + requestCategory +
+                            ", map=" + (map == OR_REG ? "OR_REG" : "AND_REG") +
+                            " -> no builders found, no '*' fallback.");
+                    return List.of();
+                }
                 System.out.println("[XPathyRegistry] expandInternal: category=" + requestCategory +
                         ", map=" + (map == OR_REG ? "OR_REG" : "AND_REG") +
-                        " -> no builders found, no '*' fallback.");
+                        " -> using '*' fallback, buildersCount=" + starList.size());
+                allBuilders.addAll(starList);
+            } else {
+                // There ARE builders in the other map (AND vs OR), so we skip "*"
+                System.out.println("[XPathyRegistry] expandInternal: category=" + requestCategory +
+                        ", map=" + (map == OR_REG ? "OR_REG" : "AND_REG") +
+                        " -> no builders in this map, but found in other map; skipping '*' fallback.");
                 return List.of();
             }
-            System.out.println("[XPathyRegistry] expandInternal: category=" + requestCategory +
-                    ", map=" + (map == OR_REG ? "OR_REG" : "AND_REG") +
-                    " -> using '*' fallback, buildersCount=" + starList.size());
-            allBuilders.addAll(starList);
         }
+
 
         List<XPathy> result = allBuilders.stream()
                 .map(b -> b.build(requestCategory, value, op)).filter(Objects::nonNull)
@@ -650,4 +661,19 @@ public final class XPathyRegistry {
         }
         return count;
     }
+
+    private static boolean hasAnyRegisteredBuilders(List<String> lineage) {
+        for (String catKey : lineage) {
+            var orBuilders  = OR_REG.get(catKey);
+            if (orBuilders != null && !orBuilders.isEmpty()) {
+                return true;
+            }
+            var andBuilders = AND_REG.get(catKey);
+            if (andBuilders != null && !andBuilders.isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }

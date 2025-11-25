@@ -1,6 +1,6 @@
 Feature: Addition
 
-  Scenario: ss2
+  Scenario: ss3
     Then print aaa
   @[DEBUG] Then print aaa
     Given set $(CHROME)
