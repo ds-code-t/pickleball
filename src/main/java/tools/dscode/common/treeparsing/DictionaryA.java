@@ -78,12 +78,19 @@ public class DictionaryA extends NodeDictionary {
         // Link
         //
         category("Link")
-                .or(
+                .and(
                         (category, v, op) ->
                                 XPathy.from(any).byAttribute(role).equals("link")
-                                        .or().byAttribute(aria_label).equals("link"),
-
-                        (category, v, op) -> XPathy.from(Tag.a)
+                                        .or().byAttribute(aria_label).equals("link")
+                                        .or().tag(Tag.a),
+                        (category, v, op) -> {
+                            if (v == null || v.isBlank())
+                                return null;
+                            return any.byHaving(
+                                    XPathy.from("descendant-or-self::*")
+                                            .byHaving(deepNormalizedText(v))
+                            );
+                        }
                 );
 
 
