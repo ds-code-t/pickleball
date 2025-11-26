@@ -289,19 +289,19 @@ public final class DefinitionContext {
 
 
             category("baseCategory").and(
-//                    (category, v, op) -> {
-//                        XPathy selfInvisible = any.byCondition(invisible());
-//                        String invisiblePredicate = extractPredicate("//*", selfInvisible.getXpath());
-//
-//                        XPathy selfVisible = any.byCondition(visible());
-//                        String visiblePredicate = extractPredicate("//*", selfVisible.getXpath());
-//
-//                        return XPathy.from(
-//                                "//*[" +
-//                                        visiblePredicate +
-//                                        " and not(ancestor::*[" + invisiblePredicate + "])]"
-//                        );
-//                    }
+                    (category, v, op) -> {
+                        XPathy selfInvisible = any.byCondition(invisible());
+                        String invisiblePredicate = extractPredicate("//*", selfInvisible.getXpath());
+
+                        XPathy selfVisible = any.byCondition(visible());
+                        String visiblePredicate = extractPredicate("//*", selfVisible.getXpath());
+
+                        return XPathy.from(
+                                "//*[" +
+                                        visiblePredicate +
+                                        " and not(ancestor::*[" + invisiblePredicate + "])]"
+                        );
+                    }
             );
 
             category("visible")
