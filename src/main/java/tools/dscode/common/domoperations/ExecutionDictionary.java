@@ -17,7 +17,7 @@ public class ExecutionDictionary {
         XPathy build(String category, String value, Op op);
     }
 
-    public enum Op { EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE }
+    public enum Op { DEFAULT, EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE }
 
     public enum HtmlType {
         SHADOW_HOST,
@@ -329,7 +329,7 @@ public class ExecutionDictionary {
 
         List<XPathy> result = allBuilders.stream()
                 .map(b -> b.build(requestCategory, value, op))
-                .filter(Objects::nonNull)
+//                .filter(Objects::nonNull)
                 .toList();
 
         System.out.println("[ExecutionDictionary] expandInternal: category=" + requestCategory +

@@ -263,7 +263,7 @@ public class PhraseExecution {
 //        public Set<XPathyRegistry.HtmlType> htmlTypes;
         public PhraseExecution parentPhrase;
         public String toString() {
-            return   (selectionType.isEmpty() ? "" : selectionType+ " ") +  (elementPosition.isEmpty() ? "" : elementPosition+ " ") + (text.isEmpty() ? "" :"'" + text + "' ") + category +(xPathy == null ? "" :  "\n"+  xPathy.getXpath());
+            return   (selectionType.isEmpty() ? "" : selectionType+ " ") +  (elementPosition.isEmpty() ? "" : elementPosition+ " ") + (text== null ? "" :"'" + text + "' ") + category +(xPathy == null ? "" :  "\n"+  xPathy.getXpath());
         }
         public enum ElementType {
             HTML, ALERT, BROWSER, BROWSER_WINDOW, BROWSER_TAB, URL, VALUE;
@@ -312,7 +312,7 @@ public class PhraseExecution {
 //                return;
 
 
-            ExecutionDictionary.Op textOp = text.isBlank() ? null : ExecutionDictionary.Op.EQUALS;
+            ExecutionDictionary.Op textOp = text.isBlank() ? ExecutionDictionary.Op.DEFAULT : ExecutionDictionary.Op.EQUALS;
             xPathy = getExecutionDictionary().andThenOr(category, text, textOp);
             MatchNode predicateNode = (MatchNode) elementNode.getFromGlobalState((String) elementNode.getFromLocalState("predicate"));
 
