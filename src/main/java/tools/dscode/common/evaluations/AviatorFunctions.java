@@ -115,7 +115,7 @@ public class AviatorFunctions {
         }
     }
 
-    public static final String operatorFlag = "\u206ATF";
+    public static final String operatorFlag = "\u206A\u208A";
     static String IF = operatorFlag + "IF:", ELSE = operatorFlag + "ELSE:", ELSEIF = operatorFlag + "ELSEIF:",
             THEN = operatorFlag + "THEN:";
 

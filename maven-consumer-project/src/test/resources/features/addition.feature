@@ -8,7 +8,7 @@ Feature: Addition
     Then , from the Frame, I click the "Create" Button
 
   Scenario: if test
-    * IF: "" THEN: ,  select "CheckList" from "cars" Dropdown
+    * IF: "Merwe Fadasd - WKM Reremkdfj - Msdfdsgfh Dfgd Rg" THEN: ,  select "CheckList" from "cars" Dropdown
 #    * IF: "a" THEN:   print ssss ELSE: print 44
 
   Scenario: ss3
