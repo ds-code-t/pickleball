@@ -239,7 +239,7 @@ public final class DefinitionContext {
             //
             // Button
             //
-            category("Button").inheritsFrom("forLabel")
+            category("Button").inheritsFrom("forLabel", "containsText")
 //                .and((category, v, op) -> XPathy.from("descendant-or-self::*")
 //                        .byHaving(deepNormalizedText(v)))
                     .or(
