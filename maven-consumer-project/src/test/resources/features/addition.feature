@@ -15,11 +15,11 @@ Feature: Addition
     Then print aaa
   @[DEBUG] Then print aaa
     Given set $(CHROME)
-    * config
+#    * config
 #    * navigate to: URL.w3
 #    Then , click the "Create" Link
 #    Then , from the Frame, I select "Opel" in the "cars" Dropdown
-    Then , from the IframeResult, I select "Opel" in the "cars" Dropdown, and click the "Submit" Button
+    Then , from the Frame, I select "Opel" in the "cars" Dropdown, and click the "Submit" Button
 #    * , from the IframeResult, I enter "dd" in the "Last name:" Textbox
 #    * , click "Essential QA Service" Qqq
 
