@@ -214,13 +214,13 @@ public final class MatchNode {
     public String resolvedGroupText(String groupName) {
         String returnString = unmask(groups().get(groupName));
         if (returnString == null) returnString = "";
-        return returnString;
+        return returnString.trim();
     }
 
     public String resolvedGroupText(int groupNum) {
         String returnString = unmask(groups().get(groupNum));
         if (returnString == null) returnString = "";
-        return returnString;
+        return returnString.trim();
     }
 
 
