@@ -47,6 +47,7 @@ public abstract class StepData extends StepMapping {
     public boolean isCoreStep;
     protected final List<String> stepFlags = new ArrayList<>();
     protected List<DefinitionFlag> definitionFlags;
+    protected List<DefinitionFlag> nextSiblingDefinitionFlags;
     public List<String> stepTags = new ArrayList<>();
     public List<String> bookmarks = new ArrayList<>();
     public Method method;

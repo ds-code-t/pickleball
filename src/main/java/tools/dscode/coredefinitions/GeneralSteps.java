@@ -1,5 +1,6 @@
 package tools.dscode.coredefinitions;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.core.stepexpression.DocStringArgument;
@@ -27,9 +28,12 @@ import static io.cucumber.core.runner.CurrentScenarioState.registerScenarioObjec
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.GlobalConstants.INFO_STEP;
+import static tools.dscode.common.GlobalConstants.NEXT_SIBLING_STEP;
 import static tools.dscode.common.GlobalConstants.ROOT_STEP;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.GlobalConstants.SOFT_ERROR_STEP;
+import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
+import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort;
 import static tools.dscode.common.domoperations.SeleniumUtils.portFromString;
@@ -43,8 +47,12 @@ public class GeneralSteps extends CoreSteps {
 //        // step body here
 //    }
 
-    public static ChromiumDriver getBrowser(String browserName){
-        return (ChromiumDriver) returnStepParameter(browserName);
+    public static ChromiumDriver getBrowser(String browserName) {
+        Object returnObject1 = getScenarioObject(browserName);
+        if (returnObject1 != null) return (ChromiumDriver) returnObject1;
+        Object returnObject2 = returnStepParameter(browserName);
+        if (returnObject2 != null) return (ChromiumDriver) returnObject2;
+        return (ChromiumDriver) returnStepParameter("CHROME");
     }
 
     @Given("navigate {returnStepParameter}")
@@ -53,35 +61,31 @@ public class GeneralSteps extends CoreSteps {
         waitForPageReady(driver, Duration.ofSeconds(60));
     }
 
-
-    @ParameterType("\\$\\(([^()]+)\\)")
     public static Object returnStepParameter(String stepText) {
+        return returnStepParameter(stepText, null);
+    }
 
-        String getKey = "";
-        if (stepText.contains(":")) {
-            getKey = stepText.substring(0, stepText.indexOf(":"));
-            stepText = stepText.substring(stepText.indexOf(":") + 1);
-            Object existingObject = getScenarioObject(getKey);
-            if (existingObject != null) return existingObject;
-        }
-        else {
-            Object existingObject = getScenarioObject(stepText);
-            if (existingObject != null) return existingObject;
-        }
-        stepText = "$" + stepText;
+    //    @ParameterType("\\$\\(([^()]+)\\)")
+    @ParameterType("([A-Za-z0-9_-]+)(:([A-Za-z0-9_-]+))?")
+    public static Object returnStepParameter(String stepText, String key) {
         StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
-        StepExtension modifiedStep = currentStep.modifyStepExtension(stepText);
-        modifiedStep.argument = currentStep.argument;
-        if(!getKey.isEmpty())
-            modifiedStep.put("_getKey" , normalizeRegistryKey(getKey));
-
-        Object returnValue = modifiedStep.runAndGetReturnValue();
-        registerScenarioObject(stepText, returnValue);
-
-        if (getKey.isEmpty()) return returnValue;
-
-        registerScenarioObject(getKey, returnValue);
-        return returnValue;
+        Object existingObject = getScenarioObject(stepText);
+        if (key == null || key.isBlank()) {
+            if (existingObject != null) return existingObject;
+            StepExtension modifiedStep = currentStep.modifyStepExtension("$" + stepText);
+            modifiedStep.argument = currentStep.argument;
+            Object returnValue = modifiedStep.runAndGetReturnValue();
+            registerScenarioObject(stepText, returnValue);
+            return returnValue;
+        } else {
+            Object existingObjectFromKey = getScenarioObject(key);
+            if (existingObjectFromKey != null) return existingObjectFromKey;
+            StepExtension modifiedStep = currentStep.modifyStepExtension("$" + stepText);
+            modifiedStep.argument = currentStep.argument;
+            Object returnValue = modifiedStep.runAndGetReturnValue();
+            registerScenarioObject(key, returnValue);
+            return returnValue;
+        }
     }
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -96,10 +100,11 @@ public class GeneralSteps extends CoreSteps {
         ChromeOptions options = new ChromeOptions();
         map.forEach(options::setCapability);
         if (getCurrentScenarioState().debugBrowser) {
-            String name = (String) currentStep.getStepNodeMap().get("_getKey");
-            if (name == null) name = "chrome";
-
-            ensureDevToolsPort(options, name);   // <— use the ChromiumOptions overload here
+//            String name = (String) currentStep.getStepNodeMap().get("_getKey");
+//            if (name == null)
+//                name = "chrome";
+//            ensureDevToolsPort(options, name);   // <— use the ChromiumOptions overload here
+            ensureDevToolsPort(options, "chrome");
         }
         ChromeDriver chromeDriver = new ChromeDriver(options);
         registerScenarioObject("browser", chromeDriver);
@@ -138,6 +143,13 @@ public class GeneralSteps extends CoreSteps {
     @Given("^print (.*)$")
     public static void printVal(String message) {
         System.out.println("PRINT: " + message);
+    }
+
+
+    @DefinitionFlags(_NO_LOGGING)
+    @Given(NEXT_SIBLING_STEP)
+    public static void NEXT_SIBLING_STEP() {
+        System.out.println("NEXT_SIBLING_STEP: ");
     }
 
 }

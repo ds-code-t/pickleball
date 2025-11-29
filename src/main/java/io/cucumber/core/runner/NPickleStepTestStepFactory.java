@@ -31,7 +31,12 @@ public class NPickleStepTestStepFactory {
     }
 
     public static PickleStepTestStep createPickleStepTestStep(URI uri, Step step, PickleStepDefinitionMatch pickleStepDefinitionMatch) {
-        return new PickleStepTestStep(UUID.randomUUID(), toAbsoluteFileUri(uri), step, updatePickleStepDefinitionMatch(pickleStepDefinitionMatch));
+        try {
+            return new PickleStepTestStep(UUID.randomUUID(), toAbsoluteFileUri(uri), step, updatePickleStepDefinitionMatch(pickleStepDefinitionMatch));
+                    }
+        catch (Throwable t) {
+            throw new RuntimeException("Failed step text: " + step.getText(), t);
+        }
     }
 
 

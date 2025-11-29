@@ -17,19 +17,20 @@ public class ExecutionDictionary {
         XPathy build(String category, String value, Op op);
     }
 
+    // Default base category that *every* category implicitly inherits from
+    private static final String BASE_CATEGORY = "_baseCategory";
+
+    public static final String DEFAULT_STARTING_CONTEXT = "_defaultStartingContext";
+
     public enum Op { DEFAULT, EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE }
 
-    public enum HtmlType {
-        SHADOW_HOST,
-        IFRAME
-    }
+    public enum CategoryFlags { CONTEXT}
+
 
     //========================================================
     // Instance state
     //========================================================
 
-    private final ConcurrentMap<String, CopyOnWriteArraySet<HtmlType>> htmlTypeReg =
-            new ConcurrentHashMap<>();
 
     // childCategory -> [parentCategory1, parentCategory2, ...]
     private final Multimap<String, String> categoryParents =
@@ -41,8 +42,10 @@ public class ExecutionDictionary {
     private final ConcurrentMap<String, CopyOnWriteArrayList<Builder>> andReg =
             new ConcurrentHashMap<>();
 
-    // Default base category that *every* category implicitly inherits from
-    private static final String BASE_CATEGORY = "baseCategory";
+    private final ConcurrentMap<String, Set<CategoryFlags>> categoryFlags =
+            new ConcurrentHashMap<>();
+
+
 
     //========================================================
     // Construction / registration hook
@@ -143,48 +146,6 @@ public class ExecutionDictionary {
         return lineage;
     }
 
-    //========================================================
-    // HTML type registration
-    //========================================================
-
-    public void addHtmlTypes(String category, HtmlType... htmlTypes) {
-        Objects.requireNonNull(category, "category must not be null");
-        Objects.requireNonNull(htmlTypes, "htmlTypes must not be null");
-
-        System.out.println("[ExecutionDictionary] addHtmlTypes: category=" + category +
-                ", htmlTypes=" + Arrays.toString(htmlTypes));
-
-        if (htmlTypes.length == 0) {
-            return;
-        }
-
-        CopyOnWriteArraySet<HtmlType> set = htmlTypeReg.computeIfAbsent(
-                category,
-                k -> new CopyOnWriteArraySet<>()
-        );
-
-        for (HtmlType type : htmlTypes) {
-            set.add(Objects.requireNonNull(type, "HtmlType must not be null"));
-        }
-    }
-
-    public Set<HtmlType> getHtmlTypes(String category) {
-        var set = htmlTypeReg.get(category);
-        Set<HtmlType> result = (set == null || set.isEmpty())
-                ? Set.of()
-                : Set.copyOf(set);
-        System.out.println("[ExecutionDictionary] getHtmlTypes: category=" + category +
-                " -> " + result);
-        return result;
-    }
-
-    public boolean hasHtmlType(String category, HtmlType type) {
-        var set = htmlTypeReg.get(category);
-        boolean has = set != null && set.contains(type);
-        System.out.println("[ExecutionDictionary] hasHtmlType: category=" + category +
-                ", type=" + type + " -> " + has);
-        return has;
-    }
 
     // ========================================================
     // OR / AND builder registries
@@ -443,6 +404,17 @@ public class ExecutionDictionary {
         }
 
         return result.get();
+    }
+
+    public record CategoryResolution(String category, String value, Op op, XPathy xpath, Set<CategoryFlags> flags) { }
+    /**
+     * Convenience: call andThenOr (preserving its semantics, including null),
+     * and return the result together with the resolved category flags.
+     */
+    public CategoryResolution andThenOrWithFlags(String category, String value, Op op) {
+        XPathy xpath = andThenOr(category, value, op); // preserves old behavior, including null
+        Set<CategoryFlags> flags = getResolvedCategoryFlags(category);
+        return new CategoryResolution(category,  value,  op , xpath, flags);
     }
 
     /**
@@ -726,20 +698,20 @@ public class ExecutionDictionary {
         }
 
         /**
-         * Convenience for HTML type registration on this category, on this dictionary instance.
-         */
-        public CategorySpec htmlTypes(HtmlType... htmlTypes) {
-            dict.addHtmlTypes(category, htmlTypes);
-            return this;
-        }
-
-        /**
          * Expose the category name if needed for further manual wiring.
          */
         public String name() {
             return category;
         }
+
+        public CategorySpec flags(CategoryFlags... flags) {
+            dict.addCategoryFlags(category, flags);
+            return this;
+        }
     }
+
+
+
 
     // ======================================================
     // CategoriesSpec: fluent config for multiple categories
@@ -786,10 +758,11 @@ public class ExecutionDictionary {
          * Convenience for HTML type registration on all categories in this group,
          * on this dictionary instance.
          */
-        public CategoriesSpec htmlTypes(HtmlType... htmlTypes) {
+
+        public CategoriesSpec addCategoryFlags(CategoryFlags... flags) {
             for (String cat : categories) {
                 if (cat == null || cat.isBlank()) continue;
-                dict.addHtmlTypes(cat, htmlTypes);
+                dict.addCategoryFlags(cat, flags);
             }
             return this;
         }
@@ -869,15 +842,6 @@ public class ExecutionDictionary {
             });
         }
 
-        // ------ HTML Types ------
-        System.out.println("\n--- HTML Types ---");
-        if (htmlTypeReg.isEmpty()) {
-            System.out.println("(none)");
-        } else {
-            htmlTypeReg.forEach((cat, types) -> {
-                System.out.println("Category: " + cat + " -> " + types);
-            });
-        }
 
         // ------ Category Inheritance ------
         System.out.println("\n--- Category Inheritance ---");
@@ -901,5 +865,48 @@ public class ExecutionDictionary {
             return XPathy.from("//ERROR[" + e.getClass().getSimpleName() + "]");
         }
     }
+
+// ========================================================
+// Category flags registration / resolution
+// ========================================================
+
+    private void addCategoryFlags(String category, CategoryFlags... flags) {
+        Objects.requireNonNull(category, "category must not be null");
+        Objects.requireNonNull(flags, "flags must not be null");
+        if (flags.length == 0) {
+            return;
+        }
+
+        var set = categoryFlags.computeIfAbsent(
+                category,
+                k -> ConcurrentHashMap.<CategoryFlags>newKeySet()
+        );
+        for (CategoryFlags f : flags) {
+            set.add(Objects.requireNonNull(f, "CategoryFlag must not be null"));
+        }
+    }
+
+    /**
+     * Resolve all flags for a category, honoring inheritance (just like the
+     * builder resolution does).
+     */
+    public Set<CategoryFlags> getResolvedCategoryFlags(String category) {
+        List<String> lineage = resolveCategoryLineage(
+                (category == null || category.isBlank()) ? BASE_CATEGORY : category
+        );
+        if (lineage.isEmpty()) {
+            return Set.of();
+        }
+
+        EnumSet<CategoryFlags> result = EnumSet.noneOf(CategoryFlags.class);
+        for (String catKey : lineage) {
+            var set = categoryFlags.get(catKey);
+            if (set != null && !set.isEmpty()) {
+                result.addAll(set);
+            }
+        }
+        return result.isEmpty() ? Set.of() : EnumSet.copyOf(result);
+    }
+
 
 }

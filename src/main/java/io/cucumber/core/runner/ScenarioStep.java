@@ -3,6 +3,7 @@ package io.cucumber.core.runner;
 //import io.cucumber.messages.types.Pickle;
 
 import io.cucumber.core.gherkin.Pickle;
+import tools.dscode.common.annotations.DefinitionFlag;
 
 import java.util.HashMap;
 import java.util.List;
@@ -12,6 +13,7 @@ import static io.cucumber.core.runner.GlobalState.getGivenKeyword;
 import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.createPickleStepTestStepsFromPickle;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
+import static tools.dscode.common.GlobalConstants.NEXT_SIBLING_STEP;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.setProperty;
@@ -56,6 +58,11 @@ public class ScenarioStep extends StepExtension {
             if (previousSibling != null) {
                 currentStep.previousSibling = previousSibling;
                 previousSibling.nextSibling = currentStep;
+
+                if(previousSibling.nextSiblingDefinitionFlags != null)
+                {
+                    currentStep.addDefinitionFlag(previousSibling.nextSiblingDefinitionFlags.toArray(new DefinitionFlag[0]));
+                }
             }
             if (parentStep != null) {
                 parentStep.childSteps.add(currentStep);

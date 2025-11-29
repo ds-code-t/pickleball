@@ -3,26 +3,14 @@ package io.cucumber.gherkin;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static tools.dscode.common.GlobalConstants.NEXT_SIBLING_STEP;
 import static tools.dscode.common.GlobalConstants.PARSER_FLAG;
 
-/**
- * Rewrites the string returned by EncodingParser.readWithEncodingFromSource(..)
- * by swapping the order of certain prefix segments and the main line content,
- * inserting a META flag in between — equivalent to the provided ByteBuddy DSL.
- *
- * ByteBuddy DSL intent:
- *   - Pattern (MULTILINE):
- *       ^((?:(?:\s*:)|(?:\s*@\[[^\[\]]*\]))+)(\s*[A-Z*].*$)
- *   - Replacement: "$2" + PARSER_FLAG + "$1"
- *
- * This aspect applies the same transformation with AspectJ.
- */
 public aspect EncodingParserLineSwap {
 
     /** The same pattern you used (multiline). */
     private static final Pattern LINE_SWAP_PATTERN = Pattern.compile(
-            "^((?:(?:\\s*:)|(?:\\s*@\\[[^\\[\\]]*\\]))+)(\\s*[A-Z*].*$)",
-            Pattern.MULTILINE
+            "\n((?:(?:\\s*:)|(?:\\s*@\\[[^\\[\\]]*\\]))+)(\\s*[A-Z*].*$)?"
     );
 
 
@@ -34,6 +22,8 @@ public aspect EncodingParserLineSwap {
     pointcut readWithEncoding():
             execution(String io.cucumber.gherkin.EncodingParser.readWithEncodingFromSource(..));
 
+    String replacementStep = "* " + NEXT_SIBLING_STEP;
+
     /**
      * Around advice: call the original method, then transform its return value.
      */
@@ -41,6 +31,26 @@ public aspect EncodingParserLineSwap {
         String ret = proceed();
         String original = (ret == null) ? "" : ret;
         Matcher matcher = LINE_SWAP_PATTERN.matcher(original);
-        return matcher.replaceAll("$2" + PARSER_FLAG + "$1");
+        StringBuffer sb = new StringBuffer();
+
+        while (matcher.find()) {
+            String g1 = matcher.group(1);
+            String g2 = matcher.group(2);
+
+            System.out.println("@@g0: " + matcher.group(0));
+            System.out.println("@@g1: " + g1);
+            System.out.println("@@g2: " + g2);
+
+            // Hardcoded fallback for group 2
+            String prefix = (g2 != null) ? g2 : replacementStep;
+            System.out.println("@@prefix: " + prefix);
+
+            String replacement = prefix + PARSER_FLAG + g1.replace("\n"," ").strip();
+            System.out.println("@@replacement: " + replacement);
+
+            matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
     }
 }

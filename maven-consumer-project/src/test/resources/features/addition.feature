@@ -1,10 +1,23 @@
 Feature: Addition
 
 
+  Scenario:  test555
+
+  @[DEBUG]
+
+
+
+    * print A
+
+    * print B
+
+
+    * print C
+
   Scenario:  test22
     * print ddd
-    @[DEBUG]
-      Then set $(CHROME)
+  @[DEBUG]
+    Then set $(CHROME)
     Then , from the Frame, I click the "Create" Button
 
   Scenario: if test
@@ -14,12 +27,15 @@ Feature: Addition
   Scenario: ss3
     Then print aaa
   @[DEBUG] Then print aaa
-    Given set $(CHROME)
+    Given set CHROME
 #    * config
 #    * navigate to: URL.w3
 #    Then , click the "Create" Link
 #    Then , from the Frame, I select "Opel" in the "cars" Dropdown
-    Then , from the Frame, I select "Opel" in the "cars" Dropdown, and click the "Submit" Button
+#    Then , from the IframeResult, I select "Opel" in the "cars" Dropdown
+    Then , from the IframeResult, I select "Opel" in the "cars" Dropdown, and click the Submit Button
+#    Then , I select "Opel" in the "cars" Dropdown, and select "Volvo" in the "cars" Dropdown
+#    Then , I select "Opel" in the "cars" Dropdown, and click the "Submit" Button
 #    * , from the IframeResult, I enter "dd" in the "Last name:" Textbox
 #    * , click "Essential QA Service" Qqq
 

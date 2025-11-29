@@ -248,6 +248,11 @@ public final class DefinitionContext {
                             (category, v, op) -> XPathy.from(Tag.a).byAttribute(role).equals("button")
                     );
 
+
+            getExecutionDictionary(). category("Submit Button").or(
+                    (category, v, op) ->  input.byAttribute(type).equals("submit")
+            );
+
             //
             // Link
             //

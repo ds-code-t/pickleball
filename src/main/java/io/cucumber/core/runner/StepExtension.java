@@ -8,9 +8,11 @@ import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.ParsingMap;
 
 import java.lang.reflect.InvocationTargetException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
@@ -21,7 +23,6 @@ import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleStepTestStep;
 import static tools.dscode.common.util.DebugUtils.printDebug;
-import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
 
 public class StepExtension extends StepData {
@@ -32,10 +33,15 @@ public class StepExtension extends StepData {
 
     public StepExtension(io.cucumber.core.runner.TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
         super(testCase, pickleStepTestStep);
-
+        System.out.println("@@pickleStepTestStep-text:: " + pickleStepTestStep.getStep().getText());
 //        pickle = (io.cucumber.messages.types.Pickle) getProperty(testCase, "pickle");
         method = pickleStepTestStep.getMethod();
-        definitionFlags = pickleStepTestStep.getDefinitionFlags();
+        definitionFlags = pickleStepTestStep.getDefinitionFlags().stream().map(f -> {
+            if(f.toString().startsWith("_"))
+                return DefinitionFlag.valueOf(f.toString().substring(1));
+            return f;
+        }) .collect(Collectors.toCollection(ArrayList::new));
+        System.out.println("@@definitionFlags: " + definitionFlags);
 
 
         this.methodName = this.method == null ? "" : this.method.getName();
@@ -43,11 +49,15 @@ public class StepExtension extends StepData {
         if (definitionFlags.contains(DefinitionFlag.NO_LOGGING))
             pickleStepTestStep.setNoLogging(true);
 
-        if (isCoreStep && methodName.startsWith("flagStep_")) {
-            this.isFlagStep = true;
-            stepFlags.add(pickleStepTestStep.getStep().getText());
+        if (isCoreStep) {
+            if (methodName.startsWith("flagStep_")) {
+                this.isFlagStep = true;
+                stepFlags.add(pickleStepTestStep.getStep().getText());
+            } else if (methodName.equals("NEXT_SIBLING_STEP")) {
+                nextSiblingDefinitionFlags = pickleStepTestStep.getDefinitionFlags().stream().filter(f -> !f.toString().startsWith("_")).collect(Collectors.toCollection(ArrayList::new));
+                System.out.println("@@nextSiblingDefinitionFlags: " + nextSiblingDefinitionFlags);
+            }
         }
-
 
         String metaText = pickleStepTestStep.getPickleStep().getMetaText();
         Matcher matcher = pattern.matcher(metaText);

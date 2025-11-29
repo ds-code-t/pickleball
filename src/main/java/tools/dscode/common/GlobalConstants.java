@@ -36,7 +36,9 @@ public class GlobalConstants {
 //    public static final String RETURN_STEP_FLAG = "^\u206A -_";
     public static final String MATCH_START = "\u206A ";
     public static final String META_FLAG = "\u206AMETA";
-    public static final String PARSER_FLAG = ",,,\u207A,,,";
+
+    public static final String NEXT_SIBLING_STEP  = "\u207ANXT";
+    public static final String PARSER_FLAG  = "\u207A-F";
     public static final String STEP_PREFIX = "\uFEFF\u200B\u00A0\u200C";
     public static final String ROOT_STEP = STEP_PREFIX + "-ROOT-STEP-";
     public static final String INFO_STEP = STEP_PREFIX + "INFO: ";
