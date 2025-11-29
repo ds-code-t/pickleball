@@ -249,7 +249,7 @@ public final class DefinitionContext {
                     );
 
 
-            getExecutionDictionary(). category("Submit Button").or(
+            category("Submit Button").or(
                     (category, v, op) ->  input.byAttribute(type).equals("submit")
             );
 

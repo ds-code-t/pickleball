@@ -21,7 +21,7 @@ public class Registrations {
     public static void beforeRun() {
         System.out.println("@@=--- beforeRun");
 
-        getExecutionDictionary().category(ExecutionDictionary.DEFAULT_STARTING_CONTEXT).inheritsFrom().and(
+        getExecutionDictionary().category(ExecutionDictionary.DEFAULT_STARTING_CONTEXT).and(
                 (category, v, op) ->
                         XPathy.from(Tag.iframe).byAttribute(id).equals("IframeResult")
         );
