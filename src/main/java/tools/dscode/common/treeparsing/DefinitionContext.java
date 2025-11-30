@@ -2,6 +2,7 @@ package tools.dscode.common.treeparsing;
 
 import com.xpathy.Tag;
 import com.xpathy.XPathy;
+import io.cucumber.core.runner.StepExtension;
 import org.intellij.lang.annotations.Language;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 
@@ -16,6 +17,7 @@ import static com.xpathy.Case.LOWER;
 import static com.xpathy.Tag.any;
 import static com.xpathy.Tag.input;
 import static com.xpathy.Tag.select;
+import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.domoperations.VisibilityConditions.extractPredicate;
 import static tools.dscode.common.domoperations.VisibilityConditions.invisible;
 import static tools.dscode.common.domoperations.VisibilityConditions.visible;
@@ -98,10 +100,12 @@ public final class DefinitionContext {
 
             @Override
             public String onSubstitute(MatchNode self) {
-                PhraseExecution lastPhraseExecution = (PhraseExecution) self.getFromGlobalState("lastPhraseExecution");
+                StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
+//                PhraseExecution lastPhraseExecution = (PhraseExecution) self.getFromGlobalState("lastPhraseExecution");
+                PhraseExecution lastPhraseExecution = currentStep.contextPhraseExecution;
                 printDebug("@@##lastPhraseExecution: " + lastPhraseExecution);
                 if (lastPhraseExecution == null) {
-                    lastPhraseExecution = initiateFirstPhraseExecution();
+                    lastPhraseExecution = currentStep.getParentContextPhraseExecution() == null ? initiateFirstPhraseExecution() : currentStep.getParentContextPhraseExecution();
                 } else {
                     if ((!(lastPhraseExecution.termination.equals(";") || lastPhraseExecution.termination.equals(",")))) {
                         self.putToLocalState("newContext", true);
@@ -110,7 +114,8 @@ public final class DefinitionContext {
 
 
                 self.putToLocalState("context", self.resolvedGroupText("context"));
-                self.putToGlobalState("lastPhraseExecution", lastPhraseExecution.initiateNextPhraseExecution(self));
+//                self.putToGlobalState("lastPhraseExecution", lastPhraseExecution.initiateNextPhraseExecution(self));
+                currentStep.contextPhraseExecution = lastPhraseExecution.initiateNextPhraseExecution(self);
                 return self.token();
             }
         };
@@ -250,7 +255,7 @@ public final class DefinitionContext {
 
 
             category("Submit Button").or(
-                    (category, v, op) ->  input.byAttribute(type).equals("submit")
+                    (category, v, op) -> input.byAttribute(type).equals("submit")
             );
 
             //

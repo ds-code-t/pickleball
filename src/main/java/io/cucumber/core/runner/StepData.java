@@ -8,6 +8,7 @@ import io.cucumber.docstring.DocString;
 import io.cucumber.plugin.event.Result;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.StepMapping;
+import tools.dscode.common.treeparsing.PhraseExecution;
 import tools.dscode.coredefinitions.GeneralSteps;
 
 import java.lang.reflect.Method;
@@ -19,6 +20,13 @@ import static tools.dscode.common.util.DebugUtils.printDebug;
 
 
 public abstract class StepData extends StepMapping {
+    public PhraseExecution contextPhraseExecution;
+
+    public PhraseExecution getParentContextPhraseExecution() {
+        return parentStep == null ? null :   parentStep.contextPhraseExecution;
+    }
+
+
     public io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep;
     public io.cucumber.core.runner.PickleStepTestStep executingPickleStepTestStep;
     public TestCase testCase;
