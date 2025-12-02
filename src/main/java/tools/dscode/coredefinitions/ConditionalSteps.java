@@ -12,15 +12,13 @@ import io.cucumber.core.runner.StepExtension;
 import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.DefinitionFlags;
-import tools.dscode.common.annotations.NoLogging;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
 import static tools.dscode.common.annotations.DefinitionFlag.SKIP_CHILDREN;
-import static tools.dscode.common.util.DebugUtils.printDebug;
 
 
 public class ConditionalSteps extends CoreSteps {
@@ -28,7 +26,7 @@ public class ConditionalSteps extends CoreSteps {
     @DefinitionFlags(NO_LOGGING)
     @Given("^((?:IF:|ELSE:|ELSE-IF:|THEN:).*)$")
     public static void runConditional(String inputString) {
-        StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
+        StepExtension currentStep = getRunningStep();
         if (inputString.startsWith("ELSE")) {
             if (!currentStep.previousSibling.getConditionalStates()
                     .contains(StepData.ConditionalStates.FALSE)) {

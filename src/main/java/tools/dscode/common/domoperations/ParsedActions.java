@@ -3,9 +3,10 @@ package tools.dscode.common.domoperations;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import tools.dscode.common.treeparsing.MatchNode;
-import tools.dscode.common.treeparsing.PhraseExecution;
-import tools.dscode.common.treeparsing.PhraseExecution.ElementMatch;
-import tools.dscode.common.treeparsing.PhraseExecution.ValueMatch;
+import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
+import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
+import tools.dscode.common.treeparsing.parsedComponents.ValueMatch;
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,17 +24,17 @@ import static tools.dscode.common.domoperations.SeleniumUtils.waitSeconds;
 public class ParsedActions {
 
 
-    public static void executeAction(ChromiumDriver driver, PhraseExecution phraseExecution) {
+    public static void executeAction(ChromiumDriver driver, PhraseData phraseData) {
 
-        MatchNode actionNode = phraseExecution.phraseNode.getChild("action");
-        String action = phraseExecution.action;
+        MatchNode actionNode = phraseData.phraseNode.getChild("action");
+        String action = phraseData.action;
 
-        List<ElementMatch> nextElementMatches = phraseExecution.getNextComponents(actionNode.position, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
+        List<ElementMatch> nextElementMatches = phraseData.getNextComponents(actionNode.position, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
         ElementMatch nextElementMatch = nextElementMatches .isEmpty() ? null : nextElementMatches.getFirst();
 
         List<WrappedWebElement> nextElements = nextElementMatch == null || nextElementMatch.matchedElements == null ?
                 new ArrayList<>() : nextElementMatch.matchedElements.getWrappers();
-        ValueMatch nextValue = (ValueMatch) phraseExecution.getNextComponents(actionNode.position, "valueMatch").stream().findFirst().orElse(null);
+        ValueMatch nextValue = (ValueMatch) phraseData.getNextComponents(actionNode.position, "valueMatch").stream().findFirst().orElse(null);
 
         if (!action.equals("wait") && (nextElementMatches.isEmpty() || nextElements.isEmpty())) {
             String message = "No elements found for " + action;

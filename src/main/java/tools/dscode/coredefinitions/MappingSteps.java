@@ -16,10 +16,10 @@ import java.util.Arrays;
 import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.util.TableUtils.toFlatMultimap;
 import static io.cucumber.core.runner.util.TableUtils.toRowsMultimap;
 import static tools.dscode.common.GlobalConstants.MATCH_START;
-import static tools.dscode.common.util.DebugUtils.printDebug;
 
 
 public class MappingSteps extends CoreSteps {
@@ -29,7 +29,7 @@ public class MappingSteps extends CoreSteps {
     @Given("^For every ROW in (:?\"(.*)\"\\s+)?DATA TABLE$")
     public static void forEveryRow(String tableName) {
 
-        StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
+        StepExtension currentStep = getRunningStep();
         DataTable dataTable = currentStep.getDataTable();
         tableName = tableName == null || tableName.isBlank() ? "" : tableName.trim();
         if (tableName.isEmpty()) {
@@ -80,7 +80,7 @@ public class MappingSteps extends CoreSteps {
 
     @Given("^"+ MATCH_START + "ROW (\\d+): (.*)$")
     public static void loop(String count, String mapString) {
-        StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
+        StepExtension currentStep = getRunningStep();
     }
 
     @Given("^(:?\"(.*)\"\\s+)?DATA TABLE$")

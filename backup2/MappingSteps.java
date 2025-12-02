@@ -23,7 +23,7 @@
 //    public static void forEverRow(String tableName) {
 //        printDebug("@@forEverRow!!");
 //
-//        StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
+//        StepExtension currentStep = getCurrentStep();
 //        DataTable dataTable = null;
 //        tableName = tableName == null || tableName.isBlank() ? "" : tableName.trim();
 //        if (tableName.isEmpty()) {

@@ -1,13 +1,10 @@
 package tools.dscode.coredefinitions;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.core.stepexpression.DocStringArgument;
 import io.cucumber.java.ParameterType;
 import io.cucumber.java.en.Given;
-import org.openqa.selenium.Capabilities;
-import org.openqa.selenium.MutableCapabilities;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.chromium.ChromiumDriver;
@@ -17,27 +14,23 @@ import tools.dscode.common.annotations.DefinitionFlags;
 import tools.dscode.common.status.SoftRuntimeException;
 
 import java.time.Duration;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 import static io.cucumber.core.runner.CurrentScenarioState.getScenarioObject;
-import static io.cucumber.core.runner.CurrentScenarioState.normalizeRegistryKey;
 import static io.cucumber.core.runner.CurrentScenarioState.registerScenarioObject;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.GlobalConstants.INFO_STEP;
 import static tools.dscode.common.GlobalConstants.NEXT_SIBLING_STEP;
 import static tools.dscode.common.GlobalConstants.ROOT_STEP;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.GlobalConstants.SOFT_ERROR_STEP;
-import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
 import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort;
-import static tools.dscode.common.domoperations.SeleniumUtils.portFromString;
-import static tools.dscode.common.util.DebugUtils.printDebug;
 
 
 public class GeneralSteps extends CoreSteps {
@@ -68,7 +61,7 @@ public class GeneralSteps extends CoreSteps {
     //    @ParameterType("\\$\\(([^()]+)\\)")
     @ParameterType("([A-Za-z0-9_-]+)(:([A-Za-z0-9_-]+))?")
     public static Object returnStepParameter(String stepText, String key) {
-        StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
+        StepExtension currentStep = getRunningStep();
         Object existingObject = getScenarioObject(stepText);
         if (key == null || key.isBlank()) {
             if (existingObject != null) return existingObject;
@@ -93,7 +86,7 @@ public class GeneralSteps extends CoreSteps {
     //    @Given("(?i)^@chrome$")
     @Given("$CHROME")
     public ChromeDriver getChrome() throws Exception {
-        StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
+        StepExtension currentStep = getRunningStep();
         String json = currentStep.argument == null || !(currentStep.argument instanceof DocStringArgument) ? (String) currentStep.getStepParsingMap().getAndResolve("configs.chrome") : currentStep.argument.getValue().toString();
         if (Objects.isNull(json)) throw new RuntimeException("Chrome Driver Configuration not found");
         Map<String, Object> map = MAPPER.readValue(json, Map.class);

@@ -1,9 +1,11 @@
-package tools.dscode.common.domoperations;
+package tools.dscode.common.treeparsing.xpathcomponents;
 
+import com.xpathy.XPathy;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
+import tools.dscode.common.domoperations.WrappedWebElement;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -18,7 +20,7 @@ import java.util.List;
 public final class XPathChainResult {
 
     private final WebDriver driver;
-    private final List<XPathData> xPathDataList;
+    private final List<XPathy> xPathDataList;
 
     private List<WebElement> delegates = Collections.emptyList();
     private List<WrappedWebElement> wrappers = Collections.emptyList();
@@ -27,7 +29,7 @@ public final class XPathChainResult {
         return delegates.isEmpty();
     }
 
-    public XPathChainResult(WebDriver driver, List<XPathData> xPathDataList) {
+    public XPathChainResult(WebDriver driver, List<XPathy> xPathDataList) {
         this.driver = driver;
         this.xPathDataList = List.copyOf(xPathDataList);
         refreshAll(); // initial resolve
@@ -39,7 +41,7 @@ public final class XPathChainResult {
     }
 
     /** Delegate lookup for a given wrapper index. */
-    WebElement getDelegate(int index) {
+    public WebElement getDelegate(int index) {
         if (index < 0 || index >= delegates.size()) {
             throw new NoSuchElementException("No delegate at index " + index);
         }

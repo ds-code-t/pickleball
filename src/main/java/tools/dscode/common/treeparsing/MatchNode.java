@@ -192,7 +192,7 @@ public final class MatchNode {
     /**
      * Iterate global replacements until fixed point so sibling tokens inside expansions are handled.
      */
-    private String unmask(String s) {
+    public String unmask(String s) {
         if (s == null) return null;
         Map<String, MatchNode> matchNodeMap = ((Map<String, MatchNode>) globalState.get("_MatchNodeMap").getFirst());
         if (s.isEmpty() || matchNodeMap.isEmpty()) return s;

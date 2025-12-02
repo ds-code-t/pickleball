@@ -8,8 +8,6 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Given;
 import org.intellij.lang.annotations.Language;
 import tools.dscode.common.CoreSteps;
-import tools.dscode.common.annotations.DefinitionFlags;
-import tools.dscode.common.annotations.NoLogging;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 
@@ -18,10 +16,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.ScenarioStep.createScenarioStep;
 import static tools.dscode.common.GlobalConstants.COMPONENT_TAG_META_CHAR;
-import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
 import static tools.dscode.common.util.Reflect.getProperty;
 
 public class ModularScenarios extends CoreSteps {
@@ -53,7 +50,7 @@ public class ModularScenarios extends CoreSteps {
     static final @Language("RegExp") String tagRegexReplacement = "(?<!@)("+ COMPONENT_TAG_META_CHAR + "[A-Za-z])";
 
     public static void filterAndExecutePickles(List<Map<String, String>> maps, String... messageString) {
-        StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
+        StepExtension currentStep = getRunningStep();
         StepExtension lastScenarioNameStep = null;
 
         for (Map<String, String> map : maps) {

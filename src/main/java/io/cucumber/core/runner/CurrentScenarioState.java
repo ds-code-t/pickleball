@@ -15,7 +15,6 @@ import tools.dscode.registry.GlobalRegistry;
 import java.time.Duration;
 import java.util.List;
 
-import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FAILED;
@@ -195,7 +194,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     //Singleton registration of object in both step nodes, and local register.
     public static void registerScenarioObject(String key, Object value) {
         key = normalizeRegistryKey(key);
-        getCurrentScenarioState().getCurrentStep().getStepNodeMap().put(key, value);
+        GlobalState.getRunningStep().getStepNodeMap().put(key, value);
         GlobalRegistry.putLocal(key, value);
     }
 
@@ -203,7 +202,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     public static Object getScenarioObject(String key) {
         key = normalizeRegistryKey(key);
         printDebug("@@getScenarioObject: " + key + "");
-        Object returnObject = getCurrentScenarioState().getCurrentStep().getStepParsingMap().get(key);
+        Object returnObject =  GlobalState.getRunningStep().getStepParsingMap().get(key);
         return returnObject == null ? GlobalRegistry.getLocal(key) : returnObject;
     }
 

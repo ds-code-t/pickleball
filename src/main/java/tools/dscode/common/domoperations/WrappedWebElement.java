@@ -1,6 +1,8 @@
 package tools.dscode.common.domoperations;
 
 import org.openqa.selenium.*;
+import tools.dscode.common.treeparsing.xpathcomponents.XPathChainResult;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,7 +75,7 @@ public final class WrappedWebElement implements WebElement, WrapsElement {
             "position", "z-index"
     );
 
-    WrappedWebElement(XPathChainResult parent, int index, WebElement delegate) {
+    public WrappedWebElement(XPathChainResult parent, int index, WebElement delegate) {
         this.parent  = parent;
         this.index   = index;
         this.current = this;
@@ -87,12 +89,12 @@ public final class WrappedWebElement implements WebElement, WrapsElement {
     // Neighbor & generation wiring
     // ---------------------------------------------------------------------
 
-    void setNeighbors(WrappedWebElement previous, WrappedWebElement next) {
+    public void setNeighbors(WrappedWebElement previous, WrappedWebElement next) {
         this.previous = previous;
         this.next = next;
     }
 
-    void setCurrent(WrappedWebElement current) {
+    public void setCurrent(WrappedWebElement current) {
         this.current = current;
     }
 

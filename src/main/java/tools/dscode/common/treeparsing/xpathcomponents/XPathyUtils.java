@@ -1,7 +1,8 @@
-package tools.dscode.common.domoperations;
+package tools.dscode.common.treeparsing.xpathcomponents;
 
 import com.xpathy.XPathy;
-import tools.dscode.common.treeparsing.PhraseExecution.ElementMatch;
+import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
+
 
 import java.util.List;
 

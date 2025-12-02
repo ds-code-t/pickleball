@@ -8,7 +8,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.CopyOnWriteArraySet;
 
 public class ExecutionDictionary {
 
@@ -18,13 +17,13 @@ public class ExecutionDictionary {
     }
 
     // Default base category that *every* category implicitly inherits from
-    private static final String BASE_CATEGORY = "_baseCategory";
+    public static final String BASE_CATEGORY = "Element_baseCategory";
 
-    public static final String DEFAULT_STARTING_CONTEXT = "_defaultStartingContext";
+    public static final String DEFAULT_STARTING_CONTEXT = "Element_defaultStartingContext";
 
-    public enum Op { DEFAULT, EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE }
+    public enum Op {DEFAULT, EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE}
 
-    public enum CategoryFlags { CONTEXT}
+    public enum CategoryFlags {CONTEXT, TOP_CONTEXT}
 
 
     //========================================================
@@ -44,7 +43,6 @@ public class ExecutionDictionary {
 
     private final ConcurrentMap<String, Set<CategoryFlags>> categoryFlags =
             new ConcurrentHashMap<>();
-
 
 
     //========================================================
@@ -87,9 +85,9 @@ public class ExecutionDictionary {
 
     /**
      * Convenience method: declare that MANY categories inherit from ONE parent.
-     *
+     * <p>
      * Example:
-     *     registerParentOfCategories("Clickable", "Button", "Link", "MenuItem");
+     * registerParentOfCategories("Clickable", "Button", "Link", "MenuItem");
      */
     public void registerParentOfCategories(String parentCategory, String... childCategories) {
         Objects.requireNonNull(parentCategory, "parentCategory must not be null");
@@ -231,6 +229,12 @@ public class ExecutionDictionary {
                 registerAndBuilder(category, builders);
             }
         }
+    }
+
+    public boolean categoryHasRegistration(String category) {
+        Objects.requireNonNull(category, "category must not be null");
+        List<String> lineage = resolveCategoryLineage(category);
+        return hasAnyRegisteredBuilders(lineage);
     }
 
     //========================================================
@@ -406,7 +410,9 @@ public class ExecutionDictionary {
         return result.get();
     }
 
-    public record CategoryResolution(String category, String value, Op op, XPathy xpath, Set<CategoryFlags> flags) { }
+    public record CategoryResolution(String category, String value, Op op, XPathy xpath, Set<CategoryFlags> flags) {
+    }
+
     /**
      * Convenience: call andThenOr (preserving its semantics, including null),
      * and return the result together with the resolved category flags.
@@ -414,7 +420,7 @@ public class ExecutionDictionary {
     public CategoryResolution andThenOrWithFlags(String category, String value, Op op) {
         XPathy xpath = andThenOr(category, value, op); // preserves old behavior, including null
         Set<CategoryFlags> flags = getResolvedCategoryFlags(category);
-        return new CategoryResolution(category,  value,  op , xpath, flags);
+        return new CategoryResolution(category, value, op, xpath, flags);
     }
 
     /**
@@ -425,7 +431,7 @@ public class ExecutionDictionary {
                 ", value=" + value + ", op=" + op);
 
         Optional<XPathy> andPart = andAll(category, value, op);
-        Optional<XPathy> orPart  = orAll(category, value, op);
+        Optional<XPathy> orPart = orAll(category, value, op);
 
         System.out.println("[ExecutionDictionary] andThenOrOptional: andPartPresent=" + andPart.isPresent() +
                 (andPart.isPresent() ? ", andXpath=" + safeXpath(andPart.get()) : ""));
@@ -446,7 +452,7 @@ public class ExecutionDictionary {
         }
 
         String andStep = toSelfStep(andPart.get().getXpath());
-        String orStep  = toSelfStep(orPart.get().getXpath());
+        String orStep = toSelfStep(orPart.get().getXpath());
 
         String combinedExpr = "(" + andStep + ") and (" + orStep + ")";
         System.out.println("[ExecutionDictionary] andThenOrOptional: combinedExpr=" + combinedExpr);
@@ -625,7 +631,7 @@ public class ExecutionDictionary {
 
     private boolean hasAnyRegisteredBuilders(List<String> lineage) {
         for (String catKey : lineage) {
-            var orBuilders  = orReg.get(catKey);
+            var orBuilders = orReg.get(catKey);
             if (orBuilders != null && !orBuilders.isEmpty()) {
                 return true;
             }
@@ -671,6 +677,8 @@ public class ExecutionDictionary {
         private CategorySpec(ExecutionDictionary dict, String category) {
             this.dict = Objects.requireNonNull(dict, "dict must not be null");
             this.category = Objects.requireNonNull(category, "category must not be null");
+            if (category.equals(DEFAULT_STARTING_CONTEXT))
+                flags(CategoryFlags.TOP_CONTEXT, CategoryFlags.CONTEXT);
         }
 
         /**
@@ -709,8 +717,6 @@ public class ExecutionDictionary {
             return this;
         }
     }
-
-
 
 
     // ======================================================
@@ -855,7 +861,6 @@ public class ExecutionDictionary {
 
         System.out.println("\n======================================");
     }
-
 
 
     private XPathy safeInvoke(Builder builder, String category, String value, Op op) {

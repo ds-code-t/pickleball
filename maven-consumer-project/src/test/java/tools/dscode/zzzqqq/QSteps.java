@@ -110,12 +110,12 @@ public class QSteps {
     @Given("^zprint (.*)$")
     public static void printVal(String message) {
         System.out.println("PRINT: " + message);
-        PickleStepTestStep executingPickleStepTestStep =  getCurrentScenarioState().getCurrentStep().executingPickleStepTestStep;
-        System.out.println("nestingLevel1-: " + getCurrentScenarioState().getCurrentStep().getNestingLevel());
+        PickleStepTestStep executingPickleStepTestStep =  getCurrentStep().executingPickleStepTestStep;
+        System.out.println("nestingLevel1-: " + getCurrentStep().getNestingLevel());
         System.out.println("nestingLevel2-: " + executingPickleStepTestStep.getPickleStep().nestingLevel);
 
-        System.out.println("zzz1: " + getCurrentScenarioState().getCurrentStep().executingPickleStepTestStep.getStepText());
-        System.out.println("zzz2: " + getCurrentScenarioState().getCurrentStep().executingPickleStepTestStep.getStep().getText());
+        System.out.println("zzz1: " + getCurrentStep().executingPickleStepTestStep.getStepText());
+        System.out.println("zzz2: " + getCurrentStep().executingPickleStepTestStep.getStep().getText());
     }
 
     public static void main(String[] args) {

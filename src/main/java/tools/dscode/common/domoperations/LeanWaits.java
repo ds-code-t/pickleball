@@ -9,8 +9,10 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.FluentWait;
-import tools.dscode.common.treeparsing.PhraseExecution;
-import tools.dscode.common.treeparsing.PhraseExecution.ElementMatch;
+import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
+import tools.dscode.common.treeparsing.parsedComponents.Phrase;
+import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
+
 
 import java.time.Duration;
 import java.util.List;
@@ -24,7 +26,7 @@ public final class LeanWaits {
     }
 
 
-    public static void waitForPhraseEntities(ChromiumDriver driver, PhraseExecution parsingPhrase) {
+    public static void waitForPhraseEntities(ChromiumDriver driver, PhraseData parsingPhrase) {
 
         driver.switchTo().defaultContent();
 

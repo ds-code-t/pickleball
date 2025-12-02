@@ -4,7 +4,7 @@
 //
 //import java.util.List;
 //
-//import static tools.dscode.common.domoperations.XPathyUtils.deepNormalizedText;
+//import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
 //
 //public final class Main {
 //    static void printCodepoints(String label, String s) {

@@ -5,6 +5,7 @@ import com.xpathy.XPathy;
 import io.cucumber.core.runner.StepExtension;
 import org.intellij.lang.annotations.Language;
 import tools.dscode.common.domoperations.ExecutionDictionary;
+import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import static com.xpathy.Attribute.aria_label;
 import static com.xpathy.Attribute.id;
@@ -21,11 +22,9 @@ import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.domoperations.VisibilityConditions.extractPredicate;
 import static tools.dscode.common.domoperations.VisibilityConditions.invisible;
 import static tools.dscode.common.domoperations.VisibilityConditions.visible;
-import static tools.dscode.common.domoperations.XPathyUtils.deepNormalizedText;
-import static tools.dscode.common.treeparsing.PhraseExecution.initiateFirstPhraseExecution;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
 import static tools.dscode.common.treeparsing.RegexUtil.betweenWithEscapes;
 import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
-import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
 import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public final class DefinitionContext {
@@ -41,12 +40,13 @@ public final class DefinitionContext {
         public static final @Language("RegExp") String punc = ",;\\.\\?!";
 
 
-        ParseNode line = new ParseNode("^.*$") {
-            @Override
-            public String onCapture(MatchNode self) {
-                return stripObscureNonText(self.originalText().strip());
-            }
-        };
+        ParseNode line = new ParseNode("^.*$");
+//        ParseNode line = new ParseNode("^.*$") {
+//            @Override
+//            public String onCapture(MatchNode self) {
+//                return stripObscureNonText(self.originalText().strip());
+//            }
+//        };
 
         ParseNode quoteMask = new ParseNode(betweenWithEscapes("\"", "\"")) {
             @Override
@@ -62,7 +62,6 @@ public final class DefinitionContext {
                 return normalizeWhitespace(s)
                         .replaceAll("(?i)\\b(?:the|then|a)\\b", "")
                         .replaceAll("(\\d+)(?:\\\s*(?:st|nd|rd|th))", "#$1")
-//                    .replaceAll("([^" + punc + "]$)", "$1 -")
                         .replaceAll("\\bverifies\\b", "verify")
                         .replaceAll("\\bensures\\b", "ensure")
                         .replaceAll("\\bno\\b|n't\\b", " not");
@@ -74,20 +73,22 @@ public final class DefinitionContext {
         };
 
 
+        //
         //    ParseNode phrase = new ParseNode("(?<conjunction>\\b(?:and|or)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>[^" + punc + "]+)(?<punc>[" + punc + "])");
-        ParseNode phrase = new ParseNode("(?<conjunction>\\b(?:and|or)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>[^" + punc + "]+)(?<punc>[" + punc + "])?") {
+//        ParseNode phrase = new ParseNode("(?<conjunction>\\b(?:and|or)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>[^" + punc + "]+)(?<punc>[" + punc + "])?") {
+        ParseNode phrase = new ParseNode("^(?<conjunction>\\b(?:and|or)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
             @Override
             public String onCapture(MatchNode self) {
                 System.out.println("@@phrase: " + self.originalText() + "");
                 String context = self.resolvedGroupText("context");
                 System.out.println("@@context-: " + context + "");
                 if (!context.isEmpty() && Character.isUpperCase(context.charAt(0)))
-                    self.putToLocalState("newContext", true);
+                    self.putToLocalState("newStartContext", true);
                 self.putToLocalState("context", context.toLowerCase());
                 self.putToLocalState("conjunction", self.resolvedGroupText("conjunction"));
-                String termination = self.resolvedGroupText("punc");
-                if (termination == null || termination.isBlank()) termination = "";
-                self.putToLocalState("termination", termination);
+//                String termination = self.resolvedGroupText("punc");
+//                if (termination == null || termination.isBlank()) termination = "";
+//                self.putToLocalState("termination", termination);
                 if (self.localStateBoolean("context")) {
                     self.localState().put("skip:action", "true");
                     self.localState().put("skip:assertion", "true");
@@ -100,22 +101,22 @@ public final class DefinitionContext {
 
             @Override
             public String onSubstitute(MatchNode self) {
-                StepExtension currentStep = getCurrentScenarioState().getCurrentStep();
-//                PhraseExecution lastPhraseExecution = (PhraseExecution) self.getFromGlobalState("lastPhraseExecution");
-                PhraseExecution lastPhraseExecution = currentStep.contextPhraseExecution;
-                printDebug("@@##lastPhraseExecution: " + lastPhraseExecution);
-                if (lastPhraseExecution == null) {
-                    lastPhraseExecution = currentStep.getParentContextPhraseExecution() == null ? initiateFirstPhraseExecution() : currentStep.getParentContextPhraseExecution();
-                } else {
-                    if ((!(lastPhraseExecution.termination.equals(";") || lastPhraseExecution.termination.equals(",")))) {
-                        self.putToLocalState("newContext", true);
-                    }
-                }
-
-
-                self.putToLocalState("context", self.resolvedGroupText("context"));
-//                self.putToGlobalState("lastPhraseExecution", lastPhraseExecution.initiateNextPhraseExecution(self));
-                currentStep.contextPhraseExecution = lastPhraseExecution.initiateNextPhraseExecution(self);
+//                StepExtension currentStep = getCurrentStep();
+////                PhraseData lastPhraseExecution = (PhraseExecution) self.getFromGlobalState("lastPhraseExecution");
+//                PhraseData lastPhraseExecution = currentStep.contextPhraseExecution;
+//                printDebug("@@##lastPhraseExecution: " + lastPhraseExecution);
+//                if (lastPhraseExecution == null) {
+//                    lastPhraseExecution = currentStep.getParentContextPhraseExecution() == null ? initiateFirstPhraseExecution() : currentStep.getParentContextPhraseExecution();
+//                } else {
+//                    if ((!(lastPhraseExecution.termination.equals(";") || lastPhraseExecution.termination.equals(",")))) {
+//                        self.putToLocalState("newContext", true);
+//                    }
+//                }
+//
+//
+//                self.putToLocalState("context", self.resolvedGroupText("context"));
+////                self.putToGlobalState("lastPhraseExecution", lastPhraseExecution.initiateNextPhraseExecution(self));
+//                currentStep.contextPhraseExecution = lastPhraseExecution.initiateNextPhraseExecution(self);
                 return self.token();
             }
         };
@@ -201,11 +202,10 @@ public final class DefinitionContext {
                 return self.originalText();
             }
         };
-        // Build the hierarchy AFTER the nodes above exist
+
         ParseNode root = buildFromYaml("""
                 line:
                   - quoteMask
-                  - preProcess
                   - phrase:
                     - predicate
                     - elementMatch
@@ -214,6 +214,20 @@ public final class DefinitionContext {
                     - assertion
                     - action
                 """);
+
+        // Build the hierarchy AFTER the nodes above exist
+//        ParseNode root = buildFromYaml("""
+//                line:
+//                  - quoteMask
+//                  - preProcess
+//                  - phrase:
+//                    - predicate
+//                    - elementMatch
+//                    - valueMatch
+//                    - assertionType
+//                    - assertion
+//                    - action
+//                """);
     };
 
     public static ExecutionDictionary DEFAULT_EXECUTION_DICTIONARY = new ExecutionDictionary() {
@@ -298,7 +312,7 @@ public final class DefinitionContext {
                     );
 
 
-            category("baseCategory").and(
+            category(BASE_CATEGORY).and(
                     (category, v, op) -> {
                         XPathy selfInvisible = any.byCondition(invisible());
                         String invisiblePredicate = extractPredicate("//*", selfInvisible.getXpath());

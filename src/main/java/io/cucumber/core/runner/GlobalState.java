@@ -63,4 +63,8 @@ public class GlobalState {
     public static io.cucumber.core.runner.CurrentScenarioState getCurrentScenarioState() {
         return (CurrentScenarioState) getProperty(localOrGlobalOf(TestCase.class), "currentScenarioState");
     }
+
+    public static StepExtension getRunningStep() {
+        return getCurrentScenarioState().getCurrentStep();
+    }
 }
