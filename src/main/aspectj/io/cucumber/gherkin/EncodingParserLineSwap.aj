@@ -8,9 +8,10 @@ import static tools.dscode.common.GlobalConstants.PARSER_FLAG;
 
 public aspect EncodingParserLineSwap {
 
-    /** The same pattern you used (multiline). */
+
     private static final Pattern LINE_SWAP_PATTERN = Pattern.compile(
-            "\n((?:(?:\\s*:)|(?:\\s*@\\[[^\\[\\]]*\\]))+)(\\s*[A-Z*].*$)?"
+            "^((?:(?:\\s*:)|(?:\\s*@\\[[^\\[\\]]*\\]))+)(\\s*[A-Z*].*$)?",
+            Pattern.MULTILINE
     );
 
 
