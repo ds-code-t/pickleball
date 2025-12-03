@@ -150,6 +150,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
         if (!stepExtension.childSteps.isEmpty() && !stepExtension.definitionFlags.contains(SKIP_CHILDREN)) {
             StepExtension firstChild = (StepExtension) stepExtension.initializeChildSteps();
+            System.out.println("@@firstChild: " + firstChild);
             if (firstChild != null)
                 runStep(firstChild);
         }

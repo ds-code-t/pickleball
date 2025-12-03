@@ -176,7 +176,7 @@ public class ElementMatch extends Component {
                 System.out.println("@@phraseData-- 1 " + xPathyList);
                 if (!xPathyList.isEmpty()) {
                     XPathy combinedXPathy = combineAnd(xPathyList);
-                    matchedElements = new XPathChainResult(parentPhrase.getCurrentWrappedContext(), combinedXPathy);
+                    parentPhrase.setCurrentWrappedContext(parentPhrase.getCurrentWrappedContext().findElement(combinedXPathy.getLocator()));
                     xPathyList.clear();
                 }
                 System.out.println("@@phraseData-- 2a " + parentPhrase.getCurrentWrappedContext());

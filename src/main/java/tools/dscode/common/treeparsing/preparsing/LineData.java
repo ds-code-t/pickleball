@@ -76,6 +76,8 @@ public abstract class LineData implements Iterable<Phrase> {
             if (this.delimiters.contains(c)) {
                 // Unmask in reverse order for the chunk before the delimiter
                 String chunk = buf.toString();
+                System.out.println("@@chunk: " + chunk);
+
                 String unmasked = qp.restoreFrom(bm.restoreFrom(chunk));
                 this.phrases.add(new Phrase(unmasked, c, this));
                 buf.setLength(0);
@@ -85,8 +87,11 @@ public abstract class LineData implements Iterable<Phrase> {
         }
         // Final chunk (no trailing delimiter)
         String lastChunk = buf.toString();
-        String unmaskedLast = qp.restoreFrom(bm.restoreFrom(lastChunk));
-        this.phrases.add(new Phrase(unmaskedLast, ' ', this));
+        if(!lastChunk.isBlank()) {
+            System.out.println("@@chunk-lastChunk: " + lastChunk);
+            String unmaskedLast = qp.restoreFrom(bm.restoreFrom(lastChunk));
+            this.phrases.add(new Phrase(unmaskedLast, ' ', this));
+        }
     }
 
     /**

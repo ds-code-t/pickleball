@@ -1,15 +1,9 @@
 Feature: Addition
 
 
-  Scenario:  test555
-  @[DEBUG]
-
-
-
-    * print A
-
-    * print B
-
-
-    * print C
-
+  Scenario: ss3
+    Then print aaa
+  @[DEBUG] Then print aaa
+    Given set CHROME
+    * , from the Top Panel:
+  : * , I click the "Get your own website" Link

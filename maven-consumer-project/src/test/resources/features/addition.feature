@@ -28,6 +28,9 @@ Feature: Addition
     Then print aaa
   @[DEBUG] Then print aaa
     Given set CHROME
+    * , from the Top Panel:
+  : * , I click the "Get your own website" Link
+
 #    * config
 #    * navigate to: URL.w3
 #    Then , click the "Create" Link
@@ -40,7 +43,7 @@ Feature: Addition
 #    * , from the Top Panel, I click the "Run ❯" Button
 #    * , I enter "dd" in the "Last name:" Textbox
 #    * , click "Essential QA Service" Qqq
-    * , from the Top Panel, I click the "Get your own website" Link
+
 
 
   Scenario: b test2
