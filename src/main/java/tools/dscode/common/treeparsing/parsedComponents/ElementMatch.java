@@ -9,6 +9,7 @@ import tools.dscode.common.domoperations.WrappedWebElement;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathChainResult;
 
+import java.sql.SQLOutput;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -195,7 +196,14 @@ public class ElementMatch extends Component {
         System.out.println(prettyPrintXPath(combinedXPathy));
         System.out.println("\n---\n");
 
-        matchedElements = new XPathChainResult(parentPhrase.getCurrentWrappedContext(), combinedXPathy);
+        try {
+            matchedElements = new XPathChainResult(parentPhrase.getCurrentWrappedContext(), combinedXPathy);
+        }
+        catch (Throwable throwable) {
+            System.out.println("Failed to match " + this);
+            System.out.println(prettyPrintXPath(combinedXPathy));
+            throw new RuntimeException(throwable);
+        }
         System.out.println("@@matchedElements: "  + matchedElements);
         return matchedElements;
     }
