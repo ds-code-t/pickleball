@@ -8,6 +8,8 @@ import io.cucumber.java.en.Given;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.chromium.ChromiumDriver;
+import org.openqa.selenium.edge.EdgeDriver;
+import org.openqa.selenium.edge.EdgeOptions;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.DefinitionFlags;
@@ -84,24 +86,37 @@ public class GeneralSteps extends CoreSteps {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     //    @Given("(?i)^@chrome$")
+    @Given("$BROWSER")
     @Given("$CHROME")
     public ChromeDriver getChrome() throws Exception {
         StepExtension currentStep = getRunningStep();
-        String json = currentStep.argument == null || !(currentStep.argument instanceof DocStringArgument) ? (String) currentStep.getStepParsingMap().getAndResolve("configs.chrome") : currentStep.argument.getValue().toString();
+        String json = !(currentStep.argument instanceof DocStringArgument) ? (String) currentStep.getStepParsingMap().getAndResolve("configs.chrome") : currentStep.argument.getValue().toString();
         if (Objects.isNull(json)) throw new RuntimeException("Chrome Driver Configuration not found");
         Map<String, Object> map = MAPPER.readValue(json, Map.class);
         ChromeOptions options = new ChromeOptions();
         map.forEach(options::setCapability);
         if (getCurrentScenarioState().debugBrowser) {
-//            String name = (String) currentStep.getStepNodeMap().get("_getKey");
-//            if (name == null)
-//                name = "chrome";
-//            ensureDevToolsPort(options, name);   // <— use the ChromiumOptions overload here
             ensureDevToolsPort(options, "chrome");
         }
         ChromeDriver chromeDriver = new ChromeDriver(options);
         registerScenarioObject("browser", chromeDriver);
         return chromeDriver;
+    }
+
+    @Given("$EDGE")
+    public EdgeDriver getEdge() throws Exception {
+        StepExtension currentStep = getRunningStep();
+        String json = !(currentStep.argument instanceof DocStringArgument) ? (String) currentStep.getStepParsingMap().getAndResolve("configs.edge") : currentStep.argument.getValue().toString();
+        if (Objects.isNull(json)) throw new RuntimeException("Edge Driver Configuration not found");
+        Map<String, Object> map = MAPPER.readValue(json, Map.class);
+        EdgeOptions options = new EdgeOptions();
+        map.forEach(options::setCapability);
+        if (getCurrentScenarioState().debugBrowser) {
+            ensureDevToolsPort(options, "edge");
+        }
+        EdgeDriver edgeDriver = new EdgeDriver(options);
+        registerScenarioObject("browser", edgeDriver);
+        return edgeDriver;
     }
 
 
