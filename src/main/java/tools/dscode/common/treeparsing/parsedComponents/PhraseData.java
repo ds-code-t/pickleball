@@ -1,7 +1,10 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.xpathy.XPathy;
+import org.openqa.selenium.SearchContext;
 import tools.dscode.common.domoperations.ExecutionDictionary;
+import tools.dscode.common.domoperations.WrappedContext;
+import tools.dscode.common.domoperations.WrappedWebElement;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathChainResult;
@@ -15,11 +18,13 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
+import static tools.dscode.common.domoperations.SeleniumUtils.wrapContext;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inBetweenOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.insideOf;
+import static tools.dscode.coredefinitions.GeneralSteps.getBrowser;
 
 
 public abstract class PhraseData {
@@ -41,6 +46,7 @@ public abstract class PhraseData {
     public boolean isIn;
     public boolean isTopContext;
     public boolean isContext;
+    public boolean hasDOMInteraction;
     public List<ElementMatch> elements;
     public ElementMatch elementMatch;
     public String conjunction;
@@ -53,6 +59,23 @@ public abstract class PhraseData {
 
     public XPathy contextXPathy;
 
+    public WrappedContext getCurrentWrappedContext() {
+        if (currentWrappedContext == null) {
+            currentWrappedContext = wrapContext(getBrowser("BROWSER"));
+        }
+        return currentWrappedContext;
+    }
+
+    public void setCurrentWrappedContext(SearchContext searchContext) {
+        if (searchContext instanceof WrappedContext)
+            this.currentWrappedContext = (WrappedContext) searchContext;
+        else
+            this.currentWrappedContext = wrapContext(searchContext);
+    }
+
+    private WrappedContext currentWrappedContext;
+
+
     public enum PhraseType {
         INITIAL, CONTEXT, ACTION, ASSERTION
     }
@@ -63,10 +86,9 @@ public abstract class PhraseData {
 
     public String selectionType;
 
-//    public XPathChainResult contextMatch;
+    //    public XPathChainResult contextMatch;
     @Override
-    public String toString()
-    {
+    public String toString() {
         return text;
     }
 
@@ -117,6 +139,7 @@ public abstract class PhraseData {
         if (phraseType == null) {
             phraseType = PhraseType.CONTEXT;
         }
+        hasDOMInteraction = phraseType.equals(PhraseType.ASSERTION) || phraseType.equals(PhraseType.ACTION);
 
         newContext = phraseNode.localStateBoolean("newStartContext");
         if (position > 0) {

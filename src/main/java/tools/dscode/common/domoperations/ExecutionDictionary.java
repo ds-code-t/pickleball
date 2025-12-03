@@ -3,6 +3,7 @@ package tools.dscode.common.domoperations;
 import com.xpathy.XPathy;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import org.openqa.selenium.SearchContext;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,7 +22,7 @@ public class ExecutionDictionary {
 
     @FunctionalInterface
     public interface ContextBuilder {
-        WrappedContext build(String category, String value, Op op, WrappedContext context);
+        SearchContext build(String category, String value, Op op, WrappedContext context);
     }
 
 
@@ -29,6 +30,8 @@ public class ExecutionDictionary {
     public static final String BASE_CATEGORY = "BaseCategoryElement";
 
     public static final String STARTING_CONTEXT = "DefaultStartingContextElement";
+
+    public static final String VISIBILITY_FILTER = "VisibilityFilterDefaults";
 
     public enum Op {DEFAULT, EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE}
 
@@ -71,8 +74,8 @@ public class ExecutionDictionary {
      * Override in anonymous subclasses to register builders, category inheritance, html types, etc.
      */
     protected void register() {
-        registerStartingContext((category, v, op, ctx) -> {
-            System.out.println("@@registerStartingContext - default");
+        registerDefaultStartingContext((category, v, op, ctx) -> {
+            System.out.println("@@registerDefaultStartingContext - default");
             return wrapContext(ctx.switchTo().defaultContent());
         });
     }
@@ -425,6 +428,10 @@ public class ExecutionDictionary {
         return result.get();
     }
 
+    public XPathy getBaseXPathy(String category) {
+        return  andThenOr(category, null, null);
+    }
+
     public record CategoryResolution(String category, String value, Op op, XPathy xpath, Set<CategoryFlags> flags) {
     }
 
@@ -587,9 +594,10 @@ public class ExecutionDictionary {
         return new ParentSpec(this, parentName);
     }
 
-    public CategorySpec registerStartingContext(ContextBuilder builder) {
-        return category(STARTING_CONTEXT).context(builder);
+    public CategorySpec registerDefaultStartingContext(ContextBuilder builder) {
+        return category(STARTING_CONTEXT).context(builder).flags(CategoryFlags.PAGE_TOP_CONTEXT, CategoryFlags.PAGE_CONTEXT);
     }
+
 
     // ======================================================
     // CategorySpec: fluent config for a single category
@@ -602,8 +610,6 @@ public class ExecutionDictionary {
         private CategorySpec(ExecutionDictionary dict, String category) {
             this.dict = Objects.requireNonNull(dict, "dict must not be null");
             this.category = Objects.requireNonNull(category, "category must not be null");
-            if (category.equals(STARTING_CONTEXT))
-                flags(CategoryFlags.PAGE_TOP_CONTEXT, CategoryFlags.PAGE_CONTEXT);
         }
 
         /**
@@ -650,6 +656,19 @@ public class ExecutionDictionary {
             dict.registerContextBuilder(category, builder);
             flags(CategoryFlags.PAGE_CONTEXT);
             return this;
+        }
+
+        public CategorySpec startingContext(ContextBuilder builder) {
+            System.out.println("@@registering startingContext::: " + category);
+            try {
+                dict.registerContextBuilder(category, builder);
+                flags(CategoryFlags.PAGE_CONTEXT, CategoryFlags.PAGE_TOP_CONTEXT);
+                System.out.println("@@FLAGS:::" +  Arrays.asList(flags()));
+                return this;
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException("Error registering startingContext::: " + category, e);
+            }
         }
 
 
@@ -875,7 +894,7 @@ public class ExecutionDictionary {
      * Invoke the SearchContext builder for this category (if present).
      * If none is registered, returns the original context unchanged.
      */
-    public WrappedContext applyContextBuilder(
+    public SearchContext applyContextBuilder(
             String category,
             String value,
             Op op,

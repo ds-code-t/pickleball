@@ -1,6 +1,7 @@
 package tools.dscode.common.domoperations;
 
 
+import org.jspecify.annotations.Nullable;
 import org.openqa.selenium.*;
 import org.openqa.selenium.logging.Logs;
 
@@ -30,15 +31,15 @@ public abstract class WrappedWebDriver extends  WrappedContext {
         return ((WebDriver)  searchContext).getTitle();
     }
 
-    @Override
-    public List<WebElement> findElements(By by) {
-        return searchContext.findElements(by);
-    }
-
-    @Override
-    public WebElement findElement(By by) {
-        return searchContext.findElement(by);
-    }
+//    @Override
+//    public List<WebElement> findElements(By by) {
+//        return searchContext.findElements(by);
+//    }
+//
+//    @Override
+//    public WebElement findElement(By by) {
+//        return searchContext.findElement(by);
+//    }
 
     @Override
     public String getPageSource() {
@@ -305,5 +306,37 @@ public abstract class WrappedWebDriver extends  WrappedContext {
         }
     }
 
+
+    // Javascript executor
+
+    @Override
+    public @Nullable Object executeScript(String script, @Nullable Object... args) {
+        return ((JavascriptExecutor) searchContext). executeScript( script,  args);
+    }
+
+    @Override
+    public @Nullable Object executeAsyncScript(String script, @Nullable Object... args) {
+        return ((JavascriptExecutor) searchContext). executeAsyncScript( script,  args);
+    }
+
+    @Override
+    public ScriptKey pin(String script) {
+        return ((JavascriptExecutor) searchContext).pin(script);
+    }
+
+    @Override
+    public void unpin(ScriptKey key) {
+        ((JavascriptExecutor) searchContext).unpin(key);
+    }
+
+    @Override
+    public Set<ScriptKey> getPinnedScripts() {
+        return ((JavascriptExecutor) searchContext).getPinnedScripts();
+    }
+
+    @Override
+    public @Nullable Object executeScript(ScriptKey key, @Nullable Object... args) {
+        return ((JavascriptExecutor) searchContext).executeScript(key, args);
+    }
 
 }

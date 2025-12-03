@@ -23,32 +23,27 @@ public class Registrations {
     public static void beforeRun() {
         System.out.println("@@=--- beforeRun");
 
-//        getExecutionDictionary().category(ExecutionDictionary.STARTING_CONTEXT).and(
-//                (category, v, op) ->
-//                        XPathy.from(Tag.iframe).byAttribute(id).equals("IframeResult")
-//        );
-
 
         getExecutionDictionary().category("Submit Button").or(
                 (category, v, op) -> input.byAttribute(type).equals("submit")
         );
 
-        getExecutionDictionary().registerStartingContext((category, v, op, ctx) ->
+        getExecutionDictionary().category("Top Panel").startingContext((category, v, op, ctx) ->
+                {
+                    System.out.println("@@switching to Top Panel");
+                    return ctx.switchTo().defaultContent();
+                }
+        );
+
+        getExecutionDictionary().registerDefaultStartingContext((category, v, op, ctx) ->
         {
             try {
-                System.out.println("@@registerStartingContext: " + category);
-                WebDriver webDriver = ctx.switchTo().defaultContent();
-                System.out.println("@@webDriver: " + webDriver);
-                System.out.println("@@XPathy..getLocator(): " + XPathy.from(Tag.iframe).byAttribute(id).equals("iframeResult").getLocator());
-                WebElement webElement = ctx.findElement(XPathy.from(Tag.iframe).byAttribute(id).equals("iframeResult").getLocator());
-                System.out.println("@@webElement: " + webElement);
+                System.out.println("@@--registration of registerDefaultStartingContext");
+                ctx.switchTo().defaultContent();
+                WebElement webElement = ctx.findElementWithBaseFilter(XPathy.from(Tag.iframe).byAttribute(id).equals("iframeResult"));
                 ctx.switchTo().frame(webElement);
-//                WrappedContext wrappedContext = wrapContext(ctx);
-                System.out.println("@@wrappedContext: " + ctx);
                 return ctx;
-//            return wrapContext(ctx.findElement(XPathy.from(Tag.iframe).byAttribute(id).equals("IframeResult").getLocator()));
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 e.printStackTrace();
                 throw new RuntimeException(e);
             }

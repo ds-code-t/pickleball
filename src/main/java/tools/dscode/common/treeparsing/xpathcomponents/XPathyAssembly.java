@@ -267,4 +267,42 @@ public final class XPathyAssembly {
         }
         return count;
     }
+
+
+    public static String prettyPrintXPath(XPathy xpathy) {
+        return prettyPrintXPath(xpathy.getXpath());
+    }
+
+    public static String prettyPrintXPath(String xpath) {
+        if (xpath == null) return null;
+
+        // Split before "self::*" only when NOT preceded by '-'
+        String[] parts = xpath.split("(?<!-)(?=self::\\*)");
+
+        StringBuilder sb = new StringBuilder();
+        int indent = 0;
+
+        for (String part : parts) {
+            String trimmed = part.trim();
+
+            // If part begins with a closing paren, reduce indent
+            if (trimmed.startsWith(")")) {
+                indent = Math.max(0, indent - 1);
+            }
+
+            sb.append("    ".repeat(indent))
+                    .append(trimmed)
+                    .append("\n");
+
+            // Increase indent if the part begins with or contains a new self::*
+            if (trimmed.contains("self::*") && !trimmed.startsWith("-self::*")) {
+                indent++;
+            }
+        }
+
+        return sb.toString();
+    }
+
+
+
 }

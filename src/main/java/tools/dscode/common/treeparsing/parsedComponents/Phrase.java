@@ -28,15 +28,22 @@ public final class Phrase extends PhraseData {
     public void runPhrase() {
         System.out.println("@@runPhrase:: " + this);
         System.out.println("@@phraseType:: " + phraseType);
-//        if (phraseType.equals(PhraseType.CONTEXT) && assertionType.isEmpty())
-//            return;
+        System.out.println("@@hasDOMInteraction:: " + hasDOMInteraction);
 
-        waitMilliseconds(1000);
-        lifecycle.fire(Phase.BEFORE_DOM_LOAD_CHECK);
-        WebDriver driver = getBrowser("BROWSER");
-        waitForPhraseEntities(driver, this);
-        waitMilliseconds(100);
-        lifecycle.fire(Phase.BEFORE_DOM_INTERACTION);
+        if (previousPhrase != null && !previousPhrase.contextTermination) {
+            contextPhrases.addAll(previousPhrase.contextPhrases);
+        }
+
+        WebDriver driver = null;
+        if (hasDOMInteraction) {
+            waitMilliseconds(1000);
+            lifecycle.fire(Phase.BEFORE_DOM_LOAD_CHECK);
+            driver = getCurrentWrappedContext();
+            waitForPhraseEntities(driver, this);
+            waitMilliseconds(100);
+            lifecycle.fire(Phase.BEFORE_DOM_INTERACTION);
+        }
+
 
 
         if (phraseType.equals(PhraseType.ASSERTION)) {
@@ -44,11 +51,12 @@ public final class Phrase extends PhraseData {
         } else if (phraseType.equals(PhraseType.ACTION)) {
             executeAction(driver, this);
         } else if (phraseType.equals(PhraseType.CONTEXT)) {
-            if (previousPhrase == null || previousPhrase.contextTermination) {
-                contextPhrases.add(this);
-            } else {
-                contextPhrases.addAll(previousPhrase.contextPhrases);
-            }
+             contextPhrases.add(this);
+//            if (previousPhrase == null || previousPhrase.contextTermination) {
+//                contextPhrases.add(this);
+//            } else {
+//                contextPhrases.addAll(previousPhrase.contextPhrases);
+//            }
         }
         System.out.println("@@contextPhrases 4 : " + contextPhrases);
         if (contextTermination) {

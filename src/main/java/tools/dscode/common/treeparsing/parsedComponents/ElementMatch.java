@@ -14,8 +14,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static tools.dscode.common.domoperations.SeleniumUtils.wrapContext;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.prettyPrintXPath;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrOp;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyTextOp;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.everyNth;
@@ -154,35 +156,46 @@ public class ElementMatch extends Component {
     public WrappedContext getWrappedContext(WrappedContext currentWrappedContext) {
         System.out.println("@@getWrappedContext:: " + this);
         System.out.println("@@category:: " + category);
-        return getExecutionDictionary().applyContextBuilder(category, text, textOp, currentWrappedContext);
+        SearchContext searchContext = getExecutionDictionary().applyContextBuilder(category, text, textOp, currentWrappedContext);
+        if(searchContext instanceof  WrappedContext)
+            return (WrappedContext) searchContext;
+        return wrapContext(searchContext);
     }
 
     public XPathChainResult findWebElements(WebDriver driver) {
-        WrappedContext currentWrappedContext = new WrappedWebElement(driver);
+
+//        WrappedContext currentWrappedContext = new WrappedWebElement(driver);
         List<PhraseData> contextList = getPhraseContextList();
         List<XPathy> xPathyList = new ArrayList<>();
+        System.out.println("@@CurrentPhrase-- " + parentPhrase);
         for (int j = 0; j < contextList.size(); j++) {
             PhraseData phraseData = contextList.get(j);
             System.out.println("@@phraseData-- " + phraseData);
+            System.out.println("@@phraseData.categoryFlags-- " + phraseData.categoryFlags);
             if (phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
                 System.out.println("@@phraseData-- 1 " + xPathyList);
                 if (!xPathyList.isEmpty()) {
                     XPathy combinedXPathy = combineAnd(xPathyList);
-                    matchedElements = new XPathChainResult(currentWrappedContext, combinedXPathy);
+                    matchedElements = new XPathChainResult(parentPhrase.getCurrentWrappedContext(), combinedXPathy);
                     xPathyList.clear();
                 }
-                System.out.println("@@phraseData-- 2a " + currentWrappedContext);
-                currentWrappedContext = phraseData.elementMatch.getWrappedContext(currentWrappedContext);
-                System.out.println("@@phraseData-- 2b " + currentWrappedContext);
+                System.out.println("@@phraseData-- 2a " + parentPhrase.getCurrentWrappedContext());
+                parentPhrase.setCurrentWrappedContext(phraseData.elementMatch.getWrappedContext(parentPhrase.getCurrentWrappedContext()));
+                System.out.println("@@phraseData-- 2b " + parentPhrase.getCurrentWrappedContext());
             } else {
                 xPathyList.add(phraseData.contextXPathy);
                 System.out.println("@@phraseData-- 3 " + xPathyList);
             }
         }
         xPathyList.add(getTerminalXPathy());
+        System.out.println("@@phraseData-- 3b " + getTerminalXPathy());
+        System.out.println("@@phraseData-- 3c " + xPathyList);
         XPathy combinedXPathy = combineAnd(xPathyList);
-        System.out.println("@@phraseData-- 4 " + xPathyList);
-        matchedElements = new XPathChainResult(currentWrappedContext, combinedXPathy);
+        System.out.println("\n\n@@prettyPrintXPath-combinedXPathy ");
+        System.out.println(prettyPrintXPath(combinedXPathy));
+        System.out.println("\n---\n");
+
+        matchedElements = new XPathChainResult(parentPhrase.getCurrentWrappedContext(), combinedXPathy);
         System.out.println("@@matchedElements: "  + matchedElements);
         return matchedElements;
     }
