@@ -10,7 +10,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class ValueFormatting {
-
+    public static final String NON_SERIALIZABLE_FIELD = "_NonSerializableReferenceID";
     protected final ObjectNode root;
 
     // Global mapper (or reuse your existing one if you prefer)
@@ -23,7 +23,7 @@ public abstract class ValueFormatting {
      * Lightweight placeholder type that gets serialized instead of the real object.
      * JSON will look like: { "id": "some-uuid" }
      */
-    public record NonSerializableRef(String id) {}
+    public record NonSerializableRef(String _NonSerializableReferenceID) {}
 
     protected ValueFormatting(ObjectNode root) {
         this.root = root;
@@ -57,22 +57,19 @@ public abstract class ValueFormatting {
         return MAPPER.valueToTree(ref);
     }
 
-    /**
-     * Reverse conversion:
-     *  - If the object is a NonSerializableRef → resolve from nonSerializable map
-     *  - Otherwise → just return it unchanged
-     *
-     * This is meant to be called on *deserialized* objects, not JsonNode.
-     */
-    public static Object fromSafeJsonNode(Object obj) {
-        if (obj == null) return null;
-
-        if (obj instanceof NonSerializableRef ref) {
-            return nonSerializable.get(ref.id());
+    public static Object fromSafeJsonNode(Object node) {
+        if (node instanceof ObjectNode objectNode) {
+            // Only treat as a NonSerializableRef placeholder if our special field is present
+            if (objectNode.has(NON_SERIALIZABLE_FIELD)) {
+                NonSerializableRef ref = MAPPER.convertValue(objectNode, NonSerializableRef.class);
+                return nonSerializable.get(ref._NonSerializableReferenceID());
+            }
         }
-
-        return obj;
+        // Not a placeholder → just return as-is
+        return node;
     }
+
+
 
 
     // ───────── safe package detection ─────────

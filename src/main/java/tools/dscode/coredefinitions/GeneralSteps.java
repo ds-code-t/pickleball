@@ -43,7 +43,12 @@ public class GeneralSteps extends CoreSteps {
 //    }
 
     public static ChromiumDriver getBrowser(String browserName) {
+        System.out.println("@@getBrowser: " + browserName);
         Object returnObject1 = getScenarioObject(browserName);
+        if(returnObject1 != null) {
+            System.out.println("@@returnObject1: " + returnObject1);
+            System.out.println("@@returnObject1 getClass: " + returnObject1.getClass().getName());
+        }
         if (returnObject1 != null) return (ChromiumDriver) returnObject1;
         Object returnObject2 = returnStepParameter(browserName);
         if (returnObject2 != null) return (ChromiumDriver) returnObject2;
@@ -89,6 +94,7 @@ public class GeneralSteps extends CoreSteps {
     @Given("$BROWSER")
     @Given("$CHROME")
     public ChromeDriver getChrome() throws Exception {
+        System.out.println("@@getChrome");
         StepExtension currentStep = getRunningStep();
         String json = !(currentStep.argument instanceof DocStringArgument) ? (String) currentStep.getStepParsingMap().getAndResolve("configs.chrome") : currentStep.argument.getValue().toString();
         if (Objects.isNull(json)) throw new RuntimeException("Chrome Driver Configuration not found");
