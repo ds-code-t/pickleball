@@ -1,104 +1,15 @@
 package tools.dscode.common.treeparsing.xpathcomponents;
 
+import com.xpathy.Attribute;
 import com.xpathy.XPathy;
-import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
-
-
-import java.util.List;
+import tools.dscode.common.domoperations.ExecutionDictionary;
 
 public final class XPathyUtils {
-
-    /**
-     * Combines all ElementMatch.xPathy into a single union XPath:
-     * xpath1 | xpath2 | xpath3 ...
-     */
-    public static XPathy orAllElements(List<ElementMatch> elements) {
-        if (elements == null || elements.isEmpty()) {
-            throw new IllegalArgumentException("Need at least one ElementMatch");
-        }
-
-        StringBuilder sb = new StringBuilder();
-        boolean first = true;
-
-        for (ElementMatch el : elements) {
-            if (el == null || el.xPathy == null) {
-                continue;
-            }
-
-            String xpath = el.xPathy.getXpath();
-            if (xpath == null || xpath.isBlank()) {
-                continue;
-            }
-
-            if (!first) {
-                sb.append(" | ");
-            } else {
-                first = false;
-            }
-            sb.append(xpath);
-        }
-
-        if (first) {
-            // never appended anything
-            throw new IllegalArgumentException("All ElementMatch instances had null/blank XPathy");
-        }
-
-        return new XPathy(sb.toString());
-    }
-
-    /**
-     * Combines all ElementMatch.xPathy into a boolean AND expression:
-     * (xpath1) and (xpath2) and (xpath3) ...
-     * <p>
-     * This is a boolean expression, not a standalone location path.
-     * Use it where a boolean XPath expression is valid (e.g. inside predicates).
-     */
-    public static XPathy andAllElements(List<ElementMatch> elements) {
-        if (elements == null || elements.isEmpty()) {
-            throw new IllegalArgumentException("Need at least one ElementMatch");
-        }
-
-        StringBuilder sb = new StringBuilder();
-        boolean first = true;
-
-        for (ElementMatch el : elements) {
-            if (el == null || el.xPathy == null) {
-                continue;
-            }
-
-            String xpath = el.xPathy.getXpath();
-            if (xpath == null || xpath.isBlank()) {
-                continue;
-            }
-
-            if (!first) {
-                sb.append(" and ");
-            } else {
-                first = false;
-            }
-
-            // Wrap each expression so any internal "and/or" stays grouped correctly
-            sb.append('(').append(xpath).append(')');
-        }
-
-        if (first) {
-            // never appended anything
-            throw new IllegalArgumentException("All ElementMatch instances had null/blank XPathy");
-        }
-
-        return new XPathy(sb.toString());
-    }
-
-
-
 
 
     private XPathyUtils() {
         // utility class
     }
-
-
-
 
 
     private static XPathy wrapWithPredicate(XPathy xp, String predicate) {
@@ -147,161 +58,39 @@ public final class XPathyUtils {
     }
 
 
-    private static String requireNonBlankXpath(XPathy xp, String label) {
-        if (xp == null) {
-            throw new IllegalArgumentException(label + " XPathy must not be null");
-        }
-        String xpath = xp.getXpath();
-        if (xpath == null || xpath.isBlank()) {
-            throw new IllegalArgumentException(label + " XPath must not be null/blank");
-        }
-        return xpath.trim();
-    }
 
-    /**
-     * Normalize an XPath to be used as a relative step after an axis
-     * (descendant::, preceding::, following::, etc.).
-     * <p>
-     * Examples:
-     * "//button[@id='x']" -> "button[@id='x']"
-     * ".//span"          -> "span"
-     * "/div"             -> "div"
-     * "a[@href]"         -> "a[@href]"
-     */
-    private static String asRelativeStep(XPathy xp, String label) {
-        String s = requireNonBlankXpath(xp, label);
+    public final static  String from = ""
+            + "\u0020"  // space
+            + "\u0009"  // tab
+            + ((char) 0x000A)  // LF
+            + ((char) 0x000D)  // CR
+            + "\u00A0"  // NBSP
 
-        if (s.startsWith(".//")) return s.substring(3);
-        else if (s.startsWith("./")) return s.substring(2);
-        else if (s.startsWith("//")) return s.substring(2);
-        else if (s.startsWith("/")) return s.substring(1);
-        return s;
-    }
+            + "\u200B"  // ZWSP
+            + "\u200C"  // ZWNJ
+            + "\u200D"  // ZWJ
+            + "\uFEFF"  // ZERO WIDTH NBSP/BOM
 
-    /**
-     * Build the predicate used for "between" relationships:
-     * [preceding::beforeStep and following::afterStep]
-     */
-    private static String betweenPredicate(XPathy before, XPathy after) {
-        String beforeStep = asRelativeStep(before, "before");
-        String afterStep = asRelativeStep(after, "after");
-        return "preceding::" + beforeStep + " and following::" + afterStep;
-    }
+            + "\u1680"  // OGHAM SPACE MARK
+            + "\u180E"  // MONGOLIAN VOWEL SEPARATOR (deprecated but still found)
+            + "\u2000"  // EN QUAD
+            + "\u2001"  // EM QUAD
+            + "\u2002"  // EN SPACE
+            + "\u2003"  // EM SPACE
+            + "\u2004"  // THREE-PER-EM SPACE
+            + "\u2005"  // FOUR-PER-EM SPACE
+            + "\u2006"  // SIX-PER-EM SPACE
+            + "\u2007"  // FIGURE SPACE
+            + "\u2008"  // PUNCTUATION SPACE
+            + "\u2009"  // THIN SPACE
+            + "\u200A"  // HAIR SPACE
+            + "\u2028"  // LINE SEPARATOR
+            + "\u2029"  // PARAGRAPH SEPARATOR
+            + "\u202F"  // NARROW NBSP
+            + "\u205F"  // MMSP
+            + "\u3000"; // IDEOGRAPHIC SPACE
 
-    // -------------------------------------------------------------------------
-    // Scope builders: inside / before / after / in-between
-    // -------------------------------------------------------------------------
-
-    /**
-     * Scope: all nodes that are inside (descendants of) any node matched by {@code anchor}.
-     * <p>
-     * Example:
-     * anchor  = //div[contains(@class,'classA')]
-     * result  = //* [ancestor::(//div[contains(@class,'classA')])]
-     */
-    public static XPathy insideOf(XPathy anchor) {
-        String anchorXpath = requireNonBlankXpath(anchor, "anchor");
-        String expr = "//*[ancestor::(" + anchorXpath + ")]";
-        return new XPathy(expr);
-    }
-
-    /**
-     * Scope: all nodes that appear before any node matched by {@code anchor} in document order.
-     * <p>
-     * Example:
-     * anchor  = //div[contains(@class,'classA')]
-     * result  = //* [following::(//div[contains(@class,'classA')])]
-     */
-    public static XPathy beforeOf(XPathy anchor) {
-        String anchorXpath = requireNonBlankXpath(anchor, "anchor");
-        String expr = "//*[following::(" + anchorXpath + ")]";
-        return new XPathy(expr);
-    }
-
-    /**
-     * Scope: all nodes that appear after any node matched by {@code anchor} in document order.
-     * <p>
-     * Example:
-     * anchor  = //div[contains(@class,'classA')]
-     * result  = //* [preceding::(//div[contains(@class,'classA')])]
-     */
-    public static XPathy afterOf(XPathy anchor) {
-        String anchorXpath = requireNonBlankXpath(anchor, "anchor");
-        String expr = "//*[preceding::(" + anchorXpath + ")]";
-        return new XPathy(expr);
-    }
-
-    /**
-     * Scope: all nodes that are between any {@code before} node and any {@code after} node
-     * in document order.
-     * <p>
-     * Example:
-     * before = //h2
-     * after  = //footer
-     * result = //* [preceding::h2 and following::footer]
-     */
-    public static XPathy inBetweenOf(XPathy before, XPathy after) {
-        String predicate = betweenPredicate(before, after);
-        String expr = "//*[" + predicate + "]";
-        return new XPathy(expr);
-    }
-
-    // -------------------------------------------------------------------------
-    // General-purpose refiner
-    // -------------------------------------------------------------------------
-
-    /**
-     * General-purpose refinement:
-     * <p>
-     * result0 = base
-     * result1 = (result0)/descendant::filter1Step
-     * result2 = (result1)/descendant::filter2Step
-     * ...
-     * <p>
-     * Each {@code filter} is treated as a relative step under the current result.
-     * <p>
-     * Examples:
-     * <p>
-     * // All <button> inside any div.classA
-     * XPathy divs    = new XPathy("//div[contains(@class,'classA')]");
-     * XPathy buttons = new XPathy("button");
-     * XPathy buttonsInside =
-     * XPathyUtils.refine(XPathyUtils.insideOf(divs), buttons);
-     * <p>
-     * // All <strong> inside <span> that live between <h2> and <footer>
-     * XPathy h2     = new XPathy("//h2");
-     * XPathy footer = new XPathy("//footer");
-     * XPathy span   = new XPathy("span");
-     * XPathy strong = new XPathy("strong");
-     * XPathy strongBetween =
-     * XPathyUtils.refine(XPathyUtils.inBetweenOf(h2, footer), span, strong);
-     */
-    public static XPathy refine(XPathy base, XPathy... filters) {
-        String current = requireNonBlankXpath(base, "base");
-
-        if (filters == null || filters.length == 0) {
-            // nothing to refine; return an equivalent XPathy
-            return new XPathy(current);
-        }
-
-        for (int i = 0; i < filters.length; i++) {
-            XPathy f = filters[i];
-            String step = asRelativeStep(f, "filter[" + i + "]");
-            current = "(" + current + ")/descendant::" + step;
-        }
-
-        return new XPathy(current);
-    }
-
-    public static XPathy deepNormalizedTextWrapped(String rawText) {
-        // Get predicate from your existing method
-        XPathy inner = deepNormalizedText(rawText);   // e.g. "(normalize-space(...) = 'User Name')"
-
-        // Wrap exactly as requested: *[(predicate)]
-        String wrapped = "*[" + inner.getXpath() + "]";
-
-        return XPathy.from(wrapped);
-    }
+    public final static String to = " ".repeat(from.length());
 
     public static XPathy deepNormalizedText(String rawText) {
         if (rawText == null) {
@@ -311,43 +100,9 @@ public final class XPathyUtils {
         // Normalize the expected Java value the same way.
         String expected = rawText.replaceAll("\\s+", " ").strip();
 
-        // IMPORTANT:
-        // Build the translate() FROM string as a literal containing ALL weird whitespace chars.
-        // These chars are *actual literal Unicode characters*, NOT Java escapes inside XPath.
-        // Java string will contain real codepoints, but XPath will see them correctly.
-        String from = ""
-                + "\u0020"  // space
-                + "\u0009"  // tab
-                + ((char) 0x000A)  // LF
-                + ((char) 0x000D)  // CR
-                + "\u00A0"  // NBSP
-
-                + "\u200B"  // ZWSP
-                + "\u200C"  // ZWNJ
-                + "\u200D"  // ZWJ
-                + "\uFEFF"  // ZERO WIDTH NBSP/BOM
-
-                + "\u1680"  // OGHAM SPACE MARK
-                + "\u180E"  // MONGOLIAN VOWEL SEPARATOR (deprecated but still found)
-                + "\u2000"  // EN QUAD
-                + "\u2001"  // EM QUAD
-                + "\u2002"  // EN SPACE
-                + "\u2003"  // EM SPACE
-                + "\u2004"  // THREE-PER-EM SPACE
-                + "\u2005"  // FOUR-PER-EM SPACE
-                + "\u2006"  // SIX-PER-EM SPACE
-                + "\u2007"  // FIGURE SPACE
-                + "\u2008"  // PUNCTUATION SPACE
-                + "\u2009"  // THIN SPACE
-                + "\u200A"  // HAIR SPACE
-                + "\u2028"  // LINE SEPARATOR
-                + "\u2029"  // PARAGRAPH SEPARATOR
-                + "\u202F"  // NARROW NBSP
-                + "\u205F"  // MMSP
-                + "\u3000"; // IDEOGRAPHIC SPACE
 
         // Build TO string: same number of spaces
-        String to = " ".repeat(from.length());
+
 
         // Build predicate
         String predicate =
@@ -361,6 +116,30 @@ public final class XPathyUtils {
         // Return a relative XPathy node predicate
         return XPathy.from("(" + predicate + ")");
     }
+
+
+
+    public static String normalizeText(String rawText) {
+        return rawText.replaceAll("[" + from + "]", " ").replaceAll("\\s+", " ").strip();
+    }
+
+
+
+
+    private static String normalizeValue(Object value) {
+
+        if (value == null) {
+            return "";
+        }
+
+        String s = String.valueOf(value)
+                .replace('\u00A0', ' ')
+                .replaceAll("\\s+", " ")
+                .strip();
+
+        return s;
+    }
+
 
 
     private static String toXPathLiteral(String s) {
@@ -385,6 +164,78 @@ public final class XPathyUtils {
     }
 
 
+
+
+    private static String normalizedAttrExpr(Attribute attr) {
+        return "normalize-space(translate(@" + attr + ", " + toXPathLiteral(from) + " , " + toXPathLiteral(to) + "))";
+    }
+
+    private static String normalizedTextExpr() {
+        return "normalize-space(translate(string(.), " + toXPathLiteral(from) + " , " + toXPathLiteral(to) + "))";
+    }
+
+    // =====================================================================
+    //  NORMALIZED OPS
+    // =====================================================================
+
+    private static XPathy applyNormalizedOp(
+            XPathy base,
+            ExecutionDictionary.Op op,
+            String normExpr,
+            String normalizedValue,
+            String label
+    ) {
+        if (op == null) {
+            return base;
+        }
+
+        String literal = toXPathLiteral(normalizedValue);
+
+        String predicate = switch (op) {
+            case EQUALS      -> "[" + normExpr + " = " + literal + "]";
+            case CONTAINS    -> "[contains(" + normExpr + ", " + literal + ")]";
+            case STARTS_WITH -> "[starts-with(" + normExpr + ", " + literal + ")]";
+            default -> {
+                String msg = "Unsupported " + label + " op: " + op;
+                throw new IllegalArgumentException(msg);
+            }
+        };
+
+        String out = "(" + base.getXpath().trim() + ")" + predicate;
+
+        return XPathy.from(out);
+    }
+
+
+    public static XPathy applyAttrOp(XPathy base, Attribute attr, ExecutionDictionary.Op op, Object value) {
+        if (attr == null) {
+            return base;
+        }
+
+        XPathy out = applyNormalizedOp(
+                base,
+                op,
+                normalizedAttrExpr(attr),
+                normalizeValue(value),
+                "attr"
+        );
+
+        return out;
+    }
+
+
+    public static XPathy applyTextOp(XPathy base, ExecutionDictionary.Op op, Object value) {
+
+        XPathy out = applyNormalizedOp(
+                base,
+                op,
+                normalizedTextExpr(),
+                normalizeValue(value),
+                "text"
+        );
+
+        return out;
+    }
 
 
 

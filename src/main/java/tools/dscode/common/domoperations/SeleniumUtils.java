@@ -1,6 +1,9 @@
 package tools.dscode.common.domoperations;
 
 import org.openqa.selenium.MutableCapabilities;
+import org.openqa.selenium.SearchContext;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chromium.ChromiumOptions;
 
 import java.io.IOException;
@@ -99,5 +102,11 @@ public class SeleniumUtils {
             return false;
         }
     }
+
+    public static WrappedContext wrapContext(SearchContext searchContext)
+    {
+        return new WrappedWebElement(searchContext);
+    }
+
 }
 

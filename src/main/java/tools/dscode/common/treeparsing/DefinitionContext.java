@@ -22,6 +22,7 @@ import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.domoperations.VisibilityConditions.extractPredicate;
 import static tools.dscode.common.domoperations.VisibilityConditions.invisible;
 import static tools.dscode.common.domoperations.VisibilityConditions.visible;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
 import static tools.dscode.common.treeparsing.RegexUtil.betweenWithEscapes;
 import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
@@ -248,11 +249,11 @@ public final class DefinitionContext {
             //
             // IframeResult
             //
-            category("IframeResult")
-                    .and(
-                            (category, v, op) ->
-                                    XPathy.from(Tag.iframe).byAttribute(id).equals("iframeResult")
-                    );
+//            category("IframeResult")
+//                    .and(
+//                            (category, v, op) ->
+//                                    XPathy.from(Tag.iframe).byAttribute(id).equals("iframeResult")
+//                    );
 
 
             //

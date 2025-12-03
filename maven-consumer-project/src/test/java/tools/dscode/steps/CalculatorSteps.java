@@ -28,15 +28,7 @@ import static com.xpathy.Case.LOWER;
 import static com.xpathy.Tag.any;
 import static com.xpathy.Tag.input;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.catchException;
-import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
-import static tools.dscode.common.domoperations.VisibilityConditions.extractPredicate;
-import static tools.dscode.common.domoperations.VisibilityConditions.invisible;
-import static tools.dscode.common.domoperations.VisibilityConditions.visible;
-import static tools.dscode.common.domoperations.XPathyMini.orMap;
-import static tools.dscode.common.domoperations.XPathyMini.textOp;
-import static tools.dscode.common.domoperations.XPathyUtils.deepNormalizedText;
-import static tools.dscode.common.domoperations.XPathyUtils.deepNormalizedTextWrapped;
+
 import static tools.dscode.common.evaluations.AviatorFunctions.processTernaryExpression;
 import static tools.dscode.common.treeparsing.DefinitionContext.DEFAULT_EXECUTION_DICTIONARY;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;

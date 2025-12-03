@@ -29,6 +29,7 @@ public class XPathChainResolver {
             int index,
             List<? extends SearchContext> currentContexts
     ) {
+
         XPathy current = steps.get(index);
 
         // 1. Collect elements for this step from all current contexts

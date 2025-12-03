@@ -9,6 +9,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import static tools.dscode.common.domoperations.SeleniumUtils.wrapContext;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.toSelfStep;
+
 public class ExecutionDictionary {
 
     @FunctionalInterface
@@ -16,14 +19,20 @@ public class ExecutionDictionary {
         XPathy build(String category, String value, Op op);
     }
 
-    // Default base category that *every* category implicitly inherits from
-    public static final String BASE_CATEGORY = "Element_baseCategory";
+    @FunctionalInterface
+    public interface ContextBuilder {
+        WrappedContext build(String category, String value, Op op, WrappedContext context);
+    }
 
-    public static final String DEFAULT_STARTING_CONTEXT = "Element_defaultStartingContext";
+
+    // Default base category that *every* category implicitly inherits from
+    public static final String BASE_CATEGORY = "BaseCategoryElement";
+
+    public static final String STARTING_CONTEXT = "DefaultStartingContextElement";
 
     public enum Op {DEFAULT, EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE}
 
-    public enum CategoryFlags {CONTEXT, TOP_CONTEXT}
+    public enum CategoryFlags {PAGE_CONTEXT, PAGE_TOP_CONTEXT}
 
 
     //========================================================
@@ -39,6 +48,9 @@ public class ExecutionDictionary {
             new ConcurrentHashMap<>();
 
     private final ConcurrentMap<String, CopyOnWriteArrayList<Builder>> andReg =
+            new ConcurrentHashMap<>();
+
+    private final ConcurrentMap<String, ContextBuilder> contextReg =
             new ConcurrentHashMap<>();
 
     private final ConcurrentMap<String, Set<CategoryFlags>> categoryFlags =
@@ -59,7 +71,10 @@ public class ExecutionDictionary {
      * Override in anonymous subclasses to register builders, category inheritance, html types, etc.
      */
     protected void register() {
-        // default no-op
+        registerStartingContext((category, v, op, ctx) -> {
+            System.out.println("@@registerStartingContext - default");
+            return wrapContext(ctx.switchTo().defaultContent());
+        });
     }
 
     //========================================================
@@ -359,7 +374,7 @@ public class ExecutionDictionary {
         // Build boolean expression over self::... steps
         String combinedExpr = sorted.stream()
                 .map(XPathy::getXpath)
-                .map(this::toSelfStep)
+                .map(x -> toSelfStep(x))
                 .peek(s -> System.out.println("    [combine] selfStep=" + s))
                 .collect(java.util.stream.Collectors.joining(" " + joiner + " "));
 
@@ -466,100 +481,6 @@ public class ExecutionDictionary {
         return Optional.of(x);
     }
 
-    /**
-     * Convenience: OR-combine an initial XPathy with additional XPathy expressions.
-     */
-    public XPathy combineOr(XPathy first, XPathy... rest) {
-        Objects.requireNonNull(first, "first XPathy must not be null");
-        List<XPathy> list = new ArrayList<>();
-        list.add(first);
-
-        if (rest != null && rest.length > 0) {
-            for (XPathy x : rest) {
-                list.add(Objects.requireNonNull(x, "XPathy in rest must not be null"));
-            }
-        }
-
-        System.out.println("[ExecutionDictionary] combineOr: totalCount=" + list.size());
-        Optional<XPathy> result = combine(list, "or");
-        if (result.isEmpty()) {
-            throw new IllegalStateException("combineOr was given an empty list, which should not happen.");
-        }
-        return result.get();
-    }
-
-    /**
-     * Convenience: AND-combine an initial XPathy with additional XPathy expressions.
-     */
-    public XPathy combineAnd(XPathy first, XPathy... rest) {
-        Objects.requireNonNull(first, "first XPathy must not be null");
-        List<XPathy> list = new ArrayList<>();
-        list.add(first);
-
-        if (rest != null && rest.length > 0) {
-            for (XPathy x : rest) {
-                list.add(Objects.requireNonNull(x, "XPathy in rest must not be null"));
-            }
-        }
-
-        System.out.println("[ExecutionDictionary] combineAnd: totalCount=" + list.size());
-        Optional<XPathy> result = combine(list, "and");
-        if (result.isEmpty()) {
-            throw new IllegalStateException("combineAnd was given an empty list, which should not happen.");
-        }
-        return result.get();
-    }
-
-    //========================================================
-    // Utility: normalize an XPath to a "self::" step
-    //========================================================
-
-    public String toSelfStep(String xpath) {
-        if (xpath == null) {
-            return "self::*";
-        }
-
-        String s = xpath.trim();
-
-        // Special-case: patterns like (//*)[...]
-        if (s.startsWith("(//*)[")) {
-            String tail = s.substring("(//*)".length()); // keep the [...] part
-            String out = "self::*" + tail;
-            System.out.println("[ExecutionDictionary] toSelfStep (paren //*): input=" + xpath + " -> " + out);
-            return out;
-        }
-
-        // Strip leading //, /, .//, ./ etc.
-        s = s.replaceFirst("^\\.?/+", "");
-
-        // Find the last "/" that is NOT inside "[" ... "]"
-        int depth = 0;
-        int lastTopLevelSlash = -1;
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (c == '[') {
-                depth++;
-            } else if (c == ']') {
-                if (depth > 0) depth--;
-            } else if (c == '/' && depth == 0) {
-                lastTopLevelSlash = i;
-            }
-        }
-
-        if (lastTopLevelSlash >= 0) {
-            s = s.substring(lastTopLevelSlash + 1);
-        }
-
-        // If already starts with an axis ("descendant::", "self::", etc.), keep it
-        if (s.matches("^[A-Za-z-]+::.*")) {
-            System.out.println("[ExecutionDictionary] toSelfStep: input=" + xpath + " (already axis) -> " + s);
-            return s;
-        }
-
-        String out = "self::" + s;
-        System.out.println("[ExecutionDictionary] toSelfStep: input=" + xpath + " -> " + out);
-        return out;
-    }
 
     // Heuristic scoring for XPath specificity / efficiency.
     // Lower score == considered "better"
@@ -666,6 +587,10 @@ public class ExecutionDictionary {
         return new ParentSpec(this, parentName);
     }
 
+    public CategorySpec registerStartingContext(ContextBuilder builder) {
+        return category(STARTING_CONTEXT).context(builder);
+    }
+
     // ======================================================
     // CategorySpec: fluent config for a single category
     // ======================================================
@@ -677,8 +602,8 @@ public class ExecutionDictionary {
         private CategorySpec(ExecutionDictionary dict, String category) {
             this.dict = Objects.requireNonNull(dict, "dict must not be null");
             this.category = Objects.requireNonNull(category, "category must not be null");
-            if (category.equals(DEFAULT_STARTING_CONTEXT))
-                flags(CategoryFlags.TOP_CONTEXT, CategoryFlags.CONTEXT);
+            if (category.equals(STARTING_CONTEXT))
+                flags(CategoryFlags.PAGE_TOP_CONTEXT, CategoryFlags.PAGE_CONTEXT);
         }
 
         /**
@@ -716,6 +641,26 @@ public class ExecutionDictionary {
             dict.addCategoryFlags(category, flags);
             return this;
         }
+
+        /**
+         * Register a SearchContext-based builder for this category.
+         * If present, callers can choose to ignore the XPathy builders.
+         */
+        public CategorySpec context(ContextBuilder builder) {
+            dict.registerContextBuilder(category, builder);
+            flags(CategoryFlags.PAGE_CONTEXT);
+            return this;
+        }
+
+
+        /**
+         * Return the resolved flags for this category, honoring inheritance.
+         * This is a convenience passthrough to ExecutionDictionary#getResolvedCategoryFlags.
+         */
+        public Set<CategoryFlags> getResolvedFlags() {
+            return dict.getResolvedCategoryFlags(category);
+        }
+
     }
 
 
@@ -913,5 +858,38 @@ public class ExecutionDictionary {
         return result.isEmpty() ? Set.of() : EnumSet.copyOf(result);
     }
 
+// ========================================================
+// SearchContext builders (optional override per category)
+// ========================================================
+
+    public void registerContextBuilder(String category, ContextBuilder builder) {
+        Objects.requireNonNull(category, "category must not be null");
+        Objects.requireNonNull(builder, "builder must not be null");
+        // Only one SearchContext builder per category; overwrite any existing
+        System.out.println("@@registerContextBuilder:: " + category);
+        contextReg.put(category, builder);
+    }
+
+
+    /**
+     * Invoke the SearchContext builder for this category (if present).
+     * If none is registered, returns the original context unchanged.
+     */
+    public WrappedContext applyContextBuilder(
+            String category,
+            String value,
+            Op op,
+            WrappedContext context
+    ) {
+        Objects.requireNonNull(category, "category must not be null");
+        Objects.requireNonNull(context, "context must not be null");
+        ContextBuilder cb = contextReg.get(category);
+        System.out.println("@@category " + category);
+        System.out.println("@@cb " + cb);
+        if (cb == null) {
+            return context; // no override → keep existing behavior
+        }
+        return cb.build(category, value, op, context);
+    }
 
 }

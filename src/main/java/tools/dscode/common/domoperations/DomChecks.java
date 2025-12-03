@@ -2,8 +2,8 @@ package tools.dscode.common.domoperations;
 
 import com.xpathy.XPathy;
 import org.openqa.selenium.By;
+import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.chromium.ChromiumDriver;
 
 import java.util.List;
 import java.util.Objects;
@@ -11,7 +11,7 @@ import java.util.Objects;
 /**
  * Concise DOM check helpers for XPathy + Selenium.
  * All methods:
- *   - take a ChromiumDriver and an XPathy
+ *   - take a WebDriver and an XPathy
  *   - return a CheckResult (no exceptions)
  *   - describe what was found
  */
@@ -60,7 +60,7 @@ public final class DomChecks {
      *  Internal helpers
      * ------------------------------------------------------------- */
 
-    private static List<WebElement> find(ChromiumDriver driver, XPathy xpathy) {
+    private static List<WebElement> find(WebDriver driver, XPathy xpathy) {
         Objects.requireNonNull(driver, "driver must not be null");
         Objects.requireNonNull(xpathy, "xpathy must not be null");
 
@@ -95,7 +95,7 @@ public final class DomChecks {
      * ------------------------------------------------------------- */
 
     /** Are there any matches for this XPathy? */
-    public static CheckResult hasAny(ChromiumDriver driver, XPathy xpathy) {
+    public static CheckResult hasAny(WebDriver driver, XPathy xpathy) {
         List<WebElement> els = find(driver, xpathy);
         boolean ok = !els.isEmpty();
         String desc = ok
@@ -105,7 +105,7 @@ public final class DomChecks {
     }
 
     /** Does this XPathy match exactly {@code expectedCount} elements? */
-    public static CheckResult matchCount(ChromiumDriver driver, XPathy xpathy, int expectedCount) {
+    public static CheckResult matchCount(WebDriver driver, XPathy xpathy, int expectedCount) {
         List<WebElement> els = find(driver, xpathy);
         int actual = els.size();
         boolean ok = (actual == expectedCount);
@@ -116,7 +116,7 @@ public final class DomChecks {
     }
 
     /** Is the first matched element selected (checkbox, radio, option, etc.)? */
-    public static CheckResult firstIsSelected(ChromiumDriver driver, XPathy xpathy) {
+    public static CheckResult firstIsSelected(WebDriver driver, XPathy xpathy) {
         List<WebElement> els = find(driver, xpathy);
         if (els.isEmpty()) {
             return new CheckResult(false, "No elements found for isSelected check.");
@@ -129,7 +129,7 @@ public final class DomChecks {
     }
 
     /** Does the first matched element have a non-empty 'value' attribute? */
-    public static CheckResult firstHasValue(ChromiumDriver driver, XPathy xpathy) {
+    public static CheckResult firstHasValue(WebDriver driver, XPathy xpathy) {
         List<WebElement> els = find(driver, xpathy);
         if (els.isEmpty()) {
             return new CheckResult(false, "No elements found for value check.");
@@ -143,7 +143,7 @@ public final class DomChecks {
     }
 
     /** Does the first matched element have non-empty visible text content? */
-    public static CheckResult firstHasText(ChromiumDriver driver, XPathy xpathy) {
+    public static CheckResult firstHasText(WebDriver driver, XPathy xpathy) {
         List<WebElement> els = find(driver, xpathy);
         if (els.isEmpty()) {
             return new CheckResult(false, "No elements found for text check.");
@@ -157,7 +157,7 @@ public final class DomChecks {
     }
 
     /** Does the first matched element have this attribute at all (value may be empty)? */
-    public static CheckResult firstHasAttribute(ChromiumDriver driver,
+    public static CheckResult firstHasAttribute(WebDriver driver,
                                                 XPathy xpathy,
                                                 String attrName) {
         List<WebElement> els = find(driver, xpathy);
@@ -174,7 +174,7 @@ public final class DomChecks {
     }
 
     /** Is the first element's text (normalized) equal to the expected value (normalized)? */
-    public static CheckResult firstTextEquals(ChromiumDriver driver,
+    public static CheckResult firstTextEquals(WebDriver driver,
                                               XPathy xpathy,
                                               Object expected) {
         List<WebElement> els = find(driver, xpathy);
@@ -192,7 +192,7 @@ public final class DomChecks {
     }
 
     /** Is the first element's attribute value (normalized) equal to the expected value (normalized)? */
-    public static CheckResult firstAttributeEquals(ChromiumDriver driver,
+    public static CheckResult firstAttributeEquals(WebDriver driver,
                                                    XPathy xpathy,
                                                    String attrName,
                                                    Object expected) {

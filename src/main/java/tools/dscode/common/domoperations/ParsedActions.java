@@ -1,5 +1,6 @@
 package tools.dscode.common.domoperations;
 
+import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import tools.dscode.common.treeparsing.MatchNode;
@@ -24,7 +25,7 @@ import static tools.dscode.common.domoperations.SeleniumUtils.waitSeconds;
 public class ParsedActions {
 
 
-    public static void executeAction(ChromiumDriver driver, PhraseData phraseData) {
+    public static void executeAction(WebDriver driver, PhraseData phraseData) {
 
         MatchNode actionNode = phraseData.phraseNode.getChild("action");
         String action = phraseData.action;

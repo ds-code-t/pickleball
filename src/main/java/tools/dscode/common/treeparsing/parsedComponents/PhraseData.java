@@ -4,6 +4,7 @@ import com.xpathy.XPathy;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.preparsing.LineData;
+import tools.dscode.common.treeparsing.xpathcomponents.XPathChainResult;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -13,20 +14,20 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.afterOf;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.beforeOf;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.inBetweenOf;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.insideOf;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.refine;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inBetweenOf;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.insideOf;
+
 
 public abstract class PhraseData {
 //    List<XPathData> contextXPathDataList = new ArrayList<>();
 
-    public final String originalText;
-    public String text;
+    public final String text;
     public Character termination; // nullable
-
+    public boolean contextTermination;
     public final LineData parsedLine;
 
     public PhraseData previousPhrase;
@@ -41,6 +42,7 @@ public abstract class PhraseData {
     public boolean isTopContext;
     public boolean isContext;
     public List<ElementMatch> elements;
+    public ElementMatch elementMatch;
     public String conjunction;
     public String action;
     public String assertion;
@@ -56,46 +58,23 @@ public abstract class PhraseData {
     }
 
     public List<PhraseData> contextPhrases = new ArrayList<>();
-    public List<XPathy> contextXpathyList;
-    List<PhraseData> usedContextPhrases;
+//    public List<XPathy> contextXpathyList;
+//    List<PhraseData> usedContextPhrases;
 
-    public List<XPathy> getContextXpathyList() {
-        if (contextXpathyList == null) {
-            contextXpathyList = new ArrayList<>();
+    public String selectionType;
 
-            usedContextPhrases = new ArrayList<>();
-            for (int i = contextPhrases.size() - 1; i >= 0; i--) {
-                PhraseData phraseData = contextPhrases.get(i);
-                usedContextPhrases.addFirst(phraseData);
-                if (phraseData.isFrom && phraseData.isTopContext)
-                    break;
-            }
-
-            PhraseData lastPhraseData = null;
-            for (int i = 0; i < usedContextPhrases.size(); i++) {
-                PhraseData phraseData = usedContextPhrases.get(i);
-                if (phraseData.contextXPathy != null) {
-                    if (lastPhraseData == null) {
-                        contextXpathyList.add(phraseData.contextXPathy);
-//                    } else if (lastPhraseData.isFrom || lastPhraseData.isContext || phraseData.isFrom || phraseData.isContext) {
-                    } else if (lastPhraseData.isContext || phraseData.isContext) {
-                        contextXpathyList.add(phraseData.contextXPathy);
-                    } else if (!contextXpathyList.isEmpty()) {
-                        XPathy mergedXpathy = refine(contextXpathyList.getLast(), phraseData.contextXPathy);
-                        contextXpathyList.set(contextXpathyList.size() - 1, mergedXpathy);
-                    }
-                }
-                lastPhraseData = phraseData;
-            }
-        }
-        return contextXpathyList;
+//    public XPathChainResult contextMatch;
+    @Override
+    public String toString()
+    {
+        return text;
     }
-
 
     public PhraseData(String inputText, Character delimiter, LineData lineData) {
         parsedLine = lineData;
-        originalText = inputText;
+        text = inputText;
         termination = delimiter;
+        contextTermination = termination.equals('.') || termination.equals(':');
         MatchNode returnMatchNode = getNodeDictionary().parse(inputText);
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
@@ -106,22 +85,20 @@ public abstract class PhraseData {
             ElementMatch newElementMatch = new ElementMatch(m);
             return newElementMatch;
         }).toList();
+        components.forEach(component -> component.parentPhrase = this);
         elements = getNextComponents(-1, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
         elements.forEach(element -> categoryFlags.addAll(element.categoryFlags));
-        isTopContext = categoryFlags.contains(ExecutionDictionary.CategoryFlags.TOP_CONTEXT);
-        isContext = isTopContext || categoryFlags.contains(ExecutionDictionary.CategoryFlags.CONTEXT);
+        elementMatch = elements.isEmpty() ? null : elements.getFirst();
+        selectionType = elementMatch == null ? "" : elementMatch.selectionType;
+        isTopContext = categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT);
+        isContext = isTopContext || categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT);
 
         conjunction = phraseNode.getStringFromLocalState("conjunction");
         position = lineData.phrases.size();
         context = phraseNode.getStringFromLocalState("context");
+        System.out.println("@@context:: " + context);
         if (!context.isBlank()) {
             phraseType = PhraseType.CONTEXT;
-            if (context.equals("in")) {
-                if (isContext)
-                    context = "from";
-                else
-                    isIn = true;
-            }
             isFrom = context.equals("from");
             contextXPathy = getXPathyContext(context, elements);
         } else {
@@ -137,34 +114,44 @@ public abstract class PhraseData {
                 }
             }
         }
+        if (phraseType == null) {
+            phraseType = PhraseType.CONTEXT;
+        }
+
         newContext = phraseNode.localStateBoolean("newStartContext");
         if (position > 0) {
             previousPhrase = lineData.phrases.get(position - 1);
             previousPhrase.nextPhrase = this;
         }
-//        newContext = phraseNode.localStateBoolean("newStartContext") || (previousPhrase != null && previousPhrase.termination.equals('.'));
-
-        if (newContext) {
-
-        } else if (previousPhrase == null) {
-            contextPhrases.addAll(lineData.contextPhrases);
-        } else {
-            if (previousPhrase.termination.equals('.') && !previousPhrase.contextPhrases.isEmpty())
-                contextPhrases.addAll(previousPhrase.contextPhrases.subList(0, previousPhrase.contextPhrases.size() - 1));
-            else
-                contextPhrases.addAll(previousPhrase.contextPhrases);
-        }
-        if (phraseType == PhraseType.CONTEXT)
-            contextPhrases.add(this);
     }
 
 
+    public List<PhraseData> processContextList() {
+        System.out.println("@@processContextList1");
+        List<PhraseData> returnList = new ArrayList<>();
+        returnList.add(new Phrase("from " + STARTING_CONTEXT, ',', parsedLine));
+        for (List<PhraseData> inner : parsedLine.inheritedContextPhrases) {
+            returnList.addAll(inner);
+        }
+        returnList.addAll(contextPhrases);
+        System.out.println("@@returnList1: " + returnList);
+        for (int i = returnList.size() - 1; i >= 0; i--) {
+            PhraseData phraseData = returnList.get(i);
+            if (phraseData.newContext || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT)) {
+                return returnList.subList(i, returnList.size());
+            }
+        }
+        System.out.println("@@returnList2: " + returnList);
+        return returnList;
+    }
+
     public static XPathy getXPathyContext(String context, List<ElementMatch> elements) {
+        System.out.println("@@getXPathyContext: " + elements);
         if (elements.isEmpty()) return null;
         XPathy xPathy = elements.getFirst().xPathy;
         if (xPathy == null) return null;
         return switch (context.toLowerCase()) {
-            case String s when s.startsWith("from") -> xPathy;
+            case String s when s.startsWith("from") -> insideOf(xPathy);
             case String s when s.startsWith("in") -> insideOf(xPathy);
             case String s when s.startsWith("after") -> afterOf(xPathy);
             case String s when s.startsWith("before") -> beforeOf(xPathy);

@@ -1,11 +1,13 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.xpathy.XPathy;
+import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.domoperations.ExecutionDictionary;
+import tools.dscode.common.domoperations.WrappedContext;
+import tools.dscode.common.domoperations.WrappedWebElement;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathChainResult;
-import tools.dscode.common.treeparsing.xpathcomponents.XPathData;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -13,10 +15,10 @@ import java.util.List;
 import java.util.Set;
 
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyMini.applyAttrOp;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyMini.applyTextOp;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrOp;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyTextOp;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.everyNth;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.refine;
 
 public class ElementMatch extends Component {
     String text;
@@ -28,7 +30,7 @@ public class ElementMatch extends Component {
     ElementMatch.ElementType elementType;
     public XPathChainResult matchedElements;
     //        public Set<XPathyRegistry.HtmlType> htmlTypes;
-    public Phrase parentPhrase;
+
 
     public Set<ExecutionDictionary.CategoryFlags> categoryFlags = new HashSet<>();
 
@@ -51,28 +53,28 @@ public class ElementMatch extends Component {
 
     int elementIndex;
 
-    public List<XPathy> elementXpathyList;
+//    public List<XPathy> elementXpathyList;
 
-    public List<XPathy> getElementXPathyList() {
-        if (elementXpathyList == null) {
-            elementXpathyList = new ArrayList<>();
-            List<XPathy> contextList = parentPhrase.getContextXpathyList();
-            PhraseData lastPhrase = parentPhrase.usedContextPhrases.isEmpty() ? null : parentPhrase.usedContextPhrases.getLast();
-            elementXpathyList.addAll(contextList);
-            if (elementXpathyList.isEmpty() || lastPhrase == null || lastPhrase.isContext) {
-                elementXpathyList.add(xPathy);
-            } else {
-                XPathy mergedXpathy = refine(elementXpathyList.getLast(), xPathy);
-                elementXpathyList.set(elementXpathyList.size() - 1, mergedXpathy);
-            }
-
-        }
-        if (elementPosition.isEmpty() && selectionType.isEmpty()) {
-            XPathy singleMatch = elementXpathyList.getLast().nth(1);
-            elementXpathyList.set(elementXpathyList.size() - 1, singleMatch);
-        }
-        return elementXpathyList;
-    }
+    //    public List<XPathy> getElementXPathyList() {
+//        if (elementXpathyList == null) {
+//            elementXpathyList = new ArrayList<>();
+//            List<XPathy> contextList = parentPhrase.getContextXpathyList();
+//            PhraseData lastPhrase = parentPhrase.usedContextPhrases.isEmpty() ? null : parentPhrase.usedContextPhrases.getLast();
+//            elementXpathyList.addAll(contextList);
+//            if (elementXpathyList.isEmpty() || lastPhrase == null || lastPhrase.isContext) {
+//                elementXpathyList.add(xPathy);
+//            } else {
+//                XPathy mergedXpathy = refine(elementXpathyList.getLast(), xPathy);
+//                elementXpathyList.set(elementXpathyList.size() - 1, mergedXpathy);
+//            }
+//        }
+//        if (elementPosition.isEmpty() && selectionType.isEmpty()) {
+//            XPathy singleMatch = elementXpathyList.getLast().nth(1);
+//            elementXpathyList.set(elementXpathyList.size() - 1, singleMatch);
+//        }
+//        return elementXpathyList;
+//    }
+    public ExecutionDictionary.Op textOp;
 
     public ElementMatch(MatchNode elementNode) {
         super(elementNode);
@@ -95,48 +97,97 @@ public class ElementMatch extends Component {
         if (elementType == null)
             elementType = ElementMatch.ElementType.HTML;
 
-        ExecutionDictionary.Op textOp = text.isBlank() ? ExecutionDictionary.Op.DEFAULT : ExecutionDictionary.Op.EQUALS;
-        ExecutionDictionary.CategoryResolution categoryResolution = getExecutionDictionary().andThenOrWithFlags(category, text, textOp);
-        categoryFlags.addAll(categoryResolution.flags());
-        xPathy = categoryResolution.xpath();
-        MatchNode predicateNode = (MatchNode) elementNode.getFromGlobalState((String) elementNode.getFromLocalState("predicate"));
+        textOp = text.isBlank() ? ExecutionDictionary.Op.DEFAULT : ExecutionDictionary.Op.EQUALS;
+        categoryFlags.addAll(getExecutionDictionary().getResolvedCategoryFlags(category));
 
-        if (predicateNode != null) {
-            this.attribute = new Attribute((String) elementNode.getFromLocalState("attrName"), (String) predicateNode.getFromLocalState("predicateType"), (String) predicateNode.getFromLocalState("predicateVal"));
+        if (!categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
+            ExecutionDictionary.CategoryResolution categoryResolution = getExecutionDictionary().andThenOrWithFlags(category, text, textOp);
+            xPathy = categoryResolution.xpath();
+            MatchNode predicateNode = (MatchNode) elementNode.getFromGlobalState((String) elementNode.getFromLocalState("predicate"));
 
-            ExecutionDictionary.Op op = switch (attribute.predicateType) {
-                case null -> null;
-                case String s when s.isBlank() -> null;
-                case String s when s.startsWith("equal") -> ExecutionDictionary.Op.EQUALS;
-                case String s when s.startsWith("contain") -> ExecutionDictionary.Op.CONTAINS;
-                case String s when s.startsWith("start") -> ExecutionDictionary.Op.STARTS_WITH;
-                default -> null;
-            };
-            if (attribute.attrName.equals("TEXT"))
-                xPathy = applyTextOp(xPathy, op, text);
-            else
-                xPathy = applyAttrOp(xPathy, com.xpathy.Attribute.custom(attribute.attrName), op, attribute.predicateVal);
-        }
+            if (predicateNode != null) {
+                this.attribute = new Attribute((String) elementNode.getFromLocalState("attrName"), (String) predicateNode.getFromLocalState("predicateType"), (String) predicateNode.getFromLocalState("predicateVal"));
 
-        if (elementPosition.equals("last")) {
-            xPathy = xPathy.last();
-        } else if (!elementPosition.isEmpty()) {
-            elementIndex = Integer.parseInt(elementPosition);
-            if (selectionType.isEmpty()) {
-                xPathy = xPathy.nth(elementIndex);
-            } else {
-                xPathy = everyNth(xPathy, elementIndex);
+                ExecutionDictionary.Op op = switch (attribute.predicateType) {
+                    case null -> null;
+                    case String s when s.isBlank() -> null;
+                    case String s when s.startsWith("equal") -> ExecutionDictionary.Op.EQUALS;
+                    case String s when s.startsWith("contain") -> ExecutionDictionary.Op.CONTAINS;
+                    case String s when s.startsWith("start") -> ExecutionDictionary.Op.STARTS_WITH;
+                    default -> null;
+                };
+                if (attribute.attrName.equals("TEXT"))
+                    xPathy = applyTextOp(xPathy, op, text);
+                else
+                    xPathy = applyAttrOp(xPathy, com.xpathy.Attribute.custom(attribute.attrName), op, attribute.predicateVal);
+            }
+
+            if (elementPosition.equals("last")) {
+                xPathy = xPathy.last();
+            } else if (!elementPosition.isEmpty()) {
+                elementIndex = Integer.parseInt(elementPosition);
+                if (selectionType.isEmpty()) {
+                    xPathy = xPathy.nth(elementIndex);
+                } else {
+                    xPathy = everyNth(xPathy, elementIndex);
+                }
             }
         }
+    }
 
+    private List<PhraseData> phraseContextList;
+
+    public List<PhraseData> getPhraseContextList() {
+        if (phraseContextList == null)
+            phraseContextList = parentPhrase.processContextList();
+        return phraseContextList;
+    }
+
+    private XPathy elementTerminalXPath;
+
+    public XPathy getTerminalXPathy() {
+        if (elementTerminalXPath == null)
+            elementTerminalXPath = (elementPosition.isEmpty() && selectionType.isEmpty()) ? xPathy.nth(1) : xPathy;
+        return elementTerminalXPath;
+    }
+
+    public WrappedContext getWrappedContext(WrappedContext currentWrappedContext) {
+        System.out.println("@@getWrappedContext:: " + this);
+        System.out.println("@@category:: " + category);
+        return getExecutionDictionary().applyContextBuilder(category, text, textOp, currentWrappedContext);
     }
 
     public XPathChainResult findWebElements(WebDriver driver) {
-        List<XPathy> xpathDataList = getElementXPathyList();
-        System.out.println(this);
-        System.out.println("\n===============\nFinding Elements for:" + xpathDataList.size() + "\n" + xpathDataList);
-        System.out.println("\n---------------\n");
-        matchedElements = new XPathChainResult(driver, xpathDataList);
+        WrappedContext currentWrappedContext = new WrappedWebElement(driver);
+        List<PhraseData> contextList = getPhraseContextList();
+        List<XPathy> xPathyList = new ArrayList<>();
+        for (int j = 0; j < contextList.size(); j++) {
+            PhraseData phraseData = contextList.get(j);
+            System.out.println("@@phraseData-- " + phraseData);
+            if (phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
+                System.out.println("@@phraseData-- 1 " + xPathyList);
+                if (!xPathyList.isEmpty()) {
+                    XPathy combinedXPathy = combineAnd(xPathyList);
+                    matchedElements = new XPathChainResult(currentWrappedContext, combinedXPathy);
+                    xPathyList.clear();
+                }
+                System.out.println("@@phraseData-- 2a " + currentWrappedContext);
+                currentWrappedContext = phraseData.elementMatch.getWrappedContext(currentWrappedContext);
+                System.out.println("@@phraseData-- 2b " + currentWrappedContext);
+            } else {
+                xPathyList.add(phraseData.contextXPathy);
+                System.out.println("@@phraseData-- 3 " + xPathyList);
+            }
+        }
+        xPathyList.add(getTerminalXPathy());
+        XPathy combinedXPathy = combineAnd(xPathyList);
+        System.out.println("@@phraseData-- 4 " + xPathyList);
+        matchedElements = new XPathChainResult(currentWrappedContext, combinedXPathy);
+        System.out.println("@@matchedElements: "  + matchedElements);
         return matchedElements;
     }
+
+
+
+
 }

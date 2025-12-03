@@ -2,6 +2,7 @@ package tools.dscode.common.treeparsing.xpathcomponents;
 
 import com.xpathy.XPathy;
 import org.openqa.selenium.NoSuchElementException;
+import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
@@ -19,8 +20,8 @@ import java.util.List;
  */
 public final class XPathChainResult {
 
-    private final WebDriver driver;
-    private final List<XPathy> xPathDataList;
+    public final SearchContext searchContext;
+    private final XPathy xPathy;
 
     private List<WebElement> delegates = Collections.emptyList();
     private List<WrappedWebElement> wrappers = Collections.emptyList();
@@ -29,9 +30,9 @@ public final class XPathChainResult {
         return delegates.isEmpty();
     }
 
-    public XPathChainResult(WebDriver driver, List<XPathy> xPathDataList) {
-        this.driver = driver;
-        this.xPathDataList = List.copyOf(xPathDataList);
+    public XPathChainResult(SearchContext searchContext, XPathy xPathy) {
+        this.searchContext = searchContext;
+        this.xPathy = xPathy;
         refreshAll(); // initial resolve
     }
 
@@ -50,9 +51,10 @@ public final class XPathChainResult {
 
     /** On-demand, single-attempt full refresh of delegates + wrappers. */
     public void refreshAll() {
-        List<WebElement> newDelegates =
-                XPathChainResolver.resolveXPathChain(driver, xPathDataList);
-
+        System.out.println("@@refreshAll :\n" + xPathy.getXpath() + "\n\n======\n");
+        System.out.println("@@getLocator :\n" + xPathy.getLocator() + "\n\n======\n");
+        List<WebElement> newDelegates = searchContext.findElements(xPathy.getLocator());
+        System.out.println("@@newDelegates :\n" + newDelegates + "\n\n======\n");
         List<WrappedWebElement> oldWrappers = this.wrappers;
         List<WrappedWebElement> newWrappers = new ArrayList<>(newDelegates.size());
 

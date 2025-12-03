@@ -14,33 +14,37 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static tools.dscode.common.domoperations.ExecutionDictionary.DEFAULT_STARTING_CONTEXT;
+import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
 
-public class LineData implements Iterable<Phrase> {
-    public List<PhraseData> contextPhrases = new ArrayList<>();
+public abstract class LineData implements Iterable<Phrase> {
+    public LineData inheritedLineData;
+//    public List<PhraseData> contextPhrases = new ArrayList<>();
+    public List<List<PhraseData>> inheritedContextPhrases = new ArrayList<>();
     private final String original;
     private final QuoteParser qp;
     private final BracketMasker bm;
     public final List<Phrase> phrases = new ArrayList<>();
     private final Set<Character> delimiters; // characters that cause a split
     //    public final List<PhraseData> contextPhrases = new ArrayList<>();
-    public ExecutionDictionary.CategoryResolution defaultCategory = getExecutionDictionary().andThenOrWithFlags(DEFAULT_STARTING_CONTEXT, null, ExecutionDictionary.Op.DEFAULT);
+    public ExecutionDictionary.CategoryResolution defaultCategory = getExecutionDictionary().andThenOrWithFlags(STARTING_CONTEXT, null, ExecutionDictionary.Op.DEFAULT);
 
-    public Phrase getDefaultContextPhrase(){
-        Phrase initialPhrase = null;
-        if(getExecutionDictionary().categoryHasRegistration(DEFAULT_STARTING_CONTEXT)) {
-            initialPhrase = new Phrase("from " + DEFAULT_STARTING_CONTEXT, ',', this);
-            initialPhrase.phraseType = PhraseData.PhraseType.INITIAL;
-        }
-        return initialPhrase;
-    }
+
+
+
+//    public Phrase getDefaultContextPhrase() {
+//        Phrase initialPhrase = null;
+//        if(getExecutionDictionary().categoryHasRegistration(STARTING_CONTEXT)) {
+//            initialPhrase = new Phrase("from " + STARTING_CONTEXT, ',', this);
+//            initialPhrase.phraseType = PhraseData.PhraseType.INITIAL;
+//        }
+//        return initialPhrase;
+//    }
 
     public LineData(String input, Collection<Character> delimiters) {
-        contextPhrases.addAll(getRunningStep().contextPhraseData);
+//        contextPhrases.addAll(getRunningStep().contextPhraseData);
 
 
         this.original = stripObscureNonText(Objects.requireNonNull(input, "input"));

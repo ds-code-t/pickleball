@@ -1,6 +1,7 @@
 package tools.dscode.common.domoperations;
 
 
+import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import tools.dscode.common.status.SoftRuntimeException;
 import tools.dscode.common.treeparsing.MatchNode;
@@ -15,7 +16,7 @@ import static tools.dscode.common.domoperations.DomChecks.hasAny;
 public class ParsedAssertions {
 
 
-    public static void executeAssertions(ChromiumDriver driver, PhraseData phraseExecution) {
+    public static void executeAssertions(WebDriver driver, PhraseData phraseExecution) {
 
         boolean isTrue = !phraseExecution.phraseNode.getChild("not").modifiedText().equals("not");
         MatchNode assertionNode = phraseExecution.phraseNode.getChild("assertion");

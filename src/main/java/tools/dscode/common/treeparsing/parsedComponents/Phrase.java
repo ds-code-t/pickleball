@@ -1,6 +1,7 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 
+import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
@@ -25,18 +26,39 @@ public final class Phrase extends PhraseData {
 
     @Override
     public void runPhrase() {
+        System.out.println("@@runPhrase:: " + this);
+        System.out.println("@@phraseType:: " + phraseType);
+//        if (phraseType.equals(PhraseType.CONTEXT) && assertionType.isEmpty())
+//            return;
+
         waitMilliseconds(1000);
         lifecycle.fire(Phase.BEFORE_DOM_LOAD_CHECK);
-        ChromiumDriver driver = getBrowser("BROWSER");
+        WebDriver driver = getBrowser("BROWSER");
         waitForPhraseEntities(driver, this);
         waitMilliseconds(100);
         lifecycle.fire(Phase.BEFORE_DOM_INTERACTION);
+
 
         if (phraseType.equals(PhraseType.ASSERTION)) {
             executeAssertions(driver, this);
         } else if (phraseType.equals(PhraseType.ACTION)) {
             executeAction(driver, this);
+        } else if (phraseType.equals(PhraseType.CONTEXT)) {
+            if (previousPhrase == null || previousPhrase.contextTermination) {
+                contextPhrases.add(this);
+            } else {
+                contextPhrases.addAll(previousPhrase.contextPhrases);
+            }
         }
+        System.out.println("@@contextPhrases 4 : " + contextPhrases);
+        if (contextTermination) {
+            if (termination.equals(':')) {
+                parsedLine.inheritedContextPhrases.add(contextPhrases);
+            } else {
+                parsedLine.inheritedContextPhrases.remove(parsedLine.inheritedContextPhrases.size() - 1);
+            }
+        }
+
     }
 
 }

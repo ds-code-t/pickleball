@@ -4,8 +4,8 @@ import io.cucumber.java.eo.Se;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.Keys;
+import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.chromium.ChromiumDriver;
 import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.Select;
 
@@ -36,7 +36,7 @@ public final class HumanInteractions {
      * Fallback:
      * - JS: finds the option by normalized text, sets it selected, and fires input/change events.
      */
-    public static void selectDropdownByVisibleText(ChromiumDriver driver,
+    public static void selectDropdownByVisibleText(WebDriver driver,
                                                    WrappedWebElement selectEl,
                                                    String visibleText) {
         Objects.requireNonNull(driver, "driver");
@@ -55,7 +55,7 @@ public final class HumanInteractions {
     /**
      * Move, hover briefly, and click. JS-dispatch fallback if Actions fails.
      */
-    public static void click(ChromiumDriver driver, WebElement el) {
+    public static void click(WebDriver driver, WebElement el) {
         Objects.requireNonNull(el);
         try {
 //            scrollElementNearTop(driver, el);
@@ -73,7 +73,7 @@ public final class HumanInteractions {
     /**
      * Move and double-click (user-like). JS fallback dispatches dblclick.
      */
-    public static void doubleClick(ChromiumDriver driver, WebElement el) {
+    public static void doubleClick(WebDriver driver, WebElement el) {
         Objects.requireNonNull(el);
         try {
 //            scrollElementNearTop(driver, el);
@@ -89,7 +89,7 @@ public final class HumanInteractions {
     /**
      * Move and context-click. JS fallback dispatches contextmenu.
      */
-    public static void contextClick(ChromiumDriver driver, WebElement el) {
+    public static void contextClick(WebDriver driver, WebElement el) {
         Objects.requireNonNull(el);
         try {
 //            scrollElementNearTop(driver, el);
@@ -105,7 +105,7 @@ public final class HumanInteractions {
     /**
      * Just hover; useful to open menus/tooltips. JS fallback dispatches mouseover/mouseenter.
      */
-    public static void hover(ChromiumDriver driver, WebElement el) {
+    public static void hover(WebDriver driver, WebElement el) {
         Objects.requireNonNull(el);
         try {
 //            scrollElementNearTop(driver, el);
@@ -120,7 +120,7 @@ public final class HumanInteractions {
     /**
      * Drag source element onto target. JS fallback uses HTML5 drag/drop dispatch.
      */
-    public static void dragAndDrop(ChromiumDriver driver, WebElement source, WebElement target) {
+    public static void dragAndDrop(WebDriver driver, WebElement source, WebElement target) {
         Objects.requireNonNull(source);
         Objects.requireNonNull(target);
         try {
@@ -140,7 +140,7 @@ public final class HumanInteractions {
     /**
      * Drag by an x/y offset. JS fallback tries HTML5 drag with offset.
      */
-    public static void dragByOffset(ChromiumDriver driver, WebElement source, int xOffset, int yOffset) {
+    public static void dragByOffset(WebDriver driver, WebElement source, int xOffset, int yOffset) {
         Objects.requireNonNull(source);
         try {
             centerScroll(driver, source);
@@ -158,11 +158,11 @@ public final class HumanInteractions {
     /**
      * Wheel-scroll the element into view center, then nudge by deltaY pixels.
      */
-    public static void wheelScrollBy(ChromiumDriver driver, WebElement el) {
+    public static void wheelScrollBy(WebDriver driver, WebElement el) {
         wheelScrollBy(driver, el, 0);
     }
 
-    public static void wheelScrollBy(ChromiumDriver driver, WebElement el, int deltaY) {
+    public static void wheelScrollBy(WebDriver driver, WebElement el, int deltaY) {
         Objects.requireNonNull(el);
         try {
             centerScroll(driver, el);
@@ -181,7 +181,7 @@ public final class HumanInteractions {
     /**
      * Focus element, clear (Ctrl/Cmd+A + Delete), then type text. JS fallback sets value + events.
      */
-    public static void clearAndType(ChromiumDriver driver, WebElement el, CharSequence text) {
+    public static void clearAndType(WebDriver driver, WebElement el, CharSequence text) {
         Objects.requireNonNull(el);
         try {
             centerScroll(driver, el);
@@ -200,7 +200,7 @@ public final class HumanInteractions {
     /**
      * Focus element and type text as-is. JS fallback appends value + events.
      */
-    public static void typeText(ChromiumDriver driver, WebElement el, CharSequence text) {
+    public static void typeText(WebDriver driver, WebElement el, CharSequence text) {
         Objects.requireNonNull(el);
         try {
             centerScroll(driver, el);
@@ -217,7 +217,7 @@ public final class HumanInteractions {
     /**
      * Send raw keys to the currently focused element (e.g., ENTER, ESC).
      */
-    public static void sendKeys(ChromiumDriver driver, CharSequence... keys) {
+    public static void sendKeys(WebDriver driver, CharSequence... keys) {
         try {
             new Actions(driver)
                     .pause(SHORT)
@@ -232,7 +232,7 @@ public final class HumanInteractions {
     /**
      * Press ENTER on an element (focus first).
      */
-    public static void pressEnter(ChromiumDriver driver, WebElement el) {
+    public static void pressEnter(WebDriver driver, WebElement el) {
         Objects.requireNonNull(el);
         try {
             centerScroll(driver, el);
@@ -249,7 +249,7 @@ public final class HumanInteractions {
     /**
      * Press ESC (global).
      */
-    public static void pressEsc(ChromiumDriver driver) {
+    public static void pressEsc(WebDriver driver) {
         sendKeys(driver, Keys.ESCAPE);
     }
 
@@ -265,12 +265,12 @@ public final class HumanInteractions {
     /**
      * Center-scroll to reduce sticky header/overlay issues.
      */
-    private static void centerScroll(ChromiumDriver driver, WebElement el) {
+    private static void centerScroll(WebDriver driver, WebElement el) {
         ((JavascriptExecutor) driver).executeScript(
                 "try{arguments[0].scrollIntoView({block:'center',inline:'center'});}catch(e){}", el);
     }
 
-    private static void jsClick(ChromiumDriver driver, WebElement el) {
+    private static void jsClick(WebDriver driver, WebElement el) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const el = arguments[0];
@@ -281,7 +281,7 @@ public final class HumanInteractions {
                         """, el);
     }
 
-    private static void jsDispatchMouse(ChromiumDriver driver, WebElement el, String type) {
+    private static void jsDispatchMouse(WebDriver driver, WebElement el, String type) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const el = arguments[0], type = arguments[1];
@@ -290,7 +290,7 @@ public final class HumanInteractions {
                         """, el, type);
     }
 
-    private static void jsHover(ChromiumDriver driver, WebElement el) {
+    private static void jsHover(WebDriver driver, WebElement el) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const el = arguments[0];
@@ -300,7 +300,7 @@ public final class HumanInteractions {
                         """, el);
     }
 
-    private static void jsSetValue(ChromiumDriver driver, WebElement el, String value, boolean clear) {
+    private static void jsSetValue(WebDriver driver, WebElement el, String value, boolean clear) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const el = arguments[0], val = arguments[1], clr = arguments[2];
@@ -312,7 +312,7 @@ public final class HumanInteractions {
                         """, el, value, clear);
     }
 
-    private static void jsAppendValue(ChromiumDriver driver, WebElement el, String value) {
+    private static void jsAppendValue(WebDriver driver, WebElement el, String value) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const el = arguments[0], val = arguments[1];
@@ -322,7 +322,7 @@ public final class HumanInteractions {
                         """, el, value);
     }
 
-    private static void jsDispatchKeyboard(ChromiumDriver driver, WebElement el, String key) {
+    private static void jsDispatchKeyboard(WebDriver driver, WebElement el, String key) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const el = arguments[0], key = arguments[1];
@@ -335,7 +335,7 @@ public final class HumanInteractions {
                         """, el, key);
     }
 
-    private static void jsScrollBy(ChromiumDriver driver, WebElement el, int dy) {
+    private static void jsScrollBy(WebDriver driver, WebElement el, int dy) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const el = arguments[0], dy = arguments[1];
@@ -346,7 +346,7 @@ public final class HumanInteractions {
     /**
      * HTML5 drag/drop via DataTransfer; works for many modern UIs when Actions fails.
      */
-    private static void jsHtml5DragDrop(ChromiumDriver driver, WebElement source, WebElement target) {
+    private static void jsHtml5DragDrop(WebDriver driver, WebElement source, WebElement target) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const src = arguments[0], tgt = arguments[1];
@@ -365,7 +365,7 @@ public final class HumanInteractions {
                         """, source, target);
     }
 
-    private static void jsHtml5DragBy(ChromiumDriver driver, WebElement source, int dx, int dy) {
+    private static void jsHtml5DragBy(WebDriver driver, WebElement source, int dx, int dy) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const src = arguments[0], dx = arguments[1], dy = arguments[2];
@@ -399,7 +399,7 @@ public final class HumanInteractions {
     /**
      * JS fallback for selecting an option by visible text in a native <select>.
      */
-    private static void jsSelectByVisibleText(ChromiumDriver driver,
+    private static void jsSelectByVisibleText(WebDriver driver,
                                               WebElement selectEl,
                                               String visibleText) {
         ((JavascriptExecutor) driver).executeScript(
@@ -434,7 +434,7 @@ public final class HumanInteractions {
     }
 
 
-//    public static void scrollElementNearTop(ChromiumDriver driver, WebElement el) {
+//    public static void scrollElementNearTop(WebDriver driver, WebElement el) {
 //        Objects.requireNonNull(el);
 //
 //        JavascriptExecutor js = (JavascriptExecutor) driver;

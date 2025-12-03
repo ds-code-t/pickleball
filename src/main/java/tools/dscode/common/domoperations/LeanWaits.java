@@ -4,6 +4,7 @@ import org.openqa.selenium.ElementClickInterceptedException;
 import org.openqa.selenium.JavascriptException;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.StaleElementReferenceException;
+import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chromium.ChromiumDriver;
@@ -26,9 +27,9 @@ public final class LeanWaits {
     }
 
 
-    public static void waitForPhraseEntities(ChromiumDriver driver, PhraseData parsingPhrase) {
+    public static void waitForPhraseEntities(WebDriver driver, PhraseData parsingPhrase) {
 
-        driver.switchTo().defaultContent();
+//        driver.switchTo().defaultContent();
 
         // SAFE version: never throws
         safeWaitForPageReady(driver, Duration.ofSeconds(60));
@@ -65,7 +66,7 @@ public final class LeanWaits {
     }
 
     public static WrappedWebElement safeWaitForElementReady(
-            ChromiumDriver driver,
+            WebDriver driver,
             WrappedWebElement element,
             Duration timeout
     ) {
@@ -80,7 +81,7 @@ public final class LeanWaits {
     }
 
 
-    public static void safeWaitForPageReady(ChromiumDriver driver, Duration timeout) {
+    public static void safeWaitForPageReady(WebDriver driver, Duration timeout) {
         try {
             waitForPageReady(driver, timeout);
         } catch (Exception e) {
@@ -95,7 +96,7 @@ public final class LeanWaits {
      * 1) document.readyState == 'complete'
      * 2) short "quiet period" (no DOM mutations) to let last micro-updates settle
      */
-    public static void waitForPageReady(ChromiumDriver driver, Duration timeout) {
+    public static void waitForPageReady(WebDriver driver, Duration timeout) {
         var wait = new FluentWait<>(driver)
                 .withTimeout(timeout)
                 .pollingEvery(Duration.ofMillis(1000))
@@ -106,7 +107,7 @@ public final class LeanWaits {
         wait.until(d -> "complete".equals(((JavascriptExecutor) d).executeScript("return document.readyState")));
 
         // 2) short DOM-quiet period (MutationObserver) – lightweight and bounded
-        wait.until((Function<ChromiumDriver, Boolean>) d ->
+        wait.until((Function<WebDriver, Boolean>) d ->
                 Boolean.TRUE.equals(((JavascriptExecutor) d).executeAsyncScript(QUIET_PERIOD_JS, 300))
         );
     }
@@ -118,7 +119,7 @@ public final class LeanWaits {
      * <p>
      * NOTE: If the passed WebElement goes stale, re-locate it before calling this.
      */
-    public static WrappedWebElement waitForElementReady(ChromiumDriver driver, WrappedWebElement element, Duration timeout) {
+    public static WrappedWebElement waitForElementReady(WebDriver driver, WrappedWebElement element, Duration timeout) {
         var wait = new FluentWait<>(driver)
                 .withTimeout(timeout)
                 .pollingEvery(Duration.ofMillis(150))

@@ -1,5 +1,6 @@
 package tools.dscode.common.domoperations;
 
+import org.jspecify.annotations.Nullable;
 import org.openqa.selenium.*;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathChainResult;
 
@@ -8,33 +9,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 
-/**
- * Snapshot-oriented WebElement wrapper.
- *
- * - On construction, it caches major passive data from the delegate:
- *   tagName, text, isDisplayed, isEnabled, isSelected, common attributes,
- *   basic geometry, and some CSS properties.
- *
- * - All passive WebElement methods (that only return information) are served
- *   from this snapshot and DO NOT touch the live delegate:
- *     getTagName, getText, getAttribute, isDisplayed, isEnabled, isSelected,
- *     getLocation, getSize, getRect, getCssValue.
- *
- * - Active operations (click, sendKeys, clear, submit, findElement(s),
- *   getScreenshotAs) prefer the cached delegate first. If that fails with a
- *   stale / not-found error, they delegate to withFreshElement(...), which will:
- *     - obtain a fresh delegate from the parent,
- *     - recapture the snapshot from that delegate,
- *     - retry the operation once after a refresh.
- */
-public final class WrappedWebElement implements WebElement, WrapsElement {
+
+public class WrappedWebElement extends WrappedWebDriver  {
 
     // ---------------------------------------------------------------------
     // Core linkage
     // ---------------------------------------------------------------------
 
-    private final XPathChainResult parent;
-    private final int index;
+    private XPathChainResult parent;
+    private int index;
 
     /** Cached live delegate. Prefer this for direct DOM interactions. */
     private WebElement delegate;
@@ -75,11 +58,19 @@ public final class WrappedWebElement implements WebElement, WrapsElement {
             "position", "z-index"
     );
 
+
+
+    public WrappedWebElement( SearchContext searchContext) {
+        super(searchContext);
+    }
+
     public WrappedWebElement(XPathChainResult parent, int index, WebElement delegate) {
+        super(parent.searchContext);
         this.parent  = parent;
         this.index   = index;
         this.current = this;
         this.delegate = delegate;
+
 
         // one place that populates all snapshot state
         captureSnapshotFrom(delegate);
@@ -414,11 +405,13 @@ public final class WrappedWebElement implements WebElement, WrapsElement {
 
     @Override
     public List<WebElement> findElements(By by) {
+        if(delegate==null) return  searchContext.findElements(by);
         return doActiveOp(el -> el.findElements(by));
     }
 
     @Override
     public WebElement findElement(By by) {
+        if(delegate==null) return  searchContext.findElement(by);
         return doActiveOp(el -> el.findElement(by));
     }
 
@@ -427,4 +420,36 @@ public final class WrappedWebElement implements WebElement, WrapsElement {
         // treated as "active": this still talks to the browser directly
         return doActiveOp(el -> el.getScreenshotAs(target));
     }
+
+
+    // default method Overrides
+
+    @Override
+    public  @Nullable String getDomProperty(String name) {
+        return doActiveOp(el -> el.getDomProperty(name));
+    }
+
+    @Override
+    public @Nullable String getDomAttribute(String name) {
+        return doActiveOp(el -> el.getDomAttribute(name));
+    }
+
+    @Override
+    public @Nullable String getAriaRole() {
+        return doActiveOp(WebElement::getAriaRole);
+    }
+
+
+    @Override
+    public @Nullable String getAccessibleName() {
+        return doActiveOp(WebElement::getAccessibleName);
+    }
+
+    @Override
+    public SearchContext getShadowRoot() {
+        if(delegate == null)
+            findElement(new By.ByXPath("//body")).getShadowRoot();
+        return doActiveOp(WebElement::getShadowRoot);
+    }
+
 }

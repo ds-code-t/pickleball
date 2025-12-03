@@ -11,7 +11,7 @@ import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionar
 public class DynamicSteps  extends CoreSteps {
     @Given("^,(.*)$")
     public void executeDynamicStep(String stepText) {
-        new ParsedLine(stepText);
-        getNodeDictionary().parse(stepText);
+        ParsedLine parsedLine = new ParsedLine(stepText);
+        parsedLine.runPhrases();
     }
 }

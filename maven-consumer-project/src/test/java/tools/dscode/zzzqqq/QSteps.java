@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static org.assertj.core.api.Assertions.assertThat;
 import static tools.dscode.common.util.DebugUtils.printDebug;
 
@@ -110,12 +111,12 @@ public class QSteps {
     @Given("^zprint (.*)$")
     public static void printVal(String message) {
         System.out.println("PRINT: " + message);
-        PickleStepTestStep executingPickleStepTestStep =  getCurrentStep().executingPickleStepTestStep;
-        System.out.println("nestingLevel1-: " + getCurrentStep().getNestingLevel());
+        PickleStepTestStep executingPickleStepTestStep = getRunningStep().executingPickleStepTestStep;
+        System.out.println("nestingLevel1-: " + getRunningStep().getNestingLevel());
         System.out.println("nestingLevel2-: " + executingPickleStepTestStep.getPickleStep().nestingLevel);
 
-        System.out.println("zzz1: " + getCurrentStep().executingPickleStepTestStep.getStepText());
-        System.out.println("zzz2: " + getCurrentStep().executingPickleStepTestStep.getStep().getText());
+        System.out.println("zzz1: " + getRunningStep().executingPickleStepTestStep.getStepText());
+        System.out.println("zzz2: " + getRunningStep().executingPickleStepTestStep.getStep().getText());
     }
 
     public static void main(String[] args) {
