@@ -238,5 +238,73 @@ public final class XPathyUtils {
     }
 
 
+    /**
+     * If the XPath looks like a context-independent, absolute expression
+     * (e.g. //div[@x], /html/body//a, (//div | //span[@x])),
+     * wrap it so that it returns only nodes that are NOT ancestors of
+     * any other node in the original result.
+     *
+     * Otherwise, return the original XPath unchanged.
+     */
+    public static String maybeDeepestMatches(String xpath) {
+        if (xpath == null || xpath.isBlank()) return xpath;
 
+        String normalized = xpath.strip();
+
+        if (!looksAbsolutelyScoped(normalized)) {
+            // Context-dependent or weird-looking → don't transform
+            return xpath;
+        }
+
+        if (looksLikeItUsesRelativeDots(normalized)) {
+            // Mixed absolute + .// or ./ etc → too risky → don't transform
+            return xpath;
+        }
+
+        String wrapped = "(" + xpath + ")";
+        return wrapped +
+                "[not(descendant::*[count(. | " + wrapped + ") = count(" + wrapped + ")])]";
+    }
+
+    /**
+     * Very simple heuristic:
+     *   - Strip leading whitespace and '('
+     *   - Expression is considered absolute if first non-paren char is '/'
+     *     (covers both '/' and '//' and things like (/html|//div)).
+     */
+    private static boolean looksAbsolutelyScoped(String xpath) {
+        int i = 0;
+        int len = xpath.length();
+        while (i < len && Character.isWhitespace(xpath.charAt(i))) {
+            i++;
+        }
+        while (i < len && xpath.charAt(i) == '(') {
+            i++;
+            while (i < len && Character.isWhitespace(xpath.charAt(i))) {
+                i++;
+            }
+        }
+        if (i >= len) return false;
+        char c = xpath.charAt(i);
+        return c == '/';
+    }
+
+    /**
+     * Cheap disqualifier: if we see obvious relative-dot patterns anywhere
+     * (./foo, .//bar, .., etc.), we bail out and don't transform.
+     *
+     * This is intentionally conservative: it may reject some XPaths
+     * that would actually be safe, but it won't break any.
+     */
+    private static boolean looksLikeItUsesRelativeDots(String xpath) {
+        String s = xpath;
+        return s.contains(".//")
+                || s.contains("./")
+                || s.contains("..")
+                || s.contains(" | .")  // union with a dot-relative part
+                || s.startsWith(".")   // purely relative at top-level
+                ;
+    }
 }
+
+

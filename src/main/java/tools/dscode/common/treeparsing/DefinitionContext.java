@@ -234,7 +234,7 @@ public final class DefinitionContext {
 
     public static ExecutionDictionary DEFAULT_EXECUTION_DICTIONARY = new ExecutionDictionary() {
         @Override
-        protected void register() {
+        public void register() {
 
 //            registerDefaultStartingContext((category, v, op, ctx) -> {
 //                System.out.println("@@registerDefaultStartingContext - default");
