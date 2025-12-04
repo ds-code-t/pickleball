@@ -202,10 +202,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     public static Object getScenarioObject(String key) {
         key = normalizeRegistryKey(key);
-        System.out.println("@@getScenarioObject: " + key + "");
         Object returnObject =  GlobalState.getRunningStep().getStepParsingMap().get(key);
-        System.out.println("@@returnObject1: " + returnObject + "");
-        System.out.println("@@returnObject2: " + GlobalRegistry.getLocal(key) + "");
         return returnObject == null ? GlobalRegistry.getLocal(key) : returnObject;
     }
 

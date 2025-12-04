@@ -25,6 +25,8 @@ public abstract class WrappedContext implements WebDriver, SearchContext, WebEle
     }
 
     public WebElement findElementWithBaseFilter(XPathy xpathy) {
+        System.out.println("@@findElementWithBaseFilter: " + xpathy);
+        System.out.println("@@getBaseXPathy: " + getExecutionDictionary().getBaseXPathy(ExecutionDictionary.BASE_CATEGORY));
         return findElement(combineAnd(xpathy, getExecutionDictionary().getBaseXPathy(ExecutionDictionary.BASE_CATEGORY)).getLocator());
     }
 

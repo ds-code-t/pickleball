@@ -320,6 +320,10 @@ public final class DefinitionContext {
 
                         XPathy selfVisible = any.byCondition(visible());
                         String visiblePredicate = extractPredicate("//*", selfVisible.getXpath());
+                        System.out.println("\n==========\n@@##BASE-visiblePredicate:  " + visiblePredicate);
+                        System.out.println("\n==========\n@@##BASE-selfVisible:  " + selfVisible);
+                        System.out.println("\n==========\n@@##BASE-invisiblePredicate:  " + invisiblePredicate);
+                        System.out.println("\n----------\n");
 
                         return XPathy.from(
                                 "//*[" +

@@ -26,19 +26,21 @@ Feature: Addition
 
   Scenario: ss3
     Then print aaa
-  @[DEBUG] Then print aaa
+   Then print aaa
     Given set CHROME
-    * , from the Top Panel:
-  : * , I click the "Get your own website" Link
+#    * , from the Top Panel:
+#  : * , I click the "Get your own website" Link
 
 #    * config
-#    * navigate to: URL.w3
+    * navigate to: URL.select
 #    Then , click the "Create" Link
 #    Then , from the Frame, I select "Opel" in the "cars" Dropdown
 #    Then , from the IframeResult, I select "Opel" in the "cars" Dropdown
 #    Then , from the IframeResult, I select "Opel" in the "cars" Dropdown, and click the Submit Button
 #    Then , I select "Opel" in the "cars" Dropdown, and select "Volvo" in the "cars" Dropdown
-#    Then , I select "Opel" in the "cars" Dropdown, and click the "Submit" Button
+  @[DEBUG]
+#    * , from the Top Panel:
+    Then , I select "Opel" in the "cars" Dropdown, and click the Submit Button
 #    * , from the IframeResult, I enter "dd" in the "Last name:" Textbox
 #    * , from the Top Panel, I click the "Run ❯" Button
 #    * , I enter "dd" in the "Last name:" Textbox

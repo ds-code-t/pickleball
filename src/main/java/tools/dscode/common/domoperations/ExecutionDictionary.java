@@ -91,8 +91,6 @@ public class ExecutionDictionary {
         Objects.requireNonNull(category, "category must not be null");
         Objects.requireNonNull(parentCategories, "parentCategories must not be null");
 
-        System.out.println("[ExecutionDictionary] registerCategoryInheritance: category=" + category +
-                ", parents=" + Arrays.toString(parentCategories));
 
         for (String parent : parentCategories) {
             if (parent == null) continue;
@@ -111,8 +109,6 @@ public class ExecutionDictionary {
         Objects.requireNonNull(parentCategory, "parentCategory must not be null");
         Objects.requireNonNull(childCategories, "childCategories must not be null");
 
-        System.out.println("[ExecutionDictionary] registerParentOfCategories: parent=" + parentCategory +
-                ", children=" + Arrays.toString(childCategories));
 
         for (String child : childCategories) {
             if (child == null) continue;
@@ -157,8 +153,7 @@ public class ExecutionDictionary {
         }
 
         List<String> lineage = new ArrayList<>(ordered);
-        System.out.println("[ExecutionDictionary] resolveCategoryLineage: category=" + category +
-                " -> lineage=" + lineage);
+
         return lineage;
     }
 
@@ -179,8 +174,6 @@ public class ExecutionDictionary {
             return;
         }
 
-        System.out.println("[ExecutionDictionary] registerOrBuilder: category=" + category +
-                ", builderCount=" + builders.length);
 
         var list = orReg.computeIfAbsent(category, k -> new CopyOnWriteArrayList<>());
         for (Builder b : builders) {
@@ -198,8 +191,6 @@ public class ExecutionDictionary {
             return;
         }
 
-        System.out.println("[ExecutionDictionary] registerOrForCategories: categories=" + categories +
-                ", builderCount=" + builders.length);
 
         for (String category : categories) {
             if (category != null && !category.isBlank()) {
@@ -220,8 +211,6 @@ public class ExecutionDictionary {
             return;
         }
 
-        System.out.println("[ExecutionDictionary] registerAndBuilder: category=" + category +
-                ", builderCount=" + builders.length);
 
         var list = andReg.computeIfAbsent(category, k -> new CopyOnWriteArrayList<>());
         for (Builder b : builders) {
@@ -239,8 +228,6 @@ public class ExecutionDictionary {
             return;
         }
 
-        System.out.println("[ExecutionDictionary] registerAndForCategories: categories=" + categories +
-                ", builderCount=" + builders.length);
 
         for (String category : categories) {
             if (category != null && !category.isBlank()) {
@@ -271,20 +258,23 @@ public class ExecutionDictionary {
         String requestCategory = (category == null || category.isBlank())
                 ? BASE_CATEGORY
                 : category;
-
+        System.out.println("@@expandInternalL " + category);
         List<String> lineage = resolveCategoryLineage(requestCategory);
         List<Builder> allBuilders = new ArrayList<>();
 
         for (String catKey : lineage) {
+            System.out.println("@@catKey: " + catKey);
             var builders = map.get(catKey);
+            if (builders != null) {
+                System.out.println("@@builders: " + builders.size());
+            }
             if (builders != null && !builders.isEmpty()) {
-                System.out.println("[ExecutionDictionary] expandInternal: category=" + requestCategory +
-                        ", map=" + (map == orReg ? "OR_REG" : "AND_REG") +
-                        ", catKey=" + catKey + ", buildersCount=" + builders.size());
                 allBuilders.addAll(builders);
             }
         }
-
+        if (allBuilders != null) {
+            System.out.println("@@allBuilders: " + allBuilders.size());
+        }
         // If nothing found in this map for the lineage, decide whether to fallback to "*"
         if (allBuilders.isEmpty()) {
             // Only use "*" fallback if there are NO AND or OR builders
@@ -292,20 +282,13 @@ public class ExecutionDictionary {
             if (!hasAnyRegisteredBuilders(lineage)) {
                 var starList = map.get("*");
                 if (starList == null || starList.isEmpty()) {
-                    System.out.println("[ExecutionDictionary] expandInternal: category=" + requestCategory +
-                            ", map=" + (map == orReg ? "OR_REG" : "AND_REG") +
-                            " -> no builders found, no '*' fallback.");
+
                     return List.of();
                 }
-                System.out.println("[ExecutionDictionary] expandInternal: category=" + requestCategory +
-                        ", map=" + (map == orReg ? "OR_REG" : "AND_REG") +
-                        " -> using '*' fallback, buildersCount=" + starList.size());
+
                 allBuilders.addAll(starList);
             } else {
                 // There ARE builders in the other map (AND vs OR), so we skip "*"
-                System.out.println("[ExecutionDictionary] expandInternal: category=" + requestCategory +
-                        ", map=" + (map == orReg ? "OR_REG" : "AND_REG") +
-                        " -> no builders in this map, but found in other map; skipping '*' fallback.");
                 return List.of();
             }
         }
@@ -315,10 +298,6 @@ public class ExecutionDictionary {
 //                .filter(Objects::nonNull)
                 .toList();
 
-        System.out.println("[ExecutionDictionary] expandInternal: category=" + requestCategory +
-                ", map=" + (map == orReg ? "OR_REG" : "AND_REG") +
-                ", value=" + value + ", op=" + op +
-                " -> produced XPathy count=" + result.size());
         for (int i = 0; i < result.size(); i++) {
             XPathy x = result.get(i);
             System.out.println("    [expandInternal] xpath[" + i + "]=" + safeXpath(x));
@@ -331,19 +310,18 @@ public class ExecutionDictionary {
         try {
             return x == null ? "null" : x.getXpath();
         } catch (Exception e) {
+            e.printStackTrace();
             return "ERROR_GETTING_XPATH: " + e;
         }
     }
 
     public List<XPathy> expandOr(String category, String value, Op op) {
-        System.out.println("[ExecutionDictionary] expandOr: category=" + category +
-                ", value=" + value + ", op=" + op);
+
         return expandInternal(orReg, category, value, op);
     }
 
     public List<XPathy> expandAnd(String category, String value, Op op) {
-        System.out.println("[ExecutionDictionary] expandAnd: category=" + category +
-                ", value=" + value + ", op=" + op);
+
         return expandInternal(andReg, category, value, op);
     }
 
@@ -355,12 +333,8 @@ public class ExecutionDictionary {
      * Combine a list of XPathy into a single XPathy using "and"/"or".
      */
     private Optional<XPathy> combine(List<XPathy> list, String joiner) {
-        System.out.println("[ExecutionDictionary] combine: joiner=" + joiner +
-                ", listSize=" + list.size());
-
         if (list.isEmpty()) {
-            System.out.println("[ExecutionDictionary] combine: list empty, returning Optional.empty()");
-            return Optional.empty();
+            return Optional.empty();   // ← what you clearly intended
         }
 
         // Make a defensive copy so we don't mutate caller's list
@@ -369,7 +343,7 @@ public class ExecutionDictionary {
         // Sort by heuristic specificity score (lower is "better")
         sorted.sort(Comparator.comparingInt(x -> xpathSpecificityScore(x.getXpath())));
 
-        System.out.println("[ExecutionDictionary] combine: after sort, xpaths=");
+
         for (int i = 0; i < sorted.size(); i++) {
             System.out.println("    [combine] sorted[" + i + "]=" + safeXpath(sorted.get(i)));
         }
@@ -381,32 +355,25 @@ public class ExecutionDictionary {
                 .peek(s -> System.out.println("    [combine] selfStep=" + s))
                 .collect(java.util.stream.Collectors.joining(" " + joiner + " "));
 
-        System.out.println("[ExecutionDictionary] combine: combinedExpr=" + combinedExpr);
 
         String fullXpath = "//*[" + combinedExpr + "]";
-        System.out.println("[ExecutionDictionary] combine: fullXpath=" + fullXpath);
 
         XPathy x = XPathy.from(fullXpath);
-        System.out.println("[ExecutionDictionary] combine: final XPathy.getXpath()=" + safeXpath(x));
 
         return Optional.of(x);
     }
 
     public Optional<XPathy> andAll(String category, String value, Op op) {
-        System.out.println("[ExecutionDictionary] andAll: category=" + category +
-                ", value=" + value + ", op=" + op);
+
         Optional<XPathy> result = combine(expandAnd(category, value, op), "and");
-        System.out.println("[ExecutionDictionary] andAll: resultPresent=" + result.isPresent() +
-                (result.isPresent() ? ", xpath=" + safeXpath(result.get()) : ""));
+
         return result;
     }
 
     public Optional<XPathy> orAll(String category, String value, Op op) {
-        System.out.println("[ExecutionDictionary] orAll: category=" + category +
-                ", value=" + value + ", op=" + op);
+
         Optional<XPathy> result = combine(expandOr(category, value, op), "or");
-        System.out.println("[ExecutionDictionary] orAll: resultPresent=" + result.isPresent() +
-                (result.isPresent() ? ", xpath=" + safeXpath(result.get()) : ""));
+
         return result;
     }
 
@@ -415,13 +382,11 @@ public class ExecutionDictionary {
      * Delegates to resolveToXPathy and unwraps the result.
      */
     public XPathy andThenOr(String category, String value, Op op) {
-        System.out.println("[ExecutionDictionary] andThenOr: category=" + category +
-                ", value=" + value + ", op=" + op);
+
 
         Optional<XPathy> result = resolveToXPathy(category, value, op);
 
         if (result.isEmpty()) {
-            System.out.println("[ExecutionDictionary] andThenOr: Optional empty -> returning null");
             return null;  // preserve prior semantics
         }
 
@@ -429,7 +394,7 @@ public class ExecutionDictionary {
     }
 
     public XPathy getBaseXPathy(String category) {
-        return  andThenOr(category, null, null);
+        return andThenOr(category, null, null);
     }
 
     public record CategoryResolution(String category, String value, Op op, XPathy xpath, Set<CategoryFlags> flags) {
@@ -449,27 +414,19 @@ public class ExecutionDictionary {
      * Optional-returning version of andThenOr.
      */
     public Optional<XPathy> resolveToXPathy(String category, String value, Op op) {
-        System.out.println("[ExecutionDictionary] andThenOrOptional: category=" + category +
-                ", value=" + value + ", op=" + op);
+
 
         Optional<XPathy> andPart = andAll(category, value, op);
         Optional<XPathy> orPart = orAll(category, value, op);
 
-        System.out.println("[ExecutionDictionary] andThenOrOptional: andPartPresent=" + andPart.isPresent() +
-                (andPart.isPresent() ? ", andXpath=" + safeXpath(andPart.get()) : ""));
-        System.out.println("[ExecutionDictionary] andThenOrOptional: orPartPresent=" + orPart.isPresent() +
-                (orPart.isPresent() ? ", orXpath=" + safeXpath(orPart.get()) : ""));
 
         if (andPart.isEmpty() && orPart.isEmpty()) {
-            System.out.println("[ExecutionDictionary] andThenOrOptional: both empty -> Optional.empty()");
             return Optional.empty();
         }
         if (andPart.isEmpty()) {
-            System.out.println("[ExecutionDictionary] andThenOrOptional: only orPart present.");
             return orPart;
         }
         if (orPart.isEmpty()) {
-            System.out.println("[ExecutionDictionary] andThenOrOptional: only andPart present.");
             return andPart;
         }
 
@@ -477,13 +434,10 @@ public class ExecutionDictionary {
         String orStep = toSelfStep(orPart.get().getXpath());
 
         String combinedExpr = "(" + andStep + ") and (" + orStep + ")";
-        System.out.println("[ExecutionDictionary] andThenOrOptional: combinedExpr=" + combinedExpr);
 
         String fullXpath = "//*[" + combinedExpr + "]";
-        System.out.println("[ExecutionDictionary] andThenOrOptional: fullXpath=" + fullXpath);
 
         XPathy x = XPathy.from(fullXpath);
-        System.out.println("[ExecutionDictionary] andThenOrOptional: final XPathy.getXpath()=" + safeXpath(x));
 
         return Optional.of(x);
     }
@@ -542,8 +496,6 @@ public class ExecutionDictionary {
 
         if (score < 0) score = 0;
 
-        System.out.println("[ExecutionDictionary] xpathSpecificityScore: xpath=" + xpath +
-                ", score=" + score);
 
         return score;
     }
@@ -575,7 +527,8 @@ public class ExecutionDictionary {
      * Start a fluent definition for a single category on this dictionary instance.
      */
     public CategorySpec category(String name) {
-        return new CategorySpec(this, name);
+        Objects.requireNonNull(name, "name must not be null");
+        return new CategorySpec(this, List.of(name));
     }
 
     /**
@@ -595,128 +548,52 @@ public class ExecutionDictionary {
     }
 
     public CategorySpec registerDefaultStartingContext(ContextBuilder builder) {
-        return category(STARTING_CONTEXT).context(builder).flags(CategoryFlags.PAGE_TOP_CONTEXT, CategoryFlags.PAGE_CONTEXT);
+        return category(STARTING_CONTEXT)
+                .context(builder)
+                .flags(CategoryFlags.PAGE_TOP_CONTEXT, CategoryFlags.PAGE_CONTEXT);
     }
 
 
     // ======================================================
-    // CategorySpec: fluent config for a single category
+    // CategorySpec: fluent config for single or multiple categories
     // ======================================================
 
-    public static final class CategorySpec {
-        private final ExecutionDictionary dict;
-        private final String category;
+    public static class CategorySpec {
+        protected final ExecutionDictionary dict;
+        protected final List<String> categories;
 
-        private CategorySpec(ExecutionDictionary dict, String category) {
+        private CategorySpec(ExecutionDictionary dict, List<String> categories) {
             this.dict = Objects.requireNonNull(dict, "dict must not be null");
-            this.category = Objects.requireNonNull(category, "category must not be null");
+            Objects.requireNonNull(categories, "categories must not be null");
+            if (categories.isEmpty()) {
+                throw new IllegalArgumentException("categories must not be empty");
+            }
+            // Make an unmodifiable defensive copy
+            this.categories = List.copyOf(categories);
         }
 
         /**
-         * Register OR-based builders for this category on this dictionary instance.
+         * Register OR-based builders for all categories in this spec on this dictionary instance.
          */
         public CategorySpec or(Builder... builders) {
-            dict.registerOrBuilder(category, builders);
-            return this;
-        }
-
-        /**
-         * Register AND-based builders for this category on this dictionary instance.
-         */
-        public CategorySpec and(Builder... builders) {
-            dict.registerAndBuilder(category, builders);
-            return this;
-        }
-
-        /**
-         * Declare that this category inherits from the given parents, on this dictionary instance.
-         */
-        public CategorySpec inheritsFrom(String... parents) {
-            dict.registerCategoryInheritance(category, parents);
-            return this;
-        }
-
-        /**
-         * Expose the category name if needed for further manual wiring.
-         */
-        public String name() {
-            return category;
-        }
-
-        public CategorySpec flags(CategoryFlags... flags) {
-            dict.addCategoryFlags(category, flags);
-            return this;
-        }
-
-        /**
-         * Register a SearchContext-based builder for this category.
-         * If present, callers can choose to ignore the XPathy builders.
-         */
-        public CategorySpec context(ContextBuilder builder) {
-            dict.registerContextBuilder(category, builder);
-            flags(CategoryFlags.PAGE_CONTEXT);
-            return this;
-        }
-
-        public CategorySpec startingContext(ContextBuilder builder) {
-            System.out.println("@@registering startingContext::: " + category);
-            try {
-                dict.registerContextBuilder(category, builder);
-                flags(CategoryFlags.PAGE_CONTEXT, CategoryFlags.PAGE_TOP_CONTEXT);
-                System.out.println("@@FLAGS:::" +  Arrays.asList(flags()));
-                return this;
-            } catch (Exception e) {
-                e.printStackTrace();
-                throw new RuntimeException("Error registering startingContext::: " + category, e);
-            }
-        }
-
-
-        /**
-         * Return the resolved flags for this category, honoring inheritance.
-         * This is a convenience passthrough to ExecutionDictionary#getResolvedCategoryFlags.
-         */
-        public Set<CategoryFlags> getResolvedFlags() {
-            return dict.getResolvedCategoryFlags(category);
-        }
-
-    }
-
-
-    // ======================================================
-    // CategoriesSpec: fluent config for multiple categories
-    // ======================================================
-
-    public static final class CategoriesSpec {
-        private final ExecutionDictionary dict;
-        private final List<String> categories;
-
-        private CategoriesSpec(ExecutionDictionary dict, List<String> categories) {
-            this.dict = Objects.requireNonNull(dict, "dict must not be null");
-            this.categories = Objects.requireNonNull(categories, "categories must not be null");
-        }
-
-        /**
-         * Register OR-based builders for all categories in this group on this dictionary instance.
-         */
-        public CategoriesSpec or(Builder... builders) {
             dict.registerOrForCategories(categories, builders);
             return this;
         }
 
         /**
-         * Register AND-based builders for all categories in this group on this dictionary instance.
+         * Register AND-based builders for all categories in this spec on this dictionary instance.
          */
-        public CategoriesSpec and(Builder... builders) {
+        public CategorySpec and(Builder... builders) {
             dict.registerAndForCategories(categories, builders);
             return this;
         }
 
         /**
-         * Declare that all categories in this group inherit from the given parents,
+         * Declare that all categories in this spec inherit from the given parents,
          * on this dictionary instance.
          */
-        public CategoriesSpec inheritFrom(String... parents) {
+        public CategorySpec inheritsFrom(String... parents) {
+            Objects.requireNonNull(parents, "parents must not be null");
             for (String cat : categories) {
                 if (cat == null || cat.isBlank()) continue;
                 dict.registerCategoryInheritance(cat, parents);
@@ -725,15 +602,131 @@ public class ExecutionDictionary {
         }
 
         /**
-         * Convenience for HTML type registration on all categories in this group,
-         * on this dictionary instance.
+         * Register one or more flags for all categories in this spec.
          */
-
-        public CategoriesSpec addCategoryFlags(CategoryFlags... flags) {
+        public CategorySpec flags(CategoryFlags... flags) {
+            Objects.requireNonNull(flags, "flags must not be null");
+            if (flags.length == 0) {
+                return this;
+            }
             for (String cat : categories) {
                 if (cat == null || cat.isBlank()) continue;
                 dict.addCategoryFlags(cat, flags);
             }
+            return this;
+        }
+
+        /**
+         * Expose the category name.
+         * Only valid if this spec represents exactly one category.
+         */
+        public String name() {
+            if (categories.size() != 1) {
+                throw new IllegalStateException(
+                        "CategorySpec contains multiple categories: " + categories
+                );
+            }
+            return categories.get(0);
+        }
+
+        /**
+         * Register a SearchContext-based builder for all categories in this spec.
+         * If present, callers can choose to ignore the XPathy builders.
+         */
+        public CategorySpec context(ContextBuilder builder) {
+            Objects.requireNonNull(builder, "builder must not be null");
+            for (String cat : categories) {
+                if (cat == null || cat.isBlank()) continue;
+                dict.registerContextBuilder(cat, builder);
+            }
+            // Preserve original behavior: mark as PAGE_CONTEXT
+            flags(CategoryFlags.PAGE_CONTEXT);
+            return this;
+        }
+
+        /**
+         * Register a "starting" SearchContext-based builder for all categories in this spec.
+         * Adds both PAGE_CONTEXT and PAGE_TOP_CONTEXT flags.
+         */
+        public CategorySpec startingContext(ContextBuilder builder) {
+            System.out.println("@@registering startingContext::: " + categories);
+            try {
+                Objects.requireNonNull(builder, "builder must not be null");
+                for (String cat : categories) {
+                    if (cat == null || cat.isBlank()) continue;
+                    dict.registerContextBuilder(cat, builder);
+                }
+                flags(CategoryFlags.PAGE_CONTEXT, CategoryFlags.PAGE_TOP_CONTEXT);
+                System.out.println("@@FLAGS:::" + Arrays.asList(flags()));
+                return this;
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw new RuntimeException(
+                        "Error registering startingContext::: " + categories,
+                        e
+                );
+            }
+        }
+
+        /**
+         * Return the resolved flags for all categories in this spec, honoring inheritance.
+         * If there are multiple categories, this returns the union of their flags.
+         */
+        public Set<CategoryFlags> getResolvedFlags() {
+            EnumSet<CategoryFlags> result = EnumSet.noneOf(CategoryFlags.class);
+            for (String cat : categories) {
+                if (cat == null || cat.isBlank()) continue;
+                result.addAll(dict.getResolvedCategoryFlags(cat));
+            }
+            return result.isEmpty() ? Set.of() : EnumSet.copyOf(result);
+        }
+    }
+
+
+    // ======================================================
+    // CategoriesSpec: fluent config for multiple categories
+    // (thin wrapper around CategorySpec)
+    // ======================================================
+
+    public static final class CategoriesSpec extends CategorySpec {
+
+        private CategoriesSpec(ExecutionDictionary dict, List<String> categories) {
+            super(dict, categories);
+        }
+
+        /**
+         * Register OR-based builders for all categories in this group,
+         * returning CategoriesSpec for fluent chaining.
+         */
+        public CategoriesSpec or(Builder... builders) {
+            super.or(builders);
+            return this;
+        }
+
+        /**
+         * Register AND-based builders for all categories in this group,
+         * returning CategoriesSpec for fluent chaining.
+         */
+        public CategoriesSpec and(Builder... builders) {
+            super.and(builders);
+            return this;
+        }
+
+        /**
+         * Declare that all categories in this group inherit from the given parents,
+         * returning CategoriesSpec for fluent chaining.
+         */
+        public CategoriesSpec inheritFrom(String... parents) {
+            super.inheritsFrom(parents);
+            return this;
+        }
+
+        /**
+         * Convenience for registering flags on all categories in this group,
+         * returning CategoriesSpec for fluent chaining.
+         */
+        public CategoriesSpec addCategoryFlags(CategoryFlags... flags) {
+            super.flags(flags);
             return this;
         }
 
@@ -774,6 +767,7 @@ public class ExecutionDictionary {
             return parent;
         }
     }
+
 
     public void printDefinitions(String category, String value, Op op) {
         System.out.println("======================================");

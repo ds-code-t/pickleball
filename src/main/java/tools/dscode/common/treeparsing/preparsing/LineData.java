@@ -29,7 +29,6 @@ public abstract class LineData implements Iterable<Phrase> {
     public final List<Phrase> phrases = new ArrayList<>();
     private final Set<Character> delimiters; // characters that cause a split
     //    public final List<PhraseData> contextPhrases = new ArrayList<>();
-    public ExecutionDictionary.CategoryResolution defaultCategory = getExecutionDictionary().andThenOrWithFlags(STARTING_CONTEXT, null, ExecutionDictionary.Op.DEFAULT);
 
 
 
