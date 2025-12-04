@@ -12,8 +12,11 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.xpathy.Tag.any;
 import static tools.dscode.common.domoperations.SeleniumUtils.wrapContext;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.toSelfStep;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
 
 public class ExecutionDictionary {
 
@@ -29,11 +32,13 @@ public class ExecutionDictionary {
 
 
     // Default base category that *every* category implicitly inherits from
-    public static final String BASE_CATEGORY = "BaseCategoryElement";
+    public static final String CONTAINS_TEXT = "ContainsTextInternalUSE";
 
-    public static final String STARTING_CONTEXT = "DefaultStartingContextElement";
+    public static final String BASE_CATEGORY = "BaseCategoryInternalUSE";
 
-    public static final String VISIBILITY_FILTER = "VisibilityFilterDefaults";
+    public static final String STARTING_CONTEXT = "DefaultStartingContextInternalUSE";
+
+    public static final String VISIBILITY_FILTER = "VisibilityFilterInternalUSE";
 
     public enum Op {DEFAULT, EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE}
 
@@ -70,16 +75,33 @@ public class ExecutionDictionary {
         // Subclasses override register() to populate this dictionary.
         // This will be called during construction.
         register();
+        defaultRegistrations();
     }
 
     /**
      * Override in anonymous subclasses to register builders, category inheritance, html types, etc.
      */
-    public void register() {
+    protected void register(){};
+
+    private void defaultRegistrations() {
         registerDefaultStartingContext((category, v, op, ctx) -> {
             System.out.println("@@registerDefaultStartingContext - default");
             return wrapContext(ctx.switchTo().defaultContent());
         });
+
+        category("TEXT").inheritsFrom(CONTAINS_TEXT);
+
+        category(CONTAINS_TEXT)
+                .and(
+                        (category, v, op) -> {
+                            if (v == null || v.isBlank())
+                                return null;
+                            return any.byHaving(
+                                    XPathy.from("descendant-or-self::*")
+                                            .byHaving(deepNormalizedText(v))
+                            );
+                        }
+                );
     }
 
     //========================================================

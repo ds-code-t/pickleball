@@ -234,7 +234,7 @@ public final class DefinitionContext {
 
     public static ExecutionDictionary DEFAULT_EXECUTION_DICTIONARY = new ExecutionDictionary() {
         @Override
-        public void register() {
+        protected void register() {
 
 //            registerDefaultStartingContext((category, v, op, ctx) -> {
 //                System.out.println("@@registerDefaultStartingContext - default");
@@ -358,37 +358,6 @@ public final class DefinitionContext {
                             }
                     );
 
-            category("containsText")
-                    .and(
-                            (category, v, op) -> {
-                                if (v == null || v.isBlank())
-                                    return null;
-                                return any.byHaving(
-                                        XPathy.from("descendant-or-self::*")
-                                                .byHaving(deepNormalizedText(v))
-                                );
-                            }
-                    );
-
-
-            category("visibleText")
-                    .and(
-                            (category, v, op) -> {
-                                if (v == null || v.isBlank())
-                                    return null;
-
-                                return combineOr(
-                                        any.byHaving(
-                                                XPathy.from("descendant-or-self::*")
-                                                        .byHaving(deepNormalizedText(v))
-                                        ),
-                                        any.byHaving(
-                                                XPathy.from("preceding::*")
-                                                        .byHaving(deepNormalizedText(v))
-                                        )
-                                );
-                            }
-                    );
 
 
             category("forLabel")

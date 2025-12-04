@@ -126,11 +126,11 @@ public abstract class PhraseData {
         } else {
             action = phraseNode.getStringFromLocalState("action");
             System.out.println("@@actionSet to: " + action);
-            if (action != null) {
+            if (!action.isBlank()) {
                 phraseType = PhraseType.ACTION;
             } else {
                 assertionType = phraseNode.getStringFromLocalState("assertionType");
-                if (assertionType != null) {
+                if (!assertionType.isBlank()){
                     assertion = phraseNode.getStringFromLocalState("assertion");
                     phraseType = PhraseType.ASSERTION;
                 }
