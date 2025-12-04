@@ -145,6 +145,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
         if (isScenarioComplete())
             return;
+
         for (StepData attachedStep : stepExtension.attachedSteps) {
             runStep((StepExtension) attachedStep);
         }
