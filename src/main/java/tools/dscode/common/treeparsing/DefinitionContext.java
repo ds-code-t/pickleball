@@ -236,10 +236,10 @@ public final class DefinitionContext {
         @Override
         protected void register() {
 
-            registerDefaultStartingContext((category, v, op, ctx) -> {
-                System.out.println("@@registerDefaultStartingContext - default");
-                return wrapContext(ctx.switchTo().defaultContent());
-            });
+//            registerDefaultStartingContext((category, v, op, ctx) -> {
+//                System.out.println("@@registerDefaultStartingContext - default");
+//                return wrapContext(ctx.switchTo().defaultContent());
+//            });
 
             //
             // Frame
@@ -283,11 +283,13 @@ public final class DefinitionContext {
             // Link
             //
             category("Link")
-                    .and(
+                    .or(
                             (category, v, op) ->
                                     XPathy.from(any).byAttribute(role).equals("link")
-                                            .or().byAttribute(aria_label).equals("link")
-                                            .or().tag(Tag.a),
+                                            .or().byAttribute(aria_label).equals("link"),
+                            (category, v, op) ->
+                                    XPathy.from(Tag.a)
+                            ).and(
                             (category, v, op) -> {
                                 if (v == null || v.isBlank())
                                     return null;

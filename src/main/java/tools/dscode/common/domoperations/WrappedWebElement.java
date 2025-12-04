@@ -2,8 +2,11 @@ package tools.dscode.common.domoperations;
 
 import org.jspecify.annotations.Nullable;
 import org.openqa.selenium.*;
+import org.openqa.selenium.interactions.Interactive;
+import org.openqa.selenium.interactions.Sequence;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathChainResult;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -312,6 +315,22 @@ public class WrappedWebElement extends WrappedWebDriver  {
         } catch (WebDriverException e) {
             return new Rectangle(0, 0, 0, 0);
         }
+    }
+
+    @Override
+    public void perform(Collection<Sequence> actions) {
+        doActiveOp(el ->  {
+            ((Interactive) el).perform(actions);
+            return null;
+        });
+    }
+
+    @Override
+    public void resetInputState() {
+        doActiveOp(el ->  {
+            ((Interactive) el).resetInputState();
+            return null;
+        });
     }
 
     @FunctionalInterface

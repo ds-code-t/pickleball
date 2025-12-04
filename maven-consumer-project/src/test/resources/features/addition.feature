@@ -38,11 +38,12 @@ Feature: Addition
 #    Then , from the IframeResult, I select "Opel" in the "cars" Dropdown
 #    Then , from the IframeResult, I select "Opel" in the "cars" Dropdown, and click the Submit Button
 #    Then , I select "Opel" in the "cars" Dropdown, and select "Volvo" in the "cars" Dropdown
-  @[DEBUG]
-#    * , from the Top Panel:
+
     Then , I select "Opel" in the "cars" Dropdown, and click the Submit Button
 #    * , from the IframeResult, I enter "dd" in the "Last name:" Textbox
-#    * , from the Top Panel, I click the "Run ❯" Button
+  @[DEBUG]
+    * , from the Top Panel:
+    : * , I click the "Run ❯" Button
 #    * , I enter "dd" in the "Last name:" Textbox
 #    * , click "Essential QA Service" Qqq
 
