@@ -125,16 +125,16 @@ public class ElementMatch extends Component {
                     xPathy = applyAttrOp(xPathy, com.xpathy.Attribute.custom(attribute.attrName), op, attribute.predicateVal);
             }
 
-            if (elementPosition.equals("last")) {
-                xPathy = xPathy.last();
-            } else if (!elementPosition.isEmpty()) {
-                elementIndex = Integer.parseInt(elementPosition);
-                if (selectionType.isEmpty()) {
-                    xPathy = xPathy.nth(elementIndex);
-                } else {
-                    xPathy = everyNth(xPathy, elementIndex);
-                }
-            }
+//            if (elementPosition.equals("last")) {
+//                xPathy = xPathy.last();
+//            } else if (!elementPosition.isEmpty()) {
+//                elementIndex = Integer.parseInt(elementPosition);
+//                if (selectionType.isEmpty()) {
+//                    xPathy = xPathy.nth(elementIndex);
+//                } else {
+//                    xPathy = everyNth(xPathy, elementIndex);
+//                }
+//            }
         }
     }
 
@@ -146,13 +146,35 @@ public class ElementMatch extends Component {
         return phraseContextList;
     }
 
+
+
+
     private XPathy elementTerminalXPath;
 
-    public XPathy getTerminalXPathy() {
-        if (elementTerminalXPath == null)
-            elementTerminalXPath = (elementPosition.isEmpty() && selectionType.isEmpty()) ? xPathy.nth(1) : xPathy;
+    public XPathy getElementTerminalXPath() {
         return elementTerminalXPath;
     }
+
+    public void setElementTerminalXPath(List<XPathy> xPathyList) {
+//        elementTerminalXPath = (elementPosition.isEmpty() && selectionType.isEmpty()) ? combineAnd(xPathyList).nth(1) :   combineAnd(xPathyList);
+        this.elementTerminalXPath =  combineAnd(xPathyList);
+        if(elementPosition.isEmpty() && selectionType.isEmpty())
+            elementPosition = "1";
+
+        if (elementPosition.equals("last")) {
+            elementTerminalXPath = elementTerminalXPath.last();
+        } else if (!elementPosition.isEmpty()) {
+            elementIndex = Integer.parseInt(elementPosition);
+            if (selectionType.isEmpty()) {
+                elementTerminalXPath = elementTerminalXPath.nth(elementIndex);
+            } else {
+                elementTerminalXPath = everyNth(elementTerminalXPath, elementIndex);
+            }
+        }
+
+    }
+
+
 
     public WrappedContext getWrappedContext(WrappedContext currentWrappedContext) {
         System.out.println("@@getWrappedContext:: " + this);
@@ -188,20 +210,19 @@ public class ElementMatch extends Component {
                 System.out.println("@@phraseData-- 3 " + xPathyList);
             }
         }
-        xPathyList.add(getTerminalXPathy());
-        System.out.println("@@phraseData-- 3b " + getTerminalXPathy());
+
+        xPathyList.add(xPathy);
+        setElementTerminalXPath(xPathyList);
         System.out.println("@@phraseData-- 3c " + xPathyList);
-        XPathy combinedXPathy = combineAnd(xPathyList);
         System.out.println("\n\n@@prettyPrintXPath-combinedXPathy ");
-        System.out.println(prettyPrintXPath(combinedXPathy));
+        System.out.println(prettyPrintXPath(elementTerminalXPath));
         System.out.println("\n---\n");
 
         try {
-            matchedElements = new XPathChainResult(parentPhrase.getCurrentWrappedContext(), combinedXPathy);
+            matchedElements = new XPathChainResult(parentPhrase.getCurrentWrappedContext(), elementTerminalXPath);
         }
         catch (Throwable throwable) {
             System.out.println("Failed to match " + this);
-            System.out.println(prettyPrintXPath(combinedXPathy));
             throw new RuntimeException(throwable);
         }
         System.out.println("@@matchedElements: "  + matchedElements);
