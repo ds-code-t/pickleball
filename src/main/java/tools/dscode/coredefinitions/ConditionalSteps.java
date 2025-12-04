@@ -19,11 +19,13 @@ import java.util.regex.Pattern;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
 import static tools.dscode.common.annotations.DefinitionFlag.SKIP_CHILDREN;
+import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
+import static tools.dscode.common.annotations.DefinitionFlag._SKIP_CHILDREN;
 
 
 public class ConditionalSteps extends CoreSteps {
 
-    @DefinitionFlags(NO_LOGGING)
+    @DefinitionFlags(_NO_LOGGING)
     @Given("^((?:IF:|ELSE:|ELSE-IF:|THEN:).*)$")
     public static void runConditional(String inputString) {
         StepExtension currentStep = getRunningStep();
@@ -65,7 +67,7 @@ public class ConditionalSteps extends CoreSteps {
             modifiedStep.addConditionalStates(StepData.ConditionalStates.TRUE);
             currentStep.attachedSteps.add(modifiedStep);
             modifiedStep.copyDefinitionFlags(currentStep);
-            currentStep.addDefinitionFlag(SKIP_CHILDREN);
+            currentStep.addDefinitionFlag(_SKIP_CHILDREN);
         }
     }
 
