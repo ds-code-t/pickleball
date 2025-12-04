@@ -9,6 +9,8 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static tools.dscode.common.domoperations.SeleniumUtils.wrapContext;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.toSelfStep;
@@ -122,13 +124,13 @@ public class ExecutionDictionary {
      * Resolve full inheritance chain for a category.
      */
     private List<String> resolveCategoryLineage(String category) {
-        String root = (category == null || category.isBlank())
-                ? BASE_CATEGORY
-                : category;
+        if (category == null || category.isBlank())
+            return new ArrayList<>();
+
 
         LinkedHashSet<String> ordered = new LinkedHashSet<>();
         Deque<String> stack = new ArrayDeque<>();
-        stack.push(root);
+        stack.push(category);
 
         while (!stack.isEmpty()) {
             String current = stack.pop();
@@ -146,11 +148,6 @@ public class ExecutionDictionary {
             }
         }
 
-        // Ensure all categories inherit from baseCategory by default,
-        // but do not force it for baseCategory itself.
-        if (!BASE_CATEGORY.equals(root) && !ordered.contains(BASE_CATEGORY)) {
-            ordered.add(BASE_CATEGORY);
-        }
 
         List<String> lineage = new ArrayList<>(ordered);
 
@@ -255,37 +252,38 @@ public class ExecutionDictionary {
             String value,
             Op op
     ) {
-        String requestCategory = (category == null || category.isBlank())
-                ? BASE_CATEGORY
-                : category;
+
         System.out.println("@@expandInternalL " + category);
-        List<String> lineage = resolveCategoryLineage(requestCategory);
+
+        List<String> lineage = resolveCategoryLineage(category);
+
+
         List<Builder> allBuilders = new ArrayList<>();
+
 
         for (String catKey : lineage) {
             System.out.println("@@catKey: " + catKey);
             var builders = map.get(catKey);
             if (builders != null) {
                 System.out.println("@@builders: " + builders.size());
-            }
-            if (builders != null && !builders.isEmpty()) {
-                allBuilders.addAll(builders);
+                if (!builders.isEmpty()) {
+                    allBuilders.addAll(builders);
+                }
             }
         }
-        if (allBuilders != null) {
-            System.out.println("@@allBuilders: " + allBuilders.size());
-        }
-        // If nothing found in this map for the lineage, decide whether to fallback to "*"
+        System.out.println("@@allBuilders (without base): " + allBuilders.size());
+
+        // 2) If nothing found yet in THIS map, decide whether to fallback to "*"
         if (allBuilders.isEmpty()) {
             // Only use "*" fallback if there are NO AND or OR builders
-            // anywhere in the lineage (including baseCategory).
+            // anywhere in the non-base lineage.
             if (!hasAnyRegisteredBuilders(lineage)) {
                 var starList = map.get("*");
                 if (starList == null || starList.isEmpty()) {
-
+                    System.out.println("@@starList: (none)");
                     return List.of();
                 }
-
+                System.out.println("@@starList: " + starList.size());
                 allBuilders.addAll(starList);
             } else {
                 // There ARE builders in the other map (AND vs OR), so we skip "*"
@@ -293,9 +291,11 @@ public class ExecutionDictionary {
             }
         }
 
+
+        // 4) Build XPaths
         List<XPathy> result = allBuilders.stream()
-                .map(b -> b.build(requestCategory, value, op))
-//                .filter(Objects::nonNull)
+                .map(b -> b.build(category, value, op))
+//          .filter(Objects::nonNull)
                 .toList();
 
         for (int i = 0; i < result.size(); i++) {
@@ -305,6 +305,7 @@ public class ExecutionDictionary {
 
         return result;
     }
+
 
     private String safeXpath(XPathy x) {
         try {
@@ -321,8 +322,8 @@ public class ExecutionDictionary {
     }
 
     public List<XPathy> expandAnd(String category, String value, Op op) {
-
-        return expandInternal(andReg, category, value, op);
+        return Stream.concat(expandInternal(andReg, category, value, op).stream(), expandInternal(andReg, BASE_CATEGORY, value, op).stream())
+                .collect(Collectors.toList());
     }
 
     //========================================================
@@ -415,9 +416,8 @@ public class ExecutionDictionary {
      */
     public Optional<XPathy> resolveToXPathy(String category, String value, Op op) {
 
-
-        Optional<XPathy> andPart = andAll(category, value, op);
         Optional<XPathy> orPart = orAll(category, value, op);
+        Optional<XPathy> andPart = andAll(category, value, op);
 
 
         if (andPart.isEmpty() && orPart.isEmpty()) {
@@ -522,6 +522,7 @@ public class ExecutionDictionary {
         }
         return false;
     }
+
 
     /**
      * Start a fluent definition for a single category on this dictionary instance.
@@ -854,9 +855,9 @@ public class ExecutionDictionary {
      * builder resolution does).
      */
     public Set<CategoryFlags> getResolvedCategoryFlags(String category) {
-        List<String> lineage = resolveCategoryLineage(
-                (category == null || category.isBlank()) ? BASE_CATEGORY : category
-        );
+        if (category == null || category.isBlank())
+            return new HashSet<>();
+        List<String> lineage = resolveCategoryLineage(category);
         if (lineage.isEmpty()) {
             return Set.of();
         }
