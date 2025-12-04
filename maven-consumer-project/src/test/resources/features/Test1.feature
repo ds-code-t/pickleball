@@ -6,4 +6,4 @@ Feature: Addition
   Then print aaa
     Given set CHROME
   @[DEBUG] * , from the Top Panel:
-  : * , I click the "Get your own website" Link
+  : * IF: true THEN: , I click the "Get your own website" Link

@@ -60,10 +60,12 @@ public class ConditionalSteps extends CoreSteps {
             currentStep.addConditionalStates(StepData.ConditionalStates.TRUE);
             System.out.println("Conditional returned true.  Will run child steps.");
         } else {
-            currentStep.addDefinitionFlag(SKIP_CHILDREN);
+            System.out.println("@@modifiedStep!!!");
             StepExtension modifiedStep = currentStep.modifyStepExtension(evaluatedString);
             modifiedStep.addConditionalStates(StepData.ConditionalStates.TRUE);
             currentStep.attachedSteps.add(modifiedStep);
+            modifiedStep.copyDefinitionFlags(currentStep);
+            currentStep.addDefinitionFlag(SKIP_CHILDREN);
         }
     }
 

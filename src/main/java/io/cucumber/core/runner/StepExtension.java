@@ -149,7 +149,8 @@ public class StepExtension extends StepData {
         for (DefinitionFlag flag : flags) {
             if (flag == DefinitionFlag.NO_LOGGING)
                 pickleStepTestStep.setNoLogging(true);
-            this.definitionFlags.add(flag);
+            if(!flag.toString().startsWith("_"))
+                this.definitionFlags.add(flag);
         }
     }
 
@@ -161,6 +162,9 @@ public class StepExtension extends StepData {
     public StepExtension modifyStepExtension(String newText) {
         StepExtension modifiedStep = new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep, pickleStepTestStep.getStep().getKeyword(), newText, getGherkinArgumentText(pickleStepTestStep.getStep())));
         modifiedStep.setStepParsingMap(getStepParsingMap());
+        modifiedStep.parentStep = parentStep;
+//        System.out.println("@@lineData: " + lineData);
+//        System.out.println("@@lineData-phrases: " + lineData.phrases);
         modifiedStep.lineData = lineData;
         return modifiedStep;
     }
