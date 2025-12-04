@@ -1,7 +1,6 @@
 package tools.dscode.common.domoperations;
 
 import com.xpathy.XPathy;
-import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
@@ -22,13 +21,13 @@ public abstract class WrappedContext implements WebDriver, SearchContext, WebEle
     }
 
     public List<WebElement> findElementsBaseWithFilter(XPathy xpathy) {
-       return findElements(combineAnd(xpathy, getExecutionDictionary().getBaseXPathy(ExecutionDictionary.BASE_CATEGORY)).getLocator());
+       return findElements(combineAnd(xpathy, getExecutionDictionary().getCategoryXPathy(ExecutionDictionary.BASE_CATEGORY)).getLocator());
     }
 
     public WebElement findElementWithBaseFilter(XPathy xpathy) {
         System.out.println("@@findElementWithBaseFilter: " + xpathy);
-        System.out.println("@@getBaseXPathy: " + getExecutionDictionary().getBaseXPathy(ExecutionDictionary.BASE_CATEGORY));
-        return findElement(combineAnd(xpathy, getExecutionDictionary().getBaseXPathy(ExecutionDictionary.BASE_CATEGORY)).getLocator());
+        System.out.println("@@getBaseXPathy: " + getExecutionDictionary().getCategoryXPathy(ExecutionDictionary.BASE_CATEGORY));
+        return findElement(combineAnd(xpathy, getExecutionDictionary().getCategoryXPathy(ExecutionDictionary.BASE_CATEGORY)).getLocator());
     }
 
 }

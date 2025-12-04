@@ -394,7 +394,7 @@ public class ExecutionDictionary {
         return result.get();
     }
 
-    public XPathy getBaseXPathy(String category) {
+    public XPathy getCategoryXPathy(String category) {
         return andThenOr(category, null, null);
     }
 
