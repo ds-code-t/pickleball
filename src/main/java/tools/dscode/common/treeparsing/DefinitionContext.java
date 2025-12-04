@@ -19,6 +19,7 @@ import static com.xpathy.Tag.any;
 import static com.xpathy.Tag.input;
 import static com.xpathy.Tag.select;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
+import static tools.dscode.common.domoperations.SeleniumUtils.wrapContext;
 import static tools.dscode.common.domoperations.VisibilityConditions.extractPredicate;
 import static tools.dscode.common.domoperations.VisibilityConditions.invisible;
 import static tools.dscode.common.domoperations.VisibilityConditions.visible;
@@ -234,6 +235,11 @@ public final class DefinitionContext {
     public static ExecutionDictionary DEFAULT_EXECUTION_DICTIONARY = new ExecutionDictionary() {
         @Override
         protected void register() {
+
+            registerDefaultStartingContext((category, v, op, ctx) -> {
+                System.out.println("@@registerDefaultStartingContext - default");
+                return wrapContext(ctx.switchTo().defaultContent());
+            });
 
             //
             // Frame

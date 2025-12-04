@@ -74,10 +74,7 @@ public class ExecutionDictionary {
      * Override in anonymous subclasses to register builders, category inheritance, html types, etc.
      */
     protected void register() {
-        registerDefaultStartingContext((category, v, op, ctx) -> {
-            System.out.println("@@registerDefaultStartingContext - default");
-            return wrapContext(ctx.switchTo().defaultContent());
-        });
+
     }
 
     //========================================================
