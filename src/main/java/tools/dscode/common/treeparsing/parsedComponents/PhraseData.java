@@ -33,6 +33,7 @@ public abstract class PhraseData {
     public final String text;
     public Character termination; // nullable
     public boolean contextTermination;
+    public boolean hasNot;
     public final LineData parsedLine;
 
     public PhraseData previousPhrase;
@@ -100,7 +101,7 @@ public abstract class PhraseData {
         MatchNode returnMatchNode = getNodeDictionary().parse(inputText);
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
-
+        hasNot = phraseNode.localStateBoolean("not");
         components = phraseNode.getOrderedChildren("elementMatch", "valueMatch").stream().map(m -> {
             if (m.name().equals("valueMatch"))
                 return new ValueMatch(m);

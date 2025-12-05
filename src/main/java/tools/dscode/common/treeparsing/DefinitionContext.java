@@ -190,7 +190,7 @@ public final class DefinitionContext {
         ParseNode not = new ParseNode("\\bnot\\b") {
             @Override
             public String onCapture(MatchNode self) {
-                System.out.println("@@not: " + self.originalText() + "");
+                self.parent().putToLocalState("not", "not");
                 return self.originalText();
             }
         };

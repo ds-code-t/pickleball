@@ -16,20 +16,21 @@ import static tools.dscode.common.domoperations.DomChecks.hasAny;
 public class ParsedAssertions {
 
 
-    public static void executeAssertions(WebDriver driver, PhraseData phraseExecution) {
+    public static void executeAssertions(WebDriver driver, PhraseData phraseData) {
 
-        boolean isTrue = !phraseExecution.phraseNode.getChild("not").modifiedText().equals("not");
-        MatchNode assertionNode = phraseExecution.phraseNode.getChild("assertion");
-        String assertion = assertionNode == null ? "equals" : assertionNode.modifiedText();
-        if (assertion.isEmpty())
-            assertion = "equal";
-        String assertionType = phraseExecution.phraseNode.getChild("assertionType").modifiedText();
+//        boolean isTrue = !phraseData.phraseNode.getChild("not").modifiedText().equals("not");
+//        MatchNode assertionNode = phraseData.phraseNode.getChild("assertion");
+//        String assertion = assertionNode == null ? "equals" : assertionNode.modifiedText();
+//        if (assertion.isEmpty())
+//            assertion = "equal";
+////        phraseNode.getStringFromLocalState("conjunction");
+//        String assertionType = phraseData.phraseNode.getChild("assertionType").modifiedText();
 
-        Component component1 = phraseExecution.components.getFirst();
-        Component component2 = phraseExecution.components.size() < 2 ? null : phraseExecution.components.get(1);
+        Component component1 = phraseData.components.getFirst();
+        Component component2 = phraseData.components.size() < 2 ? null : phraseData.components.get(1);
 
         DomChecks.CheckResult result;
-        switch (assertion) {
+        switch (phraseData.assertion) {
             case String s when s.contains("equal") -> {
                 result = equalsNormalized(component1.getValue(driver), component2.getValue(driver));
             }
@@ -37,15 +38,15 @@ public class ParsedAssertions {
                 result = hasAny(driver, ((ElementMatch) component1).xPathy);
             }
             default -> {
-                throw new IllegalArgumentException("Unsupported assertion: " + assertion);
+                throw new IllegalArgumentException("Unsupported assertion: " + phraseData.assertion);
             }
 
         }
 
-        boolean passed = (isTrue == result.result());
+        boolean passed = (!phraseData.hasNot == result.result());
 
         if(!passed) {
-            if(assertionType.equals("ensure"))
+            if(phraseData.assertionType.equals("ensure"))
                 throw new RuntimeException(result.description());
             else
                 throw new SoftRuntimeException(result.description());
