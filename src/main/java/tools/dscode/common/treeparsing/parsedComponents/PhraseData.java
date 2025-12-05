@@ -49,6 +49,7 @@ public abstract class PhraseData {
     public boolean isContext;
     public boolean hasDOMInteraction;
     public List<ElementMatch> elements;
+    public List<ValueMatch> values;
     public ElementMatch elementMatch;
     public String conjunction;
     public String action;
@@ -110,6 +111,7 @@ public abstract class PhraseData {
         }).toList();
         components.forEach(component -> component.parentPhrase = this);
         elements = getNextComponents(-1, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
+        values = getNextComponents(-1, "valueMatch").stream().map(m -> (ValueMatch) m).toList();
         elements.forEach(element -> categoryFlags.addAll(element.categoryFlags));
         elementMatch = elements.isEmpty() ? null : elements.getFirst();
         selectionType = elementMatch == null ? "" : elementMatch.selectionType;

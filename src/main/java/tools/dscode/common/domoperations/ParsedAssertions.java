@@ -35,7 +35,7 @@ public class ParsedAssertions {
                 result = equalsNormalized(component1.getValue(driver), component2.getValue(driver));
             }
             case String s when s.contains("displayed") -> {
-                result = hasAny(driver, ((ElementMatch) component1).xPathy);
+                result = hasAny(driver, phraseData.elementMatch.xPathy);
             }
             default -> {
                 throw new IllegalArgumentException("Unsupported assertion: " + phraseData.assertion);

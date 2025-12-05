@@ -23,19 +23,20 @@ public class Registrations {
     public static void beforeRun() {
         System.out.println("@@=--- beforeRun");
 
+        ExecutionDictionary dict = getExecutionDictionary();
 
-        getExecutionDictionary().category("Submit Button").or(
+        dict.category("Submit Button").or(
                 (category, v, op) -> input.byAttribute(type).equals("submit")
         );
 
-        getExecutionDictionary().category("Top Panel").startingContext((category, v, op, ctx) ->
+        dict.category("Top Panel").startingContext((category, v, op, ctx) ->
                 {
                     System.out.println("@@switching to Top Panel");
                     return ctx.switchTo().defaultContent();
                 }
         );
 
-        getExecutionDictionary().registerDefaultStartingContext((category, v, op, ctx) ->
+        dict.registerDefaultStartingContext((category, v, op, ctx) ->
         {
             try {
                 System.out.println("@@--registration of registerDefaultStartingContext");
@@ -49,7 +50,7 @@ public class Registrations {
             }
         });
 
-//        getExecutionDictionary().category("IframeResult").flags(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT);
+//        dict.category("IframeResult").flags(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT);
 
 //        XPathyRegistry.add("Zaaa", (v, op) ->
 //                orMap(
