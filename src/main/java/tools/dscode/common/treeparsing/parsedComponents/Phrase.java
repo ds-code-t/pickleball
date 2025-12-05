@@ -5,6 +5,7 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
+import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 
@@ -30,6 +31,8 @@ public final class Phrase extends PhraseData {
         System.out.println("@@phraseType:: " + phraseType);
         System.out.println("@@hasDOMInteraction:: " + hasDOMInteraction);
 
+        elements.forEach(e -> e.contextWrapper = new ContextWrapper(e));
+
         if (previousPhrase != null && !previousPhrase.contextTermination) {
             contextPhrases.addAll(previousPhrase.contextPhrases);
         }
@@ -38,7 +41,7 @@ public final class Phrase extends PhraseData {
         if (hasDOMInteraction) {
             waitMilliseconds(1000);
             lifecycle.fire(Phase.BEFORE_DOM_LOAD_CHECK);
-            driver = getCurrentWrappedContext();
+            driver = getBrowser( "BROWSER");
             waitForPhraseEntities(driver, this);
             waitMilliseconds(100);
             lifecycle.fire(Phase.BEFORE_DOM_INTERACTION);

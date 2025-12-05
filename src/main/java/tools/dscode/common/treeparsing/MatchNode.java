@@ -311,7 +311,9 @@ public final class MatchNode {
     public List<MatchNode> getOrderedChildren(String... names) {
         var allow = nameFilter(names);
         var out = new ArrayList<MatchNode>();
+        System.out.println("@@sortedChildren: " + sortedChildren.size());
         for (MatchNode n : sortedChildren) {
+            System.out.println("@@n: " + n + " \n "  + n.name() + " " + n.position + " " + n.start + " " + n.end);
             if (allow.test(n)) out.add(n);
         }
         return out; // already nearest -> farthest

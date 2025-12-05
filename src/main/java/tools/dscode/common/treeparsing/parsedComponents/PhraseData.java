@@ -3,11 +3,9 @@ package tools.dscode.common.treeparsing.parsedComponents;
 import com.xpathy.XPathy;
 import org.openqa.selenium.SearchContext;
 import tools.dscode.common.domoperations.ExecutionDictionary;
-import tools.dscode.common.domoperations.WrappedContext;
-import tools.dscode.common.domoperations.WrappedWebElement;
+
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.preparsing.LineData;
-import tools.dscode.common.treeparsing.xpathcomponents.XPathChainResult;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -18,13 +16,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
-import static tools.dscode.common.domoperations.SeleniumUtils.wrapContext;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inBetweenOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.insideOf;
-import static tools.dscode.coredefinitions.GeneralSteps.getBrowser;
 
 
 public abstract class PhraseData {
@@ -61,21 +57,21 @@ public abstract class PhraseData {
 
     public XPathy contextXPathy;
 
-    public WrappedContext getCurrentWrappedContext() {
-        if (currentWrappedContext == null) {
-            currentWrappedContext = wrapContext(getBrowser("BROWSER"));
-        }
-        return currentWrappedContext;
-    }
+//    public SearchContext getCurrentSearchContext() {
+//        if (currentSearchContext == null) {
+//            currentSearchContext = wrapContext(getBrowser("BROWSER"));
+//        }
+//        return currentSearchContext;
+//    }
+//
+//    public void setCurrentSearchContext(SearchContext searchContext) {
+//        if (searchContext instanceof SearchContext)
+//            this.currentSearchContext = (SearchContext) searchContext;
+//        else
+//            this.currentSearchContext = wrapContext(searchContext);
+//    }
 
-    public void setCurrentWrappedContext(SearchContext searchContext) {
-        if (searchContext instanceof WrappedContext)
-            this.currentWrappedContext = (WrappedContext) searchContext;
-        else
-            this.currentWrappedContext = wrapContext(searchContext);
-    }
-
-    private WrappedContext currentWrappedContext;
+    private SearchContext currentSearchContext;
 
 
     public enum PhraseType {

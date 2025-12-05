@@ -4,6 +4,7 @@ import com.xpathy.XPathy;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import org.openqa.selenium.SearchContext;
+import org.openqa.selenium.WebDriver;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,8 +14,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.xpathy.Tag.any;
-import static tools.dscode.common.domoperations.SeleniumUtils.wrapContext;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.toSelfStep;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
 
@@ -27,7 +26,7 @@ public class ExecutionDictionary {
 
     @FunctionalInterface
     public interface ContextBuilder {
-        SearchContext build(String category, String value, Op op, WrappedContext context);
+        SearchContext build(String category, String value, Op op,  WebDriver driver, SearchContext context);
     }
 
 
@@ -84,10 +83,10 @@ public class ExecutionDictionary {
     protected void register(){};
 
     private void defaultRegistrations() {
-        registerDefaultStartingContext((category, v, op, ctx) -> {
-            System.out.println("@@registerDefaultStartingContext - default");
-            return wrapContext(ctx.switchTo().defaultContent());
-        });
+//        registerDefaultStartingContext((category, v, op, ctx) -> {
+//            System.out.println("@@registerDefaultStartingContext - default");
+//            return wrapContext(((WebDriver)ctx).switchTo().defaultContent());
+//        });
 
         category("TEXT").inheritsFrom(CONTAINS_TEXT);
 
@@ -915,7 +914,8 @@ public class ExecutionDictionary {
             String category,
             String value,
             Op op,
-            WrappedContext context
+            WebDriver webDriver,
+            SearchContext context
     ) {
         Objects.requireNonNull(category, "category must not be null");
         Objects.requireNonNull(context, "context must not be null");
@@ -925,7 +925,7 @@ public class ExecutionDictionary {
         if (cb == null) {
             return context; // no override → keep existing behavior
         }
-        return cb.build(category, value, op, context);
+        return cb.build(category, value, op, webDriver, context);
     }
 
 }

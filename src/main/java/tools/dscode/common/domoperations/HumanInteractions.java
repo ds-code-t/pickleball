@@ -37,16 +37,16 @@ public final class HumanInteractions {
      * - JS: finds the option by normalized text, sets it selected, and fires input/change events.
      */
     public static void selectDropdownByVisibleText(WebDriver driver,
-                                                   WrappedWebElement selectEl,
+                                                   WebElement element,
                                                    String visibleText) {
         Objects.requireNonNull(driver, "driver");
-        Objects.requireNonNull(selectEl, "selectEl");
+        Objects.requireNonNull(element, "selectEl");
         Objects.requireNonNull(visibleText, "visibleText");
-        System.out.println("@@selectEl1: " + selectEl.getTagName());
-        System.out.println("@@selectEl2: " + selectEl.getText());
+        System.out.println("@@selectEl1: " + element.getTagName());
+        System.out.println("@@selectEl2: " + element.getText());
         System.out.println("@@visibleText:: " + visibleText);
-        centerScroll(driver, selectEl);
-        new Select(selectEl.getNonStaleWrappedElement()).selectByVisibleText(visibleText);
+        centerScroll(driver, element);
+        new Select(element).selectByVisibleText(visibleText);
         // Find the matching option by normalized visible text
 
     }

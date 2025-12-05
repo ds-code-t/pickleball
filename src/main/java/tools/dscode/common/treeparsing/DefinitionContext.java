@@ -18,12 +18,9 @@ import static com.xpathy.Case.LOWER;
 import static com.xpathy.Tag.any;
 import static com.xpathy.Tag.input;
 import static com.xpathy.Tag.select;
-import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
-import static tools.dscode.common.domoperations.SeleniumUtils.wrapContext;
 import static tools.dscode.common.domoperations.VisibilityConditions.extractPredicate;
 import static tools.dscode.common.domoperations.VisibilityConditions.invisible;
 import static tools.dscode.common.domoperations.VisibilityConditions.visible;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
 import static tools.dscode.common.treeparsing.RegexUtil.betweenWithEscapes;
 import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
@@ -148,7 +145,9 @@ public final class DefinitionContext {
                 self.putToLocalState("type", self.resolvedGroupText("type"));
                 self.putToLocalState("attrName", self.resolvedGroupText("attrName"));
                 self.putToLocalState("predicate", self.resolvedGroupText("predicate"));
-                return self.originalText();
+                System.out.println("@@elementMatch--maskedText: " + self.maskedText() + "");
+                System.out.println("@@elementMatch--self.token(): " + self.token() + "");
+                return self.token();
             }
         };
 
@@ -196,7 +195,7 @@ public final class DefinitionContext {
         };
 
         //    ParseNode assertion = new ParseNode("\\b(?<base>equal|less(?:er)?|greater|less|is)(?=\\s+(?:<<quoteMask>>|<<valueMatch>>|<<elementMatch>>)(s|ed|ing|es)?)\\b")
-        ParseNode assertion = new ParseNode("\\b(?:displayed|equal|less(?:er)?|greater|less)\\b") {
+        ParseNode assertion = new ParseNode("\\b(?:displayed|equalS?|less(?:er)?|greater|less)\\b") {
             @Override
             public String onCapture(MatchNode self) {
                 System.out.println("@@assertion: " + self.originalText() + "");

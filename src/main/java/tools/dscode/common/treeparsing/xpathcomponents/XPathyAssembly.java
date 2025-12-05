@@ -3,6 +3,7 @@ package tools.dscode.common.treeparsing.xpathcomponents;
 import com.xpathy.XPathy;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -115,6 +116,14 @@ public final class XPathyAssembly {
 
     public static XPathy combineOr(XPathy... items) {
         return combineOr(List.of(items));
+    }
+
+    public static String combineAnd(String... items) {
+        return combineAnd(Arrays.stream(items).map(XPathy::from).toList()).getXpath();
+    }
+
+    public static String combineOr(String... items) {
+        return combineOr(Arrays.stream(items).map(XPathy::from).toList()).getXpath();
     }
 
 

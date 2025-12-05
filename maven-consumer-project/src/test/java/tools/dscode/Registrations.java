@@ -7,14 +7,12 @@ import org.openqa.selenium.WebElement;
 import tools.dscode.common.annotations.LifecycleHook;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.domoperations.ExecutionDictionary;
-import tools.dscode.common.domoperations.WrappedContext;
 
 import static com.xpathy.Attribute.id;
 import static com.xpathy.Attribute.role;
 import static com.xpathy.Attribute.type;
 import static com.xpathy.Case.LOWER;
 import static com.xpathy.Tag.input;
-import static tools.dscode.common.domoperations.SeleniumUtils.wrapContext;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.util.DebugUtils.printDebug;
 
@@ -29,20 +27,20 @@ public class Registrations {
                 (category, v, op) -> input.byAttribute(type).equals("submit")
         );
 
-        dict.category("Top Panel").startingContext((category, v, op, ctx) ->
-                {
-                    System.out.println("@@switching to Top Panel");
-                    return ctx.switchTo().defaultContent();
-                }
+        dict.category("Top Panel").startingContext((category, v, op, webDriver, ctx) ->
+                ctx
         );
 
-        dict.registerDefaultStartingContext((category, v, op, ctx) ->
+        dict.category("FrameResult").and(
+                (category, v, op) -> XPathy.from(Tag.iframe).byAttribute(id).equals("iframeResult")
+        );
+
+        dict.registerDefaultStartingContext((category, v, op, webDriver, ctx) ->
         {
             try {
                 System.out.println("@@--registration of registerDefaultStartingContext");
-                ctx.switchTo().defaultContent();
-                WebElement webElement = ctx.findElementWithBaseFilter(XPathy.from(Tag.iframe).byAttribute(id).equals("iframeResult"));
-                ctx.switchTo().frame(webElement);
+                XPathy xpathy = dict.getCategoryXPathy("FrameResult");
+                webDriver.switchTo().frame(xpathy.getXpath());
                 return ctx;
             } catch (Exception e) {
                 e.printStackTrace();

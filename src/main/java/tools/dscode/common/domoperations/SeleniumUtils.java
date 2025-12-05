@@ -14,9 +14,12 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class SeleniumUtils {
     public static void waitSeconds(int seconds) {
@@ -103,9 +106,55 @@ public class SeleniumUtils {
         }
     }
 
-    public static WrappedContext wrapContext(SearchContext searchContext)
-    {
-        return new WrappedWebElement(searchContext);
+
+    /**
+     * UNION: Returns all elements in the given lists, preserving order
+     * and removing duplicates based on WebElement equality.
+     */
+    @SafeVarargs
+    public static List<WebElement> union(List<WebElement>... lists) {
+        LinkedHashSet<WebElement> set = new LinkedHashSet<>();
+        for (List<WebElement> list : lists) {
+            if (list != null) {
+                set.addAll(list);
+            }
+        }
+        return new ArrayList<>(set);
+    }
+
+    /**
+     * INTERSECTION: Returns elements that exist in ALL lists.
+     * Order of the result follows the order of the *first list*.
+     */
+    @SafeVarargs
+    public static List<WebElement> intersection(List<WebElement>... lists) {
+        if (lists == null || lists.length == 0) {
+            return List.of();
+        }
+
+        // If only one list, intersection is itself
+        if (lists.length == 1) {
+            return new ArrayList<>(lists[0]);
+        }
+
+        // Count occurrences
+        Map<WebElement, Integer> countMap = new IdentityHashMap<>();
+
+        for (List<WebElement> list : lists) {
+            if (list == null) continue;
+            for (WebElement el : list) {
+                countMap.merge(el, 1, Integer::sum);
+            }
+        }
+
+        int required = lists.length;
+
+        // Return only elements that appear in ALL lists,
+        // and preserve order based on list 0
+        List<WebElement> first = lists[0];
+        return first.stream()
+                .filter(el -> countMap.getOrDefault(el, 0) == required)
+                .collect(Collectors.toList());
     }
 
 }

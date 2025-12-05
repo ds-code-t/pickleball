@@ -6,9 +6,11 @@ import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebDriverException;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.FluentWait;
 import org.openqa.selenium.TimeoutException;
+import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
@@ -40,35 +42,30 @@ public final class LeanWaits {
                 continue;   // continue to next elementMatch
             }
 
-            System.out.println("@@elementMatch.matchedElements.getWrappers().size(): "
-                    + elementMatch.matchedElements.getWrappers().size());
 
             if (!elementMatch.selectionType.equals("any")
-                    && elementMatch.matchedElements.isEmpty()) {
+                    && elementMatch.wrappedElements.isEmpty()) {
+                throw new RuntimeException("[WARN] Required element not found for " + elementMatch);
 
-                // SAFE: no exception thrown
-                System.out.println("[WARN] Required element not found for " + elementMatch);
-                continue;
             }
 
-            for (WrappedWebElement element : elementMatch.matchedElements.getWrappers()) {
-                safeWaitForElementReady(driver, element, Duration.ofSeconds(60));
+            for (ElementWrapper elementWrapper : elementMatch.wrappedElements) {
+                safeWaitForElementReady(driver, elementWrapper.element, Duration.ofSeconds(60));
             }
         }
     }
 
-    public static WrappedWebElement safeWaitForElementReady(
+    public static void safeWaitForElementReady(
             WebDriver driver,
-            WrappedWebElement element,
+            WebElement element,
             Duration timeout
     ) {
         try {
-            return waitForElementReady(driver, element, timeout);
+            waitForElementReady(driver, element, timeout);
         } catch (Exception e) {
             System.out.println("[WARN] Element did NOT become ready: " + element);
             System.out.println("Cause: " + e);
             e.printStackTrace(System.out);
-            return element; // continue without blocking
         }
     }
 
@@ -138,8 +135,8 @@ public final class LeanWaits {
      *
      * NOTE: If the passed WebElement goes stale, re-locate it before calling this.
      */
-    public static WrappedWebElement waitForElementReady(WebDriver driver,
-                                                        WrappedWebElement element,
+    public static WebElement waitForElementReady(WebDriver driver,
+                                                        WebElement element,
                                                         Duration timeout) {
         FluentWait<WebDriver> wait = new FluentWait<>(driver)
                 .withTimeout(timeout)

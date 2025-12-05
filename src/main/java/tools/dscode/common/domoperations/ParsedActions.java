@@ -33,8 +33,8 @@ public class ParsedActions {
         List<ElementMatch> nextElementMatches = phraseData.getNextComponents(actionNode.position, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
         ElementMatch nextElementMatch = nextElementMatches .isEmpty() ? null : nextElementMatches.getFirst();
 
-        List<WrappedWebElement> nextElements = nextElementMatch == null || nextElementMatch.matchedElements == null ?
-                new ArrayList<>() : nextElementMatch.matchedElements.getWrappers();
+        List<WebElement> nextElements = nextElementMatch == null || nextElementMatch.wrappedElements.isEmpty() ?
+                new ArrayList<>() : nextElementMatch.wrappedElements.stream().map(e -> e.element).toList();
         ValueMatch nextValue = (ValueMatch) phraseData.getNextComponents(actionNode.position, "valueMatch").stream().findFirst().orElse(null);
 
         if (!action.equals("wait") && (nextElementMatches.isEmpty() || nextElements.isEmpty())) {
@@ -47,32 +47,32 @@ public class ParsedActions {
         System.out.println("Attempting " + action);
         switch (action) {
             case String s when s.contains("select") -> {
-                for (WrappedWebElement nextElement : nextElements) {
+                for (WebElement nextElement : nextElements) {
                     selectDropdownByVisibleText(driver, nextElement, nextValue.value);
                 }
             }
              case String s when s.contains("click") -> {
-                for (WrappedWebElement nextElement : nextElements) {
+                for (WebElement nextElement : nextElements) {
                     click(driver, nextElement);
                 }
             }
             case String s when s.contains("double click") -> {
-                for (WrappedWebElement nextElement : nextElements) {
+                for (WebElement nextElement : nextElements) {
                     doubleClick(driver, nextElement);
                 }
             }
             case String s when s.contains("right click") -> {
-                for (WrappedWebElement nextElement : nextElements) {
+                for (WebElement nextElement : nextElements) {
                     contextClick(driver, nextElement);
                 }
             }
             case String s when s.contains("enter") -> {
-                for (WrappedWebElement nextElement : nextElements) {
+                for (WebElement nextElement : nextElements) {
                     typeText(driver, nextElement, nextValue.value);
                 }
             }
             case String s when s.contains("scroll") -> {
-                for (WrappedWebElement nextElement : nextElements) {
+                for (WebElement nextElement : nextElements) {
                     wheelScrollBy(driver, nextElement);
                 }
             }
@@ -80,7 +80,7 @@ public class ParsedActions {
                 waitSeconds(Integer.parseInt(nextValue.value.replace("\"|'|`", "")));
             }
             case String s when s.contains("overwrite") -> {
-                for (WrappedWebElement nextElement : nextElements) {
+                for (WebElement nextElement : nextElements) {
                     clearAndType(driver, nextElement, nextValue.value);
                 }
             }

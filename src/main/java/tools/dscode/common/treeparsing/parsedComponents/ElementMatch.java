@@ -3,35 +3,32 @@ package tools.dscode.common.treeparsing.parsedComponents;
 import com.xpathy.XPathy;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
 import tools.dscode.common.domoperations.ExecutionDictionary;
-import tools.dscode.common.domoperations.WrappedContext;
-import tools.dscode.common.domoperations.WrappedWebElement;
+import tools.dscode.common.seleniumextensions.ContextWrapper;
+import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
-import tools.dscode.common.treeparsing.xpathcomponents.XPathChainResult;
 
-import java.sql.SQLOutput;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
-import static tools.dscode.common.domoperations.SeleniumUtils.wrapContext;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.prettyPrintXPath;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrOp;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyTextOp;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.everyNth;
 
 public class ElementMatch extends Component {
-    String text;
-    String category;
+    public String text;
+    public String category;
     public String selectionType;
-    String elementPosition;
+    public String elementPosition;
     Attribute attribute;
     public XPathy xPathy;
     ElementMatch.ElementType elementType;
-    public XPathChainResult matchedElements;
+    public ContextWrapper contextWrapper;
+//    public XPathChainResult matchedElements;
     //        public Set<XPathyRegistry.HtmlType> htmlTypes;
 
 
@@ -54,34 +51,22 @@ public class ElementMatch extends Component {
         ANY, EVERY, FIRST, LAST
     }
 
-    int elementIndex;
+    public int elementIndex;
 
-//    public List<XPathy> elementXpathyList;
 
-    //    public List<XPathy> getElementXPathyList() {
-//        if (elementXpathyList == null) {
-//            elementXpathyList = new ArrayList<>();
-//            List<XPathy> contextList = parentPhrase.getContextXpathyList();
-//            PhraseData lastPhrase = parentPhrase.usedContextPhrases.isEmpty() ? null : parentPhrase.usedContextPhrases.getLast();
-//            elementXpathyList.addAll(contextList);
-//            if (elementXpathyList.isEmpty() || lastPhrase == null || lastPhrase.isContext) {
-//                elementXpathyList.add(xPathy);
-//            } else {
-//                XPathy mergedXpathy = refine(elementXpathyList.getLast(), xPathy);
-//                elementXpathyList.set(elementXpathyList.size() - 1, mergedXpathy);
-//            }
-//        }
-//        if (elementPosition.isEmpty() && selectionType.isEmpty()) {
-//            XPathy singleMatch = elementXpathyList.getLast().nth(1);
-//            elementXpathyList.set(elementXpathyList.size() - 1, singleMatch);
-//        }
-//        return elementXpathyList;
-//    }
+
+    public List<ElementWrapper> wrappedElements = new ArrayList<>();
+
+    public void findWebElements(WebDriver driver) {
+        List<WebElement> elements = contextWrapper.getElements(driver);
+        wrappedElements.addAll(elements.stream().map(e -> new ElementWrapper(driver, e, this)).toList());
+    }
+
+
     public ExecutionDictionary.Op textOp;
 
     public ElementMatch(MatchNode elementNode) {
         super(elementNode);
-
         this.text = elementNode.getStringFromLocalState("text");
         this.category = elementNode.getStringFromLocalState("type");
         this.elementPosition = elementNode.getStringFromLocalState("elementPosition");
@@ -125,17 +110,9 @@ public class ElementMatch extends Component {
                     xPathy = applyAttrOp(xPathy, com.xpathy.Attribute.custom(attribute.attrName), op, attribute.predicateVal);
             }
 
-//            if (elementPosition.equals("last")) {
-//                xPathy = xPathy.last();
-//            } else if (!elementPosition.isEmpty()) {
-//                elementIndex = Integer.parseInt(elementPosition);
-//                if (selectionType.isEmpty()) {
-//                    xPathy = xPathy.nth(elementIndex);
-//                } else {
-//                    xPathy = everyNth(xPathy, elementIndex);
-//                }
-//            }
         }
+
+
     }
 
     private List<PhraseData> phraseContextList;
@@ -146,88 +123,6 @@ public class ElementMatch extends Component {
         return phraseContextList;
     }
 
-
-
-
-    private XPathy elementTerminalXPath;
-
-    public XPathy getElementTerminalXPath() {
-        return elementTerminalXPath;
-    }
-
-    public void setElementTerminalXPath(List<XPathy> xPathyList) {
-//        elementTerminalXPath = (elementPosition.isEmpty() && selectionType.isEmpty()) ? combineAnd(xPathyList).nth(1) :   combineAnd(xPathyList);
-        this.elementTerminalXPath =  combineAnd(xPathyList);
-        if(elementPosition.isEmpty() && selectionType.isEmpty())
-            elementPosition = "1";
-
-        if (elementPosition.equals("last")) {
-            elementTerminalXPath = elementTerminalXPath.last();
-        } else if (!elementPosition.isEmpty()) {
-            elementIndex = Integer.parseInt(elementPosition);
-            if (selectionType.isEmpty()) {
-                elementTerminalXPath = elementTerminalXPath.nth(elementIndex);
-            } else {
-                elementTerminalXPath = everyNth(elementTerminalXPath, elementIndex);
-            }
-        }
-
-    }
-
-
-
-    public WrappedContext getWrappedContext(WrappedContext currentWrappedContext) {
-        System.out.println("@@getWrappedContext:: " + this);
-        System.out.println("@@category:: " + category);
-        SearchContext searchContext = getExecutionDictionary().applyContextBuilder(category, text, textOp, currentWrappedContext);
-        if(searchContext instanceof  WrappedContext)
-            return (WrappedContext) searchContext;
-        return wrapContext(searchContext);
-    }
-
-    public XPathChainResult findWebElements(WebDriver driver) {
-
-//        WrappedContext currentWrappedContext = new WrappedWebElement(driver);
-        List<PhraseData> contextList = getPhraseContextList();
-        List<XPathy> xPathyList = new ArrayList<>();
-        System.out.println("@@CurrentPhrase-- " + parentPhrase);
-        for (int j = 0; j < contextList.size(); j++) {
-            PhraseData phraseData = contextList.get(j);
-            System.out.println("@@phraseData-- " + phraseData);
-            System.out.println("@@phraseData.categoryFlags-- " + phraseData.categoryFlags);
-            if (phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
-                System.out.println("@@phraseData-- 1 " + xPathyList);
-                if (!xPathyList.isEmpty()) {
-                    XPathy combinedXPathy = combineAnd(xPathyList);
-                    parentPhrase.setCurrentWrappedContext(parentPhrase.getCurrentWrappedContext().findElement(combinedXPathy.getLocator()));
-                    xPathyList.clear();
-                }
-                System.out.println("@@phraseData-- 2a " + parentPhrase.getCurrentWrappedContext());
-                parentPhrase.setCurrentWrappedContext(phraseData.elementMatch.getWrappedContext(parentPhrase.getCurrentWrappedContext()));
-                System.out.println("@@phraseData-- 2b " + parentPhrase.getCurrentWrappedContext());
-            } else {
-                xPathyList.add(phraseData.contextXPathy);
-                System.out.println("@@phraseData-- 3 " + xPathyList);
-            }
-        }
-
-        xPathyList.add(xPathy);
-        setElementTerminalXPath(xPathyList);
-        System.out.println("@@phraseData-- 3c " + xPathyList);
-        System.out.println("\n\n@@prettyPrintXPath-combinedXPathy ");
-        System.out.println(prettyPrintXPath(elementTerminalXPath));
-        System.out.println("\n---\n");
-
-        try {
-            matchedElements = new XPathChainResult(parentPhrase.getCurrentWrappedContext(), elementTerminalXPath);
-        }
-        catch (Throwable throwable) {
-            System.out.println("Failed to match " + this);
-            throw new RuntimeException(throwable);
-        }
-        System.out.println("@@matchedElements: "  + matchedElements);
-        return matchedElements;
-    }
 
 
 
