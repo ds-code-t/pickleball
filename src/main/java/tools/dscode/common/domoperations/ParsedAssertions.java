@@ -50,6 +50,7 @@ public class ParsedAssertions {
 
         System.out.println("@@result: " + result);
         System.out.println("@@phraseData.assertionTyp: " + phraseData.assertionType);
+        System.out.println("@@phraseData.hasNot: " + phraseData.hasNot);
 
 
         boolean passed = (!phraseData.hasNot == result.result());

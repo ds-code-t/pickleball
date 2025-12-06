@@ -208,6 +208,7 @@ public final class DefinitionContext {
                 line:
                   - quoteMask
                   - phrase:
+                    - not
                     - predicate
                     - elementMatch
                     - valueMatch
