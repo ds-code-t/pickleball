@@ -62,7 +62,7 @@ public final class MatchNode {
         MatchNode matchNode = new MatchNode(start, ends, parseNode, parent, originalText, token, globalState);
         globalState.put(baseToken, matchNode);
         if (parent != null)
-            ((Map<String, MatchNode>) globalState.get("_MatchNodeMap").getFirst()).put(token, matchNode);
+            ((Map<String, MatchNode>) globalState.get(matchNodeMapKey).getFirst()).put(token, matchNode);
         return matchNode;
     }
 
@@ -77,13 +77,30 @@ public final class MatchNode {
         this.originalText = originalText;
         this.token = token;
         this.globalState = (globalState != null) ? globalState : LinkedListMultimap.create();
-        if (this.globalState.isEmpty())
-            this.globalState.put("_MatchNodeMap", new HashMap<String, MatchNode>());
+        if (!globalState.containsKey(matchNodeMapKey))
+            this.globalState.put(matchNodeMapKey, new HashMap<String, MatchNode>());
+//        if (this.globalState.isEmpty())
+//            this.globalState.put("_MatchNodeMap", new HashMap<String, MatchNode>());
         this.localState = LinkedListMultimap.create();
         this.groups = null; // set by engine when created from a regex match
         this.start = start;
         this.end = ends;
     }
+
+    static final String matchNodeMapKey = "_MatchNodeMap";
+
+    public void putMatchNode(String key, MatchNode value) {
+        ((Map<String, MatchNode>) globalState.get(matchNodeMapKey).getFirst()).put(key, value);
+    }
+
+    public MatchNode getMatchNode(String key) {
+        try {
+            return ((Map<String, MatchNode>) globalState.get(matchNodeMapKey).getFirst()).get(key);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
 
     @Override
     public String toString() {
@@ -194,7 +211,7 @@ public final class MatchNode {
      */
     public String unmask(String s) {
         if (s == null) return null;
-        Map<String, MatchNode> matchNodeMap = ((Map<String, MatchNode>) globalState.get("_MatchNodeMap").getFirst());
+        Map<String, MatchNode> matchNodeMap = ((Map<String, MatchNode>) globalState.get(matchNodeMapKey).getFirst());
         if (s.isEmpty() || matchNodeMap.isEmpty()) return s;
         String prev;
         String cur = s;
@@ -313,7 +330,7 @@ public final class MatchNode {
         var out = new ArrayList<MatchNode>();
         System.out.println("@@sortedChildren: " + sortedChildren.size());
         for (MatchNode n : sortedChildren) {
-            System.out.println("@@n: " + n + " \n "  + n.name() + " " + n.position + " " + n.start + " " + n.end);
+            System.out.println("@@n: " + n + " \n " + n.name() + " " + n.position + " " + n.start + " " + n.end);
             if (allow.test(n)) out.add(n);
         }
         return out; // already nearest -> farthest

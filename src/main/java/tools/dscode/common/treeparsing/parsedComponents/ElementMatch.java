@@ -1,7 +1,6 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.xpathy.XPathy;
-import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.domoperations.ExecutionDictionary;
@@ -10,10 +9,11 @@ import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrOp;
@@ -24,10 +24,13 @@ public class ElementMatch extends Component {
     public String category;
     public String selectionType;
     public String elementPosition;
+    public List<String> valueTypes;
+    public String state;
     Attribute attribute;
     public XPathy xPathy;
     ElementMatch.ElementType elementType;
     public ContextWrapper contextWrapper;
+    public String defaultValueKey = "textContent";
 //    public XPathChainResult matchedElements;
     //        public Set<XPathyRegistry.HtmlType> htmlTypes;
 
@@ -54,7 +57,6 @@ public class ElementMatch extends Component {
     public int elementIndex;
 
 
-
     public List<ElementWrapper> wrappedElements = new ArrayList<>();
 
     public void findWebElements(WebDriver driver) {
@@ -67,10 +69,13 @@ public class ElementMatch extends Component {
 
     public ElementMatch(MatchNode elementNode) {
         super(elementNode);
+        this.state = elementNode.getStringFromLocalState("state");
         this.text = elementNode.getStringFromLocalState("text");
         this.category = elementNode.getStringFromLocalState("type");
         this.elementPosition = elementNode.getStringFromLocalState("elementPosition");
         this.selectionType = elementNode.getStringFromLocalState("selectionType");
+        this.valueTypes = Arrays.stream(elementNode.getStringFromLocalState("valueTypes").replaceAll("of", "").trim().replaceAll("\\s+", ",").split(",")).sorted(Comparator.reverseOrder()).toList();
+        System.out.println("@@this.valueTypes: " + this.valueTypes);
 //            if(selectionType.isEmpty())
 //                selectionType = "single";
         for (ElementMatch.ElementType et : ElementMatch.ElementType.values()) {
@@ -124,7 +129,28 @@ public class ElementMatch extends Component {
     }
 
 
+    public String getDefaultElementValue(ElementWrapper elementWrapper) {
+        String defaultValue = String.valueOf(elementWrapper.getAttributeSnapshot().get(defaultValueKey));
+        String currentValue = defaultValue;
 
+        for (String valueType : valueTypes) {
+            switch (valueType) {
+                case "length":
+                    currentValue = String.valueOf(currentValue.length());
+                    break;
+                case "lowercase":
+                    currentValue = currentValue.toLowerCase();
+                    break;
+                case "uppercase":
+                    currentValue = currentValue.toUpperCase();
+                    break;
+                default:
+                    break; // unknown escape -> literal char
+            }
+        }
+
+        return defaultValue;
+    }
 
 
 }

@@ -20,7 +20,7 @@ public class ElementWrapper {
 
     private final WebDriver driver;
     public WebElement element;
-    private  ObjectNode attributeSnapshot;
+    public  ObjectNode attributeSnapshot;
     private final String xpath1;
     private final String xpath2;
     public final ElementMatch elementMatch;
