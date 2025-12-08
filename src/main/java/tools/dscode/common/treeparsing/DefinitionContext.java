@@ -298,8 +298,8 @@ public final class DefinitionContext {
             // Button
             //
             category("Button").inheritsFrom("forLabel", "containsText")
-//                .and((category, v, op) -> XPathy.from("descendant-or-self::*")
-//                        .byHaving(deepNormalizedText(v)))
+                    .and((category, v, op) -> XPathy.from("descendant-or-self::*")
+                            .byHaving(deepNormalizedText(v)))
                     .or(
                             (category, v, op) -> XPathy.from(Tag.button),
                             (category, v, op) -> XPathy.from(Tag.img).byAttribute(role).equals("button"),
@@ -321,7 +321,7 @@ public final class DefinitionContext {
                                             .or().byAttribute(aria_label).equals("link"),
                             (category, v, op) ->
                                     XPathy.from(Tag.a)
-                            ).and(
+                    ).and(
                             (category, v, op) -> {
                                 if (v == null || v.isBlank())
                                     return null;
@@ -389,7 +389,6 @@ public final class DefinitionContext {
                                 );
                             }
                     );
-
 
 
             category("forLabel")
