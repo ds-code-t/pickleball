@@ -187,12 +187,21 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite)(?:s|ed|ing|es)?\\b") {
+        ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite|save)(?:s|ed|ing|es)?\\b") {
             @Override
             public String onCapture(MatchNode self) {
                 System.out.println("@@action: " + self.originalText() + "");
                 self.parent().putToLocalState("action", self.resolvedGroupText("base"));
                 return self.resolvedGroupText("base").replaceAll("move", "hover");
+            }
+        };
+
+        ParseNode key = new ParseNode("\\bas\\s+(?<keyName><<quoteMask>>)") {
+            @Override
+            public String onCapture(MatchNode self) {
+                self.parent().putToLocalState("key", self.resolvedGroupText("keyName"));
+//                return self.originalText();
+                return "";
             }
         };
 
@@ -207,7 +216,7 @@ public final class DefinitionContext {
         };
 
         //    ParseNode assertion = new ParseNode("\\b(?<base>equal|less(?:er)?|greater|less|is)(?=\\s+(?:<<quoteMask>>|<<valueMatch>>|<<elementMatch>>)(s|ed|ing|es)?)\\b")
-        ParseNode assertion = new ParseNode("\\b(?:displayed|equalS?|less(?:er)?|greater|less)\\b") {
+        ParseNode assertion = new ParseNode("\\b(?:displayed|equals?|less(?:er)?|greater|less)\\b") {
             @Override
             public String onCapture(MatchNode self) {
                 System.out.println("@@assertion: " + self.originalText() + "");
@@ -230,6 +239,7 @@ public final class DefinitionContext {
                   - quoteMask
                   - phrase:
                     - not
+                    - key
                     - predicate
                     - elementMatch
                     - valueMatch

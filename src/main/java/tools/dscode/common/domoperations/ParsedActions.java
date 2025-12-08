@@ -34,7 +34,7 @@ public class ParsedActions {
         ElementMatch nextElementMatch = nextElementMatches .isEmpty() ? null : nextElementMatches.getFirst();
 
         List<WebElement> nextElements = nextElementMatch == null || nextElementMatch.wrappedElements.isEmpty() ?
-                new ArrayList<>() : nextElementMatch.wrappedElements.stream().map(e -> e.element).toList();
+                new ArrayList<>() : nextElementMatch.wrappedElements.stream().map(e -> e.getElement()).toList();
         ValueMatch nextValue = (ValueMatch) phraseData.getNextComponents(actionNode.position, "valueMatch").stream().findFirst().orElse(null);
 
         if (!action.equals("wait") && (nextElementMatches.isEmpty() || nextElements.isEmpty())) {
@@ -46,6 +46,14 @@ public class ParsedActions {
 
         System.out.println("Attempting " + action);
         switch (action) {
+            case String s when s.contains("save") -> {
+                for (WebElement nextElement : nextElements) {
+                    selectDropdownByVisibleText(driver, nextElement, nextValue.value);
+                }
+            }
+            case String s when s.contains("wait") -> {
+                waitSeconds(Integer.parseInt(nextValue.value.replace("\"|'|`", "")));
+            }
             case String s when s.contains("select") -> {
                 for (WebElement nextElement : nextElements) {
                     selectDropdownByVisibleText(driver, nextElement, nextValue.value);
@@ -75,9 +83,6 @@ public class ParsedActions {
                 for (WebElement nextElement : nextElements) {
                     wheelScrollBy(driver, nextElement);
                 }
-            }
-            case String s when s.contains("wait") -> {
-                waitSeconds(Integer.parseInt(nextValue.value.replace("\"|'|`", "")));
             }
             case String s when s.contains("overwrite") -> {
                 for (WebElement nextElement : nextElements) {
