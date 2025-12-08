@@ -298,8 +298,6 @@ public final class DefinitionContext {
             // Button
             //
             category("Button").inheritsFrom("forLabel", CONTAINS_TEXT)
-                    .and((category, v, op) -> XPathy.from("descendant-or-self::*")
-                            .byHaving(deepNormalizedText(v)))
                     .or(
                             (category, v, op) -> XPathy.from(Tag.button),
                             (category, v, op) -> XPathy.from(Tag.img).byAttribute(role).equals("button"),
