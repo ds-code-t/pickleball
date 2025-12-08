@@ -58,7 +58,8 @@ public class ContextWrapper {
                     searchContext = searchContext.findElement(combinedXPathy.getLocator());
                     xPathyList.clear();
                 }
-                searchContext = getExecutionDictionary().applyContextBuilder(elementMatch.category, elementMatch.text, elementMatch.textOp, driver, searchContext);
+                System.out.println("@@before-settingContext: " + phraseData.elementMatch.category + " , " +  phraseData.elementMatch.text+ " , " +  phraseData.elementMatch.textOp);
+                searchContext = getExecutionDictionary().applyContextBuilder(phraseData.elementMatch.category, phraseData.elementMatch.text, phraseData.elementMatch.textOp, driver, searchContext);
             } else {
                 xPathyList.add(phraseData.contextXPathy);
                 System.out.println("@@phraseData-- 3 " + xPathyList);

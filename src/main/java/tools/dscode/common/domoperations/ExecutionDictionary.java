@@ -923,7 +923,7 @@ public class ExecutionDictionary {
         System.out.println("@@category " + category);
         System.out.println("@@cb " + cb);
         if (cb == null) {
-            return context; // no override → keep existing behavior
+            throw new RuntimeException("category '" + category +"' does not have a registered context");
         }
         return cb.build(category, value, op, webDriver, context);
     }

@@ -9,6 +9,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class GlobalRegistry {
+
+    static {
+        Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
+            System.err.println("### UNCAUGHT in thread " + t.getName());
+            e.printStackTrace();
+        });
+    }
+
     private GlobalRegistry() {
     }
 

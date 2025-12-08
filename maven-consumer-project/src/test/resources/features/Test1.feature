@@ -1,5 +1,11 @@
 Feature: Addition
 
+  Scenario: testqwq
+  @[DEBUG]
+    Then , I select "Opel" in the "cars" Dropdown, and click the Submit Button
+
+#    * , from the Top Panel:
+#  : * IF: "<Opel sd>" THEN: , I verify  length of value of "Get your own website" Link equal "AA"
 
   Scenario: ss3
     Then print aaa

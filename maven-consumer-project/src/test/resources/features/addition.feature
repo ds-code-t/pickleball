@@ -39,7 +39,7 @@ Feature: Addition
 #    Then , from the IframeResult, I select "Opel" in the "cars" Dropdown, and click the Submit Button
 #    Then , I select "Opel" in the "cars" Dropdown, and select "Volvo" in the "cars" Dropdown
 
-    Then , I select "Opel" in the "cars" Dropdown, and click the Submit Button`
+    Then , I select "Opel" in the "cars" Dropdown, and click the Submit Button
 #    * , from the IframeResult, I enter "dd" in the "Last name:" Textbox
   @[DEBUG]
     * , from the Top Panel:

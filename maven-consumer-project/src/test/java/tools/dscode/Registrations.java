@@ -38,10 +38,16 @@ public class Registrations {
         dict.registerDefaultStartingContext((category, v, op, webDriver, ctx) ->
         {
             try {
+                System.out.println("@@DC-1");
+                webDriver.switchTo().defaultContent();
                 System.out.println("@@--registration of registerDefaultStartingContext");
                 XPathy xpathy = dict.getCategoryXPathy("FrameResult");
-                webDriver.switchTo().frame(xpathy.getXpath());
-                return ctx;
+                System.out.println("@@DC-2: " + xpathy.getXpath());
+                WebElement frame = webDriver.findElement(xpathy.getLocator());
+                System.out.println("@@DC-2.5 frame: " + frame);
+                webDriver.switchTo().frame(frame);
+                System.out.println("@@DC-3: " + ctx);
+                return webDriver;
             } catch (Exception e) {
                 e.printStackTrace();
                 throw new RuntimeException(e);
