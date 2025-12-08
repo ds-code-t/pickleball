@@ -9,7 +9,6 @@ import io.cucumber.plugin.event.Result;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.StepMapping;
 
-import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 import tools.dscode.coredefinitions.GeneralSteps;
 
@@ -17,8 +16,6 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import static tools.dscode.common.util.DebugUtils.printDebug;
 
 
 public abstract class StepData extends StepMapping {
@@ -52,6 +49,7 @@ public abstract class StepData extends StepMapping {
     public String codeLocation;
     public boolean isCoreStep;
     protected final List<String> stepFlags = new ArrayList<>();
+    protected List<DefinitionFlag> inheritableDefinitionFlags = new ArrayList<>();
     protected List<DefinitionFlag> definitionFlags;
     protected List<DefinitionFlag> nextSiblingDefinitionFlags;
     public List<String> stepTags = new ArrayList<>();
@@ -171,7 +169,7 @@ public abstract class StepData extends StepMapping {
     public abstract Result execute(io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep);
 
      public void copyDefinitionFlags(StepData stepData) {
-         addDefinitionFlag(stepData.definitionFlags.toArray(new DefinitionFlag[0]));
+         addDefinitionFlag(stepData.inheritableDefinitionFlags.toArray(new DefinitionFlag[0]));
      };
     public abstract void addDefinitionFlag(DefinitionFlag... flags);
 

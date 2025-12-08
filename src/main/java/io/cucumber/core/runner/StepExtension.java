@@ -39,6 +39,8 @@ public class StepExtension extends StepData {
         definitionFlags = pickleStepTestStep.getDefinitionFlags().stream().map(f -> {
             if(f.toString().startsWith("_"))
                 return DefinitionFlag.valueOf(f.toString().substring(1));
+            else
+                inheritableDefinitionFlags.add(f);
             return f;
         }) .collect(Collectors.toCollection(ArrayList::new));
         System.out.println("@@definitionFlags: " + definitionFlags);
