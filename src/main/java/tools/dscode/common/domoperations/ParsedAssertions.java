@@ -35,9 +35,9 @@ public class ParsedAssertions {
         DomChecks.CheckResult result;
         switch (phraseData.assertion) {
             case String s when s.contains("equal") -> {
-                System.out.println("@@component1.getValue(driver): " + component1.getValue(driver));
-                System.out.println("@@component2.getValue(driver): " + component2.getValue(driver));
-                result = equalsNormalized(component1.getValue(driver), component2.getValue(driver));
+                System.out.println("@@component1.getValue(driver): " + component1.getValue());
+                System.out.println("@@component2.getValue(driver): " + component2.getValue());
+                result = equalsNormalized(component1.getValue(), component2.getValue());
             }
             case String s when s.contains("displayed") -> {
                 result = hasAny(driver, phraseData.elementMatch.xPathy);

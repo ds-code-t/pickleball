@@ -2,8 +2,10 @@ package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.xpathy.XPathy;
 import org.openqa.selenium.SearchContext;
+import org.openqa.selenium.WrapsElement;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 
+import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 
@@ -45,6 +47,7 @@ public abstract class PhraseData {
     public boolean isContext;
     public boolean hasDOMInteraction;
     public List<ElementMatch> elements;
+    public List<ElementWrapper> wrappedElements;
     public List<ValueMatch> values;
     public ElementMatch elementMatch;
     public String conjunction;
@@ -56,6 +59,8 @@ public abstract class PhraseData {
     public PhraseType phraseType;
 
     public XPathy contextXPathy;
+
+    public String keyName;
 
 //    public SearchContext getCurrentSearchContext() {
 //        if (currentSearchContext == null) {
@@ -99,6 +104,7 @@ public abstract class PhraseData {
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
         hasNot = phraseNode.localStateBoolean("not");
+        keyName = phraseNode.getStringFromLocalState("keyName");
         components = phraseNode.getOrderedChildren("elementMatch", "valueMatch").stream().map(m -> {
             if (m.name().equals("valueMatch"))
                 return new ValueMatch(m);

@@ -2,7 +2,7 @@ package tools.dscode.common.domoperations;
 
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.chromium.ChromiumDriver;
+import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
@@ -12,6 +12,7 @@ import tools.dscode.common.treeparsing.parsedComponents.ValueMatch;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.domoperations.HumanInteractions.clearAndType;
 import static tools.dscode.common.domoperations.HumanInteractions.click;
 import static tools.dscode.common.domoperations.HumanInteractions.contextClick;
@@ -47,8 +48,11 @@ public class ParsedActions {
         System.out.println("Attempting " + action);
         switch (action) {
             case String s when s.contains("save") -> {
-                for (WebElement nextElement : nextElements) {
-                    selectDropdownByVisibleText(driver, nextElement, nextValue.value);
+                String keyName = phraseData.keyName;
+                for (ElementWrapper nextElement : phraseData.wrappedElements) {
+                    if(keyName.isBlank())
+                        keyName = nextElement.elementMatch.category;
+                    getRunningStep().getStepParsingMap().put(keyName, nextElement.getElementReturnValue());
                 }
             }
             case String s when s.contains("wait") -> {

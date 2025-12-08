@@ -13,6 +13,7 @@ import static tools.dscode.common.domoperations.LeanWaits.safeWaitForElementRead
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.intersection;
 import static tools.dscode.common.domoperations.SeleniumUtils.union;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementMatch.ELEMENT_RETURN_VALUE;
 
 public class ElementWrapper {
 
@@ -88,6 +89,33 @@ public class ElementWrapper {
 
     public ObjectNode getAttributeSnapshot() {
         return attributeSnapshot;
+    }
+
+    public String getElementReturnValue() {
+        if(attributeSnapshot.has(ELEMENT_RETURN_VALUE))
+            return attributeSnapshot.get(ELEMENT_RETURN_VALUE).asText();
+
+        switch (elementMatch.category){
+            case "Field":
+                List<WebElement> valueElements =  element.findElements(By.xpath(".//*[contains(@class,'read')]"));
+                if(!valueElements.isEmpty()){
+                    String returnVal = valueElements.getLast().getText();
+                    attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
+                    return returnVal;
+                }
+                attributeSnapshot.put(ELEMENT_RETURN_VALUE, "text");
+                break;
+        }
+        for (String key : elementMatch.defaultValueKeys) {
+            if (attributeSnapshot.has(key))
+            {
+                String returnVal = attributeSnapshot.get(key).asText();
+                attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
+                return returnVal;
+            }
+        }
+        attributeSnapshot.put(ELEMENT_RETURN_VALUE, "");
+        return "";
     }
 
 

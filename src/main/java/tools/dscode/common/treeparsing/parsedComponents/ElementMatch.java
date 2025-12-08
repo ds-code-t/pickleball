@@ -19,7 +19,11 @@ import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDict
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrOp;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyTextOp;
 
+
 public class ElementMatch extends Component {
+
+    public static final String ELEMENT_LABEL_VALUE ="_elementLabelValue";
+    public static final String ELEMENT_RETURN_VALUE ="_elementReturnValue";
     public String text;
     public String category;
     public String selectionType;
@@ -30,7 +34,7 @@ public class ElementMatch extends Component {
     public XPathy xPathy;
     ElementMatch.ElementType elementType;
     public ContextWrapper contextWrapper;
-    public String defaultValueKey = "textContent";
+    public  List<String> defaultValueKeys = new ArrayList<>(List.of(ELEMENT_RETURN_VALUE, "value", "textContent"));
 //    public XPathChainResult matchedElements;
     //        public Set<XPathyRegistry.HtmlType> htmlTypes;
 
@@ -62,6 +66,7 @@ public class ElementMatch extends Component {
     public void findWebElements(WebDriver driver) {
         List<WebElement> elements = contextWrapper.getElements(driver);
         wrappedElements.addAll(elements.stream().map(e -> new ElementWrapper(driver, e, this)).toList());
+        parentPhrase.wrappedElements.addAll(wrappedElements);
     }
 
 
@@ -130,7 +135,7 @@ public class ElementMatch extends Component {
 
 
     public String getDefaultElementValue(ElementWrapper elementWrapper) {
-        String defaultValue = String.valueOf(elementWrapper.getAttributeSnapshot().get(defaultValueKey));
+        String defaultValue = String.valueOf(elementWrapper.getElementReturnValue());
         String currentValue = defaultValue;
 
         for (String valueType : valueTypes) {
@@ -149,7 +154,7 @@ public class ElementMatch extends Component {
             }
         }
 
-        return defaultValue;
+        return currentValue;
     }
 
 
