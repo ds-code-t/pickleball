@@ -49,9 +49,12 @@ public class ParsedActions {
         switch (action) {
             case String s when s.contains("save") -> {
                 String keyName = phraseData.keyName;
+                System.out.println("@@keyName1: " + keyName);
                 for (ElementWrapper nextElement : phraseData.wrappedElements) {
                     if (keyName.isBlank())
                         keyName = nextElement.elementMatch.category;
+                    System.out.println("@@keyName2: " + keyName);
+                    System.out.println("@@nextElement.getElementReturnValue(): " + nextElement.getElementReturnValue());
                     getRunningStep().getStepParsingMap().put(keyName, nextElement.getElementReturnValue());
                 }
             }

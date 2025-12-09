@@ -139,7 +139,7 @@ public final class DefinitionContext {
 //            self.getAncestor("phrase").putToLocalState("elementMatch", self);
                 self.putToLocalState("selectionType", self.resolvedGroupText("selectionType"));
                 String elementPosition = self.resolvedGroupText("elementPosition");
-                if (elementPosition == null || elementPosition.isBlank() || elementPosition.equals("first"))
+                if (elementPosition.isBlank() || elementPosition.equals("first"))
                     elementPosition = "1";
                 self.putToLocalState("elementPosition", elementPosition.replaceAll("#", ""));
                 self.putToLocalState("state", self.resolvedGroupText("state"));
@@ -147,9 +147,6 @@ public final class DefinitionContext {
                 self.putToLocalState("type", self.resolvedGroupText("type"));
                 self.putToLocalState("attrName", self.resolvedGroupText("attrName"));
                 self.putToLocalState("elPredicate", self.groups().get("elPredicate"));
-
-
-
                 return self.token();
             }
         };
@@ -201,9 +198,9 @@ public final class DefinitionContext {
         ParseNode key = new ParseNode("\\bas\\s+(?<keyName><<quoteMask>>)") {
             @Override
             public String onCapture(MatchNode self) {
-                self.parent().putToLocalState("key", self.resolvedGroupText("keyName"));
+                self.parent().putToLocalState("keyName", self.resolvedGroupText("keyName"));
 //                return self.originalText();
-                return "";
+                return " ";
             }
         };
 
@@ -213,7 +210,7 @@ public final class DefinitionContext {
             public String onCapture(MatchNode self) {
                 self.parent().putToLocalState("not", "not");
 //                return self.originalText();
-                return "";
+                return " ";
             }
         };
 
@@ -232,7 +229,7 @@ public final class DefinitionContext {
             public String onCapture(MatchNode self) {
                 self.parent().putToLocalState("not", "not");
 //                return self.originalText();
-                return "";
+                return " ";
             }
         };
 
@@ -360,11 +357,6 @@ public final class DefinitionContext {
 
                         XPathy selfVisible = any.byCondition(visible());
                         String visiblePredicate = extractPredicate("//*", selfVisible.getXpath());
-                        System.out.println("\n==========\n@@##BASE-visiblePredicate:  " + visiblePredicate);
-                        System.out.println("\n==========\n@@##BASE-selfVisible:  " + selfVisible);
-                        System.out.println("\n==========\n@@##BASE-invisiblePredicate:  " + invisiblePredicate);
-                        System.out.println("\n----------\n");
-
                         return XPathy.from(
                                 "//*[" +
                                         visiblePredicate +

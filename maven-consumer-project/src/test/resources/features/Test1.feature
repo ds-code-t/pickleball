@@ -6,9 +6,11 @@ Feature: Addition
 #    Then IF: "Asdd Rdfds "   THEN: , I select "Opel" in the "cars" Dropdown
 #    Then , IF: "Asdd Rdfds "   THEN: , I select "Opel" in the "cars" Dropdown, and click the Submit Button
 #  * , verify "The select element" Text is displayed
-  * , verify Text containing "The select element"  is displayed
-#    * , from the Top Panel:
-#  : * IF: "<Opel sd>" THEN: , I verify  "Get your own website" Link equals "AA"
+#  * , verify Text containing "The select element"  is displayed
+#  * , verify Text containing "The select element"  is displayed
+    * , from the Top Panel:
+  : * , I save  Link starting with  "Get your own" as "Q"
+  : * , I verify "<Q>" equals "Q"
 #  : * IF: "<Opel sd>" THEN: , I verify  "Get your own website" Link matches with "^Gset.*$"
 
   Scenario: ss3

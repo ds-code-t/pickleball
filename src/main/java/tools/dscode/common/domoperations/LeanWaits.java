@@ -135,33 +135,29 @@ public final class LeanWaits {
     public static WebElement waitForElementReady(WebDriver driver,
                                                         WebElement element,
                                                         Duration timeout) {
-        System.out.println("@@waitForElementReady: " + element + " timeout=" + timeout);
         FluentWait<WebDriver> wait = new FluentWait<>(driver)
                 .withTimeout(timeout)
                 .pollingEvery(Duration.ofMillis(150))
                 .ignoring(ElementClickInterceptedException.class)
                 .ignoring(JavascriptException.class)
                 .ignoring(WebDriverException.class);
-        System.out.println("@@wait=" + wait);
+
+        System.out.println("Waiting for element to become ready " + timeout + "ms: " + element.toString());
         return wait.until(d -> {
             try {
                 if (element == null) {
                     return null;
                 }
-                System.out.println("@@1");
                 boolean displayed;
                 try {
                     displayed = element.isDisplayed();
                 } catch (StaleElementReferenceException stale) {
-                    System.out.println("@@stale");
                     // let caller re-locate if needed; continue polling until timeout
                     return null;
                 }
-                System.out.println("@@2");
                 if (!displayed) {
                     return null;
                 }
-                System.out.println("@@3");
                 // Center into viewport to avoid sticky headers/partial visibility
                 try {
                     ((JavascriptExecutor) d).executeScript(
@@ -172,30 +168,24 @@ public final class LeanWaits {
                     System.out.println("@@ignored-- JavascriptException");
                     // ignore and continue polling
                 }
-                System.out.println("@@4");
                 // Small hover nudge for CSS :hover menus/tooltips
                 try {
                     new Actions(d).moveToElement(element)
                             .pause(Duration.ofMillis(100))
                             .perform();
                 } catch (WebDriverException ignored) {
-                    System.out.println("@@ignored-- WebDriverException");
                     // hover failures shouldn't abort; just keep polling
                 }
-                System.out.println("@@5");
                 // JS hit-test at center (shadow DOM aware) + style checks
                 Boolean ok;
                 try {
                     ok = (Boolean) ((JavascriptExecutor) d).executeScript(HIT_TEST_JS, element);
                 } catch (JavascriptException ignored) {
-                    System.out.println("@@ignored-- JavascriptException2");
                     return null;
                 }
-                System.out.println("@@6 ok: " + ok);
                 return Boolean.TRUE.equals(ok) ? element : null;
 
             } catch (StaleElementReferenceException stale) {
-                System.out.println("@@stale2");
                 // The reference is dead; the caller should re-locate and call again.
                 return null;
             }
