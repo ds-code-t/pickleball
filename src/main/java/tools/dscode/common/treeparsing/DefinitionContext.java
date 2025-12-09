@@ -353,7 +353,7 @@ public final class DefinitionContext {
                     );
 
 
-            category(BASE_CATEGORY+"ZZ").and(
+            category(BASE_CATEGORY).and(
                     (category, v, op) -> {
                         XPathy selfInvisible = any.byCondition(invisible());
                         String invisiblePredicate = extractPredicate("//*", selfInvisible.getXpath());
