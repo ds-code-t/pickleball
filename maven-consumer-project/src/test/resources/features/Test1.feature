@@ -8,7 +8,7 @@ Feature: Addition
 
     * , from the Top Panel:
 #  : * IF: "<Opel sd>" THEN: , I verify  "Get your own website" Link equals "AA"
-  : * IF: "<Opel sd>" THEN: , I verify  "Get your own website" Link starts with "Get"
+  : * IF: "<Opel sd>" THEN: , I verify  "Get your own website" Link matches with "^Gset.*$"
 
   Scenario: ss3
     Then print aaa

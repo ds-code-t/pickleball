@@ -12,6 +12,7 @@ import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import static tools.dscode.common.domoperations.DomChecks.endsWithNormalized;
 import static tools.dscode.common.domoperations.DomChecks.equalsNormalized;
 import static tools.dscode.common.domoperations.DomChecks.hasAny;
+import static tools.dscode.common.domoperations.DomChecks.matchesNormalized;
 import static tools.dscode.common.domoperations.DomChecks.startsWithNormalized;
 
 
@@ -41,15 +42,20 @@ public class ParsedAssertions {
                 System.out.println("@@component2.getValue(driver): " + component2.getValue());
                 result = equalsNormalized(component1.getValue(), component2.getValue());
             }
-            case String s when s.contains("starts with") -> {
+            case String s when s.contains("start with") -> {
                 System.out.println("@@component1.getValue(driver): " + component1.getValue());
                 System.out.println("@@component2.getValue(driver): " + component2.getValue());
                 result = startsWithNormalized(component1.getValue(), component2.getValue());
             }
-            case String s when s.contains("ends with") -> {
+            case String s when s.contains("end with") -> {
                 System.out.println("@@component1.getValue(driver): " + component1.getValue());
                 System.out.println("@@component2.getValue(driver): " + component2.getValue());
                 result = endsWithNormalized(component1.getValue(), component2.getValue());
+            }
+            case String s when s.contains("match") -> {
+                System.out.println("@@component1.getValue(driver): " + component1.getValue());
+                System.out.println("@@component2.getValue(driver): " + component2.getValue());
+                result = matchesNormalized(component1.getValue(), String.valueOf(component2.getValue()));
             }
             case String s when s.contains("displayed") -> {
                 result = hasAny(driver, phraseData.elementMatch.xPathy);

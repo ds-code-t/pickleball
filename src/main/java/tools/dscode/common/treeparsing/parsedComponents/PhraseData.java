@@ -136,7 +136,7 @@ public abstract class PhraseData {
             } else {
                 assertionType = phraseNode.getStringFromLocalState("assertionType");
                 if (!assertionType.isBlank()){
-                    assertion = phraseNode.getStringFromLocalState("assertion");
+                    assertion = phraseNode.getStringFromLocalState("assertion").replaceAll("s$","").replaceAll("e?s\\s+"," ");
                     phraseType = PhraseType.ASSERTION;
                 }
             }

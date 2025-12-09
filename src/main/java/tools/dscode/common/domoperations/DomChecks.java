@@ -91,7 +91,7 @@ public final class DomChecks {
         boolean ok = sa.matches(regex);
         return new CheckResult(
                 ok,
-                "containsNormalized: [" + sa + "] vs [" + regex + "] -> " + ok
+                "matchesNormalized: [" + sa + "] vs [" + regex + "] -> " + ok
         );
     }
 
