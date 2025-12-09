@@ -47,7 +47,7 @@ public abstract class PhraseData {
     public boolean isContext;
     public boolean hasDOMInteraction;
     public List<ElementMatch> elements;
-    public List<ElementWrapper> wrappedElements;
+    public List<ElementWrapper> wrappedElements = new ArrayList<>();
     public List<ValueMatch> values;
     public ElementMatch elementMatch;
     public String conjunction;

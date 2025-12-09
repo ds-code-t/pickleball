@@ -32,13 +32,13 @@ public class ParsedActions {
         String action = phraseData.action;
 
         List<ElementMatch> nextElementMatches = phraseData.getNextComponents(actionNode.position, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
-        ElementMatch nextElementMatch = nextElementMatches .isEmpty() ? null : nextElementMatches.getFirst();
+        ElementMatch nextElementMatch = nextElementMatches.isEmpty() ? null : nextElementMatches.getFirst();
 
         List<WebElement> nextElements = nextElementMatch == null || nextElementMatch.wrappedElements.isEmpty() ?
                 new ArrayList<>() : nextElementMatch.wrappedElements.stream().map(e -> e.getElement()).toList();
         ValueMatch nextValue = (ValueMatch) phraseData.getNextComponents(actionNode.position, "valueMatch").stream().findFirst().orElse(null);
 
-        if (!action.equals("wait") && (nextElementMatches.isEmpty() || nextElements.isEmpty())) {
+        if (!action.equals("wait") && (nextElementMatches.isEmpty() || (!phraseData.elementMatch.selectionType.equals("any") && nextElements.isEmpty()))) {
             String message = "No elements found for " + action;
             if (nextElementMatch != null && nextElementMatch.xPathy != null)
                 message += " at " + nextElementMatch.xPathy.getXpath();
@@ -50,7 +50,7 @@ public class ParsedActions {
             case String s when s.contains("save") -> {
                 String keyName = phraseData.keyName;
                 for (ElementWrapper nextElement : phraseData.wrappedElements) {
-                    if(keyName.isBlank())
+                    if (keyName.isBlank())
                         keyName = nextElement.elementMatch.category;
                     getRunningStep().getStepParsingMap().put(keyName, nextElement.getElementReturnValue());
                 }
@@ -63,7 +63,7 @@ public class ParsedActions {
                     selectDropdownByVisibleText(driver, nextElement, nextValue.value);
                 }
             }
-             case String s when s.contains("click") -> {
+            case String s when s.contains("click") -> {
                 for (WebElement nextElement : nextElements) {
                     click(driver, nextElement);
                 }

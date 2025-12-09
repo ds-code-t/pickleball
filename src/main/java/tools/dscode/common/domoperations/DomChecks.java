@@ -1,23 +1,12 @@
 package tools.dscode.common.domoperations;
 
-import com.xpathy.XPathy;
 import org.intellij.lang.annotations.RegExp;
-import org.openqa.selenium.By;
-import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 
 import java.util.List;
-import java.util.Objects;
 
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.normalizeText;
 
-/**
- * Concise DOM check helpers for XPathy + Selenium.
- * All methods:
- *   - take a WebDriver and an XPathy
- *   - return a CheckResult (no exceptions)
- *   - describe what was found
- */
 public final class DomChecks {
 
 
@@ -100,12 +89,7 @@ public final class DomChecks {
      *  Internal helpers
      * ------------------------------------------------------------- */
 
-    private static List<WebElement> find(WebDriver driver, XPathy xpathy) {
-        Objects.requireNonNull(driver, "driver must not be null");
-        Objects.requireNonNull(xpathy, "xpathy must not be null");
-
-        By by = xpathy.getLocator();  // from XPathy API :contentReference[oaicite:0]{index=0}
-        List<WebElement> elements = driver.findElements(by);
+    private static List<WebElement> find(List<WebElement> elements) {
         return elements == null ? List.of() : elements;
     }
 
@@ -135,8 +119,7 @@ public final class DomChecks {
      * ------------------------------------------------------------- */
 
     /** Are there any matches for this XPathy? */
-    public static CheckResult hasAny(WebDriver driver, XPathy xpathy) {
-        List<WebElement> els = find(driver, xpathy);
+    public static CheckResult hasAny(List<WebElement> els) {
         boolean ok = !els.isEmpty();
         String desc = ok
                 ? "Found " + els.size() + " elements. First: " + summarizeFirst(els)
@@ -145,8 +128,7 @@ public final class DomChecks {
     }
 
     /** Does this XPathy match exactly {@code expectedCount} elements? */
-    public static CheckResult matchCount(WebDriver driver, XPathy xpathy, int expectedCount) {
-        List<WebElement> els = find(driver, xpathy);
+    public static CheckResult matchCount(List<WebElement> els, int expectedCount) {
         int actual = els.size();
         boolean ok = (actual == expectedCount);
         String desc = "Match count expected=" + expectedCount +
@@ -156,8 +138,7 @@ public final class DomChecks {
     }
 
     /** Is the first matched element selected (checkbox, radio, option, etc.)? */
-    public static CheckResult firstIsSelected(WebDriver driver, XPathy xpathy) {
-        List<WebElement> els = find(driver, xpathy);
+    public static CheckResult firstIsSelected(List<WebElement> els) {
         if (els.isEmpty()) {
             return new CheckResult(false, "No elements found for isSelected check.");
         }
@@ -169,8 +150,7 @@ public final class DomChecks {
     }
 
     /** Does the first matched element have a non-empty 'value' attribute? */
-    public static CheckResult firstHasValue(WebDriver driver, XPathy xpathy) {
-        List<WebElement> els = find(driver, xpathy);
+    public static CheckResult firstHasValue(List<WebElement> els) {
         if (els.isEmpty()) {
             return new CheckResult(false, "No elements found for value check.");
         }
@@ -183,8 +163,7 @@ public final class DomChecks {
     }
 
     /** Does the first matched element have non-empty visible text content? */
-    public static CheckResult firstHasText(WebDriver driver, XPathy xpathy) {
-        List<WebElement> els = find(driver, xpathy);
+    public static CheckResult firstHasText(List<WebElement> els) {
         if (els.isEmpty()) {
             return new CheckResult(false, "No elements found for text check.");
         }
@@ -197,10 +176,8 @@ public final class DomChecks {
     }
 
     /** Does the first matched element have this attribute at all (value may be empty)? */
-    public static CheckResult firstHasAttribute(WebDriver driver,
-                                                XPathy xpathy,
+    public static CheckResult firstHasAttribute(List<WebElement> els,
                                                 String attrName) {
-        List<WebElement> els = find(driver, xpathy);
         if (els.isEmpty()) {
             return new CheckResult(false,
                     "No elements found for attribute @" + attrName + " existence check.");
@@ -214,10 +191,8 @@ public final class DomChecks {
     }
 
     /** Is the first element's text (normalized) equal to the expected value (normalized)? */
-    public static CheckResult firstTextEquals(WebDriver driver,
-                                              XPathy xpathy,
+    public static CheckResult firstTextEquals(List<WebElement> els,
                                               Object expected) {
-        List<WebElement> els = find(driver, xpathy);
         if (els.isEmpty()) {
             return new CheckResult(false, "No elements found for text equality check.");
         }
@@ -232,11 +207,9 @@ public final class DomChecks {
     }
 
     /** Is the first element's attribute value (normalized) equal to the expected value (normalized)? */
-    public static CheckResult firstAttributeEquals(WebDriver driver,
-                                                   XPathy xpathy,
+    public static CheckResult firstAttributeEquals(List<WebElement> els,
                                                    String attrName,
                                                    Object expected) {
-        List<WebElement> els = find(driver, xpathy);
         if (els.isEmpty()) {
             return new CheckResult(false,
                     "No elements found for attribute @" + attrName + " equality check.");

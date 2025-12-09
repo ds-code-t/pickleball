@@ -343,6 +343,9 @@ public class ExecutionDictionary {
     }
 
     public List<XPathy> expandAnd(String category, String value, Op op) {
+        System.out.println("@@=Category: " + category + " Value: " + value + " Op: " + op + "");
+        List<XPathy> xPathy =  expandInternal(andReg, BASE_CATEGORY, value, op);
+        xPathy.forEach(x -> System.out.println("@@x: " + x.getXpath()));
         return Stream.concat(expandInternal(andReg, category, value, op).stream(), expandInternal(andReg, BASE_CATEGORY, value, op).stream())
                 .collect(Collectors.toList());
     }
@@ -360,7 +363,7 @@ public class ExecutionDictionary {
         }
 
         // Make a defensive copy so we don't mutate caller's list
-        List<XPathy> sorted = new ArrayList<>(list);
+        List<XPathy> sorted = new ArrayList<>(list.stream().filter(Objects::nonNull).toList());
 
         // Sort by heuristic specificity score (lower is "better")
         sorted.sort(Comparator.comparingInt(x -> xpathSpecificityScore(x.getXpath())));
@@ -407,7 +410,7 @@ public class ExecutionDictionary {
 
 
         Optional<XPathy> result = resolveToXPathy(category, value, op);
-
+        System.out.println("@@result--: " + result);
         if (result.isEmpty()) {
             return null;  // preserve prior semantics
         }
@@ -436,9 +439,10 @@ public class ExecutionDictionary {
      * Optional-returning version of andThenOr.
      */
     public Optional<XPathy> resolveToXPathy(String category, String value, Op op) {
-
+        System.out.println("@@resolveToXPathy::: category: " + category + " Value: " + value + " Op: " + op + "");
         Optional<XPathy> orPart = orAll(category, value, op);
         Optional<XPathy> andPart = andAll(category, value, op);
+        System.out.println("@@resolveToXPathy- orPart: " + orPart + " ,  andPart: " + andPart );
 
 
         if (andPart.isEmpty() && orPart.isEmpty()) {
@@ -454,8 +458,12 @@ public class ExecutionDictionary {
         String andStep = toSelfStep(andPart.get().getXpath());
         String orStep = toSelfStep(orPart.get().getXpath());
 
+        System.out.println("@@andStep: " + andStep);
+        System.out.println("@@orStep: " + orStep);
+
         String combinedExpr = "(" + andStep + ") and (" + orStep + ")";
 
+        System.out.println("@@combinedExpr: " + combinedExpr);
         String fullXpath = "//*[" + combinedExpr + "]";
 
         XPathy x = XPathy.from(fullXpath);

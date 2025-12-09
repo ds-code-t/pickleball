@@ -44,7 +44,6 @@ public class ContextWrapper {
     }
 
     public SearchContext getFinalSearchContext(WebDriver driver) {
-        driver.switchTo().defaultContent();
         SearchContext searchContext = driver;
         List<XPathy> xPathyList = new ArrayList<>();
         for (int j = 0; j < contextList.size(); j++) {
@@ -61,11 +60,14 @@ public class ContextWrapper {
                 System.out.println("@@before-settingContext: " + phraseData.elementMatch.category + " , " +  phraseData.elementMatch.text+ " , " +  phraseData.elementMatch.textOp);
                 searchContext = getExecutionDictionary().applyContextBuilder(phraseData.elementMatch.category, phraseData.elementMatch.text, phraseData.elementMatch.textOp, driver, searchContext);
             } else {
+                System.out.println("@@addomg1: phraseData.contextXPathy " + phraseData.contextXPathy);
                 xPathyList.add(phraseData.contextXPathy);
                 System.out.println("@@phraseData-- 3 " + xPathyList);
             }
 
         }
+        System.out.println("@@addomg2: phraseData.contextXPathy " + elementMatch.xPathy);
+
         xPathyList.add(elementMatch.xPathy);
         initializeElementXPaths(xPathyList);
         return searchContext;
@@ -76,6 +78,7 @@ public class ContextWrapper {
     XPathy elementTerminalXPath;
 
     public void initializeElementXPaths(List<XPathy> xPathyList) {
+        xPathyList.forEach(x -> System.out.println("@@initializeElementXPaths: " + prettyPrintXPath(x)));
         if (elementTerminalXPath != null) return;
         elementPath = combineAnd(xPathyList);
         if (elementMatch.elementPosition.isEmpty() && elementMatch.selectionType.isEmpty())

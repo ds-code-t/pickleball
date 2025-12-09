@@ -123,7 +123,7 @@ public final class DefinitionContext {
         ParseNode predicate = new ParseNode("(?:\\b(?<predicateType>starting with|containing)\\s+(?<predicateVal>\\d+|<<quoteMask>>))") {
             @Override
             public String onCapture(MatchNode self) {
-                System.out.println("@@predicate: " + self.originalText() + "");
+                System.out.println("@@predicate:@@predicate: " + self.originalText() + "");
                 self.putToLocalState("predicateType", self.resolvedGroupText("predicateType"));
                 self.putToLocalState("predicateVal", self.resolvedGroupText("predicateVal"));
                 return self.originalText();
@@ -131,7 +131,8 @@ public final class DefinitionContext {
         };
 
 
-        ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?:with\\s+(?<attrName>[a-z]+)?)?\\s+(?<predicate><<predicate>>))?") {
+//        ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?:with\\s+(?<attrName>[a-z]+)?)?\\s+(?<predicate><<predicate>>))?");
+        ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?:with\\s+(?<attrName>[a-z]+)?)?\\s*(?<predicate><<predicate>>))?") {
             @Override
             public String onSubstitute(MatchNode self) {
                 System.out.println("@@elementMatch: " + self.originalText() + "");
@@ -145,7 +146,8 @@ public final class DefinitionContext {
                 self.putToLocalState("text", self.resolvedGroupText("text"));
                 self.putToLocalState("type", self.resolvedGroupText("type"));
                 self.putToLocalState("attrName", self.resolvedGroupText("attrName"));
-                self.putToLocalState("predicate", self.resolvedGroupText("predicate"));
+                self.putToLocalState("elPredicate", self.groups().get("elPredicate"));
+                System.out.println("@@predicate--: " +self.resolvedGroupText("elPredicate") + "");
                 System.out.println("@@elementMatch--maskedText: " + self.maskedText() + "");
                 System.out.println("@@elementMatch--self.token(): " + self.token() + "");
                 return self.token();
@@ -351,7 +353,7 @@ public final class DefinitionContext {
                     );
 
 
-            category(BASE_CATEGORY).and(
+            category(BASE_CATEGORY+"ZZ").and(
                     (category, v, op) -> {
                         XPathy selfInvisible = any.byCondition(invisible());
                         String invisiblePredicate = extractPredicate("//*", selfInvisible.getXpath());

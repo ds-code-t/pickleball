@@ -37,17 +37,14 @@ public final class LeanWaits {
             try {
                 elementMatch.findWebElements(driver);
             } catch (Exception e) {
+                System.out.println(e.getMessage());
+                e.printStackTrace();
                 System.out.println("[WARN] Error locating elements for: " + elementMatch);
                 e.printStackTrace(System.out);
                 continue;   // continue to next elementMatch
             }
 
 
-            if (!elementMatch.selectionType.equals("any")
-                    && elementMatch.wrappedElements.isEmpty()) {
-                throw new RuntimeException("[WARN] Required element not found for " + elementMatch);
-
-            }
 
             for (ElementWrapper elementWrapper : elementMatch.wrappedElements) {
                 safeWaitForElementReady(driver, elementWrapper.element, Duration.ofSeconds(60));

@@ -5,7 +5,8 @@ Feature: Addition
 #    Then , I select "Opel" in the "cars" Dropdown
 #    Then IF: "Asdd Rdfds "   THEN: , I select "Opel" in the "cars" Dropdown
 #    Then , IF: "Asdd Rdfds "   THEN: , I select "Opel" in the "cars" Dropdown, and click the Submit Button
-  * , verify "The select element" Text is displayed
+#  * , verify "The select element" Text is displayed
+  * , verify Text containing "The select elfement"  is displayed
 #    * , from the Top Panel:
 #  : * IF: "<Opel sd>" THEN: , I verify  "Get your own website" Link equals "AA"
 #  : * IF: "<Opel sd>" THEN: , I verify  "Get your own website" Link matches with "^Gset.*$"

@@ -6,8 +6,9 @@ public class Attribute {
     String predicateVal;
 
     public Attribute(String attrName, String predicateType, String predicateVal) {
-        this.attrName = attrName == null || attrName.isBlank() ? "TEXT" : attrName;
+        this.attrName = attrName == null || attrName.isBlank() ? "Text" : attrName;
         this.predicateType = predicateType;
         this.predicateVal = predicateVal;
+        System.out.println("@@attrName: " + attrName + ", predicateType: " + predicateType + ", predicateVal: " + predicateVal + "");
     }
 }

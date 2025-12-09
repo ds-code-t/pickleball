@@ -58,7 +58,9 @@ public class ParsedAssertions {
                 result = matchesNormalized(component1.getValue(), String.valueOf(component2.getValue()));
             }
             case String s when s.contains("displayed") -> {
-                result = hasAny(driver, phraseData.elementMatch.xPathy);
+                System.out.println("@@isdispayed");
+                System.out.println("@@isdispayed xpath: "+ phraseData.elementMatch.xPathy);
+                result = hasAny(phraseData.wrappedElements.stream().map(w -> w.element).toList());
             }
             default -> {
                 throw new IllegalArgumentException("Unsupported assertion: " + phraseData.assertion);
