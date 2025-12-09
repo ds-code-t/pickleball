@@ -148,7 +148,7 @@ public final class LeanWaits {
                 if (element == null) {
                     return null;
                 }
-
+                System.out.println("@@1");
                 boolean displayed;
                 try {
                     displayed = element.isDisplayed();
@@ -157,11 +157,11 @@ public final class LeanWaits {
                     // let caller re-locate if needed; continue polling until timeout
                     return null;
                 }
-
+                System.out.println("@@2");
                 if (!displayed) {
                     return null;
                 }
-
+                System.out.println("@@3");
                 // Center into viewport to avoid sticky headers/partial visibility
                 try {
                     ((JavascriptExecutor) d).executeScript(
@@ -172,7 +172,7 @@ public final class LeanWaits {
                     System.out.println("@@ignored-- JavascriptException");
                     // ignore and continue polling
                 }
-
+                System.out.println("@@4");
                 // Small hover nudge for CSS :hover menus/tooltips
                 try {
                     new Actions(d).moveToElement(element)
@@ -182,7 +182,7 @@ public final class LeanWaits {
                     System.out.println("@@ignored-- WebDriverException");
                     // hover failures shouldn't abort; just keep polling
                 }
-
+                System.out.println("@@5");
                 // JS hit-test at center (shadow DOM aware) + style checks
                 Boolean ok;
                 try {
@@ -191,7 +191,7 @@ public final class LeanWaits {
                     System.out.println("@@ignored-- JavascriptException2");
                     return null;
                 }
-
+                System.out.println("@@6 ok: " + ok);
                 return Boolean.TRUE.equals(ok) ? element : null;
 
             } catch (StaleElementReferenceException stale) {
