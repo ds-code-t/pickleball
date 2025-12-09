@@ -129,7 +129,6 @@ public final class XPathyAssembly {
 
     /** Combine all XPathy with logical AND: //*[ self::... and self::... and ... ] */
     public static XPathy combineAnd(List<XPathy> list) {
-        new Exception().printStackTrace();
         System.out.println("@@combineAnd==:  " + list);
         list.forEach(l -> System.out.println("\n@@combineAnd-entry: "  + l.getXpath()));
         System.out.println("\n\n-=-=");
@@ -178,10 +177,6 @@ public final class XPathyAssembly {
      */
     public static String toSelfStep(String xpath) {
         String s = xpath.trim();
-        System.out.println("@@toSelfStep: " + xpath);
-        if(xpath.trim().equals("//*[]"))
-            new Exception().printStackTrace();
-
 
         // 1. Preserve leading parentheses, operate on the core after them
         int coreStart = 0;
