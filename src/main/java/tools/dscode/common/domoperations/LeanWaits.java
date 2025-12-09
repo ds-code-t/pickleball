@@ -135,13 +135,14 @@ public final class LeanWaits {
     public static WebElement waitForElementReady(WebDriver driver,
                                                         WebElement element,
                                                         Duration timeout) {
+        System.out.println("@@waitForElementReady: " + element + " timeout=" + timeout);
         FluentWait<WebDriver> wait = new FluentWait<>(driver)
                 .withTimeout(timeout)
                 .pollingEvery(Duration.ofMillis(150))
                 .ignoring(ElementClickInterceptedException.class)
                 .ignoring(JavascriptException.class)
                 .ignoring(WebDriverException.class);
-
+        System.out.println("@@wait=" + wait);
         return wait.until(d -> {
             try {
                 if (element == null) {
@@ -152,6 +153,7 @@ public final class LeanWaits {
                 try {
                     displayed = element.isDisplayed();
                 } catch (StaleElementReferenceException stale) {
+                    System.out.println("@@stale");
                     // let caller re-locate if needed; continue polling until timeout
                     return null;
                 }
@@ -167,6 +169,7 @@ public final class LeanWaits {
                             element
                     );
                 } catch (JavascriptException ignored) {
+                    System.out.println("@@ignored-- JavascriptException");
                     // ignore and continue polling
                 }
 
@@ -176,6 +179,7 @@ public final class LeanWaits {
                             .pause(Duration.ofMillis(100))
                             .perform();
                 } catch (WebDriverException ignored) {
+                    System.out.println("@@ignored-- WebDriverException");
                     // hover failures shouldn't abort; just keep polling
                 }
 
@@ -184,12 +188,14 @@ public final class LeanWaits {
                 try {
                     ok = (Boolean) ((JavascriptExecutor) d).executeScript(HIT_TEST_JS, element);
                 } catch (JavascriptException ignored) {
+                    System.out.println("@@ignored-- JavascriptException2");
                     return null;
                 }
 
                 return Boolean.TRUE.equals(ok) ? element : null;
 
             } catch (StaleElementReferenceException stale) {
+                System.out.println("@@stale2");
                 // The reference is dead; the caller should re-locate and call again.
                 return null;
             }
