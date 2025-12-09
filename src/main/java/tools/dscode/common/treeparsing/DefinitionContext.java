@@ -216,7 +216,7 @@ public final class DefinitionContext {
         };
 
         //    ParseNode assertion = new ParseNode("\\b(?<base>equal|less(?:er)?|greater|less|is)(?=\\s+(?:<<quoteMask>>|<<valueMatch>>|<<elementMatch>>)(s|ed|ing|es)?)\\b")
-        ParseNode assertion = new ParseNode("\\b(?:displayed|equals?|less(?:er)?|greater|less)\\b") {
+        ParseNode assertion = new ParseNode("\\b(?:starts? with|ends? with|contains?|match(?:es)?|displayed|equals?|less(?:er)?|greater|less)\\b") {
             @Override
             public String onCapture(MatchNode self) {
                 System.out.println("@@assertion: " + self.originalText() + "");

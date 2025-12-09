@@ -7,7 +7,8 @@ Feature: Addition
 #    Then , IF: "Asdd Rdfds "   THEN: , I select "Opel" in the "cars" Dropdown, and click the Submit Button
 
     * , from the Top Panel:
-  : * IF: "<Opel sd>" THEN: , I verify  length of value of "Get your own website" Link equal "AA"
+#  : * IF: "<Opel sd>" THEN: , I verify  "Get your own website" Link equals "AA"
+  : * IF: "<Opel sd>" THEN: , I verify  "Get your own website" Link starts with "Get"
 
   Scenario: ss3
     Then print aaa

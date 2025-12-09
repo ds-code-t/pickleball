@@ -1,12 +1,15 @@
 package tools.dscode.common.domoperations;
 
 import com.xpathy.XPathy;
+import org.intellij.lang.annotations.RegExp;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 
 import java.util.List;
 import java.util.Objects;
+
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.normalizeText;
 
 /**
  * Concise DOM check helpers for XPathy + Selenium.
@@ -42,19 +45,56 @@ public final class DomChecks {
                 .trim();
     }
 
-    /**
-     * Simple normalized equality between two arbitrary objects.
-     * Uses {@link #normalize(Object)} on both.
-     */
     public static CheckResult equalsNormalized(Object a, Object b) {
-        String sa = normalize(a);
-        String sb = normalize(b);
+        String sa = normalizeText(String.valueOf(a));
+        String sb = normalizeText(String.valueOf(b));
         boolean ok = sa.equals(sb);
         return new CheckResult(
                 ok,
                 "equalsNormalized: [" + sa + "] vs [" + sb + "] -> " + ok
         );
     }
+
+    public static CheckResult startsWithNormalized(Object a, Object b) {
+        String sa = normalizeText(String.valueOf(a));
+        String sb = normalizeText(String.valueOf(b));
+        boolean ok = sa.startsWith(sb);
+        return new CheckResult(
+                ok,
+                "startsWithNormalized: [" + sa + "] vs [" + sb + "] -> " + ok
+        );
+    }
+
+    public static CheckResult endsWithNormalized(Object a, Object b) {
+        String sa = normalizeText(String.valueOf(a));
+        String sb = normalizeText(String.valueOf(b));
+        boolean ok = sa.startsWith(sb);
+        return new CheckResult(
+                ok,
+                "endsWithNormalized: [" + sa + "] vs [" + sb + "] -> " + ok
+        );
+    }
+
+
+    public static CheckResult containsNormalized(Object a, Object b) {
+        String sa = normalizeText(String.valueOf(a));
+        String sb = normalizeText(String.valueOf(b));
+        boolean ok = sa.startsWith(sb);
+        return new CheckResult(
+                ok,
+                "containsNormalized: [" + sa + "] vs [" + sb + "] -> " + ok
+        );
+    }
+
+    public static CheckResult matchesNormalized(Object a, @RegExp String regex) {
+        String sa = normalizeText(String.valueOf(a));
+        boolean ok = sa.matches(regex);
+        return new CheckResult(
+                ok,
+                "containsNormalized: [" + sa + "] vs [" + regex + "] -> " + ok
+        );
+    }
+
 
     /* -------------------------------------------------------------
      *  Internal helpers
