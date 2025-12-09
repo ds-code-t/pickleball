@@ -66,6 +66,7 @@ public class ElementMatch extends Component {
     public void findWebElements(WebDriver driver) {
         driver.switchTo().defaultContent();
         List<WebElement> elements = contextWrapper.getElements(driver);
+        System.out.println("@@elements: " + elements.size() + "");
         wrappedElements.addAll(elements.stream().map(e -> new ElementWrapper(driver, e, this)).toList());
         parentPhrase.wrappedElements.addAll(wrappedElements);
     }

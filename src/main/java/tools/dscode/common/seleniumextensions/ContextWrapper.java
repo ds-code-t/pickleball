@@ -40,6 +40,7 @@ public class ContextWrapper {
 
     public List<WebElement> getElements(WebDriver driver) {
         getFinalSearchContext(driver);
+        System.out.println("@@getElements:  " + prettyPrintXPath(elementTerminalXPath) + "\n");
         return driver.findElements(elementTerminalXPath.getLocator());
     }
 
