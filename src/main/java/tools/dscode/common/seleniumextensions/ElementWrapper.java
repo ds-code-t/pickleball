@@ -97,13 +97,13 @@ public class ElementWrapper {
 
         switch (elementMatch.category){
             case "Field":
-                List<WebElement> valueElements =  element.findElements(By.xpath(".//*[contains(@class,'read')]"));
+                List<WebElement> valueElements =  element.findElements(By.xpath("descendant::*[contains(@class,'Read')]"));
                 if(!valueElements.isEmpty()){
                     String returnVal = valueElements.getLast().getText();
+                    System.out.println("@@returnVal: " + returnVal);
                     attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
                     return returnVal;
                 }
-                attributeSnapshot.put(ELEMENT_RETURN_VALUE, "text");
                 break;
         }
         for (String key : elementMatch.defaultValueKeys) {
