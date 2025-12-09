@@ -88,7 +88,7 @@ public class ExecutionDictionary {
 //            return wrapContext(((WebDriver)ctx).switchTo().defaultContent());
 //        });
 
-        category("TEXT").inheritsFrom(CONTAINS_TEXT);
+        category("Text").inheritsFrom(CONTAINS_TEXT);
 
         category(CONTAINS_TEXT)
                 .and(
