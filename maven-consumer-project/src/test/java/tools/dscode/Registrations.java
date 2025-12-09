@@ -19,7 +19,7 @@ import static tools.dscode.common.util.DebugUtils.printDebug;
 public class Registrations {
     @LifecycleHook(Phase.BEFORE_CUCUMBER_RUN)
     public static void beforeRun() {
-        System.out.println("@@=--- beforeRun");
+
 
         ExecutionDictionary dict = getExecutionDictionary();
 
@@ -38,15 +38,15 @@ public class Registrations {
         dict.registerDefaultStartingContext((category, v, op, webDriver, ctx) ->
         {
             try {
-                System.out.println("@@DC-1");
+
                 webDriver.switchTo().defaultContent();
-                System.out.println("@@--registration of registerDefaultStartingContext");
+
                 XPathy xpathy = dict.getCategoryXPathy("FrameResult");
-                System.out.println("@@DC-2: " + xpathy.getXpath());
+
                 WebElement frame = webDriver.findElement(xpathy.getLocator());
-                System.out.println("@@DC-2.5 frame: " + frame);
+
                 webDriver.switchTo().frame(frame);
-                System.out.println("@@DC-3: " + ctx);
+
                 return webDriver;
             } catch (Exception e) {
                 e.printStackTrace();

@@ -42,9 +42,9 @@ public final class HumanInteractions {
         Objects.requireNonNull(driver, "driver");
         Objects.requireNonNull(element, "selectEl");
         Objects.requireNonNull(visibleText, "visibleText");
-        System.out.println("@@selectEl1: " + element.getTagName());
-        System.out.println("@@selectEl2: " + element.getText());
-        System.out.println("@@visibleText:: " + visibleText);
+
+
+
         centerScroll(driver, element);
         new Select(element).selectByVisibleText(visibleText);
         // Find the matching option by normalized visible text

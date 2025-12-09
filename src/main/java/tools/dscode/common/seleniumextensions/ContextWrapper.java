@@ -48,25 +48,25 @@ public class ContextWrapper {
         List<XPathy> xPathyList = new ArrayList<>();
         for (int j = 0; j < contextList.size(); j++) {
             PhraseData phraseData = contextList.get(j);
-            System.out.println("@@phraseData-- " + phraseData);
-            System.out.println("@@phraseData.categoryFlags-- " + phraseData.categoryFlags);
+
+
             if (phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
-                System.out.println("@@phraseData-- 1 " + xPathyList);
+
                 if (!xPathyList.isEmpty()) {
                     XPathy combinedXPathy = combineAnd(xPathyList);
                     searchContext = searchContext.findElement(combinedXPathy.getLocator());
                     xPathyList.clear();
                 }
-                System.out.println("@@before-settingContext: " + phraseData.elementMatch.category + " , " +  phraseData.elementMatch.text+ " , " +  phraseData.elementMatch.textOp);
+
                 searchContext = getExecutionDictionary().applyContextBuilder(phraseData.elementMatch.category, phraseData.elementMatch.text, phraseData.elementMatch.textOp, driver, searchContext);
             } else {
-                System.out.println("@@addomg1: phraseData.contextXPathy " + phraseData.contextXPathy);
+
                 xPathyList.add(phraseData.contextXPathy);
-                System.out.println("@@phraseData-- 3 " + xPathyList);
+
             }
 
         }
-        System.out.println("@@addomg2: phraseData.contextXPathy " + elementMatch.xPathy);
+
 
         xPathyList.add(elementMatch.xPathy);
         initializeElementXPaths(xPathyList);
@@ -78,7 +78,7 @@ public class ContextWrapper {
     XPathy elementTerminalXPath;
 
     public void initializeElementXPaths(List<XPathy> xPathyList) {
-        xPathyList.forEach(x -> System.out.println("@@initializeElementXPaths: " + prettyPrintXPath(x)));
+
         if (elementTerminalXPath != null) return;
         elementPath = combineAnd(xPathyList);
         if (elementMatch.elementPosition.isEmpty() && elementMatch.selectionType.isEmpty())

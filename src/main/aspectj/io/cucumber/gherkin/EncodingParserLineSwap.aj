@@ -38,16 +38,16 @@ public aspect EncodingParserLineSwap {
             String g1 = matcher.group(1);
             String g2 = matcher.group(2);
 
-            System.out.println("@@g0: " + matcher.group(0));
-            System.out.println("@@g1: " + g1);
-            System.out.println("@@g2: " + g2);
+
+
+
 
             // Hardcoded fallback for group 2
             String prefix = (g2 != null) ? g2 : replacementStep;
-            System.out.println("@@prefix: " + prefix);
+
 
             String replacement = prefix + PARSER_FLAG + g1.replace("\n"," ").strip();
-            System.out.println("@@replacement: " + replacement);
+
 
             matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
         }

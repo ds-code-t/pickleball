@@ -78,9 +78,9 @@ public final class DefinitionContext {
         ParseNode phrase = new ParseNode("^(?<conjunction>\\b(?:and|or)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
             @Override
             public String onCapture(MatchNode self) {
-                System.out.println("@@phrase: " + self.originalText() + "");
+
                 String context = self.resolvedGroupText("context");
-                System.out.println("@@context-: " + context + "");
+
                 if (!context.isEmpty() && Character.isUpperCase(context.charAt(0)))
                     self.putToLocalState("newStartContext", true);
                 self.putToLocalState("context", context.toLowerCase());
@@ -123,7 +123,7 @@ public final class DefinitionContext {
         ParseNode predicate = new ParseNode("(?:\\b(?<predicateType>starting with|containing)\\s+(?<predicateVal>\\d+|<<quoteMask>>))") {
             @Override
             public String onCapture(MatchNode self) {
-                System.out.println("@@predicate:@@predicate: " + self.originalText() + "");
+
                 self.putToLocalState("predicateType", self.resolvedGroupText("predicateType"));
                 self.putToLocalState("predicateVal", self.resolvedGroupText("predicateVal"));
                 return self.originalText();
@@ -135,7 +135,7 @@ public final class DefinitionContext {
         ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?:with\\s+(?<attrName>[a-z]+)?)?\\s*(?<predicate><<predicate>>))?") {
             @Override
             public String onSubstitute(MatchNode self) {
-                System.out.println("@@elementMatch: " + self.originalText() + "");
+
 //            self.getAncestor("phrase").putToLocalState("elementMatch", self);
                 self.putToLocalState("selectionType", self.resolvedGroupText("selectionType"));
                 String elementPosition = self.resolvedGroupText("elementPosition");
@@ -147,9 +147,9 @@ public final class DefinitionContext {
                 self.putToLocalState("type", self.resolvedGroupText("type"));
                 self.putToLocalState("attrName", self.resolvedGroupText("attrName"));
                 self.putToLocalState("elPredicate", self.groups().get("elPredicate"));
-                System.out.println("@@predicate--: " +self.resolvedGroupText("elPredicate") + "");
-                System.out.println("@@elementMatch--maskedText: " + self.maskedText() + "");
-                System.out.println("@@elementMatch--self.token(): " + self.token() + "");
+
+
+
                 return self.token();
             }
         };
@@ -157,7 +157,7 @@ public final class DefinitionContext {
         ParseNode valueMatch = new ParseNode("\\s(?<value>\\d+|<<quoteMask>>)(?<unitMatch>\\s+(?<unit>minute|second|number|text)s?\\b)?") {
             @Override
             public String onSubstitute(MatchNode self) {
-                System.out.println("@@valueMatch: " + self.originalText() + "");
+
                 String count = self.resolvedGroupText("value");
                 String unit = self.resolvedGroupText("unit");
                 self.putToLocalState("value", count);
@@ -171,9 +171,9 @@ public final class DefinitionContext {
             public String onSubstitute(MatchNode self) {
                 String elOrValToken = self.groups().get("val");
                 MatchNode elOrValNode = self.getMatchNode(elOrValToken);
-                System.out.println("@@elOrValNode: " + elOrValNode);
+
                 elOrValNode.putToLocalState("valueTypes", self.resolvedGroupText("valueTypes"));
-                System.out.println("@@elOrValToken: " + elOrValToken);
+
 //                return elOrValToken;
                 return self.originalText();
             }
@@ -182,7 +182,7 @@ public final class DefinitionContext {
         ParseNode assertionType = new ParseNode("\\b(ensure|verify)\\b") {
             @Override
             public String onSubstitute(MatchNode self) {
-                System.out.println("@@assertionType: " + self.originalText() + "");
+
                 self.parent().putToLocalState("assertionType", self.originalText());
                 self.parent().localState().put("skip:action", "true");
                 return self.originalText();
@@ -192,7 +192,7 @@ public final class DefinitionContext {
         ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite|save)(?:s|ed|ing|es)?\\b") {
             @Override
             public String onCapture(MatchNode self) {
-                System.out.println("@@action: " + self.originalText() + "");
+
                 self.parent().putToLocalState("action", self.resolvedGroupText("base"));
                 return self.resolvedGroupText("base").replaceAll("move", "hover");
             }
@@ -221,7 +221,7 @@ public final class DefinitionContext {
         ParseNode assertion = new ParseNode("\\b(?:starts? with|ends? with|contains?|match(?:es)?|displayed|equals?|less(?:er)?|greater|less)\\b") {
             @Override
             public String onCapture(MatchNode self) {
-                System.out.println("@@assertion: " + self.originalText() + "");
+
                 self.parent().putToLocalState("assertion", self.originalText());
                 return self.originalText();
             }
@@ -271,7 +271,7 @@ public final class DefinitionContext {
         protected void register() {
 
 //            registerDefaultStartingContext((category, v, op, ctx) -> {
-//                System.out.println("@@registerDefaultStartingContext - default");
+
 //                return wrapContext(ctx.switchTo().defaultContent());
 //            });
 

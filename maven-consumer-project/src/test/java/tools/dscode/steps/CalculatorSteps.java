@@ -41,8 +41,8 @@ public class CalculatorSteps {
     public static void main(String[] args) {
         String pre = "IF: 1 > 0 THEN:   print A ELSE: print 333";
         String post = processTernaryExpression("IF: 1 > 0 THEN:   print A ELSE: print 333");
-        System.out.println("@@pre: " + pre);
-        System.out.println("@@pst: " + post);
+
+
     }
 
 

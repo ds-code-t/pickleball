@@ -81,7 +81,7 @@ public class ElementMatch extends Component {
         this.elementPosition = elementNode.getStringFromLocalState("elementPosition");
         this.selectionType = elementNode.getStringFromLocalState("selectionType");
         this.valueTypes = Arrays.stream(elementNode.getStringFromLocalState("valueTypes").replaceAll("of", "").trim().replaceAll("\\s+", ",").split(",")).sorted(Comparator.reverseOrder()).toList();
-        System.out.println("@@this.valueTypes: " + this.valueTypes);
+
 //            if(selectionType.isEmpty())
 //                selectionType = "single";
         for (ElementMatch.ElementType et : ElementMatch.ElementType.values()) {
@@ -91,8 +91,8 @@ public class ElementMatch extends Component {
             }
         }
 
-        System.out.println("@@ElementMatch:: " + this);
-        System.out.println("@@elementType:: " + elementType);
+
+
         if (elementType == null)
             elementType = ElementMatch.ElementType.HTML;
 
@@ -102,12 +102,12 @@ public class ElementMatch extends Component {
         if (!categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
             ExecutionDictionary.CategoryResolution categoryResolution = getExecutionDictionary().andThenOrWithFlags(category, text, textOp);
             xPathy = categoryResolution.xpath();
-            System.out.println("@@xPathy11: "+ xPathy);
+
             MatchNode predicateNode = (MatchNode) elementNode.getMatchNode((String) elementNode.getFromLocalState("elPredicate"));
-            System.out.println("@@predicateNode: " + predicateNode);
+
             if (predicateNode != null) {
                 this.attribute = new Attribute((String) elementNode.getFromLocalState("attrName"), (String) predicateNode.getFromLocalState("predicateType"), (String) predicateNode.getFromLocalState("predicateVal"));
-                System.out.println("@@attribute: " + attribute);
+
                 ExecutionDictionary.Op op = switch (attribute.predicateType) {
                     case null -> null;
                     case String s when s.isBlank() -> null;
@@ -121,7 +121,7 @@ public class ElementMatch extends Component {
                 else
                     xPathy = applyAttrOp(xPathy, com.xpathy.Attribute.custom(attribute.attrName), op, attribute.predicateVal);
             }
-            System.out.println("@@xPathy33: "+ xPathy);
+
 
 
         }

@@ -33,7 +33,7 @@ public class StepExtension extends StepData {
 
     public StepExtension(io.cucumber.core.runner.TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
         super(testCase, pickleStepTestStep);
-        System.out.println("@@pickleStepTestStep-text:: " + pickleStepTestStep.getStep().getText());
+
 //        pickle = (io.cucumber.messages.types.Pickle) getProperty(testCase, "pickle");
         method = pickleStepTestStep.getMethod();
         definitionFlags = pickleStepTestStep.getDefinitionFlags().stream().map(f -> {
@@ -43,7 +43,7 @@ public class StepExtension extends StepData {
                 inheritableDefinitionFlags.add(f);
             return f;
         }) .collect(Collectors.toCollection(ArrayList::new));
-        System.out.println("@@definitionFlags: " + definitionFlags);
+
 
 
         this.methodName = this.method == null ? "" : this.method.getName();
@@ -57,7 +57,7 @@ public class StepExtension extends StepData {
                 stepFlags.add(pickleStepTestStep.getStep().getText());
             } else if (methodName.equals("NEXT_SIBLING_STEP")) {
                 nextSiblingDefinitionFlags = pickleStepTestStep.getDefinitionFlags().stream().filter(f -> !f.toString().startsWith("_")).collect(Collectors.toCollection(ArrayList::new));
-                System.out.println("@@nextSiblingDefinitionFlags: " + nextSiblingDefinitionFlags);
+
             }
         }
 
@@ -165,8 +165,8 @@ public class StepExtension extends StepData {
         StepExtension modifiedStep = new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep, pickleStepTestStep.getStep().getKeyword(), newText, getGherkinArgumentText(pickleStepTestStep.getStep())));
         modifiedStep.setStepParsingMap(getStepParsingMap());
         modifiedStep.parentStep = parentStep;
-//        System.out.println("@@lineData: " + lineData);
-//        System.out.println("@@lineData-phrases: " + lineData.phrases);
+
+
         modifiedStep.lineData = lineData;
         return modifiedStep;
     }

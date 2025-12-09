@@ -51,10 +51,10 @@
 //
 //    /** On-demand, single-attempt full refresh of delegates + wrappers. */
 //    public void refreshAll() {
-//        System.out.println("@@refreshAll :\n" + xPathy.getXpath() + "\n\n======\n");
-//        System.out.println("@@getLocator :\n" + xPathy.getLocator() + "\n\n======\n");
+
+
 //        List<WebElement> newDelegates = searchContext.findElements(xPathy.getLocator());
-//        System.out.println("@@newDelegates :\n" + newDelegates + "\n\n======\n");
+
 //        List<WrappedWebElement> oldWrappers = this.wrappers;
 //        List<WrappedWebElement> newWrappers = new ArrayList<>(newDelegates.size());
 //

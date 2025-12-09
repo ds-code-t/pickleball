@@ -39,8 +39,8 @@ public class ElementWrapper {
         // Uses default attribute priority when varargs are omitted.
         this.xpath1 = buildXPathForElement(element, "id", "data-user-id", "name", "title", "role", "aria-label", "class");
         this.xpath2 = buildXPathForElement(element, "href", "target", "src", "onclick", "type", "index");
-        System.out.println("@@xpath1: " + xpath1);
-        System.out.println("@@xpath2: " + xpath2);
+
+
     }
 
     public void takeSnapshot() {
@@ -100,7 +100,7 @@ public class ElementWrapper {
                 List<WebElement> valueElements =  element.findElements(By.xpath("descendant::*[contains(@class,'Read')]"));
                 if(!valueElements.isEmpty()){
                     String returnVal = valueElements.getLast().getText();
-                    System.out.println("@@returnVal: " + returnVal);
+
                     attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
                     return returnVal;
                 }
@@ -198,7 +198,7 @@ public class ElementWrapper {
     }
 
     private static String buildXPathForElement(WebElement element, String... attrPriority) {
-        System.out.println("@@buildXPathForElement " + Arrays.stream(attrPriority).toList());
+
         String tag = safeTagName(element);
 
         // default attribute priority if none supplied
@@ -212,11 +212,11 @@ public class ElementWrapper {
 
         outerDesc:
         for (String attr : effectiveAttrs) {
-            System.out.println("@@attr: " + attr);
-            System.out.println("@@element: " + element);
+
+
             // check self first
             String selfVal = getAttrOrEmpty(element, attr);
-            System.out.println("@@selfVal: " + selfVal);
+
             if (!selfVal.isEmpty()) {
                 descAttrName = attr;
                 descAttrValue = selfVal;
@@ -226,7 +226,7 @@ public class ElementWrapper {
             // then any descendant (RELATIVE to element)
             try {
                 String xpathExpr = ".//*[@" + attr + "]";
-                System.out.println("@@XPATH::: " + xpathExpr);
+
                 WebElement d = element.findElement(By.xpath(xpathExpr));
                 String v = getAttrOrEmpty(d, attr);
                 if (!v.isEmpty()) {

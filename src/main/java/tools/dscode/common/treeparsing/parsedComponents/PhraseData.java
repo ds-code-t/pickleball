@@ -123,14 +123,14 @@ public abstract class PhraseData {
         conjunction = phraseNode.getStringFromLocalState("conjunction");
         position = lineData.phrases.size();
         context = phraseNode.getStringFromLocalState("context");
-        System.out.println("@@context:: " + context);
+
         if (!context.isBlank()) {
             phraseType = PhraseType.CONTEXT;
             isFrom = context.equals("from");
             contextXPathy = getXPathyContext(context, elements);
         } else {
             action = phraseNode.getStringFromLocalState("action");
-            System.out.println("@@actionSet to: " + action);
+
             if (!action.isBlank()) {
                 phraseType = PhraseType.ACTION;
             } else {
@@ -155,26 +155,26 @@ public abstract class PhraseData {
 
 
     public List<PhraseData> processContextList() {
-        System.out.println("@@processContextList1");
+
         List<PhraseData> returnList = new ArrayList<>();
         returnList.add(new Phrase("from " + STARTING_CONTEXT, ',', parsedLine));
         for (List<PhraseData> inner : parsedLine.inheritedContextPhrases) {
             returnList.addAll(inner);
         }
         returnList.addAll(contextPhrases);
-        System.out.println("@@returnList1: " + returnList);
+
         for (int i = returnList.size() - 1; i >= 0; i--) {
             PhraseData phraseData = returnList.get(i);
             if (phraseData.newContext || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT)) {
                 return returnList.subList(i, returnList.size());
             }
         }
-        System.out.println("@@returnList2: " + returnList);
+
         return returnList;
     }
 
     public static XPathy getXPathyContext(String context, List<ElementMatch> elements) {
-        System.out.println("@@getXPathyContext: " + elements);
+
         if (elements.isEmpty()) return null;
         XPathy xPathy = elements.getFirst().xPathy;
         if (xPathy == null) return null;

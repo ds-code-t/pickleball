@@ -84,7 +84,7 @@ public class ExecutionDictionary {
 
     private void defaultRegistrations() {
 //        registerDefaultStartingContext((category, v, op, ctx) -> {
-//            System.out.println("@@registerDefaultStartingContext - default");
+
 //            return wrapContext(((WebDriver)ctx).switchTo().defaultContent());
 //        });
 
@@ -274,7 +274,7 @@ public class ExecutionDictionary {
             Op op
     ) {
 
-        System.out.println("@@expandInternalL " + category);
+
 
         List<String> lineage = resolveCategoryLineage(category);
 
@@ -283,16 +283,16 @@ public class ExecutionDictionary {
 
 
         for (String catKey : lineage) {
-            System.out.println("@@catKey: " + catKey);
+
             var builders = map.get(catKey);
             if (builders != null) {
-                System.out.println("@@builders: " + builders.size());
+
                 if (!builders.isEmpty()) {
                     allBuilders.addAll(builders);
                 }
             }
         }
-        System.out.println("@@allBuilders (without base): " + allBuilders.size());
+
 
         // 2) If nothing found yet in THIS map, decide whether to fallback to "*"
         if (allBuilders.isEmpty()) {
@@ -301,10 +301,10 @@ public class ExecutionDictionary {
             if (!hasAnyRegisteredBuilders(lineage)) {
                 var starList = map.get("*");
                 if (starList == null || starList.isEmpty()) {
-                    System.out.println("@@starList: (none)");
+
                     return List.of();
                 }
-                System.out.println("@@starList: " + starList.size());
+
                 allBuilders.addAll(starList);
             } else {
                 // There ARE builders in the other map (AND vs OR), so we skip "*"
@@ -343,9 +343,6 @@ public class ExecutionDictionary {
     }
 
     public List<XPathy> expandAnd(String category, String value, Op op) {
-        System.out.println("@@=Category: " + category + " Value: " + value + " Op: " + op + "");
-        List<XPathy> xPathy =  expandInternal(andReg, BASE_CATEGORY, value, op);
-        xPathy.forEach(x -> System.out.println("@@x: " + x.getXpath()));
         return Stream.concat(expandInternal(andReg, category, value, op).stream(), expandInternal(andReg, BASE_CATEGORY, value, op).stream())
                 .collect(Collectors.toList());
     }
@@ -369,15 +366,11 @@ public class ExecutionDictionary {
         sorted.sort(Comparator.comparingInt(x -> xpathSpecificityScore(x.getXpath())));
 
 
-        for (int i = 0; i < sorted.size(); i++) {
-            System.out.println("    [combine] sorted[" + i + "]=" + safeXpath(sorted.get(i)));
-        }
 
         // Build boolean expression over self::... steps
         String combinedExpr = sorted.stream()
                 .map(XPathy::getXpath)
                 .map(x -> toSelfStep(x))
-                .peek(s -> System.out.println("    [combine] selfStep=" + s))
                 .collect(java.util.stream.Collectors.joining(" " + joiner + " "));
 
 
@@ -410,7 +403,7 @@ public class ExecutionDictionary {
 
 
         Optional<XPathy> result = resolveToXPathy(category, value, op);
-        System.out.println("@@result--: " + result);
+
         if (result.isEmpty()) {
             return null;  // preserve prior semantics
         }
@@ -439,10 +432,10 @@ public class ExecutionDictionary {
      * Optional-returning version of andThenOr.
      */
     public Optional<XPathy> resolveToXPathy(String category, String value, Op op) {
-        System.out.println("@@resolveToXPathy::: category: " + category + " Value: " + value + " Op: " + op + "");
+
         Optional<XPathy> orPart = orAll(category, value, op);
         Optional<XPathy> andPart = andAll(category, value, op);
-        System.out.println("@@resolveToXPathy- orPart: " + orPart + " ,  andPart: " + andPart );
+
 
 
         if (andPart.isEmpty() && orPart.isEmpty()) {
@@ -458,12 +451,12 @@ public class ExecutionDictionary {
         String andStep = toSelfStep(andPart.get().getXpath());
         String orStep = toSelfStep(orPart.get().getXpath());
 
-        System.out.println("@@andStep: " + andStep);
-        System.out.println("@@orStep: " + orStep);
+
+
 
         String combinedExpr = "(" + andStep + ") and (" + orStep + ")";
 
-        System.out.println("@@combinedExpr: " + combinedExpr);
+
         String fullXpath = "//*[" + combinedExpr + "]";
 
         XPathy x = XPathy.from(fullXpath);
@@ -679,7 +672,7 @@ public class ExecutionDictionary {
          * Adds both PAGE_CONTEXT and PAGE_TOP_CONTEXT flags.
          */
         public CategorySpec startingContext(ContextBuilder builder) {
-            System.out.println("@@registering startingContext::: " + categories);
+
             try {
                 Objects.requireNonNull(builder, "builder must not be null");
                 for (String cat : categories) {
@@ -687,7 +680,7 @@ public class ExecutionDictionary {
                     dict.registerContextBuilder(cat, builder);
                 }
                 flags(CategoryFlags.PAGE_CONTEXT, CategoryFlags.PAGE_TOP_CONTEXT);
-                System.out.println("@@FLAGS:::" + Arrays.asList(flags()));
+
                 return this;
             } catch (Exception e) {
                 e.printStackTrace();
@@ -909,7 +902,7 @@ public class ExecutionDictionary {
         Objects.requireNonNull(category, "category must not be null");
         Objects.requireNonNull(builder, "builder must not be null");
         // Only one SearchContext builder per category; overwrite any existing
-        System.out.println("@@registerContextBuilder:: " + category);
+
         contextReg.put(category, builder);
     }
 
@@ -928,8 +921,8 @@ public class ExecutionDictionary {
         Objects.requireNonNull(category, "category must not be null");
         Objects.requireNonNull(context, "context must not be null");
         ContextBuilder cb = contextReg.get(category);
-        System.out.println("@@category " + category);
-        System.out.println("@@cb " + cb);
+
+
         if (cb == null) {
             throw new RuntimeException("category '" + category +"' does not have a registered context");
         }

@@ -64,7 +64,7 @@ public privileged aspect PickleStepMetaTextAspect {
         if (text != null && flag != null && !flag.isEmpty()) {
             int idx = text.indexOf(flag);
             if (idx >= 0) {
-                System.out.println("@@text::-- " + text);
+
                 // Split on first occurrence only
                 String left  = text.substring(0, idx);
                 String right = text.substring(idx + flag.length());

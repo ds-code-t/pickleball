@@ -129,16 +129,13 @@ public final class XPathyAssembly {
 
     /** Combine all XPathy with logical AND: //*[ self::... and self::... and ... ] */
     public static XPathy combineAnd(List<XPathy> list) {
-        System.out.println("@@combineAnd==:  " + list);
-        list.forEach(l -> System.out.println("\n@@combineAnd-entry: "  + l.getXpath()));
-        System.out.println("\n\n-=-=");
 
         return XPathy.from(combine(list, "and").getXpath().replace("[]",""));
     }
 
     /** Combine all XPathy with logical OR: //*[ self::... or self::... or ... ] */
     public static XPathy combineOr(List<XPathy> list) {
-        System.out.println("@@combineOr:  " + list);
+
         return combine(list, "or");
     }
 

@@ -9,6 +9,6 @@ public class Attribute {
         this.attrName = attrName == null || attrName.isBlank() ? "Text" : attrName;
         this.predicateType = predicateType;
         this.predicateVal = predicateVal;
-        System.out.println("@@attrName: " + attrName + ", predicateType: " + predicateType + ", predicateVal: " + predicateVal + "");
+
     }
 }

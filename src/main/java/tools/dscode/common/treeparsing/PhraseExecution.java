@@ -64,7 +64,7 @@
 ////        for (XPathData xPathData : mergedDateList) {
 //        for (int x = 0; x<  mergedDateList.size(); x++ ) {
 //            XPathData xPathData = mergedDateList.get(x);
-//            System.out.println("@@mergedDateList-xPathData: " + xPathData);
+
 ////            if (xPathData.isNewContext() && (previousXPathData == null || !previousXPathData.categoryFlags().contains(ExecutionDictionary.CategoryFlags.CONTEXT))) {
 //            if ((x == 0 || xPathData.isNewContext()) && !xPathData.categoryFlags().contains(ExecutionDictionary.CategoryFlags.CONTEXT)) {
 //                returnList.add(new XPathData("from", defaultCategory.xpath(), true, true, Set.of(ExecutionDictionary.CategoryFlags.CONTEXT)));
@@ -157,8 +157,8 @@
 //        this.phraseNode = phraseNode;
 //        text = phraseNode.toString();
 //        newContext = phraseNode.localStateBoolean("newContext");
-//        System.out.println("@@phrase- text: " + text);
-//        System.out.println("@@pnewContext: " + newContext);
+
+
 //        conjunction = phraseNode.getStringFromLocalState("conjunction");
 //        termination = phraseNode.getStringFromLocalState("termination");
 //
@@ -170,7 +170,7 @@
 //            //            contextElementMatch = new ElementMatch(phraseNode.getChild("elementMatch"));
 //        } else {
 //            action = phraseNode.getStringFromLocalState("action");
-//            System.out.println("@@actionSet to: " + action);
+
 //            if (action != null) {
 //                phraseType = PhraseType.ACTION;
 //            } else {
@@ -181,9 +181,9 @@
 //                }
 //            }
 //        }
-//        System.out.println("@@phrase-text: " + text);
-//        System.out.println("@@phraseType: " + phraseType);
-//        System.out.println("@@context: " + context);
+
+
+
 //
 //
 //    }
@@ -324,8 +324,8 @@
 //                }
 //            }
 //
-//            System.out.println("@@ElementMatch:: " + this);
-//            System.out.println("@@elementType:: " + elementType);
+
+
 //            if (elementType == null)
 //                elementType = ElementType.HTML;
 //

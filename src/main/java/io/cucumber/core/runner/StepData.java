@@ -118,10 +118,10 @@ public abstract class StepData extends StepMapping {
             childSteps.addAll(grandChildrenSteps);
             grandChildrenSteps = new ArrayList<>();
         }
-        System.out.println("@@initializeChildSteps for " + this);
+
         StepData lastChild = null;
         for (StepData child : childSteps) {
-            System.out.println("@@child " + child);
+
 
             child.childSteps.addAll(grandChildrenSteps);
             child.parentStep = this;

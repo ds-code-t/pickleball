@@ -27,9 +27,9 @@ public final class Phrase extends PhraseData {
 
     @Override
     public void runPhrase() {
-        System.out.println("@@runPhrase:: " + this);
-        System.out.println("@@phraseType:: " + phraseType);
-        System.out.println("@@hasDOMInteraction:: " + hasDOMInteraction);
+
+
+
 
         elements.forEach(e -> e.contextWrapper = new ContextWrapper(e));
 
@@ -61,7 +61,7 @@ public final class Phrase extends PhraseData {
 //                contextPhrases.addAll(previousPhrase.contextPhrases);
 //            }
         }
-        System.out.println("@@contextPhrases 4 : " + contextPhrases);
+
         if (contextTermination) {
             if (termination.equals(':')) {
                 parsedLine.inheritedContextPhrases.add(contextPhrases);

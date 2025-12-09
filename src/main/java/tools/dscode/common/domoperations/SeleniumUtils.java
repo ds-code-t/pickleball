@@ -89,7 +89,7 @@ public class SeleniumUtils {
         HttpClient client = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(300))
                 .build();
-        System.out.println("@@client: " + client);
+
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://" + host + ":" + port + "/json/version"))
                 .timeout(Duration.ofMillis(500))
