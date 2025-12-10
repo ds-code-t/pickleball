@@ -111,6 +111,14 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
     public void runStep(StepExtension stepExtension) {
+
+        runningStep(stepExtension);
+
+
+
+    }
+
+    public void runningStep(StepExtension stepExtension) {
         System.out.println("Running " + stepExtension);
         currentStep = stepExtension;
         if (!shouldRun(stepExtension)) return;
@@ -148,7 +156,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         if (isScenarioComplete())
             return;
 
-        for (StepData attachedStep : stepExtension.attachedSteps) {
+        for (StepBase attachedStep : stepExtension.attachedSteps) {
             runStep((StepExtension) attachedStep);
         }
         if (!stepExtension.childSteps.isEmpty() && !stepExtension.definitionFlags.contains(SKIP_CHILDREN)) {

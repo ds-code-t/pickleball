@@ -2,6 +2,7 @@ package tools.dscode.coredefinitions;
 
 import com.google.common.collect.LinkedListMultimap;
 import io.cucumber.core.runner.CurrentScenarioState;
+import io.cucumber.core.runner.StepBase;
 import io.cucumber.core.runner.StepData;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.datatable.DataTable;
@@ -33,7 +34,7 @@ public class MappingSteps extends CoreSteps {
         DataTable dataTable = currentStep.getDataTable();
         tableName = tableName == null || tableName.isBlank() ? "" : tableName.trim();
         if (tableName.isEmpty()) {
-            StepData nestStep = currentStep.nextSibling;
+            StepBase nestStep = currentStep.nextSibling;
             if (nestStep != null && nestStep.dataTable != null)
                 dataTable = nestStep.dataTable;
         } else {

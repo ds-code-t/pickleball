@@ -1,6 +1,5 @@
 package tools.dscode.common.treeparsing.preparsing;
 
-import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.mappings.QuoteParser;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
@@ -14,12 +13,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
-import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
+
 import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
 
-public abstract class LineData implements Iterable<Phrase> {
+public abstract class LineData implements  Cloneable {
+    public int startPhraseIndex = 0;
     public LineData inheritedLineData;
 //    public List<PhraseData> contextPhrases = new ArrayList<>();
     public List<List<PhraseData>> inheritedContextPhrases = new ArrayList<>();
@@ -33,8 +32,6 @@ public abstract class LineData implements Iterable<Phrase> {
 
 
     public LineData(String input, Collection<Character> delimiters) {
-
-
         this.original = stripObscureNonText(Objects.requireNonNull(input, "input"));
         Objects.requireNonNull(delimiters, "delimiters");
         if (delimiters.isEmpty())
@@ -110,10 +107,7 @@ public abstract class LineData implements Iterable<Phrase> {
         return phrases.get(index);
     }
 
-    @Override
-    public Iterator<Phrase> iterator() {
-        return phrases.iterator();
-    }
+
 
     /**
      * Expose the QuoteParser used (useful if callers need placeholder map,
@@ -130,5 +124,16 @@ public abstract class LineData implements Iterable<Phrase> {
     public BracketMasker bracketMasker() {
         return bm;
     }
+
+    @Override
+    public LineData clone() {
+        try {
+            LineData copy = (LineData) super.clone();
+            return copy;
+        } catch (CloneNotSupportedException e) {
+            throw new AssertionError("Clone should be supported", e);
+        }
+    }
+
 
 }

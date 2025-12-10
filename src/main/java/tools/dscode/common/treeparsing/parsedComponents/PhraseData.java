@@ -2,6 +2,8 @@ package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.xpathy.XPathy;
 import org.openqa.selenium.SearchContext;
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.WrapsElement;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 
@@ -25,8 +27,26 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inB
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.insideOf;
 
 
-public abstract class PhraseData {
-//    List<XPathData> contextXPathDataList = new ArrayList<>();
+public abstract class PhraseData implements Cloneable {
+    public List<PhraseData> clones = new ArrayList<>();
+
+    ElementWrapper contextElement;
+    public SearchContext searchContext;
+    WebDriver webDriver;
+
+    public SearchContext getSearchContext() {
+        if (contextElement != null){
+            WebElement element = contextElement.getElement();
+            if (element == null)
+                throw new RuntimeException("Element not found: " + contextElement.elementMatch + " at " + contextElement.elementMatch.xPathy);
+            return element;
+        }
+        if (searchContext == null)
+            return webDriver;
+        return searchContext;
+    }
+
+    //    List<XPathData> contextXPathDataList = new ArrayList<>();
 
     public final String text;
     public Character termination; // nullable
@@ -61,7 +81,6 @@ public abstract class PhraseData {
     public XPathy contextXPathy;
 
     public String keyName;
-
 
 
 //    public SearchContext getCurrentSearchContext() {
@@ -137,8 +156,8 @@ public abstract class PhraseData {
                 phraseType = PhraseType.ACTION;
             } else {
                 assertionType = phraseNode.getStringFromLocalState("assertionType");
-                if (!assertionType.isBlank()){
-                    assertion = phraseNode.getStringFromLocalState("assertion").replaceAll("s$","").replaceAll("e?s\\s+"," ");
+                if (!assertionType.isBlank()) {
+                    assertion = phraseNode.getStringFromLocalState("assertion").replaceAll("s$", "").replaceAll("e?s\\s+", " ");
                     phraseType = PhraseType.ASSERTION;
                 }
             }
@@ -211,5 +230,14 @@ public abstract class PhraseData {
 
     public abstract void runPhrase();
 
-
+    @Override
+    public PhraseData clone() {
+        try {
+            PhraseData copy = (PhraseData) super.clone();
+            copy.clones = new ArrayList<>();
+            return copy;
+        } catch (CloneNotSupportedException e) {
+            throw new AssertionError(e);     // should never happen if Cloneable is implemented
+        }
+    }
 }

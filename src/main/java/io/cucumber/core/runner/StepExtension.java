@@ -9,7 +9,6 @@ import tools.dscode.common.mappings.ParsingMap;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -22,14 +21,11 @@ import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleStepTestStep;
-import static tools.dscode.common.util.DebugUtils.printDebug;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
 
 public class StepExtension extends StepData {
     private static final Pattern pattern = Pattern.compile("@\\[([^\\[\\]]*)\\]");
-    boolean runMethodDirectly = false;
 
-    public boolean debugStartStep = false;
 
     public StepExtension(io.cucumber.core.runner.TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
         super(testCase, pickleStepTestStep);
@@ -198,26 +194,5 @@ public class StepExtension extends StepData {
         modifiedStep.setStepParsingMap(getStepParsingMap());
         return modifiedStep;
     }
-
-//    public  PickleStepTestStep resolveAndClone(String stepText,  ParsingMap parsingMap) {
-//        PickleStepArgument pickleStepArgument = pickleStepTestStep.getPickleStep().getArgument().orElse(null);
-//        return resolveAndClone( stepText, pickleStepArgument, parsingMap);
-//    }
-
-//    public  PickleStepTestStep resolveAndClone( ParsingMap parsingMap) {
-//        PickleStepArgument pickleStepArgument = pickleStepTestStep.getPickleStep().getArgument().orElse(null);
-//        return resolveAndClone(pickleStepTestStep.getStepText(), pickleStepArgument, parsingMap);
-//    }
-
-
-//    public  PickleStepTestStep resolveAndClone( String stepText, PickleStepArgument pickleStepArgument, ParsingMap parsingMap) {
-//        String newStepText = parsingMap.resolveWholeText(stepText);
-//        PickleStepArgument newPickleStepArgument = null;
-//        if (pickleStepArgument != null) {
-//            UnaryOperator<String> external = parsingMap::resolveWholeText;
-//            newPickleStepArgument = PickleStepArgUtils.transformPickleArgument(pickleStepArgument, external);
-//        }
-//            return clonePickleStepTestStep(pickleStepTestStep, newStepText, newPickleStepArgument);
-//    }
 
 }

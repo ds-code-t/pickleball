@@ -20,23 +20,6 @@ import java.util.List;
 
 public abstract class StepData extends StepMapping {
 
-    public LineData lineData;
-
-    public io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep;
-    public io.cucumber.core.runner.PickleStepTestStep executingPickleStepTestStep;
-    public TestCase testCase;
-    //    public Pickle pickle;
-    public List<StepData> childSteps = new ArrayList<>();
-    public List<StepData> grandChildrenSteps = new ArrayList<>();
-
-    public List<StepData> attachedSteps = new ArrayList<>();
-    public StepData parentStep;
-    public StepData previousSibling;
-    public StepData nextSibling;
-    public String overrideLoggingText = null;
-    List<Argument> arguments;
-    public Argument argument;
-
     public int getNestingLevel() {
         return nestingLevel;
     }
@@ -45,22 +28,6 @@ public abstract class StepData extends StepMapping {
         this.nestingLevel = nestingLevel;
     }
 
-    private int nestingLevel = 0;
-    public String codeLocation;
-    public boolean isCoreStep;
-    protected final List<String> stepFlags = new ArrayList<>();
-    protected List<DefinitionFlag> inheritableDefinitionFlags = new ArrayList<>();
-    protected List<DefinitionFlag> definitionFlags;
-    protected List<DefinitionFlag> nextSiblingDefinitionFlags;
-    public List<String> stepTags = new ArrayList<>();
-    public List<String> bookmarks = new ArrayList<>();
-    public Method method;
-    public String methodName;
-    public boolean isFlagStep = false;
-    public static final String corePackagePath = GeneralSteps.class.getPackageName() + ".";
-    public boolean hardFail = false;
-    public boolean softFail = false;
-    public boolean skipped = false;
 
     public DocString getDocString() {
         if (docString == null && nextSibling != null)
@@ -92,16 +59,6 @@ public abstract class StepData extends StepMapping {
     }
 
 
-    public DocString docString;
-    public DataTable dataTable;
-
-
-    public enum ConditionalStates {
-        SKIP, FALSE, TRUE
-    }
-
-    private final List<ConditionalStates> conditionalStates = new ArrayList<>();
-
     public List<ConditionalStates> getConditionalStates() {
         return conditionalStates;
     }
@@ -111,7 +68,7 @@ public abstract class StepData extends StepMapping {
     }
 
 
-    public StepData initializeChildSteps() {
+    public StepBase initializeChildSteps() {
         if (childSteps.isEmpty()) {
             if (grandChildrenSteps.isEmpty())
                 return null;
@@ -119,8 +76,8 @@ public abstract class StepData extends StepMapping {
             grandChildrenSteps = new ArrayList<>();
         }
 
-        StepData lastChild = null;
-        for (StepData child : childSteps) {
+        StepBase lastChild = null;
+        for (StepBase child : childSteps) {
 
 
             child.childSteps.addAll(grandChildrenSteps);
@@ -137,7 +94,7 @@ public abstract class StepData extends StepMapping {
     }
 
     public void addChildStep(StepData child) {
-        StepData lastChild = childSteps.size() == 0 ? null : childSteps.getLast();
+        StepBase lastChild = childSteps.size() == 0 ? null : childSteps.getLast();
         if (lastChild != null) {
             lastChild.nextSibling = child;
             child.previousSibling = lastChild;

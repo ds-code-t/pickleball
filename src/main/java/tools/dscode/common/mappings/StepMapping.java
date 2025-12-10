@@ -3,19 +3,15 @@ package tools.dscode.common.mappings;
 import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.Multimaps;
 import io.cucumber.core.runner.ScenarioStep;
+import io.cucumber.core.runner.StepBase;
 
 
 import java.util.EnumSet;
 import java.util.Set;
 
 import static tools.dscode.common.evaluations.AviatorUtil.eval;
-import static tools.dscode.common.mappings.MapConfigurations.MapType.STEP_MAP;
-import static tools.dscode.common.util.DebugUtils.printDebug;
 
-public class StepMapping {
-
-    private final ParsingMap stepParsingMap = new ParsingMap();
-
+public abstract class StepMapping extends StepBase {
 
     public ParsingMap getStepParsingMap() {
         return stepParsingMap;
@@ -24,8 +20,6 @@ public class StepMapping {
     public NodeMap getStepNodeMap() {
         return stepNodeMap;
     }
-
-    private final NodeMap stepNodeMap = new NodeMap(STEP_MAP);
 
     public void mergeToStepNodeMap(LinkedListMultimap<?, ?> obj) {
         stepNodeMap.merge(obj);
