@@ -165,7 +165,7 @@ public final class LeanWaits {
                             element
                     );
                 } catch (JavascriptException ignored) {
-                    System.out.println("@@ignored-- JavascriptException");
+
                     // ignore and continue polling
                 }
                 // Small hover nudge for CSS :hover menus/tooltips

@@ -71,7 +71,7 @@ public class ElementMatch extends Component {
     public void findWebElements(WebDriver driver) {
         driver.switchTo().defaultContent();
         List<WebElement> elements = contextWrapper.getElements(driver);
-        System.out.println("@@elements: " + elements.size() + "");
+
         wrappedElements.addAll(elements.stream().map(e -> new ElementWrapper(driver, e, this)).toList());
         parentPhrase.wrappedElements.addAll(wrappedElements);
     }
@@ -85,7 +85,7 @@ public class ElementMatch extends Component {
     public record TextOp(String text, ExecutionDictionary.Op op){
         public TextOp(String text, String op)
         {
-            this(text, ExecutionDictionary.Op.valueOf(op));
+            this(text, getOpFromString(op));
         }
     };
 
@@ -120,11 +120,13 @@ public class ElementMatch extends Component {
         categoryFlags.addAll(getExecutionDictionary().getResolvedCategoryFlags(category));
 
 
-        String elPredicates = elementNode.getStringFromLocalState("elPredicate");
-        for ( String elPredicate : elPredicates.split("\\s+")){
-            MatchNode elPredicateNode = elementNode.getMatchNode(elPredicate.trim());
-            if(elPredicateNode!= null) {
-                textOps.add(new TextOp(elPredicateNode.getStringFromLocalState("predicateType"),    elPredicateNode.getStringFromLocalState("predicateVal")));
+        if(elementNode.localStateBoolean("elPredicate")) {
+            String elPredicates = elementNode.getStringFromLocalState("elPredicate");
+            for (String elPredicate : elPredicates.split("\\s+")) {
+                MatchNode elPredicateNode = elementNode.getMatchNode(elPredicate.trim());
+                if (elPredicateNode != null) {
+                    textOps.add(new TextOp(elPredicateNode.getStringFromLocalState("predicateVal"), elPredicateNode.getStringFromLocalState("predicateType")));
+                }
             }
         }
 
@@ -134,17 +136,20 @@ public class ElementMatch extends Component {
         }
 
 
-        String atrPredicate = elementNode.getStringFromLocalState("atrPredicate");
 
-        for (String attr : atrPredicate.split("\\bwith\b")) {
-            Matcher m = attributePattern.matcher(attr.trim());
-            if (m.find()) {
-                String attrName = m.group("attrName");   // named group
-                String predicate = m.group("predicate");   // named group
-                MatchNode predicateNode = elementNode.getMatchNode(predicate.trim());
-                attributes.add(new Attribute(attrName, (String) predicateNode.getFromLocalState("predicateType"), (String) predicateNode.getFromLocalState("predicateVal")));
-            } else {
-                throw new RuntimeException("Invalid attribute predicate: " + attr);
+        if(elementNode.localStateBoolean("atrPredicate")) {
+            String atrPredicate = elementNode.getStringFromLocalState("atrPredicate");
+            for (String attr : atrPredicate.split("\\bwith\b")) {
+
+                Matcher m = attributePattern.matcher(attr.trim());
+                if (m.find()) {
+                    String attrName = m.group("attrName");   // named group
+                    String predicate = m.group("predicate");   // named group
+                    MatchNode predicateNode = elementNode.getMatchNode(predicate.trim());
+                    attributes.add(new Attribute(attrName, (String) predicateNode.getFromLocalState("predicateVal"), (String) predicateNode.getFromLocalState("predicateType")));
+                } else {
+                    throw new RuntimeException("Invalid attribute predicate: " + attr);
+                }
             }
         }
 
@@ -162,14 +167,7 @@ public class ElementMatch extends Component {
 
 
             for (Attribute attribute : attributes) {
-                ExecutionDictionary.Op op = switch (attribute.predicateType) {
-                    case null -> null;
-                    case String s when s.isBlank() -> null;
-                    case String s when s.startsWith("equal") -> ExecutionDictionary.Op.EQUALS;
-                    case String s when s.startsWith("contain") -> ExecutionDictionary.Op.CONTAINS;
-                    case String s when s.startsWith("start") -> ExecutionDictionary.Op.STARTS_WITH;
-                    default -> null;
-                };
+                ExecutionDictionary.Op op = getOpFromString(attribute.predicateType);
                 xPathy = applyAttrOp(xPathy, com.xpathy.Attribute.custom(attribute.attrName), op, attribute.predicateVal);
             }
 
@@ -177,6 +175,19 @@ public class ElementMatch extends Component {
         }
 
 
+    }
+
+    public static ExecutionDictionary.Op getOpFromString(String input)
+    {
+        return switch (input) {
+            case null -> null;
+            case String s when s.isBlank() -> null;
+            case String s when s.startsWith("equal") -> ExecutionDictionary.Op.EQUALS;
+            case String s when s.startsWith("contain") -> ExecutionDictionary.Op.CONTAINS;
+            case String s when s.startsWith("start") -> ExecutionDictionary.Op.STARTS_WITH;
+            case String s when s.startsWith("end") -> ExecutionDictionary.Op.ENDS_WITH;
+            default -> null;
+        };
     }
 
     private List<PhraseData> phraseContextList;

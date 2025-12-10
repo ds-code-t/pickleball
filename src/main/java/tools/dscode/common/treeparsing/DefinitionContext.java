@@ -103,7 +103,7 @@ public final class DefinitionContext {
 //                StepExtension currentStep = getCurrentStep();
 ////                PhraseData lastPhraseExecution = (PhraseExecution) self.getFromGlobalState("lastPhraseExecution");
 //                PhraseData lastPhraseExecution = currentStep.contextPhraseExecution;
-//                printDebug("@@##lastPhraseExecution: " + lastPhraseExecution);
+
 //                if (lastPhraseExecution == null) {
 //                    lastPhraseExecution = currentStep.getParentContextPhraseExecution() == null ? initiateFirstPhraseExecution() : currentStep.getParentContextPhraseExecution();
 //                } else {
@@ -120,11 +120,12 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode predicate = new ParseNode("(?:\\b(?<predicateType>starting with|containing)\\s+(?<predicateVal>\\d+|<<quoteMask>>))") {
+        ParseNode predicate = new ParseNode("(?:\\b(?<predicateType>starting with|ending with|containing|equaling|of)\\s+(?<predicateVal>\\d+|<<quoteMask>>))") {
             @Override
             public String onCapture(MatchNode self) {
-
-                self.putToLocalState("predicateType", self.resolvedGroupText("predicateType"));
+                String predicateType = self.resolvedGroupText("predicateType");
+                predicateType = predicateType.replaceAll("with", "").replaceAll("of", "equaling").trim();
+                self.putToLocalState("predicateType", predicateType);
                 self.putToLocalState("predicateVal", self.resolvedGroupText("predicateVal"));
                 return self.originalText();
             }
@@ -132,7 +133,7 @@ public final class DefinitionContext {
 
 
 //        ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>)*)?\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*")
-        ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate><\\s*<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*") {
+        ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*") {
             //        ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?:\\bwith\\s+(?<attrName>[a-z]+)?)?\\s*(?<predicate><<predicate>>))?(?<elPredicate>(?:with\\s+(?<attrName>[a-z]+)?)?\\s*(?<predicate><<predicate>>))?") {
             @Override
             public String onSubstitute(MatchNode self) {
@@ -148,7 +149,9 @@ public final class DefinitionContext {
                     self.putToLocalState("text", self.resolvedGroupText("text"));
                 }
                 self.putToLocalState("type", self.resolvedGroupText("type"));
-//                self.putToLocalState("attrName", self.resolvedGroupText("attrName"));
+
+
+
                 self.putToLocalState("elPredicate", self.groups().get("elPredicate"));
                 self.putToLocalState("atrPredicate", self.groups().get("atrPredicate"));
                 return self.token();
@@ -315,22 +318,13 @@ public final class DefinitionContext {
             //
             // Link
             //
-            category("Link")
+            category("Link").inheritsFrom("Text")
                     .or(
                             (category, v, op) ->
                                     XPathy.from(any).byAttribute(role).equals("link")
                                             .or().byAttribute(aria_label).equals("link"),
                             (category, v, op) ->
                                     XPathy.from(Tag.a)
-                    ).and(
-                            (category, v, op) -> {
-                                if (v == null || v.isBlank())
-                                    return null;
-                                return any.byHaving(
-                                        XPathy.from("descendant-or-self::*")
-                                                .byHaving(deepNormalizedText(v))
-                                );
-                            }
                     );
 
 

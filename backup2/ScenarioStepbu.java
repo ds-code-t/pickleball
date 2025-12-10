@@ -24,13 +24,13 @@
 //                : META_FLAG + "SCENARIO: " +
 //                        testCaseExtension.pickle.getName();
 //        PickleStepTestStep newPickleStepTestStep = updatePickleStepTestStep(modelStep, stepText, null);
-//        printDebug("@@newPickleStepTestStep1: " + newPickleStepTestStep.getStepText());
-//        printDebug("@@newPickleStepTestStep2: " + ((GherkinMessagesStep) newPickleStepTestStep.step).getText());
+
+
 //        System.out.println(
 //            "@@newPickleStepTestStep3: " + ((GherkinMessagesStep) newPickleStepTestStep.step).pickleStep.text);
 //        ScenarioStep scenarioStep = new ScenarioStep(newPickleStepTestStep, testCaseExtension.pickle, isRoot, 0);
-//        printDebug("@@scenarioStep getStepLine11 " + scenarioStep.getStepLine());
-//        printDebug("@@scenarioStep getStepLine22: " + scenarioStep.delegate.getStepLine());
+
+
 //        testCaseExtension.registerStep(scenarioStep.delegate);
 //        // putTestStepById(scenarioStep);
 //        return scenarioStep;

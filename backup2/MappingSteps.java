@@ -21,7 +21,7 @@
 //    // @NoLogging
 //    @Given("^For every ROW in (:?\"(.*)\"\\s+)?DATA TABLE$")
 //    public static void forEverRow(String tableName) {
-//        printDebug("@@forEverRow!!");
+
 //
 //        StepExtension currentStep = getCurrentStep();
 //        DataTable dataTable = null;
@@ -37,17 +37,17 @@
 //            throw new RuntimeException("Data Table not defined");
 //
 //        LinkedListMultimap<String, LinkedListMultimap<String, String>> rowMap = toRowsMultimap(dataTable);
-//        printDebug("@@rowMap:::::: " + rowMap);
+
 //        // if (!tableName.isEmpty())
 //        // currentStep.getStepNodeMap().put(tableName.trim(), rowMap);
 //        // else
 //        // currentStep.getStepNodeMap().merge(rowMap);
 //
-//        printDebug("@@currentStep.getStepParsingMap:: " + currentStep.getStepParsingMap());
+
 //
 //        List<LinkedListMultimap<String, String>> rows = rowMap.get("ROWS");
 //        currentStep.put("ROWS=", rows);
-//        printDebug("@@rowss: " + rows);
+
 //        printDebug("@currentStepgetStepParsingMap " + currentStep.getStepParsingMap());
 //        System.out
 //                .println("@currentStepgetStepParsingMap get(\"ROWS\") " + currentStep.getStepParsingMap().get("ROWS"));
@@ -55,12 +55,12 @@
 //        List<StepData> children = currentStep.getChildSteps();
 //        currentStep.clearChildSteps();
 //
-//        printDebug("@@rows.size(): " + rows.size());
+
 //        for (int r = 0; r < rows.size(); r++) {
 //            LinkedListMultimap<String, String> row = rows.get(r);
 //            StepExtension nextSibling = currentStep.modifyStep("-" + r + "- " + currentStep.getStepText());
 //            nextSibling.setStepParsingMap(currentStep.getStepParsingMap());
-//            printDebug("@@row: " + row);
+
 //            nextSibling.mergeToStepMap(row);
 //            nextSibling.put("ROW", row);
 //            if (!tableName.isEmpty())
@@ -70,7 +70,7 @@
 //            if (lastSibling != null)
 //                pairSiblings(lastSibling, nextSibling);
 //            else
-//                printDebug("@@nextSibling getNextSibling: " + nextSibling.getNextSibling());
+
 //
 //            lastSibling = nextSibling;
 //            System.out.println("\n\n@@nextSibling parsaing33:\n" + nextSibling.getStepParsingMap());
@@ -80,8 +80,8 @@
 //
 //    @Given("^-(\\d+)-( For .*)")
 //    public static void loop(String count, String stepText) {
-//        printDebug("@@@LOOP _ " + count + "  -  " + stepText);
-//        printDebug("@@@LOOP _ passing mpa: " + getCurrentStep().getStepParsingMap());
+
+
 //    }
 //
 //    @Given("^(:?\"(.*)\"\\s+)?DATA TABLE$")

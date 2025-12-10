@@ -133,7 +133,9 @@ public class CurrentScenarioState extends ScenarioMapping {
                 else
                     throwable = new RuntimeException("Step failed with status: " + status);
             }
+
             if (throwable != null) {
+
                 if (SoftExceptionInterface.class.isAssignableFrom(throwable.getClass()))
                     isScenarioSoftFail = true;
                 else {
@@ -174,6 +176,8 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public boolean shouldRun(StepExtension stepExtension) {
+
+
         if (stepExtension.parentStep == null)
             return true;
 
@@ -185,10 +189,13 @@ public class CurrentScenarioState extends ScenarioMapping {
 
         if (stepExtension.stepFlags.contains(RUN_IF_SCENARIO_SOFT_FAILED))
             return isScenarioSoftFail;
+
         if (stepExtension.stepFlags.contains(RUN_IF_SCENARIO_HARD_FAILED))
             return isScenarioHardFail;
+
         if (stepExtension.stepFlags.contains(RUN_IF_SCENARIO_PASSING))
             return !isScenarioFailed();
+
         return !stepExtension.skipped;
     }
 

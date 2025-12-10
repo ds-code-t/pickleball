@@ -35,19 +35,19 @@
 //    }
 //
 //    public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(String stepText, String argument) {
-//        printDebug("@@getPickleStepTestStepFromStrings1: " + stepText);
+
 ////        Pickle pickle = createGherkinMessagesPickle("* " + stepText, argument);
 //        Pickle pickle = createGherkinMessagesPickle("* " + stepText, argument);
 //        io.cucumber.messages.types.Pickle gPickle = (io.cucumber.messages.types.Pickle) getProperty(pickle, "pickle");
-//        printDebug("@@gPicklegetName : " + gPickle.getName() + "");
-//        printDebug("@@outer pickle first().getText(: " + pickle.getSteps().getFirst().getText());
-//        printDebug("@@inner pickle first().getText(: " + gPickle.getSteps().getFirst().getText());
+
+
+
 //        List<PickleStepTestStep> testSteps = (List<PickleStepTestStep>) invokeAnyMethod(getRunner(), "createTestStepsForPickleSteps", pickle);
 //        return testSteps.getFirst();
 //    }
 //
 ////        TestCase testCase = getGlobalContext().createTestCase(pickle);
-////        printDebug("@@getPickleStepTestStepFromStrings2: " + stepText);
+
 ////        return (PickleStepTestStep) testCase.getTestSteps().getFirst();
 ////    }
 //
@@ -62,17 +62,17 @@
 //    public static PickleStepDefinitionMatch getStepDefinitionMatch(URI uri, Step step) {
 //        List<PickleStepDefinitionMatch> result = new ArrayList<>();
 //        Map<String, CoreStepDefinition> stepDefinitionsByPattern = getCachingGlue().getStepDefinitionsByPattern();
-//        printDebug("@@stepDefinitionsByPattern: " + stepDefinitionsByPattern.values());
+
 //        io.cucumber.core.gherkin.Argument arg = step.getArgument();
 //        List<PickleStepDefinitionMatch> matches = new ArrayList<>();
 //        for (CoreStepDefinition coreStepDefinition : stepDefinitionsByPattern.values()) {
-//            printDebug("@@coreStepDefinition-getStepDefinition1: " + coreStepDefinition.getStepDefinition());
-//            printDebug("@@coreStepDefinition-getStepDefinition().getLocation2: " + coreStepDefinition.getStepDefinition().getLocation());
-//            printDebug("@@coreStepDefinition-coreStepDefinition.getPattern()3: " + coreStepDefinition.getPattern());
-//            printDebug("@@coreStepDefinition-coreStepDefinition.getExpression()3: " + coreStepDefinition.getExpression());
-//            printDebug("@@coreStepDefinition-coreStepDefinition.getExpression().getSource()3: " + coreStepDefinition.getExpression().getSource());
+
+
+
+
+
 //            Type[] types = (Type[]) getProperty(coreStepDefinition, "types");
-//            printDebug("@@MAtching step text = " + step.getText());
+
 //            StepExpression stepExpression = coreStepDefinition.getExpression();
 //            List<Argument> args = stepExpression.match(step.getText(), types);
 //            if (args != null)
@@ -93,7 +93,7 @@
 //        System.out.println("\n\n=======\n@@originalPickleStepTestStep: ");
 //        System.out.println(originalPickleStepTestStep.getStepText());
 //        System.out.println(originalPickleStepTestStep.getStepText());
-//        printDebug("@@args: " + originalPickleStepTestStep.getStep().getArgument());
+
 //
 //
 //        System.out.println(originalPickleStepTestStep.getDefinitionMatch());
@@ -103,9 +103,9 @@
 //        System.out.println("--------\n");
 //
 //        PickleStepTestStep resolvedPickleStepTestStep = resolvePickleStepTestStep(originalPickleStepTestStep, parsingMap);
-//        printDebug("@@##resolvedPickleStepTestStep text: " + resolvedPickleStepTestStep.getStep().getText());
-//        printDebug("@@resolvedPickleStepTestStep-getDefinitionMatch:: " + resolvedPickleStepTestStep.getDefinitionMatch());
-//        printDebug("@@args: " + resolvedPickleStepTestStep.getStep().getArgument());
+
+
+
 //
 //        PickleStep originalPickleStep = originalPickleStepTestStep.getPickleStep();
 //        PickleStep resolvedPickleStep = resolvedPickleStepTestStep.getPickleStep();
@@ -114,7 +114,7 @@
 //        PickleStepTestStep returnPickleStepTestStep = new PickleStepTestStep(UUID.randomUUID(), originalPickleStepTestStep.getUri(), newGherkinMessagesStep, getStepDefinitionMatch(resolvedPickleStepTestStep.getUri(), newGherkinMessagesStep));
 //        System.out.println("\n*******\n@@returnPickleStepTestStep: ");
 //        System.out.println(returnPickleStepTestStep.getStepText());
-//        printDebug("@@args: " + returnPickleStepTestStep.getStep().getArgument());
+
 //
 //        System.out.println(returnPickleStepTestStep.getDefinitionMatch());
 //        System.out.println(returnPickleStepTestStep.getDefinitionArgument());

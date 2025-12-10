@@ -97,7 +97,7 @@ public class ExecutionDictionary {
                                 return null;
                             return any.byHaving(
                                     XPathy.from("descendant-or-self::*")
-                                            .byHaving(deepNormalizedText(v))
+                                            .byHaving(deepNormalizedText(v, op))
                             );
                         }
                 );

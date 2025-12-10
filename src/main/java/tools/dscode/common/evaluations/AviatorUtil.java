@@ -90,7 +90,7 @@ public final class AviatorUtil {
     }
 
     public static void main(String[] args) {
-        printDebug("@@eval: " + eval("true ? 1 : 0"));
+
     }
 
     public static Object eval(Object expr) {

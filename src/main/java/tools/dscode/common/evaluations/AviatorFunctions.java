@@ -133,7 +133,7 @@ public class AviatorFunctions {
     }
 
     private static String processTernaryString(String input) {
-        printDebug("@@processTernaryString2: " + input);
+
         if (!input.contains(operatorFlag))
             return input;
         input = input.replaceAll("^([^" + operatorFlag + "]*)" + "(" + ELSE + "|" + ELSEIF + ")",

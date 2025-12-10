@@ -105,7 +105,7 @@ public final class CucumberOptionResolver {
         if (CACHE.isEmpty()) {
             Map<String, List<String>> merged = new LinkedHashMap<>();
 
-            printDebug("@@CucumberOptionResolver: resolving global options…");
+
             var tccl = Thread.currentThread().getContextClassLoader();
             dbg("TCCL         = %s", loaderName(tccl));
             dbg("Self loader  = %s", loaderName(CucumberOptionResolver.class.getClassLoader()));
@@ -228,7 +228,7 @@ public final class CucumberOptionResolver {
                 }
             }
         } catch (Throwable t) {
-            printDebug("@@CucumberOptionResolver: JUnit5 suite scan failed: " + t);
+
             if (DEBUG) t.printStackTrace(System.out);
         }
     }

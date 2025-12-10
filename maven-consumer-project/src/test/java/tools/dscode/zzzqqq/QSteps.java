@@ -26,7 +26,7 @@ public class QSteps {
 
     @ReturnStep("rrr")
     public void runInternal() {
-        printDebug("@@run runInternal");
+
     }
 
     @Given("I open {browser}")
@@ -50,13 +50,13 @@ public class QSteps {
 
     @Given("^zargt1 (.*)$")
     public void arg1(Integer z) {
-        printDebug("@@argt dd- "  + z.getClass());
-        printDebug("@@argt999- "  + z);
+
+
     }
 
     @Given("QQQ")
     public void qqq1() {
-        printDebug("@@qqq1");
+
     }
 
 
@@ -64,48 +64,48 @@ public class QSteps {
 
     @Given("map")
     public void mapTest(Map<String, String> map) {
-        printDebug("@@map::: " + map);
+
     }
 
     @Given("list")
     public void listTest(List<String> list) {
-        printDebug("@@map::: " + list);
+
     }
 
     @Given("set")
     public void setTest(Set<String> set) {
-        printDebug("@@set::: " + set);
+
     }
 
     @Given("string")
     public void stringTest(String string) {
-        printDebug("@@string::: " + string);
+
     }
     @Given("dataTable")
     public void dataTableTest(DataTable dataTable) {
-        printDebug("@@dataTable::: " + dataTable);
+
     }
 
 
 
     @Given("get browser {returnStepParameter}")
     public void chrometest1(Object param, DocString docString) {
-        printDebug("@@param class = " + param.getClass());
-        printDebug("@@param value = " + param);
-        printDebug("@@docString--" + docString + "--");
+
+
+
     }
 
     @Given("^xQQQ2(.*)$")
     public void qqq2(String arg0 ) {
-        printDebug("@@arg0: " + arg0.getClass());
-        printDebug("@@zzzzzzzzzzzzzqqq2--" + arg0+"--");
+
+
     }
 
 
     @Given("^zdatatable (.*)$")
     public void dataTable(String arg0, DataTable table) {
-        printDebug("@@arg0: " + arg0);
-        printDebug("@@table: " + table);
+
+
     }
 
     @Given("^zprint (.*)$")

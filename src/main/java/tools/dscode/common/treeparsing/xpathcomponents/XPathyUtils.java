@@ -92,30 +92,64 @@ public final class XPathyUtils {
 
     public final static String to = " ".repeat(from.length());
 
+//    public enum TextMatchMode {
+//        EQUALS,
+//        STARTS_WITH,
+//        CONTAINS,
+//        ENDS_WITH
+//    }
+
+
     public static XPathy deepNormalizedText(String rawText) {
+        return deepNormalizedText(rawText, ExecutionDictionary.Op.EQUALS);
+    }
+
+
+    public static XPathy deepNormalizedText(String rawText, ExecutionDictionary.Op mode) {
         if (rawText == null) {
             throw new IllegalArgumentException("rawText must not be null");
         }
 
-        // Normalize the expected Java value the same way.
-        String expected = rawText.replaceAll("\\s+", " ").strip();
+        // Your existing Java-side normalization helper
+        String expected = normalizeText(rawText);
 
+        String from =
+                " \t\u00A0\u200B\u200C\u200D\uFEFF\u1680\u180E" +
+                        "\u2000\u2001\u2002\u2003\u2004\u2005\u2006" +
+                        "\u2007\u2008\u2009\u200A\u2028\u2029\u202F\u205F\u3000";
 
-        // Build TO string: same number of spaces
+        String to = " ".repeat(from.length());
 
-
-        // Build predicate
-        String predicate =
+        String norm =
                 "normalize-space(" +
                         "translate(string(.), " +
                         toXPathLiteral(from) + ", " +
                         toXPathLiteral(to) +
                         ")" +
-                        ") = " + toXPathLiteral(expected);
+                        ")";
 
-        // Return a relative XPathy node predicate
+        String predicate = switch (mode) {
+            case STARTS_WITH ->
+                    "starts-with(" + norm + ", " + toXPathLiteral(expected) + ")";
+
+            case CONTAINS ->
+                    "contains(" + norm + ", " + toXPathLiteral(expected) + ")";
+
+            case ENDS_WITH ->
+                    "substring(" +
+                            norm + ", " +
+                            "string-length(" + norm + ") - string-length(" + toXPathLiteral(expected) + ") + 1" +
+                            ") = " + toXPathLiteral(expected);
+
+            case EQUALS ->
+                    norm + " = " + toXPathLiteral(expected);
+            default -> throw new IllegalArgumentException("Unsupported mode: " + mode);
+        };
+
         return XPathy.from("(" + predicate + ")");
     }
+
+
 
 
 

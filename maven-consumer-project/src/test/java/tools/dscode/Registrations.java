@@ -67,26 +67,26 @@ public class Registrations {
 
     @LifecycleHook(Phase.AFTER_CUCUMBER_RUN)
     public static void afterRun() {
-        printDebug("@@=--- afterRun");
+
     }
 
     @LifecycleHook(Phase.BEFORE_SCENARIO_RUN)
     public static void beforeScenario() {
-        printDebug("@@=--- beforeScenario");
+
     }
 
     @LifecycleHook(Phase.AFTER_SCENARIO_RUN)
     public static void afterScenario() {
-        printDebug("@@=--- afterScenario");
+
     }
 
     @LifecycleHook(Phase.AFTER_SCENARIO_FAIL)
     public static void afterScenarioFail() {
-        printDebug("@@=--- afterScenarioFail");
+
     }
 
     @LifecycleHook(Phase.AFTER_SCENARIO_PASS)
     public static void afterScenarioPass() {
-        printDebug("@@=--- afterScenarioPass");
+
     }
 }

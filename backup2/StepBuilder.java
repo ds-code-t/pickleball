@@ -159,7 +159,7 @@
 //        PickleStepDefinitionMatch match = findPickleStepDefinitionMatch(step, Arrays.stream(gluePaths)
 //                .flatMap(p -> Stream.of("--glue", p))
 //                .toArray(String[]::new));
-//        printDebug("@@match: " + match );
+
 //        return constructPickleStepTestStep(uri, match, step);
 //    }
 //
@@ -216,13 +216,13 @@
 //
 //        // Use the first Given keyword from the current dialect, defaulting to "Given"
 //        String keyword;
-//        printDebug("@@keyword1: '" + getGivenKeyword()+"'" );
+
 //        try {
 //            keyword = getGivenKeyword();
 //        } catch (Throwable t) {
 //            keyword = "Given ";
 //        }
-//        printDebug("@@keyword2: '" + keyword+"'" );
+
 //        return buildPickleStepTestStep(
 //                stepText,
 //                uri,

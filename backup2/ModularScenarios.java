@@ -44,14 +44,14 @@ package tools.dscode.coredefinitions;//package tools.dscode.coredefinitions;
 //        }
 //        maps.forEach(map -> {
 //            map.computeIfPresent("Tags", (key, value) -> {
-//                printDebug("@@key: " + key);
-//                printDebug("@@value: " + value);
+
+
 //                String cleaned = value.startsWith("@") ? value.substring(1) : value;
 //                return COMPONENT_TAG_PREFIX + cleaned;
 //            });
 //        });
 //
-//        printDebug("@@RUN COMPONENT SCENA " + maps);
+
 //        filterAndExecutePickles(maps, "'RUN COMPONENT SCENARIOS' step");
 //    }
 //
@@ -70,7 +70,7 @@ package tools.dscode.coredefinitions;//package tools.dscode.coredefinitions;
 //    }
 //
 //    public static void filterAndExecutePickles(List<Map<String, String>> maps, String... messageString) {
-//        printDebug("@@runScenarios - " + maps);
+
 //        String messagePrefix = String.join("," + Arrays.stream(messageString).toList());
 //        StepExtension currentStep = getCurrentStep();
 //        if (maps.isEmpty()) {
@@ -105,7 +105,7 @@ package tools.dscode.coredefinitions;//package tools.dscode.coredefinitions;
 //                    lastScenarioNameStep = messageStep;
 //                    continue;
 //                }
-//                printDebug("@@scenarioTags: " + scenarioTags);
+
 //                if (scenarioTags != null)
 //                    cucumberProps.put("cucumber.filter.tags", scenarioTags);
 //                if (featurePaths != null)
@@ -116,18 +116,18 @@ package tools.dscode.coredefinitions;//package tools.dscode.coredefinitions;
 //
 ////                StepExecution stepExecution = getScenarioState().stepExecution;
 //                StepExtension currentScenarioNameStep;
-//                printDebug("@@pickle/. size: " + pickles.size());
+
 //                for (Pickle pickle : pickles) {
-//                    printDebug("@@pickle*: " + pickle.getName());
-//                    printDebug("@@currentStep=: " + currentStep);
+
+
 //                    // final String overRideStepText = RUN_SCENARIO +
 //                    // pickle.getName();
 //                    NodeMap scenarioMap = getScenarioState().getScenarioMap(pickle);
 //                    currentScenarioNameStep = new ScenarioStep(pickle, false, currentStep.getNestingLevel());
 //                    currentStep.addChildStep(currentScenarioNameStep);
-//                    printDebug("@@currentStep: " + currentStep);
-//                    printDebug("@@currentStep-getChildSteps " + currentStep.getChildSteps());
-//                    printDebug("@@currentScenarioNameStep: " + currentScenarioNameStep);
+
+
+
 //                    System.out.println(
 //                            "@@currentScenarioNameStep-getChildSteps " + currentScenarioNameStep.getChildSteps());
 //                    if (scenarioMap != null) {
@@ -136,12 +136,12 @@ package tools.dscode.coredefinitions;//package tools.dscode.coredefinitions;
 //                        currentScenarioNameStep.getStepParsingMap().replaceMaps(scenarioMap);
 //                    }
 //
-//                    printDebug("@@lastScenarioNameStep:-- " + lastScenarioNameStep);
-//                    printDebug("@@currentScenarioNameStep:-- " + currentScenarioNameStep);
+
+
 //                    if (lastScenarioNameStep != null) {
-//                        printDebug("@@pairSiblings!!");
-//                        printDebug("@@lastScenarioNameStep: " + lastScenarioNameStep);
-//                        printDebug("@@currentScenarioNameStep: " + currentScenarioNameStep);
+
+
+
 //
 //                        pairSiblings(lastScenarioNameStep, currentScenarioNameStep);
 //                    }

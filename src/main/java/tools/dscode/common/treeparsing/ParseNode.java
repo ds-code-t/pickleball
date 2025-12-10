@@ -160,10 +160,10 @@ public class ParseNode {
         if (!skipAllChildren.isEmpty() && String.valueOf(skipAllChildren.getLast()).equalsIgnoreCase("true")) return;
         for (ParseNode childDef : parentDef.parseChildren) {
 //            Object obj = parentMatch.getFromLocalState("skip:"+childDef.getName());
-//            printDebug("@@parentMatch: " + parentMatch.localState());
+
 //            if(obj != null) {
-//                printDebug("@@parentMatch: " + parentMatch);
-//                printDebug("@@childDef: " + childDef);
+
+
 //            }
             if (parentMatch.localStateBoolean("skip:" + childDef.getName())) continue;
 
@@ -175,7 +175,7 @@ public class ParseNode {
             Pattern pattern = Pattern.compile(childDef.getRegexPattern(), Pattern.DOTALL);
             Matcher m = pattern.matcher(parentSnapshot);
 
-            printDebug("@@-AttemptingMatch: " + pattern + "  ::  " + parentSnapshot);
+
 
             StringBuilder newMasked = new StringBuilder(parentSnapshot.length());
             int lastEnd = 0;

@@ -9,8 +9,9 @@ Feature: Addition
 #  * , verify Text containing "The select element"  is displayed
 #  * , verify Text containing "The select element"  is displayed
     * , from the Top Panel:
-  : * , I save  Link starting with  "Get your own" as "Q"
+  : * , I save  Link containing " own " as "Q"
   : * , I verify "<Q>" equals "Q"
+  : * , I verify "<Q>" equals "1Q"
 #  : * IF: "<Opel sd>" THEN: , I verify  "Get your own website" Link matches with "^Gset.*$"
 
   Scenario: ss3

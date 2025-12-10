@@ -66,9 +66,7 @@ public final class CucumberScanUtil {
         cucumberProps.put("cucumber.filter.tags", tagString);
         RuntimeOptions cucumberOptions = new CucumberPropertiesParser().parse(cucumberProps).build();
         Filters filters = new Filters(cucumberOptions);
-        features.stream()
-                .flatMap(f -> f.getPickles().stream()).forEach(pickle -> printDebug("@@pickle.getTags(): " + pickle.getTags()));
-        return features.stream()
+          return features.stream()
                 .flatMap(f -> f.getPickles().stream())
                 .filter(filters::test)
                 .collect(Collectors.toUnmodifiableList());

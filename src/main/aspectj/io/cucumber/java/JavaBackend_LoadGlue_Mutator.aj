@@ -24,12 +24,12 @@ public aspect JavaBackend_LoadGlue_Mutator {
 
         java.util.List modified = new java.util.ArrayList();
         java.util.List globalPaths =  glueDistinct();
-        printDebug("@@old gluePaths: " + gluePaths);
+
         lifecycle.fire(Phase.BEFORE_CUCUMBER_RUN);
 //        modified.remove("classpath:");
 //        modified.remove("classpath:/");
         for (Object o : globalPaths) {
-            printDebug("@@gluePath1: " + o + "");
+
             java.net.URI uri = null;
             try {
                 uri = CucumberOptionResolver.toClasspathUriStrict((String) o);
@@ -40,7 +40,7 @@ public aspect JavaBackend_LoadGlue_Mutator {
 
             if (text.startsWith("classpath:/tools/dscode/coredefinitions")) continue;
             if (text.equals("classpath:") || text.equals("classpath:/")) continue;
-            printDebug("@@gluePath11: " + uri + "");
+
             modified.add(uri);
         }
 
@@ -49,7 +49,7 @@ public aspect JavaBackend_LoadGlue_Mutator {
         }
 
         for (Object o : gluePaths) {
-            printDebug("@@gluePath2: " + o + "");
+
             java.net.URI uri = (java.net.URI) o;
             if (modified.contains(uri)) continue;
             modified.add(uri);
@@ -59,7 +59,7 @@ public aspect JavaBackend_LoadGlue_Mutator {
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
         }
-        printDebug("@@modified gluePaths: " + modified);
+
         proceed(glue, modified);
     }
 }

@@ -79,7 +79,7 @@
 //        @Override
 //        public String onSubstitute(MatchNode self) {
 //            PhraseData lastPhraseExecution = (PhraseExecution) self.getFromGlobalState("lastPhraseExecution");
-//            printDebug("@@##lastPhraseExecution: " + lastPhraseExecution);
+
 //            if (lastPhraseExecution == null) {
 //                lastPhraseExecution = initiateFirstPhraseExecution();
 //            } else {

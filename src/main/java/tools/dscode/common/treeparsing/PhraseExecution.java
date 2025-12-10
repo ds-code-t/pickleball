@@ -189,8 +189,8 @@
 //    }
 //
 //    public static XPathy getXPathyContext(String context, List<ElementMatch> elements) {
-//        printDebug("@@##getXPathyContext: " + context);
-//        printDebug("@@##elements: " + elements);
+
+
 //        if (elements.isEmpty()) return null;
 //        XPathy xPathy = elements.getFirst().xPathy;
 //        return switch (context.toLowerCase()) {

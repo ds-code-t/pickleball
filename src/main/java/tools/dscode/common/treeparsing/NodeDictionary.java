@@ -83,7 +83,7 @@ public abstract class    NodeDictionary {
             if (!parseNode.useRegexTemplating)
                 continue;
             Pattern pattern = Pattern.compile("<<(.+?)>>");
-//            printDebug("@@parseNode.selfRegex: " + parseNode.getName() + "  ::  " + parseNode.selfRegex);
+
             Matcher m = pattern.matcher(parseNode.selfRegex);
             parseNode.selfRegex = m.replaceAll((MatchResult mr) -> {
                 String key = mr.group(1);

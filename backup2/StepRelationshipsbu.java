@@ -98,17 +98,17 @@
 //    }
 //
 //    public void setStepParsingMap(ParsingMap stepParsingMap) {
-//        printDebug("@@setStepParsingMap for " + this);
+
 //        this.stepParsingMap.copyParsingMap(stepParsingMap);
 //        // this.stepParsingMap = stepParsingMap;
 //        this.stepParsingMap.addMaps(stepNodeMap);
-//        printDebug("@@setStepParsingMap " + stepParsingMap);
+
 //    }
 //
 //    public void addToStepParsingMap(NodeMap... nodes) {
-//        printDebug("@@this.stepParsingMap1: " + this.stepParsingMap);
+
 //        this.stepParsingMap.addMaps(nodes);
-//        printDebug("@@this.stepParsingMap2: " + this.stepParsingMap);
+
 //
 //    }
 //
@@ -119,18 +119,18 @@
 //    private final ParsingMap stepParsingMap = new ParsingMap();
 //
 //    public void initializeChildSteps() {
-//        // printDebug("@@parent: " + this);
-//        printDebug("@@parent-stepParsingMap: " + stepParsingMap);
+
+
 //        childSteps.forEach(this::initializeChildStep);
 //    }
 //
 //    public void initializeChildStep(StepRelationships child) {
-//        printDebug("@@parent## " + this);
-//        printDebug("@@parent##--stepParsingMap: " + stepParsingMap);
+
+
 //        // if (child.inheritFromParent)
 //        // child.setStepParsingMap(new ParsingMap(stepParsingMap));
-//        // printDebug("@@child: " + child);
-//        // printDebug("@@child-stepParsingMap: " +
+
+
 //        // child.getStepParsingMap());
 //    }
 //
@@ -148,13 +148,13 @@
 //    }
 //
 //    public void addChildStep(StepRelationships child) {
-//        printDebug("@@addChildStep-currentChildren: " + childSteps.size());
-//        printDebug("@@addChildStep-getStepParsingMap: " + child.getStepParsingMap());
+
+
 //        child.setParentStep((StepExtension) this);
 //        childSteps.add(child);
 //        if (isFlagStep) {
-//            printDebug("@@flag-step: " + this);
-//            printDebug("@@flag-child-step: " + child);
+
+
 //            child.stepFlags.addAll(stepFlags);
 //        }
 //    }
@@ -188,9 +188,9 @@
 //    }
 //
 //    public static void pairSiblings(StepRelationships sibling1, StepRelationships sibling2) {
-//        printDebug("@@pairSiblings: ");
-//        printDebug("@@sibling1: " + sibling1);
-//        printDebug("@@sibling2: " + sibling2);
+
+
+
 //        sibling1.setNextSibling(sibling2);
 //        sibling2.setPreviousSibling(sibling1);
 //    }
@@ -207,13 +207,13 @@
 //        StepRelationships originalNextSibling = getNextSibling();
 //        if (originalNextSibling != null)
 //            insertNextSibling.setNextSibling(originalNextSibling);
-//        printDebug("@@nextSibling11: " + originalNextSibling);
+
 //        setNextSibling(insertNextSibling);
 //        if (parentStep != null) {
 //            insertNextSibling.setParentStep(parentStep);
 //            // insertNextSibling.setStepParsingMap(new
 //            // ParsingMap(parentStep.getStepParsingMap()));
-//            printDebug("@@nextSibling22: " + originalNextSibling);
+
 //            if (originalNextSibling == null)
 //                parentStep.getChildSteps().add(insertNextSibling);
 //            else
