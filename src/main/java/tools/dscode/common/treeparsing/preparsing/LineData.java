@@ -32,18 +32,7 @@ public abstract class LineData implements Iterable<Phrase> {
 
 
 
-
-//    public Phrase getDefaultContextPhrase() {
-//        Phrase initialPhrase = null;
-//        if(getExecutionDictionary().categoryHasRegistration(STARTING_CONTEXT)) {
-//            initialPhrase = new Phrase("from " + STARTING_CONTEXT, ',', this);
-//            initialPhrase.phraseType = PhraseData.PhraseType.INITIAL;
-//        }
-//        return initialPhrase;
-//    }
-
     public LineData(String input, Collection<Character> delimiters) {
-//        contextPhrases.addAll(getRunningStep().contextPhraseData);
 
 
         this.original = stripObscureNonText(Objects.requireNonNull(input, "input"));
@@ -87,7 +76,6 @@ public abstract class LineData implements Iterable<Phrase> {
         // Final chunk (no trailing delimiter)
         String lastChunk = buf.toString();
         if(!lastChunk.isBlank()) {
-
             String unmaskedLast = qp.restoreFrom(bm.restoreFrom(lastChunk));
             this.phrases.add(new Phrase(unmaskedLast, ' ', this));
         }

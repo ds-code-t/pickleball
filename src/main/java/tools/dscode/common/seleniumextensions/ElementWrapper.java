@@ -21,13 +21,29 @@ public class ElementWrapper {
 
     private final WebDriver driver;
     public WebElement element;
-    public  ObjectNode attributeSnapshot;
+    public ObjectNode attributeSnapshot;
     private final String xpath1;
     private final String xpath2;
     public final ElementMatch elementMatch;
+    public final Integer matchIndex;
 
-    @SuppressWarnings("unchecked")
+    public static List<ElementWrapper> getWrappedElement(WebDriver driver, ElementMatch elementMatch) {
+        List<ElementWrapper> elementWrappers = new ArrayList<>();
+        List<WebElement> elements = elementMatch.contextWrapper.getElements(driver);
+        int index = 0;
+        for (WebElement element : elements) {
+            elementWrappers.add(new ElementWrapper(driver, element, elementMatch, ++index));
+        }
+        return elementWrappers;
+    }
+
     public ElementWrapper(WebDriver driver, WebElement element, ElementMatch elementMatch) {
+        this(driver, element, elementMatch, null);
+    }
+
+
+    private ElementWrapper(WebDriver driver, WebElement element, ElementMatch elementMatch, Integer matchIndex) {
+        this.matchIndex = matchIndex;
         this.elementMatch = elementMatch;
         this.driver = Objects.requireNonNull(driver, "driver must not be null");
         this.element = Objects.requireNonNull(element, "element must not be null");
@@ -92,13 +108,13 @@ public class ElementWrapper {
     }
 
     public String getElementReturnValue() {
-        if(attributeSnapshot.has(ELEMENT_RETURN_VALUE))
+        if (attributeSnapshot.has(ELEMENT_RETURN_VALUE))
             return attributeSnapshot.get(ELEMENT_RETURN_VALUE).asText();
 
-        switch (elementMatch.category){
+        switch (elementMatch.category) {
             case "Field":
-                List<WebElement> valueElements =  element.findElements(By.xpath("descendant::*[contains(@class,'Read')]"));
-                if(!valueElements.isEmpty()){
+                List<WebElement> valueElements = element.findElements(By.xpath("descendant::*[contains(@class,'Read')]"));
+                if (!valueElements.isEmpty()) {
                     String returnVal = valueElements.getLast().getText();
 
                     attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
@@ -107,8 +123,7 @@ public class ElementWrapper {
                 break;
         }
         for (String key : elementMatch.defaultValueKeys) {
-            if (attributeSnapshot.has(key))
-            {
+            if (attributeSnapshot.has(key)) {
                 String returnVal = attributeSnapshot.get(key).asText();
                 attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
                 return returnVal;
@@ -190,6 +205,13 @@ public class ElementWrapper {
         List<WebElement> elementList7 = getElementList(driver, elementMatch.contextWrapper.elementTerminalXPath.getXpath());
         if (elementList7.size() == 1) {
             return elementList7.getFirst();
+        }
+
+        if (elementList7.size() > 1 && matchIndex != null) {
+            List<WebElement> elementList8 = getElementList(driver, "(" + elementMatch.contextWrapper.elementTerminalXPath.getXpath() + ")[" + matchIndex + "]");
+            if (elementList8.size() == 1) {
+                return elementList7.getFirst();
+            }
         }
 
         throw new RuntimeException("Failed to relocate " + elementMatch);

@@ -17,6 +17,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElement;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrOp;
@@ -70,9 +71,7 @@ public class ElementMatch extends Component {
 
     public void findWebElements(WebDriver driver) {
         driver.switchTo().defaultContent();
-        List<WebElement> elements = contextWrapper.getElements(driver);
-
-        wrappedElements.addAll(elements.stream().map(e -> new ElementWrapper(driver, e, this)).toList());
+        wrappedElements = getWrappedElement(driver, this);
         parentPhrase.wrappedElements.addAll(wrappedElements);
     }
 

@@ -168,9 +168,12 @@ public abstract class StepData extends StepMapping {
 
     public abstract Result execute(io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep);
 
-     public void copyDefinitionFlags(StepData stepData) {
-         addDefinitionFlag(stepData.inheritableDefinitionFlags.toArray(new DefinitionFlag[0]));
-     };
+    public void copyDefinitionFlags(StepData stepData) {
+        addDefinitionFlag(stepData.inheritableDefinitionFlags.toArray(new DefinitionFlag[0]));
+    }
+
+    ;
+
     public abstract void addDefinitionFlag(DefinitionFlag... flags);
 
 
