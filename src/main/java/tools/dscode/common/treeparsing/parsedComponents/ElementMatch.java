@@ -14,35 +14,40 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrOp;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyTextOp;
 
 
 public class ElementMatch extends Component {
 
-    public static final String ELEMENT_LABEL_VALUE ="_elementLabelValue";
-    public static final String ELEMENT_RETURN_VALUE ="_elementReturnValue";
-    public String text;
+    public static final String ELEMENT_LABEL_VALUE = "_elementLabelValue";
+    public static final String ELEMENT_RETURN_VALUE = "_elementReturnValue";
+    public List<TextOp> textOps = new ArrayList<>();
     public String category;
     public String selectionType;
     public String elementPosition;
     public List<String> valueTypes;
     public String state;
-    Attribute attribute;
+    List<Attribute> attributes = new ArrayList<>();
     public XPathy xPathy;
     ElementMatch.ElementType elementType;
     public ContextWrapper contextWrapper;
-    public  List<String> defaultValueKeys = new ArrayList<>(List.of(ELEMENT_RETURN_VALUE, "value", "textContent"));
+    public List<String> defaultValueKeys = new ArrayList<>(List.of(ELEMENT_RETURN_VALUE, "value", "textContent"));
 //    public XPathChainResult matchedElements;
     //        public Set<XPathyRegistry.HtmlType> htmlTypes;
 
+    public String defaultText;
+    public ExecutionDictionary.Op defaultTextOp;
 
     public Set<ExecutionDictionary.CategoryFlags> categoryFlags = new HashSet<>();
 
     public String toString() {
-        return (selectionType.isEmpty() ? "" : selectionType + " ") + (elementPosition.isEmpty() ? "" : elementPosition + " ") + (text == null ? "" : "'" + text + "' ") + category + (xPathy == null ? "" : "\n" + xPathy.getXpath());
+        return (selectionType.isEmpty() ? "" : selectionType + " ") + (elementPosition.isEmpty() ? "" : elementPosition + " ") + textOps + " " + category + (xPathy == null ? "" : "\n" + xPathy.getXpath());
     }
 
     public enum ElementType {
@@ -72,12 +77,22 @@ public class ElementMatch extends Component {
     }
 
 
-    public ExecutionDictionary.Op textOp;
+//    public ExecutionDictionary.Op textOp;
+
+
+    static final Pattern attributePattern = Pattern.compile("^(?<attrName>[a-z][a-z\\s]+)\\s+(?<predicate>.*)$");
+
+    public record TextOp(String text, ExecutionDictionary.Op op){
+        public TextOp(String text, String op)
+        {
+            this(text, ExecutionDictionary.Op.valueOf(op));
+        }
+    };
 
     public ElementMatch(MatchNode elementNode) {
         super(elementNode);
         this.state = elementNode.getStringFromLocalState("state");
-        this.text = elementNode.getStringFromLocalState("text");
+
         this.category = elementNode.getStringFromLocalState("type");
         this.elementPosition = elementNode.getStringFromLocalState("elementPosition");
         this.selectionType = elementNode.getStringFromLocalState("selectionType");
@@ -93,22 +108,60 @@ public class ElementMatch extends Component {
         }
 
 
-
         if (elementType == null)
             elementType = ElementMatch.ElementType.HTML;
 
-        textOp = text.isBlank() ? ExecutionDictionary.Op.DEFAULT : ExecutionDictionary.Op.EQUALS;
+        if(elementNode.localStateBoolean("text"))
+        {
+            textOps.add(new TextOp(elementNode.getStringFromLocalState("text") , ExecutionDictionary.Op.EQUALS));
+        }
+
+
         categoryFlags.addAll(getExecutionDictionary().getResolvedCategoryFlags(category));
 
+
+        String elPredicates = elementNode.getStringFromLocalState("elPredicate");
+        for ( String elPredicate : elPredicates.split("\\s+")){
+            MatchNode elPredicateNode = elementNode.getMatchNode(elPredicate.trim());
+            if(elPredicateNode!= null) {
+                textOps.add(new TextOp(elPredicateNode.getStringFromLocalState("predicateType"),    elPredicateNode.getStringFromLocalState("predicateVal")));
+            }
+        }
+
+        if(!textOps.isEmpty()) {
+            defaultText = textOps.getFirst().text;
+            defaultTextOp = textOps.getFirst().op;
+        }
+
+
+        String atrPredicate = elementNode.getStringFromLocalState("atrPredicate");
+
+        for (String attr : atrPredicate.split("\\bwith\b")) {
+            Matcher m = attributePattern.matcher(attr.trim());
+            if (m.find()) {
+                String attrName = m.group("attrName");   // named group
+                String predicate = m.group("predicate");   // named group
+                MatchNode predicateNode = elementNode.getMatchNode(predicate.trim());
+                attributes.add(new Attribute(attrName, (String) predicateNode.getFromLocalState("predicateType"), (String) predicateNode.getFromLocalState("predicateVal")));
+            } else {
+                throw new RuntimeException("Invalid attribute predicate: " + attr);
+            }
+        }
+
+
         if (!categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
-            ExecutionDictionary.CategoryResolution categoryResolution = getExecutionDictionary().andThenOrWithFlags(category, text, textOp);
-            xPathy = categoryResolution.xpath();
+            ExecutionDictionary dict = getExecutionDictionary();
+            List<XPathy> elPredictXPaths = new ArrayList<>();
+            for (TextOp textOp : textOps) {
+                ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, textOp.text, textOp.op);
+                elPredictXPaths.add(categoryResolution.xpath());
+            }
 
-            MatchNode predicateNode = (MatchNode) elementNode.getMatchNode((String) elementNode.getFromLocalState("elPredicate"));
+            xPathy = combineAnd(elPredictXPaths);
 
-            if (predicateNode != null) {
-                this.attribute = new Attribute((String) elementNode.getFromLocalState("attrName"), (String) predicateNode.getFromLocalState("predicateType"), (String) predicateNode.getFromLocalState("predicateVal"));
 
+
+            for (Attribute attribute : attributes) {
                 ExecutionDictionary.Op op = switch (attribute.predicateType) {
                     case null -> null;
                     case String s when s.isBlank() -> null;
@@ -117,12 +170,8 @@ public class ElementMatch extends Component {
                     case String s when s.startsWith("start") -> ExecutionDictionary.Op.STARTS_WITH;
                     default -> null;
                 };
-                if (attribute.attrName.equals("Text"))
-                    xPathy = applyTextOp(xPathy, op,  attribute.predicateVal);
-                else
-                    xPathy = applyAttrOp(xPathy, com.xpathy.Attribute.custom(attribute.attrName), op, attribute.predicateVal);
+                xPathy = applyAttrOp(xPathy, com.xpathy.Attribute.custom(attribute.attrName), op, attribute.predicateVal);
             }
-
 
 
         }

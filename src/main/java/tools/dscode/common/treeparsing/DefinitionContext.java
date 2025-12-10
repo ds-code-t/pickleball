@@ -131,8 +131,9 @@ public final class DefinitionContext {
         };
 
 
-//        ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?:with\\s+(?<attrName>[a-z]+)?)?\\s+(?<predicate><<predicate>>))?");
-        ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?:with\\s+(?<attrName>[a-z]+)?)?\\s*(?<predicate><<predicate>>))?") {
+//        ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>)*)?\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*")
+        ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate><\\s*<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*") {
+            //        ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?:\\bwith\\s+(?<attrName>[a-z]+)?)?\\s*(?<predicate><<predicate>>))?(?<elPredicate>(?:with\\s+(?<attrName>[a-z]+)?)?\\s*(?<predicate><<predicate>>))?") {
             @Override
             public String onSubstitute(MatchNode self) {
 
@@ -143,10 +144,13 @@ public final class DefinitionContext {
                     elementPosition = "1";
                 self.putToLocalState("elementPosition", elementPosition.replaceAll("#", ""));
                 self.putToLocalState("state", self.resolvedGroupText("state"));
-                self.putToLocalState("text", self.resolvedGroupText("text"));
+                if (self.groups().containsKey("text")) {
+                    self.putToLocalState("text", self.resolvedGroupText("text"));
+                }
                 self.putToLocalState("type", self.resolvedGroupText("type"));
-                self.putToLocalState("attrName", self.resolvedGroupText("attrName"));
+//                self.putToLocalState("attrName", self.resolvedGroupText("attrName"));
                 self.putToLocalState("elPredicate", self.groups().get("elPredicate"));
+                self.putToLocalState("atrPredicate", self.groups().get("atrPredicate"));
                 return self.token();
             }
         };

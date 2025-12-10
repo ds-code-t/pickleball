@@ -8,6 +8,8 @@ import org.openqa.selenium.WebElement;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
+import tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly;
+import tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +18,7 @@ import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDict
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.prettyPrintXPath;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.everyNth;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.maybeDeepestMatches;
 import static tools.dscode.coredefinitions.GeneralSteps.getBrowser;
 
 public class ContextWrapper {
@@ -58,8 +61,7 @@ public class ContextWrapper {
                     searchContext = searchContext.findElement(combinedXPathy.getLocator());
                     xPathyList.clear();
                 }
-
-                searchContext = getExecutionDictionary().applyContextBuilder(phraseData.elementMatch.category, phraseData.elementMatch.text, phraseData.elementMatch.textOp, driver, searchContext);
+                searchContext = getExecutionDictionary().applyContextBuilder(phraseData.elementMatch.category, phraseData.elementMatch.defaultText, phraseData.elementMatch.defaultTextOp, driver, searchContext);
             } else {
 
                 xPathyList.add(phraseData.contextXPathy);
@@ -79,8 +81,9 @@ public class ContextWrapper {
     XPathy elementTerminalXPath;
 
     public void initializeElementXPaths(List<XPathy> xPathyList) {
-
         if (elementTerminalXPath != null) return;
+//        XPathy xPathy = combineAnd(xPathyList);
+//        elementPath = XPathy.from(XPathyUtils.maybeDeepestMatches(xPathy.getXpath()));
         elementPath = combineAnd(xPathyList);
         if (elementMatch.elementPosition.isEmpty() && elementMatch.selectionType.isEmpty())
             elementMatch.elementPosition = "1";
@@ -96,7 +99,6 @@ public class ContextWrapper {
                 elementTerminalXPath = everyNth(elementPath, elementMatch.elementIndex);
             }
         }
-
     }
 
 
