@@ -17,7 +17,7 @@ import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.coredefinitions.GeneralSteps.getBrowser;
 
 public final class Phrase extends PhraseData {
-    WebDriver driver = null;
+
 
     public Phrase(String inputText, Character delimiter, LineData parsedLine) {
         super(inputText, delimiter, parsedLine);
@@ -28,6 +28,7 @@ public final class Phrase extends PhraseData {
 
     @Override
     public void runPhrase() {
+        System.out.println("Running phrase: " + this);
         parsedLine.startPhraseIndex = position;
 
         elements.forEach(e -> e.contextWrapper = new ContextWrapper(e));
@@ -43,9 +44,9 @@ public final class Phrase extends PhraseData {
 
 
         if (phraseType.equals(PhraseType.ASSERTION)) {
-            executeAssertions(driver, this);
+            executeAssertions(webDriver, this);
         } else if (phraseType.equals(PhraseType.ACTION)) {
-            executeAction(driver, this);
+            executeAction(webDriver, this);
         } else if (phraseType.equals(PhraseType.CONTEXT)) {
             processContextPhrase();
         }
@@ -66,7 +67,7 @@ public final class Phrase extends PhraseData {
             contextPhrases.add(this);
         } else {
             syncWithDOM();
-            if (!elementMatch.selectionType.equals("any")) {
+            if (!elementMatch.selectionType.equals("any") && elementMatch.wrappedElements.isEmpty()) {
                 throw new RuntimeException("Failed to find WebElements for " + elementMatch);
             }
             for (ElementWrapper elementWrapper : wrappedElements) {
@@ -80,10 +81,10 @@ public final class Phrase extends PhraseData {
 
 
     public void syncWithDOM() {
+        this.webDriver = getBrowser("BROWSER");
         waitMilliseconds(1000);
         lifecycle.fire(Phase.BEFORE_DOM_LOAD_CHECK);
-        driver = getBrowser("BROWSER");
-        waitForPhraseEntities(driver, this);
+        waitForPhraseEntities(this);
         waitMilliseconds(100);
         lifecycle.fire(Phase.BEFORE_DOM_INTERACTION);
     }

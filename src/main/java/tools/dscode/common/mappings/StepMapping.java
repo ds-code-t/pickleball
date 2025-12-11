@@ -32,12 +32,14 @@ public abstract class StepMapping extends StepBase {
     }
 
     public void setStepParsingMap(ParsingMap stepParsingMap) {
-
+        System.out.println("@@setStepParsingMap1: "  + this);
         copyParsingMap(stepParsingMap);
+        System.out.println("@@setStepParsingMap2: "  + this);
 
 
 
         this.stepParsingMap.addMaps(stepNodeMap);
+        System.out.println("@@setStepParsingMap3: "  + this);
 
     }
 

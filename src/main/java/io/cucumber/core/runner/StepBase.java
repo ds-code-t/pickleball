@@ -71,7 +71,7 @@ public abstract class StepBase implements Cloneable {
 
 
 
-    abstract void setStepParsingMap(ParsingMap stepParsingMap);
+    public abstract void setStepParsingMap(ParsingMap stepParsingMap);
 
     protected abstract DocString getDocString();
 

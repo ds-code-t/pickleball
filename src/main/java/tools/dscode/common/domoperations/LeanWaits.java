@@ -24,18 +24,17 @@ public final class LeanWaits {
     private LeanWaits() {
     }
 
-    public static void waitForPhraseEntities(WebDriver driver, PhraseData parsingPhrase) {
+    public static void waitForPhraseEntities( PhraseData parsingPhrase) {
 
         // SAFE version: never throws
-        safeWaitForPageReady(driver, Duration.ofSeconds(60));
+        safeWaitForPageReady(parsingPhrase.webDriver, Duration.ofSeconds(60));
 
         List<ElementMatch> elementMatches = parsingPhrase.getNextComponents(-1, "elementMatch")
                 .stream().map(c -> (ElementMatch) c).toList();
 
         for (ElementMatch elementMatch : elementMatches) {
-
             try {
-                elementMatch.findWebElements(driver);
+                elementMatch.findWebElements();
             } catch (Exception e) {
                 System.out.println(e.getMessage());
                 e.printStackTrace();
@@ -47,7 +46,7 @@ public final class LeanWaits {
 
 
             for (ElementWrapper elementWrapper : elementMatch.wrappedElements) {
-                safeWaitForElementReady(driver, elementWrapper.element, Duration.ofSeconds(60));
+                safeWaitForElementReady(parsingPhrase.webDriver, elementWrapper.element, Duration.ofSeconds(60));
             }
         }
     }

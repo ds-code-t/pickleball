@@ -9,6 +9,7 @@ Feature: Addition
 #  * , verify Text containing "The select element"  is displayed
 #  * , verify Text containing "The select element"  is displayed
     * , from the Top Panel:
+  : * , for any Link, I save Link as "A"
   : * , I save  Link containing " own " as "Q"
   : * , I verify "<Q>" equals "Q"
   : * , I verify "<Q>" equals "1Q"

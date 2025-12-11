@@ -27,25 +27,27 @@ public class ElementWrapper {
     public final ElementMatch elementMatch;
     public final Integer matchIndex;
 
-    public static List<ElementWrapper> getWrappedElement(WebDriver driver, ElementMatch elementMatch) {
+
+    public static List<ElementWrapper> getWrappedElements(ElementMatch elementMatch) {
+
         List<ElementWrapper> elementWrappers = new ArrayList<>();
-        List<WebElement> elements = elementMatch.contextWrapper.getElements(driver);
+        List<WebElement> elements = elementMatch.contextWrapper.getElements();
         int index = 0;
         for (WebElement element : elements) {
-            elementWrappers.add(new ElementWrapper(driver, element, elementMatch, ++index));
+            elementWrappers.add(new ElementWrapper(element, elementMatch, ++index));
         }
         return elementWrappers;
     }
 
     public ElementWrapper(WebDriver driver, WebElement element, ElementMatch elementMatch) {
-        this(driver, element, elementMatch, null);
+        this(element, elementMatch, null);
     }
 
 
-    private ElementWrapper(WebDriver driver, WebElement element, ElementMatch elementMatch, Integer matchIndex) {
+    private ElementWrapper(WebElement element, ElementMatch elementMatch, Integer matchIndex) {
+        this.driver = elementMatch.parentPhrase.webDriver;
         this.matchIndex = matchIndex;
         this.elementMatch = elementMatch;
-        this.driver = Objects.requireNonNull(driver, "driver must not be null");
         this.element = Objects.requireNonNull(element, "element must not be null");
 
         takeSnapshot();

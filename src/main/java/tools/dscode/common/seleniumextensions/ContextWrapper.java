@@ -16,10 +16,7 @@ import java.util.List;
 
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.prettyPrintXPath;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.everyNth;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.maybeDeepestMatches;
-import static tools.dscode.coredefinitions.GeneralSteps.getBrowser;
 
 public class ContextWrapper {
 
@@ -41,14 +38,14 @@ public class ContextWrapper {
 //    }
 
 
-    public List<WebElement> getElements(WebDriver driver) {
-        getFinalSearchContext(driver);
+    public List<WebElement> getElements() {
+        SearchContext searchContext = getFinalSearchContext();
 
-        return driver.findElements(elementTerminalXPath.getLocator());
+        return searchContext.findElements(elementTerminalXPath.getLocator());
     }
 
-    public SearchContext getFinalSearchContext(WebDriver driver) {
-        SearchContext searchContext = driver;
+    public SearchContext getFinalSearchContext() {
+        SearchContext searchContext = elementMatch.parentPhrase.searchContext == null ? elementMatch.parentPhrase.webDriver : elementMatch.parentPhrase.searchContext;
         List<XPathy> xPathyList = new ArrayList<>();
         for (int j = 0; j < contextList.size(); j++) {
             PhraseData phraseData = contextList.get(j);
@@ -61,7 +58,7 @@ public class ContextWrapper {
                     searchContext = searchContext.findElement(combinedXPathy.getLocator());
                     xPathyList.clear();
                 }
-                searchContext = getExecutionDictionary().applyContextBuilder(phraseData.elementMatch.category, phraseData.elementMatch.defaultText, phraseData.elementMatch.defaultTextOp, driver, searchContext);
+                searchContext = getExecutionDictionary().applyContextBuilder(phraseData.elementMatch.category, phraseData.elementMatch.defaultText, phraseData.elementMatch.defaultTextOp, elementMatch.parentPhrase.webDriver, searchContext);
             } else {
 
                 xPathyList.add(phraseData.contextXPathy);

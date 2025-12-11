@@ -4,6 +4,7 @@ import com.xpathy.XPathy;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import org.openqa.selenium.SearchContext;
+import org.openqa.selenium.WebDriver;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -25,7 +26,7 @@ public class ExecutionDictionary {
 
     @FunctionalInterface
     public interface ContextBuilder {
-        SearchContext build(String category, String value, Op op, SearchContext searchContext);
+        SearchContext build(String category, String value, Op op,  WebDriver driver, SearchContext context);
     }
 
 
@@ -914,16 +915,17 @@ public class ExecutionDictionary {
             String category,
             String value,
             Op op,
-            SearchContext searchContext,
-            SearchContext context) {
+            WebDriver webDriver,
+            SearchContext context
+    ) {
         Objects.requireNonNull(category, "category must not be null");
-        Objects.requireNonNull(searchContext, "searchContext must not be null");
+
         ContextBuilder cb = contextReg.get(category);
 
         if (cb == null) {
             throw new RuntimeException("category '" + category +"' does not have a registered context");
         }
-        return cb.build(category, value, op, searchContext);
+        return cb.build(category, value, op, webDriver, context);
     }
 
 }

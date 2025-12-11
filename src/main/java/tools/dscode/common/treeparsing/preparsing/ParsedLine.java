@@ -40,6 +40,7 @@ public final class ParsedLine extends LineData {
     }
 
     public void runPhraseFromLine(PhraseData phrase) {
+        System.out.println("@@runPhraseFromLine " + phrase);
         phrase.runPhrase();
         if (phrase.clones.isEmpty()) {
             if (phrase.nextPhrase != null) {

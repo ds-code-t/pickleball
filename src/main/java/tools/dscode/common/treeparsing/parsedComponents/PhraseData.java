@@ -28,11 +28,11 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.ins
 
 
 public abstract class PhraseData implements Cloneable {
+    public WebDriver webDriver = null;
     public List<PhraseData> clones = new ArrayList<>();
 
     ElementWrapper contextElement;
     public SearchContext searchContext;
-    WebDriver webDriver;
 
     public SearchContext getSearchContext() {
         if (contextElement != null){
@@ -186,7 +186,7 @@ public abstract class PhraseData implements Cloneable {
 
         for (int i = returnList.size() - 1; i >= 0; i--) {
             PhraseData phraseData = returnList.get(i);
-            if (phraseData.newContext || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT)) {
+            if (phraseData.contextElement != null || phraseData.newContext || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT)) {
                 return returnList.subList(i, returnList.size());
             }
         }

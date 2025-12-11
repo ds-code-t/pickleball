@@ -69,6 +69,8 @@ public abstract class StepData extends StepMapping {
 
 
     public StepBase initializeChildSteps() {
+        System.out.println("@@initializeChildSteps: " + this);
+        System.out.println("@@childSteps.size1: " + childSteps.size());
         if (childSteps.isEmpty()) {
             if (grandChildrenSteps.isEmpty())
                 return null;
@@ -77,19 +79,28 @@ public abstract class StepData extends StepMapping {
         }
 
         StepBase lastChild = null;
+        System.out.println("@@childSteps.size2: " + childSteps.size());
         for (StepBase child : childSteps) {
-
+            System.out.println("@@child: " + child + "");
 
             child.childSteps.addAll(grandChildrenSteps);
+            System.out.println("@@child1: " + child + "");
             child.parentStep = this;
+            System.out.println("@@child2: " + child + "");
             child.stepFlags.addAll(stepFlags);
+            System.out.println("@@child3: " + child + "");
             if (lastChild != null) {
                 lastChild.nextSibling = child;
+                System.out.println("@@child3.5: " + child + "");
                 child.previousSibling = lastChild;
             }
+            System.out.println("@@child4: " + child + "");
             child.setStepParsingMap(getStepParsingMap());
+            System.out.println("@@child5: " + child + "");
             lastChild = child;
+            System.out.println("@@child6: " + child + "");
         }
+        System.out.println("@@childSteps.getFirst " + childSteps.getFirst());
         return childSteps.getFirst();
     }
 

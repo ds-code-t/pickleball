@@ -2,7 +2,6 @@ package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.xpathy.XPathy;
 import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
@@ -17,11 +16,10 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElement;
+import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrOp;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyTextOp;
 
 
 public class ElementMatch extends Component {
@@ -69,9 +67,12 @@ public class ElementMatch extends Component {
 
     public List<ElementWrapper> wrappedElements = new ArrayList<>();
 
-    public void findWebElements(WebDriver driver) {
+    WebDriver driver;
+
+    public void findWebElements() {
+        driver = parentPhrase.webDriver;
         driver.switchTo().defaultContent();
-        wrappedElements = getWrappedElement(driver, this);
+        wrappedElements = getWrappedElements(this);
         parentPhrase.wrappedElements.addAll(wrappedElements);
     }
 
