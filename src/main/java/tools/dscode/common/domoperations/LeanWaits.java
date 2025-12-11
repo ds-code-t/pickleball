@@ -19,6 +19,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.function.Function;
 
+import static tools.dscode.common.util.DebugUtils.printDebug;
+
 public final class LeanWaits {
 
     private LeanWaits() {
@@ -141,6 +143,8 @@ public final class LeanWaits {
                 .ignoring(JavascriptException.class)
                 .ignoring(WebDriverException.class);
 
+        String elementString  = element.getText();
+        printDebug("##waitForElementReady: " + (elementString.length() > 200 ? elementString.substring(0, 200) : elementString));
         System.out.println("Waiting for element to become ready " + timeout + "ms: " + element.toString());
         return wait.until(d -> {
             try {

@@ -41,7 +41,7 @@ public class ExecutionDictionary {
 
     public enum Op {DEFAULT, EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE}
 
-    public enum CategoryFlags {PAGE_CONTEXT, PAGE_TOP_CONTEXT}
+    public enum CategoryFlags {PAGE_CONTEXT, PAGE_TOP_CONTEXT, ELEMENT_CONTEXT}
 
 
     //========================================================

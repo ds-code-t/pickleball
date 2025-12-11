@@ -9,10 +9,13 @@ Feature: Addition
 #  * , verify Text containing "The select element"  is displayed
 #  * , verify Text containing "The select element"  is displayed
     * , from the Top Panel:
-  : * , for any Link, I save Link as "A"
-  : * , I save  Link containing " own " as "Q"
-  : * , I verify "<Q>" equals "Q"
-  : * , I verify "<Q>" equals "1Q"
+#  : * , I click the  Link containing " own "
+  : * , for any Button containing "Shadow", I save  Text as "A"
+  : * , I verify "<A>" equals "Q"
+#  : * , for any  Link containing " own ", I save  Link containing " own " as "A"
+#  : * , I save  Link containing " own " as "Q"
+#  : * , I verify "<Q>" equals "Q"
+#  : * , I verify "<Q>" equals "1Q"
 #  : * IF: "<Opel sd>" THEN: , I verify  "Get your own website" Link matches with "^Gset.*$"
 
   Scenario: ss3

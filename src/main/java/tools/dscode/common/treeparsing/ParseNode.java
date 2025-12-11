@@ -173,6 +173,9 @@ public class ParseNode {
 
             // Keep the Pattern so we can build NamedGroupMap later
             Pattern pattern = Pattern.compile(childDef.getRegexPattern(), Pattern.DOTALL);
+            printDebug("\n##MatchNode: name: " + childDef.getName());
+            printDebug("##MatchNode: pattern: " + pattern.pattern());
+            printDebug("##MatchNode: parentSnapshot: " + parentSnapshot);
             Matcher m = pattern.matcher(parentSnapshot);
 
 
@@ -186,6 +189,8 @@ public class ParseNode {
                 }
 
                 String childOriginal = m.group(0);
+                printDebug("##MatchNode: matched: " + childOriginal);
+
                 // Build token with Option A format
                 String childToken = childDef.keyBase();
                 // Provide shared global state from parent; localState is fresh.

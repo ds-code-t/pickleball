@@ -4,7 +4,6 @@ import com.xpathy.XPathy;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.WrapsElement;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 
 import tools.dscode.common.seleniumextensions.ElementWrapper;
@@ -27,16 +26,21 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inB
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.insideOf;
 
 
-public abstract class PhraseData implements Cloneable {
+public abstract class PhraseData  {
+    public boolean skipNextPhrase = false;
+
     public WebDriver webDriver = null;
     public List<PhraseData> clones = new ArrayList<>();
 
-    ElementWrapper contextElement;
-    public SearchContext searchContext;
+    public ElementWrapper contextElement;
+    private SearchContext searchContext;
 
     public SearchContext getSearchContext() {
+        System.out.println("@@getSearchContext()- " + this);
+        System.out.println("@@contextElement- " + contextElement);
         if (contextElement != null){
             WebElement element = contextElement.getElement();
+            System.out.println("@@element- " + element);
             if (element == null)
                 throw new RuntimeException("Element not found: " + contextElement.elementMatch + " at " + contextElement.elementMatch.xPathy);
             return element;
@@ -49,7 +53,7 @@ public abstract class PhraseData implements Cloneable {
     //    List<XPathData> contextXPathDataList = new ArrayList<>();
 
     public final String text;
-    public Character termination; // nullable
+    public final Character termination; // nullable
     public boolean contextTermination;
     public boolean hasNot;
     public final LineData parsedLine;
@@ -81,7 +85,7 @@ public abstract class PhraseData implements Cloneable {
     public XPathy contextXPathy;
 
     public String keyName;
-
+    public  boolean isClone = false;
 
 //    public SearchContext getCurrentSearchContext() {
 //        if (currentSearchContext == null) {
@@ -117,6 +121,7 @@ public abstract class PhraseData implements Cloneable {
     }
 
     public PhraseData(String inputText, Character delimiter, LineData lineData) {
+
         parsedLine = lineData;
         text = inputText;
         termination = delimiter;
@@ -168,25 +173,32 @@ public abstract class PhraseData implements Cloneable {
         hasDOMInteraction = phraseType.equals(PhraseType.ASSERTION) || phraseType.equals(PhraseType.ACTION);
 
         newContext = phraseNode.localStateBoolean("newStartContext");
-        if (position > 0) {
-            previousPhrase = lineData.phrases.get(position - 1);
-            previousPhrase.nextPhrase = this;
-        }
+//        if (position > 0) {
+//            previousPhrase = lineData.phrases.get(position - 1);
+//            previousPhrase.nextPhrase = this;
+//        }
     }
 
 
     public List<PhraseData> processContextList() {
-
+        System.out.println("@@processContextList: " + this + " , isclone? " + isClone );
+        System.out.println("@@processContextList-contextPhrases: " + contextPhrases);
         List<PhraseData> returnList = new ArrayList<>();
         returnList.add(new Phrase("from " + STARTING_CONTEXT, ',', parsedLine));
         for (List<PhraseData> inner : parsedLine.inheritedContextPhrases) {
             returnList.addAll(inner);
         }
         returnList.addAll(contextPhrases);
-
+        System.out.println("@@--returnList: " + returnList.size());
         for (int i = returnList.size() - 1; i >= 0; i--) {
             PhraseData phraseData = returnList.get(i);
-            if (phraseData.contextElement != null || phraseData.newContext || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT)) {
+            System.out.println("@@processContextList1 phraseData - "+ phraseData);
+            System.out.println("@@processContextList1 phraseData.contextElement - "+ phraseData.contextElement);
+            if(phraseData.contextElement != null){
+                System.out.println("@@phraseData.contextElement.getClass() "+ phraseData.contextElement.getClass());
+
+            }
+            if (phraseData.contextElement != null || phraseData.newContext || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT) || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.ELEMENT_CONTEXT)) {
                 return returnList.subList(i, returnList.size());
             }
         }
@@ -229,15 +241,21 @@ public abstract class PhraseData implements Cloneable {
 
 
     public abstract void runPhrase();
+    public abstract PhraseData clonePhrase( PhraseData previous);
 
-    @Override
-    public PhraseData clone() {
-        try {
-            PhraseData copy = (PhraseData) super.clone();
-            copy.clones = new ArrayList<>();
-            return copy;
-        } catch (CloneNotSupportedException e) {
-            throw new AssertionError(e);     // should never happen if Cloneable is implemented
-        }
-    }
+//    @Override
+//    public PhraseData clone() {
+//        try {
+//            PhraseData copy = (PhraseData) super.clone();
+//            copy.clones = new ArrayList<>();
+//            copy.isClone = true;
+//            copy.contextPhrases = new ArrayList<>();
+//            System.out.println("@@copy.nextPhrase: " + copy.nextPhrase);
+//            if(copy.nextPhrase != null)
+//                copy.nextPhrase.previousPhrase = copy;
+//            return copy;
+//        } catch (CloneNotSupportedException e) {
+//            throw new AssertionError(e);     // should never happen if Cloneable is implemented
+//        }
+//    }
 }

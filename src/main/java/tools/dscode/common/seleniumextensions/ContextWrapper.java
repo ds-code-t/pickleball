@@ -2,6 +2,7 @@ package tools.dscode.common.seleniumextensions;
 
 import com.xpathy.XPathy;
 import io.cucumber.java.eo.Se;
+import org.openqa.selenium.By;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -16,18 +17,20 @@ import java.util.List;
 
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.prettyPrintXPath;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.everyNth;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public class ContextWrapper {
 
-    public List<PhraseData> contextList;
+//    public List<PhraseData> contextList;
     public ElementMatch elementMatch;
 
     public List<XPathy> paths = new ArrayList<>();
 
     public ContextWrapper(ElementMatch elementMatch) {
         this.elementMatch = elementMatch;
-        this.contextList = elementMatch.getPhraseContextList();
+//        this.contextList = elementMatch.getPhraseContextList();
     }
 
 
@@ -39,38 +42,83 @@ public class ContextWrapper {
 
 
     public List<WebElement> getElements() {
+        System.out.println("@@getElements:::: " + elementMatch.parentPhrase + " , isClone: " + elementMatch.parentPhrase.isClone);
         SearchContext searchContext = getFinalSearchContext();
+        printDebug("\n##searchContext: " + searchContext.getClass().getSimpleName());
+        printDebug("\n##elementMatch.parentPhrase: " + elementMatch.parentPhrase);
+        printDebug("\n##elementTerminalXPath " );
+        prettyPrintXPath(elementTerminalXPath);
+        printDebug("\n\n##");
 
-        return searchContext.findElements(elementTerminalXPath.getLocator());
+        return getElementListFromSearchContext(searchContext, elementTerminalXPath);
+//        return searchContext.findElements(elementTerminalXPath.getLocator());
     }
 
     public SearchContext getFinalSearchContext() {
-        SearchContext searchContext = elementMatch.parentPhrase.searchContext == null ? elementMatch.parentPhrase.webDriver : elementMatch.parentPhrase.searchContext;
+        printDebug("\n##getFinalSearchContext11");
+        printDebug("\n##getFinalSearchContext: " + elementMatch.category + " , " + elementMatch.parentPhrase);
+        printDebug("\n##elementMatch.parentPhrase.contextElement: " + elementMatch.parentPhrase.contextElement);
+        SearchContext searchContext = elementMatch.parentPhrase.getSearchContext();
+        List<PhraseData> contextList = elementMatch.getPhraseContextList();
+        printDebug("## contextList.size(): " + contextList.size());
+        printDebug("##searchContext1: " + searchContext.getClass().getSimpleName());
         List<XPathy> xPathyList = new ArrayList<>();
+        printDebug("\n------\n##currentPhrase: " + elementMatch.parentPhrase);
         for (int j = 0; j < contextList.size(); j++) {
             PhraseData phraseData = contextList.get(j);
 
+            printDebug("##phraseData1: " + phraseData);
 
-            if (phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
+            if (phraseData.contextElement != null) {
+                printDebug("##psearchContext1: " + searchContext);
+                searchContext = phraseData.getSearchContext();
+                printDebug("##psearchContext2: " + searchContext);
 
+                printDebug("##phraseData.getSearchContext()222: " + phraseData.getSearchContext());
+            } else if (phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
+                printDebug("##phraseData2: " + xPathyList);
+                printDebug("##phraseData.searchContext: " + phraseData.getSearchContext());
                 if (!xPathyList.isEmpty()) {
                     XPathy combinedXPathy = combineAnd(xPathyList);
-                    searchContext = searchContext.findElement(combinedXPathy.getLocator());
+                    searchContext = getElementFromSearchContext(searchContext, combinedXPathy);
+//                    searchContext = searchContext.findElement(combinedXPathy.getLocator());
                     xPathyList.clear();
                 }
-                searchContext = getExecutionDictionary().applyContextBuilder(phraseData.elementMatch.category, phraseData.elementMatch.defaultText, phraseData.elementMatch.defaultTextOp, elementMatch.parentPhrase.webDriver, searchContext);
-            } else {
 
+                searchContext = getExecutionDictionary().applyContextBuilder(phraseData.elementMatch.category, phraseData.elementMatch.defaultText, phraseData.elementMatch.defaultTextOp, elementMatch.parentPhrase.webDriver, searchContext);
+
+                printDebug("##searchContext2: " + (searchContext == null ? "null" : searchContext.getClass().getSimpleName()));
+            } else {
+                printDebug("##phraseData4: " + phraseData.contextXPathy);
                 xPathyList.add(phraseData.contextXPathy);
 
             }
 
         }
 
-
         xPathyList.add(elementMatch.xPathy);
         initializeElementXPaths(xPathyList);
         return searchContext;
+    }
+
+    public static List<WebElement> getElementListFromSearchContext(SearchContext searchContext, XPathy xPathy) {
+        String xpath = xPathy.getXpath();
+        System.out.println("@@getElementListFromSearchContext1: " + xpath);
+        System.out.println("@@searchContext: " + searchContext.getClass().getSimpleName());
+
+        if (searchContext instanceof WebElement) {
+            if (xpath.strip().replaceAll("\\(", "").startsWith("//"))
+                xpath = xpath.replaceFirst("//", "descendant-or-self::");
+        }
+        System.out.println("@@getElementListFromSearchContext2: " + xpath);
+        return searchContext.findElements(new By.ByXPath(xpath));
+    }
+
+    public static WebElement getElementFromSearchContext(SearchContext searchContext, XPathy xPathy) {
+        System.out.println("@@getElementFromSearchContext0: " + xPathy.getXpath());
+        List<WebElement> list = getElementListFromSearchContext(searchContext, xPathy);
+        if (list.isEmpty()) return null;
+        return list.getFirst();
     }
 
 
@@ -93,7 +141,11 @@ public class ContextWrapper {
             if (elementMatch.selectionType.isEmpty()) {
                 elementTerminalXPath = elementPath.nth(elementMatch.elementIndex);
             } else {
-                elementTerminalXPath = everyNth(elementPath, elementMatch.elementIndex);
+                if (elementMatch.elementIndex == 1) {
+                    elementTerminalXPath = elementPath;
+                } else {
+                    elementTerminalXPath = everyNth(elementPath, elementMatch.elementIndex);
+                }
             }
         }
     }

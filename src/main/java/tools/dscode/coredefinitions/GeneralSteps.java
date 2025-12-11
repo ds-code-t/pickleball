@@ -42,6 +42,9 @@ public class GeneralSteps extends CoreSteps {
 //        // step body here
 //    }
 
+    public static ChromiumDriver getBrowser() {
+        return getBrowser("BROWSER");
+    }
     public static ChromiumDriver getBrowser(String browserName) {
 
         Object returnObject = getScenarioObject(browserName);

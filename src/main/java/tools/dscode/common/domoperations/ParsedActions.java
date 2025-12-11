@@ -21,6 +21,7 @@ import static tools.dscode.common.domoperations.HumanInteractions.selectDropdown
 import static tools.dscode.common.domoperations.HumanInteractions.typeText;
 import static tools.dscode.common.domoperations.HumanInteractions.wheelScrollBy;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitSeconds;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
 
 public class ParsedActions {
@@ -54,6 +55,7 @@ public class ParsedActions {
                     if (keyName.isBlank())
                         keyName = nextElement.elementMatch.category;
 
+                    printDebug("##Actions: saving '" + nextElement.getElementReturnValue() + "' to key: " + keyName);
 
                     getRunningStep().getStepParsingMap().put(keyName, nextElement.getElementReturnValue());
                 }

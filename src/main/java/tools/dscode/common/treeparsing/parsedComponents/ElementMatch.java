@@ -46,7 +46,7 @@ public class ElementMatch extends Component {
     public Set<ExecutionDictionary.CategoryFlags> categoryFlags = new HashSet<>();
 
     public String toString() {
-        return (selectionType.isEmpty() ? "" : selectionType + " ") + (elementPosition.isEmpty() ? "" : elementPosition + " ") + textOps + " " + category + (xPathy == null ? "" : "\n" + xPathy.getXpath());
+        return (selectionType.isEmpty() ? "" : selectionType + " ") + (elementPosition.isEmpty() ? "" : elementPosition + " ") + textOps + " " + category;
     }
 
     public enum ElementType {
@@ -71,7 +71,7 @@ public class ElementMatch extends Component {
 
     public void findWebElements() {
         driver = parentPhrase.webDriver;
-        driver.switchTo().defaultContent();
+//        driver.switchTo().defaultContent();
         wrappedElements = getWrappedElements(this);
         parentPhrase.wrappedElements.addAll(wrappedElements);
     }
@@ -96,6 +96,7 @@ public class ElementMatch extends Component {
         this.category = elementNode.getStringFromLocalState("type");
         this.elementPosition = elementNode.getStringFromLocalState("elementPosition");
         this.selectionType = elementNode.getStringFromLocalState("selectionType");
+        System.out.println("@@selectionType::: " + selectionType);
         this.valueTypes = Arrays.stream(elementNode.getStringFromLocalState("valueTypes").replaceAll("of", "").trim().replaceAll("\\s+", ",").split(",")).sorted(Comparator.reverseOrder()).toList();
 
 //            if(selectionType.isEmpty())
@@ -190,12 +191,13 @@ public class ElementMatch extends Component {
         };
     }
 
-    private List<PhraseData> phraseContextList;
+//    private List<PhraseData> phraseContextList;
 
     public List<PhraseData> getPhraseContextList() {
-        if (phraseContextList == null)
-            phraseContextList = parentPhrase.processContextList();
-        return phraseContextList;
+//        if (phraseContextList == null)
+//            phraseContextList = parentPhrase.processContextList();
+//        return phraseContextList;
+        return parentPhrase.processContextList();
     }
 
 

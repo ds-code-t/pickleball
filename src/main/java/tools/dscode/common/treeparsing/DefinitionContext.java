@@ -133,7 +133,7 @@ public final class DefinitionContext {
 
 
 //        ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>)*)?\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*")
-        ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*") {
+        ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*") {
             //        ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?:\\bwith\\s+(?<attrName>[a-z]+)?)?\\s*(?<predicate><<predicate>>))?(?<elPredicate>(?:with\\s+(?<attrName>[a-z]+)?)?\\s*(?<predicate><<predicate>>))?") {
             @Override
             public String onSubstitute(MatchNode self) {
