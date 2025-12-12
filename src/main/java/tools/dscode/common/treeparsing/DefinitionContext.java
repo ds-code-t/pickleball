@@ -18,6 +18,7 @@ import static com.xpathy.Case.LOWER;
 import static com.xpathy.Tag.any;
 import static com.xpathy.Tag.input;
 import static com.xpathy.Tag.select;
+import static com.xpathy.Tag.textarea;
 import static tools.dscode.common.domoperations.VisibilityConditions.extractPredicate;
 import static tools.dscode.common.domoperations.VisibilityConditions.invisible;
 import static tools.dscode.common.domoperations.VisibilityConditions.visible;
@@ -347,6 +348,14 @@ public final class DefinitionContext {
                                     input.byAttribute(placeholder).equals(v)
                     );
 
+            category("Textarea").inheritsFrom("forLabel")
+                    .and((category, v, op) ->
+                            XPathy.from(textarea)
+                    )
+                    .or(
+                            (category, v, op) ->
+                                    input.byAttribute(placeholder).equals(v)
+                    );
 
             category(BASE_CATEGORY).and(
                     (category, v, op) -> {
