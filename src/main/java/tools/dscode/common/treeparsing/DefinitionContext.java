@@ -354,7 +354,7 @@ public final class DefinitionContext {
                     )
                     .or(
                             (category, v, op) ->
-                                    input.byAttribute(placeholder).equals(v)
+                                    textarea.byAttribute(placeholder).equals(v)
                     );
 
             category(BASE_CATEGORY).and(
