@@ -319,10 +319,6 @@ public class ExecutionDictionary {
 //          .filter(Objects::nonNull)
                 .toList();
 
-        for (int i = 0; i < result.size(); i++) {
-            XPathy x = result.get(i);
-            System.out.println("    [expandInternal] xpath[" + i + "]=" + safeXpath(x));
-        }
 
         return result;
     }

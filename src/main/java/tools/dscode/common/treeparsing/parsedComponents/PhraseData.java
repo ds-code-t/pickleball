@@ -30,7 +30,7 @@ public abstract class PhraseData  {
 //    public boolean skipNextPhrase = false;
 
     public WebDriver webDriver = null;
-    public List<PhraseData> clones = new ArrayList<>();
+    public List<PhraseData> branchedPhrases = new ArrayList<>();
 
     public ElementWrapper contextElement;
     private SearchContext searchContext;
@@ -212,6 +212,7 @@ public abstract class PhraseData  {
         XPathy xPathy = elements.getFirst().xPathy;
         if (xPathy == null) return null;
         return switch (context.toLowerCase()) {
+            case String s when s.startsWith("for") -> insideOf(xPathy);
             case String s when s.startsWith("from") -> insideOf(xPathy);
             case String s when s.startsWith("in") -> insideOf(xPathy);
             case String s when s.startsWith("after") -> afterOf(xPathy);
@@ -243,19 +244,4 @@ public abstract class PhraseData  {
     public abstract void runPhrase();
     public abstract PhraseData clonePhrase( PhraseData previous);
 
-//    @Override
-//    public PhraseData clone() {
-//        try {
-//            PhraseData copy = (PhraseData) super.clone();
-//            copy.clones = new ArrayList<>();
-//            copy.isClone = true;
-//            copy.contextPhrases = new ArrayList<>();
-
-//            if(copy.nextPhrase != null)
-//                copy.nextPhrase.previousPhrase = copy;
-//            return copy;
-//        } catch (CloneNotSupportedException e) {
-//            throw new AssertionError(e);     // should never happen if Cloneable is implemented
-//        }
-//    }
 }

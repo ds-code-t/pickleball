@@ -28,7 +28,6 @@ public abstract class LineData implements  Cloneable {
     public final List<PhraseData> phrases = new ArrayList<>();
     private final Set<Character> delimiters; // characters that cause a split
     //    public final List<PhraseData> contextPhrases = new ArrayList<>();
-    public List<PhraseData> branchPhrases;
 
 
     public LineData(String input, Collection<Character> delimiters) {

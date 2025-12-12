@@ -97,6 +97,8 @@ public class ContextWrapper {
         }
 
         xPathyList.add(elementMatch.xPathy);
+        System.out.println("@@xPathyList.size:: " + xPathyList.size());
+        System.out.println("@@xPathyList:: " + xPathyList);
         initializeElementXPaths(xPathyList);
         return searchContext;
     }

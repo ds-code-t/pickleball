@@ -37,13 +37,10 @@ public final class Phrase extends PhraseData {
         System.out.println("Run Phrase: " + this + (isClone ? " (clone)" : ""));
 
 
-
-        if(contextElement!=null)
-        {
+        if (contextElement != null) {
             contextPhrases.add(this);
             return;
         }
-
 
 
         parsedLine.startPhraseIndex = position;
@@ -54,8 +51,7 @@ public final class Phrase extends PhraseData {
             contextPhrases.addAll(previousPhrase.contextPhrases);
         }
 
-    
-   
+
         if (hasDOMInteraction) {
             syncWithDOM();
         }
@@ -68,14 +64,21 @@ public final class Phrase extends PhraseData {
         } else if (phraseType.equals(PhraseType.CONTEXT)) {
             processContextPhrase();
         }
+        System.out.println("@@c-phrase: " + this);
+        System.out.println("@@termination: " + termination);
 
         if (contextTermination) {
             if (termination.equals(':')) {
+                System.out.println("@@contextPhrases== " + contextPhrases);
+                System.out.println("@@parsedLine.inheritedContextPhrases1== " + parsedLine.inheritedContextPhrases);
                 parsedLine.inheritedContextPhrases.add(contextPhrases);
+                System.out.println("@@parsedLine.inheritedContextPhrases2== " + parsedLine.inheritedContextPhrases);
             } else {
                 parsedLine.inheritedContextPhrases.remove(parsedLine.inheritedContextPhrases.size() - 1);
             }
         }
+
+        System.out.println("@@parsedLine.inheritedContextPhrases3== " + parsedLine.inheritedContextPhrases);
 
     }
 
@@ -83,12 +86,9 @@ public final class Phrase extends PhraseData {
     void processContextPhrase() {
 
 
-
-
         if (elementMatch.selectionType.isEmpty()) {
             contextPhrases.add(this);
-        } else {
-
+        } else  {
             syncWithDOM();
             if (elementMatch.wrappedElements.isEmpty()) {
                 if (!elementMatch.selectionType.equals("any")) {
@@ -97,14 +97,15 @@ public final class Phrase extends PhraseData {
 //                skipNextPhrase = true;
                 System.out.println("No elements match for " + elementMatch + ", skipping subsequent phrases");
             }
-
+            System.out.println("@@wrappedElements.size(::: " + wrappedElements.size());
             for (ElementWrapper elementWrapper : wrappedElements) {
-                parsedLine.branchPhrases = new ArrayList<>();
-                parsedLine.branchPhrases.add(cloneWithElementContext(elementWrapper));
+
+                branchedPhrases.add(cloneWithElementContext(elementWrapper));
 
 //                clones.add(clone);
 //                contextPhrases.add(clone);
             }
+            contextPhrases.add(this);
         }
     }
 
@@ -136,10 +137,9 @@ public final class Phrase extends PhraseData {
         Phrase clone = new Phrase(text, termination, parsedLine);
         clone.isClone = true;
         clone.position = position;
-        clones.add(clone);
+//        clones.add(clone);
         clone.previousPhrase = previous;
-        if(nextPhrase != null)
-        {
+        if (nextPhrase != null) {
 
             clone.nextPhrase = nextPhrase.clonePhrase(clone);
             clone.nextPhrase.previousPhrase = clone;

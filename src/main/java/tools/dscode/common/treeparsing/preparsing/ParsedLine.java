@@ -1,8 +1,6 @@
 package tools.dscode.common.treeparsing.preparsing;
 
 import io.cucumber.core.runner.StepBase;
-import io.cucumber.core.runner.StepData;
-import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import java.util.Collection;
@@ -28,8 +26,8 @@ public final class ParsedLine extends LineData {
 
     public void runPhrases() {
         PhraseData phrase = phrases.get(startPhraseIndex);
-
         runPhraseFromLine(phrase);
+        System.out.println("@@inheritedContextPhrases:::: " + inheritedContextPhrases);
     }
 
     public void runPhraseFromLine(PhraseData phrase) {
@@ -43,11 +41,11 @@ public final class ParsedLine extends LineData {
             System.out.println("Line complete");
             return;
         }
-        branchPhrases = null;
-        if (phrase.clones.isEmpty()) {
+        System.out.println("@@branchPhrases=null");
+        if (phrase.branchedPhrases.isEmpty()) {
             runPhraseFromLine(phrase.nextPhrase);
         } else {
-            for (PhraseData clone : phrase.clones) {
+            for (PhraseData clone : phrase.branchedPhrases) {
                 runPhraseFromLine(clone);
             }
         }

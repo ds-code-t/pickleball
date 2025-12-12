@@ -3,14 +3,14 @@ Feature: Addition
 
   Scenario: branch test1 testqwq
   @[DEBUG]
-
+#    * navigate to: URL.buttons
     * , from the Top Panel:
 #  : * , for any Button containing "Rounder", I save  Text as "A"
 
   : * , for any Button containing "and Rounder":
-    :: * print sss
-#  :: * , I save  Text as "A"
-#  :: * , I verify "<A>" equals "Q"
+  :: * print sss
+  :: * , I save  Text as "A"
+  :: * , I verify "<A>" equals "Q"
 
   Scenario: testqwq
   @[DEBUG]

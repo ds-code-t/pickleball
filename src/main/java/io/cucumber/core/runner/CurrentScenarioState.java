@@ -111,7 +111,6 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
     }
 
-
     public void runStep(StepExtension stepExtension) {
         System.out.println("@@runStep- " + stepExtension);
         StepBase stepBase = stepExtension;
@@ -120,19 +119,16 @@ public class CurrentScenarioState extends ScenarioMapping {
             if (stepBase == null)
                 break;
             if (stepBase.lineData != null) {
-                stepExtension.inheritedLineData = stepBase.lineData;
+                stepExtension.inheritedLineData = stepBase.lineData.clone();
                 break;
             }
         }
+
+
         List<PhraseData> branchedPhrases = null;
         try {
-            System.out.println("@@trying banches: " + stepExtension);
-            stepExtension.inheritedLineData.branchPhrases.forEach(phrase -> {
-                System.out.println("@@inheritedLineData-phrase : " + phrase + " , clone size? " + phrase.clones.size());
-            });
-//            branchedPhrases = stepExtension.inheritedLineData.phrases.getLast().clones;
-            branchedPhrases = stepExtension.inheritedLineData.branchPhrases;
-            System.out.println("@@branchedPhrases: " + branchedPhrases.size());
+           branchedPhrases = stepExtension.inheritedLineData.inheritedContextPhrases.getLast().getLast().branchedPhrases;
+
             if (branchedPhrases.isEmpty()) {
                 runningStep(stepExtension);
             }
@@ -143,14 +139,18 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
 
         for (PhraseData branch : branchedPhrases) {
-            System.out.println("@@branch-- : " + branch);
-
-            StepExtension branchStep = (StepExtension) stepExtension.clone();
-            branchStep.lineData.inheritedContextPhrases.getLast().removeLast();
-            branchStep.lineData.inheritedContextPhrases.getLast().add(branch);
+            try {
+                System.out.println("@@branch-- : " + branch);
+                StepExtension branchStep = (StepExtension) stepExtension.clone();
+                System.out.println("@@running-branchStep1 : " + branchStep);
+                branchStep.inheritedLineData.inheritedContextPhrases.getLast().add(branch);
 //            branchStep.lineData.phrases.add(branch);
-            System.out.println("@@running-branchStep : " + branchStep);
-            runningStep(branchStep);
+                System.out.println("@@running-branchStep2 : " + branchStep);
+                runningStep(branchStep);
+            }
+            catch (Throwable ignored) {
+                ignored.printStackTrace();
+            }
         }
     }
 
