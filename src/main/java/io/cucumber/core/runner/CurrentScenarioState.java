@@ -10,11 +10,11 @@ import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
 import tools.dscode.common.status.SoftExceptionInterface;
-import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.registry.GlobalRegistry;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
@@ -24,7 +24,6 @@ import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_HARD_FAILED;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_PASSING;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
 import static tools.dscode.common.annotations.DefinitionFlag.SKIP_CHILDREN;
-import static tools.dscode.common.util.DebugUtils.printDebug;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
 
@@ -72,7 +71,6 @@ public class CurrentScenarioState extends ScenarioMapping {
         rootScenarioStep.runMethodDirectly = true;
         Pickle gherkinMessagesPickle = (Pickle) getProperty(testCase, "pickle");
         io.cucumber.messages.types.Pickle pickle = (io.cucumber.messages.types.Pickle) getProperty(gherkinMessagesPickle, "pickle");
-        put("@@startFlag", "startFlag!");
 //
         if (pickle.getValueRow() != null && !pickle.getValueRow().isEmpty()) {
             NodeMap examples = new NodeMap(MapConfigurations.MapType.EXAMPLE_MAP);
@@ -112,7 +110,6 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void runStep(StepExtension stepExtension) {
-        System.out.println("@@runStep- " + stepExtension);
         StepBase stepBase = stepExtension;
         while (true) {
             stepBase = stepBase.parentStep;
@@ -124,35 +121,9 @@ public class CurrentScenarioState extends ScenarioMapping {
             }
         }
 
-
-        List<PhraseData> branchedPhrases = null;
-        try {
-           branchedPhrases = stepExtension.inheritedLineData.inheritedContextPhrases.getLast().getLast().branchedPhrases;
-
-            if (branchedPhrases.isEmpty()) {
-                runningStep(stepExtension);
-            }
-        } catch (Throwable ignored) {
-            System.out.println("@@ignored: " + ignored.getMessage());
-            runningStep(stepExtension);
-            System.out.println("@@ran:  " + stepExtension);
-        }
-
-        for (PhraseData branch : branchedPhrases) {
-            try {
-                System.out.println("@@branch-- : " + branch);
-                StepExtension branchStep = (StepExtension) stepExtension.clone();
-                System.out.println("@@running-branchStep1 : " + branchStep);
-                branchStep.inheritedLineData.inheritedContextPhrases.getLast().add(branch);
-//            branchStep.lineData.phrases.add(branch);
-                System.out.println("@@running-branchStep2 : " + branchStep);
-                runningStep(branchStep);
-            }
-            catch (Throwable ignored) {
-                ignored.printStackTrace();
-            }
-        }
+        runningStep(stepExtension);
     }
+
 
     public void runningStep(StepExtension stepExtension) {
         System.out.println("Running " + stepExtension);
@@ -195,15 +166,52 @@ public class CurrentScenarioState extends ScenarioMapping {
         for (StepBase attachedStep : stepExtension.attachedSteps) {
             runStep((StepExtension) attachedStep);
         }
-        if (!stepExtension.childSteps.isEmpty() && !stepExtension.definitionFlags.contains(SKIP_CHILDREN)) {
-            StepExtension firstChild = (StepExtension) stepExtension.initializeChildSteps();
 
-            if (firstChild != null)
-                runStep(firstChild);
+        if (!stepExtension.childSteps.isEmpty() && !stepExtension.definitionFlags.contains(SKIP_CHILDREN)) {
+            List<StepExtension> repeatSteps = getNestedRepetitions(stepExtension);
+            for(StepExtension repeatStep : repeatSteps) {
+                StepExtension firstChild = (StepExtension) repeatStep.initializeChildSteps();
+
+                if (firstChild != null) {
+                    runStep(firstChild);
+
+                }
+            }
         }
         if (stepExtension.nextSibling != null) {
             runStep((StepExtension) stepExtension.nextSibling);
         }
+    }
+
+    public List<StepExtension> getNestedRepetitions(StepExtension stepExtension){
+        List<StepExtension> returnList = new ArrayList<>();
+
+        List<PhraseData> branchedPhrases = null;
+        try {
+            branchedPhrases = stepExtension.lineData.inheritedContextPhrases.getLast().getLast().branchedPhrases;
+        }
+        catch (Throwable ignored) {
+            returnList.add(stepExtension);
+            return returnList;
+        }
+
+        for (PhraseData branch : branchedPhrases) {
+            try {
+                StepExtension branchStep = (StepExtension) stepExtension.clone();
+                branchStep.lineData.inheritedContextPhrases.getLast().add(branch);
+                returnList.add(branchStep);
+            }
+            catch (Throwable t) {
+                t.printStackTrace();
+                throw new RuntimeException(t);
+            }
+        }
+
+        if(branchedPhrases.isEmpty())
+        {
+            returnList.add(stepExtension);
+        }
+        return returnList;
     }
 
 

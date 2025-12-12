@@ -7,8 +7,8 @@ Feature: Addition
     * , from the Top Panel:
 #  : * , for any Button containing "Rounder", I save  Text as "A"
 
-  : * , for any Button containing "and Rounder":
-  :: * print sss
+  : * , for any Button containing "Rounder":
+#  :: * print sss
   :: * , I save  Text as "A"
   :: * , I verify "<A>" equals "Q"
 
