@@ -24,6 +24,7 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.aft
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inBetweenOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.insideOf;
+import static tools.dscode.coredefinitions.GeneralSteps.getBrowser;
 
 
 public abstract class PhraseData  {
@@ -45,8 +46,12 @@ public abstract class PhraseData  {
                 throw new RuntimeException("Element not found: " + contextElement.elementMatch + " at " + contextElement.elementMatch.xPathy);
             return element;
         }
-        if (searchContext == null)
+        if (searchContext == null){
+            if(webDriver == null)
+                webDriver = getBrowser();
             return webDriver;
+        }
+
         return searchContext;
     }
 
@@ -170,7 +175,8 @@ public abstract class PhraseData  {
         if (phraseType == null) {
             phraseType = PhraseType.CONTEXT;
         }
-        hasDOMInteraction = phraseType.equals(PhraseType.ASSERTION) || phraseType.equals(PhraseType.ACTION);
+//        hasDOMInteraction = phraseType.equals(PhraseType.ASSERTION) || phraseType.equals(PhraseType.ACTION);
+        hasDOMInteraction = !elements.isEmpty();
 
         newContext = phraseNode.localStateBoolean("newStartContext");
 //        if (position > 0) {
@@ -243,5 +249,20 @@ public abstract class PhraseData  {
 
     public abstract void runPhrase();
     public abstract PhraseData clonePhrase( PhraseData previous);
+
+
+
+
+    public List<String> getAllPhraseValues() {
+        List<String> returnList = new ArrayList<>();
+        for (Component component : components) {
+            if(component instanceof ElementMatch elementMatch) {
+                elementMatch.wrappedElements.forEach(e -> returnList.add(e.getElementReturnValue()));
+            }
+            else
+                returnList.add(component.getValue().toString());
+        }
+        return returnList;
+    }
 
 }

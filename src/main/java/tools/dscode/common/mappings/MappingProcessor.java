@@ -230,7 +230,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     private String resolveByMap(String s) {
-
         String key = null;
         try {
             Matcher m = ANGLE.matcher(s);
@@ -239,6 +238,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
             while (m.find()) {
                 key = m.group(1);
+
                 replacement = get(key);
                 if (replacement != null)
                     break;

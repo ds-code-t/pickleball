@@ -99,7 +99,7 @@ public final class Tokenized {
         if (isSingletonKey)
             q = q.substring(1);
 
-        q = q.replaceAll("(^[A-Za-z0-9_]+)(\\..*|$)", "$1." + topArrayFlag + "$2");
+        q = q.replaceAll("(^[A-Za-z0-9_`]+)(\\..*|$)", "$1." + topArrayFlag + "$2");
 
         isValueAssignmentKey = q.endsWith("=");
         if (isValueAssignmentKey)
@@ -129,6 +129,7 @@ public final class Tokenized {
     }
 
     public Object get(JsonNode root) {
+
         List<JsonNode> list = getList(root, getQuery);
         if (list == null)
             return null;
@@ -148,7 +149,6 @@ public final class Tokenized {
 
     public List<JsonNode> getList(JsonNode root, String queryString) {
         JsonNode returnedNode = getWithPath(root, queryString);
-
         if (returnedNode == null)
             return null;
         if (returnedNode instanceof ArrayNode arrayNode)
@@ -262,6 +262,9 @@ public final class Tokenized {
     }
 
     public static JsonNode setProperty(ObjectNode objectNode, String fieldName, Object value) {
+        if (fieldName.startsWith("`") && fieldName.endsWith("`")) {
+            fieldName = fieldName.substring(1, fieldName.length() - 1);
+        }
         JsonNode valueToSet = value instanceof JsonNode valueNode ? valueNode : objectNode.get(fieldName);
         if (valueToSet == null)
             valueToSet = value.equals(ArrayNode.class) ? MAPPER.createArrayNode() : MAPPER.createObjectNode();

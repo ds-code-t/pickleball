@@ -27,21 +27,15 @@ public final class ParsedLine extends LineData {
     public void runPhrases() {
         PhraseData phrase = phrases.get(startPhraseIndex);
         runPhraseFromLine(phrase);
-        System.out.println("@@inheritedContextPhrases:::: " + inheritedContextPhrases);
     }
 
     public void runPhraseFromLine(PhraseData phrase) {
-
-
-        System.out.println("\n@@inheritedContextPhrases1" + inheritedContextPhrases);
         phrase.runPhrase();
-        System.out.println("@@inheritedContextPhrases2" + inheritedContextPhrases);
         if(phrase.nextPhrase == null)
         {
             System.out.println("Line complete");
             return;
         }
-        System.out.println("@@branchPhrases=null");
         if (phrase.branchedPhrases.isEmpty()) {
             runPhraseFromLine(phrase.nextPhrase);
         } else {

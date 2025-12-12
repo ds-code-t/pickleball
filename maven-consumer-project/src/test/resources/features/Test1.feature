@@ -1,16 +1,30 @@
 Feature: Addition
 
+Scenario: test2334
+#  * , save "AA" as "Q"
+  * , save "AA" as "Q Q"
+#  * , verify "<Q>" equals "AA"
+  * , verify "<Q Q>" equals "AA"
 
-  Scenario: branch test1 testqwq
-  @[DEBUG]
+
+  Scenario Outline: branch test1 testqwq
+    @[DEBUG]
 #    * navigate to: URL.buttons
     * , from the Top Panel:
 #  : * , for any Button containing "Rounder", I save  Text as "A"
 
   : * , for any Button containing "Rounder":
-#  :: * print sss
-  :: * , I save  Text as "A"
-  :: * , I verify "<A>" equals "Q"
+  :: * print a
+  :: * print sss
+  :: * print a
+  :: * print a <A>
+#  :: * , I save  Text as "A"
+#  :: * , I verify "<A>" equals "Q"
+    Examples:
+      | A |
+      | 1 |
+      | 2 |
+
 
   Scenario: testqwq
   @[DEBUG]

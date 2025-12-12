@@ -13,6 +13,7 @@ import tools.dscode.common.treeparsing.preparsing.LineData;
 import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.ParsedActions.executeAction;
@@ -25,8 +26,6 @@ public final class Phrase extends PhraseData {
 
     public Phrase(String inputText, Character delimiter, LineData parsedLine) {
         super(inputText, delimiter, parsedLine);
-
-        webDriver = getBrowser();
     }
 
     private final LifecycleManager lifecycle = new LifecycleManager();
@@ -64,22 +63,13 @@ public final class Phrase extends PhraseData {
         } else if (phraseType.equals(PhraseType.CONTEXT)) {
             processContextPhrase();
         }
-        System.out.println("@@c-phrase: " + this);
-        System.out.println("@@termination: " + termination);
-
         if (contextTermination) {
             if (termination.equals(':')) {
-                System.out.println("@@contextPhrases== " + contextPhrases);
-                System.out.println("@@parsedLine.inheritedContextPhrases1== " + parsedLine.inheritedContextPhrases);
                 parsedLine.inheritedContextPhrases.add(contextPhrases);
-                System.out.println("@@parsedLine.inheritedContextPhrases2== " + parsedLine.inheritedContextPhrases);
             } else {
                 parsedLine.inheritedContextPhrases.remove(parsedLine.inheritedContextPhrases.size() - 1);
             }
         }
-
-        System.out.println("@@parsedLine.inheritedContextPhrases3== " + parsedLine.inheritedContextPhrases);
-
     }
 
 
@@ -97,7 +87,6 @@ public final class Phrase extends PhraseData {
 //                skipNextPhrase = true;
                 System.out.println("No elements match for " + elementMatch + ", skipping subsequent phrases");
             }
-            System.out.println("@@wrappedElements.size(::: " + wrappedElements.size());
             for (ElementWrapper elementWrapper : wrappedElements) {
 
                 branchedPhrases.add(cloneWithElementContext(elementWrapper));
@@ -146,5 +135,6 @@ public final class Phrase extends PhraseData {
         }
         return clone;
     }
+
 
 }

@@ -4,6 +4,7 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
+import tools.dscode.common.treeparsing.parsedComponents.Component;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.parsedComponents.ValueMatch;
@@ -39,7 +40,8 @@ public class ParsedActions {
                 new ArrayList<>() : nextElementMatch.wrappedElements.stream().map(e -> e.getElement()).toList();
         ValueMatch nextValue = (ValueMatch) phraseData.getNextComponents(actionNode.position, "valueMatch").stream().findFirst().orElse(null);
 
-        if (!action.equals("wait") && (nextElementMatches.isEmpty() || (!phraseData.elementMatch.selectionType.equals("any") && nextElements.isEmpty()))) {
+//        if (!action.equals("wait") && (nextElementMatches.isEmpty() || (!phraseData.elementMatch.selectionType.equals("any") && nextElements.isEmpty()))) {
+        if ((phraseData.elementMatch !=null && nextElements.isEmpty()) && (!phraseData.elementMatch.selectionType.equals("any"))) {
             String message = "No elements found for " + action;
             if (nextElementMatch != null && nextElementMatch.xPathy != null)
                 message += " at " + nextElementMatch.xPathy.getXpath();
@@ -49,14 +51,19 @@ public class ParsedActions {
         System.out.println("Attempting " + action);
         switch (action) {
             case String s when s.contains("save") -> {
-                String keyName = phraseData.keyName;
-
-                for (ElementWrapper nextElement : phraseData.wrappedElements) {
-                    if (keyName.isBlank())
-                        keyName = nextElement.elementMatch.category;
-                    printDebug("##Actions: saving '" + nextElement.getElementReturnValue() + "' to key: " + keyName);
-                    getRunningStep().getStepParsingMap().put(keyName, nextElement.getElementReturnValue());
+                String keyName = phraseData.keyName.isBlank() ? "saved" : phraseData.keyName;
+                for (String value : phraseData.getAllPhraseValues()) {
+                    printDebug("##Actions: saving '" + value + "' to key: " + keyName);
+                    getRunningStep().getStepParsingMap().put(keyName, value);
                 }
+
+
+//                for (ElementWrapper nextElement : phraseData.wrappedElements) {
+//                    if (keyName.isBlank())
+//                        keyName = nextElement.elementMatch.category;
+//                    printDebug("##Actions: saving '" + nextElement.getElementReturnValue() + "' to key: " + keyName);
+//                    getRunningStep().getStepParsingMap().put(keyName, nextElement.getElementReturnValue());
+//                }
             }
             case String s when s.contains("wait") -> {
                 waitSeconds(Integer.parseInt(nextValue.value.replace("\"|'|`", "")));
