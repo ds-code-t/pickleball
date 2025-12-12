@@ -87,10 +87,10 @@
 //
 //
 //    public static PickleStepTestStep cloneAndResolvePickleStepTestStep(PickleStepTestStep originalPickleStepTestStep, ParsingMap parsingMap) {
-//        System.out.println("\n@@RUNNER GLUER: ");
+
 //        System.out.println(getCachingGlue());
 //        System.out.println(getCachingGlue());
-//        System.out.println("\n\n=======\n@@originalPickleStepTestStep: ");
+
 //        System.out.println(originalPickleStepTestStep.getStepText());
 //        System.out.println(originalPickleStepTestStep.getStepText());
 
@@ -112,7 +112,7 @@
 //        PickleStep newPickleStep = new PickleStep(resolvedPickleStep.getArgument().orElse(null), originalPickleStep.getAstNodeIds(), originalPickleStep.getId(), originalPickleStep.getType().orElse(PickleStepType.CONTEXT), resolvedPickleStep.getText());
 //        Step newGherkinMessagesStep = buildGherkinMessagesStepAsStep(newPickleStep, originalPickleStepTestStep.getStep().getLocation(), originalPickleStepTestStep.getStep().getKeyword(), originalPickleStepTestStep.getStep().getPreviousGivenWhenThenKeyword(), getGherkinDialect());
 //        PickleStepTestStep returnPickleStepTestStep = new PickleStepTestStep(UUID.randomUUID(), originalPickleStepTestStep.getUri(), newGherkinMessagesStep, getStepDefinitionMatch(resolvedPickleStepTestStep.getUri(), newGherkinMessagesStep));
-//        System.out.println("\n*******\n@@returnPickleStepTestStep: ");
+
 //        System.out.println(returnPickleStepTestStep.getStepText());
 
 //

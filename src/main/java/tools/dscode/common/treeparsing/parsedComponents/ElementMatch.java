@@ -96,7 +96,7 @@ public class ElementMatch extends Component {
         this.category = elementNode.getStringFromLocalState("type");
         this.elementPosition = elementNode.getStringFromLocalState("elementPosition");
         this.selectionType = elementNode.getStringFromLocalState("selectionType");
-        System.out.println("@@selectionType::: " + selectionType);
+
         this.valueTypes = Arrays.stream(elementNode.getStringFromLocalState("valueTypes").replaceAll("of", "").trim().replaceAll("\\s+", ",").split(",")).sorted(Comparator.reverseOrder()).toList();
 
 //            if(selectionType.isEmpty())

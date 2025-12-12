@@ -10,6 +10,8 @@ import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
 import tools.dscode.common.status.SoftExceptionInterface;
+import tools.dscode.common.treeparsing.parsedComponents.Phrase;
+import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.registry.GlobalRegistry;
 
 import java.time.Duration;
@@ -111,8 +113,45 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
     public void runStep(StepExtension stepExtension) {
-        System.out.println("@@runStep:  " + stepExtension);
-        runningStep(stepExtension);
+        System.out.println("@@runStep- " + stepExtension);
+        StepBase stepBase = stepExtension;
+        while (true) {
+            stepBase = stepBase.parentStep;
+            if (stepBase == null)
+                break;
+            if (stepBase.lineData != null) {
+                stepExtension.inheritedLineData = stepBase.lineData;
+                break;
+            }
+        }
+        List<PhraseData> branchedPhrases = null;
+        try {
+            System.out.println("@@trying banches: " + stepExtension);
+            stepExtension.inheritedLineData.branchPhrases.forEach(phrase -> {
+                System.out.println("@@inheritedLineData-phrase : " + phrase + " , clone size? " + phrase.clones.size());
+            });
+//            branchedPhrases = stepExtension.inheritedLineData.phrases.getLast().clones;
+            branchedPhrases = stepExtension.inheritedLineData.branchPhrases;
+            System.out.println("@@branchedPhrases: " + branchedPhrases.size());
+            if (branchedPhrases.isEmpty()) {
+                runningStep(stepExtension);
+            }
+        } catch (Throwable ignored) {
+            System.out.println("@@ignored: " + ignored.getMessage());
+            runningStep(stepExtension);
+            System.out.println("@@ran:  " + stepExtension);
+        }
+
+        for (PhraseData branch : branchedPhrases) {
+            System.out.println("@@branch-- : " + branch);
+
+            StepExtension branchStep = (StepExtension) stepExtension.clone();
+            branchStep.lineData.inheritedContextPhrases.getLast().removeLast();
+            branchStep.lineData.inheritedContextPhrases.getLast().add(branch);
+//            branchStep.lineData.phrases.add(branch);
+            System.out.println("@@running-branchStep : " + branchStep);
+            runningStep(branchStep);
+        }
     }
 
     public void runningStep(StepExtension stepExtension) {
@@ -158,7 +197,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
         if (!stepExtension.childSteps.isEmpty() && !stepExtension.definitionFlags.contains(SKIP_CHILDREN)) {
             StepExtension firstChild = (StepExtension) stepExtension.initializeChildSteps();
-            System.out.println("@@firstChild: " + firstChild);
+
             if (firstChild != null)
                 runStep(firstChild);
         }
@@ -215,7 +254,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     public static Object getScenarioObject(String key) {
         key = normalizeRegistryKey(key);
-        Object returnObject =  GlobalState.getRunningStep().getStepParsingMap().get(key);
+        Object returnObject = GlobalState.getRunningStep().getStepParsingMap().get(key);
         return returnObject == null ? GlobalRegistry.getLocal(key) : returnObject;
     }
 

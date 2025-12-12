@@ -27,7 +27,7 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.ins
 
 
 public abstract class PhraseData  {
-    public boolean skipNextPhrase = false;
+//    public boolean skipNextPhrase = false;
 
     public WebDriver webDriver = null;
     public List<PhraseData> clones = new ArrayList<>();
@@ -36,11 +36,11 @@ public abstract class PhraseData  {
     private SearchContext searchContext;
 
     public SearchContext getSearchContext() {
-        System.out.println("@@getSearchContext()- " + this);
-        System.out.println("@@contextElement- " + contextElement);
+
+
         if (contextElement != null){
             WebElement element = contextElement.getElement();
-            System.out.println("@@element- " + element);
+
             if (element == null)
                 throw new RuntimeException("Element not found: " + contextElement.elementMatch + " at " + contextElement.elementMatch.xPathy);
             return element;
@@ -181,21 +181,21 @@ public abstract class PhraseData  {
 
 
     public List<PhraseData> processContextList() {
-        System.out.println("@@processContextList: " + this + " , isclone? " + isClone );
-        System.out.println("@@processContextList-contextPhrases: " + contextPhrases);
+
+
         List<PhraseData> returnList = new ArrayList<>();
         returnList.add(new Phrase("from " + STARTING_CONTEXT, ',', parsedLine));
         for (List<PhraseData> inner : parsedLine.inheritedContextPhrases) {
             returnList.addAll(inner);
         }
         returnList.addAll(contextPhrases);
-        System.out.println("@@--returnList: " + returnList.size());
+
         for (int i = returnList.size() - 1; i >= 0; i--) {
             PhraseData phraseData = returnList.get(i);
-            System.out.println("@@processContextList1 phraseData - "+ phraseData);
-            System.out.println("@@processContextList1 phraseData.contextElement - "+ phraseData.contextElement);
+
+
             if(phraseData.contextElement != null){
-                System.out.println("@@phraseData.contextElement.getClass() "+ phraseData.contextElement.getClass());
+
 
             }
             if (phraseData.contextElement != null || phraseData.newContext || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT) || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.ELEMENT_CONTEXT)) {
@@ -250,7 +250,7 @@ public abstract class PhraseData  {
 //            copy.clones = new ArrayList<>();
 //            copy.isClone = true;
 //            copy.contextPhrases = new ArrayList<>();
-//            System.out.println("@@copy.nextPhrase: " + copy.nextPhrase);
+
 //            if(copy.nextPhrase != null)
 //                copy.nextPhrase.previousPhrase = copy;
 //            return copy;

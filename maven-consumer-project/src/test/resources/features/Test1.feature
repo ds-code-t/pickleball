@@ -1,5 +1,17 @@
 Feature: Addition
 
+
+  Scenario: branch test1 testqwq
+  @[DEBUG]
+
+    * , from the Top Panel:
+#  : * , for any Button containing "Rounder", I save  Text as "A"
+
+  : * , for any Button containing "and Rounder":
+    :: * print sss
+#  :: * , I save  Text as "A"
+#  :: * , I verify "<A>" equals "Q"
+
   Scenario: testqwq
   @[DEBUG]
 #    Then , I select "Opel" in the "cars" Dropdown
@@ -10,8 +22,15 @@ Feature: Addition
 #  * , verify Text containing "The select element"  is displayed
     * , from the Top Panel:
 #  : * , I click the  Link containing " own "
-  : * , for any Button containing "Shadow", I save  Text as "A"
+  : * , for any Button containing "Rounder", I save  Text as "A"
   : * , I verify "<A>" equals "Q"
+  : * , I verify "<A #0>" equals "Q"
+  : * , I verify "<A #1>" equals "Q"
+  : * , I verify "<A #2>" equals "Q"
+  : * , I verify "<A #3>" equals "Q"
+  : * , I verify "<A #4>" equals "Q"
+  : * , I verify "<A #5>" equals "Q"
+  : * , I verify "<A #6>" equals "Q"
 #  : * , for any  Link containing " own ", I save  Link containing " own " as "A"
 #  : * , I save  Link containing " own " as "Q"
 #  : * , I verify "<Q>" equals "Q"

@@ -17,11 +17,12 @@ import java.util.List;
 import static tools.dscode.common.mappings.MapConfigurations.MapType.STEP_MAP;
 
 public abstract class StepBase implements Cloneable {
+    public boolean isClone = false;
     public List<StepBase> clones = new ArrayList<>();
 
     protected boolean runMethodDirectly = false;
     public boolean debugStartStep = false;
-
+    public LineData inheritedLineData;
     public LineData lineData;
 
     public io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep;
@@ -30,7 +31,6 @@ public abstract class StepBase implements Cloneable {
     //    public Pickle pickle;
     public List<StepBase> childSteps = new ArrayList<>();
     public List<StepBase> grandChildrenSteps = new ArrayList<>();
-
     public List<StepBase> attachedSteps = new ArrayList<>();
     public StepBase parentStep;
     public StepBase previousSibling;
@@ -93,7 +93,7 @@ public abstract class StepBase implements Cloneable {
             // 1. Shallow copy of this StepBase
             StepBase copy = (StepBase) super.clone();
             copy.clones = new ArrayList<>();
-
+            copy.isClone = true;
             // Clone LineData shallowly (new instance)
             if (this.lineData != null) {
                 copy.lineData = this.lineData.clone();
@@ -114,6 +114,14 @@ public abstract class StepBase implements Cloneable {
             copy.arguments = shallowCopyList(this.arguments);
             copy.stepFlags = shallowCopyList(this.stepFlags);
             copy.conditionalStates = shallowCopyList(this.conditionalStates);
+
+            if(nextSibling != null)
+            {
+                copy.nextSibling = nextSibling.clone();
+                copy.nextSibling.previousSibling = copy;
+            }
+
+
 
             return copy;
         } catch (CloneNotSupportedException e) {

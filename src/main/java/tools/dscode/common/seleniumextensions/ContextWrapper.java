@@ -42,7 +42,7 @@ public class ContextWrapper {
 
 
     public List<WebElement> getElements() {
-        System.out.println("@@getElements:::: " + elementMatch.parentPhrase + " , isClone: " + elementMatch.parentPhrase.isClone);
+
         SearchContext searchContext = getFinalSearchContext();
         printDebug("\n##searchContext: " + searchContext.getClass().getSimpleName());
         printDebug("\n##elementMatch.parentPhrase: " + elementMatch.parentPhrase);
@@ -103,19 +103,19 @@ public class ContextWrapper {
 
     public static List<WebElement> getElementListFromSearchContext(SearchContext searchContext, XPathy xPathy) {
         String xpath = xPathy.getXpath();
-        System.out.println("@@getElementListFromSearchContext1: " + xpath);
-        System.out.println("@@searchContext: " + searchContext.getClass().getSimpleName());
+
+
 
         if (searchContext instanceof WebElement) {
             if (xpath.strip().replaceAll("\\(", "").startsWith("//"))
                 xpath = xpath.replaceFirst("//", "descendant-or-self::");
         }
-        System.out.println("@@getElementListFromSearchContext2: " + xpath);
+
         return searchContext.findElements(new By.ByXPath(xpath));
     }
 
     public static WebElement getElementFromSearchContext(SearchContext searchContext, XPathy xPathy) {
-        System.out.println("@@getElementFromSearchContext0: " + xPathy.getXpath());
+
         List<WebElement> list = getElementListFromSearchContext(searchContext, xPathy);
         if (list.isEmpty()) return null;
         return list.getFirst();

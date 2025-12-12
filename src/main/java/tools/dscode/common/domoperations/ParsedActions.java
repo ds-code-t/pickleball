@@ -54,9 +54,7 @@ public class ParsedActions {
                 for (ElementWrapper nextElement : phraseData.wrappedElements) {
                     if (keyName.isBlank())
                         keyName = nextElement.elementMatch.category;
-
                     printDebug("##Actions: saving '" + nextElement.getElementReturnValue() + "' to key: " + keyName);
-
                     getRunningStep().getStepParsingMap().put(keyName, nextElement.getElementReturnValue());
                 }
             }

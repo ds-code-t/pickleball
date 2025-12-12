@@ -19,16 +19,16 @@ import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
 
 public abstract class LineData implements  Cloneable {
     public int startPhraseIndex = 0;
-    public LineData inheritedLineData;
+//    public LineData inheritedLineData;
 //    public List<PhraseData> contextPhrases = new ArrayList<>();
     public List<List<PhraseData>> inheritedContextPhrases = new ArrayList<>();
     private final String original;
     private final QuoteParser qp;
     private final BracketMasker bm;
-    public final List<Phrase> phrases = new ArrayList<>();
+    public final List<PhraseData> phrases = new ArrayList<>();
     private final Set<Character> delimiters; // characters that cause a split
     //    public final List<PhraseData> contextPhrases = new ArrayList<>();
-
+    public List<PhraseData> branchPhrases;
 
 
     public LineData(String input, Collection<Character> delimiters) {
@@ -99,7 +99,7 @@ public abstract class LineData implements  Cloneable {
     /**
      * The phrases in order, each with its trailing delimiter (if any).
      */
-    public List<Phrase> phrases() {
+    public List<PhraseData> phrases() {
         return phrases;
     }
 
@@ -114,7 +114,7 @@ public abstract class LineData implements  Cloneable {
         return phrases.size();
     }
 
-    public Phrase get(int index) {
+    public PhraseData get(int index) {
         return phrases.get(index);
     }
 
@@ -140,6 +140,18 @@ public abstract class LineData implements  Cloneable {
     public LineData clone() {
         try {
             LineData copy = (LineData) super.clone();
+
+
+            copy.inheritedContextPhrases = new ArrayList<>(this.inheritedContextPhrases.size());
+
+            // clone each inner list wrapper, but keep the same PhraseData objects
+            for (List<PhraseData> inner : this.inheritedContextPhrases) {
+                List<PhraseData> innerCopy =
+                        (inner == null ? null : new ArrayList<>(inner));  // shallow copy of inner list
+                copy.inheritedContextPhrases.add(innerCopy);
+            }
+
+
             return copy;
         } catch (CloneNotSupportedException e) {
             throw new AssertionError("Clone should be supported", e);
