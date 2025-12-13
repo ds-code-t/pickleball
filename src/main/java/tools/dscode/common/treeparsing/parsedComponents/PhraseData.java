@@ -27,7 +27,7 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.ins
 import static tools.dscode.coredefinitions.GeneralSteps.getBrowser;
 
 
-public abstract class PhraseData  {
+public abstract class PhraseData {
 //    public boolean skipNextPhrase = false;
 
     public WebDriver webDriver = null;
@@ -39,15 +39,15 @@ public abstract class PhraseData  {
     public SearchContext getSearchContext() {
 
 
-        if (contextElement != null){
+        if (contextElement != null) {
             WebElement element = contextElement.getElement();
 
             if (element == null)
                 throw new RuntimeException("Element not found: " + contextElement.elementMatch + " at " + contextElement.elementMatch.xPathy);
             return element;
         }
-        if (searchContext == null){
-            if(webDriver == null)
+        if (searchContext == null) {
+            if (webDriver == null)
                 webDriver = getBrowser();
             return webDriver;
         }
@@ -90,7 +90,7 @@ public abstract class PhraseData  {
     public XPathy contextXPathy;
 
     public String keyName;
-    public  boolean isClone = false;
+    public boolean isClone = false;
 
 //    public SearchContext getCurrentSearchContext() {
 //        if (currentSearchContext == null) {
@@ -111,6 +111,7 @@ public abstract class PhraseData  {
 
     public enum PhraseType {
         INITIAL, CONTEXT, ACTION, ASSERTION
+//        , CONDITIONAL
     }
 
     public List<PhraseData> contextPhrases = new ArrayList<>();
@@ -118,6 +119,10 @@ public abstract class PhraseData  {
 //    List<PhraseData> usedContextPhrases;
 
     public String selectionType;
+    public String conditional;
+    public String body;
+    public boolean phraseConditionalState = true;
+
 
     //    public XPathChainResult contextMatch;
     @Override
@@ -136,6 +141,8 @@ public abstract class PhraseData  {
         assert phraseNode != null;
         hasNot = phraseNode.localStateBoolean("not");
         keyName = phraseNode.getStringFromLocalState("keyName");
+        conditional = phraseNode.getStringFromLocalState("conditional");
+        body = phraseNode.getStringFromLocalState("body");
         components = phraseNode.getOrderedChildren("elementMatch", "valueMatch").stream().map(m -> {
             if (m.name().equals("valueMatch"))
                 return new ValueMatch(m);
@@ -154,8 +161,10 @@ public abstract class PhraseData  {
         conjunction = phraseNode.getStringFromLocalState("conjunction");
         position = lineData.phrases.size();
         context = phraseNode.getStringFromLocalState("context");
-
-        if (!context.isBlank()) {
+        if (!conditional.isBlank()) {
+            phraseType = PhraseType.ASSERTION;
+            assertion = phraseNode.getStringFromLocalState("assertion").replaceAll("s$", "").replaceAll("e?s\\s+", " ");
+        } else if (!context.isBlank()) {
             phraseType = PhraseType.CONTEXT;
             isFrom = context.equals("from");
             contextXPathy = getXPathyContext(context, elements);
@@ -200,7 +209,7 @@ public abstract class PhraseData  {
             PhraseData phraseData = returnList.get(i);
 
 
-            if(phraseData.contextElement != null){
+            if (phraseData.contextElement != null) {
 
 
             }
@@ -248,18 +257,16 @@ public abstract class PhraseData  {
 
 
     public abstract void runPhrase();
-    public abstract PhraseData clonePhrase( PhraseData previous);
 
-
+    public abstract PhraseData clonePhrase(PhraseData previous);
 
 
     public List<String> getAllPhraseValues() {
         List<String> returnList = new ArrayList<>();
         for (Component component : components) {
-            if(component instanceof ElementMatch elementMatch) {
+            if (component instanceof ElementMatch elementMatch) {
                 elementMatch.wrappedElements.forEach(e -> returnList.add(e.getElementReturnValue()));
-            }
-            else
+            } else
                 returnList.add(component.getValue().toString());
         }
         return returnList;

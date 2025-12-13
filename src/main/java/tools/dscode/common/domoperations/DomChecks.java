@@ -5,6 +5,9 @@ import org.openqa.selenium.WebElement;
 
 import java.util.List;
 
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static tools.dscode.common.evaluations.AviatorUtil.evalToBoolean;
+import static tools.dscode.common.evaluations.AviatorUtil.isStringTruthy;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.normalizeText;
 
 public final class DomChecks {
@@ -117,6 +120,24 @@ public final class DomChecks {
     /* -------------------------------------------------------------
      *  XPathy-based WebElement checks
      * ------------------------------------------------------------- */
+
+    public static CheckResult evalTextToBool(String inputText) {
+        String evalString = "{" + inputText.trim();
+        evalString = evalString.endsWith("?") ? evalString + "}" : evalString + "?}";
+        boolean ok = isStringTruthy(getRunningStep().evalWithStepMaps(evalString));
+        String desc = ok
+                ? "'" + inputText +  "' evaluated to truthy value"
+                : "'" + inputText +  "' evaluated to falsy value";
+        return new CheckResult(ok, desc);
+    }
+
+    public static CheckResult isTruthy(List<String> input) {
+        boolean ok = input.stream().anyMatch(v -> isStringTruthy(v));
+        String desc = ok
+                ? "Found truthy value in " + input
+                : "No truthy value in " + input;
+        return new CheckResult(ok, desc);
+    }
 
     /** Are there any matches for this XPathy? */
     public static CheckResult hasAny(List<WebElement> els) {

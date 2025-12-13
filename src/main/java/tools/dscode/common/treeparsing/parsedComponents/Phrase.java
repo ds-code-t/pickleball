@@ -57,7 +57,7 @@ public final class Phrase extends PhraseData {
 
 
         if (phraseType.equals(PhraseType.ASSERTION)) {
-            executeAssertions(webDriver, this);
+            executeAssertions(this);
         } else if (phraseType.equals(PhraseType.ACTION)) {
             executeAction(webDriver, this);
         } else if (phraseType.equals(PhraseType.CONTEXT)) {

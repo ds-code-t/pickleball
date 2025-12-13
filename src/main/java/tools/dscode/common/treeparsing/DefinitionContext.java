@@ -22,10 +22,8 @@ import static com.xpathy.Tag.textarea;
 import static tools.dscode.common.domoperations.VisibilityConditions.extractPredicate;
 import static tools.dscode.common.domoperations.VisibilityConditions.invisible;
 import static tools.dscode.common.domoperations.VisibilityConditions.visible;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
 import static tools.dscode.common.treeparsing.RegexUtil.betweenWithEscapes;
 import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
-import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public final class DefinitionContext {
 
@@ -74,9 +72,8 @@ public final class DefinitionContext {
 
 
         //
-        //    ParseNode phrase = new ParseNode("(?<conjunction>\\b(?:and|or)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>[^" + punc + "]+)(?<punc>[" + punc + "])");
-//        ParseNode phrase = new ParseNode("(?<conjunction>\\b(?:and|or)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>[^" + punc + "]+)(?<punc>[" + punc + "])?") {
-        ParseNode phrase = new ParseNode("^(?<conjunction>\\b(?:and|or)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
+//        ParseNode phrase = new ParseNode("^(?<conjunction>\\b(?:and|or)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
+        ParseNode phrase = new ParseNode("^(?<conjunction>\\b(?:and|or)\\b)?\\s*(?<conditional>\\b(?:else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
             @Override
             public String onCapture(MatchNode self) {
 
@@ -85,7 +82,9 @@ public final class DefinitionContext {
                 if (!context.isEmpty() && Character.isUpperCase(context.charAt(0)))
                     self.putToLocalState("newStartContext", true);
                 self.putToLocalState("context", context.toLowerCase());
+                self.putToLocalState("conditional", self.resolvedGroupText("conditional"));
                 self.putToLocalState("conjunction", self.resolvedGroupText("conjunction"));
+                self.putToLocalState("body", self.resolvedGroupText("body"));
 //                String termination = self.resolvedGroupText("punc");
 //                if (termination == null || termination.isBlank()) termination = "";
 //                self.putToLocalState("termination", termination);
@@ -101,22 +100,6 @@ public final class DefinitionContext {
 
             @Override
             public String onSubstitute(MatchNode self) {
-//                StepExtension currentStep = getCurrentStep();
-////                PhraseData lastPhraseExecution = (PhraseExecution) self.getFromGlobalState("lastPhraseExecution");
-//                PhraseData lastPhraseExecution = currentStep.contextPhraseExecution;
-
-//                if (lastPhraseExecution == null) {
-//                    lastPhraseExecution = currentStep.getParentContextPhraseExecution() == null ? initiateFirstPhraseExecution() : currentStep.getParentContextPhraseExecution();
-//                } else {
-//                    if ((!(lastPhraseExecution.termination.equals(";") || lastPhraseExecution.termination.equals(",")))) {
-//                        self.putToLocalState("newContext", true);
-//                    }
-//                }
-//
-//
-//                self.putToLocalState("context", self.resolvedGroupText("context"));
-////                self.putToGlobalState("lastPhraseExecution", lastPhraseExecution.initiateNextPhraseExecution(self));
-//                currentStep.contextPhraseExecution = lastPhraseExecution.initiateNextPhraseExecution(self);
                 return self.token();
             }
         };
