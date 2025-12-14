@@ -1,15 +1,25 @@
 Feature: Addition
 
-Scenario: test2334
+
+  Scenario: test243hy
+  @[DEBUG]
+    * , from the Top Panel:
+  : * , Button containing "Szign" is displayed?
+  :: * , I click the  Link containing "Sign"
+#    * , from the Top Panel:
+#    : * , verify Button containing "Rounder" is displayed
+#    : * , if Button containing "Rounder" is displayed, click Button containing "Rounder"
+
+  Scenario: test2334
 #  * , save "AA" as "Q"
-  * , save "AA" as "Q Q"
+    * , save "AA" as "Q Q"
 #  * , verify "<Q>" equals "AA"
-  * , verify "<Q Q>" equals "AA"
+    * , verify "<Q Q>" equals "AA"
 
 
   Scenario Outline: branch test1 testqwq
     @[DEBUG]
-#    * navigate to: URL.buttons
+    * navigate to: URL.buttons
     * , from the Top Panel:
 #  : * , for any Button containing "Rounder", I save  Text as "A"
 
@@ -23,7 +33,7 @@ Scenario: test2334
     Examples:
       | A |
       | 1 |
-      | 2 |
+#      | 2 |
 
 
   Scenario: testqwq

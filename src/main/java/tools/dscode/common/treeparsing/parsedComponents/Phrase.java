@@ -1,22 +1,13 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 
-import io.cucumber.core.runner.StepExtension;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WrapsElement;
-import org.openqa.selenium.chromium.ChromiumDriver;
 import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.preparsing.LineData;
-import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.ParsedActions.executeAction;
 import static tools.dscode.common.domoperations.ParsedAssertions.executeAssertions;
@@ -34,17 +25,38 @@ public final class Phrase extends PhraseData {
 
 
     boolean shouldRun() {
-        conditionalRanMode = previousPhrase == null ? 0 : previousPhrase.conditionalRanMode;
+        System.out.println("@@shouldRun: " + this);
+        phraseConditionalMode = previousPhrase == null ? 0 : previousPhrase.phraseConditionalMode;
+        System.out.println("@@phraseConditionalMode1: " + phraseConditionalMode);
         if (conditional.startsWith("else")) {
-            return conditionalRanMode * -1 > 0;
+            phraseConditionalMode = phraseConditionalMode * -1;
         }
-        return conditionalRanMode >= 0;
+        System.out.println("@@phraseConditionalMode2: " + phraseConditionalMode);
+        return phraseConditionalMode >= 0;
+
+
+
+
+//        phraseConditionalMode = previousPhrase == null ? 0 : previousPhrase.phraseConditionalMode;
+//        if (conditional.startsWith("else")) {
+//            parsedLine.lineConditionalMode *= -1;
+//            phraseConditionalMode = parsedLine.lineConditionalMode * -1;
+//        }
+//        phraseConditionalMode = phraseConditionalMode * -1;
+//        return phraseConditionalMode >= 0;
+
     }
 
     @Override
     public void runPhrase() {
-        System.out.println("Run Phrase: " + this + (isClone ? " (clone)" : ""));
-
+        System.out.println("@@PhrasE::: " + this  + " phraseType::" + phraseType + "");
+        if (shouldRun()) {
+            System.out.println("Run Phrase: " + this + (isClone ? " (clone)" : ""));
+        }
+        else {
+            System.out.println("Skipping Phrase: " + this + (isClone ? " (clone)" : ""));
+            return;
+        }
 
         if (contextElement != null) {
             contextPhrases.add(this);
@@ -63,7 +75,9 @@ public final class Phrase extends PhraseData {
             syncWithDOM();
         }
 
-        if (phraseType.equals(PhraseType.ASSERTION) || phraseType.equals(PhraseType.CONDITIONAL)) {
+        if (phraseType.equals(PhraseType.CONDITIONAL)) {
+            executeAssertions(this);
+        } else if (phraseType.equals(PhraseType.ASSERTION)) {
             executeAssertions(this);
         } else if (phraseType.equals(PhraseType.ACTION)) {
             executeAction(webDriver, this);
@@ -71,10 +85,13 @@ public final class Phrase extends PhraseData {
             processContextPhrase();
         }
         if (contextTermination) {
-            if (termination.equals(':')) {
+            if (phraseType.equals(PhraseType.CONDITIONAL)) {
+                parsedLine.lineConditionalMode = phraseConditionalMode;
+            } else if (termination.equals(':')) {
                 parsedLine.inheritedContextPhrases.add(contextPhrases);
+                parsedLine.lineConditionalMode = phraseConditionalMode;
             } else {
-                parsedLine.inheritedContextPhrases.remove(parsedLine.inheritedContextPhrases.size() - 1);
+                parsedLine.inheritedContextPhrases.removeLast();
             }
         }
     }

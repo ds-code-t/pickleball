@@ -1,15 +1,10 @@
 package tools.dscode.common.domoperations;
 
 
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.chromium.ChromiumDriver;
 import tools.dscode.common.status.SoftRuntimeException;
-import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.parsedComponents.Component;
-import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.domoperations.DomChecks.endsWithNormalized;
 import static tools.dscode.common.domoperations.DomChecks.equalsNormalized;
 import static tools.dscode.common.domoperations.DomChecks.evalTextToBool;
@@ -17,8 +12,6 @@ import static tools.dscode.common.domoperations.DomChecks.hasAny;
 import static tools.dscode.common.domoperations.DomChecks.isTruthy;
 import static tools.dscode.common.domoperations.DomChecks.matchesNormalized;
 import static tools.dscode.common.domoperations.DomChecks.startsWithNormalized;
-import static tools.dscode.common.evaluations.AviatorUtil.evalToBoolean;
-import static tools.dscode.common.evaluations.AviatorUtil.isStringTruthy;
 
 
 public class ParsedAssertions {
@@ -38,7 +31,7 @@ public class ParsedAssertions {
         Component component1 = phraseData.components.getFirst();
         Component component2 = phraseData.components.size() < 2 ? null : phraseData.components.get(1);
 
-
+        System.out.println("@@phraseData.assertion:: " + phraseData.assertion);
         DomChecks.CheckResult result;
         switch (phraseData.assertion) {
             case String s when s.contains("equal") -> {
@@ -77,7 +70,7 @@ public class ParsedAssertions {
 
         boolean passed = (!phraseData.hasNot == result.result());
 
-        if(phraseData.conditional.isEmpty()) {
+        if(phraseData.phraseType.equals(PhraseData.PhraseType.ASSERTION)) {
             if (!passed) {
                 if (phraseData.assertionType.equals("ensure"))
                     throw new RuntimeException(result.description());
@@ -87,7 +80,10 @@ public class ParsedAssertions {
         }
         else
         {
-            phraseData.phraseConditionalState = passed;
+            System.out.println("@@passed: " + passed);
+            phraseData.phraseConditionalMode = passed ? 1 : -1;
+            System.out.println("@@phraseData.phraseConditionalMode3: " + phraseData.phraseConditionalMode);
+
         }
 
     }

@@ -5,14 +5,13 @@ import tools.dscode.common.CoreSteps;
 import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 
 
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 
 
 public class DynamicSteps  extends CoreSteps {
     @Given("^,(.*)$")
     public void executeDynamicStep(String stepText) {
-
-        ParsedLine parsedLine = new ParsedLine(stepText);
-        parsedLine.runPhrases();
+        getRunningStep().lineData.runPhrases();
     }
 }

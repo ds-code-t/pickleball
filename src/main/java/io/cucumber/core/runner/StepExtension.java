@@ -14,6 +14,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
+import static io.cucumber.core.gherkin.messages.NGherkinFactory.createGherkinMessagesStep;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getEventBus;
@@ -84,6 +85,7 @@ public class StepExtension extends StepData {
                 getCurrentScenarioState().getParsingMap().getRootSingletonMap().put("DATATABLE." + tableName.trim(), dataTable);
             }
         }
+
     }
 
     public Object runAndGetReturnValue() {
@@ -109,8 +111,15 @@ public class StepExtension extends StepData {
     }
 
     public Result run() {
+
         try {
-            executingPickleStepTestStep = resolveAndClone(getStepParsingMap());
+            if(logAndIgnore)
+            {
+                executingPickleStepTestStep = resolveAndClone(getStepParsingMap(), "SKIPPING: " + pickleStepTestStep.getStepText());
+            }
+            else {
+                executingPickleStepTestStep = resolveAndClone(getStepParsingMap());
+            }
             executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
             executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
             io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep);

@@ -26,6 +26,7 @@ public abstract class LineData implements  Cloneable {
     private final String original;
     private final QuoteParser qp;
     private final BracketMasker bm;
+    private final String fullyMasked;
     public final List<PhraseData> phrases = new ArrayList<>();
     private final Set<Character> delimiters; // characters that cause a split
     //    public final List<PhraseData> contextPhrases = new ArrayList<>();
@@ -34,8 +35,8 @@ public abstract class LineData implements  Cloneable {
     public LineData(String input, Collection<Character> delimiters) {
         this.original = stripObscureNonText(Objects.requireNonNull(input, "input"));
         Objects.requireNonNull(delimiters, "delimiters");
-        if (delimiters.isEmpty())
-            throw new IllegalArgumentException("Delimiters cannot be empty");
+//        if (delimiters.isEmpty())
+//            throw new IllegalArgumentException("Delimiters cannot be empty");
         this.delimiters = Collections.unmodifiableSet(new LinkedHashSet<>(delimiters));
 
         // 1) Mask quotes first
@@ -44,7 +45,10 @@ public abstract class LineData implements  Cloneable {
 
         // 2) Mask brackets second (BracketMasker is in the same package)
         this.bm = new BracketMasker(afterQuotes);
-        String fullyMasked = bm.masked();
+        fullyMasked = bm.masked();
+
+        if(!original.startsWith(","))
+            return;
 
         String preParsedNormalized = normalizeWhitespace(fullyMasked)
                 .replaceAll("(?i)\\b(?:the|then|a)\\b", "")
@@ -159,4 +163,5 @@ public abstract class LineData implements  Cloneable {
     }
 
 
+    public abstract void runPhrases();
 }

@@ -1,14 +1,16 @@
 package tools.dscode.common.treeparsing.preparsing;
 
-import io.cucumber.core.runner.StepBase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
-
 public final class ParsedLine extends LineData {
+
+    public ParsedLine() {
+        this("", new ArrayList<>());
+    }
 
     public ParsedLine(String input) {
         this(input, List.of(',', ';', ':', '.', '!', '?'));
@@ -16,14 +18,14 @@ public final class ParsedLine extends LineData {
 
     public ParsedLine(String input, Collection<Character> delimiters) {
         super(input, delimiters);
-        StepBase currentStep = getRunningStep();
-        currentStep.lineData = this;
-        if (currentStep.inheritedLineData != null) {
-            inheritedContextPhrases.addAll(currentStep.inheritedLineData.inheritedContextPhrases);
-        }
+//        StepBase currentStep = getRunningStep();
+//        currentStep.lineData = this;
+//        if (currentStep.inheritedLineData != null) {
+//            inheritedContextPhrases.addAll(currentStep.inheritedLineData.inheritedContextPhrases);
+//        }
     }
 
-
+    @Override
     public void runPhrases() {
         PhraseData phrase = phrases.get(startPhraseIndex);
         runPhraseFromLine(phrase);

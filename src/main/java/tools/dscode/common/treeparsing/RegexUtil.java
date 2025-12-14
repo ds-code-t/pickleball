@@ -28,7 +28,7 @@ public final class RegexUtil {
         String out = input.replaceAll("[\\p{Cf}&&[^\\u2060\\u2063]]+", "");
         // 2) Remove all Cc EXCEPT tab/newline/CR
         out = out.replaceAll("[\\p{Cc}&&[^\\t\\n\\r]]+", "");
-        return out;
+        return out.strip();
     }
 
     public static String normalizeWhitespace(String input) {

@@ -110,8 +110,7 @@ public abstract class PhraseData {
 
 
     public enum PhraseType {
-        INITIAL, CONTEXT, ACTION, ASSERTION, CONDITIONAL
-//        , CONDITIONAL
+        INITIAL, CONTEXT, ACTION, ASSERTION, CONDITIONAL, NO_EXECUTION
     }
 
     public List<PhraseData> contextPhrases = new ArrayList<>();
@@ -121,8 +120,8 @@ public abstract class PhraseData {
     public String selectionType;
     public String conditional;
     public String body;
-    public boolean phraseConditionalState = true;
-    public int conditionalRanMode = 0;
+//    public boolean phraseConditionalState = true;
+    public int phraseConditionalMode = 0;
 
     //    public XPathChainResult contextMatch;
     @Override
@@ -135,7 +134,7 @@ public abstract class PhraseData {
         parsedLine = lineData;
         text = inputText;
         termination = delimiter;
-        contextTermination = termination.equals('.') || termination.equals(':');
+        contextTermination = termination.equals('.') || termination.equals(':') || termination.equals('?');
         MatchNode returnMatchNode = getNodeDictionary().parse(inputText);
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
@@ -161,7 +160,7 @@ public abstract class PhraseData {
         conjunction = phraseNode.getStringFromLocalState("conjunction");
         position = lineData.phrases.size();
         context = phraseNode.getStringFromLocalState("context");
-        if (!conditional.isBlank()) {
+        if (conditional.contains("if") || termination.equals('?')) {
             phraseType = PhraseType.CONDITIONAL;
             assertion = phraseNode.getStringFromLocalState("assertion").replaceAll("s$", "").replaceAll("e?s\\s+", " ");
         } else if (!context.isBlank()) {
@@ -181,17 +180,29 @@ public abstract class PhraseData {
                 }
             }
         }
+
         if (phraseType == null) {
-            phraseType = PhraseType.CONTEXT;
+            phraseType = PhraseType.NO_EXECUTION;
+//            if (conditional.startsWith("else")) {
+//                phraseType = PhraseType.NO_EXECUTION;
+//            }
+//            else {
+//                phraseType = PhraseType.CONTEXT;
+//            }
         }
-//        hasDOMInteraction = phraseType.equals(PhraseType.ASSERTION) || phraseType.equals(PhraseType.ACTION);
-        hasDOMInteraction = !elements.isEmpty();
+
+
+
+        hasDOMInteraction = !elements.isEmpty() || phraseType.equals(PhraseType.CONTEXT);
 
         newContext = phraseNode.localStateBoolean("newStartContext");
 //        if (position > 0) {
 //            previousPhrase = lineData.phrases.get(position - 1);
 //            previousPhrase.nextPhrase = this;
 //        }
+
+        System.out.println("@@ phrase constuct:  " + this + " , phraseType: " + phraseType);
+
     }
 
 

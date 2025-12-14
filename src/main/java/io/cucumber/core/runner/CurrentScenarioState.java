@@ -11,6 +11,7 @@ import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
 import tools.dscode.common.status.SoftExceptionInterface;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
+import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 import tools.dscode.registry.GlobalRegistry;
 
 import java.time.Duration;
@@ -90,6 +91,7 @@ public class CurrentScenarioState extends ScenarioMapping {
                 lifecycle.fire(Phase.AFTER_SCENARIO_PASS);
         } catch (Throwable t) {
             lifecycle.fire(Phase.AFTER_SCENARIO_FAIL);
+            throw t;
         }
         lifecycle.fire(Phase.AFTER_SCENARIO_RUN);
 
@@ -111,28 +113,42 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void runStep(StepExtension stepExtension) {
+        System.out.println("@@runStep: " + stepExtension + "");
         StepBase stepBase = stepExtension;
         while (true) {
             stepBase = stepBase.parentStep;
-            if (stepBase == null)
+            if (stepBase == null) {
+                System.out.println("@@stepBase: " + stepBase);
+                stepExtension.inheritedLineData = new ParsedLine();
                 break;
+            }
             if (stepBase.lineData != null) {
                 stepExtension.inheritedLineData = stepBase.lineData.clone();
                 break;
             }
         }
-
-        if (stepExtension.inheritedLineData.lineConditionalMode == 0) {
-            if (stepExtension.methodName.equals("executeDynamicStep")) {
-                if (stepExtension.pickleStepTestStep.getStepText().toLowerCase().replaceAll(",|then|the|and|or", "").strip().startsWith("else")) {
-                    if (stepExtension.previousSibling == null || stepExtension.previousSibling.lineData.lineConditionalMode > -1) {
-                        return;
-                    }
-                }
-            }
-//            stepExtension.inheritedLineData.lineConditionalMode = stepExtension.previousSibling.inheritedLineData.lineConditionalMode;
+        stepExtension.lineData = new ParsedLine(stepExtension.pickleStepTestStep.getStepText());
+        if (stepExtension.inheritedLineData != null) {
+            stepExtension.lineData.inheritedContextPhrases.addAll(stepExtension.inheritedLineData.inheritedContextPhrases);
         }
 
+        System.out.println("@@stepBase: " + stepBase);
+        System.out.println("@@stepExtension: " + stepExtension);
+        System.out.println("@@stepExtension.inheritedLineData: " + stepExtension.inheritedLineData);
+        System.out.println("@@stepExtension.inheritedLineData.lineConditionalMode:: " + stepExtension.inheritedLineData.lineConditionalMode);
+        System.out.println("@@methodName: " + stepExtension.methodName);
+
+        if ((stepExtension.parentStep != null && stepExtension.parentStep.logAndIgnore) || stepExtension.inheritedLineData.lineConditionalMode < 0) {
+            stepExtension.logAndIgnore = true;
+        } else if (stepExtension.methodName.equals("executeDynamicStep")) {
+            if (stepExtension.pickleStepTestStep.getStepText().toLowerCase().replaceAll(",|then|the|and|or", "").strip().startsWith("else")) {
+                if (stepExtension.previousSibling == null || stepExtension.previousSibling.lineData.lineConditionalMode > -1) {
+                    stepExtension.logAndIgnore = true;
+                }
+            }
+        }
+//            stepExtension.inheritedLineData.lineConditionalMode = stepExtension.previousSibling.inheritedLineData.lineConditionalMode;
+        System.out.println("@@stepExtension: " + stepExtension +  " , " + stepExtension.logAndIgnore);
         runningStep(stepExtension);
     }
 

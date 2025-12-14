@@ -152,6 +152,12 @@ public class GeneralSteps extends CoreSteps {
         throw new SoftRuntimeException(message);
     }
 
+    @Given("^SKIPPING: (.*)$")
+    public static void skippedStep(String message) {
+        System.out.println("Skipping step: " + message);
+    }
+
+
 
     @Given("^print (.*)$")
     public static void printVal(String message) {

@@ -141,6 +141,7 @@ public final class DomChecks {
 
     /** Are there any matches for this XPathy? */
     public static CheckResult hasAny(List<WebElement> els) {
+        System.out.println("@@hasAny: " + els + "");
         boolean ok = !els.isEmpty();
         String desc = ok
                 ? "Found " + els.size() + " elements. First: " + summarizeFirst(els)
