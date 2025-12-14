@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FAILED;
@@ -121,6 +122,17 @@ public class CurrentScenarioState extends ScenarioMapping {
             }
         }
 
+        if (stepExtension.inheritedLineData.lineConditionalMode == 0) {
+            if (stepExtension.methodName.equals("executeDynamicStep")) {
+                if (stepExtension.pickleStepTestStep.getStepText().toLowerCase().replaceAll(",|then|the|and|or", "").strip().startsWith("else")) {
+                    if (stepExtension.previousSibling == null || stepExtension.previousSibling.lineData.lineConditionalMode > -1) {
+                        return;
+                    }
+                }
+            }
+//            stepExtension.inheritedLineData.lineConditionalMode = stepExtension.previousSibling.inheritedLineData.lineConditionalMode;
+        }
+
         runningStep(stepExtension);
     }
 
@@ -169,7 +181,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
         if (!stepExtension.childSteps.isEmpty() && !stepExtension.definitionFlags.contains(SKIP_CHILDREN)) {
             List<StepExtension> repeatSteps = getNestedRepetitions(stepExtension);
-            for(StepExtension repeatStep : repeatSteps) {
+            for (StepExtension repeatStep : repeatSteps) {
                 StepExtension firstChild = (StepExtension) repeatStep.initializeChildSteps();
 
                 if (firstChild != null) {
@@ -183,14 +195,13 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
     }
 
-    public List<StepExtension> getNestedRepetitions(StepExtension stepExtension){
+    public List<StepExtension> getNestedRepetitions(StepExtension stepExtension) {
         List<StepExtension> returnList = new ArrayList<>();
 
         List<PhraseData> branchedPhrases = null;
         try {
             branchedPhrases = stepExtension.lineData.inheritedContextPhrases.getLast().getLast().branchedPhrases;
-        }
-        catch (Throwable ignored) {
+        } catch (Throwable ignored) {
             returnList.add(stepExtension);
             return returnList;
         }
@@ -200,15 +211,13 @@ public class CurrentScenarioState extends ScenarioMapping {
                 StepExtension branchStep = (StepExtension) stepExtension.clone();
                 branchStep.lineData.inheritedContextPhrases.getLast().add(branch);
                 returnList.add(branchStep);
-            }
-            catch (Throwable t) {
+            } catch (Throwable t) {
                 t.printStackTrace();
                 throw new RuntimeException(t);
             }
         }
 
-        if(branchedPhrases.isEmpty())
-        {
+        if (branchedPhrases.isEmpty()) {
             returnList.add(stepExtension);
         }
         return returnList;

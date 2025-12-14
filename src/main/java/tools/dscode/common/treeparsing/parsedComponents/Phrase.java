@@ -1,6 +1,7 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 
+import io.cucumber.core.runner.StepExtension;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WrapsElement;
 import org.openqa.selenium.chromium.ChromiumDriver;
@@ -15,6 +16,7 @@ import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.ParsedActions.executeAction;
 import static tools.dscode.common.domoperations.ParsedAssertions.executeAssertions;
@@ -31,6 +33,14 @@ public final class Phrase extends PhraseData {
     private final LifecycleManager lifecycle = new LifecycleManager();
 
 
+    boolean shouldRun() {
+        conditionalRanMode = previousPhrase == null ? 0 : previousPhrase.conditionalRanMode;
+        if (conditional.startsWith("else")) {
+            return conditionalRanMode * -1 > 0;
+        }
+        return conditionalRanMode >= 0;
+    }
+
     @Override
     public void runPhrase() {
         System.out.println("Run Phrase: " + this + (isClone ? " (clone)" : ""));
@@ -41,8 +51,7 @@ public final class Phrase extends PhraseData {
             return;
         }
 
-
-        parsedLine.startPhraseIndex = position;
+//        parsedLine.startPhraseIndex = position;
 
         elements.forEach(e -> e.contextWrapper = new ContextWrapper(e));
 
@@ -50,13 +59,11 @@ public final class Phrase extends PhraseData {
             contextPhrases.addAll(previousPhrase.contextPhrases);
         }
 
-
         if (hasDOMInteraction) {
             syncWithDOM();
         }
 
-
-        if (phraseType.equals(PhraseType.ASSERTION)) {
+        if (phraseType.equals(PhraseType.ASSERTION) || phraseType.equals(PhraseType.CONDITIONAL)) {
             executeAssertions(this);
         } else if (phraseType.equals(PhraseType.ACTION)) {
             executeAction(webDriver, this);
@@ -74,25 +81,18 @@ public final class Phrase extends PhraseData {
 
 
     void processContextPhrase() {
-
-
         if (elementMatch.selectionType.isEmpty()) {
             contextPhrases.add(this);
-        } else  {
+        } else {
             syncWithDOM();
             if (elementMatch.wrappedElements.isEmpty()) {
                 if (!elementMatch.selectionType.equals("any")) {
                     throw new RuntimeException("Failed to find WebElements for " + elementMatch);
                 }
-//                skipNextPhrase = true;
                 System.out.println("No elements match for " + elementMatch + ", skipping subsequent phrases");
             }
             for (ElementWrapper elementWrapper : wrappedElements) {
-
                 branchedPhrases.add(cloneWithElementContext(elementWrapper));
-
-//                clones.add(clone);
-//                contextPhrases.add(clone);
             }
             contextPhrases.add(this);
         }

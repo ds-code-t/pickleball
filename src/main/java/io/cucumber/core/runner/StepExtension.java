@@ -161,10 +161,6 @@ public class StepExtension extends StepData {
         StepExtension modifiedStep = new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep, pickleStepTestStep.getStep().getKeyword(), newText, getGherkinArgumentText(pickleStepTestStep.getStep())));
         modifiedStep.setStepParsingMap(getStepParsingMap());
         modifiedStep.parentStep = parentStep;
-//        modifiedStep.previousSibling = previousSibling;
-//        modifiedStep.nextSibling = nextSibling;
-
-
         modifiedStep.lineData = lineData;
         return modifiedStep;
     }

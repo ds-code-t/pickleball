@@ -86,8 +86,8 @@ public class ParsedAssertions {
             }
         }
         else
-        {ws
- start here
+        {
+            phraseData.phraseConditionalState = passed;
         }
 
     }

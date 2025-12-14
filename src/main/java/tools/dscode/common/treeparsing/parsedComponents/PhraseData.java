@@ -110,7 +110,7 @@ public abstract class PhraseData {
 
 
     public enum PhraseType {
-        INITIAL, CONTEXT, ACTION, ASSERTION
+        INITIAL, CONTEXT, ACTION, ASSERTION, CONDITIONAL
 //        , CONDITIONAL
     }
 
@@ -122,7 +122,7 @@ public abstract class PhraseData {
     public String conditional;
     public String body;
     public boolean phraseConditionalState = true;
-
+    public int conditionalRanMode = 0;
 
     //    public XPathChainResult contextMatch;
     @Override
@@ -162,7 +162,7 @@ public abstract class PhraseData {
         position = lineData.phrases.size();
         context = phraseNode.getStringFromLocalState("context");
         if (!conditional.isBlank()) {
-            phraseType = PhraseType.ASSERTION;
+            phraseType = PhraseType.CONDITIONAL;
             assertion = phraseNode.getStringFromLocalState("assertion").replaceAll("s$", "").replaceAll("e?s\\s+", " ");
         } else if (!context.isBlank()) {
             phraseType = PhraseType.CONTEXT;
@@ -208,11 +208,6 @@ public abstract class PhraseData {
         for (int i = returnList.size() - 1; i >= 0; i--) {
             PhraseData phraseData = returnList.get(i);
 
-
-            if (phraseData.contextElement != null) {
-
-
-            }
             if (phraseData.contextElement != null || phraseData.newContext || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT) || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.ELEMENT_CONTEXT)) {
                 return returnList.subList(i, returnList.size());
             }
