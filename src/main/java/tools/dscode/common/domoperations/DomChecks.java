@@ -2,6 +2,7 @@ package tools.dscode.common.domoperations;
 
 import org.intellij.lang.annotations.RegExp;
 import org.openqa.selenium.WebElement;
+import tools.dscode.common.treeparsing.parsedComponents.Component;
 
 import java.util.List;
 
@@ -146,6 +147,22 @@ public final class DomChecks {
         String desc = ok
                 ? "Found " + els.size() + " elements. First: " + summarizeFirst(els)
                 : "No elements matched.";
+        return new CheckResult(ok, desc);
+    }
+
+    public static CheckResult hasValue(List<Component> components, boolean anyTrue) {
+        System.out.println("@@anyHasValue: " + components + "");
+        boolean ok = anyTrue ?  components.stream().anyMatch(c -> String.valueOf(c.getValue()).isBlank()) : components.stream().allMatch(c -> String.valueOf(c.getValue()).isBlank()) ;
+        String desc = ok
+                ? (anyTrue? "All of the entries have values": "Some of the entities have values") : (anyTrue? "None of the entries have value": "Some of the entities do not have values");
+        return new CheckResult(ok, desc);
+    }
+
+    public static CheckResult isBlank(List<Component> components, boolean anyTrue) {
+        System.out.println("@@anyHasValue: " + components + "");
+        boolean ok = !hasValue(components, anyTrue).result;
+        String desc = ok
+                ?  (anyTrue? "None of the entries have value": "Some of the entities do not have values") : (anyTrue? "All of the entries have values": "Some of the entities have values");
         return new CheckResult(ok, desc);
     }
 

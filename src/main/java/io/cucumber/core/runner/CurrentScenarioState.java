@@ -50,7 +50,6 @@ public class CurrentScenarioState extends ScenarioMapping {
     public CurrentScenarioState(TestCase testCase) {
         this.testCase = testCase;
         this.pickle = (Pickle) getProperty(testCase, "pickle");
-
     }
 
     private final LifecycleManager lifecycle = new LifecycleManager();
@@ -140,7 +139,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
         if ((stepExtension.parentStep != null && stepExtension.parentStep.logAndIgnore) || stepExtension.inheritedLineData.lineConditionalMode < 0) {
             stepExtension.logAndIgnore = true;
-        } else if (stepExtension.methodName.equals("executeDynamicStep")) {
+        } else if (stepExtension.isDynamicStep) {
             if (stepExtension.pickleStepTestStep.getStepText().toLowerCase().replaceAll(",|then|the|and|or", "").strip().startsWith("else")) {
                 if (stepExtension.previousSibling == null || stepExtension.previousSibling.lineData.lineConditionalMode > -1) {
                     stepExtension.logAndIgnore = true;

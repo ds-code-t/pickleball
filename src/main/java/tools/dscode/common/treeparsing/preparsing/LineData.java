@@ -90,7 +90,6 @@ public abstract class LineData implements  Cloneable {
             }
             lastPhrase = phrase;
         }
-
     }
 
     /**

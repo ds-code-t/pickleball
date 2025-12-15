@@ -6,6 +6,8 @@ Feature: Addition
     * , from the Top Panel:
   : * , Button containing "Szign" is displayed?
   :: * , I click the  Link containing "Sign"
+  : * , click the Link containing "Certified"
+
 #    * , from the Top Panel:
 #    : * , verify Button containing "Rounder" is displayed
 #    : * , if Button containing "Rounder" is displayed, click Button containing "Rounder"

@@ -62,7 +62,8 @@ public final class DefinitionContext {
                         .replaceAll("(\\d+)(?:\\\s*(?:st|nd|rd|th))", "#$1")
                         .replaceAll("\\bverifies\\b", "verify")
                         .replaceAll("\\bensures\\b", "ensure")
-                        .replaceAll("\\bno\\b|n't\\b", " not");
+                        .replaceAll("\\b(?:no|n't)\\b", " not ")
+                        .replaceAll("\\bhave\\b", "has");
             }
 
             public String onSubstitute(MatchNode self) {
@@ -206,10 +207,9 @@ public final class DefinitionContext {
         };
 
         //    ParseNode assertion = new ParseNode("\\b(?<base>equal|less(?:er)?|greater|less|is)(?=\\s+(?:<<quoteMask>>|<<valueMatch>>|<<elementMatch>>)(s|ed|ing|es)?)\\b")
-        ParseNode assertion = new ParseNode("\\b(?:starts? with|ends? with|contains?|match(?:es)?|displayed|equals?|less(?:er)?|greater|less)\\b") {
+        ParseNode assertion = new ParseNode("\\b(?:starts? with|ends? with|contains?|match(?:es)?|displayed|equals?|less(?:er)?|greater|less|has\\s+value|is\\s+blank)\\b") {
             @Override
             public String onCapture(MatchNode self) {
-
                 self.parent().putToLocalState("assertion", self.originalText());
                 return self.originalText();
             }

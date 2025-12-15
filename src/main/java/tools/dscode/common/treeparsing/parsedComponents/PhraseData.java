@@ -108,7 +108,6 @@ public abstract class PhraseData {
 
     private SearchContext currentSearchContext;
 
-
     public enum PhraseType {
         INITIAL, CONTEXT, ACTION, ASSERTION, CONDITIONAL, NO_EXECUTION
     }
@@ -130,7 +129,6 @@ public abstract class PhraseData {
     }
 
     public PhraseData(String inputText, Character delimiter, LineData lineData) {
-
         parsedLine = lineData;
         text = inputText;
         termination = delimiter;

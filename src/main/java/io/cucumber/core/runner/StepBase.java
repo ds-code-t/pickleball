@@ -16,7 +16,9 @@ import java.util.List;
 
 import static tools.dscode.common.mappings.MapConfigurations.MapType.STEP_MAP;
 
+
 public abstract class StepBase implements Cloneable {
+    public boolean isDynamicStep;
     public boolean logAndIgnore = false;
     public boolean isClone = false;
     public List<StepBase> clones = new ArrayList<>();
@@ -46,7 +48,7 @@ public abstract class StepBase implements Cloneable {
     protected int nestingLevel = 0;
     public String codeLocation;
     public boolean isCoreStep;
-    protected  List<String> stepFlags = new ArrayList<>();
+    protected List<String> stepFlags = new ArrayList<>();
     protected List<DefinitionFlag> inheritableDefinitionFlags = new ArrayList<>();
     protected List<DefinitionFlag> definitionFlags;
     protected List<DefinitionFlag> nextSiblingDefinitionFlags;
@@ -59,7 +61,7 @@ public abstract class StepBase implements Cloneable {
     public boolean hardFail = false;
     public boolean softFail = false;
     public boolean skipped = false;
-    protected  List<ConditionalStates> conditionalStates = new ArrayList<>();
+    protected List<ConditionalStates> conditionalStates = new ArrayList<>();
 
     public DocString docString;
     public DataTable dataTable;
@@ -68,7 +70,6 @@ public abstract class StepBase implements Cloneable {
     public enum ConditionalStates {
         SKIP, FALSE, TRUE
     }
-
 
 
     public abstract void setStepParsingMap(ParsingMap stepParsingMap);
@@ -82,9 +83,6 @@ public abstract class StepBase implements Cloneable {
     protected abstract DataTable getDataTableFromParent();
 
     public abstract Collection<ConditionalStates> getConditionalStates();
-
-
-
 
 
     @Override
@@ -115,12 +113,10 @@ public abstract class StepBase implements Cloneable {
             copy.stepFlags = shallowCopyList(this.stepFlags);
             copy.conditionalStates = shallowCopyList(this.conditionalStates);
 
-            if(nextSibling != null)
-            {
+            if (nextSibling != null) {
                 copy.nextSibling = nextSibling.clone();
                 copy.nextSibling.previousSibling = copy;
             }
-
 
 
             return copy;
@@ -143,12 +139,6 @@ public abstract class StepBase implements Cloneable {
     private static <T> List<T> shallowCopyList(List<T> source) {
         return (source == null) ? null : new ArrayList<>(source);
     }
-
-
-
-
-
-
 
 
 }

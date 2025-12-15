@@ -9,6 +9,8 @@ import static tools.dscode.common.domoperations.DomChecks.endsWithNormalized;
 import static tools.dscode.common.domoperations.DomChecks.equalsNormalized;
 import static tools.dscode.common.domoperations.DomChecks.evalTextToBool;
 import static tools.dscode.common.domoperations.DomChecks.hasAny;
+import static tools.dscode.common.domoperations.DomChecks.hasValue;
+import static tools.dscode.common.domoperations.DomChecks.isBlank;
 import static tools.dscode.common.domoperations.DomChecks.isTruthy;
 import static tools.dscode.common.domoperations.DomChecks.matchesNormalized;
 import static tools.dscode.common.domoperations.DomChecks.startsWithNormalized;
@@ -19,18 +21,9 @@ public class ParsedAssertions {
 
     public static void executeAssertions(PhraseData phraseData) {
 
-//        boolean isTrue = !phraseData.phraseNode.getChild("not").modifiedText().equals("not");
-//        MatchNode assertionNode = phraseData.phraseNode.getChild("assertion");
-//        String assertion = assertionNode == null ? "equals" : assertionNode.modifiedText();
-//        if (assertion.isEmpty())
-//            assertion = "equal";
-////        phraseNode.getStringFromLocalState("conjunction");
-//        String assertionType = phraseData.phraseNode.getChild("assertionType").modifiedText();
-
-
         Component component1 = phraseData.components.getFirst();
         Component component2 = phraseData.components.size() < 2 ? null : phraseData.components.get(1);
-
+        boolean anyTrue = phraseData.selectionType.equals("any");
         System.out.println("@@phraseData.assertion:: " + phraseData.assertion);
         DomChecks.CheckResult result;
         switch (phraseData.assertion) {
@@ -48,6 +41,12 @@ public class ParsedAssertions {
             }
             case String s when s.contains("displayed") -> {
                 result = hasAny(phraseData.wrappedElements.stream().map(w -> w.element).toList());
+            }
+            case String s when s.contains("has value") -> {
+                result = hasValue(phraseData.components, anyTrue);
+            }
+            case String s when s.contains("isBlank") -> {
+                result = isBlank(phraseData.components, anyTrue);
             }
             default -> {
                 if (!phraseData.wrappedElements.isEmpty()) {
