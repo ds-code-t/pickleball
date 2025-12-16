@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
@@ -58,6 +59,7 @@ public abstract class PhraseData {
     //    List<XPathData> contextXPathDataList = new ArrayList<>();
 
     public final String text;
+    public final String resolvedText;
     public final Character termination; // nullable
     public boolean contextTermination;
     public boolean hasNot;
@@ -125,15 +127,16 @@ public abstract class PhraseData {
     //    public XPathChainResult contextMatch;
     @Override
     public String toString() {
-        return text;
+        return resolvedText + termination;
     }
 
     public PhraseData(String inputText, Character delimiter, LineData lineData) {
         parsedLine = lineData;
         text = inputText;
+        resolvedText = getRunningStep().getStepParsingMap().resolveWholeText(text);
         termination = delimiter;
         contextTermination = termination.equals('.') || termination.equals(':') || termination.equals('?');
-        MatchNode returnMatchNode = getNodeDictionary().parse(inputText);
+        MatchNode returnMatchNode = getNodeDictionary().parse(resolvedText);
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
         hasNot = phraseNode.localStateBoolean("not");
@@ -263,6 +266,8 @@ public abstract class PhraseData {
     public abstract void runPhrase();
 
     public abstract PhraseData clonePhrase(PhraseData previous);
+    public abstract PhraseData resolvePhrase();
+    public abstract PhraseData getNextResolvedPhrase();
 
 
     public List<String> getAllPhraseValues() {

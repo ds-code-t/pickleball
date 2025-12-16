@@ -8,6 +8,7 @@ import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.ParsedActions.executeAction;
 import static tools.dscode.common.domoperations.ParsedAssertions.executeAssertions;
@@ -49,9 +50,10 @@ public final class Phrase extends PhraseData {
 
     @Override
     public void runPhrase() {
+        parsedLine.executedPhrases.add(this);
         System.out.println("@@PhrasE::: " + this  + " phraseType::" + phraseType + "");
         if (shouldRun()) {
-            System.out.println("Run Phrase: " + this + (isClone ? " (clone)" : ""));
+            System.out.println("Running Phrase: " + this + (isClone ? " (clone)" : ""));
         }
         else {
             System.out.println("Skipping Phrase: " + this + (isClone ? " (clone)" : ""));
@@ -138,19 +140,34 @@ public final class Phrase extends PhraseData {
 
     @Override
     public PhraseData clonePhrase(PhraseData previous) {
-
-
         Phrase clone = new Phrase(text, termination, parsedLine);
         clone.isClone = true;
         clone.position = position;
 //        clones.add(clone);
         clone.previousPhrase = previous;
         if (nextPhrase != null) {
-
             clone.nextPhrase = nextPhrase.clonePhrase(clone);
             clone.nextPhrase.previousPhrase = clone;
         }
         return clone;
+    }
+
+    public PhraseData resolvePhrase() {
+        System.out.println("@@resolvePhrase1: " + this.text +  " r: " + this.resolvedText);
+        Phrase resolvedPhrase = new Phrase(text, termination, parsedLine);
+        System.out.println("@@resolvePhrase2: " + resolvedPhrase.text +  " r: " + resolvedPhrase.resolvedText);
+        resolvedPhrase.position = position;
+        resolvedPhrase.previousPhrase = previousPhrase;
+        resolvedPhrase.nextPhrase = nextPhrase;
+        return resolvedPhrase;
+    }
+
+    public PhraseData getNextResolvedPhrase() {
+        System.out.println("@@getNextResolvedPhrase: " + this  + " next: " + nextPhrase);
+        PhraseData nextResolvedPhrase = nextPhrase.resolvePhrase();
+        nextResolvedPhrase.previousPhrase = this;
+        this.nextPhrase = nextResolvedPhrase;
+        return nextResolvedPhrase;
     }
 
 

@@ -4,9 +4,14 @@ Feature: Addition
   Scenario: test243hy
   @[DEBUG]
     * , from the Top Panel:
-  : * , Button containing "Szign" is displayed?
-  :: * , I click the  Link containing "Sign"
-  : * , click the Link containing "Certified"
+    : * , if Button containing "Sign" is displayed?
+    :: * , save "Button" as "Element"
+    :: * , save "Link" as "Element" ,  click the  <Element> containing "Sign"
+
+#
+#  : * , Button containing "Sign" is displayed?
+#  :: * , I click the  Link containing "Sign"
+#  : * , else click the Link containing "Certified"
 
 #    * , from the Top Panel:
 #    : * , verify Button containing "Rounder" is displayed

@@ -147,7 +147,7 @@ public class CurrentScenarioState extends ScenarioMapping {
             }
         }
 //            stepExtension.inheritedLineData.lineConditionalMode = stepExtension.previousSibling.inheritedLineData.lineConditionalMode;
-        System.out.println("@@stepExtension: " + stepExtension +  " , " + stepExtension.logAndIgnore);
+        System.out.println("@@stepExtension: " + stepExtension + " , " + stepExtension.logAndIgnore);
         runningStep(stepExtension);
     }
 
@@ -167,28 +167,28 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
         io.cucumber.plugin.event.Status status = result.getStatus();
-        if (!result.getStatus().equals(io.cucumber.plugin.event.Status.PASSED)) {
-            Throwable throwable = result.getError();
-            if (throwable == null) {
-                if (status.equals(io.cucumber.plugin.event.Status.UNDEFINED))
-                    throwable = new RuntimeException("'" + stepExtension.pickleStepTestStep.getStep().getText() + "' step is undefined");
-                else
-                    throwable = new RuntimeException("Step failed with status: " + status);
+        Throwable throwable = result.getError();
+        if (throwable != null) {
+            if (SoftExceptionInterface.class.isAssignableFrom(throwable.getClass()))
+                isScenarioSoftFail = true;
+            else {
+                isScenarioHardFail = true;
+                isScenarioSoftFail = false;
             }
-
-            if (throwable != null) {
-
-                if (SoftExceptionInterface.class.isAssignableFrom(throwable.getClass()))
-                    isScenarioSoftFail = true;
-                else {
-                    isScenarioHardFail = true;
-                    isScenarioSoftFail = false;
-                }
-            }
+        } else if (!result.getStatus().equals(io.cucumber.plugin.event.Status.PASSED) && !result.getStatus().equals(Status.SKIPPED)) {
+            if (status.equals(io.cucumber.plugin.event.Status.UNDEFINED))
+                throwable = new RuntimeException("'" + stepExtension.pickleStepTestStep.getStep().getText() + "' step is undefined");
+            else
+                throwable = new RuntimeException("Step failed with status: " + status);
         }
 
+
+        System.out.println("@@throwable: " + throwable);
+
+        System.out.println("@@isScenarioComplete1 : " + stepExtension);
         if (isScenarioComplete())
             return;
+        System.out.println("@@isScenarioComplete2 : " + stepExtension);
 
         for (StepBase attachedStep : stepExtension.attachedSteps) {
             runStep((StepExtension) attachedStep);
@@ -205,6 +205,7 @@ public class CurrentScenarioState extends ScenarioMapping {
                 }
             }
         }
+        System.out.println("@@stepExtension.nextSibling: " + stepExtension.nextSibling);
         if (stepExtension.nextSibling != null) {
             runStep((StepExtension) stepExtension.nextSibling);
         }

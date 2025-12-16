@@ -127,14 +127,13 @@ public abstract class StepData extends StepMapping {
         if (codeLocation == null)
             codeLocation = "";
         isCoreStep = codeLocation.startsWith(corePackagePath);
-        isDynamicStep = isCoreStep && methodName.equals("exeexecuteDynamicStep");
         arguments = pickleStepTestStep == null || pickleStepTestStep.getDefinitionMatch() == null ? new ArrayList<>() : pickleStepTestStep.getDefinitionMatch().getArguments();
         argument = arguments.isEmpty() || arguments.getLast() instanceof ExpressionArgument ? null : arguments.getLast();
     }
 
     public abstract Result run();
 
-    public abstract Result execute(io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep);
+    public abstract Result execute(io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep, ExecutionMode executionMode);
 
     public void copyDefinitionFlags(StepData stepData) {
         addDefinitionFlag(stepData.inheritableDefinitionFlags.toArray(new DefinitionFlag[0]));

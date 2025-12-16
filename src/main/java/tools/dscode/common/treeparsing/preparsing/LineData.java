@@ -7,7 +7,6 @@ import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -17,10 +16,10 @@ import java.util.Set;
 import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
 
-public abstract class LineData implements  Cloneable {
+public abstract class LineData implements Cloneable {
     public int lineConditionalMode = 0;
     public int startPhraseIndex = 0;
-//    public LineData inheritedLineData;
+    //    public LineData inheritedLineData;
 //    public List<PhraseData> contextPhrases = new ArrayList<>();
     public List<List<PhraseData>> inheritedContextPhrases = new ArrayList<>();
     private final String original;
@@ -28,6 +27,7 @@ public abstract class LineData implements  Cloneable {
     private final BracketMasker bm;
     private final String fullyMasked;
     public final List<PhraseData> phrases = new ArrayList<>();
+    public final List<PhraseData> executedPhrases = new ArrayList<>();
     private final Set<Character> delimiters; // characters that cause a split
     //    public final List<PhraseData> contextPhrases = new ArrayList<>();
 
@@ -47,7 +47,7 @@ public abstract class LineData implements  Cloneable {
         this.bm = new BracketMasker(afterQuotes);
         fullyMasked = bm.masked();
 
-        if(!original.startsWith(","))
+        if (!original.startsWith(","))
             return;
 
         String preParsedNormalized = normalizeWhitespace(fullyMasked)
@@ -68,7 +68,9 @@ public abstract class LineData implements  Cloneable {
 
 
                 String unmasked = qp.restoreFrom(bm.restoreFrom(chunk));
-                this.phrases.add(new Phrase(unmasked, c, this));
+                if (!unmasked.isBlank()) {
+                    this.phrases.add(new Phrase(unmasked, c, this));
+                }
                 buf.setLength(0);
             } else {
                 buf.append(c);
@@ -76,15 +78,13 @@ public abstract class LineData implements  Cloneable {
         }
         // Final chunk (no trailing delimiter)
         String lastChunk = buf.toString();
-        if(!lastChunk.isBlank()) {
+        if (!lastChunk.isBlank()) {
             String unmaskedLast = qp.restoreFrom(bm.restoreFrom(lastChunk));
             this.phrases.add(new Phrase(unmaskedLast, ' ', this));
         }
         PhraseData lastPhrase = null;
-        for(PhraseData phrase: this.phrases)
-        {
-            if(lastPhrase != null)
-            {
+        for (PhraseData phrase : this.phrases) {
+            if (lastPhrase != null) {
                 phrase.previousPhrase = lastPhrase;
                 lastPhrase.nextPhrase = phrase;
             }
@@ -113,14 +113,10 @@ public abstract class LineData implements  Cloneable {
         return delimiters;
     }
 
-    public int size() {
-        return phrases.size();
-    }
 
     public PhraseData get(int index) {
         return phrases.get(index);
     }
-
 
 
     /**

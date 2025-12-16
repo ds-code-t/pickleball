@@ -34,16 +34,16 @@ public class StepExtension extends StepData {
 //        pickle = (io.cucumber.messages.types.Pickle) getProperty(testCase, "pickle");
         method = pickleStepTestStep.getMethod();
         definitionFlags = pickleStepTestStep.getDefinitionFlags().stream().map(f -> {
-            if(f.toString().startsWith("_"))
+            if (f.toString().startsWith("_"))
                 return DefinitionFlag.valueOf(f.toString().substring(1));
             else
                 inheritableDefinitionFlags.add(f);
             return f;
-        }) .collect(Collectors.toCollection(ArrayList::new));
-
+        }).collect(Collectors.toCollection(ArrayList::new));
 
 
         this.methodName = this.method == null ? "" : this.method.getName();
+        this.isDynamicStep = isCoreStep && methodName.equals("executeDynamicStep");
 
         if (definitionFlags.contains(DefinitionFlag.NO_LOGGING))
             pickleStepTestStep.setNoLogging(true);
@@ -111,18 +111,19 @@ public class StepExtension extends StepData {
     }
 
     public Result run() {
-
+        ExecutionMode executionMode = ExecutionMode.RUN;
         try {
-            if(logAndIgnore)
-            {
-                executingPickleStepTestStep = resolveAndClone(getStepParsingMap(), "SKIPPING: " + pickleStepTestStep.getStepText());
-            }
-            else {
+            if (logAndIgnore) {
+                executingPickleStepTestStep = pickleStepTestStep;
+                executionMode = ExecutionMode.SKIP;
+            } else if (isDynamicStep) {
+                executingPickleStepTestStep = pickleStepTestStep;
+            } else {
                 executingPickleStepTestStep = resolveAndClone(getStepParsingMap());
             }
             executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
             executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
-            io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep);
+            io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep,executionMode);
             return result;
         } catch (Throwable t) {
             Throwable cause = t instanceof InvocationTargetException ? t.getCause() : t;
@@ -131,9 +132,9 @@ public class StepExtension extends StepData {
         }
     }
 
-    public Result execute(io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep) {
+    public Result execute(io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep, ExecutionMode executionMode) {
         try {
-            Object r = invokeAnyMethodOrThrow(executionPickleStepTestStep, "run", getTestCase(), getEventBus(), getTestCaseState(), ExecutionMode.RUN);
+            Object r = invokeAnyMethodOrThrow(executionPickleStepTestStep, "run", getTestCase(), getEventBus(), getTestCaseState(), executionMode);
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
@@ -156,7 +157,7 @@ public class StepExtension extends StepData {
         for (DefinitionFlag flag : flags) {
             if (flag == DefinitionFlag.NO_LOGGING)
                 pickleStepTestStep.setNoLogging(true);
-            if(!flag.toString().startsWith("_"))
+            if (!flag.toString().startsWith("_"))
                 this.definitionFlags.add(flag);
         }
     }
