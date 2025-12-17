@@ -1,10 +1,31 @@
 Feature: Addition
 
+  Scenario: stesss
+  @[DEBUG]
+#    * navigate to: URL.buttons
+    * , from the Top Panel:
+      : * IF: Link containing "Previosus" is displayed THEN:
+  :: * ,  click the  Link containing "Previous"
+
+
+#  : * , if  Link containing "Sigsn" is displayed :
+#  :: * ,  click the  Link containing "Sign"
+
+#  : * IF: Link containing "Sign" is displayed THEN:
+#  :: * ,  click the  Link containing "Sign"
+
+
+  Scenario: tesss
+  @[DEBUG]
+    * , from the Top Panel:
+  : * IF: Link containing "Sigsn" is displayed THEN:  , save "Button" as "Element" ELSE-IF: Link containing "Sign" is displayed THEN: , save "Link" as "Element"
+  : * ,  click the  <Element> containing "Sign"
+
 
   Scenario: test243hy
   @[DEBUG]
     * , from the Top Panel:
-    : * , if Button containing "Sign" is displayed?
+    : * , if Link containing "Sign" is displayed?
     :: * , save "Button" as "Element"
     :: * , save "Link" as "Element" ,  click the  <Element> containing "Sign"
 

@@ -23,7 +23,7 @@ import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public class ContextWrapper {
 
-//    public List<PhraseData> contextList;
+    //    public List<PhraseData> contextList;
     public ElementMatch elementMatch;
 
     public List<XPathy> paths = new ArrayList<>();
@@ -46,7 +46,7 @@ public class ContextWrapper {
         SearchContext searchContext = getFinalSearchContext();
         printDebug("\n##searchContext: " + searchContext.getClass().getSimpleName());
         printDebug("\n##elementMatch.parentPhrase: " + elementMatch.parentPhrase);
-        printDebug("\n##elementTerminalXPath " );
+        printDebug("\n##elementTerminalXPath ");
         prettyPrintXPath(elementTerminalXPath);
         printDebug("\n\n##");
 
@@ -73,11 +73,11 @@ public class ContextWrapper {
                 printDebug("##psearchContext1: " + searchContext);
                 searchContext = phraseData.getSearchContext();
                 printDebug("##psearchContext2: " + searchContext);
-
                 printDebug("##phraseData.getSearchContext()222: " + phraseData.getSearchContext());
             } else if (phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
                 printDebug("##phraseData2: " + xPathyList);
                 printDebug("##phraseData.searchContext: " + phraseData.getSearchContext());
+                printDebug("##xPathyList:= " + xPathyList);
                 if (!xPathyList.isEmpty()) {
                     XPathy combinedXPathy = combineAnd(xPathyList);
                     searchContext = getElementFromSearchContext(searchContext, combinedXPathy);
@@ -85,7 +85,10 @@ public class ContextWrapper {
                     xPathyList.clear();
                 }
 
-                searchContext = getExecutionDictionary().applyContextBuilder(phraseData.elementMatch.category, phraseData.elementMatch.defaultText, phraseData.elementMatch.defaultTextOp, elementMatch.parentPhrase.webDriver, searchContext);
+                    printDebug("##searchContext-1 " + searchContext);
+                    searchContext = getExecutionDictionary().applyContextBuilder(phraseData.elementMatch.category, phraseData.elementMatch.defaultText, phraseData.elementMatch.defaultTextOp, elementMatch.parentPhrase.webDriver, searchContext);
+                    printDebug("##searchContext-2 " + searchContext);
+
 
                 printDebug("##searchContext2: " + (searchContext == null ? "null" : searchContext.getClass().getSimpleName()));
             } else {
@@ -103,8 +106,6 @@ public class ContextWrapper {
 
     public static List<WebElement> getElementListFromSearchContext(SearchContext searchContext, XPathy xPathy) {
         String xpath = xPathy.getXpath();
-
-
 
         if (searchContext instanceof WebElement) {
             if (xpath.strip().replaceAll("\\(", "").startsWith("//"))

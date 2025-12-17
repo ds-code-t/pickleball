@@ -24,7 +24,7 @@ public class ParsedAssertions {
         Component component1 = phraseData.components.getFirst();
         Component component2 = phraseData.components.size() < 2 ? null : phraseData.components.get(1);
         boolean anyTrue = phraseData.selectionType.equals("any");
-        System.out.println("@@phraseData.assertion:: " + phraseData.assertion);
+
         DomChecks.CheckResult result;
         switch (phraseData.assertion) {
             case String s when s.contains("equal") -> {
@@ -79,9 +79,9 @@ public class ParsedAssertions {
         }
         else
         {
-            System.out.println("@@passed: " + passed);
+
             phraseData.phraseConditionalMode = passed ? 1 : -1;
-            System.out.println("@@phraseData.phraseConditionalMode3: " + phraseData.phraseConditionalMode);
+
 
         }
 

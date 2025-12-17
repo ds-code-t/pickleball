@@ -21,6 +21,7 @@ public class Registrations {
     public static void beforeRun() {
 
 
+
         ExecutionDictionary dict = getExecutionDictionary();
 
         dict.category("Submit Button").or(
@@ -49,6 +50,7 @@ public class Registrations {
 
                 return webDriver;
             } catch (Exception e) {
+
                 e.printStackTrace();
                 throw new RuntimeException(e);
             }

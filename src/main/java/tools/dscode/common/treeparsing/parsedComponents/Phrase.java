@@ -26,13 +26,13 @@ public final class Phrase extends PhraseData {
 
 
     boolean shouldRun() {
-        System.out.println("@@shouldRun: " + this);
+
         phraseConditionalMode = previousPhrase == null ? 0 : previousPhrase.phraseConditionalMode;
-        System.out.println("@@phraseConditionalMode1: " + phraseConditionalMode);
+
         if (conditional.startsWith("else")) {
             phraseConditionalMode = phraseConditionalMode * -1;
         }
-        System.out.println("@@phraseConditionalMode2: " + phraseConditionalMode);
+
         return phraseConditionalMode >= 0;
 
 
@@ -51,7 +51,7 @@ public final class Phrase extends PhraseData {
     @Override
     public void runPhrase() {
         parsedLine.executedPhrases.add(this);
-        System.out.println("@@PhrasE::: " + this  + " phraseType::" + phraseType + "");
+
         if (shouldRun()) {
             System.out.println("Running Phrase: " + this + (isClone ? " (clone)" : ""));
         }
@@ -100,6 +100,7 @@ public final class Phrase extends PhraseData {
 
 
     void processContextPhrase() {
+        System.out.println("@@processContextPhrase(): " + this + "\n elementMatch.selectionType: " + elementMatch.selectionType);
         if (elementMatch.selectionType.isEmpty()) {
             contextPhrases.add(this);
         } else {
@@ -153,9 +154,9 @@ public final class Phrase extends PhraseData {
     }
 
     public PhraseData resolvePhrase() {
-        System.out.println("@@resolvePhrase1: " + this.text +  " r: " + this.resolvedText);
+
         Phrase resolvedPhrase = new Phrase(text, termination, parsedLine);
-        System.out.println("@@resolvePhrase2: " + resolvedPhrase.text +  " r: " + resolvedPhrase.resolvedText);
+
         resolvedPhrase.position = position;
         resolvedPhrase.previousPhrase = previousPhrase;
         resolvedPhrase.nextPhrase = nextPhrase;
@@ -163,7 +164,7 @@ public final class Phrase extends PhraseData {
     }
 
     public PhraseData getNextResolvedPhrase() {
-        System.out.println("@@getNextResolvedPhrase: " + this  + " next: " + nextPhrase);
+
         PhraseData nextResolvedPhrase = nextPhrase.resolvePhrase();
         nextResolvedPhrase.previousPhrase = this;
         this.nextPhrase = nextResolvedPhrase;

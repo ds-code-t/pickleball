@@ -186,7 +186,7 @@ C:\Users\Admin\.gradle\caches\modules-2\files-2.1\org.seleniumhq.selenium\seleni
 C:\Users\Admin\.gradle\caches\modules-2\files-2.1\io.opentelemetry\opentelemetry-common\1.55.0\a979f45396c5332f43b9198ebf3eb52f5451e83f\opentelemetry-common-1.55.0.jar(2139 bytes)
 ---- Compiler Messages ---
 error at
-System.out.println("@@elementNode.getStringFromLocalState(\"atrPredicate\");: " + elementNode.getStringFromLocalState("atrPredicate"););
+
                                                                                                                                      ^
 C:\Users\Admin\IdeaProjects\pickleballAJ\src\main\java\tools\dscode\common\treeparsing\parsedComponents\ElementMatch.java:139:0::0 Syntax error on token ";", delete this token
 error at

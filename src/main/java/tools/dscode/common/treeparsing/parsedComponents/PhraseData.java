@@ -202,7 +202,7 @@ public abstract class PhraseData {
 //            previousPhrase.nextPhrase = this;
 //        }
 
-        System.out.println("@@ phrase constuct:  " + this + " , phraseType: " + phraseType);
+
 
     }
 

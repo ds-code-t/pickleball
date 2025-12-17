@@ -37,10 +37,7 @@ import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort
 
 public class GeneralSteps extends CoreSteps {
 
-//    @ReturnStep("^@(.*)-(.*)$")
-//    public void test(String stepText) {
-//        // step body here
-//    }
+
 
     public static ChromiumDriver getBrowser() {
         return getBrowser("BROWSER");

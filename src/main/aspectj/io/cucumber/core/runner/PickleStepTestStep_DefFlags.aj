@@ -25,6 +25,7 @@ public privileged aspect PickleStepTestStep_DefFlags {
 
     /** Underlying Java method for the bound step definition (or null). */
     public Method io.cucumber.core.runner.PickleStepTestStep.method = null;
+    public String io.cucumber.core.runner.PickleStepTestStep.unresolvedText = null;
 
     /** Flags declared on the method via @DefinitionFlags (or empty). */
     public List<DefinitionFlag> io.cucumber.core.runner.PickleStepTestStep.definitionFlags =

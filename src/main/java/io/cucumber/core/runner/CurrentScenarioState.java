@@ -18,14 +18,14 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FAILED;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_HARD_FAILED;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_PASSING;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
-import static tools.dscode.common.annotations.DefinitionFlag.SKIP_CHILDREN;
+import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_FALSE;
+import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
 
@@ -112,30 +112,37 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void runStep(StepExtension stepExtension) {
-        System.out.println("@@runStep: " + stepExtension + "");
+
+
+        stepExtension.lineData = new ParsedLine(stepExtension.getUnmodifiedText());
         StepBase stepBase = stepExtension;
         while (true) {
             stepBase = stepBase.parentStep;
             if (stepBase == null) {
-                System.out.println("@@stepBase: " + stepBase);
                 stepExtension.inheritedLineData = new ParsedLine();
                 break;
             }
+
             if (stepBase.lineData != null) {
+
+
                 stepExtension.inheritedLineData = stepBase.lineData.clone();
+
+
                 break;
             }
         }
-        stepExtension.lineData = new ParsedLine(stepExtension.pickleStepTestStep.getStepText());
+
+        stepExtension.lineData = new ParsedLine(stepExtension.getUnmodifiedText());
         if (stepExtension.inheritedLineData != null) {
             stepExtension.lineData.inheritedContextPhrases.addAll(stepExtension.inheritedLineData.inheritedContextPhrases);
         }
 
-        System.out.println("@@stepBase: " + stepBase);
-        System.out.println("@@stepExtension: " + stepExtension);
-        System.out.println("@@stepExtension.inheritedLineData: " + stepExtension.inheritedLineData);
-        System.out.println("@@stepExtension.inheritedLineData.lineConditionalMode:: " + stepExtension.inheritedLineData.lineConditionalMode);
-        System.out.println("@@methodName: " + stepExtension.methodName);
+
+
+
+
+
 
         if ((stepExtension.parentStep != null && stepExtension.parentStep.logAndIgnore) || stepExtension.inheritedLineData.lineConditionalMode < 0) {
             stepExtension.logAndIgnore = true;
@@ -146,8 +153,7 @@ public class CurrentScenarioState extends ScenarioMapping {
                 }
             }
         }
-//            stepExtension.inheritedLineData.lineConditionalMode = stepExtension.previousSibling.inheritedLineData.lineConditionalMode;
-        System.out.println("@@stepExtension: " + stepExtension + " , " + stepExtension.logAndIgnore);
+
         runningStep(stepExtension);
     }
 
@@ -168,6 +174,13 @@ public class CurrentScenarioState extends ScenarioMapping {
 
         io.cucumber.plugin.event.Status status = result.getStatus();
         Throwable throwable = result.getError();
+        if (!result.getStatus().equals(Status.PASSED) && !result.getStatus().equals(Status.SKIPPED) && throwable == null) {
+            if (status.equals(io.cucumber.plugin.event.Status.UNDEFINED))
+                throwable = new RuntimeException("'" + stepExtension.pickleStepTestStep.getStep().getText() + "' step is undefined");
+            else
+                throwable = new RuntimeException("Step failed with status: " + status);
+        }
+
         if (throwable != null) {
             if (SoftExceptionInterface.class.isAssignableFrom(throwable.getClass()))
                 isScenarioSoftFail = true;
@@ -175,26 +188,30 @@ public class CurrentScenarioState extends ScenarioMapping {
                 isScenarioHardFail = true;
                 isScenarioSoftFail = false;
             }
-        } else if (!result.getStatus().equals(io.cucumber.plugin.event.Status.PASSED) && !result.getStatus().equals(Status.SKIPPED)) {
-            if (status.equals(io.cucumber.plugin.event.Status.UNDEFINED))
-                throwable = new RuntimeException("'" + stepExtension.pickleStepTestStep.getStep().getText() + "' step is undefined");
-            else
-                throwable = new RuntimeException("Step failed with status: " + status);
         }
 
 
-        System.out.println("@@throwable: " + throwable);
 
-        System.out.println("@@isScenarioComplete1 : " + stepExtension);
+
         if (isScenarioComplete())
             return;
-        System.out.println("@@isScenarioComplete2 : " + stepExtension);
+
 
         for (StepBase attachedStep : stepExtension.attachedSteps) {
             runStep((StepExtension) attachedStep);
         }
 
-        if (!stepExtension.childSteps.isEmpty() && !stepExtension.definitionFlags.contains(SKIP_CHILDREN)) {
+
+
+
+
+
+        if ((stepExtension.lineData.lineConditionalMode < 0 || stepExtension.logAndIgnore) && stepExtension.definitionFlags.contains(IGNORE_CHILDREN_IF_FALSE)) {
+            return;
+        }
+
+
+        if (!stepExtension.definitionFlags.contains(IGNORE_CHILDREN)) {
             List<StepExtension> repeatSteps = getNestedRepetitions(stepExtension);
             for (StepExtension repeatStep : repeatSteps) {
                 StepExtension firstChild = (StepExtension) repeatStep.initializeChildSteps();
@@ -205,7 +222,7 @@ public class CurrentScenarioState extends ScenarioMapping {
                 }
             }
         }
-        System.out.println("@@stepExtension.nextSibling: " + stepExtension.nextSibling);
+
         if (stepExtension.nextSibling != null) {
             runStep((StepExtension) stepExtension.nextSibling);
         }

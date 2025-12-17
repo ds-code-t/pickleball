@@ -6,6 +6,7 @@ import io.cucumber.messages.types.PickleStepArgument;
 import io.cucumber.plugin.event.Result;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.ParsingMap;
+import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
@@ -160,6 +161,8 @@ public class StepExtension extends StepData {
             if (!flag.toString().startsWith("_"))
                 this.definitionFlags.add(flag);
         }
+
+
     }
 
     @Override
@@ -171,7 +174,10 @@ public class StepExtension extends StepData {
         StepExtension modifiedStep = new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep, pickleStepTestStep.getStep().getKeyword(), newText, getGherkinArgumentText(pickleStepTestStep.getStep())));
         modifiedStep.setStepParsingMap(getStepParsingMap());
         modifiedStep.parentStep = parentStep;
-        modifiedStep.lineData = lineData;
+        modifiedStep.inheritedLineData = inheritedLineData.clone();
+
+        modifiedStep.nestingLevel = nestingLevel;
+//        modifiedStep.pickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
         return modifiedStep;
     }
 

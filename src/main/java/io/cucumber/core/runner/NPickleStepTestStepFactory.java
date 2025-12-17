@@ -42,10 +42,11 @@ public class NPickleStepTestStepFactory {
 
     public static io.cucumber.core.runner.PickleStepTestStep resolvePickleStepTestStep(PickleStepTestStep pickleStepTestStep, ParsingMap parsingMap) {
         Step gherkinMessagesStep = pickleStepTestStep.getStep();
-        String resolvedStepString = parsingMap.resolveWholeText(gherkinMessagesStep.getText());
+        String resolvedStepString = parsingMap.resolveWholeText(pickleStepTestStep.getStepText());
         String resolvedArgString = parsingMap.resolveWholeText(getGherkinArgumentText(gherkinMessagesStep));
-
-        return getPickleStepTestStepFromStrings(pickleStepTestStep, gherkinMessagesStep.getKeyword(), resolvedStepString, resolvedArgString);
+        PickleStepTestStep returnStep = getPickleStepTestStepFromStrings(pickleStepTestStep, gherkinMessagesStep.getKeyword(), resolvedStepString, resolvedArgString);
+        returnStep.unresolvedText = pickleStepTestStep.unresolvedText == null ? pickleStepTestStep.getStepText(): pickleStepTestStep.unresolvedText;
+        return returnStep;
     }
 
     public static io.cucumber.core.runner.PickleStepTestStep resolvePickleStepTestStep(PickleStepTestStep pickleStepTestStep, ParsingMap parsingMap, String newText) {

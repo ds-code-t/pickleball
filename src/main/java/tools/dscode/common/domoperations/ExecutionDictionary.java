@@ -3,8 +3,10 @@ package tools.dscode.common.domoperations;
 import com.xpathy.XPathy;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import org.openqa.selenium.By;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -921,7 +923,140 @@ public class ExecutionDictionary {
         if (cb == null) {
             throw new RuntimeException("category '" + category +"' does not have a registered context");
         }
-        return cb.build(category, value, op, webDriver, context);
+        try {
+            return cb.build(category, value, op, webDriver, context);
+        }
+        catch (Throwable t) {
+            throw new RuntimeException("Error invoking context builder for category '" + category + "'", t);
+        }
     }
+
+
+
+
+
+
+    /**
+     * Registers a category that resolves to an iframe/frame element via the normal XPathy builders
+     * (.and/.or), but is invoked using applyContextBuilder(...) because this method automatically
+     * registers a ContextBuilder that:
+     *
+     * 1) switches driver to defaultContent()
+     * 2) resolves XPathy using andThenOr(...)
+     * 3) finds the iframe/frame element on the driver
+     * 4) switches the driver into that frame
+     * 5) returns the WebDriver (as SearchContext)
+     *
+     * Flags: PAGE_CONTEXT + PAGE_TOP_CONTEXT (same semantics as startingContext()).
+     */
+    public CategorySpec registerStartingIframe(String categoryName) {
+        Objects.requireNonNull(categoryName, "categoryName must not be null");
+
+        return category(categoryName).startingContext((category, value, op, driver, context) -> {
+            // 1) Always start from the top of the page context
+            driver.switchTo().defaultContent();
+
+            // 2) Resolve the iframe/frame XPath from the category’s normal AND/OR registrations
+            XPathy xpathy = andThenOr(category, value, op);
+            if (xpathy == null) {
+                // Preserve prior semantics: nothing to do
+                return driver;
+            }
+
+            // 3) Find the iframe/frame element in the top-level DOM
+            WebElement frameEl = driver.findElement(By.xpath(xpathy.getXpath()));
+
+            // 4) Switch into it and return driver
+            driver.switchTo().frame(frameEl);
+            return driver;
+        });
+    }
+
+    /**
+     * Registers a category that resolves to a nested iframe/frame element via the normal XPathy builders
+     * (.and/.or), but is invoked using applyContextBuilder(...) because this method automatically
+     * registers a ContextBuilder that:
+     *
+     * 1) resolves XPathy using andThenOr(...)
+     * 2) finds the iframe/frame element within the provided SearchContext
+     * 3) switches the driver into that frame
+     * 4) returns the WebDriver (as SearchContext)
+     *
+     * Flags: PAGE_CONTEXT (same semantics as context()).
+     */
+    public CategorySpec registerIframe(String categoryName) {
+        Objects.requireNonNull(categoryName, "categoryName must not be null");
+
+        return category(categoryName).context((category, value, op, driver, context) -> {
+            // 1) Resolve the iframe/frame XPath from the category’s normal AND/OR registrations
+            XPathy xpathy = andThenOr(category, value, op);
+            if (xpathy == null) {
+                return driver;
+            }
+
+            // 2) Find the iframe/frame element within the current SearchContext
+            WebElement frameEl = context.findElement(By.xpath(xpathy.getXpath()));
+
+            // 3) Switch into it and return driver
+            driver.switchTo().frame(frameEl);
+            return driver;
+        });
+    }
+
+
+    /**
+     * Registers a category that resolves (via normal .and/.or XPathy builders) to a SHADOW HOST element
+     * at the TOP of the page (defaultContent), and returns its shadow root as the new SearchContext.
+     *
+     * Flags: PAGE_CONTEXT + PAGE_TOP_CONTEXT (same semantics as startingContext()).
+     */
+    public CategorySpec registerStartingShadowRoot(String categoryName) {
+        Objects.requireNonNull(categoryName, "categoryName must not be null");
+
+        return category(categoryName).startingContext((category, value, op, driver, context) -> {
+            // Always start from top-level document
+            driver.switchTo().defaultContent();
+
+            // Resolve XPath to the shadow host
+            XPathy xpathy = andThenOr(category, value, op);
+            if (xpathy == null) {
+                return driver; // preserve your "no-op" semantics
+            }
+
+            // Find shadow host at top-level
+            WebElement host = driver.findElement(By.xpath(xpathy.getXpath()));
+
+            // Return the shadow root as the new SearchContext
+            SearchContext shadowRoot = host.getShadowRoot();
+            return shadowRoot;
+        });
+    }
+
+    /**
+     * Registers a category that resolves (via normal .and/.or XPathy builders) to a SHADOW HOST element
+     * within the CURRENT SearchContext, and returns its shadow root as the new SearchContext.
+     *
+     * Flags: PAGE_CONTEXT (same semantics as context()).
+     */
+    public CategorySpec registerShadowRoot(String categoryName) {
+        Objects.requireNonNull(categoryName, "categoryName must not be null");
+
+        return category(categoryName).context((category, value, op, driver, context) -> {
+            // Resolve XPath to the shadow host
+            XPathy xpathy = andThenOr(category, value, op);
+            if (xpathy == null) {
+                return context; // no-op: keep current context
+            }
+
+            // Find shadow host within current context
+            WebElement host = context.findElement(By.xpath(xpathy.getXpath()));
+
+            // Return the shadow root as the new SearchContext
+            SearchContext shadowRoot = host.getShadowRoot();
+            return shadowRoot;
+        });
+    }
+
+
 
 }

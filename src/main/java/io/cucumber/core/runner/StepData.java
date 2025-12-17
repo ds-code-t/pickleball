@@ -10,12 +10,15 @@ import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.StepMapping;
 
 import tools.dscode.common.treeparsing.preparsing.LineData;
+import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 import tools.dscode.coredefinitions.GeneralSteps;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import static tools.dscode.common.util.Reflect.getProperty;
 
 
 public abstract class StepData extends StepMapping {
@@ -82,7 +85,6 @@ public abstract class StepData extends StepMapping {
 
         for (StepBase child : childSteps) {
 
-
             child.childSteps.addAll(grandChildrenSteps);
 
             child.parentStep = this;
@@ -122,6 +124,7 @@ public abstract class StepData extends StepMapping {
 
     StepData(TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
         this.testCase = testCase;
+
         this.pickleStepTestStep = pickleStepTestStep;
         codeLocation = pickleStepTestStep.getCodeLocation();
         if (codeLocation == null)
@@ -129,6 +132,10 @@ public abstract class StepData extends StepMapping {
         isCoreStep = codeLocation.startsWith(corePackagePath);
         arguments = pickleStepTestStep == null || pickleStepTestStep.getDefinitionMatch() == null ? new ArrayList<>() : pickleStepTestStep.getDefinitionMatch().getArguments();
         argument = arguments.isEmpty() || arguments.getLast() instanceof ExpressionArgument ? null : arguments.getLast();
+
+        if(pickleStepTestStep.unresolvedText == null)
+            pickleStepTestStep.unresolvedText = getUnmodifiedText();
+
     }
 
     public abstract Result run();
@@ -143,5 +150,9 @@ public abstract class StepData extends StepMapping {
 
     public abstract void addDefinitionFlag(DefinitionFlag... flags);
 
+
+    public String getUnmodifiedText() {
+        return (String) getProperty(pickleStepTestStep.getStep(), "text");
+    }
 
 }

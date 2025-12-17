@@ -37,11 +37,11 @@ public final class LeanWaits {
         for (ElementMatch elementMatch : elementMatches) {
             try {
                 elementMatch.findWebElements();
-            } catch (Exception e) {
-                System.out.println(e.getMessage());
-                e.printStackTrace();
-                System.out.println("[WARN] Error locating elements for: " + elementMatch);
-                e.printStackTrace(System.out);
+            } catch (Throwable t) {
+                if(!elementMatch.selectionType.equals("any"))
+                {
+                    throw new RuntimeException("Failed to find WebElements for " + elementMatch, t);
+                }
                 continue;   // continue to next elementMatch
             }
 

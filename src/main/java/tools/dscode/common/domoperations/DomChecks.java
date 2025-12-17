@@ -142,7 +142,7 @@ public final class DomChecks {
 
     /** Are there any matches for this XPathy? */
     public static CheckResult hasAny(List<WebElement> els) {
-        System.out.println("@@hasAny: " + els + "");
+
         boolean ok = !els.isEmpty();
         String desc = ok
                 ? "Found " + els.size() + " elements. First: " + summarizeFirst(els)
@@ -151,7 +151,7 @@ public final class DomChecks {
     }
 
     public static CheckResult hasValue(List<Component> components, boolean anyTrue) {
-        System.out.println("@@anyHasValue: " + components + "");
+
         boolean ok = anyTrue ?  components.stream().anyMatch(c -> String.valueOf(c.getValue()).isBlank()) : components.stream().allMatch(c -> String.valueOf(c.getValue()).isBlank()) ;
         String desc = ok
                 ? (anyTrue? "All of the entries have values": "Some of the entities have values") : (anyTrue? "None of the entries have value": "Some of the entities do not have values");
@@ -159,7 +159,7 @@ public final class DomChecks {
     }
 
     public static CheckResult isBlank(List<Component> components, boolean anyTrue) {
-        System.out.println("@@anyHasValue: " + components + "");
+
         boolean ok = !hasValue(components, anyTrue).result;
         String desc = ok
                 ?  (anyTrue? "None of the entries have value": "Some of the entities do not have values") : (anyTrue? "All of the entries have values": "Some of the entities have values");
