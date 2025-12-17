@@ -4,6 +4,8 @@ import com.xpathy.XPathy;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
+import tools.dscode.common.annotations.LifecycleManager;
+import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 
 import tools.dscode.common.seleniumextensions.ElementWrapper;
@@ -20,6 +22,8 @@ import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
+import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
+import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
@@ -111,7 +115,7 @@ public abstract class PhraseData {
     private SearchContext currentSearchContext;
 
     public enum PhraseType {
-        INITIAL, CONTEXT, ACTION, ASSERTION, CONDITIONAL, NO_EXECUTION
+        INITIAL, CONTEXT, ACTION, ASSERTION, CONDITIONAL, NO_EXECUTION, DATA
     }
 
     public List<PhraseData> contextPhrases = new ArrayList<>();
@@ -121,7 +125,7 @@ public abstract class PhraseData {
     public String selectionType;
     public String conditional;
     public String body;
-//    public boolean phraseConditionalState = true;
+    //    public boolean phraseConditionalState = true;
     public int phraseConditionalMode = 0;
 
     //    public XPathChainResult contextMatch;
@@ -273,7 +277,9 @@ public abstract class PhraseData {
     public List<String> getAllPhraseValues() {
         List<String> returnList = new ArrayList<>();
         for (Component component : components) {
-            if (component instanceof ElementMatch elementMatch) {
+            if (component instanceof DataMatch dataMatch) {
+
+            } else if (component instanceof ElementMatch elementMatch) {
                 elementMatch.wrappedElements.forEach(e -> returnList.add(e.getElementReturnValue()));
             } else
                 returnList.add(component.getValue().toString());

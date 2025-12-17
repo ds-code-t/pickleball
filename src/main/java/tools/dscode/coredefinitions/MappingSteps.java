@@ -24,7 +24,37 @@ import static tools.dscode.common.GlobalConstants.MATCH_START;
 
 
 public class MappingSteps extends CoreSteps {
-
+//    @Given("^For every ROW in (:?\"(.*)\"\\s+)?DATA TABLE$")
+//    public static void forEveryRow(String tableName) {
+//        StepExtension currentStep = getRunningStep();
+//
+//        currentStep.grandChildrenSteps.addAll(currentStep.childSteps);
+//        currentStep.childSteps.clear();
+//
+//        DataTable dataTable = currentStep.getDataTable();
+//        tableName = tableName == null || tableName.isBlank() ? "" : tableName.trim();
+//        if (tableName.isEmpty()) {
+//            StepBase nestStep = currentStep.nextSibling;
+//            if (nestStep != null && nestStep.dataTable != null)
+//                dataTable = nestStep.dataTable;
+//        } else {
+//            dataTable = (DataTable) getCurrentScenarioState().get("-DATATABLE." + tableName);
+//        }
+//        if (dataTable == null)
+//            throw new RuntimeException("Data Table not defined");
+//
+//        LinkedListMultimap<String, LinkedListMultimap<String, String>> rowMap = toRowsMultimap(dataTable);
+//        if (!tableName.isEmpty())
+//            currentStep.getStepNodeMap().put(tableName.trim(), rowMap);
+//        else
+//            currentStep.getStepNodeMap().merge(rowMap);
+//
+//        List<LinkedListMultimap<String, String>> rows = rowMap.get("ROWS");
+//
+//        for (int r = 0; r < rows.size(); r++) {
+//
+//        }
+//    }
 
     // @NoLogging
     @Given("^For every ROW in (:?\"(.*)\"\\s+)?DATA TABLE$")
@@ -74,9 +104,7 @@ public class MappingSteps extends CoreSteps {
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
-
         }
-
     }
 
     @Given("^"+ MATCH_START + "ROW (\\d+): (.*)$")

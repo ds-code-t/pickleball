@@ -44,6 +44,7 @@ public class ContextWrapper {
     public List<WebElement> getElements() {
 
         SearchContext searchContext = getFinalSearchContext();
+        if(searchContext == null) return new ArrayList<>();
         printDebug("\n##searchContext: " + searchContext.getClass().getSimpleName());
         printDebug("\n##elementMatch.parentPhrase: " + elementMatch.parentPhrase);
         printDebug("\n##elementTerminalXPath ");
@@ -88,7 +89,8 @@ public class ContextWrapper {
                     printDebug("##searchContext-1 " + searchContext);
                     searchContext = getExecutionDictionary().applyContextBuilder(phraseData.elementMatch.category, phraseData.elementMatch.defaultText, phraseData.elementMatch.defaultTextOp, elementMatch.parentPhrase.webDriver, searchContext);
                     printDebug("##searchContext-2 " + searchContext);
-
+                if(searchContext == null)
+                    break;
 
                 printDebug("##searchContext2: " + (searchContext == null ? "null" : searchContext.getClass().getSimpleName()));
             } else {

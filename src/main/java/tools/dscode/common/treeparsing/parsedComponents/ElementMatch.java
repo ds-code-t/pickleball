@@ -32,9 +32,9 @@ public class ElementMatch extends Component {
     public String elementPosition;
     public List<String> valueTypes;
     public String state;
-    List<Attribute> attributes = new ArrayList<>();
+    public List<Attribute> attributes = new ArrayList<>();
     public XPathy xPathy;
-    ElementMatch.ElementType elementType;
+    public ElementMatch.ElementType elementType;
     public ContextWrapper contextWrapper;
     public List<String> defaultValueKeys = new ArrayList<>(List.of(ELEMENT_RETURN_VALUE, "value", "textContent"));
 //    public XPathChainResult matchedElements;

@@ -6,7 +6,7 @@ import tools.dscode.common.treeparsing.MatchNode;
 
 public abstract class Component {
     public final int position;
-    public final String name;
+    public String name;
     public PhraseData parentPhrase;
 
     public Component(MatchNode matchNode) {

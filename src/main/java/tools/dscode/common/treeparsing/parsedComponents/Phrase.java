@@ -8,7 +8,6 @@ import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.ParsedActions.executeAction;
 import static tools.dscode.common.domoperations.ParsedAssertions.executeAssertions;

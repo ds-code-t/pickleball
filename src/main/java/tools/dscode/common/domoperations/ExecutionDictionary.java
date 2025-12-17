@@ -927,7 +927,8 @@ public class ExecutionDictionary {
             return cb.build(category, value, op, webDriver, context);
         }
         catch (Throwable t) {
-            throw new RuntimeException("Error invoking context builder for category '" + category + "'", t);
+            System.out.println("Could not return SearchContext for '" + category + "'");
+            return null;
         }
     }
 
