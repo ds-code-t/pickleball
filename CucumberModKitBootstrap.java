@@ -47,6 +47,8 @@ public final class CucumberModKitBootstrap {
     public static final String META_FLAG = "\u206AMETA";
     public static final String PARSER_FLAG = ",,,\u207A,,,";
 
+
+
     // Swap “leading tags/colon blob” with the step text, inserting META_FLAG between
     private static final Pattern LINE_SWAP_PATTERN = Pattern.compile(
             "^((?:(?:\\s*:)|(?:\\s*@\\[[^\\[\\]]*\\]))+)(\\s*[A-Z*].*$)",

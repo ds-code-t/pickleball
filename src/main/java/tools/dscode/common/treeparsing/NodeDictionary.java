@@ -29,6 +29,7 @@ import java.util.regex.Pattern;
  */
 public abstract class    NodeDictionary {
 
+
     /**
      * Root node; typically assigned by buildFromYaml(...) in the subclass.
      */

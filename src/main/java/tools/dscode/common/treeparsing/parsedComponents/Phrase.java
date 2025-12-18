@@ -22,7 +22,6 @@ public final class Phrase extends PhraseData {
         super(inputText, delimiter, parsedLine);
     }
 
-    private final LifecycleManager lifecycle = new LifecycleManager();
 
 
     boolean shouldRun() {
@@ -67,15 +66,15 @@ public final class Phrase extends PhraseData {
 
 //        parsedLine.startPhraseIndex = position;
 
-        elements.forEach(e -> e.contextWrapper = new ContextWrapper(e));
+        elementMatches.forEach(e -> { if(firstElement.elementType == ElementType.HTML) e.contextWrapper = new ContextWrapper(e);});
 
         if (previousPhrase != null && !previousPhrase.contextTermination) {
             contextPhrases.addAll(previousPhrase.contextPhrases);
         }
 
-        if (hasDOMInteraction) {
-            syncWithDOM();
-        }
+//        if (hasDOMInteraction) {
+//            syncWithDOM();
+//        }
 
         if (phraseType.equals(PhraseType.CONDITIONAL)) {
             executeAssertions(this);
@@ -100,18 +99,18 @@ public final class Phrase extends PhraseData {
 
 
     void processContextPhrase() {
-        System.out.println("@@processContextPhrase(): " + this + "\n elementMatch.selectionType: " + elementMatch.selectionType);
-        if (elementMatch.selectionType.isEmpty()) {
+        System.out.println("@@processContextPhrase(): " + this + "\n elementMatch.selectionType: " + firstElement.selectionType);
+        if (firstElement.selectionType.isEmpty()) {
             contextPhrases.add(this);
         } else {
-            syncWithDOM();
-            if (elementMatch.wrappedElements.isEmpty()) {
-                if (!elementMatch.selectionType.equals("any")) {
-                    throw new RuntimeException("Failed to find WebElements for " + elementMatch);
+//            syncWithDOM();
+            if (firstElement.getElementWrappers().isEmpty()) {
+                if (!firstElement.selectionType.equals("any")) {
+                    throw new RuntimeException("Failed to find WebElements for " + firstElement);
                 }
-                System.out.println("No elements match for " + elementMatch + ", skipping subsequent phrases");
+                System.out.println("No elements match for " + firstElement + ", skipping subsequent phrases");
             }
-            for (ElementWrapper elementWrapper : wrappedElements) {
+            for (ElementWrapper elementWrapper : getWrappedElements()) {
                 branchedPhrases.add(cloneWithElementContext(elementWrapper));
             }
             contextPhrases.add(this);
@@ -119,15 +118,7 @@ public final class Phrase extends PhraseData {
     }
 
 
-    public void syncWithDOM() {
-        if (this.webDriver == null)
-            this.webDriver = GeneralSteps.getDriver();
-        waitMilliseconds(1000);
-        lifecycle.fire(Phase.BEFORE_DOM_LOAD_CHECK);
-        waitForPhraseEntities(this);
-        waitMilliseconds(100);
-        lifecycle.fire(Phase.BEFORE_DOM_INTERACTION);
-    }
+
 
 
     public PhraseData cloneWithElementContext(ElementWrapper elementWrapper) {

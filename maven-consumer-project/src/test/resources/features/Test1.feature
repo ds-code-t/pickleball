@@ -3,17 +3,18 @@ Feature: Addition
   Scenario: ssatesss
   @[DEBUG]
 #    * navigate to: URL.buttons
+#    * , from the Top Panel:
+#  : * ,  if Link containing "Previous" is displayed, click it
     * , from the Top Panel:
-  : * ,  if Link containing "Previous" is displayed, click it
-#  : * IF: Link containing "Previous" is displayed THEN:
-#  :: * ,  click the  Link containing "Previous"
+  : * IF: Link containing "Previous" is displayed THEN:
+  :: * ,  click the  Link containing "Previous"
 
 
   Scenario: stesss
   @[DEBUG]
 #    * navigate to: URL.buttons
     * , from the Top Panel:
-      : * IF: Link containing "Previosus" is displayed THEN:
+  : * IF: Link containing "Previosus" is displayed THEN:
   :: * ,  click the  Link containing "Previous"
 
 
@@ -34,9 +35,9 @@ Feature: Addition
   Scenario: test243hy
   @[DEBUG]
     * , from the Top Panel:
-    : * , if Link containing "Sign" is displayed?
-    :: * , save "Button" as "Element"
-    :: * , save "Link" as "Element" ,  click the  <Element> containing "Sign"
+  : * , if Link containing "Sign" is displayed?
+  :: * , save "Button" as "Element"
+  :: * , save "Link" as "Element" ,  click the  <Element> containing "Sign"
 
 #
 #  : * , Button containing "Sign" is displayed?

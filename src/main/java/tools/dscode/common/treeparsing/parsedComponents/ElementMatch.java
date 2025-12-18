@@ -12,21 +12,19 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrOp;
-import static tools.dscode.common.util.StringUtilities.normalizeSingular;
 
 
-public class ElementMatch extends Component {
-
+public class ElementMatch {
+    public final int position;
+    public PhraseData parentPhrase;
     public static final String ELEMENT_LABEL_VALUE = "_elementLabelValue";
     public static final String ELEMENT_RETURN_VALUE = "_elementReturnValue";
     public List<TextOp> textOps = new ArrayList<>();
@@ -52,23 +50,34 @@ public class ElementMatch extends Component {
         return (selectionType.isEmpty() ? "" : selectionType + " ") + (elementPosition.isEmpty() ? "" : elementPosition + " ") + textOps + " " + category;
     }
 
+    public List<Object> nonHTMLValues = new ArrayList<>();
 
-    public enum SelectType {
-        ANY, EVERY, FIRST, LAST
-    }
+//    public enum SelectType {
+//        ANY, EVERY, FIRST, LAST
+//    }
 
     public int elementIndex;
 
 
-    public List<ElementWrapper> wrappedElements = new ArrayList<>();
+    private List<ElementWrapper> wrappedElements = null;
 
     WebDriver driver;
 
-    public void findWebElements() {
+    public List<ElementWrapper> findWrappedElements() {
+        if(wrappedElements!=null) return wrappedElements;
         driver = parentPhrase.webDriver;
-//        driver.switchTo().defaultContent();
-        wrappedElements = getWrappedElements(this);
-        parentPhrase.wrappedElements.addAll(wrappedElements);
+        try {
+            wrappedElements = getWrappedElements(this);
+        }
+        catch (Throwable t) {
+            if(!selectionType.equals("any") && parentPhrase.phraseType == PhraseData.PhraseType.ACTION)
+            {
+                throw new RuntimeException("Failed to find WebElements for " + this, t);
+            }
+            wrappedElements = new ArrayList<>();
+        }
+        parentPhrase.getWrappedElements().addAll(wrappedElements);
+        return wrappedElements;
     }
 
 
@@ -77,35 +86,33 @@ public class ElementMatch extends Component {
 
     static final Pattern attributePattern = Pattern.compile("^(?<attrName>[a-z][a-z\\s]+)\\s+(?<predicate>.*)$");
 
-    public record TextOp(String text, ExecutionDictionary.Op op){
-        public TextOp(String text, String op)
-        {
+    public record TextOp(String text, ExecutionDictionary.Op op) {
+        public TextOp(String text, String op) {
             this(text, getOpFromString(op));
         }
-    };
+    }
 
     public ElementMatch(MatchNode elementNode) {
-        super(elementNode);
+        this.position = elementNode.position;
         this.state = elementNode.getStringFromLocalState("state");
 
         this.category = elementNode.getStringFromLocalState("type");
         this.elementPosition = elementNode.getStringFromLocalState("elementPosition");
         this.selectionType = elementNode.getStringFromLocalState("selectionType");
 
-        this.valueTypes = Arrays.stream(elementNode.getStringFromLocalState("valueTypes").replaceAll("of", "").trim().replaceAll("\\s+", ",").split(",")).sorted(Comparator.reverseOrder()).toList();
+        this.valueTypes = Arrays.stream(elementNode.getStringFromLocalState("valueTypes").split("\\s+")).sorted(Comparator.reverseOrder()).toList();
 
         this.elementType = ElementType.fromString(this.category).orElse(ElementType.HTML);
 
-        if(elementNode.localStateBoolean("text"))
-        {
-            textOps.add(new TextOp(elementNode.getStringFromLocalState("text") , ExecutionDictionary.Op.EQUALS));
+        if (elementNode.localStateBoolean("text")) {
+            textOps.add(new TextOp(elementNode.getStringFromLocalState("text"), ExecutionDictionary.Op.EQUALS));
         }
 
 
         categoryFlags.addAll(getExecutionDictionary().getResolvedCategoryFlags(category));
 
 
-        if(elementNode.localStateBoolean("elPredicate")) {
+        if (elementNode.localStateBoolean("elPredicate")) {
             String elPredicates = elementNode.getStringFromLocalState("elPredicate");
             for (String elPredicate : elPredicates.split("\\s+")) {
                 MatchNode elPredicateNode = elementNode.getMatchNode(elPredicate.trim());
@@ -115,14 +122,13 @@ public class ElementMatch extends Component {
             }
         }
 
-        if(!textOps.isEmpty()) {
+        if (!textOps.isEmpty()) {
             defaultText = textOps.getFirst().text;
             defaultTextOp = textOps.getFirst().op;
         }
 
 
-
-        if(elementNode.localStateBoolean("atrPredicate")) {
+        if (elementNode.localStateBoolean("atrPredicate")) {
             String atrPredicate = elementNode.getStringFromLocalState("atrPredicate");
             for (String attr : atrPredicate.split("\\bwith\b")) {
 
@@ -150,7 +156,6 @@ public class ElementMatch extends Component {
             xPathy = combineAnd(elPredictXPaths);
 
 
-
             for (Attribute attribute : attributes) {
                 ExecutionDictionary.Op op = getOpFromString(attribute.predicateType);
                 xPathy = applyAttrOp(xPathy, com.xpathy.Attribute.custom(attribute.attrName), op, attribute.predicateVal);
@@ -162,8 +167,7 @@ public class ElementMatch extends Component {
 
     }
 
-    public static ExecutionDictionary.Op getOpFromString(String input)
-    {
+    public static ExecutionDictionary.Op getOpFromString(String input) {
         return switch (input) {
             case null -> null;
             case String s when s.isBlank() -> null;
@@ -178,7 +182,7 @@ public class ElementMatch extends Component {
 //    private List<PhraseData> phraseContextList;
 
     public List<PhraseData> getPhraseContextList() {
-        if(categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) return new ArrayList<>();
+        if (categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) return new ArrayList<>();
 //        if (phraseContextList == null)
 //            phraseContextList = parentPhrase.processContextList();
 //        return phraseContextList;
@@ -207,6 +211,23 @@ public class ElementMatch extends Component {
         }
 
         return currentValue;
+    }
+
+    public List<Object> getValues() {
+        List<Object> returnList = new ArrayList<>();
+        if (elementType == ElementType.HTML) {
+            getElementWrappers().forEach(e -> returnList.add(e.getElementReturnValue()));
+        } else {
+            returnList.addAll(nonHTMLValues);
+        }
+        return returnList;
+    }
+
+    public List<ElementWrapper> getElementWrappers() {
+        if (wrappedElements == null) {
+            parentPhrase.syncWithDOM();
+        }
+        return wrappedElements;
     }
 
 

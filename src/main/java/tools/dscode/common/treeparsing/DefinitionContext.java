@@ -6,6 +6,7 @@ import io.cucumber.core.runner.StepExtension;
 import org.intellij.lang.annotations.Language;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
+import tools.dscode.common.treeparsing.parsedComponents.ValueWrapper;
 
 import static com.xpathy.Attribute.aria_label;
 import static com.xpathy.Attribute.id;
@@ -16,9 +17,11 @@ import static com.xpathy.Attribute.title;
 import static com.xpathy.Attribute.type;
 import static com.xpathy.Case.LOWER;
 import static com.xpathy.Tag.any;
+import static com.xpathy.Tag.i;
 import static com.xpathy.Tag.input;
 import static com.xpathy.Tag.select;
 import static com.xpathy.Tag.textarea;
+import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.domoperations.VisibilityConditions.extractPredicate;
 import static tools.dscode.common.domoperations.VisibilityConditions.invisible;
 import static tools.dscode.common.domoperations.VisibilityConditions.visible;
@@ -26,6 +29,10 @@ import static tools.dscode.common.treeparsing.RegexUtil.betweenWithEscapes;
 import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 
 public final class DefinitionContext {
+
+    public static final @Language("RegExp") String NUMERIC_TOKEN =
+            "(?<!\\S)-?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?!\\S)";
+
 
     private DefinitionContext() {
         // utility class
@@ -35,45 +42,70 @@ public final class DefinitionContext {
     public static NodeDictionary DEFAULT_NODE_DICTIONARY = new NodeDictionary() {
 
 
-        public static final @Language("RegExp") String punc = ",;\\.\\?!";
+//        public static final @Language("RegExp") String punc = ",;\\.\\?!";
 
 
-        ParseNode line = new ParseNode("^.*$");
-//        ParseNode line = new ParseNode("^.*$") {
-//            @Override
-//            public String onCapture(MatchNode self) {
-//                return stripObscureNonText(self.originalText().strip());
-//            }
-//        };
+        ParseNode line = new ParseNode("^.*$") {
+            public String onSubstitute(MatchNode self) {
+                return " " + self.originalText() + " ";
+            }
+        };
 
-        ParseNode quoteMask = new ParseNode(betweenWithEscapes("\"", "\"")) {
+        ParseNode quoteMask = new ParseNode(betweenWithEscapes(BOOK_END, BOOK_END) + "|" + NUMERIC_TOKEN) {
             @Override
             public String onCapture(String s) {
+                System.out.println("@@s:::: " + s);
+                new ValueWrapper(s.substring(1, s.length() - 1));
                 return s.substring(1, s.length() - 1);
             }
         };
 
+        ParseNode position = new ParseNode("#\\d+");
 
-        ParseNode preProcess = new ParseNode("^.*$") {
+
+        ParseNode numericMask = new ParseNode(NUMERIC_TOKEN) {
             @Override
             public String onCapture(String s) {
-                return normalizeWhitespace(s)
-                        .replaceAll("(?i)\\b(?:the|then|a)\\b", "")
-                        .replaceAll("(\\d+)(?:\\\s*(?:st|nd|rd|th))", "#$1")
-                        .replaceAll("\\bverifies\\b", "verify")
-                        .replaceAll("\\bensures\\b", "ensure")
-                        .replaceAll("\\b(?:no|n't)\\b", " not ")
-                        .replaceAll("\\bhave\\b", "has");
+                return ValueWrapper.ValueTypes.NUMERIC + s;
             }
+        };
 
-            public String onSubstitute(MatchNode self) {
-                return self.modifiedText();
+        ParseNode valueMask = new ParseNode("<<numericMask>>|<<quoteMask>>") {
+            @Override
+            public String onCapture(MatchNode self) {
+                return  self.unmask(self.originalText());
             }
         };
 
 
+//        ParseNode quoteMask = new ParseNode(betweenWithEscapes("\"", "\"")) {
+//            @Override
+//            public String onCapture(String s) {
+//                return s.substring(1, s.length() - 1);
+//            }
+//        };
+
+
+//        ParseNode preProcess = new ParseNode("^.*$") {
+//            @Override
+//            public String onCapture(String s) {
+//                return normalizeWhitespace(s)
+//                        .replaceAll("(?i)\\b(?:the|then|a)\\b", "")
+//                        .replaceAll("(\\d+)\\s*(?:st|nd|rd|th)", "#$1")
+//                        .replaceAll("\\bverifies\\b", "verify")
+//                        .replaceAll("\\bensures\\b", "ensure")
+//                        .replaceAll("\\bare\\b", "is")
+//                        .replaceAll("(?:\\bno|n't)\\b", " not ")
+//                        .replaceAll("\\bhave\\b", "has");
+//            }
+//
+//            public String onSubstitute(MatchNode self) {
+//                return self.modifiedText();
+//            }
+//        };
+
+
         //
-//        ParseNode phrase = new ParseNode("^(?<conjunction>\\b(?:and|or)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
         ParseNode phrase = new ParseNode("^(?<conjunction>\\b(?:and|or)\\b)?\\s*(?<conditional>\\b(?:else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
             @Override
             public String onCapture(MatchNode self) {
@@ -105,7 +137,7 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode predicate = new ParseNode("(?:\\b(?<predicateType>starting with|ending with|containing|equaling|of)\\s+(?<predicateVal>\\d+|<<quoteMask>>))") {
+        ParseNode predicate = new ParseNode("(?:\\b(?<predicateType>starting with|ending with|containing|equaling|of)\\s+(?<predicateVal><<valueMask>>))") {
             @Override
             public String onCapture(MatchNode self) {
                 String predicateType = self.resolvedGroupText("predicateType");
@@ -117,9 +149,7 @@ public final class DefinitionContext {
         };
 
 
-//        ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>)*)?\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*")
-        ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*") {
-            //        ParseNode elementMatch = new ParseNode("(?:(?<selection>every,any)\\s+)?(?:(?<elementPosition>\\bfirst|\\blast|#\\d+)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<quoteMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?:\\bwith\\s+(?<attrName>[a-z]+)?)?\\s*(?<predicate><<predicate>>))?(?<elPredicate>(?:with\\s+(?<attrName>[a-z]+)?)?\\s*(?<predicate><<predicate>>))?") {
+        ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<valueMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*") {
             @Override
             public String onSubstitute(MatchNode self) {
 
@@ -136,37 +166,61 @@ public final class DefinitionContext {
                 self.putToLocalState("type", self.resolvedGroupText("type"));
 
 
-
                 self.putToLocalState("elPredicate", self.groups().get("elPredicate"));
                 self.putToLocalState("atrPredicate", self.groups().get("atrPredicate"));
                 return self.token();
             }
         };
 
-        ParseNode valueMatch = new ParseNode("\\s(?<value>\\d+|<<quoteMask>>)(?<unitMatch>\\s+(?<unit>minute|second|number|text)s?\\b)?") {
+        ParseNode valueTypes = new ParseNode("(?<valueTypes>\\s(?:(?:and\\s+)?[a-z-]+\\s+of\\s+)+)(?<element><<elementMatch>>)") {
             @Override
             public String onSubstitute(MatchNode self) {
+                String valueTypes =  self.resolvedGroupText("valueTypes").replaceAll("\\b(?:and|of)\\b", "").trim();
+                String elementToken = self.groups().get("element");
+                MatchNode elementMatchNode = self.getMatchNode(elementToken);
 
-                String count = self.resolvedGroupText("value");
-                String unit = self.resolvedGroupText("unit");
-                self.putToLocalState("value", count);
-                self.putToLocalState("unit", unit);
-                return self.token();
-            }
-        };
-
-        ParseNode valueTypes = new ParseNode("\\s(?<valueTypes>(?:[a-z-]+\\s+of\\s+)+)?(?<val><<elementMatch>>|<<valueMatch>>)") {
-            @Override
-            public String onSubstitute(MatchNode self) {
-                String elOrValToken = self.groups().get("val");
-                MatchNode elOrValNode = self.getMatchNode(elOrValToken);
-
-                elOrValNode.putToLocalState("valueTypes", self.resolvedGroupText("valueTypes"));
+                elementMatchNode.putToLocalState("valueTypes", valueTypes);
 
 //                return elOrValToken;
-                return self.originalText();
+                return " " + self.groups().get("element") +" ";
+            }
+
+        };
+
+
+
+
+        ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?<unitMatch>\\s+(?<unit>minute|second|number|text)s?\\b)?") {
+            public String onSubstitute(MatchNode self) {
+                String unitMatch = " Internal Value Type " + self.groups().get("unit").trim() + " ";
+//                if(!value.startsWith("<"))
+                return unitMatch;
             }
         };
+
+//        ParseNode valueMatch = new ParseNode("\\s(?<value><<valueMask>>)(?<unitMatch>\\s+(?<unit>minute|second|number|text)s?\\b)?") {
+//            @Override
+//            public String onSubstitute(MatchNode self) {
+//                String count = self.resolvedGroupText("value");
+//                String unit = self.resolvedGroupText("unit");
+//                self.putToLocalState("value", count);
+//                self.putToLocalState("unit", unit);
+//                return self.token();
+//            }
+//        };
+
+//        ParseNode valueTypes = new ParseNode("\\s(?<valueTypes>(?:[a-z-]+\\s+of\\s+)+)?(?<val><<elementMatch>>|<<valueMatch>>)") {
+//            @Override
+//            public String onSubstitute(MatchNode self) {
+//                String elOrValToken = self.groups().get("val");
+//                MatchNode elOrValNode = self.getMatchNode(elOrValToken);
+//
+//                elOrValNode.putToLocalState("valueTypes", self.resolvedGroupText("valueTypes"));
+//
+////                return elOrValToken;
+//                return self.originalText();
+//            }
+//        };
 
         ParseNode assertionType = new ParseNode("\\b(ensure|verify)\\b") {
             @Override
@@ -187,7 +241,7 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode key = new ParseNode("\\bas\\s+(?<keyName><<quoteMask>>)") {
+        ParseNode key = new ParseNode("\\bas\\s+(?<keyName><<valueMask>>)") {
             @Override
             public String onCapture(MatchNode self) {
                 self.parent().putToLocalState("keyName", self.resolvedGroupText("keyName"));
@@ -206,7 +260,6 @@ public final class DefinitionContext {
             }
         };
 
-        //    ParseNode assertion = new ParseNode("\\b(?<base>equal|less(?:er)?|greater|less|is)(?=\\s+(?:<<quoteMask>>|<<valueMatch>>|<<elementMatch>>)(s|ed|ing|es)?)\\b")
         ParseNode assertion = new ParseNode("\\b(?:starts? with|ends? with|contains?|match(?:es)?|displayed|equals?|less(?:er)?|greater|less|has\\s+value|is\\s+blank)\\b") {
             @Override
             public String onCapture(MatchNode self) {
@@ -227,16 +280,19 @@ public final class DefinitionContext {
         ParseNode root = buildFromYaml("""
                 line:
                   - quoteMask
+                  - position
+                  - numericMask
+                  - valueMask
+                  - valueTransform
                   - phrase:
                     - not
                     - key
                     - predicate
                     - elementMatch
-                    - valueMatch
+                    - valueTypes
                     - assertionType
                     - assertion
                     - action
-                    - valueTypes
                 """);
 
         // Build the hierarchy AFTER the nodes above exist

@@ -9,14 +9,12 @@ import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.FluentWait;
-import org.openqa.selenium.TimeoutException;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 import java.util.function.Function;
 
 import static tools.dscode.common.util.DebugUtils.printDebug;
@@ -31,23 +29,9 @@ public final class LeanWaits {
         // SAFE version: never throws
         safeWaitForPageReady(parsingPhrase.webDriver, Duration.ofSeconds(60));
 
-        List<ElementMatch> elementMatches = parsingPhrase.getNextComponents(-1, "elementMatch")
-                .stream().map(c -> (ElementMatch) c).toList();
-
-        for (ElementMatch elementMatch : elementMatches) {
-            try {
-                elementMatch.findWebElements();
-            } catch (Throwable t) {
-                if(!elementMatch.selectionType.equals("any"))
-                {
-                    throw new RuntimeException("Failed to find WebElements for " + elementMatch, t);
-                }
-                continue;   // continue to next elementMatch
-            }
-
-
-
-            for (ElementWrapper elementWrapper : elementMatch.wrappedElements) {
+        for (ElementMatch elementMatch : parsingPhrase.elementMatches) {
+            elementMatch.findWrappedElements();
+            for (ElementWrapper elementWrapper : elementMatch.getElementWrappers()) {
                 safeWaitForElementReady(parsingPhrase.webDriver, elementWrapper.element, Duration.ofSeconds(60));
             }
         }

@@ -237,4 +237,42 @@ public final class QuoteParser extends LinkedHashMap<String, String> {
         return filtered;
     }
 
+
+
+    /**
+     * Restore current masked text using current map values, wrapping with each
+     * value's original bookend, PLUS an extra bookend STRING on the outside.
+     *
+     * Example (extraBookend = "<<"):
+     *   placeholder -> <<'inner'<<  or  <<"inner"<<  or  <<`inner`<<  or  <<'''inner'''<<
+     */
+    public String restoreWithOuterBookend(String extraBookend) {
+        return restoreFromWithOuterBookend(masked, extraBookend);
+    }
+
+    /**
+     * Restore any text containing placeholders, honoring each placeholder's
+     * original bookend, PLUS an extra bookend STRING on the outside.
+     */
+    public String restoreFromWithOuterBookend(String textWithPlaceholders, String extraBookend) {
+        Objects.requireNonNull(textWithPlaceholders, "textWithPlaceholders");
+        Objects.requireNonNull(extraBookend, "extraBookend");
+
+        String out = textWithPlaceholders;
+        List<String> keys = new ArrayList<>(super.keySet());
+        keys.sort((a, b) -> Integer.compare(b.length(), a.length())); // longest first
+
+        for (String k : keys) {
+            String delim = delimiterOf.get(k); // "'", "\"", "`", or "'''"
+            String val = super.get(k);
+            char escapeChar = delim.charAt(0); // escape only this char inside the value
+            String escaped = escapeForQuote(val, escapeChar);
+
+            String restored = extraBookend + delim + escaped + delim + extraBookend;
+            out = out.replace(k, restored);
+        }
+        return out;
+    }
+
+
 }

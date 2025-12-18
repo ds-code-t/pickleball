@@ -4,6 +4,8 @@ import com.xpathy.XPathy;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
+import tools.dscode.common.annotations.LifecycleManager;
+import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 
 import tools.dscode.common.seleniumextensions.ElementWrapper;
@@ -11,16 +13,20 @@ import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 import tools.dscode.coredefinitions.GeneralSteps;
 
+import java.awt.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
+import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
+import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
@@ -78,16 +84,26 @@ public abstract class PhraseData {
     public boolean isIn;
     public boolean isTopContext;
     public boolean isContext;
-    public boolean hasDOMInteraction;
-    public List<ElementMatch> elements;
-    public List<ElementWrapper> wrappedElements = new ArrayList<>();
-    public List<ValueMatch> values;
-    public ElementMatch elementMatch;
+//    public boolean hasDOMInteraction;
+    //    public List<ElementMatch> elements;
+    public List<ElementMatch> elementMatches = new ArrayList<>();
+    public int elementCount;
+    public ElementMatch firstElement = null;
+    public ElementMatch secondElement = null;
+    public ElementMatch lastElement = null;
+
+    public List<ElementWrapper> getWrappedElements() {
+        return wrappedElements;
+    }
+
+    private List<ElementWrapper> wrappedElements = new ArrayList<>();
+    //    public List<ValueMatch> values;
+//    public ElementMatch elementMatch;
     public String conjunction;
     public String action;
     public String assertion;
     public String assertionType;
-    public List<Component> components;
+    //    public List<Component> components;
     public Set<ExecutionDictionary.CategoryFlags> categoryFlags = new HashSet<>();
     public PhraseType phraseType;
 
@@ -152,18 +168,25 @@ public abstract class PhraseData {
         keyName = phraseNode.getStringFromLocalState("keyName");
         conditional = phraseNode.getStringFromLocalState("conditional");
         body = phraseNode.getStringFromLocalState("body");
-        components = phraseNode.getOrderedChildren("elementMatch", "valueMatch").stream().map(m -> {
-            if (m.name().equals("valueMatch"))
-                return new ValueMatch(m);
-            ElementMatch newElementMatch = new ElementMatch(m);
-            return newElementMatch;
-        }).toList();
-        components.forEach(component -> component.parentPhrase = this);
-        elements = getNextComponents(-1, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
-        values = getNextComponents(-1, "valueMatch").stream().map(m -> (ValueMatch) m).toList();
-        elements.forEach(element -> categoryFlags.addAll(element.categoryFlags));
-        elementMatch = elements.isEmpty() ? null : elements.getFirst();
-        selectionType = elementMatch == null ? "" : elementMatch.selectionType;
+
+        elementMatches = phraseNode.getOrderedChildren("elementMatch").stream().map(ElementMatch::new).collect(Collectors.toList());
+        elementCount = elementMatches.size();
+        elementMatches.forEach(elementMatch -> elementMatch.parentPhrase = this);
+        if(elementCount>0)
+        {
+            firstElement = elementMatches.getFirst();
+            lastElement = elementMatches.getLast();
+            if(elementCount>1)
+            {
+                secondElement = elementMatches.get(1);
+            }
+        }
+//        components.forEach(component -> component.parentPhrase = this);
+//        elements = getNextComponents(-1, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
+//        values = getNextComponents(-1, "valueMatch").stream().map(m -> (ValueMatch) m).toList();
+//        elements.forEach(element -> categoryFlags.addAll(element.categoryFlags));
+//        elementMatch = elementMatches.isEmpty() ? null : elementMatches.getFirst();
+        selectionType = elementMatches.isEmpty() ? "" : elementMatches.getFirst().selectionType;
         isTopContext = categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT);
         isContext = isTopContext || categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT);
 
@@ -176,7 +199,7 @@ public abstract class PhraseData {
         } else if (!context.isBlank()) {
             phraseType = PhraseType.CONTEXT;
             isFrom = context.equals("from");
-            contextXPathy = getXPathyContext(context, elements);
+            contextXPathy = getXPathyContext(context, elementMatches);
         } else {
             action = phraseNode.getStringFromLocalState("action");
 
@@ -192,18 +215,20 @@ public abstract class PhraseData {
         }
 
         if (phraseType == null && previousPhrase != null) {
-            if (!components.isEmpty()) {
+            if (!elementMatches.isEmpty()) {
                 phraseType = previousPhrase.phraseType;
-                action = previousPhrase.action;
-                assertionType = previousPhrase.assertionType;
-
+                if (action.isBlank())
+                    action = previousPhrase.action;
+                if (assertionType.isBlank())
+                    assertionType = previousPhrase.assertionType;
+                if (conditional.isBlank())
+                    conditional = previousPhrase.conditional;
             }
             phraseType = PhraseType.NO_EXECUTION;
-
         }
 
 
-        hasDOMInteraction = !elements.isEmpty() && !phraseType.equals(PhraseType.CONTEXT);
+//        hasDOMInteraction = !elements.isEmpty() && !phraseType.equals(PhraseType.CONTEXT);
 
         newContext = phraseNode.localStateBoolean("newStartContext");
 //        if (position > 0) {
@@ -252,23 +277,23 @@ public abstract class PhraseData {
         };
     }
 
-    public List<Component> getNextComponents(int position, String... nodeNames) {
-        List<String> names = Arrays.asList(nodeNames);
-        return components.stream().filter(c -> c.position > position && (names.isEmpty() || names.contains(c.name))).toList();
-    }
-
-    public List<Component> getPreviousComponents(int position, String... nodeNames) {
-        List<String> names = Arrays.asList(nodeNames);
-        return components.stream()
-                .filter(c -> c.position < position && (names.isEmpty() || names.contains(c.name)))
-                .collect(Collectors.collectingAndThen(
-                        Collectors.toCollection(ArrayList::new),
-                        list -> {
-                            Collections.reverse(list);
-                            return list;
-                        }
-                ));
-    }
+//    public List<Component> getNextComponents(int position, String... nodeNames) {
+//        List<String> names = Arrays.asList(nodeNames);
+//        return components.stream().filter(c -> c.position > position && (names.isEmpty() || names.contains(c.name))).toList();
+//    }
+//
+//    public List<Component> getPreviousComponents(int position, String... nodeNames) {
+//        List<String> names = Arrays.asList(nodeNames);
+//        return components.stream()
+//                .filter(c -> c.position < position && (names.isEmpty() || names.contains(c.name)))
+//                .collect(Collectors.collectingAndThen(
+//                        Collectors.toCollection(ArrayList::new),
+//                        list -> {
+//                            Collections.reverse(list);
+//                            return list;
+//                        }
+//                ));
+//    }
 
 
     public abstract void runPhrase();
@@ -279,15 +304,24 @@ public abstract class PhraseData {
 
     public abstract PhraseData getNextResolvedPhrase();
 
+    private final LifecycleManager lifecycle = new LifecycleManager();
 
-    public List<String> getAllPhraseValues() {
-        List<String> returnList = new ArrayList<>();
-        for (Component component : components) {
-            if (component instanceof ElementMatch elementMatch) {
-                elementMatch.wrappedElements.forEach(e -> returnList.add(e.getElementReturnValue()));
-            } else {
-                returnList.add(component.getValue().toString());
-            }
+
+    public void syncWithDOM() {
+        if (this.webDriver == null)
+            this.webDriver = GeneralSteps.getDriver();
+        waitMilliseconds(1000);
+        lifecycle.fire(Phase.BEFORE_DOM_LOAD_CHECK);
+        waitForPhraseEntities(this);
+        waitMilliseconds(100);
+        lifecycle.fire(Phase.BEFORE_DOM_INTERACTION);
+    }
+
+
+    public List<Object> getAllPhraseValues() {
+        List<Object> returnList = new ArrayList<>();
+        for (ElementMatch elementMatch : elementMatches) {
+            returnList.addAll(elementMatch.getValues());
         }
         return returnList;
     }

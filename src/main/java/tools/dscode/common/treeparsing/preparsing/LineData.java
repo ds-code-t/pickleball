@@ -14,6 +14,7 @@ import java.util.Objects;
 import java.util.Set;
 
 
+import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
 
@@ -61,7 +62,7 @@ public abstract class LineData implements Cloneable {
                 .replaceAll("(\\d+)(?:\\\s*(?:st|nd|rd|th))", "#$1")
                 .replaceAll("\\bverifies\\b", "verify")
                 .replaceAll("\\bensures\\b", "ensure")
-                .replaceAll("\\bno\\b|n't\\b", " not").replaceAll("\\s+", " ");
+                .replaceAll("\\bno\\b|n't\\b", " not ").replaceAll("\\s+", " ");
 
         // Split on UNMASKED delimiters in the fully-masked string
         StringBuilder buf = new StringBuilder();
@@ -86,8 +87,7 @@ public abstract class LineData implements Cloneable {
         // Final chunk (no trailing delimiter)
         String lastChunk = buf.toString();
         if (!lastChunk.isBlank()) {
-            String unmaskedLast = qp.restoreFrom(bm.restoreFrom(lastChunk));
-
+            String unmaskedLast = qp.restoreFromWithOuterBookend(bm.restoreFrom(lastChunk), BOOK_END);
             this.phrases.add(new Phrase(unmaskedLast, ' ', this));
         }
         PhraseData lastPhrase = null;
