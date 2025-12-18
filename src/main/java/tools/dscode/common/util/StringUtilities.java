@@ -68,4 +68,12 @@ public class StringUtilities {
         return sb.toString();
     }
 
+
+    public static String normalizeSingular(String value) {
+        return value.endsWith("s")
+                ? value.substring(0, value.length() - 1)
+                : value;
+    }
+
+
 }

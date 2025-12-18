@@ -12,14 +12,17 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrOp;
+import static tools.dscode.common.util.StringUtilities.normalizeSingular;
 
 
 public class ElementMatch extends Component {
@@ -34,7 +37,7 @@ public class ElementMatch extends Component {
     public String state;
     public List<Attribute> attributes = new ArrayList<>();
     public XPathy xPathy;
-    public ElementMatch.ElementType elementType;
+    public ElementType elementType;
     public ContextWrapper contextWrapper;
     public List<String> defaultValueKeys = new ArrayList<>(List.of(ELEMENT_RETURN_VALUE, "value", "textContent"));
 //    public XPathChainResult matchedElements;
@@ -49,14 +52,6 @@ public class ElementMatch extends Component {
         return (selectionType.isEmpty() ? "" : selectionType + " ") + (elementPosition.isEmpty() ? "" : elementPosition + " ") + textOps + " " + category;
     }
 
-    public enum ElementType {
-        HTML, ALERT, BROWSER, BROWSER_WINDOW, BROWSER_TAB, URL, VALUE;
-
-        @Override
-        public String toString() {
-            return name().replace('_', ' ');
-        }
-    }
 
     public enum SelectType {
         ANY, EVERY, FIRST, LAST
@@ -99,18 +94,7 @@ public class ElementMatch extends Component {
 
         this.valueTypes = Arrays.stream(elementNode.getStringFromLocalState("valueTypes").replaceAll("of", "").trim().replaceAll("\\s+", ",").split(",")).sorted(Comparator.reverseOrder()).toList();
 
-//            if(selectionType.isEmpty())
-//                selectionType = "single";
-        for (ElementMatch.ElementType et : ElementMatch.ElementType.values()) {
-            if (this.category.startsWith(et.name())) {
-                this.elementType = et;
-                break;
-            }
-        }
-
-
-        if (elementType == null)
-            elementType = ElementMatch.ElementType.HTML;
+        this.elementType = ElementType.fromString(this.category).orElse(ElementType.HTML);
 
         if(elementNode.localStateBoolean("text"))
         {
@@ -194,6 +178,7 @@ public class ElementMatch extends Component {
 //    private List<PhraseData> phraseContextList;
 
     public List<PhraseData> getPhraseContextList() {
+        if(categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) return new ArrayList<>();
 //        if (phraseContextList == null)
 //            phraseContextList = parentPhrase.processContextList();
 //        return phraseContextList;

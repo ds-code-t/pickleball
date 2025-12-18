@@ -4,13 +4,12 @@ import com.xpathy.XPathy;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import tools.dscode.common.annotations.LifecycleManager;
-import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.preparsing.LineData;
+import tools.dscode.coredefinitions.GeneralSteps;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -22,14 +21,13 @@ import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
-import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
-import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inBetweenOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.insideOf;
-import static tools.dscode.coredefinitions.GeneralSteps.getBrowser;
+import static tools.dscode.common.util.StringUtilities.normalizeSingular;
+import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
 
 
 public abstract class PhraseData {
@@ -53,7 +51,7 @@ public abstract class PhraseData {
         }
         if (searchContext == null) {
             if (webDriver == null)
-                webDriver = getBrowser();
+                webDriver = GeneralSteps.getDriver();
             return webDriver;
         }
 
@@ -115,7 +113,7 @@ public abstract class PhraseData {
     private SearchContext currentSearchContext;
 
     public enum PhraseType {
-        INITIAL, CONTEXT, ACTION, ASSERTION, CONDITIONAL, NO_EXECUTION, DATA
+        INITIAL, CONTEXT, ACTION, ASSERTION, CONDITIONAL, NO_EXECUTION, DATA_OPERATION, BROWSER_OPERATION
     }
 
     public List<PhraseData> contextPhrases = new ArrayList<>();
@@ -133,6 +131,13 @@ public abstract class PhraseData {
     public String toString() {
         return resolvedText + termination;
     }
+
+    public static final Set<String> DATA_ELEMENTS =
+            Set.of("Data Table", "Data Row");
+
+    public static final Set<String> BROWSER_ELEMENTS =
+            Set.of("Alert", "Window", "BROWSER", "Browser Tab", "Address Bar");
+
 
     public PhraseData(String inputText, Character delimiter, LineData lineData) {
         parsedLine = lineData;
@@ -186,26 +191,25 @@ public abstract class PhraseData {
             }
         }
 
-        if (phraseType == null) {
+        if (phraseType == null && previousPhrase != null) {
+            if (!components.isEmpty()) {
+                phraseType = previousPhrase.phraseType;
+                action = previousPhrase.action;
+                assertionType = previousPhrase.assertionType;
+
+            }
             phraseType = PhraseType.NO_EXECUTION;
-//            if (conditional.startsWith("else")) {
-//                phraseType = PhraseType.NO_EXECUTION;
-//            }
-//            else {
-//                phraseType = PhraseType.CONTEXT;
-//            }
+
         }
 
 
-
-        hasDOMInteraction = !elements.isEmpty() || phraseType.equals(PhraseType.CONTEXT);
+        hasDOMInteraction = !elements.isEmpty() && !phraseType.equals(PhraseType.CONTEXT);
 
         newContext = phraseNode.localStateBoolean("newStartContext");
 //        if (position > 0) {
 //            previousPhrase = lineData.phrases.get(position - 1);
 //            previousPhrase.nextPhrase = this;
 //        }
-
 
 
     }
@@ -270,19 +274,20 @@ public abstract class PhraseData {
     public abstract void runPhrase();
 
     public abstract PhraseData clonePhrase(PhraseData previous);
+
     public abstract PhraseData resolvePhrase();
+
     public abstract PhraseData getNextResolvedPhrase();
 
 
     public List<String> getAllPhraseValues() {
         List<String> returnList = new ArrayList<>();
         for (Component component : components) {
-            if (component instanceof DataMatch dataMatch) {
-
-            } else if (component instanceof ElementMatch elementMatch) {
+            if (component instanceof ElementMatch elementMatch) {
                 elementMatch.wrappedElements.forEach(e -> returnList.add(e.getElementReturnValue()));
-            } else
+            } else {
                 returnList.add(component.getValue().toString());
+            }
         }
         return returnList;
     }

@@ -7,12 +7,13 @@ import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.preparsing.LineData;
+import tools.dscode.coredefinitions.GeneralSteps;
 
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.ParsedActions.executeAction;
 import static tools.dscode.common.domoperations.ParsedAssertions.executeAssertions;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
-import static tools.dscode.coredefinitions.GeneralSteps.getBrowser;
+import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
 
 public final class Phrase extends PhraseData {
 
@@ -120,7 +121,7 @@ public final class Phrase extends PhraseData {
 
     public void syncWithDOM() {
         if (this.webDriver == null)
-            this.webDriver = getBrowser();
+            this.webDriver = GeneralSteps.getDriver();
         waitMilliseconds(1000);
         lifecycle.fire(Phase.BEFORE_DOM_LOAD_CHECK);
         waitForPhraseEntities(this);

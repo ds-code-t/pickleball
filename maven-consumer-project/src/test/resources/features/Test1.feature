@@ -1,5 +1,14 @@
 Feature: Addition
 
+  Scenario: ssatesss
+  @[DEBUG]
+#    * navigate to: URL.buttons
+    * , from the Top Panel:
+  : * ,  if Link containing "Previous" is displayed, click it
+#  : * IF: Link containing "Previous" is displayed THEN:
+#  :: * ,  click the  Link containing "Previous"
+
+
   Scenario: stesss
   @[DEBUG]
 #    * navigate to: URL.buttons
