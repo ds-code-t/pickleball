@@ -2,8 +2,9 @@ package tools.dscode.common.domoperations;
 
 import org.intellij.lang.annotations.RegExp;
 import org.openqa.selenium.WebElement;
-import tools.dscode.common.treeparsing.parsedComponents.Component;
+import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 
+import java.awt.*;
 import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
@@ -150,7 +151,7 @@ public final class DomChecks {
         return new CheckResult(ok, desc);
     }
 
-    public static CheckResult hasValue(List<Component> components, boolean anyTrue) {
+    public static CheckResult hasValue(List<ElementMatch> components, boolean anyTrue) {
 
         boolean ok = anyTrue ?  components.stream().anyMatch(c -> String.valueOf(c.getValue()).isBlank()) : components.stream().allMatch(c -> String.valueOf(c.getValue()).isBlank()) ;
         String desc = ok
@@ -158,7 +159,7 @@ public final class DomChecks {
         return new CheckResult(ok, desc);
     }
 
-    public static CheckResult isBlank(List<Component> components, boolean anyTrue) {
+    public static CheckResult isBlank(List<ElementMatch> components, boolean anyTrue) {
 
         boolean ok = !hasValue(components, anyTrue).result;
         String desc = ok

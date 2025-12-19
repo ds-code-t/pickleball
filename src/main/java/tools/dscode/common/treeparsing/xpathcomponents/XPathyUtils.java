@@ -3,6 +3,7 @@ package tools.dscode.common.treeparsing.xpathcomponents;
 import com.xpathy.Attribute;
 import com.xpathy.XPathy;
 import tools.dscode.common.domoperations.ExecutionDictionary;
+import tools.dscode.common.treeparsing.parsedComponents.ValueWrapper;
 
 public final class XPathyUtils {
 
@@ -105,6 +106,10 @@ public final class XPathyUtils {
     }
 
 
+    public static XPathy deepNormalizedText(ValueWrapper rawValue, ExecutionDictionary.Op mode) {
+        return deepNormalizedText(rawValue.trimmedValue(), mode);
+    }
+    
     public static XPathy deepNormalizedText(String rawText, ExecutionDictionary.Op mode) {
         if (rawText == null) {
             throw new IllegalArgumentException("rawText must not be null");

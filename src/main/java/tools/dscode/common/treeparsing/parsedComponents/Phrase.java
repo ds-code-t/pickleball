@@ -1,18 +1,13 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 
-import tools.dscode.common.annotations.LifecycleManager;
-import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.preparsing.LineData;
-import tools.dscode.coredefinitions.GeneralSteps;
 
-import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.ParsedActions.executeAction;
 import static tools.dscode.common.domoperations.ParsedAssertions.executeAssertions;
-import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
 
 public final class Phrase extends PhraseData {
@@ -66,7 +61,7 @@ public final class Phrase extends PhraseData {
 
 //        parsedLine.startPhraseIndex = position;
 
-        elementMatches.forEach(e -> { if(firstElement.elementType == ElementType.HTML) e.contextWrapper = new ContextWrapper(e);});
+        elementMatches.forEach(e -> { if(e.elementTypes.contains(ElementType.HTML_TYPE)) e.contextWrapper = new ContextWrapper(e);});
 
         if (previousPhrase != null && !previousPhrase.contextTermination) {
             contextPhrases.addAll(previousPhrase.contextPhrases);
@@ -161,6 +156,9 @@ public final class Phrase extends PhraseData {
         this.nextPhrase = nextResolvedPhrase;
         return nextResolvedPhrase;
     }
+
+
+
 
 
 }

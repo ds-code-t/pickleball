@@ -7,6 +7,7 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
+import tools.dscode.common.treeparsing.parsedComponents.ValueWrapper;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -23,12 +24,12 @@ public class ExecutionDictionary {
 
     @FunctionalInterface
     public interface Builder {
-        XPathy build(String category, String value, Op op);
+        XPathy build(String category, ValueWrapper value, Op op);
     }
 
     @FunctionalInterface
     public interface ContextBuilder {
-        SearchContext build(String category, String value, Op op,  WebDriver driver, SearchContext context);
+        SearchContext build(String category, ValueWrapper value, Op op,  WebDriver driver, SearchContext context);
     }
 
 
@@ -43,7 +44,7 @@ public class ExecutionDictionary {
 
     public enum Op {DEFAULT, EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE}
 
-    public enum CategoryFlags {PAGE_CONTEXT, PAGE_TOP_CONTEXT, ELEMENT_CONTEXT}
+    public enum CategoryFlags {PAGE_CONTEXT, PAGE_TOP_CONTEXT, ELEMENT_CONTEXT, SHADOW_HOST, IFRAME}
 
 
     //========================================================
@@ -95,7 +96,7 @@ public class ExecutionDictionary {
         category(CONTAINS_TEXT)
                 .and(
                         (category, v, op) -> {
-                            if (v == null || v.isBlank())
+                            if (v == null || v.value == null || v.value.isBlank())
                                 return null;
                             return any.byHaving(
                                     XPathy.from("descendant-or-self::*")
@@ -272,7 +273,7 @@ public class ExecutionDictionary {
     private List<XPathy> expandInternal(
             ConcurrentMap<String, CopyOnWriteArrayList<Builder>> map,
             String category,
-            String value,
+            ValueWrapper value,
             Op op
     ) {
 
@@ -335,12 +336,12 @@ public class ExecutionDictionary {
         }
     }
 
-    public List<XPathy> expandOr(String category, String value, Op op) {
+    public List<XPathy> expandOr(String category, ValueWrapper value, Op op) {
 
         return expandInternal(orReg, category, value, op);
     }
 
-    public List<XPathy> expandAnd(String category, String value, Op op) {
+    public List<XPathy> expandAnd(String category, ValueWrapper value, Op op) {
         return Stream.concat(expandInternal(andReg, category, value, op).stream(), expandInternal(andReg, BASE_CATEGORY, value, op).stream())
                 .collect(Collectors.toList());
     }
@@ -379,14 +380,14 @@ public class ExecutionDictionary {
         return Optional.of(x);
     }
 
-    public Optional<XPathy> andAll(String category, String value, Op op) {
+    public Optional<XPathy> andAll(String category, ValueWrapper value, Op op) {
 
         Optional<XPathy> result = combine(expandAnd(category, value, op), "and");
 
         return result;
     }
 
-    public Optional<XPathy> orAll(String category, String value, Op op) {
+    public Optional<XPathy> orAll(String category, ValueWrapper value, Op op) {
 
         Optional<XPathy> result = combine(expandOr(category, value, op), "or");
 
@@ -397,7 +398,7 @@ public class ExecutionDictionary {
      * Combined filter (non-Optional version).
      * Delegates to resolveToXPathy and unwraps the result.
      */
-    public XPathy andThenOr(String category, String value, Op op) {
+    public XPathy andThenOr(String category, ValueWrapper value, Op op) {
 
 
         Optional<XPathy> result = resolveToXPathy(category, value, op);
@@ -413,14 +414,14 @@ public class ExecutionDictionary {
         return andThenOr(category, null, null);
     }
 
-    public record CategoryResolution(String category, String value, Op op, XPathy xpath, Set<CategoryFlags> flags) {
+    public record CategoryResolution(String category, ValueWrapper value, Op op, XPathy xpath, Set<CategoryFlags> flags) {
     }
 
     /**
      * Convenience: call andThenOr (preserving its semantics, including null),
      * and return the result together with the resolved category flags.
      */
-    public CategoryResolution andThenOrWithFlags(String category, String value, Op op) {
+    public CategoryResolution andThenOrWithFlags(String category, ValueWrapper value, Op op) {
         XPathy xpath = andThenOr(category, value, op); // preserves old behavior, including null
         Set<CategoryFlags> flags = getResolvedCategoryFlags(category);
         return new CategoryResolution(category, value, op, xpath, flags);
@@ -429,7 +430,7 @@ public class ExecutionDictionary {
     /**
      * Optional-returning version of andThenOr.
      */
-    public Optional<XPathy> resolveToXPathy(String category, String value, Op op) {
+    public Optional<XPathy> resolveToXPathy(String category, ValueWrapper value, Op op) {
 
         Optional<XPathy> orPart = orAll(category, value, op);
         Optional<XPathy> andPart = andAll(category, value, op);
@@ -790,7 +791,7 @@ public class ExecutionDictionary {
     }
 
 
-    public void printDefinitions(String category, String value, Op op) {
+    public void printDefinitions(String category, ValueWrapper value, Op op) {
         System.out.println("======================================");
         System.out.println(" ExecutionDictionary Definitions");
         System.out.println(" Instance: " + this);
@@ -842,7 +843,7 @@ public class ExecutionDictionary {
     }
 
 
-    private XPathy safeInvoke(Builder builder, String category, String value, Op op) {
+    private XPathy safeInvoke(Builder builder, String category, ValueWrapper value, Op op) {
         try {
             return builder.build(category, value, op);
         } catch (Exception e) {
@@ -911,7 +912,7 @@ public class ExecutionDictionary {
      */
     public SearchContext applyContextBuilder(
             String category,
-            String value,
+            ValueWrapper value,
             Op op,
             WebDriver webDriver,
             SearchContext context
@@ -953,7 +954,7 @@ public class ExecutionDictionary {
     public CategorySpec registerStartingIframe(String categoryName) {
         Objects.requireNonNull(categoryName, "categoryName must not be null");
 
-        return category(categoryName).startingContext((category, value, op, driver, context) -> {
+        return category(categoryName).flags(CategoryFlags.IFRAME).startingContext((category, value, op, driver, context) -> {
             // 1) Always start from the top of the page context
             driver.switchTo().defaultContent();
 
@@ -988,7 +989,7 @@ public class ExecutionDictionary {
     public CategorySpec registerIframe(String categoryName) {
         Objects.requireNonNull(categoryName, "categoryName must not be null");
 
-        return category(categoryName).context((category, value, op, driver, context) -> {
+        return category(categoryName).flags(CategoryFlags.IFRAME).context((category, value, op, driver, context) -> {
             // 1) Resolve the iframe/frame XPath from the category’s normal AND/OR registrations
             XPathy xpathy = andThenOr(category, value, op);
             if (xpathy == null) {
@@ -1014,7 +1015,7 @@ public class ExecutionDictionary {
     public CategorySpec registerStartingShadowRoot(String categoryName) {
         Objects.requireNonNull(categoryName, "categoryName must not be null");
 
-        return category(categoryName).startingContext((category, value, op, driver, context) -> {
+        return category(categoryName).flags(CategoryFlags.SHADOW_HOST).startingContext((category, value, op, driver, context) -> {
             // Always start from top-level document
             driver.switchTo().defaultContent();
 
@@ -1042,7 +1043,7 @@ public class ExecutionDictionary {
     public CategorySpec registerShadowRoot(String categoryName) {
         Objects.requireNonNull(categoryName, "categoryName must not be null");
 
-        return category(categoryName).context((category, value, op, driver, context) -> {
+        return category(categoryName).flags(CategoryFlags.SHADOW_HOST).context((category, value, op, driver, context) -> {
             // Resolve XPath to the shadow host
             XPathy xpathy = andThenOr(category, value, op);
             if (xpathy == null) {

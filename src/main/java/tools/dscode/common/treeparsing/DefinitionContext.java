@@ -2,11 +2,10 @@ package tools.dscode.common.treeparsing;
 
 import com.xpathy.Tag;
 import com.xpathy.XPathy;
-import io.cucumber.core.runner.StepExtension;
 import org.intellij.lang.annotations.Language;
 import tools.dscode.common.domoperations.ExecutionDictionary;
-import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.parsedComponents.ValueWrapper;
+import tools.dscode.common.treeparsing.xpathcomponents.XPathyBuilder;
 
 import static com.xpathy.Attribute.aria_label;
 import static com.xpathy.Attribute.id;
@@ -17,7 +16,6 @@ import static com.xpathy.Attribute.title;
 import static com.xpathy.Attribute.type;
 import static com.xpathy.Case.LOWER;
 import static com.xpathy.Tag.any;
-import static com.xpathy.Tag.i;
 import static com.xpathy.Tag.input;
 import static com.xpathy.Tag.select;
 import static com.xpathy.Tag.textarea;
@@ -26,7 +24,6 @@ import static tools.dscode.common.domoperations.VisibilityConditions.extractPred
 import static tools.dscode.common.domoperations.VisibilityConditions.invisible;
 import static tools.dscode.common.domoperations.VisibilityConditions.visible;
 import static tools.dscode.common.treeparsing.RegexUtil.betweenWithEscapes;
-import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 
 public final class DefinitionContext {
 
@@ -55,25 +52,18 @@ public final class DefinitionContext {
             @Override
             public String onCapture(String s) {
                 System.out.println("@@s:::: " + s);
-                new ValueWrapper(s.substring(1, s.length() - 1));
                 return s.substring(1, s.length() - 1);
             }
         };
 
         ParseNode position = new ParseNode("#\\d+");
 
-
-        ParseNode numericMask = new ParseNode(NUMERIC_TOKEN) {
-            @Override
-            public String onCapture(String s) {
-                return ValueWrapper.ValueTypes.NUMERIC + s;
-            }
-        };
+        ParseNode numericMask = new ParseNode(NUMERIC_TOKEN);
 
         ParseNode valueMask = new ParseNode("<<numericMask>>|<<quoteMask>>") {
             @Override
             public String onCapture(MatchNode self) {
-                return  self.unmask(self.originalText());
+                return self.unmask(self.originalText());
             }
         };
 
@@ -175,24 +165,22 @@ public final class DefinitionContext {
         ParseNode valueTypes = new ParseNode("(?<valueTypes>\\s(?:(?:and\\s+)?[a-z-]+\\s+of\\s+)+)(?<element><<elementMatch>>)") {
             @Override
             public String onSubstitute(MatchNode self) {
-                String valueTypes =  self.resolvedGroupText("valueTypes").replaceAll("\\b(?:and|of)\\b", "").trim();
+                String valueTypes = self.resolvedGroupText("valueTypes").replaceAll("\\b(?:and|of)\\b", "").trim();
                 String elementToken = self.groups().get("element");
                 MatchNode elementMatchNode = self.getMatchNode(elementToken);
 
                 elementMatchNode.putToLocalState("valueTypes", valueTypes);
 
 //                return elOrValToken;
-                return " " + self.groups().get("element") +" ";
+                return " " + self.groups().get("element") + " ";
             }
 
         };
 
 
-
-
-        ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?<unitMatch>\\s+(?<unit>minute|second|number|text)s?\\b)?") {
+        ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?<unitMatch>\\s+(?<unit>second|minute|hour|day|week|month|year|time|number|integer|decimal|color|text)s?\\b)?") {
             public String onSubstitute(MatchNode self) {
-                String unitMatch = " Internal Value Type " + self.groups().get("unit").trim() + " ";
+                String unitMatch = " Internal Value T" + self.groups().get("unit").trim().replaceAll("\\s$", "") + " ";
 //                if(!value.startsWith("<"))
                 return unitMatch;
             }
@@ -217,7 +205,7 @@ public final class DefinitionContext {
 //
 //                elOrValNode.putToLocalState("valueTypes", self.resolvedGroupText("valueTypes"));
 //
-////                return elOrValToken;
+        ////                return elOrValToken;
 //                return self.originalText();
 //            }
 //        };
@@ -370,9 +358,9 @@ public final class DefinitionContext {
 
             category("Dropdown").inheritsFrom("forLabel").and((category, v, op) ->
                     XPathy.from(select)).or(
-                    (category, v, op) -> select.byAttribute(id).equals(v),
-                    (category, v, op) -> select.byAttribute(title).equals(v),
-                    (category, v, op) -> select.byAttribute(name).equals(v)
+                    (category, v, op) -> XPathyBuilder.build(select, id, v, op),
+                    (category, v, op) -> XPathyBuilder.build(select, title, v, op),
+                    (category, v, op) -> XPathyBuilder.build(select, name, v, op)
             );
 
 
@@ -384,7 +372,7 @@ public final class DefinitionContext {
                             input.byAttribute(type).equals("text").or().byAttribute(type).equals("password").or().byAttribute(type).equals("email"))
                     .or(
                             (category, v, op) ->
-                                    input.byAttribute(placeholder).equals(v)
+                                    XPathyBuilder.build(input, placeholder, v, op)
                     );
 
             category("Textarea").inheritsFrom("forLabel")
@@ -393,7 +381,7 @@ public final class DefinitionContext {
                     )
                     .or(
                             (category, v, op) ->
-                                    textarea.byAttribute(placeholder).equals(v)
+                                    XPathyBuilder.build(textarea, placeholder, v, op)
                     );
 
             category(BASE_CATEGORY).and(
@@ -431,7 +419,7 @@ public final class DefinitionContext {
 
             category("forLabel")
                     .or((category, v, op) -> {
-                        if (v == null || v.isBlank()) {
+                        if (v == null || v.isNullOrBlank()) {
                             return null; // no label text to match, skip this builder
                         }
                         return new XPathy("//*[@id][@id = //*[normalize-space(text())='" + v + "']/@for]");

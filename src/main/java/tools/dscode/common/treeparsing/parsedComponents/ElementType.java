@@ -4,11 +4,18 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public enum ElementType {
-    HTML, ALERT, BROWSER, BROWSER_WINDOW, BROWSER_TAB, URL, VALUE, DATA_ROW, DATA_TABLE;
+    HTML_TYPE, HTML_ELEMENT, HTML_IFRAME, HTML_SHADOW_ROOT,
+    BROWSER_TYPE, ALERT, BROWSER, BROWSER_WINDOW, BROWSER_TAB, URL,
+    DATA_TYPE, DATA_ROW, DATA_TABLE,
+    VALUE_TYPE, TIME_VALUE, NUMERIC_VALUE, INTEGER_VALUE, DECIMAL_VALUE, TEXT_VALUE,
+    RETURNS_VALUE;
+
+    public static final String VALUE_TYPE_MATCH = "Internal Value T";
 
     private static final Map<String, ElementType> LOOKUP =
             Arrays.stream(values())
@@ -22,18 +29,42 @@ public enum ElementType {
         return name(); // enum constant name is the canonical key
     }
 
-    public static Optional<ElementType> fromString(String raw) {
-        if (raw == null) return Optional.empty();
+    public static final Set<String> TIME_UNITS = Set.of(
+            "MILLISECOND",
+            "SECOND",
+            "MINUTE",
+            "HOUR",
+            "DAY",
+            "WEEK",
+            "MONTH",
+            "YEAR"
+    );
 
+    public static final Set<String> NUMERIC_TYPES = Set.of(
+            "DECIMAL",
+            "NUMBER",
+            "INTEGER"
+            );
+
+    public static Set<ElementType> fromString(String raw) {
+        Set<ElementType> returnSet = new java.util.HashSet<>();
         String normalized = raw.trim()
                 .replace(' ', '_')
+                .replaceAll("S$", "")
                 .toUpperCase(Locale.ROOT);
-
-        // naive plural handling: drop trailing 'S' (customize if needed)
-        if (normalized.endsWith("S")) {
-            normalized = normalized.substring(0, normalized.length() - 1);
+        if (normalized.startsWith(VALUE_TYPE_MATCH.toUpperCase(Locale.ROOT))) {
+            switch (normalized.replace(VALUE_TYPE_MATCH, "")) {
+                case String x when TIME_UNITS.contains(x) -> returnSet.add(TIME_VALUE);
+                case String x when NUMERIC_TYPES.contains(x) -> returnSet.add(NUMERIC_VALUE);
+                default -> returnSet.add(TEXT_VALUE);
+            }
+            returnSet.add(VALUE_TYPE);
+            return returnSet;
         }
 
-        return Optional.ofNullable(LOOKUP.get(normalized));
+
+        returnSet.add(LOOKUP.getOrDefault(normalized, HTML_TYPE));
+
+        return returnSet;
     }
 }

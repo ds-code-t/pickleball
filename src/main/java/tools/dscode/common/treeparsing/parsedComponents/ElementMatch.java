@@ -18,11 +18,13 @@ import java.util.regex.Pattern;
 
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETURNS_VALUE;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrOp;
 
 
 public class ElementMatch {
+
     public final int position;
     public PhraseData parentPhrase;
     public static final String ELEMENT_LABEL_VALUE = "_elementLabelValue";
@@ -35,13 +37,13 @@ public class ElementMatch {
     public String state;
     public List<Attribute> attributes = new ArrayList<>();
     public XPathy xPathy;
-    public ElementType elementType;
+    public Set<ElementType> elementTypes;
     public ContextWrapper contextWrapper;
     public List<String> defaultValueKeys = new ArrayList<>(List.of(ELEMENT_RETURN_VALUE, "value", "textContent"));
 //    public XPathChainResult matchedElements;
     //        public Set<XPathyRegistry.HtmlType> htmlTypes;
 
-    public String defaultText;
+    public ValueWrapper defaultText;
     public ExecutionDictionary.Op defaultTextOp;
 
     public Set<ExecutionDictionary.CategoryFlags> categoryFlags = new HashSet<>();
@@ -50,7 +52,7 @@ public class ElementMatch {
         return (selectionType.isEmpty() ? "" : selectionType + " ") + (elementPosition.isEmpty() ? "" : elementPosition + " ") + textOps + " " + category;
     }
 
-    public List<Object> nonHTMLValues = new ArrayList<>();
+    public List<ValueWrapper> nonHTMLValues = new ArrayList<>();
 
 //    public enum SelectType {
 //        ANY, EVERY, FIRST, LAST
@@ -64,14 +66,12 @@ public class ElementMatch {
     WebDriver driver;
 
     public List<ElementWrapper> findWrappedElements() {
-        if(wrappedElements!=null) return wrappedElements;
+        if (wrappedElements != null) return wrappedElements;
         driver = parentPhrase.webDriver;
         try {
             wrappedElements = getWrappedElements(this);
-        }
-        catch (Throwable t) {
-            if(!selectionType.equals("any") && parentPhrase.phraseType == PhraseData.PhraseType.ACTION)
-            {
+        } catch (Throwable t) {
+            if (!selectionType.equals("any") && parentPhrase.phraseType == PhraseData.PhraseType.ACTION) {
                 throw new RuntimeException("Failed to find WebElements for " + this, t);
             }
             wrappedElements = new ArrayList<>();
@@ -86,8 +86,8 @@ public class ElementMatch {
 
     static final Pattern attributePattern = Pattern.compile("^(?<attrName>[a-z][a-z\\s]+)\\s+(?<predicate>.*)$");
 
-    public record TextOp(String text, ExecutionDictionary.Op op) {
-        public TextOp(String text, String op) {
+    public record TextOp(ValueWrapper text, ExecutionDictionary.Op op) {
+        public TextOp(ValueWrapper text, String op) {
             this(text, getOpFromString(op));
         }
     }
@@ -102,14 +102,14 @@ public class ElementMatch {
 
         this.valueTypes = Arrays.stream(elementNode.getStringFromLocalState("valueTypes").split("\\s+")).sorted(Comparator.reverseOrder()).toList();
 
-        this.elementType = ElementType.fromString(this.category).orElse(ElementType.HTML);
 
         if (elementNode.localStateBoolean("text")) {
-            textOps.add(new TextOp(elementNode.getStringFromLocalState("text"), ExecutionDictionary.Op.EQUALS));
+            textOps.add(new TextOp(elementNode.getValueWrapper("text"), ExecutionDictionary.Op.EQUALS));
         }
 
 
         categoryFlags.addAll(getExecutionDictionary().getResolvedCategoryFlags(category));
+        this.elementTypes = ElementType.fromString(this.category);
 
 
         if (elementNode.localStateBoolean("elPredicate")) {
@@ -117,7 +117,7 @@ public class ElementMatch {
             for (String elPredicate : elPredicates.split("\\s+")) {
                 MatchNode elPredicateNode = elementNode.getMatchNode(elPredicate.trim());
                 if (elPredicateNode != null) {
-                    textOps.add(new TextOp(elPredicateNode.getStringFromLocalState("predicateVal"), elPredicateNode.getStringFromLocalState("predicateType")));
+                    textOps.add(new TextOp(elPredicateNode.getValueWrapper("predicateVal"), elPredicateNode.getStringFromLocalState("predicateType")));
                 }
             }
         }
@@ -137,7 +137,7 @@ public class ElementMatch {
                     String attrName = m.group("attrName");   // named group
                     String predicate = m.group("predicate");   // named group
                     MatchNode predicateNode = elementNode.getMatchNode(predicate.trim());
-                    attributes.add(new Attribute(attrName, (String) predicateNode.getFromLocalState("predicateVal"), (String) predicateNode.getFromLocalState("predicateType")));
+                    attributes.add(new Attribute(attrName, (String) predicateNode.getFromLocalState("predicateType"), predicateNode.getValueWrapper("predicateVal")));
                 } else {
                     throw new RuntimeException("Invalid attribute predicate: " + attr);
                 }
@@ -162,6 +162,20 @@ public class ElementMatch {
             }
 
 
+        }
+
+        if (elementTypes.contains(ElementType.HTML_TYPE)) {
+            if (categoryFlags.contains(ExecutionDictionary.CategoryFlags.IFRAME)) {
+                elementTypes.add(ElementType.HTML_IFRAME);
+            } else if (categoryFlags.contains(ExecutionDictionary.CategoryFlags.SHADOW_HOST)) {
+                elementTypes.add(ElementType.HTML_SHADOW_ROOT);
+            } else {
+                elementTypes.add(ElementType.HTML_ELEMENT);
+                elementTypes.add(RETURNS_VALUE);
+            }
+        } else if (elementTypes.contains(ElementType.VALUE_TYPE)) {
+            nonHTMLValues.add(defaultText);
+            elementTypes.add(RETURNS_VALUE);
         }
 
 
@@ -215,7 +229,7 @@ public class ElementMatch {
 
     public List<Object> getValues() {
         List<Object> returnList = new ArrayList<>();
-        if (elementType == ElementType.HTML) {
+        if (elementTypes.contains(ElementType.HTML_TYPE)) {
             getElementWrappers().forEach(e -> returnList.add(e.getElementReturnValue()));
         } else {
             returnList.addAll(nonHTMLValues);

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.openqa.selenium.*;
 import org.openqa.selenium.NoSuchElementException;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
+import tools.dscode.common.treeparsing.parsedComponents.ValueWrapper;
 
 import java.time.Duration;
 import java.util.*;
@@ -109,18 +110,17 @@ public class ElementWrapper {
         return attributeSnapshot;
     }
 
-    public String getElementReturnValue() {
+    public ValueWrapper getElementReturnValue() {
         if (attributeSnapshot.has(ELEMENT_RETURN_VALUE))
-            return attributeSnapshot.get(ELEMENT_RETURN_VALUE).asText();
+            return new ValueWrapper(attributeSnapshot.get(ELEMENT_RETURN_VALUE).asText());
 
         switch (elementMatch.category) {
             case "Field":
                 List<WebElement> valueElements = element.findElements(By.xpath("descendant::*[contains(@class,'Read')]"));
                 if (!valueElements.isEmpty()) {
                     String returnVal = valueElements.getLast().getText();
-
                     attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
-                    return returnVal;
+                    return new ValueWrapper(returnVal);
                 }
                 break;
         }
@@ -128,11 +128,11 @@ public class ElementWrapper {
             if (attributeSnapshot.has(key)) {
                 String returnVal = attributeSnapshot.get(key).asText();
                 attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
-                return returnVal;
+                return new ValueWrapper(returnVal);
             }
         }
         attributeSnapshot.put(ELEMENT_RETURN_VALUE, "");
-        return "";
+        return new ValueWrapper("");
     }
 
 

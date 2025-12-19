@@ -1,6 +1,7 @@
 package tools.dscode.common.treeparsing;
 
 import com.google.common.collect.LinkedListMultimap;
+import tools.dscode.common.treeparsing.parsedComponents.ValueWrapper;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -178,6 +179,12 @@ public final class MatchNode {
         Object o = getFromLocalState(key);
         if (o == null) return "";
         return o.toString();
+    }
+
+    public ValueWrapper getValueWrapper(String key) {
+        Object o = getFromLocalState(key);
+        if (o == null) return null;
+        return new ValueWrapper(o.toString());
     }
 
     public Object getFromLocalState(String key) {

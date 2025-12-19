@@ -12,6 +12,10 @@ public class ValueWrapper {
         DOUBLE_QUOTED, SINGLE_QUOTED, BACK_TICKED, NUMERIC, OTHER
     }
 
+    public boolean isNull() { return value == null; }
+    public boolean isBlank() { return value.isBlank(); }
+    public boolean isNullOrBlank() { return value == null || value.isBlank(); }
+
     public ValueWrapper(String raw) {
         Objects.requireNonNull(raw);
 
@@ -70,5 +74,10 @@ public class ValueWrapper {
             if (!Character.isDigit(t.charAt(i))) return false;
         }
         return true;
+    }
+
+    @Override
+    public String toString() {
+        return value;
     }
 }

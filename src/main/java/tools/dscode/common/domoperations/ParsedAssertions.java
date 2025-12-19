@@ -2,8 +2,9 @@ package tools.dscode.common.domoperations;
 
 
 import tools.dscode.common.status.SoftRuntimeException;
-import tools.dscode.common.treeparsing.parsedComponents.Component;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
+
+import java.util.List;
 
 import static tools.dscode.common.domoperations.DomChecks.endsWithNormalized;
 import static tools.dscode.common.domoperations.DomChecks.equalsNormalized;
@@ -21,14 +22,14 @@ public class ParsedAssertions {
 
     public static void executeAssertions(PhraseData phraseData) {
 
-        Component component1 = phraseData.components.getFirst();
-        Component component2 = phraseData.components.size() < 2 ? null : phraseData.components.get(1);
         boolean anyTrue = phraseData.selectionType.equals("any");
+
+
 
         DomChecks.CheckResult result;
         switch (phraseData.assertion) {
             case String s when s.contains("equal") -> {
-                result = equalsNormalized(component1.getValue(), component2.getValue());
+                result = equalsNormalized(phraseData.firstElement.getValues(), component2.getValue());
             }
             case String s when s.contains("start with") -> {
                 result = startsWithNormalized(component1.getValue(), component2.getValue());
