@@ -4,7 +4,9 @@ Feature: Addition
   @[DEBUG]
 #    * navigate to: URL.buttons
     * , from the Top Panel:
-    : * , click the  Link containing "Previous"
+#    : *  , click the  Link containing "Previous"
+    : * , if Link containing "Previous" is displayed, click it
+#    : * , if Link containing "Previous" is displayed, click the  Link containing "Previous"
 #  : * ,  if Link containing "Previous" is displayed, click it
 #    * , from the Top Panel:
 #  : * IF: Link containing "Previous" is displayed THEN:

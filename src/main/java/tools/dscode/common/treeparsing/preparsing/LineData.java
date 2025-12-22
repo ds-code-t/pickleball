@@ -74,7 +74,7 @@ public abstract class LineData implements Cloneable {
                 String chunk = buf.toString();
 
 
-                String unmasked = qp.restoreFrom(bm.restoreFrom(chunk));
+                String unmasked = qp.restoreFromWithOuterBookend(bm.restoreFrom(chunk), BOOK_END);
 
                 if (!unmasked.isBlank()) {
                     this.phrases.add(new Phrase(unmasked, c, this));

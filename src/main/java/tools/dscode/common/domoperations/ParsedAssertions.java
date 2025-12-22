@@ -188,7 +188,7 @@ public class ParsedAssertions {
             }
 
         }
-        String assertionMessage = "Assertion phrase " + phraseData.text + " is " + passed;
+        String assertionMessage = "Assertion phrase '" + phraseData.text + "' evaluates to: " + passed;
         if(a!= null)
         {
             assertionMessage+= "\n" + a + ":\n"+ a.getValues();
