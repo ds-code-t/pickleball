@@ -1,7 +1,7 @@
 package tools.dscode.common.treeparsing;
 
 import com.google.common.collect.LinkedListMultimap;
-import tools.dscode.common.treeparsing.parsedComponents.ValueWrapper;
+import tools.dscode.common.assertions.ValueWrapper;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -14,9 +14,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.treeparsing.RegexUtil.TOKEN_BODY;
 import static tools.dscode.common.treeparsing.RegexUtil.TOKEN_END;
 import static tools.dscode.common.treeparsing.RegexUtil.TOKEN_START;
+
 
 /**
  * Runtime node created for each match.
@@ -24,7 +26,7 @@ import static tools.dscode.common.treeparsing.RegexUtil.TOKEN_START;
 public final class MatchNode {
     public MatchNode nextSibling;
     public MatchNode previousSibling;
-    public int position;        // (fixed the "nt" -> int)
+    public int position;
     //    public String name;
     private final ParseNode parseNode;
     private final MatchNode parent;
@@ -52,7 +54,7 @@ public final class MatchNode {
     private String originalText;
     private String modifiedText;
     private String maskedText;
-    int start;
+    public int start;
     private int end;
 
 
@@ -184,7 +186,7 @@ public final class MatchNode {
     public ValueWrapper getValueWrapper(String key) {
         Object o = getFromLocalState(key);
         if (o == null) return null;
-        return new ValueWrapper(o.toString());
+        return createValueWrapper(o);
     }
 
     public Object getFromLocalState(String key) {

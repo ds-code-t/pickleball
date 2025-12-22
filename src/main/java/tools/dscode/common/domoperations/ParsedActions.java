@@ -2,13 +2,17 @@ package tools.dscode.common.domoperations;
 
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
+import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
+import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.coredefinitions.GeneralSteps;
 
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
@@ -19,6 +23,7 @@ import static tools.dscode.common.domoperations.HumanInteractions.doubleClick;
 import static tools.dscode.common.domoperations.HumanInteractions.selectDropdownByVisibleText;
 import static tools.dscode.common.domoperations.HumanInteractions.typeText;
 import static tools.dscode.common.domoperations.HumanInteractions.wheelScrollBy;
+import static tools.dscode.common.domoperations.SeleniumUtils.waitForDuration;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitSeconds;
 import static tools.dscode.common.util.DebugUtils.printDebug;
 import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
@@ -77,6 +82,12 @@ public class ParsedActions {
 //            throw new RuntimeException(message);
 //        }
 
+        LinkedHashSet<ElementMatch> generalValueElements = phraseData.getElementMatch(ElementType.RETURNS_VALUE);
+        LinkedHashSet<ElementMatch> htmlElements = phraseData.getElementMatch(ElementType.HTML_ELEMENT);
+        LinkedHashSet<ElementMatch> nonHtmlElements = phraseData.getElementMatch(ElementType.VALUE_TYPE);
+        ElementMatch elementMatch1 = htmlElements.getFirst();
+
+
         System.out.println("Attempting " + action);
         switch (action) {
             case String s when s.contains("save") -> {
@@ -91,41 +102,42 @@ public class ParsedActions {
                 }
             }
             case String s when s.contains("wait") -> {
-                waitSeconds(Integer.parseInt(nextValue.value.replace("\"|'|`", "")));
+                ElementMatch waitElementMatch = phraseData.getSingleElementMatch(ElementType.TIME_VALUE);
+                waitForDuration(waitElementMatch.getValue().asDuration(waitElementMatch.category));
             }
             case String s when s.contains("select") -> {
-                for (WebElement nextElement : nextElements) {
-                    selectDropdownByVisibleText(driver, nextElement, nextValue.value);
+                for (ElementWrapper elementWrapper : elementMatch1.getElementWrappers()) {
+                    selectDropdownByVisibleText(driver, elementWrapper.getElement(), nonHtmlElements.getFirst().getValue().toString());
                 }
             }
             case String s when s.contains("click") -> {
-                for (WebElement nextElement : nextElements) {
-                    click(driver, nextElement);
+                for (ElementWrapper elementWrapper : elementMatch1.getElementWrappers()) {
+                    click(driver, elementWrapper.getElement());
                 }
             }
             case String s when s.contains("double click") -> {
-                for (WebElement nextElement : nextElements) {
-                    doubleClick(driver, nextElement);
+                for (ElementWrapper elementWrapper : elementMatch1.getElementWrappers()) {
+                    doubleClick(driver, elementWrapper.getElement());
                 }
             }
             case String s when s.contains("right click") -> {
-                for (WebElement nextElement : nextElements) {
-                    contextClick(driver, nextElement);
+                for (ElementWrapper elementWrapper : elementMatch1.getElementWrappers()) {
+                    contextClick(driver, elementWrapper.getElement());
                 }
             }
             case String s when s.contains("enter") -> {
-                for (WebElement nextElement : nextElements) {
-                    typeText(driver, nextElement, nextValue.value);
+                for (ElementWrapper elementWrapper : elementMatch1.getElementWrappers()) {
+                    typeText(driver, elementWrapper.getElement(), nonHtmlElements.getFirst().getValue().toString());
                 }
             }
             case String s when s.contains("scroll") -> {
-                for (WebElement nextElement : nextElements) {
-                    wheelScrollBy(driver, nextElement);
+                for (ElementWrapper elementWrapper : elementMatch1.getElementWrappers()) {
+                    wheelScrollBy(driver, elementWrapper.getElement());
                 }
             }
             case String s when s.contains("overwrite") -> {
-                for (WebElement nextElement : nextElements) {
-                    clearAndType(driver, nextElement, nextValue.value);
+                for (ElementWrapper elementWrapper : elementMatch1.getElementWrappers()) {
+                    clearAndType(driver, elementWrapper.getElement(),  nonHtmlElements.getFirst().getValue().toString());
                 }
             }
             default -> {

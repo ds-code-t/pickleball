@@ -7,7 +7,7 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import tools.dscode.common.treeparsing.parsedComponents.ValueWrapper;
+import tools.dscode.common.assertions.ValueWrapper;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -96,7 +96,7 @@ public class ExecutionDictionary {
         category(CONTAINS_TEXT)
                 .and(
                         (category, v, op) -> {
-                            if (v == null || v.value == null || v.value.isBlank())
+                            if (v == null || v.isNullOrBlank())
                                 return null;
                             return any.byHaving(
                                     XPathy.from("descendant-or-self::*")

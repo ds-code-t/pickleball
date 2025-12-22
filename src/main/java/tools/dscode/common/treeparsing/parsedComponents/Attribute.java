@@ -1,5 +1,7 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
+import tools.dscode.common.assertions.ValueWrapper;
+
 public class Attribute {
     String attrName;
     String predicateType;

@@ -2,6 +2,7 @@ package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.xpathy.XPathy;
 import org.openqa.selenium.WebDriver;
+import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
@@ -25,6 +26,7 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyA
 
 public class ElementMatch {
 
+    public final int startIndex;
     public final int position;
     public PhraseData parentPhrase;
     public static final String ELEMENT_LABEL_VALUE = "_elementLabelValue";
@@ -93,6 +95,7 @@ public class ElementMatch {
     }
 
     public ElementMatch(MatchNode elementNode) {
+        this.startIndex = elementNode.start;
         this.position = elementNode.position;
         this.state = elementNode.getStringFromLocalState("state");
 
@@ -155,13 +158,10 @@ public class ElementMatch {
 
             xPathy = combineAnd(elPredictXPaths);
 
-
             for (Attribute attribute : attributes) {
                 ExecutionDictionary.Op op = getOpFromString(attribute.predicateType);
                 xPathy = applyAttrOp(xPathy, com.xpathy.Attribute.custom(attribute.attrName), op, attribute.predicateVal);
             }
-
-
         }
 
         if (elementTypes.contains(ElementType.HTML_TYPE)) {
@@ -227,14 +227,36 @@ public class ElementMatch {
         return currentValue;
     }
 
-    public List<Object> getValues() {
-        List<Object> returnList = new ArrayList<>();
+//    public List<WebElement> getWebElements() {
+//        if (!elementTypes.contains(ElementType.HTML_TYPE))
+//            return null;
+//return getElementWrappers().stream().map(elementWrapper -> elementWrapper.getElement())
+//    }
+
+    public List<ValueWrapper> getValues(String valueType) {
+        List<ValueWrapper> returnList = new ArrayList<>();
         if (elementTypes.contains(ElementType.HTML_TYPE)) {
             getElementWrappers().forEach(e -> returnList.add(e.getElementReturnValue()));
         } else {
             returnList.addAll(nonHTMLValues);
         }
         return returnList;
+    }
+
+
+    public List<ValueWrapper> getValues() {
+        List<ValueWrapper> returnList = new ArrayList<>();
+        if (elementTypes.contains(ElementType.HTML_TYPE)) {
+            getElementWrappers().forEach(e -> returnList.add(e.getElementReturnValue()));
+        } else {
+            returnList.addAll(nonHTMLValues);
+        }
+        return returnList;
+    }
+
+    public ValueWrapper getValue() {
+        List<ValueWrapper> values = getValues();
+        return values.isEmpty() ? null : values.getFirst();
     }
 
     public List<ElementWrapper> getElementWrappers() {

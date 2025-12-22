@@ -4,7 +4,6 @@ import com.xpathy.Tag;
 import com.xpathy.XPathy;
 import org.intellij.lang.annotations.Language;
 import tools.dscode.common.domoperations.ExecutionDictionary;
-import tools.dscode.common.treeparsing.parsedComponents.ValueWrapper;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathyBuilder;
 
 import static com.xpathy.Attribute.aria_label;
@@ -223,8 +222,8 @@ public final class DefinitionContext {
         ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite|save)(?:s|ed|ing|es)?\\b") {
             @Override
             public String onCapture(MatchNode self) {
-
                 self.parent().putToLocalState("action", self.resolvedGroupText("base"));
+                self.parent().putToLocalState("operationIndex", self.start);
                 return self.resolvedGroupText("base").replaceAll("move", "hover");
             }
         };
@@ -239,31 +238,31 @@ public final class DefinitionContext {
         };
 
 
-        ParseNode not = new ParseNode("\\bnot\\b") {
+        ParseNode not = new ParseNode("\\b(?:not|none)\\b") {
             @Override
             public String onCapture(MatchNode self) {
-                self.parent().putToLocalState("not", "not");
+                self.parent().putToLocalState(self.originalText(), self.originalText());
 //                return self.originalText();
                 return " ";
             }
         };
 
-        ParseNode assertion = new ParseNode("\\b(?:starts? with|ends? with|contains?|match(?:es)?|displayed|equals?|less(?:er)?|greater|less|has\\s+value|is\\s+blank)\\b") {
+        ParseNode assertion = new ParseNode("\\b(?:starts? with|ends? with|contains?|match(?:es)?|displayed|(?:un)?selected|(?:un)?checked|enabled|disabled|equals?|less(?:er)?|greater|less|has\\s+value|?(?:has|is)\\s+blank)\\b") {
             @Override
             public String onCapture(MatchNode self) {
                 self.parent().putToLocalState("assertion", self.originalText());
+                self.parent().putToLocalState("operationIndex", self.start);
                 return self.originalText();
             }
         };
 
-        ParseNode elementState = new ParseNode("\\b(?<false>un)?\\s+(?<state>checked|selected|enabled|disabled|expanded|collapsed)<<elementMatch>>") {
-            @Override
-            public String onCapture(MatchNode self) {
-                self.parent().putToLocalState("not", "not");
-//                return self.originalText();
-                return " ";
-            }
-        };
+//        ParseNode elementState = new ParseNode("\\b(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))<<elementMatch>>") {
+//            @Override
+//            public String onCapture(MatchNode self) {
+//                self.parent().putToLocalState("not", "not");
+//                return self.token();
+//            }
+//        };
 
         ParseNode root = buildFromYaml("""
                 line:

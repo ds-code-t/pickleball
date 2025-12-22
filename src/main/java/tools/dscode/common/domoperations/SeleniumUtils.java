@@ -35,6 +35,16 @@ public class SeleniumUtils {
         }
     }
 
+    public static void waitForDuration(Duration duration) {
+        try {
+            Thread.sleep(duration);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("Sleep interrupted", e);
+        }
+    }
+
+
 
     public static int portFromString(String key) {
         return 9000 + (Math.abs(key.hashCode()) % 1000);

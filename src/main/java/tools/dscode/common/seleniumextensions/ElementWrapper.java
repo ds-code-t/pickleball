@@ -5,16 +5,18 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.openqa.selenium.*;
 import org.openqa.selenium.NoSuchElementException;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
-import tools.dscode.common.treeparsing.parsedComponents.ValueWrapper;
+import tools.dscode.common.assertions.ValueWrapper;
 
 import java.time.Duration;
 import java.util.*;
 
+import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForElementReady;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.intersection;
 import static tools.dscode.common.domoperations.SeleniumUtils.union;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementMatch.ELEMENT_RETURN_VALUE;
+
 
 public class ElementWrapper {
 
@@ -112,7 +114,7 @@ public class ElementWrapper {
 
     public ValueWrapper getElementReturnValue() {
         if (attributeSnapshot.has(ELEMENT_RETURN_VALUE))
-            return new ValueWrapper(attributeSnapshot.get(ELEMENT_RETURN_VALUE).asText());
+            return createValueWrapper(attributeSnapshot.get(ELEMENT_RETURN_VALUE).asText());
 
         switch (elementMatch.category) {
             case "Field":
@@ -120,7 +122,7 @@ public class ElementWrapper {
                 if (!valueElements.isEmpty()) {
                     String returnVal = valueElements.getLast().getText();
                     attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
-                    return new ValueWrapper(returnVal);
+                    return createValueWrapper(returnVal);
                 }
                 break;
         }
@@ -128,11 +130,11 @@ public class ElementWrapper {
             if (attributeSnapshot.has(key)) {
                 String returnVal = attributeSnapshot.get(key).asText();
                 attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
-                return new ValueWrapper(returnVal);
+                return createValueWrapper(returnVal);
             }
         }
         attributeSnapshot.put(ELEMENT_RETURN_VALUE, "");
-        return new ValueWrapper("");
+        return createValueWrapper("");
     }
 
 
@@ -392,4 +394,25 @@ public class ElementWrapper {
         // placeholder so this compiles – remove if you already have it in a superclass/utility
         throw new UnsupportedOperationException("getElementList must be implemented elsewhere");
     }
+
+    public boolean isDisplayed() {
+        return getElement().isDisplayed();
+    }
+
+    public boolean isEnabled() {
+        return getElement().isEnabled();
+    }
+
+    public boolean isSelected() {
+        return getElement().isSelected();
+    }
+
+    public boolean isBlank() {
+        return getElementReturnValue().isBlank();
+    }
+
+    public boolean hasValue() {
+        return !getElementReturnValue().isBlank();
+    }
+
 }

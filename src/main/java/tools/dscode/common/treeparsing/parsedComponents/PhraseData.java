@@ -13,15 +13,9 @@ import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 import tools.dscode.coredefinitions.GeneralSteps;
 
-import java.awt.*;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -30,73 +24,19 @@ import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CON
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.FOLLOWING_OPERATION;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.MULTIPLE_ELEMENTS_IN_PHRASE;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.NO_OPERATION;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PRECEDING_OPERATION;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inBetweenOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.insideOf;
-import static tools.dscode.common.util.StringUtilities.normalizeSingular;
 import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
 
 
-public abstract class PhraseData {
+public abstract class PhraseData extends PassedData {
 
-        public Map<ElementType, ElementMatch> elementMap1 = new HashMap<>();
-        public Map<ElementType, ElementMatch> elementMap2 = new HashMap<>();
-
-
-    public record MatchPair(ElementMatch first, ElementMatch second) {}
-
-    public MatchPair getDistinctElementMatches(ElementType firstType, ElementType secondType) {
-        ElementMatch first = findMatch(firstType, null);
-        ElementMatch second = findMatch(secondType, first);
-        return new MatchPair(first, second);
-    }
-
-    private ElementMatch findMatch(ElementType type, ElementMatch disallow) {
-        PhraseData phrase = this;
-        while (phrase != null) {
-            // try map1 then map2, but allow “fallback” behavior while skipping disallowed
-            ElementMatch m1 = phrase.elementMap1.get(type);
-            if (m1 != null && (disallow == null || !m1.equals(disallow))) return m1;
-
-            ElementMatch m2 = phrase.elementMap2.get(type);
-            if (m2 != null && (disallow == null || !m2.equals(disallow))) return m2;
-
-            phrase = phrase.previousPhrase;
-        }
-        return null;
-    }
-
-
-      public ElementMatch getElementMatch(ElementType elementType) {
-            PhraseData phrase = this;
-            while (phrase != null) {
-                ElementMatch elementMatch = phrase.elementMap1.getOrDefault(elementType, phrase.elementMap2.get(elementType));
-                if (elementMatch != null) return elementMatch;
-                phrase = phrase.previousPhrase;
-            }
-            return null;
-        }
-
-    public ElementMatch getElementMatch1(ElementType elementType) {
-        PhraseData phrase = this;
-        while (phrase != null) {
-            ElementMatch elementMatch = phrase.elementMap1.get(elementType);
-            if (elementMatch != null) return elementMatch;
-            phrase = phrase.previousPhrase;
-        }
-        return null;
-    }
-
-    public ElementMatch getElementMatch2(ElementType elementType) {
-        PhraseData phrase = this;
-        while (phrase != null) {
-            ElementMatch elementMatch = phrase.elementMap2.get(elementType);
-            if (elementMatch != null) return elementMatch;
-            phrase = phrase.previousPhrase;
-        }
-        return null;
-    }
 
 
     public WebDriver webDriver = null;
@@ -131,10 +71,10 @@ public abstract class PhraseData {
     public final Character termination; // nullable
     public boolean contextTermination;
     public boolean hasNot;
+    public boolean hasNone;
     public final LineData parsedLine;
 
-    public PhraseData previousPhrase;
-    public PhraseData nextPhrase;
+
     public int position;
     public boolean newContext = false;
     public MatchNode phraseNode;
@@ -146,12 +86,8 @@ public abstract class PhraseData {
     public boolean isContext;
     //    public boolean hasDOMInteraction;
     //    public List<ElementMatch> elements;
-    public List<ElementMatch> elementMatches = new ArrayList<>();
-    public int elementCount;
-    public ElementMatch firstElement = null;
-    public ElementMatch secondElement = null;
-    public ElementMatch lastElement = null;
-    public ElementMatch passedElement = null;
+
+
 
     public List<ElementWrapper> getWrappedElements() {
         return wrappedElements;
@@ -172,6 +108,9 @@ public abstract class PhraseData {
 
     public String keyName;
     public boolean isClone = false;
+
+    Integer operationIndex;
+
 
 //    public SearchContext getCurrentSearchContext() {
 //        if (currentSearchContext == null) {
@@ -225,7 +164,9 @@ public abstract class PhraseData {
         MatchNode returnMatchNode = getNodeDictionary().parse(resolvedText);
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
+        operationIndex = (Integer) phraseNode.getFromLocalState("operationIndex");
         hasNot = phraseNode.localStateBoolean("not");
+        hasNone = phraseNode.localStateBoolean("none");
         keyName = phraseNode.getStringFromLocalState("keyName");
         conditional = phraseNode.getStringFromLocalState("conditional");
         body = phraseNode.getStringFromLocalState("body");
@@ -235,11 +176,17 @@ public abstract class PhraseData {
         elementMatches.forEach(elementMatch -> elementMatch.parentPhrase = this);
         if (elementCount > 0) {
             firstElement = elementMatches.getFirst();
+            firstElement.elementTypes.add(ElementType.FIRST_ELEMENT);
             firstElement.elementTypes.forEach(elementType -> elementMap1.put(elementType, firstElement));
             lastElement = elementMatches.getLast();
+            lastElement.elementTypes.add(ElementType.LAST_ELEMENT);
             if (elementCount > 1) {
+                elementMatches.forEach(elementMatch -> elementMatch.elementTypes.add(MULTIPLE_ELEMENTS_IN_PHRASE));
                 secondElement = elementMatches.get(1);
+                secondElement.elementTypes.add(ElementType.SECOND_ELEMENT);
                 secondElement.elementTypes.forEach(elementType -> elementMap2.put(elementType, secondElement));
+            } else {
+                firstElement.elementTypes.add(ElementType.SINGLE_ELEMENT_IN_PHRASE);
             }
         }
 //        components.forEach(component -> component.parentPhrase = this);
@@ -296,6 +243,22 @@ public abstract class PhraseData {
 //            previousPhrase = lineData.phrases.get(position - 1);
 //            previousPhrase.nextPhrase = this;
 //        }
+
+        if (operationIndex != null) {
+            for (ElementMatch em : elementMatches) {
+                if (em.startIndex < operationIndex) {
+                    em.elementTypes.add(PRECEDING_OPERATION);
+                    elementMatchesProceedingOperation.add(em);
+                } else if (em.startIndex > operationIndex) {
+                    elementMatchesFollowingOperation.add(em);
+                    em.elementTypes.add(FOLLOWING_OPERATION);
+                }
+            }
+            elementBeforeOperation = elementMatchesProceedingOperation.isEmpty() ? null : elementMatchesProceedingOperation.getFirst();
+            elementAfterOperation = elementMatchesFollowingOperation.isEmpty() ? null : elementMatchesFollowingOperation.getFirst();
+        } else {
+            elementMatches.forEach(em -> em.elementTypes.add(NO_OPERATION));
+        }
 
 
     }
