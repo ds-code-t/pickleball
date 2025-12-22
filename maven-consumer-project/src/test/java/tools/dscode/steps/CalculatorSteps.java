@@ -50,9 +50,9 @@ public class CalculatorSteps {
     public static void configs() {
         DEFAULT_EXECUTION_DICTIONARY.category("Button").or(
                 (category, v, op) -> {
-                    if (!v.equalsIgnoreCase("Submit"))
+                    if (!v.asNormalizedText().equalsIgnoreCase("Submit"))
                         return null;
-                    return input.byAttribute(type).withCase(LOWER).withNormalizeSpace().equals(v);
+                    return input.byAttribute(type).withCase(LOWER).withNormalizeSpace().equals(v.asNormalizedText());
                 }
         );
 //        category("Button").inheritsFrom("visible","visibleText");

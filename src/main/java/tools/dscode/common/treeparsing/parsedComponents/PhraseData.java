@@ -174,6 +174,7 @@ public abstract class PhraseData extends PassedData {
         elementMatches = phraseNode.getOrderedChildren("elementMatch").stream().map(ElementMatch::new).collect(Collectors.toList());
         elementCount = elementMatches.size();
         elementMatches.forEach(elementMatch -> elementMatch.parentPhrase = this);
+        elementMatches.forEach(element -> categoryFlags.addAll(element.categoryFlags));
         if (elementCount > 0) {
             firstElement = elementMatches.getFirst();
             firstElement.elementTypes.add(ElementType.FIRST_ELEMENT);
@@ -192,7 +193,6 @@ public abstract class PhraseData extends PassedData {
 //        components.forEach(component -> component.parentPhrase = this);
 //        elements = getNextComponents(-1, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
 //        values = getNextComponents(-1, "valueMatch").stream().map(m -> (ValueMatch) m).toList();
-//        elements.forEach(element -> categoryFlags.addAll(element.categoryFlags));
 //        elementMatch = elementMatches.isEmpty() ? null : elementMatches.getFirst();
         selectionType = elementMatches.isEmpty() ? "" : elementMatches.getFirst().selectionType;
         isTopContext = categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT);

@@ -69,6 +69,8 @@ public class ContextWrapper {
             PhraseData phraseData = contextList.get(j);
 
             printDebug("##phraseData1: " + phraseData);
+            printDebug("##phraseData--phraseData.contextElement : " + phraseData.contextElement);
+            printDebug("##phraseData--phraseData.categoryFlag : " + phraseData.categoryFlags);
 
             if (phraseData.contextElement != null) {
                 printDebug("##psearchContext1: " + searchContext);
@@ -94,14 +96,14 @@ public class ContextWrapper {
 
                 printDebug("##searchContext2: " + (searchContext == null ? "null" : searchContext.getClass().getSimpleName()));
             } else {
-                printDebug("##phraseData4: " + phraseData.contextXPathy);
+                printDebug("phraseData4: " + phraseData.contextXPathy);
                 xPathyList.add(phraseData.contextXPathy);
-
             }
 
         }
 
         xPathyList.add(elementMatch.xPathy);
+        printDebug("##xPathyList: " + xPathyList);
         initializeElementXPaths(xPathyList);
         return searchContext;
     }
@@ -133,6 +135,7 @@ public class ContextWrapper {
 //        XPathy xPathy = combineAnd(xPathyList);
 //        elementPath = XPathy.from(XPathyUtils.maybeDeepestMatches(xPathy.getXpath()));
         elementPath = combineAnd(xPathyList);
+        System.out.println("@@elementPath: " + elementPath);
         if (elementMatch.elementPosition.isEmpty() && elementMatch.selectionType.isEmpty())
             elementMatch.elementPosition = "1";
         if (elementMatch.elementPosition.isEmpty())
@@ -151,6 +154,8 @@ public class ContextWrapper {
                 }
             }
         }
+        System.out.println("@@elementTerminalXPath: " + elementTerminalXPath);
+
     }
 
 

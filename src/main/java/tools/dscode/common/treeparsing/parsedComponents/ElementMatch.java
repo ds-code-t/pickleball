@@ -68,8 +68,11 @@ public class ElementMatch {
     WebDriver driver;
 
     public List<ElementWrapper> findWrappedElements() {
+        System.out.println("@@findWrappedElements1: " + this);
+        System.out.println("@@findWrappedElements2: " + wrappedElements);
         if (wrappedElements != null) return wrappedElements;
         driver = parentPhrase.webDriver;
+        System.out.println("@@findWrappedElements3: " + driver);
         try {
             wrappedElements = getWrappedElements(this);
         } catch (Throwable t) {
@@ -95,11 +98,13 @@ public class ElementMatch {
     }
 
     public ElementMatch(MatchNode elementNode) {
+        System.out.println("\n\n@@ElementMatch: " + elementNode);
         this.startIndex = elementNode.start;
         this.position = elementNode.position;
         this.state = elementNode.getStringFromLocalState("state");
 
         this.category = elementNode.getStringFromLocalState("type");
+        System.out.println("@@this.category: " +  this.category);
         this.elementPosition = elementNode.getStringFromLocalState("elementPosition");
         this.selectionType = elementNode.getStringFromLocalState("selectionType");
 
@@ -114,9 +119,13 @@ public class ElementMatch {
         categoryFlags.addAll(getExecutionDictionary().getResolvedCategoryFlags(category));
         this.elementTypes = ElementType.fromString(this.category);
 
+        System.out.println("@@categoryFlags: " + categoryFlags);
+        System.out.println("@@elementTypes: " + elementTypes);
+        System.out.println("@@elementNode.localStateBoolean(\"elPredicate\"): " + elementNode.localStateBoolean("elPredicate"));
 
         if (elementNode.localStateBoolean("elPredicate")) {
             String elPredicates = elementNode.getStringFromLocalState("elPredicate");
+            System.out.println("@@elPredicates: " + elPredicates);
             for (String elPredicate : elPredicates.split("\\s+")) {
                 MatchNode elPredicateNode = elementNode.getMatchNode(elPredicate.trim());
                 if (elPredicateNode != null) {
@@ -124,6 +133,7 @@ public class ElementMatch {
                 }
             }
         }
+        System.out.println("@@textOps.size: " + textOps.size());
 
         if (!textOps.isEmpty()) {
             defaultText = textOps.getFirst().text;
@@ -140,18 +150,22 @@ public class ElementMatch {
                     String attrName = m.group("attrName");   // named group
                     String predicate = m.group("predicate");   // named group
                     MatchNode predicateNode = elementNode.getMatchNode(predicate.trim());
+                    System.out.println("@@attrName: " + attrName + " predicateNode: " + predicateNode + "");
                     attributes.add(new Attribute(attrName, (String) predicateNode.getFromLocalState("predicateType"), predicateNode.getValueWrapper("predicateVal")));
                 } else {
                     throw new RuntimeException("Invalid attribute predicate: " + attr);
                 }
             }
         }
-
+        for (TextOp textOp : textOps) {
+            System.out.println("@@--textOp: " + textOp.text + " " + textOp.op);
+        }
 
         if (!categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
             ExecutionDictionary dict = getExecutionDictionary();
             List<XPathy> elPredictXPaths = new ArrayList<>();
             for (TextOp textOp : textOps) {
+                System.out.println("@@textOp: " + textOp.text + " " + textOp.op);
                 ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, textOp.text, textOp.op);
                 elPredictXPaths.add(categoryResolution.xpath());
             }

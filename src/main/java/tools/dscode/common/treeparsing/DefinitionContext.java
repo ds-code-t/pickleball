@@ -129,6 +129,7 @@ public final class DefinitionContext {
         ParseNode predicate = new ParseNode("(?:\\b(?<predicateType>starting with|ending with|containing|equaling|of)\\s+(?<predicateVal><<valueMask>>))") {
             @Override
             public String onCapture(MatchNode self) {
+                System.out.println("@@DEfinitionContext- predicate: " + self.originalText());
                 String predicateType = self.resolvedGroupText("predicateType");
                 predicateType = predicateType.replaceAll("with", "").replaceAll("of", "equaling").trim();
                 self.putToLocalState("predicateType", predicateType);
@@ -141,7 +142,7 @@ public final class DefinitionContext {
         ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<valueMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*") {
             @Override
             public String onSubstitute(MatchNode self) {
-
+                System.out.println("@@DEfinitionContext- elementMatch: " + self.originalText());
 //            self.getAncestor("phrase").putToLocalState("elementMatch", self);
                 self.putToLocalState("selectionType", self.resolvedGroupText("selectionType"));
                 String elementPosition = self.resolvedGroupText("elementPosition");
@@ -179,8 +180,9 @@ public final class DefinitionContext {
 
         ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?<unitMatch>\\s+(?<unit>second|minute|hour|day|week|month|year|time|number|integer|decimal|color|text)s?\\b)?") {
             public String onSubstitute(MatchNode self) {
-                String unitMatch = " Internal Value T" + self.groups().get("unit").trim().replaceAll("\\s$", "") + " ";
-//                if(!value.startsWith("<"))
+                System.out.println("@@DEfinitionContext- valueTransform: " + self.originalText());
+                String unitMatch = " Internal Value T" + self.groups().getOrDefault("unit","").trim().replaceAll("\\s$", "") + " ";
+                System.out.println("@@unitMatch: " + unitMatch);
                 return unitMatch;
             }
         };
@@ -247,7 +249,7 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode assertion = new ParseNode("\\b(?:starts? with|ends? with|contains?|match(?:es)?|displayed|(?:un)?selected|(?:un)?checked|enabled|disabled|equals?|less(?:er)?|greater|less|has\\s+value|?(?:has|is)\\s+blank)\\b") {
+        ParseNode assertion = new ParseNode("\\b(?:starts? with|ends? with|contains?|match(?:es)?|displayed|(?:un)?selected|(?:un)?checked|enabled|disabled|equals?|less(?:er)?|greater|less|has\\s+values?|(?:has|is|are)\\s+blank)\\b") {
             @Override
             public String onCapture(MatchNode self) {
                 self.parent().putToLocalState("assertion", self.originalText());
@@ -270,11 +272,11 @@ public final class DefinitionContext {
                   - position
                   - numericMask
                   - valueMask
-                  - valueTransform
                   - phrase:
                     - not
                     - key
                     - predicate
+                    - valueTransform
                     - elementMatch
                     - valueTypes
                     - assertionType
