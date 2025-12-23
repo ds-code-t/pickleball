@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
@@ -328,7 +329,7 @@ public abstract class PhraseData extends PassedData {
 
     public abstract PhraseData getNextResolvedPhrase();
 
-    private final LifecycleManager lifecycle = new LifecycleManager();
+//    private final LifecycleManager lifecycle = new LifecycleManager();
 
 
     public void syncWithDOM() {

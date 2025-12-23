@@ -90,6 +90,7 @@ public abstract class LineData implements Cloneable {
             String unmaskedLast = qp.restoreFromWithOuterBookend(bm.restoreFrom(lastChunk), BOOK_END);
             this.phrases.add(new Phrase(unmaskedLast, ' ', this));
         }
+        
         PhraseData lastPhrase = null;
         for (PhraseData phrase : this.phrases) {
             if (lastPhrase != null) {

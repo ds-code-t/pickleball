@@ -8,6 +8,7 @@ import tools.dscode.pickleruntime.CucumberOptionResolver;
 import java.net.URI;
 import java.net.URISyntaxException;
 
+import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static tools.dscode.common.util.DebugUtils.printDebug;
 import static tools.dscode.pickleruntime.CucumberOptionResolver.glueDistinct;
 
@@ -15,7 +16,7 @@ public aspect JavaBackend_LoadGlue_Mutator {
 
     private static final java.net.URI CORE_DEFS_URI =
             java.net.URI.create("classpath:/tools/dscode/coredefinitions");
-    private final LifecycleManager lifecycle = new LifecycleManager();
+//    private final LifecycleManager lifecycle = new LifecycleManager();
 
     // Loosened signature: match any void loadGlue(..) on JavaBackend and bind the two args
     void around(io.cucumber.core.backend.Glue glue, java.util.List gluePaths):
@@ -25,7 +26,7 @@ public aspect JavaBackend_LoadGlue_Mutator {
         java.util.List modified = new java.util.ArrayList();
         java.util.List globalPaths =  glueDistinct();
 
-        lifecycle.fire(Phase.BEFORE_CUCUMBER_RUN);
+//        lifecycle.fire(Phase.BEFORE_CUCUMBER_RUN);
 //        modified.remove("classpath:");
 //        modified.remove("classpath:/");
         for (Object o : globalPaths) {

@@ -200,7 +200,6 @@ public class ValueWrapper {
         return value.toString();
     }
 
-
     private boolean isNumeric(String s) {
         if (isNumeric != null) return isNumeric;
         if (type == ValueTypes.NUMERIC) {
@@ -221,6 +220,8 @@ public class ValueWrapper {
         isNumeric = true;
         return isNumeric;
     }
+
+
 
 
     public boolean isTruthy() {
@@ -244,6 +245,95 @@ public class ValueWrapper {
     public boolean isNullOrBlank() {
         return value == null || value.toString().isBlank();
     }
+
+
+    /**
+     * Best-guess value type for writing to XLSX:
+     * - quoted => String
+     * - true/false => Boolean
+     * - integer-like => Long (or BigInteger if too large)
+     * - decimal/scientific => Double
+     * - else => String
+     */
+    public Object asBestGuessXlsxValue() {
+        if (value == null) return null;
+
+        // Always strings if explicitly quoted
+        if (type == ValueTypes.DOUBLE_QUOTED
+                || type == ValueTypes.SINGLE_QUOTED
+                || type == ValueTypes.BACK_TICKED) {
+            return value.toString();
+        }
+
+        // Prefer booleans for textual "true"/"false"
+        String raw = value.toString().trim();
+        if (raw.equalsIgnoreCase("true")) return Boolean.TRUE;
+        if (raw.equalsIgnoreCase("false")) return Boolean.FALSE;
+
+        // If we already know it's a Boolean
+        if (type == ValueTypes.BOOLEAN && value instanceof Boolean b) {
+            return b;
+        }
+
+        // Numbers: choose integer vs double
+        if (type == ValueTypes.NUMERIC || looksNumeric(raw)) {
+            String s = raw.replace("_", ""); // allow 1_000 style if it slips in
+
+            // Integer form: optional leading -, digits only
+            if (looksInteger(s)) {
+                // Use BigInteger to parse safely, then downcast when possible
+                BigInteger bi = new BigInteger(s);
+                if (fitsInLong(bi)) return bi.longValue();
+                return bi; // caller can decide how to write huge ints
+            }
+
+            // Decimal/scientific form: use Double
+            // (XLSX stores numbers as double internally)
+            try {
+                return Double.parseDouble(s);
+            } catch (NumberFormatException ignored) {
+                // fall through to String
+            }
+        }
+
+        // Default: string
+        return value.toString();
+    }
+
+    private static boolean looksInteger(String s) {
+        if (s == null || s.isBlank()) return false;
+        int i = 0;
+        if (s.charAt(0) == '-') {
+            if (s.length() == 1) return false;
+            i = 1;
+        }
+        for (; i < s.length(); i++) {
+            if (!Character.isDigit(s.charAt(i))) return false;
+        }
+        return true;
+    }
+
+    private static boolean looksNumeric(String s) {
+        if (s == null) return false;
+        String t = s.trim();
+        if (t.isEmpty()) return false;
+
+        // Quick accept: digits/-, ., e/E, + (for exponent), underscores
+        // We’ll rely on parseDouble later for final validation.
+        for (int i = 0; i < t.length(); i++) {
+            char c = t.charAt(i);
+            if (!(Character.isDigit(c) || c == '-' || c == '.' || c == 'e' || c == 'E' || c == '+' || c == '_')) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean fitsInLong(BigInteger bi) {
+        return bi.compareTo(BigInteger.valueOf(Long.MIN_VALUE)) >= 0
+                && bi.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) <= 0;
+    }
+
 
 
 }

@@ -4,8 +4,24 @@ Feature: Addition
   @[DEBUG]
 #    * navigate to: URL.buttons
     * , from the Top Panel:
-#    : *  , click the  Link containing "Previous"
-    : * , if Link containing "Previous" is displayed, click it
+  : * Set report values
+    | xg    | s   | f   | d  | e | f     |
+    | 54345 | 222 | 333 | 44 | 5 | 66666 |
+
+  : * Set "Rep3" report values in "sht2" sheet
+    | a   | b   | cwwww   | d  | e | f     |
+    | 111 | 222 | 333 | 44 | 5 | 66666 |
+
+
+  : * Set report values
+    | xg2     | s2    | f2    | d2   | e2  | f2      |
+    | zz54345 | zz222 | zz333 | zz44 | zz5 | zz66666 |
+
+  : * Set "Rep3" report values in "sht2" sheet
+    | a   | b   | c   | d  | e | f     |
+    | 111 | 222 | 333 | 44 | 5 | 66666 |
+
+#  : * , if Link containing "Previous" is displayed, click it
 #    : * , if Link containing "Previous" is displayed, click the  Link containing "Previous"
 #  : * ,  if Link containing "Previous" is displayed, click it
 #    * , from the Top Panel:

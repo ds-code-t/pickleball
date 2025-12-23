@@ -9,6 +9,7 @@ import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
+import tools.dscode.common.reporting.WorkBook;
 import tools.dscode.common.status.SoftExceptionInterface;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.preparsing.ParsedLine;
@@ -17,8 +18,10 @@ import tools.dscode.registry.GlobalRegistry;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
+import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FAILED;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_HARD_FAILED;
@@ -30,6 +33,7 @@ import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
 
 public class CurrentScenarioState extends ScenarioMapping {
+    public final UUID id = UUID.randomUUID();
 
     public final TestCase testCase;
     public final Pickle pickle;
@@ -45,6 +49,9 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     public boolean debugBrowser = false;
 
+    WorkBook defaultReport;
+
+
 //    public ScenarioStep rootScenarioStep;
 
     public CurrentScenarioState(TestCase testCase) {
@@ -52,7 +59,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         this.pickle = (Pickle) getProperty(testCase, "pickle");
     }
 
-    private final LifecycleManager lifecycle = new LifecycleManager();
+//    private final LifecycleManager lifecycle = new LifecycleManager();
 
     public void startScenarioRun() {
         lifecycle.fire(Phase.BEFORE_SCENARIO_RUN);
