@@ -1,5 +1,6 @@
 package tools.dscode.common.treeparsing.preparsing;
 
+import io.cucumber.core.runner.StepExtension;
 import tools.dscode.common.mappings.JsonPathUtil;
 import tools.dscode.common.mappings.QuoteParser;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
@@ -14,6 +15,7 @@ import java.util.Objects;
 import java.util.Set;
 
 
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
@@ -59,7 +61,7 @@ public abstract class LineData implements Cloneable {
 
         String preParsedNormalized = normalizeWhitespace(fullyMasked)
                 .replaceAll("(?i)\\b(?:the|then|a)\\b", "")
-                .replaceAll("(\\d+)(?:\\\s*(?:st|nd|rd|th))", "#$1")
+                .replaceAll("(\\d+)(?:\\s*(?:st|nd|rd|th))", "#$1")
                 .replaceAll("\\bverifies\\b", "verify")
                 .replaceAll("\\bensures\\b", "ensure")
                 .replaceAll("\\bno\\b|n't\\b", " not ").replaceAll("\\s+", " ");
@@ -90,7 +92,7 @@ public abstract class LineData implements Cloneable {
             String unmaskedLast = qp.restoreFromWithOuterBookend(bm.restoreFrom(lastChunk), BOOK_END);
             this.phrases.add(new Phrase(unmaskedLast, ' ', this));
         }
-        
+
         PhraseData lastPhrase = null;
         for (PhraseData phrase : this.phrases) {
             if (lastPhrase != null) {

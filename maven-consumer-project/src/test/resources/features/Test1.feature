@@ -1,10 +1,21 @@
 Feature: Addition
 
+  Scenario Outline: sssgssatesssssf
+    @[DEBUG]
+    * , from the Top Panel:
+#  : * , enter "zz" in the "Name" Textbox
+  : * IF: <Work Group> THEN: , enter "AA" in the "Name" Textbox
+  : * IF: "<Work Group>" THEN: , enter "BB" in the "Name" Textbox
+
+    Examples:
+      | Work Group     |
+      | ASddfg Redfsdf |
+
 
   Scenario: gssatesssssf
   @[DEBUG]
     * , from the Top Panel:
-    : * , enter "AA" in the "Name" Textbox
+  : * , enter "AA" in the "Name" Textbox
 
 
   Scenario: ssatesss
@@ -16,8 +27,8 @@ Feature: Addition
     | 54345 | 222 | 333 | 44 | 5 | 66666 |
 
   : * Set "Rep3" report values in "sht2" sheet
-    | a   | b   | cwwww   | d  | e | f     |
-    | 111 | 222 | 333 | 44 | 5 | 66666 |
+    | a   | b   | cwwww | d  | e | f     |
+    | 111 | 222 | 333   | 44 | 5 | 66666 |
 
 
   : * Set report values

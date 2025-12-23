@@ -105,16 +105,22 @@ public final class DefinitionContext {
                 if (!context.isEmpty() && Character.isUpperCase(context.charAt(0)))
                     self.putToLocalState("newStartContext", true);
                 self.putToLocalState("context", context.toLowerCase());
-                self.putToLocalState("conditional", self.resolvedGroupText("conditional"));
+                String conditional = self.resolvedGroupText("conditional");
+                self.putToLocalState("conditional", conditional);
                 self.putToLocalState("conjunction", self.resolvedGroupText("conjunction"));
                 self.putToLocalState("body", self.resolvedGroupText("body"));
 //                String termination = self.resolvedGroupText("punc");
 //                if (termination == null || termination.isBlank()) termination = "";
 //                self.putToLocalState("termination", termination);
-                if (self.localStateBoolean("context")) {
+                if (conditional.contains("if")) {
+                    self.putToLocalState("assertionType", "conditional");
+                    self.localState().put("skip:action", "true");
+                    self.localState().put("skip:assertionType", "true");
+                } else if (self.localStateBoolean("context")) {
                     self.localState().put("skip:action", "true");
                     self.localState().put("skip:assertion", "true");
                     self.localState().put("skip:assertionType", "true");
+                    self.localState().put("skip:defaultAssertion", "true");
                 }
                 //            self.getAncestor("line").putToLocalState("phrase", self);
 //            return colorizeBookends(self.originalText(), BOLD(), BRIGHT_GREEN_TEXT());
@@ -184,7 +190,7 @@ public final class DefinitionContext {
             public String onSubstitute(MatchNode self) {
                 System.out.println("@@DEfinitionContext- valueTransform: " + self.originalText());
                 String value = " " + self.groups().get("value") + " ";
-                String unit = " " + VALUE_TYPE_MATCH + self.groups().getOrDefault("unit","").trim().replaceAll("\\s$", "") + " ";
+                String unit = " " + VALUE_TYPE_MATCH + self.groups().getOrDefault("unit", "").trim().replaceAll("\\s$", "") + " ";
                 System.out.println("@@value + unit: " + value + unit);
                 return value + unit;
             }
@@ -217,7 +223,6 @@ public final class DefinitionContext {
         ParseNode assertionType = new ParseNode("\\b(ensure|verify)\\b") {
             @Override
             public String onSubstitute(MatchNode self) {
-
                 self.parent().putToLocalState("assertionType", self.originalText());
                 self.parent().localState().put("skip:action", "true");
                 return self.originalText();
@@ -255,19 +260,27 @@ public final class DefinitionContext {
         ParseNode assertion = new ParseNode("\\b(?:starts? with|ends? with|contains?|match(?:es)?|displayed|(?:un)?selected|(?:un)?checked|enabled|disabled|equals?|less(?:er)?|greater|less|has\\s+values?|(?:has|is|are)\\s+blank)\\b") {
             @Override
             public String onCapture(MatchNode self) {
-                self.parent().putToLocalState("assertion", self.originalText());
+                String assertion = self.originalText().trim()
+                        .replaceAll("^(?:is|has|are)", "")
+                        .replaceAll("(?:with)$", "")
+                        .trim();
+                self.parent().putToLocalState("assertion", assertion);
                 self.parent().putToLocalState("operationIndex", self.start);
                 return self.originalText();
             }
         };
 
-//        ParseNode elementState = new ParseNode("\\b(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))<<elementMatch>>") {
-//            @Override
-//            public String onCapture(MatchNode self) {
-//                self.parent().putToLocalState("not", "not");
-//                return self.token();
-//            }
-//        };
+
+        ParseNode defaultAssertion = new ParseNode("<<elementMatch>>[^_]*\\sis\\s[^_]*<<elementMatch>>") {
+            @Override
+            public String onSubstitute(MatchNode self) {
+                MatchNode parentNode = self.parent();
+                if(!parentNode.localStateBoolean("context", "action", "assertion")) {
+                    parentNode.putToLocalState("assertion", "equal");
+                }
+                return self.originalText();
+            }
+        };
 
         ParseNode root = buildFromYaml("""
                 line:
@@ -283,8 +296,9 @@ public final class DefinitionContext {
                     - elementMatch
                     - valueTypes
                     - assertionType
-                    - assertion
                     - action
+                    - assertion
+                    - defaultAssertion
                 """);
 
         // Build the hierarchy AFTER the nodes above exist

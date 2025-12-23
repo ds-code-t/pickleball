@@ -20,7 +20,7 @@ public class ParsedAssertions {
 
 
     public static void executeAssertions(PhraseData phraseData) {
-
+        System.out.println("@@executeAssertions: " + phraseData);
 //        LinkedHashSet<ElementMatch> generalValueElements = phraseData.getElementMatch(ElementType.RETURNS_VALUE);
 //        LinkedHashSet<ElementMatch> htmlElements = phraseData.getElementMatch(ElementType.HTML_ELEMENT);
 //        LinkedHashSet<ElementMatch> nonHtmlElements = phraseData.getElementMatch(ElementType.VALUE_TYPE);
@@ -66,6 +66,7 @@ public class ParsedAssertions {
         ElementMatch a  = null;
         ElementMatch b = null;
 
+        System.out.println("@@assertionMatch: " + assertionMatch);
         switch (assertionMatch) {
             case String s when s.contains("equal") -> {
                 a = elementPrecedingOperation;
@@ -182,8 +183,6 @@ public class ParsedAssertions {
                                 modeArray
                         );
                     }
-
-
                 }
             }
 
@@ -198,17 +197,23 @@ public class ParsedAssertions {
             assertionMessage+= "\n" + b + ":\n"+ b.getValues();
         }
 
-        if (phraseData.phraseType.equals(PhraseData.PhraseType.ASSERTION)) {
-            if (!passed) {String errorMessage = "FAILED  " + assertionMessage;
-                if (phraseData.assertionType.equals("ensure"))
-                    throw new RuntimeException(errorMessage);
-                else
-                    throw new SoftRuntimeException(errorMessage);
+        System.out.println(assertionMessage);
+        switch (phraseData.assertionType) {
+            case "ensure" -> {
+                if (!passed) {
+                    throw new RuntimeException("FAILED  " + assertionMessage);
+                }
             }
-        } else {
-            System.out.println(assertionMessage);
-            phraseData.phraseConditionalMode = passed ? 1 : -1;
+            case "verify" -> {
+                if (!passed) {
+                    throw new SoftRuntimeException("FAILED  " + assertionMessage);
+                }
+            }
+            case "conditional" -> {
+                phraseData.phraseConditionalMode = passed ? 1 : -1;
+            }
         }
+
 
     }
 }

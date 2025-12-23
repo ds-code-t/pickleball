@@ -206,26 +206,22 @@ public class ValueWrapper {
             isNumeric = true;
             return isNumeric;
         }
-        String t = s.trim();
+        String t = s.strip();
         if (t.startsWith("-")) t = t.substring(1);
-        int dot = t.indexOf('.');
-        if (dot >= 0) t = t.substring(0, dot) + t.substring(dot + 1);
-        if (t.isEmpty()) return false;
-        for (int i = 0; i < t.length(); i++) {
-            if (!Character.isDigit(t.charAt(i))) {
-                isNumeric = false;
-                return isNumeric;
-            }
-        }
-        isNumeric = true;
+        t = t.replaceFirst("\\.", "").replaceAll("[0-9]", "");
+        isNumeric = t.isEmpty();
         return isNumeric;
     }
 
 
-
+    public boolean isNumeric() {
+        return isNumeric(normalizedText);
+    }
 
     public boolean isTruthy() {
-        if (isNumeric) {
+        if(type.toString().endsWith("QUOTED"))
+            return isStringTruthy(asNormalizedText());
+        if (isNumeric()) {
             return asBigInteger().signum() != 0;
         }
         return isStringTruthy(asNormalizedText());

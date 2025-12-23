@@ -195,18 +195,26 @@ public final class MatchNode {
         return list.getLast();
     }
 
-    public boolean localStateBoolean(String key) {
-        List<Object> list = localState.get(key);
-        if (list.isEmpty() || list.getLast() == null) return false;
-        String s = list.getLast().toString().toLowerCase().strip();
-        return !s.isBlank() && !s.equals("false") && !s.equals("0");
+    public boolean localStateBoolean(String... keys) {
+        for (String key : keys) {
+            List<Object> list = localState.get(key);
+            if (list.isEmpty() || list.getLast() == null) return false;
+            String s = list.getLast().toString().toLowerCase().strip();
+            if ((!s.isBlank() && !s.equals("false") && !s.equals("0")))
+                return true;
+        }
+        return false;
     }
 
-    public boolean globalStateBoolean(String key) {
-        List<Object> list = globalState.get(key);
-        if (list.isEmpty() || list.getLast() == null) return false;
-        String s = list.getLast().toString().toLowerCase().strip();
-        return !s.isBlank() && !s.equals("false") && !s.equals("0");
+    public boolean globalStateBoolean(String... keys) {
+        for (String key : keys) {
+            List<Object> list = globalState.get(key);
+            if (list.isEmpty() || list.getLast() == null) return false;
+            String s = list.getLast().toString().toLowerCase().strip();
+            if(!s.isBlank() && !s.equals("false") && !s.equals("0"))
+                return true;
+        }
+        return false;
     }
 
     public boolean putToLocalState(String key, Object value) {

@@ -119,6 +119,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void runStep(StepExtension stepExtension) {
+        currentStep = stepExtension;
 
 
         stepExtension.lineData = new ParsedLine(stepExtension.getUnmodifiedText());
@@ -140,7 +141,7 @@ public class CurrentScenarioState extends ScenarioMapping {
             }
         }
 
-        stepExtension.lineData = new ParsedLine(stepExtension.getUnmodifiedText());
+//        stepExtension.lineData = new ParsedLine(stepExtension.getUnmodifiedText());
         if (stepExtension.inheritedLineData != null) {
             stepExtension.lineData.inheritedContextPhrases.addAll(stepExtension.inheritedLineData.inheritedContextPhrases);
         }
@@ -167,7 +168,6 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     public void runningStep(StepExtension stepExtension) {
         System.out.println("Running " + stepExtension);
-        currentStep = stepExtension;
         if (!shouldRun(stepExtension)) return;
 
         Result result;

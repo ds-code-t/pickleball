@@ -203,6 +203,7 @@ public abstract class PhraseData extends PassedData {
         position = lineData.phrases.size();
         context = phraseNode.getStringFromLocalState("context");
         if (conditional.contains("if") || termination.equals('?')) {
+            assertionType = "conditional";
             phraseType = PhraseType.CONDITIONAL;
             assertion = phraseNode.getStringFromLocalState("assertion").replaceAll("s$", "").replaceAll("e?s\\s+", " ");
         } else if (!context.isBlank()) {
@@ -211,7 +212,6 @@ public abstract class PhraseData extends PassedData {
             contextXPathy = getXPathyContext(context, elementMatches);
         } else {
             action = phraseNode.getStringFromLocalState("action");
-
             if (!action.isBlank()) {
                 phraseType = PhraseType.ACTION;
             } else {
