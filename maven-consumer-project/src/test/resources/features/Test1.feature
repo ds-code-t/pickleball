@@ -1,5 +1,12 @@
 Feature: Addition
 
+
+  Scenario: gssatesssssf
+  @[DEBUG]
+    * , from the Top Panel:
+    : * , enter "AA" in the "Name" Textbox
+
+
   Scenario: ssatesss
   @[DEBUG]
 #    * navigate to: URL.buttons

@@ -51,7 +51,7 @@ public class ElementMatch {
     public Set<ExecutionDictionary.CategoryFlags> categoryFlags = new HashSet<>();
 
     public String toString() {
-        return (selectionType.isEmpty() ? "" : selectionType + " ") + (elementPosition.isEmpty() ? "" : elementPosition + " ") + textOps + " " + category;
+        return (selectionType.isEmpty() ? "" : selectionType + " ") + (elementPosition.isEmpty() ? "" : elementPosition + " ") + textOps + " " + category + " , elementTypes: " + elementTypes + "";
     }
 
     public List<ValueWrapper> nonHTMLValues = new ArrayList<>();

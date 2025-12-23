@@ -11,6 +11,7 @@ import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.FluentWait;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
+import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import java.time.Duration;
@@ -30,9 +31,13 @@ public final class LeanWaits {
         safeWaitForPageReady(parsingPhrase.webDriver, Duration.ofSeconds(60));
 
         for (ElementMatch elementMatch : parsingPhrase.elementMatches) {
-            elementMatch.findWrappedElements();
-            for (ElementWrapper elementWrapper : elementMatch.getElementWrappers()) {
-                safeWaitForElementReady(parsingPhrase.webDriver, elementWrapper.element, Duration.ofSeconds(60));
+            System.out.println("@@elementMatch1: " + elementMatch);
+            if (elementMatch.elementTypes.contains(ElementType.HTML_ELEMENT)) {
+                System.out.println("@@elementMatch2: " + elementMatch);
+                elementMatch.findWrappedElements();
+                for (ElementWrapper elementWrapper : elementMatch.getElementWrappers()) {
+                    safeWaitForElementReady(parsingPhrase.webDriver, elementWrapper.element, Duration.ofSeconds(60));
+                }
             }
         }
     }

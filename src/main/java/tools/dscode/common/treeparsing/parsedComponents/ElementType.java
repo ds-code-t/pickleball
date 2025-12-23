@@ -18,7 +18,7 @@ public enum ElementType {
     VALUE_TYPE, TIME_VALUE, NUMERIC_VALUE, INTEGER_VALUE, DECIMAL_VALUE, TEXT_VALUE,
     RETURNS_VALUE;
 
-    public static final String VALUE_TYPE_MATCH = "Internal Value T";
+    public static final String VALUE_TYPE_MATCH = "InternalValueUnit";
 
     private static final Map<String, ElementType> LOOKUP =
             Arrays.stream(values())
@@ -55,6 +55,9 @@ public enum ElementType {
                 .replace(' ', '_')
                 .replaceAll("S$", "")
                 .toUpperCase(Locale.ROOT);
+        System.out.println("@@normalized: " + normalized);
+        System.out.println("@@VALUE_TYPE_MATCH: " + VALUE_TYPE_MATCH);
+        System.out.println("@@normalized.startsWith(VALUE_TYPE_MATCH.toUpperCase(Locale.ROOT)): " + normalized.startsWith(VALUE_TYPE_MATCH.toUpperCase(Locale.ROOT)));
         if (normalized.startsWith(VALUE_TYPE_MATCH.toUpperCase(Locale.ROOT))) {
             switch (normalized.replace(VALUE_TYPE_MATCH, "")) {
                 case String x when TIME_UNITS.contains(x) -> returnSet.add(TIME_VALUE);

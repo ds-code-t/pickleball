@@ -23,6 +23,7 @@ import static tools.dscode.common.domoperations.VisibilityConditions.extractPred
 import static tools.dscode.common.domoperations.VisibilityConditions.invisible;
 import static tools.dscode.common.domoperations.VisibilityConditions.visible;
 import static tools.dscode.common.treeparsing.RegexUtil.betweenWithEscapes;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
 
 public final class DefinitionContext {
 
@@ -178,12 +179,14 @@ public final class DefinitionContext {
         };
 
 
-        ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?<unitMatch>\\s+(?<unit>second|minute|hour|day|week|month|year|time|number|integer|decimal|color|text)s?\\b)?") {
+        ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?!\\s*[A-Z])(?<unitMatch>\\s+(?<unit>second|minute|hour|day|week|month|year|time|number|integer|decimal|color|text)s?\\b)?") {
+            @Override
             public String onSubstitute(MatchNode self) {
                 System.out.println("@@DEfinitionContext- valueTransform: " + self.originalText());
-                String unitMatch = " Internal Value T" + self.groups().getOrDefault("unit","").trim().replaceAll("\\s$", "") + " ";
-                System.out.println("@@unitMatch: " + unitMatch);
-                return unitMatch;
+                String value = " " + self.groups().get("value") + " ";
+                String unit = " " + VALUE_TYPE_MATCH + self.groups().getOrDefault("unit","").trim().replaceAll("\\s$", "") + " ";
+                System.out.println("@@value + unit: " + value + unit);
+                return value + unit;
             }
         };
 

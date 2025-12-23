@@ -90,6 +90,8 @@ public class ParsedActions {
 
         System.out.println("Attempting " + action);
         System.out.println("@@elementMatch1 " + elementMatch1);
+        System.out.println("@@phraseData.firstElement)--- " + phraseData.firstElement);
+        System.out.println("@@phraseData.secondElement)--- " + phraseData.secondElement);
         switch (action) {
             case String s when s.contains("save") -> {
                 String keyName = phraseData.keyName.isBlank() ? "saved" : phraseData.keyName;
@@ -127,7 +129,16 @@ public class ParsedActions {
                 }
             }
             case String s when s.contains("enter") -> {
+                System.out.println("@@enter: elementMatch1: " + elementMatch1);
+                System.out.println("@@nonHtmlElements.size(): " + nonHtmlElements.size());
+                if(nonHtmlElements.size() > 0)
+                {
+                    System.out.println("@@nonHtmlElements.getFirst(): " + nonHtmlElements.getFirst());
+                    System.out.println("@@nonHtmlElements.getFirst().getValue(): " + nonHtmlElements.getFirst().getValue());
+                }
                 for (ElementWrapper elementWrapper : elementMatch1.getElementWrappers()) {
+                    System.out.println("@@elementWrapper::: " + elementWrapper);
+                    System.out.println("@@elementWrapper.getElement(::: " + elementWrapper.getElement());
                     typeText(driver, elementWrapper.getElement(), nonHtmlElements.getFirst().getValue().toString());
                 }
             }
