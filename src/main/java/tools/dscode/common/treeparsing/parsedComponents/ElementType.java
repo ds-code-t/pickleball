@@ -15,10 +15,13 @@ public enum ElementType {
     HTML_TYPE, HTML_ELEMENT, HTML_IFRAME, HTML_SHADOW_ROOT,
     BROWSER_TYPE, ALERT, BROWSER, BROWSER_WINDOW, BROWSER_TAB, URL,
     DATA_TYPE, DATA_ROW, DATA_TABLE,
-    VALUE_TYPE, TIME_VALUE, NUMERIC_VALUE, INTEGER_VALUE, DECIMAL_VALUE, TEXT_VALUE,
+    VALUE_TYPE, TIME_VALUE, NUMERIC_VALUE, INTEGER_VALUE, DECIMAL_VALUE, TEXT_VALUE, KEY_VALUE,
+    PLACE_HOLDER,
     RETURNS_VALUE;
 
     public static final String VALUE_TYPE_MATCH = "InternalValueUnit";
+    public static final String PLACE_HOLDER_MATCH = "PLACEHOLDER";
+
 
     private static final Map<String, ElementType> LOOKUP =
             Arrays.stream(values())
@@ -31,6 +34,7 @@ public enum ElementType {
     private String key() {
         return name(); // enum constant name is the canonical key
     }
+
 
     public static final Set<String> TIME_UNITS = Set.of(
             "MILLISECOND",
@@ -49,6 +53,9 @@ public enum ElementType {
             "INTEGER"
             );
 
+    public static final String KEY_NAME = "KEYNAME";
+
+
     public static Set<ElementType> fromString(String raw) {
         Set<ElementType> returnSet = new java.util.HashSet<>();
         String normalized = raw.trim()
@@ -58,8 +65,13 @@ public enum ElementType {
         System.out.println("@@normalized: " + normalized);
         System.out.println("@@VALUE_TYPE_MATCH: " + VALUE_TYPE_MATCH);
         System.out.println("@@normalized.startsWith(VALUE_TYPE_MATCH.toUpperCase(Locale.ROOT)): " + normalized.startsWith(VALUE_TYPE_MATCH.toUpperCase(Locale.ROOT)));
-        if (normalized.startsWith(VALUE_TYPE_MATCH.toUpperCase(Locale.ROOT))) {
+        if (normalized.equals(PLACE_HOLDER_MATCH)) {
+            returnSet.add(PLACE_HOLDER);
+            return returnSet;
+        }
+        else if (normalized.startsWith(VALUE_TYPE_MATCH.toUpperCase(Locale.ROOT))) {
             switch (normalized.replace(VALUE_TYPE_MATCH, "")) {
+                case String x when x.equals(KEY_NAME) -> returnSet.add(KEY_VALUE);
                 case String x when TIME_UNITS.contains(x) -> returnSet.add(TIME_VALUE);
                 case String x when NUMERIC_TYPES.contains(x) -> returnSet.add(NUMERIC_VALUE);
                 default -> returnSet.add(TEXT_VALUE);

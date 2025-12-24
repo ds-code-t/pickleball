@@ -40,6 +40,7 @@ public class ElementMatch {
     public List<Attribute> attributes = new ArrayList<>();
     public XPathy xPathy;
     public Set<ElementType> elementTypes;
+    public Set<ElementType> placeHolderElementTypes;
     public ContextWrapper contextWrapper;
     public List<String> defaultValueKeys = new ArrayList<>(List.of(ELEMENT_RETURN_VALUE, "value", "textContent"));
 //    public XPathChainResult matchedElements;

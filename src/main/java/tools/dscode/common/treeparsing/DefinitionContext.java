@@ -23,6 +23,8 @@ import static tools.dscode.common.domoperations.VisibilityConditions.extractPred
 import static tools.dscode.common.domoperations.VisibilityConditions.invisible;
 import static tools.dscode.common.domoperations.VisibilityConditions.visible;
 import static tools.dscode.common.treeparsing.RegexUtil.betweenWithEscapes;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.KEY_NAME;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
 
 public final class DefinitionContext {
@@ -60,6 +62,13 @@ public final class DefinitionContext {
 
         ParseNode numericMask = new ParseNode(NUMERIC_TOKEN);
 
+        ParseNode keyTransform = new ParseNode("\\bas\\s+(?<keyName><<quoteMask>>)(?!\\s*[A-Z])") {
+            public String onSubstitute(MatchNode self) {
+                String keyName = self.groups().get("keyName");
+                return keyName + " " + VALUE_TYPE_MATCH +  KEY_NAME;
+            }
+        };
+
         ParseNode valueMask = new ParseNode("<<numericMask>>|<<quoteMask>>") {
             @Override
             public String onCapture(MatchNode self) {
@@ -96,10 +105,12 @@ public final class DefinitionContext {
 
 
         //
-        ParseNode phrase = new ParseNode("^(?<conjunction>\\b(?:and|or)\\b)?\\s*(?<conditional>\\b(?:else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
+        ParseNode phrase = new ParseNode("^(?<separatorA>\\bthen\\b)?(?<conjunction>\\b(?:and|or)\\b)?(?<separatorB>\\bthen\\b)?(?<conjunction>\\b(?:and|or)\\b)?\\s*(?<conditional>\\b(?:else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
             @Override
             public String onCapture(MatchNode self) {
-
+                if (self.localStateBoolean("separatorA" , "separatorB")) {
+                    self.putToLocalState("separator", "true");
+                }
                 String context = self.resolvedGroupText("context");
 
                 if (!context.isEmpty() && Character.isUpperCase(context.charAt(0)))
@@ -238,14 +249,14 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode key = new ParseNode("\\bas\\s+(?<keyName><<valueMask>>)") {
-            @Override
-            public String onCapture(MatchNode self) {
-                self.parent().putToLocalState("keyName", self.resolvedGroupText("keyName"));
-//                return self.originalText();
-                return " ";
-            }
-        };
+//        ParseNode key = new ParseNode("\\bas\\s+(?<keyName><<valueMask>>)") {
+//            @Override
+//            public String onCapture(MatchNode self) {
+//                self.parent().putToLocalState("keyName", self.resolvedGroupText("keyName"));
+////                return self.originalText();
+//                return " ";
+//            }
+//        };
 
 
         ParseNode not = new ParseNode("\\b(?:not|none)\\b") {
@@ -257,12 +268,13 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode assertion = new ParseNode("\\b(?:starts? with|ends? with|contains?|match(?:es)?|displayed|(?:un)?selected|(?:un)?checked|enabled|disabled|equals?|less(?:er)?|greater|less|has\\s+values?|(?:has|is|are)\\s+blank)\\b") {
+        ParseNode assertion = new ParseNode("\\b(?:starts?\\s+with|ends?\\s+with|contains?|match(?:es)?|displayed|(?:un)?selected|(?:un)?checked|enabled|disabled|equals?|less\\s+than|greater\\s+than|has\\s+values?|(?:has|is)\\s+blank)\\b") {
             @Override
             public String onCapture(MatchNode self) {
                 String assertion = self.originalText().trim()
-                        .replaceAll("^(?:is|has|are)", "")
-                        .replaceAll("(?:with)$", "")
+                        .replaceAll("(start|end|contain|match|equal|values)(?:es|s)", "$1")
+                        .replaceAll("^(?:is|has)", "")
+                        .replaceAll("\\s+", " ")
                         .trim();
                 self.parent().putToLocalState("assertion", assertion);
                 self.parent().putToLocalState("operationIndex", self.start);
@@ -271,14 +283,28 @@ public final class DefinitionContext {
         };
 
 
-        ParseNode defaultAssertion = new ParseNode("<<elementMatch>>[^_]*\\sis\\s[^_]*<<elementMatch>>") {
+        ParseNode defaultAssertion = new ParseNode("<<elementMatch>>[^_]*\\s(?<defaultAssertion>is)\\s[^_]*<<elementMatch>>") {
             @Override
             public String onSubstitute(MatchNode self) {
                 MatchNode parentNode = self.parent();
                 if(!parentNode.localStateBoolean("context", "action", "assertion")) {
                     parentNode.putToLocalState("assertion", "equal");
+                    parentNode.putToLocalState("operationIndex",self.groups().start("defaultAssertion"));
                 }
                 return self.originalText();
+            }
+        };
+
+
+        ParseNode itPlaceholder = new ParseNode("\\bit\\b") {
+            @Override
+            public String onSubstitute(MatchNode self) {
+                MatchNode parentNode = self.parent();
+                if(!parentNode.localStateBoolean("context", "action", "assertion")) {
+                    parentNode.putToLocalState("assertion", "equal");
+                    parentNode.putToLocalState("operationIndex",self.groups().start("defaultAssertion"));
+                }
+                return " " +  PLACE_HOLDER_MATCH + " ";
             }
         };
 
@@ -287,6 +313,7 @@ public final class DefinitionContext {
                   - quoteMask
                   - position
                   - numericMask
+                  - keyTransform
                   - valueMask
                   - phrase:
                     - not

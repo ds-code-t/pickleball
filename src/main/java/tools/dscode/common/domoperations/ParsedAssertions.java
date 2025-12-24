@@ -1,7 +1,6 @@
 package tools.dscode.common.domoperations;
 
 
-
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.assertions.ValueWrapperCompareReducer;
 import tools.dscode.common.assertions.ValueWrapperComparisons;
@@ -11,16 +10,47 @@ import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashSet;
 
+import java.util.Locale;
 import java.util.Set;
 
 
 public class ParsedAssertions {
 
+    public enum AssertionOperations {
+        EQUAL, START_WITH, END_WITH, MATCH, HAS_VALUE, IS_BLANK, DISPLAYED, ENABLED,  SELECTED, IS_TRUE, IS_FALSE;
+
+        public static AssertionOperations requireAssertionFromContainingString(String input) {
+            if (input == null || input.isBlank()) {
+                throw new IllegalArgumentException("Action text was null. Expected one of: " + Arrays.toString(AssertionOperations.values()));
+            }
+
+            String normalized = input
+                    .trim()
+                    .toUpperCase(Locale.ROOT)
+                    .replaceAll("\\s+", "_").replaceAll("", "_");
+
+            return Arrays.stream(AssertionOperations.values())
+                    .sorted(Comparator.comparingInt(a -> -a.name().length())) // longest first
+                    .filter(a -> normalized.contains(a.name()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "No Action matched text: '" + input + "' (normalized: '" + normalized + "'). " +
+                                    "Expected one of: " + Arrays.toString(AssertionOperations.values())
+                    ));
+        }
+
+
+    }
+
 
     public static void executeAssertions(PhraseData phraseData) {
         System.out.println("@@executeAssertions: " + phraseData);
+
+
 //        LinkedHashSet<ElementMatch> generalValueElements = phraseData.getElementMatch(ElementType.RETURNS_VALUE);
 //        LinkedHashSet<ElementMatch> htmlElements = phraseData.getElementMatch(ElementType.HTML_ELEMENT);
 //        LinkedHashSet<ElementMatch> nonHtmlElements = phraseData.getElementMatch(ElementType.VALUE_TYPE);
@@ -40,8 +70,7 @@ public class ParsedAssertions {
         ElementMatch elementPrecedingOperation = phraseData.getElementMatch(ElementType.PRECEDING_OPERATION).stream().findFirst().orElse(null);
         ElementMatch elementFollowingOperation = phraseData.getElementMatch(ElementType.FOLLOWING_OPERATION).stream().findFirst().orElse(null);
 
-        ElementMatch precedingOperation = phraseData.getElementMatch(phraseData.elementBeforeOperation, ElementType.PRECEDING_OPERATION).stream().findFirst().orElse(null);
-
+        ElementMatch precedingOperation = phraseData.getElementMatch(phraseData.getElementBeforeOperation(), ElementType.PRECEDING_OPERATION).stream().findFirst().orElse(null);
 
 
         Set<ValueWrapperCompareReducer.Mode> modeSet = new HashSet<>();
@@ -51,24 +80,22 @@ public class ParsedAssertions {
             modeSet.add(ValueWrapperCompareReducer.Mode.NONE);
         if (phraseData.selectionType.equals("not"))
             modeSet.add(ValueWrapperCompareReducer.Mode.NOT);
-        if (phraseData.assertion.startsWith("un") || phraseData.assertion.startsWith("disable"))
+        if (phraseData.getAssertion().startsWith("un") || phraseData.getAssertion().startsWith("disable"))
             modeSet.add(ValueWrapperCompareReducer.Mode.UN);
 
-        String assertionMatch = phraseData.assertion
-                .replaceAll("disable", "enable")
-                .replaceAll("^un", "")
-                .replaceAll("check", "select");
+
+
 
         ValueWrapperCompareReducer.Mode[] modeArray = modeSet.toArray(new ValueWrapperCompareReducer.Mode[0]);
 
         boolean passed;
 
-        ElementMatch a  = null;
+        ElementMatch a = null;
         ElementMatch b = null;
 
-        System.out.println("@@assertionMatch: " + assertionMatch);
-        switch (assertionMatch) {
-            case String s when s.contains("equal") -> {
+        System.out.println("@@assertionMatch: " + phraseData.assertionOperation);
+        switch (phraseData.assertionOperation) {
+            case EQUAL -> {
                 a = elementPrecedingOperation;
                 b = elementFollowingOperation;
                 passed = ValueWrapperCompareReducer.eval(
@@ -78,7 +105,7 @@ public class ParsedAssertions {
                         modeArray
                 );
             }
-            case String s when s.contains("start with") -> {
+            case START_WITH -> {
                 a = elementPrecedingOperation;
                 b = elementFollowingOperation;
                 passed = ValueWrapperCompareReducer.eval(
@@ -88,7 +115,7 @@ public class ParsedAssertions {
                         modeArray
                 );
             }
-            case String s when s.contains("end with") -> {
+            case END_WITH -> {
                 a = elementPrecedingOperation;
                 b = elementFollowingOperation;
                 passed = ValueWrapperCompareReducer.eval(
@@ -98,7 +125,7 @@ public class ParsedAssertions {
                         modeArray
                 );
             }
-            case String s when s.contains("match") -> {
+            case MATCH -> {
                 a = elementPrecedingOperation;
                 b = elementFollowingOperation;
                 passed = ValueWrapperCompareReducer.eval(
@@ -106,11 +133,11 @@ public class ParsedAssertions {
                         a.getValues(),
                         b.getValues(),
                         modeArray
-                );            }
+                );
+            }
 
 
-
-            case String s when s.contains("display") -> {
+            case DISPLAYED -> {
                 a = firstHTMLElementValue;
                 passed =
                         ValueWrapperCompareReducer.evalElements(
@@ -120,7 +147,7 @@ public class ParsedAssertions {
                         );
             }
 
-            case String s when s.contains("enable") -> {
+            case ENABLED -> {
                 a = firstHTMLElementValue;
                 passed =
                         ValueWrapperCompareReducer.evalElements(
@@ -130,7 +157,7 @@ public class ParsedAssertions {
                         );
             }
 
-            case String s when s.contains("selected") -> {
+            case SELECTED -> {
                 a = firstHTMLElementValue;
                 passed =
                         ValueWrapperCompareReducer.evalElements(
@@ -140,44 +167,42 @@ public class ParsedAssertions {
                         );
             }
 
-            case String s when s.contains("has value") -> {
+            case HAS_VALUE -> {
                 a = precedingOperation;
-                passed =  ValueWrapperCompareReducer.evalValues(
+                passed = ValueWrapperCompareReducer.evalValues(
                         ValueWrapper::hasValue,
                         a.getValues(),
                         modeArray
                 );
             }
 
-            case String s when s.contains("isBlank") -> {
+            case IS_BLANK -> {
                 a = precedingOperation;
-                passed =  ValueWrapperCompareReducer.evalValues(
-                            ValueWrapper::isBlank,
-                            a.getValues(),
-                            modeArray
-                    );
+                passed = ValueWrapperCompareReducer.evalValues(
+                        ValueWrapper::isBlank,
+                        a.getValues(),
+                        modeArray
+                );
             }
 
 
             default -> {
-                a = phraseData.firstElement;
-                b = phraseData.secondElement;
-                if(a != null && b != null) {
+                a = phraseData.getFirstElement();
+                b = phraseData.getSecondElement();
+                if (a != null && b != null) {
                     passed = ValueWrapperCompareReducer.eval(
                             ValueWrapperComparisons::equals,
                             a.getValues(),
                             b.getValues(),
                             modeArray
                     );
-                }
-                else {
+                } else {
                     ElementMatch singleMatch = a == null ? b : a;
 
-                    if(singleMatch == null) {
+                    if (singleMatch == null) {
                         passed = false;
-                    }
-                    else {
-                        passed =  ValueWrapperCompareReducer.evalValues(
+                    } else {
+                        passed = ValueWrapperCompareReducer.evalValues(
                                 ValueWrapper::isTruthy,
                                 singleMatch.getValues(),
                                 modeArray
@@ -188,13 +213,11 @@ public class ParsedAssertions {
 
         }
         String assertionMessage = "Assertion phrase '" + phraseData.text + "' evaluates to: " + passed;
-        if(a!= null)
-        {
-            assertionMessage+= "\n" + a + ":\n"+ a.getValues();
+        if (a != null) {
+            assertionMessage += "\n" + a + ":\n" + a.getValues();
         }
-        if(b!= null)
-        {
-            assertionMessage+= "\n" + b + ":\n"+ b.getValues();
+        if (b != null) {
+            assertionMessage += "\n" + b + ":\n" + b.getValues();
         }
 
         System.out.println(assertionMessage);

@@ -36,9 +36,9 @@ public abstract class LineData implements Cloneable {
     //    public final List<PhraseData> contextPhrases = new ArrayList<>();
 
     @Override
-   public String toString() {
-        return this.original + " " +  phrases;
-   }
+    public String toString() {
+        return this.original + " " + phrases;
+    }
 
     public LineData(String input, Collection<Character> delimiters) {
 
@@ -60,8 +60,11 @@ public abstract class LineData implements Cloneable {
             return;
 
         String preParsedNormalized = normalizeWhitespace(fullyMasked)
-                .replaceAll("(?i)\\b(?:the|then|a)\\b", "")
-                .replaceAll("(\\d+)(?:\\s*(?:st|nd|rd|th))", "#$1")
+//                .replaceAll("\\b(?:the|then|a)\\b", "")
+                .replaceAll("\\b(?:the|a)\\b", "")
+                .replaceAll("\\bare\\b", "is")
+                .replaceAll("\\bhave\\b", "has")
+                .replaceAll("(\\d+)(?:\\s*(?:st|nd|rd|th)\\b)", "#$1")
                 .replaceAll("\\bverifies\\b", "verify")
                 .replaceAll("\\bensures\\b", "ensure")
                 .replaceAll("\\bno\\b|n't\\b", " not ").replaceAll("\\s+", " ");
@@ -99,9 +102,82 @@ public abstract class LineData implements Cloneable {
                 phrase.previousPhrase = lastPhrase;
                 lastPhrase.nextPhrase = phrase;
             }
+
+            if (lastPhrase != null) {
+                if (phrase.phraseType == null) {
+                    if (lastPhrase.phraseType == PhraseData.PhraseType.ACTION) {
+                        phrase.phraseType = PhraseData.PhraseType.ACTION;
+                        phrase.setAction(lastPhrase.getAction());
+                        phrase.operationPhrase = true;
+                    }
+                }
+            }
+
             lastPhrase = phrase;
+
         }
+
+        checkForMissingData();
+
+
+
+        //TODO:
+        PhraseData currentPhrase = this.phrases.isEmpty() ? null : this.phrases.getFirst();
+        lastPhrase = null;
+        while (currentPhrase != null) {
+            if (currentPhrase.phraseType == null) {
+                if(!currentPhrase.elementMatches.isEmpty())
+                {
+
+                }
+
+
+            }
+
+
+            lastPhrase = currentPhrase;
+            currentPhrase = currentPhrase.nextPhrase;
+
+        }
+
+        for (PhraseData phrase : this.phrases) {
+
+            if (phrase.context.isBlank() && !phrase.operationPhrase) {
+
+
+            }
+
+            if (!phrase.assertionType.isBlank()) {
+
+
+            }
+
+        }
+
     }
+
+
+    private boolean checkForMissingData() {
+        boolean anyMissingData = false;
+        for (PhraseData phrase : this.phrases) {
+            if (phrase.phraseType == null) {
+                phrase.missingData = true;
+                anyMissingData = true;
+            }
+
+            if (phrase.phraseType == PhraseData.PhraseType.CONDITIONAL && phrase.getAssertion().isBlank()) {
+                phrase.missingData = true;
+                anyMissingData = true;
+            }
+
+            if (phrase.phraseType == PhraseData.PhraseType.ASSERTION && (phrase.getAssertion().isBlank() || phrase.assertionType.isBlank())) {
+                phrase.missingData = true;
+                anyMissingData = true;
+            }
+        }
+        return anyMissingData;
+    }
+
 
     /**
      * Original, unmodified input.

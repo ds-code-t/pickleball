@@ -9,10 +9,37 @@ import java.util.Map;
 public abstract class PassedData {
 
     public int elementCount;
-    public ElementMatch firstElement = null;
-    public ElementMatch secondElement = null;
-    public ElementMatch elementBeforeOperation = null;
-    public ElementMatch elementAfterOperation = null;
+
+    public ElementMatch getFirstElement() {
+        if(firstElement == null || firstElement.elementTypes.contains(ElementType.PLACE_HOLDER))
+            return null;
+        return firstElement;
+    }
+
+    public ElementMatch getSecondElement() {
+        if( secondElement == null ||  secondElement.elementTypes.contains(ElementType.PLACE_HOLDER))
+            return null;
+        return secondElement;
+    }
+
+    public ElementMatch getElementBeforeOperation() {
+        if( elementBeforeOperation == null ||  elementBeforeOperation.elementTypes.contains(ElementType.PLACE_HOLDER))
+            return null;
+        return elementBeforeOperation;
+    }
+
+    public ElementMatch getElementAfterOperation() {
+        if(elementAfterOperation == null ||  elementAfterOperation.elementTypes.contains(ElementType.PLACE_HOLDER))
+            return null;
+        return elementAfterOperation;
+    }
+
+    protected ElementMatch firstElement = null;
+    protected ElementMatch secondElement = null;
+    protected ElementMatch elementBeforeOperation = null;
+    protected ElementMatch elementAfterOperation = null;
+
+
     public ElementMatch lastElement = null;
 
     public List<ElementMatch> elementMatches = new ArrayList<>();

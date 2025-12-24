@@ -89,7 +89,7 @@ public class ContextWrapper {
                 }
 
                     printDebug("##searchContext-1 " + searchContext);
-                    searchContext = getExecutionDictionary().applyContextBuilder(phraseData.firstElement.category, phraseData.firstElement.defaultText, phraseData.firstElement.defaultTextOp, elementMatch.parentPhrase.webDriver, searchContext);
+                    searchContext = getExecutionDictionary().applyContextBuilder(phraseData.getFirstElement().category, phraseData.getFirstElement().defaultText, phraseData.getFirstElement().defaultTextOp, elementMatch.parentPhrase.webDriver, searchContext);
                     printDebug("##searchContext-2 " + searchContext);
                 if(searchContext == null)
                     break;

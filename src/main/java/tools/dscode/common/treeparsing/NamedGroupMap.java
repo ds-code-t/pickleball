@@ -6,6 +6,8 @@ import java.util.regex.Pattern;
 
 public class NamedGroupMap extends java.util.HashMap<String, String> {
 
+    private static final String START_INDEX_PREFIX = "_indexOf_";
+
     public NamedGroupMap(Pattern pattern, MatchResult result) {
         super();
 
@@ -27,6 +29,7 @@ public class NamedGroupMap extends java.util.HashMap<String, String> {
                 String value = result.group(groupIndex);
                 if (value != null) {
                     this.put(name, value);
+                    this.put(START_INDEX_PREFIX + name, String.valueOf(result.start(groupIndex)));
                 }
             }
         } catch (UnsupportedOperationException | NoSuchMethodError e) {
@@ -43,6 +46,16 @@ public class NamedGroupMap extends java.util.HashMap<String, String> {
     public String get(Object key) {
         String value = super.get(key);
         return (value == null || value.isBlank()) ? null : value;
+    }
+
+    public Integer start(String key) {
+        String value = super.get(START_INDEX_PREFIX +  key);
+        try {
+            return Integer.parseInt(value);
+        }
+        catch (NumberFormatException e) {
+            return null;
+        }
     }
 
 
