@@ -7,9 +7,11 @@ import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
+import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatcher;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -40,7 +42,7 @@ public class ElementMatch {
     public List<Attribute> attributes = new ArrayList<>();
     public XPathy xPathy;
     public Set<ElementType> elementTypes;
-    public Set<ElementType> placeHolderElementTypes;
+    public ElementMatcher elementMatcher;
     public ContextWrapper contextWrapper;
     public List<String> defaultValueKeys = new ArrayList<>(List.of(ELEMENT_RETURN_VALUE, "value", "textContent"));
 //    public XPathChainResult matchedElements;
@@ -68,12 +70,17 @@ public class ElementMatch {
 
     WebDriver driver;
 
+    private boolean isPlaceHolder = false;
+    public boolean isPlaceHolder() {
+        return isPlaceHolder;
+    }
+
     public List<ElementWrapper> findWrappedElements() {
-        System.out.println("@@findWrappedElements1: " + this);
-        System.out.println("@@findWrappedElements2: " + wrappedElements);
+
+
         if (wrappedElements != null) return wrappedElements;
         driver = parentPhrase.webDriver;
-        System.out.println("@@findWrappedElements3: " + driver);
+
         try {
             wrappedElements = getWrappedElements(this);
         } catch (Throwable t) {
@@ -97,15 +104,21 @@ public class ElementMatch {
             this(text, getOpFromString(op));
         }
     }
+    public ElementMatch(PhraseData phraseData) {
+        this.parentPhrase = phraseData;
+        isPlaceHolder = true;
+        this.startIndex = -1;
+        this.position = -1;
+    }
 
-    public ElementMatch(MatchNode elementNode) {
-        System.out.println("\n\n@@ElementMatch: " + elementNode);
+    public ElementMatch(PhraseData phraseData, MatchNode elementNode) {
+        this.parentPhrase = phraseData;
         this.startIndex = elementNode.start;
         this.position = elementNode.position;
         this.state = elementNode.getStringFromLocalState("state");
 
         this.category = elementNode.getStringFromLocalState("type");
-        System.out.println("@@this.category: " +  this.category);
+
         this.elementPosition = elementNode.getStringFromLocalState("elementPosition");
         this.selectionType = elementNode.getStringFromLocalState("selectionType");
 
@@ -120,13 +133,13 @@ public class ElementMatch {
         categoryFlags.addAll(getExecutionDictionary().getResolvedCategoryFlags(category));
         this.elementTypes = ElementType.fromString(this.category);
 
-        System.out.println("@@categoryFlags: " + categoryFlags);
-        System.out.println("@@elementTypes: " + elementTypes);
-        System.out.println("@@elementNode.localStateBoolean(\"elPredicate\"): " + elementNode.localStateBoolean("elPredicate"));
+
+
+
 
         if (elementNode.localStateBoolean("elPredicate")) {
             String elPredicates = elementNode.getStringFromLocalState("elPredicate");
-            System.out.println("@@elPredicates: " + elPredicates);
+
             for (String elPredicate : elPredicates.split("\\s+")) {
                 MatchNode elPredicateNode = elementNode.getMatchNode(elPredicate.trim());
                 if (elPredicateNode != null) {
@@ -134,7 +147,7 @@ public class ElementMatch {
                 }
             }
         }
-        System.out.println("@@textOps.size: " + textOps.size());
+
 
         if (!textOps.isEmpty()) {
             defaultText = textOps.getFirst().text;
@@ -151,7 +164,7 @@ public class ElementMatch {
                     String attrName = m.group("attrName");   // named group
                     String predicate = m.group("predicate");   // named group
                     MatchNode predicateNode = elementNode.getMatchNode(predicate.trim());
-                    System.out.println("@@attrName: " + attrName + " predicateNode: " + predicateNode + "");
+
                     attributes.add(new Attribute(attrName, (String) predicateNode.getFromLocalState("predicateType"), predicateNode.getValueWrapper("predicateVal")));
                 } else {
                     throw new RuntimeException("Invalid attribute predicate: " + attr);
@@ -159,14 +172,14 @@ public class ElementMatch {
             }
         }
         for (TextOp textOp : textOps) {
-            System.out.println("@@--textOp: " + textOp.text + " " + textOp.op);
+
         }
 
         if (!categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
             ExecutionDictionary dict = getExecutionDictionary();
             List<XPathy> elPredictXPaths = new ArrayList<>();
             for (TextOp textOp : textOps) {
-                System.out.println("@@textOp: " + textOp.text + " " + textOp.op);
+
                 ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, textOp.text, textOp.op);
                 elPredictXPaths.add(categoryResolution.xpath());
             }
@@ -248,18 +261,23 @@ public class ElementMatch {
 //return getElementWrappers().stream().map(elementWrapper -> elementWrapper.getElement())
 //    }
 
-    public List<ValueWrapper> getValues(String valueType) {
-        List<ValueWrapper> returnList = new ArrayList<>();
-        if (elementTypes.contains(ElementType.HTML_TYPE)) {
-            getElementWrappers().forEach(e -> returnList.add(e.getElementReturnValue()));
-        } else {
-            returnList.addAll(nonHTMLValues);
-        }
-        return returnList;
-    }
+//    public List<ValueWrapper> getValues(String valueType) {
+//        List<ValueWrapper> returnList = new ArrayList<>();
+//        if (elementTypes.contains(ElementType.HTML_TYPE)) {
+//            getElementWrappers().forEach(e -> returnList.add(e.getElementReturnValue()));
+//        } else {
+//            returnList.addAll(nonHTMLValues);
+//        }
+//        return returnList;
+//    }
 
 
     public List<ValueWrapper> getValues() {
+        if(isPlaceHolder())
+        {
+
+
+        }
         List<ValueWrapper> returnList = new ArrayList<>();
         if (elementTypes.contains(ElementType.HTML_TYPE)) {
             getElementWrappers().forEach(e -> returnList.add(e.getElementReturnValue()));

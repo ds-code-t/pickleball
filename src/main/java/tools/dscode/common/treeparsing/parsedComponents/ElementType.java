@@ -16,7 +16,7 @@ public enum ElementType {
     BROWSER_TYPE, ALERT, BROWSER, BROWSER_WINDOW, BROWSER_TAB, URL,
     DATA_TYPE, DATA_ROW, DATA_TABLE,
     VALUE_TYPE, TIME_VALUE, NUMERIC_VALUE, INTEGER_VALUE, DECIMAL_VALUE, TEXT_VALUE, KEY_VALUE,
-    PLACE_HOLDER,
+//    PLACE_HOLDER,
     RETURNS_VALUE;
 
     public static final String VALUE_TYPE_MATCH = "InternalValueUnit";
@@ -62,15 +62,8 @@ public enum ElementType {
                 .replace(' ', '_')
                 .replaceAll("S$", "")
                 .toUpperCase(Locale.ROOT);
-        System.out.println("@@normalized: " + normalized);
-        System.out.println("@@VALUE_TYPE_MATCH: " + VALUE_TYPE_MATCH);
-        System.out.println("@@normalized.startsWith(VALUE_TYPE_MATCH.toUpperCase(Locale.ROOT)): " + normalized.startsWith(VALUE_TYPE_MATCH.toUpperCase(Locale.ROOT)));
-        if (normalized.equals(PLACE_HOLDER_MATCH)) {
-            returnSet.add(PLACE_HOLDER);
-            return returnSet;
-        }
-        else if (normalized.startsWith(VALUE_TYPE_MATCH.toUpperCase(Locale.ROOT))) {
-            switch (normalized.replace(VALUE_TYPE_MATCH, "")) {
+        if (normalized.startsWith(VALUE_TYPE_MATCH.toUpperCase(Locale.ROOT))) {
+            switch (normalized.substring(VALUE_TYPE_MATCH.length())) {
                 case String x when x.equals(KEY_NAME) -> returnSet.add(KEY_VALUE);
                 case String x when TIME_UNITS.contains(x) -> returnSet.add(TIME_VALUE);
                 case String x when NUMERIC_TYPES.contains(x) -> returnSet.add(NUMERIC_VALUE);

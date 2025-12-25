@@ -43,18 +43,18 @@ public class ReportingSteps {
 
     @When("^Set (?:\"(.+)\" )?report values(?: in \"(.+)\" sheet)?$")
     public void setRow(String reportPath, String sheetName, DataTable dataTable) {
-        System.out.println("@@setRow: " + reportPath + " " + sheetName + " " + dataTable);
+
         Report report =  getReport(reportPathPreProcess(reportPath));
         if(sheetName != null && !sheetName.isBlank())
             report = report.sheet(sheetName);
         List<List<String>> lists = dataTable.asLists();
         String rowKey = getCurrentScenarioState().id.toString();
-        System.out.println("@@rowKey: " + rowKey);
+
         for(int i = 0; i < lists.getFirst().size();   i++)
         {
             String header = lists.getFirst().get(i);
             ValueWrapper value = createValueWrapper(lists.get(1).get(i));
-            System.out.println("@@setRow: " + header + " " + value);
+
             report.put(rowKey, header , value.asBestGuessXlsxValue());
         }
     }

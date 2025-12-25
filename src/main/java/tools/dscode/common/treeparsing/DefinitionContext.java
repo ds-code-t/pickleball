@@ -53,7 +53,7 @@ public final class DefinitionContext {
         ParseNode quoteMask = new ParseNode(betweenWithEscapes(BOOK_END, BOOK_END) + "|" + NUMERIC_TOKEN) {
             @Override
             public String onCapture(String s) {
-                System.out.println("@@s:::: " + s);
+
                 return s.substring(1, s.length() - 1);
             }
         };
@@ -65,6 +65,7 @@ public final class DefinitionContext {
         ParseNode keyTransform = new ParseNode("\\bas\\s+(?<keyName><<quoteMask>>)(?!\\s*[A-Z])") {
             public String onSubstitute(MatchNode self) {
                 String keyName = self.groups().get("keyName");
+
                 return keyName + " " + VALUE_TYPE_MATCH +  KEY_NAME;
             }
         };
@@ -105,7 +106,7 @@ public final class DefinitionContext {
 
 
         //
-        ParseNode phrase = new ParseNode("^(?<separatorA>\\bthen\\b)?(?<conjunction>\\b(?:and|or)\\b)?(?<separatorB>\\bthen\\b)?(?<conjunction>\\b(?:and|or)\\b)?\\s*(?<conditional>\\b(?:else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
+        ParseNode phrase = new ParseNode("^(?<separatorA>\\bthen\\b)?(?<conjunction>\\b(?:and|or)\\b)?(?<separatorB>\\bthen\\b)?\\s*(?<conditional>\\b(?:else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
             @Override
             public String onCapture(MatchNode self) {
                 if (self.localStateBoolean("separatorA" , "separatorB")) {
@@ -147,7 +148,7 @@ public final class DefinitionContext {
         ParseNode predicate = new ParseNode("(?:\\b(?<predicateType>starting with|ending with|containing|equaling|of)\\s+(?<predicateVal><<valueMask>>))") {
             @Override
             public String onCapture(MatchNode self) {
-                System.out.println("@@DEfinitionContext- predicate: " + self.originalText());
+
                 String predicateType = self.resolvedGroupText("predicateType");
                 predicateType = predicateType.replaceAll("with", "").replaceAll("of", "equaling").trim();
                 self.putToLocalState("predicateType", predicateType);
@@ -160,7 +161,7 @@ public final class DefinitionContext {
         ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<valueMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*") {
             @Override
             public String onSubstitute(MatchNode self) {
-                System.out.println("@@DEfinitionContext- elementMatch: " + self.originalText());
+
 //            self.getAncestor("phrase").putToLocalState("elementMatch", self);
                 self.putToLocalState("selectionType", self.resolvedGroupText("selectionType"));
                 String elementPosition = self.resolvedGroupText("elementPosition");
@@ -199,10 +200,10 @@ public final class DefinitionContext {
         ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?!\\s*[A-Z])(?<unitMatch>\\s+(?<unit>second|minute|hour|day|week|month|year|time|number|integer|decimal|color|text)s?\\b)?") {
             @Override
             public String onSubstitute(MatchNode self) {
-                System.out.println("@@DEfinitionContext- valueTransform: " + self.originalText());
+
                 String value = " " + self.groups().get("value") + " ";
                 String unit = " " + VALUE_TYPE_MATCH + self.groups().getOrDefault("unit", "").trim().replaceAll("\\s$", "") + " ";
-                System.out.println("@@value + unit: " + value + unit);
+
                 return value + unit;
             }
         };
@@ -243,6 +244,7 @@ public final class DefinitionContext {
         ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite|save)(?:s|ed|ing|es)?\\b") {
             @Override
             public String onCapture(MatchNode self) {
+
                 self.parent().putToLocalState("action", self.resolvedGroupText("base"));
                 self.parent().putToLocalState("operationIndex", self.start);
                 return self.resolvedGroupText("base").replaceAll("move", "hover");
@@ -317,7 +319,6 @@ public final class DefinitionContext {
                   - valueMask
                   - phrase:
                     - not
-                    - key
                     - predicate
                     - valueTransform
                     - elementMatch

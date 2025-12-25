@@ -106,9 +106,11 @@ public abstract class LineData implements Cloneable {
             if (lastPhrase != null) {
                 if (phrase.phraseType == null) {
                     if (lastPhrase.phraseType == PhraseData.PhraseType.ACTION) {
-                        phrase.phraseType = PhraseData.PhraseType.ACTION;
-                        phrase.setAction(lastPhrase.getAction());
-                        phrase.operationPhrase = true;
+                        if(!phrase.elementMatches.isEmpty()) {
+                            phrase.phraseType = PhraseData.PhraseType.ACTION;
+                            phrase.setAction(lastPhrase.getAction());
+                            phrase.operationPhrase = true;
+                        }
                     }
                 }
             }
@@ -124,10 +126,14 @@ public abstract class LineData implements Cloneable {
         //TODO:
         PhraseData currentPhrase = this.phrases.isEmpty() ? null : this.phrases.getFirst();
         lastPhrase = null;
+
         while (currentPhrase != null) {
             if (currentPhrase.phraseType == null) {
                 if(!currentPhrase.elementMatches.isEmpty())
                 {
+
+
+
 
                 }
 

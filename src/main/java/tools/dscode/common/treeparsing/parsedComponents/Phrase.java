@@ -7,7 +7,6 @@ import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 
 import static tools.dscode.common.domoperations.ParsedActions.executeAction;
-import static tools.dscode.common.domoperations.ParsedAssertions.executeAssertions;
 import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
 
 public final class Phrase extends PhraseData {
@@ -72,11 +71,13 @@ public final class Phrase extends PhraseData {
 //        }
 
         if (phraseType.equals(PhraseType.CONDITIONAL)) {
-            executeAssertions(this);
+            runOperation();
         } else if (phraseType.equals(PhraseType.ASSERTION)) {
-            executeAssertions(this);
+            runOperation();
+//            executeAssertions(this);
         } else if (phraseType.equals(PhraseType.ACTION)) {
-            executeAction(webDriver, this);
+            runOperation();
+//            executeAction(webDriver, this);
         } else if (phraseType.equals(PhraseType.CONTEXT)) {
             processContextPhrase();
         }
@@ -94,7 +95,7 @@ public final class Phrase extends PhraseData {
 
 
     void processContextPhrase() {
-        System.out.println("@@processContextPhrase(): " + this + "\n elementMatch.selectionType: " + firstElement.selectionType);
+
         if (firstElement.selectionType.isEmpty()) {
             contextPhrases.add(this);
         } else {
@@ -128,6 +129,7 @@ public final class Phrase extends PhraseData {
     @Override
     public PhraseData clonePhrase(PhraseData previous) {
         Phrase clone = new Phrase(text, termination, parsedLine);
+        clone.result = null;
         clone.isClone = true;
         clone.position = position;
 //        clones.add(clone);

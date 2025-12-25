@@ -1,116 +1,64 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
+import tools.dscode.common.assertions.ValueWrapper;
+import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
-import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.OperationMeta;
+import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import java.util.EnumSet;
+import java.util.List;
 
-public enum AssertionOperations {
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
-    EQUAL(
-            new OperationMeta(
-                    EnumSet.of(ElementType.PRECEDING_OPERATION),
-                    EnumSet.of(ElementType.RETURNS_VALUE)
-            ),
-            new OperationMeta(
-                    EnumSet.of(ElementType.FOLLOWING_OPERATION),
-                    EnumSet.of(ElementType.RETURNS_VALUE)
-            )
-    ),
+public enum AssertionOperations  implements OperationsInterface  {
 
-    START_WITH(
-            new OperationMeta(
-                    EnumSet.of(ElementType.PRECEDING_OPERATION),
-                    EnumSet.of(ElementType.RETURNS_VALUE)
-            ),
-            new OperationMeta(
-                    EnumSet.of(ElementType.FOLLOWING_OPERATION),
-                    EnumSet.of(ElementType.RETURNS_VALUE)
-            )
-    ),
+    EQUAL{    @Override
+    public void execute(PhraseData phraseData) {
+        List<ElementMatch> list = processElementMatches(phraseData, phraseData.elementMatchesFollowingOperation,
+                new ElementMatcher()
+                        .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.FOLLOWING_OPERATION, ElementType.FIRST_ELEMENT),
+                new ElementMatcher()
+                        .mustMatchAll(ElementType.KEY_VALUE, ElementType.FOLLOWING_OPERATION)
+        );
 
-    END_WITH(
-            new OperationMeta(
-                    EnumSet.of(ElementType.PRECEDING_OPERATION),
-                    EnumSet.of(ElementType.RETURNS_VALUE)
-            ),
-            new OperationMeta(
-                    EnumSet.of(ElementType.FOLLOWING_OPERATION),
-                    EnumSet.of(ElementType.RETURNS_VALUE)
-            )
-    ),
+        ElementMatch valueElement = list.getFirst();
+        ElementMatch keyElement = list.get(1);
+        String keyName = keyElement == null ? "saved" : keyElement.getValue().toString();
+        phraseData.result = Attempt.run(() -> {
+            for (ValueWrapper valueWrapper : valueElement.getValues()) {
+                printDebug("Action: saving '" + valueWrapper + "' to key: " + keyName);
+                getRunningStep().getStepParsingMap().put(keyName, valueWrapper.getValue());
+            }
+        });
+    }};
 
-    MATCH(
-            new OperationMeta(
-                    EnumSet.of(ElementType.PRECEDING_OPERATION),
-                    EnumSet.of(ElementType.RETURNS_VALUE)
-            ),
-            new OperationMeta(
-                    EnumSet.of(ElementType.FOLLOWING_OPERATION),
-                    EnumSet.of(ElementType.VALUE_TYPE)
-            )
-    ),
+//    START_WITH,
+//
+//    END_WITH,
+//
+//    MATCH,
+//
+//    HAS_VALUE,
+//
+//    IS_BLANK,
+//
+//    DISPLAYED,
+//
+//    ENABLED,
+//
+//    SELECTED,
+//
+//    IS_TRUE,
+//
+//    IS_FALSE;
 
-    HAS_VALUE(
-            new OperationMeta(
-                    EnumSet.noneOf(ElementType.class),
-                    EnumSet.of(ElementType.RETURNS_VALUE)
-            ),
-            null
-    ),
 
-    IS_BLANK(
-            null,
-            null
-    ),
-
-    DISPLAYED(
-            new OperationMeta(
-                    EnumSet.noneOf(ElementType.class),
-                    EnumSet.of(ElementType.HTML_ELEMENT)
-            ),
-            null
-    ),
-
-    ENABLED(
-            new OperationMeta(
-                    EnumSet.noneOf(ElementType.class),
-                    EnumSet.of(ElementType.HTML_ELEMENT)
-            ),
-            null
-    ),
-
-    SELECTED(
-            new OperationMeta(
-                    EnumSet.noneOf(ElementType.class),
-                    EnumSet.of(ElementType.HTML_ELEMENT)
-            ),
-            null
-    ),
-
-    IS_TRUE(
-            null,
-            null
-    ),
-
-    IS_FALSE(
-            null,
-            null
-    );
-
-    private final OperationMeta primaryMeta;
-    private final OperationMeta secondaryMeta;
-
-    AssertionOperations(OperationMeta primaryMeta, OperationMeta secondaryMeta) {
-        this.primaryMeta = primaryMeta;
-        this.secondaryMeta = secondaryMeta;
+    public static AssertionOperations fromString(String input) {
+        return OperationsInterface.requireOperationEnum(AssertionOperations.class, input);
     }
 
-    public OperationMeta primaryMeta() {
-        return primaryMeta;
-    }
 
-    public OperationMeta secondaryMeta() {
-        return secondaryMeta;
-    }
+
 }

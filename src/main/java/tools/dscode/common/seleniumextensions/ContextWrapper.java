@@ -135,7 +135,7 @@ public class ContextWrapper {
 //        XPathy xPathy = combineAnd(xPathyList);
 //        elementPath = XPathy.from(XPathyUtils.maybeDeepestMatches(xPathy.getXpath()));
         elementPath = combineAnd(xPathyList);
-        System.out.println("@@elementPath: " + elementPath);
+
         if (elementMatch.elementPosition.isEmpty() && elementMatch.selectionType.isEmpty())
             elementMatch.elementPosition = "1";
         if (elementMatch.elementPosition.isEmpty())
@@ -154,7 +154,7 @@ public class ContextWrapper {
                 }
             }
         }
-        System.out.println("@@elementTerminalXPath: " + elementTerminalXPath);
+
 
     }
 

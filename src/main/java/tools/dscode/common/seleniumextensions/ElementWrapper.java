@@ -32,11 +32,11 @@ public class ElementWrapper {
 
 
     public static List<ElementWrapper> getWrappedElements(ElementMatch elementMatch) {
-        System.out.println("@@getWrappedElements1: " + elementMatch);
-        System.out.println("@@elementMatch.xPathy: " + elementMatch.xPathy);
+
+
         List<ElementWrapper> elementWrappers = new ArrayList<>();
         List<WebElement> elements = elementMatch.contextWrapper.getElements();
-        System.out.println("@@getWrappedElements2: " + elements);
+
 
         int index = 0;
         for (WebElement element : elements) {

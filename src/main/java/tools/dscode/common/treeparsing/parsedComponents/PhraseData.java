@@ -1,16 +1,21 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.xpathy.XPathy;
+import net.bytebuddy.implementation.bytecode.Throw;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.remote.tracing.opentelemetry.SeleniumSpanExporter;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 
-import tools.dscode.common.domoperations.ParsedActions;
-import tools.dscode.common.domoperations.ParsedAssertions;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
+import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ActionOperations;
+import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.AssertionOperations;
+import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Attempt;
+import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.OperationsInterface;
+import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHolderMatch;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 import tools.dscode.coredefinitions.GeneralSteps;
 
@@ -25,14 +30,12 @@ import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
-import static tools.dscode.common.domoperations.ParsedActions.ActionOperations.requireActionOperationFromContainingString;
-import static tools.dscode.common.domoperations.ParsedAssertions.AssertionOperations.requireAssertionFromContainingString;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.FOLLOWING_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.MULTIPLE_ELEMENTS_IN_PHRASE;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.NO_OPERATION;
-import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PRECEDING_OPERATION;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
@@ -43,6 +46,8 @@ import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
 
 public abstract class PhraseData extends PassedData {
 
+
+    public Attempt.Result result;
 
     public WebDriver webDriver = null;
     public List<PhraseData> branchedPhrases = new ArrayList<>();
@@ -79,8 +84,8 @@ public abstract class PhraseData extends PassedData {
     public boolean hasNone;
     public final LineData parsedLine;
 
-    public ParsedActions.ActionOperations actionOperation;
-    public ParsedAssertions.AssertionOperations assertionOperation;
+    public ActionOperations actionOperation;
+    public AssertionOperations assertionOperation;
 
     public int position;
     public boolean newContext = false;
@@ -108,8 +113,10 @@ public abstract class PhraseData extends PassedData {
     }
 
     public void setAction(String action) {
+
         if(action == null || action.isBlank()) return;
-        actionOperation = requireActionOperationFromContainingString(action);
+        actionOperation = ActionOperations.fromString(action);
+
         this.action = action;
     }
 
@@ -119,7 +126,7 @@ public abstract class PhraseData extends PassedData {
 
     public void setAssertion(String assertion) {
         if(assertion == null || assertion.isBlank()) return;
-        assertionOperation = requireAssertionFromContainingString(assertion.replace("disable", "enable").replaceAll("^un", ""));
+        assertionOperation = AssertionOperations.fromString(assertion);
         this.assertion = assertion;
     }
 
@@ -202,7 +209,7 @@ public abstract class PhraseData extends PassedData {
         conditional = phraseNode.getStringFromLocalState("conditional");
         body = phraseNode.getStringFromLocalState("body");
         separator = phraseNode.localStateBoolean("separator");
-        elementMatches = phraseNode.getOrderedChildren("elementMatch").stream().map(ElementMatch::new).collect(Collectors.toList());
+        elementMatches = phraseNode.getOrderedChildren("elementMatch").stream().map(this::getElementMatch).collect(Collectors.toList());
         elementCount = elementMatches.size();
         elementMatches.forEach(elementMatch -> elementMatch.parentPhrase = this);
         elementMatches.forEach(element -> categoryFlags.addAll(element.categoryFlags));
@@ -241,10 +248,29 @@ public abstract class PhraseData extends PassedData {
             }
         }
 
-        if (phraseType == PhraseType.CONTEXT) {
-            elementMatches = new ArrayList<>(elementMatches.stream().filter(elementMatch -> !elementMatch.elementTypes.contains(PLACE_HOLDER)).toList());
+
+        newContext = phraseNode.localStateBoolean("newStartContext");
+
+        initialization();
+
+    }
+
+    public  ElementMatch getElementMatch(MatchNode elementNode) {
+        if(elementNode.getStringFromLocalState("type").equals(PLACE_HOLDER_MATCH)) {
+            return new PlaceHolderMatch(this);
+        }
+        else {
+            return new ElementMatch(this, elementNode);
         }
 
+    }
+
+
+    public void initialization()
+    {
+        if ( !operationPhrase || elementMatches.size()>2) {
+            elementMatches = new ArrayList<>(elementMatches.stream().filter(elementMatch -> !elementMatch.isPlaceHolder()).toList());
+        }
 
         if (elementCount > 0) {
             firstElement = elementMatches.getFirst();
@@ -263,33 +289,13 @@ public abstract class PhraseData extends PassedData {
         }
 
 
+
         if (phraseType == null) {
             if (!elementMatches.isEmpty())
                 phraseType = PhraseType.ELEMENT_ONLY;
         }
 
 
-//        if (phraseType == null && previousPhrase != null) {
-//            if (!elementMatches.isEmpty()) {
-//                phraseType = previousPhrase.phraseType;
-//                if (action.isBlank())
-//                    action = previousPhrase.action;
-//                if (assertionType.isBlank())
-//                    assertionType = previousPhrase.assertionType;
-//                if (conditional.isBlank())
-//                    conditional = previousPhrase.conditional;
-//            }
-//            phraseType = PhraseType.NO_EXECUTION;
-//        }
-
-
-//        hasDOMInteraction = !elements.isEmpty() && !phraseType.equals(PhraseType.CONTEXT);
-
-        newContext = phraseNode.localStateBoolean("newStartContext");
-//        if (position > 0) {
-//            previousPhrase = lineData.phrases.get(position - 1);
-//            previousPhrase.nextPhrase = this;
-//        }
 
         if (operationIndex != null) {
             for (ElementMatch em : elementMatches) {
@@ -307,8 +313,8 @@ public abstract class PhraseData extends PassedData {
             elementMatches.forEach(em -> em.elementTypes.add(NO_OPERATION));
         }
 
-
     }
+
 
 
     public List<PhraseData> processContextList() {
@@ -398,6 +404,17 @@ public abstract class PhraseData extends PassedData {
     }
 
 
-//    int inherited = 0;
+
+
+    public void runOperation()
+    {
+        OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
+
+        operation.execute(this);
+        if(result.failed())
+        {
+            throw new RuntimeException("operation '" + operation + "' failed", result.error());
+        }
+    }
 
 }

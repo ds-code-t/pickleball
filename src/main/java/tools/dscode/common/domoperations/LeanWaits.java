@@ -31,9 +31,9 @@ public final class LeanWaits {
         safeWaitForPageReady(parsingPhrase.webDriver, Duration.ofSeconds(60));
 
         for (ElementMatch elementMatch : parsingPhrase.elementMatches) {
-            System.out.println("@@elementMatch1: " + elementMatch);
+
             if (elementMatch.elementTypes.contains(ElementType.HTML_ELEMENT)) {
-                System.out.println("@@elementMatch2: " + elementMatch);
+
                 elementMatch.findWrappedElements();
                 for (ElementWrapper elementWrapper : elementMatch.getElementWrappers()) {
                     safeWaitForElementReady(parsingPhrase.webDriver, elementWrapper.element, Duration.ofSeconds(60));

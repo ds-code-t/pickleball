@@ -1,5 +1,9 @@
 Feature: Addition
 
+  Scenario: tsdfsdf
+    * , save "Azzz2A"
+    * , save "<B>" as "C"
+
   Scenario Outline: sssgssatesssssf
     @[DEBUG]
     * , from the Top Panel:

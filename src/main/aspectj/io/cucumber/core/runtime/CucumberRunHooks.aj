@@ -38,7 +38,7 @@ public aspect CucumberRunHooks {
         for (WorkBook report : workBookMap.values())
         {
             try {
-                System.out.println("@@report.outputFile: " + report.outputFile);
+
                 report.write();
             } catch (IOException e)
             {

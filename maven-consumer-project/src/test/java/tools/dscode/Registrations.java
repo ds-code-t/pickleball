@@ -19,7 +19,7 @@ import static tools.dscode.common.util.DebugUtils.printDebug;
 public class Registrations {
     @LifecycleHook(Phase.BEFORE_CUCUMBER_RUN)
     public static void beforeRun() {
-        System.out.println("@@Before Run");
+
 
 
         ExecutionDictionary dict = getExecutionDictionary();

@@ -114,9 +114,9 @@ public class ParsedActions {
 //        MatchNode actionNode = phraseData.phraseNode.getChild("action");
 
 
-        System.out.println("@@##phraseData.elements: " + phraseData.elementMatches);
-        System.out.println("@@##phraseData.previousPhrase: " + phraseData.previousPhrase);
-        System.out.println("@@##action: " + phraseData.actionOperation);
+
+
+
 
 
         LinkedHashSet<ElementMatch> generalValueElements = phraseData.getElementMatch(ElementType.RETURNS_VALUE);
@@ -126,9 +126,9 @@ public class ParsedActions {
 
 
         System.out.println("Attempting " + phraseData.actionOperation);
-        System.out.println("@@elementMatch1 " + elementMatch1);
-        System.out.println("@@phraseData.firstElement)--- " + phraseData.getFirstElement());
-        System.out.println("@@phraseData.secondElement)--- " + phraseData.getSecondElement());
+
+
+
 
 
         switch (phraseData.actionOperation) {
@@ -166,16 +166,16 @@ public class ParsedActions {
                 }
             }
             case ENTER -> {
-                System.out.println("@@enter: elementMatch1: " + elementMatch1);
-                System.out.println("@@nonHtmlElements.size(): " + nonHtmlElements.size());
+
+
                 if(nonHtmlElements.size() > 0)
                 {
-                    System.out.println("@@nonHtmlElements.getFirst(): " + nonHtmlElements.getFirst());
-                    System.out.println("@@nonHtmlElements.getFirst().getValue(): " + nonHtmlElements.getFirst().getValue());
+
+
                 }
                 for (ElementWrapper elementWrapper : elementMatch1.getElementWrappers()) {
-                    System.out.println("@@elementWrapper::: " + elementWrapper);
-                    System.out.println("@@elementWrapper.getElement(::: " + elementWrapper.getElement());
+
+
                     typeText(driver, elementWrapper.getElement(), nonHtmlElements.getFirst().getValue().toString());
                 }
             }

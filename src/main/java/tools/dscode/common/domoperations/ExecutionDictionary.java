@@ -207,8 +207,8 @@ public class ExecutionDictionary {
      * Convenience: register the same OR-builders for multiple categories.
      */
     public void registerOrForCategories(List<String> categories, Builder... builders) {
-        System.out.println("@@registerOrForCategories: " + categories + " " + builders);
-        System.out.println("@@builders array:: " + Arrays.toString(builders));
+
+
         Objects.requireNonNull(categories, "categories must not be null");
         Objects.requireNonNull(builders, "builders must not be null");
         if (categories.isEmpty() || builders.length == 0) {
@@ -217,7 +217,7 @@ public class ExecutionDictionary {
 
 
         for (String category : categories) {
-            System.out.println("@@category: " + category + "");
+
             if (category != null && !category.isBlank()) {
                 registerOrBuilder(category, builders);
             }

@@ -1,105 +1,97 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
+import org.apache.poi.xssf.usermodel.XSSFPivotTable;
+import tools.dscode.common.assertions.ValueWrapper;
+import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
-import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.OperationMeta;
+import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
-import java.util.EnumSet;
+import java.util.List;
 
-public enum ActionOperations {
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
-    SAVE(
-            new OperationMeta(
-                    EnumSet.of(ElementType.FIRST_ELEMENT, ElementType.FOLLOWING_OPERATION),
-                    EnumSet.of(ElementType.RETURNS_VALUE)
-            ),
-            new OperationMeta(
-                    EnumSet.of(ElementType.SECOND_ELEMENT, ElementType.FOLLOWING_OPERATION),
-                    EnumSet.of(ElementType.KEY_VALUE)
-            )
-    ),
+public enum ActionOperations implements OperationsInterface {
 
-    WAIT(
-            new OperationMeta(
-                    EnumSet.of(ElementType.FIRST_ELEMENT, ElementType.FOLLOWING_OPERATION),
-                    EnumSet.of(ElementType.TIME_VALUE)
-            ),
-            null
-    ),
+    SAVE {
+        @Override
+        public void execute(PhraseData phraseData) {
+            System.out.println(phraseData + " : Executing SAVE");
+            List<ElementMatch> list = processElementMatches(phraseData, phraseData.elementMatchesFollowingOperation,
+                    new ElementMatcher()
+                            .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.FOLLOWING_OPERATION, ElementType.FIRST_ELEMENT),
+                    new ElementMatcher()
+                            .mustMatchAll(ElementType.KEY_VALUE, ElementType.FOLLOWING_OPERATION)
+                    );
+            System.out.println("@@1");
 
 
-    SELECT(
-            new OperationMeta(
-                    EnumSet.of(ElementType.FIRST_ELEMENT, ElementType.FOLLOWING_OPERATION),
-                    EnumSet.of(ElementType.HTML_ELEMENT)
-            ),
-            new OperationMeta(
-                    EnumSet.of(ElementType.SECOND_ELEMENT, ElementType.FOLLOWING_OPERATION),
-                    EnumSet.of(ElementType.VALUE_TYPE)
-            )
-    ),
-    CLICK(
-            new OperationMeta(
-                    EnumSet.of(ElementType.FIRST_ELEMENT, ElementType.FOLLOWING_OPERATION),
-                    EnumSet.of(ElementType.HTML_ELEMENT)
-            ),
-            null
-    ),
-    DOUBLE_CLICK(
-            new OperationMeta(
-                    EnumSet.of(ElementType.FIRST_ELEMENT, ElementType.FOLLOWING_OPERATION),
-                    EnumSet.of(ElementType.HTML_ELEMENT)
-            ),
-            null
-    ),
-    RIGHT_CLICK(
-            new OperationMeta(
-                    EnumSet.of(ElementType.FIRST_ELEMENT, ElementType.FOLLOWING_OPERATION),
-                    EnumSet.of(ElementType.HTML_ELEMENT)
-            ),
-            null
-    ),
-    ENTER(
-            new OperationMeta(
-                    EnumSet.of(ElementType.FIRST_ELEMENT, ElementType.FOLLOWING_OPERATION),
-                    EnumSet.of(ElementType.VALUE_TYPE)
-            ),
-            new OperationMeta(
-                    EnumSet.of(ElementType.SECOND_ELEMENT, ElementType.FOLLOWING_OPERATION),
-                    EnumSet.of(ElementType.HTML_ELEMENT)
-            )
-    ),
-    OVERWRITE(
-            new OperationMeta(
-                    EnumSet.of(ElementType.FIRST_ELEMENT, ElementType.FOLLOWING_OPERATION),
-                    EnumSet.of(ElementType.HTML_ELEMENT)
-            ),
-            new OperationMeta(
-                    EnumSet.of(ElementType.SECOND_ELEMENT, ElementType.FOLLOWING_OPERATION),
-                    EnumSet.of(ElementType.VALUE_TYPE)
-            )
-    ),
-    SCROLL(
-            new OperationMeta(
-                    EnumSet.of(ElementType.FIRST_ELEMENT, ElementType.FOLLOWING_OPERATION),
-                    EnumSet.of(ElementType.HTML_ELEMENT)
-            ),
-            null
-    );
+            ElementMatch valueElement = list.getFirst();
+            System.out.println("@@valueElement: " + valueElement);
+            ElementMatch keyElement = list.get(1);
+            System.out.println("@@keyElement: " + keyElement);
+            String keyName = keyElement == null ? "saved" : keyElement.getValue().toString();
+            phraseData.result = Attempt.run(() -> {
+                for (ValueWrapper valueWrapper : valueElement.getValues()) {
+                    System.out.println("Action: saving '" + valueWrapper + "' to key: " + keyName);
+                    getRunningStep().getStepParsingMap().put(keyName, valueWrapper.getValue());
+                }
+            });
+        }
+    },
+
+    WAIT {
+        @Override
+        public void execute(PhraseData phraseData) {
+        };
+    },
+
+    SELECT{
+        @Override
+        public void execute(PhraseData phraseData) {
+        }
+    },
+
+    CLICK{
+        @Override
+        public void execute(PhraseData phraseData) {
+        }
+    },
+
+    DOUBLE_CLICK{
+        @Override
+        public void execute(PhraseData phraseData) {
+        }
+    },
+
+    RIGHT_CLICK{
+        @Override
+        public void execute(PhraseData phraseData) {
+        }
+    },
+
+    ENTER{
+        @Override
+        public void execute(PhraseData phraseData) {
+        }
+    },
+    OVERWRITE{
+        @Override
+        public void execute(PhraseData phraseData) {
+        }
+    },
+    SCROLL{
+        @Override
+        public void execute(PhraseData phraseData) {
+        }
+    };
 
 
-    private final OperationMeta primaryMeta;
-    private final OperationMeta secondaryMeta;
-
-    ActionOperations(OperationMeta primaryMeta, OperationMeta secondaryMeta) {
-        this.primaryMeta = primaryMeta;
-        this.secondaryMeta = secondaryMeta;
+    public static ActionOperations fromString(String input) {
+        return OperationsInterface.requireOperationEnum(ActionOperations.class, input);
     }
 
-    public OperationMeta primaryMeta() {
-        return primaryMeta;
-    }
 
-    public OperationMeta secondaryMeta() {
-        return secondaryMeta;
-    }
+
 }
