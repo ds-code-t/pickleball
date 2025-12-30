@@ -282,38 +282,36 @@ public abstract class PhraseData extends PassedData {
         OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
 
         operation.execute(this);
+        if (result.failed()) {
+            throw new RuntimeException("operation '" + operation + "' failed", result.error());
+        }
         chainStartPhrase.resultPhrases.add(this);
-//        if(result.failed())
-//        {
-//            throw new RuntimeException("operation '" + operation + "' failed", result.error());
-//        }
     }
 
     public boolean resolveResults() {
-        System.out.println("@@resolveResults: " + this);
-        System.out.println("@@isChainStart: " + isChainStart);
-        System.out.println("@@chainStartPhrase: " + chainStartPhrase);
+        if (phraseType == PhraseType.CONTEXT)
+            return true;
         if (!isChainStart) {
             return chainStartPhrase.resolveResults();
         }
+
         boolean andConjunction = !conjunction.equals("or");
 
         for (PhraseData resultPhrase : chainStartPhrase.resultPhrases) {
-            boolean failed = resultPhrase.result.failed();
-
+            Object resultObject = resultPhrase.result.value();
+            boolean isFalse = resultObject != null && (boolean) resultObject;
             if (andConjunction) {
-                if (failed) {
+                if (isFalse) {
                     return false; // AND: one failure breaks
                 }
             } else {
-                if (!failed) {
+                if (!isFalse) {
                     return true; // OR: one success breaks
                 }
             }
         }
         return andConjunction;
     }
-
 
 
 }

@@ -98,7 +98,6 @@ public final class Phrase extends PhraseData {
 
 
     void processContextPhrase() {
-
         if (getFirstElement().selectionType.isEmpty()) {
             contextPhrases.add(this);
         } else {
@@ -163,23 +162,31 @@ public final class Phrase extends PhraseData {
         PhraseData nextResolvedPhrase = getNextPhrase().resolvePhrase();
         nextResolvedPhrase.setPreviousPhrase(this);
         this.setNextPhrase(nextResolvedPhrase);
+
+        return updateChainAndInheritances(nextResolvedPhrase);
+    }
+
+    public static PhraseData updateChainAndInheritances(PhraseData nextResolvedPhrase) {
         nextResolvedPhrase.setOperationInheritance();
-        if(nextResolvedPhrase.phraseType == PhraseType.CONTEXT)
+        if (nextResolvedPhrase.phraseType == PhraseType.CONTEXT)
             return nextResolvedPhrase;
 
+        PhraseData previousPhrase = nextResolvedPhrase.getPreviousPhrase();
 
         if (nextResolvedPhrase.isChainStart) {
-            resolveResults();
+            if (previousPhrase != null)
+                previousPhrase.resolveResults();
             setConjunctionChain(nextResolvedPhrase);
         } else {
-            nextResolvedPhrase.chainStartPhrase = chainStartPhrase;
-            nextResolvedPhrase.chainStart = chainStart;
-            nextResolvedPhrase.chainEnd = chainEnd;
-            nextResolvedPhrase.conjunction = conjunction;
+            if (previousPhrase != null) {
+                nextResolvedPhrase.chainStartPhrase = previousPhrase.chainStartPhrase;
+                nextResolvedPhrase.chainStart = previousPhrase.chainStart;
+                nextResolvedPhrase.chainEnd = previousPhrase.chainEnd;
+                nextResolvedPhrase.conjunction = previousPhrase.conjunction;
+            }
         }
 
         return nextResolvedPhrase;
-
     }
 
 

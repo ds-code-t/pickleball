@@ -1,8 +1,9 @@
 Feature: Addition
 
   Scenario: save test
-    * , save "Azzz2A"
+    * , save 'Azzz2A' as "B"
     * , save "<B>" as "C"
+
 
   Scenario Outline: sssgssatesssssf
     @[DEBUG]

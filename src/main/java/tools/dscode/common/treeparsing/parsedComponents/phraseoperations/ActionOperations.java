@@ -40,7 +40,7 @@ public enum ActionOperations implements OperationsInterface {
             phraseData.result = Attempt.run(() -> {
                 for (ValueWrapper valueWrapper : valueElement.getValues()) {
                     System.out.println(phraseData + " : Executing " + this.name());
-                    System.out.println("Action: " + this.name() + " : '" + valueWrapper + "' to key: " + keyName);
+                    System.out.println("Action: " + this.name() + " : '" + valueWrapper + "' to key: '" + keyName + "'");
                     getRunningStep().getStepParsingMap().put(keyName, valueWrapper.getValue());
                 }
             });

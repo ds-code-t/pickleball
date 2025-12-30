@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import static tools.dscode.common.treeparsing.parsedComponents.Phrase.updateChainAndInheritances;
+
 public final class ParsedLine extends LineData {
 
     public ParsedLine() {
@@ -23,7 +25,7 @@ public final class ParsedLine extends LineData {
     @Override
     public void runPhrases() {
         PhraseData phrase = phrases.get(startPhraseIndex);
-        runPhraseFromLine(phrase.resolvePhrase());
+        runPhraseFromLine(updateChainAndInheritances(phrase.resolvePhrase()));
     }
 
     public void runPhraseFromLine(PhraseData phrase) {

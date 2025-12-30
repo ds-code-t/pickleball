@@ -480,9 +480,9 @@ public abstract class PassedData {
         phraseData.chainStartPhrase = phraseData;
         phraseData.chainStart = phraseData.position;
 
-        PhraseData nextResolvedPhrase = phraseData.getNextPhrase().resolvePhrase();
+        PhraseData nextResolvedPhrase =  phraseData.getNextPhrase() == null ? null :  phraseData.getNextPhrase().resolvePhrase();
 
-        if (nextResolvedPhrase.isSeparatorPhrase()) {
+        if (nextResolvedPhrase == null || nextResolvedPhrase.isSeparatorPhrase()) {
             phraseData.chainEnd = phraseData.position;
             return phraseData.chainEnd;
         }
