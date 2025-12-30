@@ -1,28 +1,20 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.xpathy.XPathy;
-import net.bytebuddy.implementation.bytecode.Throw;
 import org.openqa.selenium.SearchContext;
-import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.remote.tracing.opentelemetry.SeleniumSpanExporter;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
-import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ActionOperations;
-import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.AssertionOperations;
-import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Attempt;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.OperationsInterface;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHolderMatch;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 import tools.dscode.coredefinitions.GeneralSteps;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -41,19 +33,16 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.aft
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inBetweenOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.insideOf;
-import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
 
 
 public abstract class PhraseData extends PassedData {
 
-
-    public Attempt.Result result;
-
-    public WebDriver webDriver = null;
-    public List<PhraseData> branchedPhrases = new ArrayList<>();
-
-    public ElementWrapper contextElement;
+    public final String text;
+    public final String resolvedText;
+    public final Character termination; // nullable
+    public final LineData parsedLine;
     private SearchContext searchContext;
+
 
     public SearchContext getSearchContext() {
 
@@ -74,30 +63,6 @@ public abstract class PhraseData extends PassedData {
         return searchContext;
     }
 
-    //    List<XPathData> contextXPathDataList = new ArrayList<>();
-
-    public final String text;
-    public final String resolvedText;
-    public final Character termination; // nullable
-    public boolean contextTermination;
-    public boolean hasNot;
-    public boolean hasNone;
-    public final LineData parsedLine;
-
-    public ActionOperations actionOperation;
-    public AssertionOperations assertionOperation;
-
-    public int position;
-    public boolean newContext = false;
-    public MatchNode phraseNode;
-
-    public String context = "";
-    public boolean isFrom;
-    public boolean isTopContext;
-    public boolean isContext;
-    //    public boolean hasDOMInteraction;
-    //    public List<ElementMatch> elements;
-
 
     public List<ElementWrapper> getWrappedElements() {
         return wrappedElements;
@@ -106,79 +71,12 @@ public abstract class PhraseData extends PassedData {
     private List<ElementWrapper> wrappedElements = new ArrayList<>();
     //    public List<ValueMatch> values;
 //    public ElementMatch elementMatch;
-    public String conjunction = "";
 
-    public String getAction() {
-        return action;
-    }
-
-    public void setAction(String action) {
-
-        if(action == null || action.isBlank()) return;
-        actionOperation = ActionOperations.fromString(action);
-
-        this.action = action;
-    }
-
-    public String getAssertion() {
-        return assertion;
-    }
-
-    public void setAssertion(String assertion) {
-        if(assertion == null || assertion.isBlank()) return;
-        assertionOperation = AssertionOperations.fromString(assertion);
-        this.assertion = assertion;
-    }
-
-    private String action = "";
-    private String assertion = "";
-    public String assertionType = "";
-    //    public List<Component> components;
-    public Set<ExecutionDictionary.CategoryFlags> categoryFlags = new HashSet<>();
-    public PhraseType phraseType;
-
-    public XPathy contextXPathy;
-
-    //    public String keyName = "";
-    public boolean isClone = false;
-
-    Integer operationIndex;
-
-
-//    public SearchContext getCurrentSearchContext() {
-//        if (currentSearchContext == null) {
-//            currentSearchContext = wrapContext(getBrowser("BROWSER"));
-//        }
-//        return currentSearchContext;
-//    }
-//
-//    public void setCurrentSearchContext(SearchContext searchContext) {
-//        if (searchContext instanceof SearchContext)
-//            this.currentSearchContext = (SearchContext) searchContext;
-//        else
-//            this.currentSearchContext = wrapContext(searchContext);
-//    }
-
-    private SearchContext currentSearchContext;
 
     public enum PhraseType {
         INITIAL, CONTEXT, ACTION, ASSERTION, CONDITIONAL, ELEMENT_ONLY, NO_EXECUTION, DATA_OPERATION, BROWSER_OPERATION
     }
 
-    public List<PhraseData> contextPhrases = new ArrayList<>();
-//    public List<XPathy> contextXpathyList;
-//    List<PhraseData> usedContextPhrases;
-
-    public String selectionType = "";
-    public String conditional = "";
-    public String body;
-    //    public boolean phraseConditionalState = true;
-    public int phraseConditionalMode = 0;
-
-    public boolean operationPhrase;
-    //    public boolean elementOnlyPhrase;
-    public boolean separator;
-    public boolean missingData;
 
     //    public XPathChainResult contextMatch;
     @Override
@@ -193,128 +91,122 @@ public abstract class PhraseData extends PassedData {
             Set.of("Alert", "Window", "BROWSER", "Browser Tab", "Address Bar");
 
 
+    public boolean hasResolvedText = false;
+    public boolean hasTextToResolve = false;
+
+
     public PhraseData(String inputText, Character delimiter, LineData lineData) {
         parsedLine = lineData;
         text = inputText;
         resolvedText = getRunningStep().getStepParsingMap().resolveWholeText(text);
+        hasResolvedText = !text.trim().equalsIgnoreCase(resolvedText.trim());
+        hasTextToResolve = hasResolvedText || text.matches(".*<.*>.*");
         termination = delimiter;
         contextTermination = termination.equals('.') || termination.equals(':') || termination.equals('?');
         MatchNode returnMatchNode = getNodeDictionary().parse(resolvedText);
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
         operationIndex = (Integer) phraseNode.getFromLocalState("operationIndex");
-        hasNot = phraseNode.localStateBoolean("not");
-        hasNone = phraseNode.localStateBoolean("none");
+//        hasNot = phraseNode.localStateBoolean("not");
+//        hasNone = phraseNode.localStateBoolean("none");
 //        keyName = phraseNode.getStringFromLocalState("keyName");
-        conditional = phraseNode.getStringFromLocalState("conditional");
+        setConditional(phraseNode.getStringFromLocalState("conditional"));
         body = phraseNode.getStringFromLocalState("body");
         separator = phraseNode.localStateBoolean("separator");
-        elementMatches = phraseNode.getOrderedChildren("elementMatch").stream().map(this::getElementMatch).collect(Collectors.toList());
-        elementCount = elementMatches.size();
-        elementMatches.forEach(elementMatch -> elementMatch.parentPhrase = this);
-        elementMatches.forEach(element -> categoryFlags.addAll(element.categoryFlags));
+        setElementMatches(phraseNode.getOrderedChildren("elementMatch").stream().map(this::getElementMatch).collect(Collectors.toList()));
+
 
 //        components.forEach(component -> component.parentPhrase = this);
 //        elements = getNextComponents(-1, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
 //        values = getNextComponents(-1, "valueMatch").stream().map(m -> (ValueMatch) m).toList();
 //        elementMatch = elementMatches.isEmpty() ? null : elementMatches.getFirst();
-        selectionType = elementMatches.isEmpty() ? "" : elementMatches.getFirst().selectionType;
         isTopContext = categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT);
         isContext = isTopContext || categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT);
 
         conjunction = phraseNode.getStringFromLocalState("conjunction");
         position = lineData.phrases.size();
         context = phraseNode.getStringFromLocalState("context");
-        if (conditional.contains("if") || termination.equals('?')) {
-            assertionType = "conditional";
-            phraseType = PhraseType.CONDITIONAL;
-            assertion = phraseNode.getStringFromLocalState("assertion").replaceAll("s$", "").replaceAll("e?s\\s+", " ");
+        if (getConditional().contains("if")) {
+            setAssertionType("conditional");
+            setAssertion(phraseNode.getStringFromLocalState("assertion"));
+        } else if (termination.equals('?')) {
+            setAssertionType("conditionalTermination");
+            setAssertion(phraseNode.getStringFromLocalState("assertion"));
         } else if (!context.isBlank()) {
             phraseType = PhraseType.CONTEXT;
             isFrom = context.equals("from");
-            contextXPathy = getXPathyContext(context, elementMatches);
+            contextXPathy = getXPathyContext(context, getElementMatches());
         } else {
             setAction(phraseNode.getStringFromLocalState("action"));
-            if (!action.isBlank()) {
-                phraseType = PhraseType.ACTION;
-                operationPhrase = true;
-            } else {
-                assertionType = phraseNode.getStringFromLocalState("assertionType");
+            if (getAction().isBlank()) {
+                setAssertionType(phraseNode.getStringFromLocalState("assertionType"));
                 setAssertion(phraseNode.getStringFromLocalState("assertion"));
-                if (!assertionType.isBlank() || !assertion.isBlank()) {
-                    phraseType = PhraseType.ASSERTION;
-                    operationPhrase = true;
-                }
             }
         }
 
 
-        newContext = phraseNode.localStateBoolean("newStartContext");
+        setNewContext(phraseNode.localStateBoolean("newStartContext"));
 
-        initialization();
 
     }
 
-    public  ElementMatch getElementMatch(MatchNode elementNode) {
-        if(elementNode.getStringFromLocalState("type").equals(PLACE_HOLDER_MATCH)) {
+    public ElementMatch getElementMatch(MatchNode elementNode) {
+        if (elementNode.getStringFromLocalState("type").equals(PLACE_HOLDER_MATCH)) {
             return new PlaceHolderMatch(this);
-        }
-        else {
+        } else {
             return new ElementMatch(this, elementNode);
         }
-
     }
 
 
-    public void initialization()
-    {
-        if ( !operationPhrase || elementMatches.size()>2) {
-            elementMatches = new ArrayList<>(elementMatches.stream().filter(elementMatch -> !elementMatch.isPlaceHolder()).toList());
-        }
-
-        if (elementCount > 0) {
-            firstElement = elementMatches.getFirst();
-            firstElement.elementTypes.add(ElementType.FIRST_ELEMENT);
-            firstElement.elementTypes.forEach(elementType -> elementMap1.put(elementType, firstElement));
-            lastElement = elementMatches.getLast();
-            lastElement.elementTypes.add(ElementType.LAST_ELEMENT);
-            if (elementCount > 1) {
-                elementMatches.forEach(elementMatch -> elementMatch.elementTypes.add(MULTIPLE_ELEMENTS_IN_PHRASE));
-                secondElement = elementMatches.get(1);
-                secondElement.elementTypes.add(ElementType.SECOND_ELEMENT);
-                secondElement.elementTypes.forEach(elementType -> elementMap2.put(elementType, secondElement));
-            } else {
-                firstElement.elementTypes.add(ElementType.SINGLE_ELEMENT_IN_PHRASE);
-            }
-        }
-
-
-
-        if (phraseType == null) {
-            if (!elementMatches.isEmpty())
-                phraseType = PhraseType.ELEMENT_ONLY;
-        }
-
-
-
-        if (operationIndex != null) {
-            for (ElementMatch em : elementMatches) {
-                if (em.startIndex < operationIndex) {
-                    em.elementTypes.add(PRECEDING_OPERATION);
-                    elementMatchesProceedingOperation.add(em);
-                } else if (em.startIndex > operationIndex) {
-                    elementMatchesFollowingOperation.add(em);
-                    em.elementTypes.add(FOLLOWING_OPERATION);
-                }
-            }
-            elementBeforeOperation = elementMatchesProceedingOperation.isEmpty() ? null : elementMatchesProceedingOperation.getFirst();
-            elementAfterOperation = elementMatchesFollowingOperation.isEmpty() ? null : elementMatchesFollowingOperation.getFirst();
-        } else {
-            elementMatches.forEach(em -> em.elementTypes.add(NO_OPERATION));
-        }
-
-    }
-
+//    public void initialization()
+//    {
+//        if ( !operationPhrase || elementCount>2) {
+//            setElementMatches(new ArrayList<>(getElementMatches().stream().filter(elementMatch -> !elementMatch.isPlaceHolder()).toList()));
+//        }
+//
+//        if (elementCount > 0) {
+//            firstElement = elementMatches.getFirst();
+//            firstElement.elementTypes.add(ElementType.FIRST_ELEMENT);
+//            firstElement.elementTypes.forEach(elementType -> elementMap1.put(elementType, firstElement));
+//            lastElement = elementMatches.getLast();
+//            lastElement.elementTypes.add(ElementType.LAST_ELEMENT);
+//            if (elementCount > 1) {
+//                elementMatches.forEach(elementMatch -> elementMatch.elementTypes.add(MULTIPLE_ELEMENTS_IN_PHRASE));
+//                secondElement = elementMatches.get(1);
+//                secondElement.elementTypes.add(ElementType.SECOND_ELEMENT);
+//                secondElement.elementTypes.forEach(elementType -> elementMap2.put(elementType, secondElement));
+//            } else {
+//                firstElement.elementTypes.add(ElementType.SINGLE_ELEMENT_IN_PHRASE);
+//            }
+//        }
+//
+//
+//
+//        if (phraseType == null) {
+//            if (!elementMatches.isEmpty())
+//                phraseType = PhraseType.ELEMENT_ONLY;
+//        }
+//
+//
+//
+//        if (operationIndex != null) {
+//            for (ElementMatch em : elementMatches) {
+//                if (em.startIndex < operationIndex) {
+//                    em.elementTypes.add(PRECEDING_OPERATION);
+//                    elementMatchesProceedingOperation.add(em);
+//                } else if (em.startIndex > operationIndex) {
+//                    elementMatchesFollowingOperation.add(em);
+//                    em.elementTypes.add(FOLLOWING_OPERATION);
+//                }
+//            }
+//            elementBeforeOperation = elementMatchesProceedingOperation.isEmpty() ? null : elementMatchesProceedingOperation.getFirst();
+//            elementAfterOperation = elementMatchesFollowingOperation.isEmpty() ? null : elementMatchesFollowingOperation.getFirst();
+//        } else {
+//            elementMatches.forEach(em -> em.elementTypes.add(NO_OPERATION));
+//        }
+//
+//    }
 
 
     public List<PhraseData> processContextList() {
@@ -330,7 +222,7 @@ public abstract class PhraseData extends PassedData {
         for (int i = returnList.size() - 1; i >= 0; i--) {
             PhraseData phraseData = returnList.get(i);
 
-            if (phraseData.contextElement != null || phraseData.newContext || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT) || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.ELEMENT_CONTEXT)) {
+            if (phraseData.contextElement != null || phraseData.isNewContext() || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT) || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.ELEMENT_CONTEXT)) {
                 return returnList.subList(i, returnList.size());
             }
         }
@@ -353,24 +245,6 @@ public abstract class PhraseData extends PassedData {
             default -> null;
         };
     }
-
-//    public List<Component> getNextComponents(int position, String... nodeNames) {
-//        List<String> names = Arrays.asList(nodeNames);
-//        return components.stream().filter(c -> c.position > position && (names.isEmpty() || names.contains(c.name))).toList();
-//    }
-//
-//    public List<Component> getPreviousComponents(int position, String... nodeNames) {
-//        List<String> names = Arrays.asList(nodeNames);
-//        return components.stream()
-//                .filter(c -> c.position < position && (names.isEmpty() || names.contains(c.name)))
-//                .collect(Collectors.collectingAndThen(
-//                        Collectors.toCollection(ArrayList::new),
-//                        list -> {
-//                            Collections.reverse(list);
-//                            return list;
-//                        }
-//                ));
-//    }
 
 
     public abstract void runPhrase();
@@ -397,24 +271,49 @@ public abstract class PhraseData extends PassedData {
 
     public List<Object> getAllPhraseValues() {
         List<Object> returnList = new ArrayList<>();
-        for (ElementMatch elementMatch : elementMatches) {
+        for (ElementMatch elementMatch : getElementMatches()) {
             returnList.addAll(elementMatch.getValues());
         }
         return returnList;
     }
 
 
-
-
-    public void runOperation()
-    {
+    public void runOperation() {
         OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
 
         operation.execute(this);
-        if(result.failed())
-        {
-            throw new RuntimeException("operation '" + operation + "' failed", result.error());
-        }
+        chainStartPhrase.resultPhrases.add(this);
+//        if(result.failed())
+//        {
+//            throw new RuntimeException("operation '" + operation + "' failed", result.error());
+//        }
     }
+
+    public boolean resolveResults() {
+        System.out.println("@@resolveResults: " + this);
+        System.out.println("@@isChainStart: " + isChainStart);
+        System.out.println("@@chainStartPhrase: " + chainStartPhrase);
+        if (!isChainStart) {
+            return chainStartPhrase.resolveResults();
+        }
+        boolean andConjunction = !conjunction.equals("or");
+
+        for (PhraseData resultPhrase : chainStartPhrase.resultPhrases) {
+            boolean failed = resultPhrase.result.failed();
+
+            if (andConjunction) {
+                if (failed) {
+                    return false; // AND: one failure breaks
+                }
+            } else {
+                if (!failed) {
+                    return true; // OR: one success breaks
+                }
+            }
+        }
+        return andConjunction;
+    }
+
+
 
 }

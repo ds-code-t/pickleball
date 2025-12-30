@@ -5,7 +5,6 @@ import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public final class ParsedLine extends LineData {
 
@@ -19,11 +18,6 @@ public final class ParsedLine extends LineData {
 
     public ParsedLine(String input, Collection<Character> delimiters) {
         super(input, delimiters);
-//        StepBase currentStep = getRunningStep();
-//        currentStep.lineData = this;
-//        if (currentStep.inheritedLineData != null) {
-//            inheritedContextPhrases.addAll(currentStep.inheritedLineData.inheritedContextPhrases);
-//        }
     }
 
     @Override
@@ -34,13 +28,15 @@ public final class ParsedLine extends LineData {
 
     public void runPhraseFromLine(PhraseData phrase) {
         phrase.runPhrase();
-        if (phrase.nextPhrase == null) {
+        if (phrase.getNextPhrase() == null) {
+            phrase.resolveResults();
             System.out.println("Step completed: " + executedPhrases);
             return;
         }
         if (phrase.branchedPhrases.isEmpty()) {
             runPhraseFromLine(phrase.getNextResolvedPhrase());
         } else {
+            phrase.resolveResults();
             for (PhraseData clone : phrase.branchedPhrases) {
                 runPhraseFromLine(clone);
             }

@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 
@@ -43,11 +44,11 @@ public final class ValueWrapperCompareReducer {
     public static boolean evalElements(
             Predicate<ElementWrapper> predicate,
             List<ElementWrapper> elements,
-            Mode... modes
+            Set<Mode> modeSet
     ) {
         Objects.requireNonNull(predicate, "predicate");
 
-        EnumSet<Mode> modeSet = toModeSet(modes);
+//        EnumSet<Mode> modeSet = toModeSet(modes);
         Aggregation agg = aggregation(modeSet);
         boolean invertEach = perComparisonInvert(modeSet);
 
@@ -83,11 +84,11 @@ public final class ValueWrapperCompareReducer {
             BiPredicate<ValueWrapper, ValueWrapper> comparator,
             Object left,
             Object right,
-            Mode... modes
+            Set<Mode> modeSet
     ) {
         Objects.requireNonNull(comparator, "comparator");
 
-        EnumSet<Mode> modeSet = toModeSet(modes);
+//        EnumSet<Mode> modeSet = toModeSet(modes);
         Aggregation agg = aggregation(modeSet);
         boolean invertEach = perComparisonInvert(modeSet);
 
@@ -132,20 +133,20 @@ public final class ValueWrapperCompareReducer {
 
     private enum Aggregation { ANY, ALL, NONE }
 
-    private static EnumSet<Mode> toModeSet(Mode... modes) {
-        EnumSet<Mode> set = EnumSet.noneOf(Mode.class);
-        if (modes != null) {
-            for (Mode m : modes) {
-                if (m != null) set.add(m);
-            }
-        }
-        return set;
-    }
+//    private static EnumSet<Mode> toModeSet(Mode... modes) {
+//        EnumSet<Mode> set = EnumSet.noneOf(Mode.class);
+//        if (modes != null) {
+//            for (Mode m : modes) {
+//                if (m != null) set.add(m);
+//            }
+//        }
+//        return set;
+//    }
 
     /**
      * Priority: ANY > NONE > ALL(default)
      */
-    private static Aggregation aggregation(EnumSet<Mode> modeSet) {
+    private static Aggregation aggregation(Set<Mode> modeSet) {
         if (modeSet.contains(Mode.ANY)) return Aggregation.ANY;
         if (modeSet.contains(Mode.NONE)) return Aggregation.NONE;
         return Aggregation.ALL;
@@ -154,7 +155,7 @@ public final class ValueWrapperCompareReducer {
     /**
      * NOT and UN both invert each comparison; if both present they cancel out.
      */
-    private static boolean perComparisonInvert(EnumSet<Mode> modeSet) {
+    private static boolean perComparisonInvert(Set<Mode> modeSet) {
         boolean not = modeSet.contains(Mode.NOT);
         boolean un = modeSet.contains(Mode.UN);
         return not ^ un; // XOR => true if exactly one is present
@@ -198,11 +199,11 @@ public final class ValueWrapperCompareReducer {
     public static boolean evalValues(
             Predicate<ValueWrapper> predicate,
             List<ValueWrapper> values,
-            Mode... modes
+            Set<Mode> modeSet
     ) {
         Objects.requireNonNull(predicate, "predicate");
 
-        EnumSet<Mode> modeSet = toModeSet(modes);
+//        EnumSet<Mode> modeSet = toModeSet(modes);
         Aggregation agg = aggregation(modeSet);
         boolean invertEach = perComparisonInvert(modeSet);
 

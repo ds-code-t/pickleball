@@ -30,7 +30,7 @@ public final class LeanWaits {
         // SAFE version: never throws
         safeWaitForPageReady(parsingPhrase.webDriver, Duration.ofSeconds(60));
 
-        for (ElementMatch elementMatch : parsingPhrase.elementMatches) {
+        for (ElementMatch elementMatch : parsingPhrase.getElementMatches()) {
 
             if (elementMatch.elementTypes.contains(ElementType.HTML_ELEMENT)) {
 

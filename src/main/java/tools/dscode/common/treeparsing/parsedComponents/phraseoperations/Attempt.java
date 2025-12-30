@@ -1,12 +1,30 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
+
+import tools.dscode.common.status.SoftRuntimeException;
+import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
+
 public final class Attempt {
 
-    private Attempt() {}
+    private Attempt() {
+    }
 
     public record Result(Object value, Throwable error) {
-        public boolean ok() { return error == null; }
-        public boolean failed() { return error != null; }
+        public boolean ok() {
+            return error == null;
+        }
+
+        public boolean failed() {
+            return error != null;
+        }
+
+        public RuntimeException getRuntimeError(boolean softError) {
+            if (softError)
+                return new SoftRuntimeException(error);
+            if (error instanceof RuntimeException)
+                return (RuntimeException) error;
+            return new RuntimeException(error);
+        }
     }
 
     @FunctionalInterface
@@ -30,4 +48,9 @@ public final class Attempt {
             return new Result(null, t);
         }
     }
+
+
+
+
+
 }

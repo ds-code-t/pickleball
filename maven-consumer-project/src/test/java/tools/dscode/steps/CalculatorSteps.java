@@ -11,7 +11,6 @@ import io.cucumber.java.en.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import tools.dscode.common.annotations.LifecycleHook;
 import tools.dscode.common.annotations.Phase;
-import tools.dscode.coredefinitions.BrowserSteps;
 
 import tools.dscode.coredefinitions.NavigationSteps;
 import tools.dscode.registry.GlobalRegistry;

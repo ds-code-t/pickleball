@@ -16,19 +16,12 @@ public class ElementMatching {
         for (int i = 0; i < elementMatchers.length; i++) {
             ElementMatcher elementMatcher = elementMatchers[i];
             ElementMatch elementMatch = i < elementMatches.size() ? elementMatches.get(i) : null;
-
-
             if (elementMatch == null) {
-
                 elementMatches.add(createPlaceHolderElementMatch(phraseData, elementMatcher));
             } else if (elementMatch.isPlaceHolder()) {
-
                 elementMatch.elementMatcher = elementMatcher;
             } else if (!elementMatcher.matches(elementMatch.elementTypes)) {
-
-
                 elementMatches.add(i, createPlaceHolderElementMatch(phraseData ,elementMatcher));
-
             }
         }
 
@@ -53,7 +46,7 @@ public class ElementMatching {
 
 
     public static ElementMatch createPlaceHolderElementMatch(PhraseData phraseData, ElementMatcher elementMatcher) {
-        ElementMatch placeHolder = new ElementMatch(phraseData);
+        PlaceHolderMatch placeHolder = new PlaceHolderMatch(phraseData);
         placeHolder.elementMatcher = elementMatcher;
         return placeHolder;
     }

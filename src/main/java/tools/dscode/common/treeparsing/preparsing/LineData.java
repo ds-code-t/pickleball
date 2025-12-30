@@ -1,7 +1,5 @@
 package tools.dscode.common.treeparsing.preparsing;
 
-import io.cucumber.core.runner.StepExtension;
-import tools.dscode.common.mappings.JsonPathUtil;
 import tools.dscode.common.mappings.QuoteParser;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
@@ -15,7 +13,6 @@ import java.util.Objects;
 import java.util.Set;
 
 
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
@@ -99,90 +96,77 @@ public abstract class LineData implements Cloneable {
         PhraseData lastPhrase = null;
         for (PhraseData phrase : this.phrases) {
             if (lastPhrase != null) {
-                phrase.previousPhrase = lastPhrase;
-                lastPhrase.nextPhrase = phrase;
+                phrase.setPreviousPhrase(lastPhrase);
+                lastPhrase.setNextPhrase(phrase);
             }
-
-            if (lastPhrase != null) {
-                if (phrase.phraseType == null) {
-                    if (lastPhrase.phraseType == PhraseData.PhraseType.ACTION) {
-                        if(!phrase.elementMatches.isEmpty()) {
-                            phrase.phraseType = PhraseData.PhraseType.ACTION;
-                            phrase.setAction(lastPhrase.getAction());
-                            phrase.operationPhrase = true;
-                        }
-                    }
-                }
-            }
+//
+//            if (lastPhrase != null) {
+//                if (phrase.phraseType == null) {
+//                    if (lastPhrase.phraseType == PhraseData.PhraseType.ACTION) {
+//                        if (!phrase.getElementMatches().isEmpty()) {
+//                            phrase.phraseType = PhraseData.PhraseType.ACTION;
+//                            phrase.setAction(lastPhrase.getAction());
+//                            phrase.isOperationPhrase = true;
+//                        }
+//                    }
+//                }
+//            }
 
             lastPhrase = phrase;
 
         }
 
-        checkForMissingData();
-
-
-
-        //TODO:
-        PhraseData currentPhrase = this.phrases.isEmpty() ? null : this.phrases.getFirst();
-        lastPhrase = null;
-
-        while (currentPhrase != null) {
-            if (currentPhrase.phraseType == null) {
-                if(!currentPhrase.elementMatches.isEmpty())
-                {
-
-
-
-
-                }
-
-
-            }
-
-
-            lastPhrase = currentPhrase;
-            currentPhrase = currentPhrase.nextPhrase;
-
-        }
-
-        for (PhraseData phrase : this.phrases) {
-
-            if (phrase.context.isBlank() && !phrase.operationPhrase) {
-
-
-            }
-
-            if (!phrase.assertionType.isBlank()) {
-
-
-            }
-
-        }
+//        checkForMissingData();
+//
+//
+//        PhraseData currentPhrase = this.phrases.isEmpty() ? null : this.phrases.getFirst();
+//        lastPhrase = null;
+//
+//        while (currentPhrase != null) {
+//            if (currentPhrase.phraseType == null) {
+//                if (!currentPhrase.getElementMatches().isEmpty()) {
+//                    if (lastPhrase != null) {
+//                        if (currentPhrase.missingData && !currentPhrase.hasTextToResolve) {
+//                            if(!lastPhrase.getAction().isBlank())
+//                            {
+//                                currentPhrase.setAction(lastPhrase.getAction());
+//                            }
+//
+//                        }
+//                    }
+//
+//
+//                    lastPhrase = currentPhrase;
+//                    currentPhrase = currentPhrase.getNextPhrase();
+//                }
+//
+//
+//            }
+//
+//        }
 
     }
 
-
-    private boolean checkForMissingData() {
-        boolean anyMissingData = false;
-        for (PhraseData phrase : this.phrases) {
-            if (phrase.phraseType == null) {
-                phrase.missingData = true;
-                anyMissingData = true;
-            }
-
-            if (phrase.phraseType == PhraseData.PhraseType.CONDITIONAL && phrase.getAssertion().isBlank()) {
-                phrase.missingData = true;
-                anyMissingData = true;
-            }
-
-            if (phrase.phraseType == PhraseData.PhraseType.ASSERTION && (phrase.getAssertion().isBlank() || phrase.assertionType.isBlank())) {
-                phrase.missingData = true;
-                anyMissingData = true;
-            }
-        }
-        return anyMissingData;
-    }
+//    private boolean checkForMissingData() {
+//        boolean anyMissingData = false;
+//        for (PhraseData phrase : this.phrases) {
+//            if (phrase.phraseType == null) {
+//                phrase.missingData = true;
+//                anyMissingData = true;
+//            }
+//
+//            if (phrase.phraseType == PhraseData.PhraseType.CONDITIONAL && phrase.getAssertion().isBlank()) {
+//                phrase.missingData = true;
+//                anyMissingData = true;
+//            }
+//
+//            if (phrase.phraseType == PhraseData.PhraseType.ASSERTION && (phrase.getAssertion().isBlank() || phrase.getAssertionType().isBlank())) {
+//                phrase.missingData = true;
+//                anyMissingData = true;
+//            }
+//        }
+//        return anyMissingData;
+//    }
 
 
     /**

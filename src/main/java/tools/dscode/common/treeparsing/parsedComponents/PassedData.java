@@ -1,14 +1,429 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
+import com.xpathy.XPathy;
+import org.openqa.selenium.WebDriver;
+import tools.dscode.common.domoperations.ExecutionDictionary;
+import tools.dscode.common.seleniumextensions.ElementWrapper;
+import tools.dscode.common.treeparsing.MatchNode;
+import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ActionOperations;
+import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.AssertionOperations;
+import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Attempt;
+
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
+
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.FOLLOWING_OPERATION;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.NO_OPERATION;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PRECEDING_OPERATION;
+
 
 public abstract class PassedData {
 
+    PhraseData chainStartPhrase;
+    int chainStart;
+    int chainEnd;
+
+    boolean groupSeparator = false;
+    boolean isChainStart = false;
+
+    public PhraseData lastOperationPhrase;
+
+    public boolean isSeparatorPhrase() {
+        if (isNewContext() || getPreviousPhrase() == null || getPreviousPhrase().contextTermination || !assertionType.isBlank())
+            return true;
+
+        return lastOperationPhrase == null || lastOperationPhrase.equals(this);
+    }
+
+
+    public void setOperationInheritance() {
+        if (isSeparatorPhrase()) {
+            groupSeparator = true;
+            lastOperationPhrase = isOperationPhrase ? (PhraseData) this : null;
+        } else {
+            lastOperationPhrase = getPreviousPhrase().lastOperationPhrase;
+            if (lastOperationPhrase == null) {
+                lastOperationPhrase = isOperationPhrase ? (PhraseData) this : null;
+            }
+        }
+
+
+
+
+        if (elementCount == 1) {
+//            if (phraseType == null) {
+            if (phraseType == null || (!getAssertion().isBlank() && getAssertionType().isBlank())) {
+                if (lastOperationPhrase == null || lastOperationPhrase.equals(this)) {
+                    if (hasTerminationConditional()) {
+                        setConditional("if");
+                        lastOperationPhrase = (PhraseData) this;
+                        PhraseData currentPhrase = (PhraseData) this;
+                        while (currentPhrase != null) {
+                            if (currentPhrase.phraseType == null) {
+                                currentPhrase.setAssertion("True");
+                            }
+                            if (currentPhrase.termination.equals('?'))
+                                break;
+                            currentPhrase = currentPhrase.getNextPhrase();
+                        }
+                    }
+                }
+            }
+            if (phraseType == null) {
+                if (lastOperationPhrase == null || lastOperationPhrase.equals(this)) {
+                    PhraseData currentPhrase = getNextPhrase().getResolvedPhrase();
+                    while (currentPhrase != null) {
+                        if (currentPhrase.isOperationPhrase) {
+                            if (!currentPhrase.getAction().isBlank()) {
+                                setAction(currentPhrase.getAction());
+                                operationIndex = firstElement.elementIndex + 1000;
+                            } else if (!currentPhrase.getAssertion().isBlank()) {
+                                setAssertion(currentPhrase.getAssertion());
+                                operationIndex = firstElement.elementIndex + 1000;
+                            }
+                        }
+                        currentPhrase = currentPhrase.getNextPhrase().getResolvedPhrase();
+                        if (currentPhrase.isSeparatorPhrase())
+                            break;
+                    }
+                } else {
+                    if (!lastOperationPhrase.getAction().isBlank()) {
+                        setAction(lastOperationPhrase.getAction());
+                        operationIndex = 0;
+                    } else if (!lastOperationPhrase.getAssertion().isBlank()) {
+                        setAssertion(lastOperationPhrase.getAssertion());
+                        operationIndex = 0;
+                    }
+                }
+            }
+
+        }
+
+        if (!isOperationPhrase)
+            return;
+
+        if (lastOperationPhrase == null || lastOperationPhrase.equals(this)) {
+            isChainStart = true;
+            return;
+        }
+
+
+        if (phraseType != null && lastOperationPhrase.phraseType != phraseType) {
+            isChainStart = true;
+            return;
+        }
+    }
+
+
+//    public boolean isGroupStart() {
+//
+//        if (groupSeparator) {
+//            lastOperationPhrase = isOperationPhrase ? (PhraseData) this : null;
+//            return true;
+//        }
+//
+//
+//        PhraseData prevPhrase = getPreviousPhrase();
+//        if (prevPhrase != null) {
+//
+//
+//        }
+//        while (prevPhrase != null) {
+//            if (prevPhrase.groupSeparator || prevPhrase.lastOperationPhrase) {
+//
+//            }
+//
+//            prevPhrase = prevPhrase.getPreviousPhrase();
+//        }
+//
+//        if (lastOperationPhrase == null)
+//            return true;
+//
+//        if (phraseType != null && prevOperationPhrase.phraseType != phraseType)
+//            return true;
+//
+//        if (!isOperationPhrase)
+//            return false;
+//
+//        String conditionalOrAssertionType = (getAssertionType() + getConditional()).trim().toLowerCase();
+//
+//        return !conditionalOrAssertionType.isBlank() && !conditionalOrAssertionType.contains("termination");
+//    }
+
+
+//    public PhraseData phraseGroupStart;
+//
+//
+//    public String phraseGroupConjunction = "";
+//
+//    private List<PhraseData> phraseGroup = new ArrayList<>();
+
+
+//    public void processPhraseGroup() {
+//
+//    }
+
+
+//    public List<ElementMatch> collectNextElements() {
+//        List<ElementMatch> returnList = new ArrayList<>();
+//        PhraseData nextPhrase = getNextPhrase();
+//        while (nextPhrase != null) {
+//            if (nextPhrase.isGroupStart())
+//                return returnList;
+//
+//            if (nextPhrase.elementCount == 1) {
+//
+//            }
+//
+//            nextPhrase = nextPhrase.getNextPhrase();
+//        }
+//        return false;
+//    }
+
+
+//
+//    public void addToPhraseGroup(PhraseData phraseData) {
+//        PhraseData currentPhrase = (PhraseData) this;
+//        PhraseData lastOperationPhrase = null;
+//
+//        if (phraseGroup.isEmpty()) {
+//            while (currentPhrase != null) {
+//                if (currentPhrase.isOperationPhrase) {
+//
+//                    if (lastOperationPhrase != null) {
+//                        if (currentPhrase.isGroupStart())
+//                            break;
+//
+//                    }
+//
+//                    if (!currentPhrase.conjunction.isBlank())
+//                        phraseGroupConjunction = currentPhrase.conjunction;
+//
+//                    lastOperationPhrase = currentPhrase;
+//                }
+//
+//
+//                currentPhrase = currentPhrase.getNextPhrase();
+//            }
+//            if (conjunction.isBlank())
+//                conjunction = "and";
+//        }
+//
+//
+//        phraseData.phraseGroupConjunction = phraseGroupConjunction;
+//        phraseData.phraseGroupStart = (PhraseData) this;
+//        phraseGroup.add(phraseData);
+//    }
+
+
+    private PhraseData previousPhrase;
+    private PhraseData nextPhrase;
+
+    private List<ElementMatch> elementMatches = new ArrayList<>();
+    private List<ElementMatch> elementMatchesProceedingOperation = new ArrayList<>();
+    private List<ElementMatch> elementMatchesFollowingOperation = new ArrayList<>();
+
+//    private SearchContext currentSearchContext;
+
+    public List<PhraseData> contextPhrases = new ArrayList<>();
+
+    public String selectionType = "";
+
+
+    private String conditional = "";
+
+
+    public String body;
+    public int phraseConditionalMode = 0;
+
+    public boolean isOperationPhrase;
+    public boolean separator;
+//    public boolean missingData;
+
     public int elementCount;
+
+
+    private ElementMatch firstElement = null;
+    private ElementMatch secondElement = null;
+    private ElementMatch elementBeforeOperation = null;
+    private ElementMatch elementAfterOperation = null;
+
+
+    private ElementMatch lastElement = null;
+
+    public PhraseData resolvedPhrase;
+
+    public Attempt.Result result;
+    public List<PhraseData> resultPhrases = new ArrayList<>();
+
+    public WebDriver webDriver = null;
+    public List<PhraseData> branchedPhrases = new ArrayList<>();
+
+    public ElementWrapper contextElement;
+
+    public boolean contextTermination;
+
+    public ActionOperations actionOperation;
+    public AssertionOperations assertionOperation;
+
+    public int position;
+    private boolean newContext = false;
+    public MatchNode phraseNode;
+
+    public String context = "";
+    public boolean isFrom;
+    public boolean isTopContext;
+    public boolean isContext;
+
+
+    private String action = "";
+    private String assertion = "";
+    public String conjunction = "";
+
+
+    private String assertionType = "";
+    //    public List<Component> components;
+    public Set<ExecutionDictionary.CategoryFlags> categoryFlags = new HashSet<>();
+    public PhraseData.PhraseType phraseType;
+
+    public XPathy contextXPathy;
+
+    //    public String keyName = "";
+    public boolean isClone = false;
+
+    Integer operationIndex;
+
+
+    public PhraseData getPreviousPhrase() {
+        if (previousPhrase == null || previousPhrase.resolvedPhrase == null)
+            return previousPhrase;
+        return previousPhrase.resolvedPhrase;
+    }
+
+    public void setPreviousPhrase(PhraseData previousPhrase) {
+        this.previousPhrase = previousPhrase;
+    }
+
+    public PhraseData getNextPhrase() {
+        if (nextPhrase == null || nextPhrase.resolvedPhrase == null)
+            return nextPhrase;
+        return nextPhrase.resolvedPhrase;
+    }
+
+    public void setNextPhrase(PhraseData nextPhrase) {
+        this.nextPhrase = nextPhrase;
+    }
+
+
+    public List<ElementMatch> getElementMatches() {
+        return elementMatches;
+    }
+
+    public void setElementMatches(List<ElementMatch> elementMatchesInput) {
+        elementMatches = elementMatchesInput.size() > 2 ? new ArrayList<>(elementMatchesInput.stream().filter(elementMatch -> !elementMatch.isPlaceHolder()).toList()) : new ArrayList<>(elementMatchesInput);
+        elementMatches.forEach(elementMatch -> elementMatch.parentPhrase = (PhraseData) this);
+        elementMatches.forEach(element -> categoryFlags.addAll(element.categoryFlags));
+        elementCount = elementMatches.size();
+        selectionType = elementMatches.isEmpty() ? "" : elementMatches.getFirst().selectionType;
+        if (elementCount > 0) {
+            firstElement = elementMatches.getFirst();
+            firstElement.elementTypes.add(ElementType.FIRST_ELEMENT);
+            lastElement = elementMatches.getLast();
+            lastElement.elementTypes.add(ElementType.LAST_ELEMENT);
+            if (elementCount > 1) {
+                elementMatches.forEach(elementMatch -> elementMatch.elementTypes.add(ElementType.MULTIPLE_ELEMENTS_IN_PHRASE));
+                secondElement = elementMatches.get(1);
+                secondElement.elementTypes.add(ElementType.SECOND_ELEMENT);
+            } else {
+                firstElement.elementTypes.add(ElementType.SINGLE_ELEMENT_IN_PHRASE);
+            }
+        }
+
+        if (phraseType == null) {
+            if (!elementMatches.isEmpty())
+                phraseType = PhraseData.PhraseType.ELEMENT_ONLY;
+        }
+
+
+        if (operationIndex != null) {
+            for (ElementMatch em : elementMatches) {
+                if (em.startIndex < operationIndex) {
+                    em.elementTypes.add(PRECEDING_OPERATION);
+                    elementMatchesProceedingOperation.add(em);
+                } else if (em.startIndex > operationIndex) {
+                    elementMatchesFollowingOperation.add(em);
+                    em.elementTypes.add(FOLLOWING_OPERATION);
+                }
+            }
+            elementBeforeOperation = elementMatchesProceedingOperation.isEmpty() ? null : elementMatchesProceedingOperation.getFirst();
+            elementAfterOperation = elementMatchesFollowingOperation.isEmpty() ? null : elementMatchesFollowingOperation.getFirst();
+        } else {
+            elementMatches.forEach(em -> em.elementTypes.add(NO_OPERATION));
+        }
+
+    }
+
+    public String getConditional() {
+        return conditional;
+    }
+
+
+    public void setConditional(String conditional) {
+        if (conditional.contains("if")) {
+            setAssertionType("conditional");
+        }
+        this.conditional = conditional;
+    }
+
+
+    public String getAction() {
+        return action;
+    }
+
+    public boolean setAction(String action) {
+        if (action == null || action.isBlank()) return false;
+        actionOperation = ActionOperations.fromString(action);
+        phraseType = PhraseData.PhraseType.ACTION;
+        isOperationPhrase = true;
+        this.action = action;
+        return true;
+    }
+
+    public String getAssertion() {
+        return assertion;
+    }
+
+    public boolean setAssertion(String assertion) {
+        if (assertion == null || assertion.isBlank()) return false;
+        assertionOperation = AssertionOperations.fromString(assertion);
+        if (phraseType == null)
+            phraseType = PhraseData.PhraseType.ASSERTION;
+        isOperationPhrase = true;
+        this.assertion = assertion;
+        return true;
+    }
+
+
+    public String getAssertionType() {
+        return assertionType;
+    }
+
+    public void setAssertionType(String assertionType) {
+        this.assertionType = assertionType;
+        isOperationPhrase = true;
+        phraseType = assertionType.startsWith("conditional") ? PhraseData.PhraseType.CONDITIONAL : PhraseData.PhraseType.ASSERTION;
+    }
+
+    public PhraseData getResolvedPhrase() {
+        return resolvedPhrase;
+    }
+
+    public void setResolvedPhrase(PhraseData resolvedPhrase) {
+        this.resolvedPhrase = resolvedPhrase;
+    }
+
 
     public ElementMatch getFirstElement() {
 //        if(firstElement == null || firstElement.elementTypes.contains(ElementType.PLACE_HOLDER))
@@ -34,228 +449,65 @@ public abstract class PassedData {
         return elementAfterOperation;
     }
 
-    public ElementMatch firstElement = null;
-    public ElementMatch secondElement = null;
-    public ElementMatch elementBeforeOperation = null;
-    public ElementMatch elementAfterOperation = null;
 
-
-    public ElementMatch lastElement = null;
-
-    public List<ElementMatch> elementMatches = new ArrayList<>();
-    public List<ElementMatch> elementMatchesProceedingOperation = new ArrayList<>();
-    public List<ElementMatch> elementMatchesFollowingOperation = new ArrayList<>();
-
-    protected final Map<ElementType, ElementMatch> elementMap1 = new HashMap<>();
-    protected final Map<ElementType, ElementMatch> elementMap2 = new HashMap<>();
-
-    public PhraseData previousPhrase;
-    public PhraseData nextPhrase;
-
-    public record MatchPair(ElementMatch first, ElementMatch second) { }
-
-    // =========================================================
-    // Priority (single ElementMatch) variants
-    // =========================================================
-
-    public LinkedHashSet<ElementMatch> getElementMatchAll(ElementMatch priorityElementMatch, ElementType... types) {
-        return findAll(false, priorityElementMatch, types);
+    public List<ElementMatch> getElementMatchesProceedingOperation() {
+        return elementMatchesProceedingOperation;
     }
 
-    public LinkedHashSet<ElementMatch> getElementMatchAllReversed(ElementMatch priorityElementMatch, ElementType... types) {
-        return findAll(true, priorityElementMatch, types);
+    public void setElementMatchesProceedingOperation(List<ElementMatch> elementMatchesProceedingOperation) {
+        this.elementMatchesProceedingOperation = elementMatchesProceedingOperation;
     }
 
-    public LinkedHashSet<ElementMatch> getElementMatch(ElementMatch priorityElementMatch, ElementType... types) {
-        return findAny(false, priorityElementMatch, types);
+    public List<ElementMatch> getElementMatchesFollowingOperation() {
+        return elementMatchesFollowingOperation;
     }
 
-    public LinkedHashSet<ElementMatch> getElementMatchReversed(ElementMatch priorityElementMatch, ElementType... types) {
-        return findAny(true, priorityElementMatch, types);
+    public void setElementMatchesFollowingOperation(List<ElementMatch> elementMatchesFollowingOperation) {
+        this.elementMatchesFollowingOperation = elementMatchesFollowingOperation;
     }
 
-    // =========================================================
-    // Priority (list) variants: seed up to first 2 entries
-    // =========================================================
 
-    public LinkedHashSet<ElementMatch> getElementMatchAll(List<ElementMatch> priorityElementMatches, ElementType... types) {
-        LinkedHashSet<ElementMatch> out = new LinkedHashSet<>(2);
-        addUpToTwo(out, priorityElementMatches);
-        mergeUpToTwo(out, findAll(false, null, types));
-        return out;
+    public boolean isNewContext() {
+        return newContext;
     }
 
-    public LinkedHashSet<ElementMatch> getElementMatchAllReversed(List<ElementMatch> priorityElementMatches, ElementType... types) {
-        LinkedHashSet<ElementMatch> out = new LinkedHashSet<>(2);
-        addUpToTwo(out, priorityElementMatches);
-        mergeUpToTwo(out, findAll(true, null, types));
-        return out;
+    public void setNewContext(boolean newContext) {
+        this.newContext = newContext;
     }
 
-    public LinkedHashSet<ElementMatch> getElementMatch(List<ElementMatch> priorityElementMatches, ElementType... types) {
-        LinkedHashSet<ElementMatch> out = new LinkedHashSet<>(2);
-        addUpToTwo(out, priorityElementMatches);
-        mergeUpToTwo(out, findAny(false, null, types));
-        return out;
-    }
 
-    public LinkedHashSet<ElementMatch> getElementMatchReversed(List<ElementMatch> priorityElementMatches, ElementType... types) {
-        LinkedHashSet<ElementMatch> out = new LinkedHashSet<>(2);
-        addUpToTwo(out, priorityElementMatches);
-        mergeUpToTwo(out, findAny(true, null, types));
-        return out;
-    }
+    static int setConjunctionChain(PhraseData phraseData) {
+        phraseData.chainStartPhrase = phraseData;
+        phraseData.chainStart = phraseData.position;
 
-    // =========================================================
-    // Non-priority variants
-    // =========================================================
+        PhraseData nextResolvedPhrase = phraseData.getNextPhrase().resolvePhrase();
 
-    public ElementMatch getSingleElementMatch(ElementType... types) {
-        return findAny(false, null, types).stream().findFirst().orElse(null);
-    }
-
-    public LinkedHashSet<ElementMatch> getElementMatchAll(ElementType... types) {
-        return findAll(false, null, types);
-    }
-
-    public LinkedHashSet<ElementMatch> getElementMatchAllReversed(ElementType... types) {
-        return findAll(true, null, types);
-    }
-
-    public LinkedHashSet<ElementMatch> getElementMatch(ElementType... types) {
-        return findAny(false, null, types);
-    }
-
-    public LinkedHashSet<ElementMatch> getElementMatchReversed(ElementType... types) {
-        return findAny(true, null, types);
-    }
-
-    public LinkedHashSet<ElementMatch> getElementMatch1(ElementType... types) {
-        return findAnyInMapOnly(1, null, types);
-    }
-
-    public LinkedHashSet<ElementMatch> getElementMatch2(ElementType... types) {
-        return findAnyInMapOnly(2, null, types);
-    }
-
-    public MatchPair getDistinctElementMatches(ElementType firstType, ElementType secondType) {
-        LinkedHashSet<ElementMatch> a = findAny(false, null, firstType);
-        LinkedHashSet<ElementMatch> b = findAny(false, first(a), secondType);
-        return new MatchPair(first(a), first(b));
-    }
-
-    public MatchPair getDistinctElementMatchesReversed(ElementType firstType, ElementType secondType) {
-        LinkedHashSet<ElementMatch> a = findAny(true, null, firstType);
-        LinkedHashSet<ElementMatch> b = findAny(true, first(a), secondType);
-        return new MatchPair(first(a), first(b));
-    }
-
-    // =========================================================
-    // Core (ANY): collect up to 2 unique in encounter order
-    // =========================================================
-
-    private LinkedHashSet<ElementMatch> findAny(boolean reversed, ElementMatch priority, ElementType... types) {
-        LinkedHashSet<ElementMatch> out = new LinkedHashSet<>(2);
-        if (priority != null) out.add(priority);
-
-        PassedData phrase = this;
-        while (phrase != null && out.size() < 2) {
-            if (!reversed) {
-                scanAnyInto(out, phrase.elementMap1, types);
-                if (out.size() < 2) scanAnyInto(out, phrase.elementMap2, types);
-            } else {
-                scanAnyInto(out, phrase.elementMap2, types);
-                if (out.size() < 2) scanAnyInto(out, phrase.elementMap1, types);
-            }
-            phrase = phrase.previousPhrase;
+        if (nextResolvedPhrase.isSeparatorPhrase()) {
+            phraseData.chainEnd = phraseData.position;
+            return phraseData.chainEnd;
         }
-        return out;
+
+        nextResolvedPhrase.chainStart = phraseData.chainStart;
+
+        phraseData.chainEnd = setConjunctionChain(nextResolvedPhrase);
+        String newConjunction = nextResolvedPhrase.conjunction.isBlank() ? phraseData.conjunction : nextResolvedPhrase.conjunction;
+        phraseData.conjunction = newConjunction;
+        nextResolvedPhrase.conjunction = newConjunction;
+        return phraseData.chainEnd;
     }
 
-    private LinkedHashSet<ElementMatch> findAnyInMapOnly(int which, ElementMatch priority, ElementType... types) {
-        LinkedHashSet<ElementMatch> out = new LinkedHashSet<>(2);
-        if (priority != null) out.add(priority);
 
-        PassedData phrase = this;
-        while (phrase != null && out.size() < 2) {
-            Map<ElementType, ElementMatch> map = (which == 1) ? phrase.elementMap1 : phrase.elementMap2;
-            scanAnyInto(out, map, types);
-            phrase = phrase.previousPhrase;
+    public boolean hasTerminationConditional() {
+        PhraseData nextPhrase = (PhraseData) this;
+        while (nextPhrase != null) {
+            if (nextPhrase.isSeparatorPhrase())
+                return false;
+            if (nextPhrase.termination.equals('?'))
+                return true;
+            nextPhrase = nextPhrase.getNextPhrase();
         }
-        return out;
+        return false;
     }
 
-    private static void scanAnyInto(LinkedHashSet<ElementMatch> out, Map<ElementType, ElementMatch> map, ElementType... types) {
-        for (ElementType t : types) {
-            ElementMatch m = map.get(t);
-            if (m != null) out.add(m); // LinkedHashSet handles uniqueness + preserves insertion order
-            if (out.size() >= 2) return;
-        }
-    }
 
-    // =========================================================
-    // Core (ALL): collect up to 2 unique matches satisfying ALL-types rule
-    // =========================================================
-
-    private LinkedHashSet<ElementMatch> findAll(boolean reversed, ElementMatch priority, ElementType... types) {
-        LinkedHashSet<ElementMatch> out = new LinkedHashSet<>(2);
-        if (priority != null) out.add(priority);
-
-        PassedData phrase = this;
-        while (phrase != null && out.size() < 2) {
-            if (!reversed) {
-                ElementMatch m = scanAllOne(phrase.elementMap1, types);
-                if (m != null) out.add(m);
-                if (out.size() < 2) {
-                    m = scanAllOne(phrase.elementMap2, types);
-                    if (m != null) out.add(m);
-                }
-            } else {
-                ElementMatch m = scanAllOne(phrase.elementMap2, types);
-                if (m != null) out.add(m);
-                if (out.size() < 2) {
-                    m = scanAllOne(phrase.elementMap1, types);
-                    if (m != null) out.add(m);
-                }
-            }
-            phrase = phrase.previousPhrase;
-        }
-        return out;
-    }
-
-    private static ElementMatch scanAllOne(Map<ElementType, ElementMatch> map, ElementType... types) {
-        if (types.length == 0) return null;
-        ElementMatch first = null;
-
-        for (ElementType t : types) {
-            ElementMatch m = map.get(t);
-            if (m == null) return null;
-
-            if (first == null) first = m;
-            else if (m != first) return null; // ALL requested types must point to same ElementMatch
-        }
-        return first;
-    }
-
-    // =========================================================
-    // Helpers
-    // =========================================================
-
-    private static void addUpToTwo(LinkedHashSet<ElementMatch> out, List<ElementMatch> priorityElementMatches) {
-        int limit = Math.min(2, priorityElementMatches.size());
-        for (int i = 0; i < limit && out.size() < 2; i++) {
-            out.add(priorityElementMatches.get(i));
-        }
-    }
-
-    private static void mergeUpToTwo(LinkedHashSet<ElementMatch> target, LinkedHashSet<ElementMatch> source) {
-        for (ElementMatch m : source) {
-            target.add(m);
-            if (target.size() >= 2) return;
-        }
-    }
-
-    private static ElementMatch first(LinkedHashSet<ElementMatch> set) {
-        return (set == null || set.isEmpty()) ? null : set.iterator().next();
-    }
 }

@@ -218,6 +218,10 @@ public class ValueWrapper {
         return isNumeric(normalizedText);
     }
 
+    public boolean isFalsy() {
+        return !isTruthy();
+    }
+
     public boolean isTruthy() {
         if(type.toString().endsWith("QUOTED"))
             return isStringTruthy(asNormalizedText());

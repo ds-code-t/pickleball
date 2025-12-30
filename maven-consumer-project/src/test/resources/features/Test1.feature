@@ -1,6 +1,6 @@
 Feature: Addition
 
-  Scenario: tsdfsdf
+  Scenario: save test
     * , save "Azzz2A"
     * , save "<B>" as "C"
 

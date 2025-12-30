@@ -104,6 +104,7 @@ public class ElementMatch {
             this(text, getOpFromString(op));
         }
     }
+
     public ElementMatch(PhraseData phraseData) {
         this.parentPhrase = phraseData;
         isPlaceHolder = true;
