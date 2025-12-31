@@ -147,6 +147,33 @@ public class FilePathResolver {
     }
 
 
+
+    public static String fixFeatureLocationForIntellij(String location) {
+        if (location == null || !location.startsWith("file:")) return location;
+
+        int featureIdx = location.indexOf(".feature");
+        if (featureIdx < 0) return location;
+
+        String pathPart = location;
+        String linePart = "";
+
+        int colonIdx = location.indexOf(':', featureIdx + ".feature".length());
+        if (colonIdx != -1) {
+            pathPart = location.substring(0, colonIdx);
+            linePart = location.substring(colonIdx); // ":<line>"
+        }
+
+        try {
+            Path p = Paths.get(URI.create(pathPart)); // decodes %20 -> space
+            return p.toString() + linePart;           // OS-native, IntelliJ-friendly
+        } catch (Exception e) {
+            // last resort: trim file:/// and keep the rest
+            return location.replaceFirst("^file:/+", "") + linePart;
+        }
+    }
+
+
+
     // ------------------ demo ------------------
 
     public static void main(String[] args) throws Exception {
@@ -159,4 +186,7 @@ public class FilePathResolver {
         System.out.println("\nDIRS (" + dirs.size() + "):");
         dirs.forEach(System.out::println);
     }
+
+
+
 }
