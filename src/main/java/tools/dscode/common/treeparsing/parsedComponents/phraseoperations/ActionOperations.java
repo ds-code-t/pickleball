@@ -78,7 +78,7 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch selection = phraseData.resultElements.getFirst();
             ElementMatch dropDowns = phraseData.resultElements.get(1);
             phraseData.result = Attempt.run(() -> {
-                for (ElementWrapper elementWrapper : dropDowns.getElementWrappers()) {
+                for (ElementWrapper elementWrapper : dropDowns.getElementThrowErrorIfEmptyWithNoModifier()) {
                     selectDropdownByVisibleText(getDriver(), elementWrapper.getElement(), selection.getValue().toString());
                 }
                 return true;
@@ -97,7 +97,7 @@ public enum ActionOperations implements OperationsInterface {
 
             ElementMatch element = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
-                for (ElementWrapper elementWrapper : element.getElementWrappers()) {
+                for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     click(getDriver(), elementWrapper.getElement());
                 }
                 return true;
@@ -116,7 +116,7 @@ public enum ActionOperations implements OperationsInterface {
 
             ElementMatch element = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
-                for (ElementWrapper elementWrapper : element.getElementWrappers()) {
+                for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     doubleClick(getDriver(), elementWrapper.getElement());
                 }
                 return true;
@@ -135,7 +135,7 @@ public enum ActionOperations implements OperationsInterface {
 
             ElementMatch element = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
-                for (ElementWrapper elementWrapper : element.getElementWrappers()) {
+                for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     contextClick(getDriver(), elementWrapper.getElement());
                 }
                 return true;
@@ -157,7 +157,7 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch value = phraseData.resultElements.getFirst();
             ElementMatch inputElement = phraseData.resultElements.get(1);
             phraseData.result = Attempt.run(() -> {
-                for (ElementWrapper elementWrapper : inputElement.getElementWrappers()) {
+                for (ElementWrapper elementWrapper : inputElement.getElementThrowErrorIfEmptyWithNoModifier()) {
                     typeText(getDriver(), elementWrapper.getElement(), value.getValue().toString());
                 }
                 return true;
@@ -178,7 +178,7 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch value = phraseData.resultElements.getFirst();
             ElementMatch inputElement = phraseData.resultElements.get(1);
             phraseData.result = Attempt.run(() -> {
-                for (ElementWrapper elementWrapper : inputElement.getElementWrappers()) {
+                for (ElementWrapper elementWrapper : inputElement.getElementThrowErrorIfEmptyWithNoModifier()) {
                     clearAndType(getDriver(), elementWrapper.getElement(), value.getValue().toString());
                 }
                 return true;
@@ -196,7 +196,7 @@ public enum ActionOperations implements OperationsInterface {
 
             ElementMatch element = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
-                for (ElementWrapper elementWrapper : element.getElementWrappers()) {
+                for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     wheelScrollBy(getDriver(), elementWrapper.getElement());
                 }
                 return true;

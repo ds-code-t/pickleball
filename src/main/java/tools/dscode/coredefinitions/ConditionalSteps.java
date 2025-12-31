@@ -66,7 +66,7 @@ public class ConditionalSteps extends CoreSteps {
         return java.util.Collections.unmodifiableMap(m);
     }
 
-//    @DefinitionFlags(_NO_LOGGING)
+    @DefinitionFlags(_NO_LOGGING)
     @Given("^(?:IF:|ELSE:|ELSE-IF:).*$")
     public static void runConditional() {
         StepExtension currentStep = getRunningStep();
@@ -110,8 +110,8 @@ public class ConditionalSteps extends CoreSteps {
 
             } else {
                 StepExtension modifiedStep = currentStep.modifyStepExtension(stepString);
-//                modifiedStep.addDefinitionFlag(NO_LOGGING);
-//                modifiedStep.addDefinitionFlag(IGNORE_CHILDREN_IF_FALSE);
+                modifiedStep.addDefinitionFlag(NO_LOGGING);
+                modifiedStep.addDefinitionFlag(IGNORE_CHILDREN_IF_FALSE);
 
                 currentStep.addChildStep(modifiedStep);
                 if (lastNonThenStep != null) {

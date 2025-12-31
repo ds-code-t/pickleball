@@ -269,11 +269,11 @@ public enum AssertionOperations implements OperationsInterface {
 
     public Set<ValueWrapperCompareReducer.Mode> getModeSet(PhraseData phraseData) {
         Set<ValueWrapperCompareReducer.Mode> modeSet = new HashSet<>();
-        if (phraseData.selectionType.equals("any"))
+        if (phraseData.resultElements.stream().anyMatch(e -> e.selectionType.equals("any")))
             modeSet.add(ValueWrapperCompareReducer.Mode.ANY);
-        if (phraseData.selectionType.equals("none"))
+        if (phraseData.resultElements.stream().anyMatch(e -> e.selectionType.equals("none")))
             modeSet.add(ValueWrapperCompareReducer.Mode.NONE);
-        if (phraseData.selectionType.equals("not"))
+        if (phraseData.hasNo)
             modeSet.add(ValueWrapperCompareReducer.Mode.NOT);
         if (phraseData.getAssertion().startsWith("un") || phraseData.getAssertion().startsWith("disable"))
             modeSet.add(ValueWrapperCompareReducer.Mode.UN);

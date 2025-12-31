@@ -154,7 +154,7 @@ public final class AviatorUtil {
             return false;
         if (v.replaceAll("[\\[\\],0.]", "").isEmpty())
             return false;
-        if (v.startsWith("<") && v.endsWith("<"))
+        if (v.startsWith("<") || v.endsWith(">"))
             return false;
         return !FALSE_VALUES.contains(v.replaceAll("[^A-Za-z]", ""));
     }

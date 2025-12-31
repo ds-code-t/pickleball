@@ -230,7 +230,9 @@ public abstract class PassedData {
 
     public List<PhraseData> contextPhrases = new ArrayList<>();
 
-    public String selectionType = "";
+//    public String selectionType = "";
+
+    public boolean hasNo;
 
 
     private String conditional = "";
@@ -329,7 +331,7 @@ public abstract class PassedData {
         elementMatches.forEach(elementMatch -> elementMatch.parentPhrase = (PhraseData) this);
         elementMatches.forEach(element -> categoryFlags.addAll(element.categoryFlags));
         elementCount = elementMatches.size();
-        selectionType = elementMatches.isEmpty() ? "" : elementMatches.getFirst().selectionType;
+//        selectionType = elementMatches.isEmpty() ? "" : elementMatches.getFirst().selectionType;
         if (elementCount > 0) {
             firstElement = elementMatches.getFirst();
             firstElement.elementTypes.add(ElementType.FIRST_ELEMENT);

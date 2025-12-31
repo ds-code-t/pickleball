@@ -296,6 +296,13 @@ public class ElementMatch {
         return values.isEmpty() ? null : values.getFirst();
     }
 
+    public List<ElementWrapper> getElementThrowErrorIfEmptyWithNoModifier() {
+        List<ElementWrapper> returnElements = getElementWrappers();
+        if(returnElements.isEmpty() && (selectionType.equals("any") || selectionType.equals("none")))
+            throw new RuntimeException("No elements found for " + this);
+        return returnElements;
+    }
+
     public List<ElementWrapper> getElementWrappers() {
         if (wrappedElements == null) {
             parentPhrase.syncWithDOM();
