@@ -86,6 +86,7 @@ public final class ValueWrapperCompareReducer {
             Object right,
             Set<Mode> modeSet
     ) {
+        System.out.println("@@eval: " + left + ", " + right + "");
         Objects.requireNonNull(comparator, "comparator");
 
 //        EnumSet<Mode> modeSet = toModeSet(modes);
@@ -101,13 +102,19 @@ public final class ValueWrapperCompareReducer {
 
         for (Object li : leftItems) {
             for (Object ri : rightItems) {
+                System.out.println("@@evalLeftRight::  li: " + li + ", , ri:" + ri + "");
+
                 sawAny = true;
 
                 ValueWrapper lw = toValueWrapper(li);
                 ValueWrapper rw = toValueWrapper(ri);
 
                 boolean r = comparator.test(lw, rw);
+                System.out.println("@@r1:: " + r);
+
                 if (invertEach) r = !r;
+
+                System.out.println("@@r2:: " + r);
 
                 anyTrue |= r;
                 allTrue &= r;
@@ -125,6 +132,10 @@ public final class ValueWrapperCompareReducer {
         // - ANY: false
         // NOTE: invertEach has nothing to invert when there are no comparisons.
         if (!sawAny) return emptyBaseResult(agg);
+        System.out.println("@@agg:: " + agg);
+        System.out.println("@@allTrue:: " + allTrue);
+        System.out.println("@@anyTrue:: " + anyTrue);
+        System.out.println("@@reduce(agg, allTrue, anyTrue):: " + reduce(agg, allTrue, anyTrue));
 
         return reduce(agg, allTrue, anyTrue);
     }

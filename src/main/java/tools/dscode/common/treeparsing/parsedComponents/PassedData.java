@@ -8,6 +8,7 @@ import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ActionOperations;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.AssertionOperations;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Attempt;
+import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHolderMatch;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -253,9 +254,11 @@ public abstract class PassedData {
 
     private ElementMatch lastElement = null;
 
-    public PhraseData resolvedPhrase;
+    private PhraseData resolvedPhrase;
+    protected PhraseData templatePhrase;
 
     public Attempt.Result result;
+    public List<ElementMatch> resultElements = new ArrayList<>();
     public List<PhraseData> resultPhrases = new ArrayList<>();
 
     public WebDriver webDriver = null;
@@ -297,9 +300,9 @@ public abstract class PassedData {
 
 
     public PhraseData getPreviousPhrase() {
-        if (previousPhrase == null || previousPhrase.resolvedPhrase == null)
+        if (previousPhrase == null || previousPhrase.getResolvedPhrase() == null)
             return previousPhrase;
-        return previousPhrase.resolvedPhrase;
+        return previousPhrase.getResolvedPhrase();
     }
 
     public void setPreviousPhrase(PhraseData previousPhrase) {
@@ -307,9 +310,9 @@ public abstract class PassedData {
     }
 
     public PhraseData getNextPhrase() {
-        if (nextPhrase == null || nextPhrase.resolvedPhrase == null)
+        if (nextPhrase == null || nextPhrase.getResolvedPhrase() == null)
             return nextPhrase;
-        return nextPhrase.resolvedPhrase;
+        return nextPhrase.getResolvedPhrase();
     }
 
     public void setNextPhrase(PhraseData nextPhrase) {
@@ -422,6 +425,7 @@ public abstract class PassedData {
 
     public void setResolvedPhrase(PhraseData resolvedPhrase) {
         this.resolvedPhrase = resolvedPhrase;
+        resolvedPhrase.templatePhrase = (PhraseData) this;
     }
 
 
@@ -447,6 +451,14 @@ public abstract class PassedData {
 //        if(elementAfterOperation == null ||  elementAfterOperation.elementTypes.contains(ElementType.PLACE_HOLDER))
 //            return null;
         return elementAfterOperation;
+    }
+
+    public List<ElementMatch> getElementMatchesBeforeAndAfterOperation() {
+        if(elementBeforeOperation != null && elementAfterOperation != null)
+            return List.of(elementBeforeOperation, elementAfterOperation);
+        ElementMatch elementMatch1 = elementBeforeOperation == null ? new PlaceHolderMatch((PhraseData) this) : elementBeforeOperation;
+        ElementMatch elementMatch2 = elementAfterOperation == null ? new PlaceHolderMatch((PhraseData) this) : elementAfterOperation;
+        return List.of(elementMatch1, elementMatch2);
     }
 
 

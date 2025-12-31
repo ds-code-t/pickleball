@@ -158,12 +158,15 @@ public final class DefinitionContext {
         };
 
 
-        ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<valueMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*") {
+        ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any|none\\s*of|none|no)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<valueMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*") {
             @Override
             public String onSubstitute(MatchNode self) {
+                self.putToLocalState("fullText", self.unmask(self.groups().get(0)));
 
 //            self.getAncestor("phrase").putToLocalState("elementMatch", self);
-                self.putToLocalState("selectionType", self.resolvedGroupText("selectionType"));
+                self.putToLocalState("selectionType", self.resolvedGroupText("selectionType")
+                        .replaceAll("of", "").trim()
+                        .replaceAll("no", "none"));
                 String elementPosition = self.resolvedGroupText("elementPosition");
                 if (elementPosition.isBlank() || elementPosition.equals("first"))
                     elementPosition = "1";
@@ -261,7 +264,7 @@ public final class DefinitionContext {
 //        };
 
 
-        ParseNode not = new ParseNode("\\b(?:not|none)\\b") {
+        ParseNode no = new ParseNode("\\bno\\b") {
             @Override
             public String onCapture(MatchNode self) {
                 self.parent().putToLocalState(self.originalText(), self.originalText());
@@ -318,10 +321,10 @@ public final class DefinitionContext {
                   - keyTransform
                   - valueMask
                   - phrase:
-                    - not
                     - predicate
                     - valueTransform
                     - elementMatch
+                    - no
                     - valueTypes
                     - assertionType
                     - action

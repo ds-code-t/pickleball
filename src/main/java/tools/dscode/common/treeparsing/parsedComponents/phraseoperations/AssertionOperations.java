@@ -24,17 +24,21 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing Assertion " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.FIRST_ELEMENT),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.SECOND_ELEMENT)
             );
 
-            ElementMatch firstElement = list.getFirst();
-            ElementMatch secondElement = list.get(1);
+
+            ElementMatch firstElement = phraseData.resultElements.getFirst();
+            ElementMatch secondElement = phraseData.resultElements.get(1);
+            System.out.println("@@firstElement.getValues(): " + firstElement.getValues());
+            System.out.println("@@secondElement.getValues(): " + secondElement.getValues());
+
             phraseData.result = Attempt.run(() -> {
-                ValueWrapperCompareReducer.eval(
+                 return ValueWrapperCompareReducer.eval(
                         ValueWrapperComparisons::equals,
                         firstElement.getValues(),
                         secondElement.getValues(),
@@ -48,17 +52,17 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing Assertion " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.FIRST_ELEMENT),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.SECOND_ELEMENT)
             );
 
-            ElementMatch firstElement = list.getFirst();
-            ElementMatch secondElement = list.get(1);
+            ElementMatch firstElement = phraseData.resultElements.getFirst();
+            ElementMatch secondElement = phraseData.resultElements.get(1);
             phraseData.result = Attempt.run(() -> {
-                ValueWrapperCompareReducer.eval(
+                return ValueWrapperCompareReducer.eval(
                         ValueWrapperComparisons::startsWith,
                         firstElement.getValues(),
                         secondElement.getValues(),
@@ -72,17 +76,17 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing Assertion " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.FIRST_ELEMENT),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.SECOND_ELEMENT)
             );
 
-            ElementMatch firstElement = list.getFirst();
-            ElementMatch secondElement = list.get(1);
+            ElementMatch firstElement = phraseData.resultElements.getFirst();
+            ElementMatch secondElement = phraseData.resultElements.get(1);
             phraseData.result = Attempt.run(() -> {
-                ValueWrapperCompareReducer.eval(
+                return ValueWrapperCompareReducer.eval(
                         ValueWrapperComparisons::endsWith,
                         firstElement.getValues(),
                         secondElement.getValues(),
@@ -95,17 +99,19 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing Assertion " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.FIRST_ELEMENT),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.SECOND_ELEMENT)
             );
-
-            ElementMatch firstElement = list.getFirst();
-            ElementMatch secondElement = list.get(1);
+            System.out.println("@@list: " + phraseData.resultElements);
+            ElementMatch firstElement = phraseData.resultElements.getFirst();
+            ElementMatch secondElement = phraseData.resultElements.get(1);
+            System.out.println("@@firstElement: " + firstElement);
+            System.out.println("@@secondElement: " + secondElement);
             phraseData.result = Attempt.run(() -> {
-                ValueWrapperCompareReducer.eval(
+                return ValueWrapperCompareReducer.eval(
                         ValueWrapperComparisons::matchesRegex,
                         firstElement.getValues(),
                         secondElement.getValues(),
@@ -119,14 +125,14 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing Assertion " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE)
             );
 
-            ElementMatch firstElement = list.getFirst();
+            ElementMatch firstElement = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
-                ValueWrapperCompareReducer.evalValues(
+                return  ValueWrapperCompareReducer.evalValues(
                         ValueWrapper::hasValue,
                         firstElement.getValues(),
                         getModeSet(phraseData)
@@ -138,14 +144,14 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing Assertion " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE)
             );
 
-            ElementMatch firstElement = list.getFirst();
+            ElementMatch firstElement = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
-                ValueWrapperCompareReducer.evalValues(
+                return    ValueWrapperCompareReducer.evalValues(
                         ValueWrapper::isBlank,
                         firstElement.getValues(),
                         getModeSet(phraseData)
@@ -157,14 +163,14 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing Assertion " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
 
-            ElementMatch firstElement = list.getFirst();
+            ElementMatch firstElement = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
-                ValueWrapperCompareReducer.evalElements(
+                return   ValueWrapperCompareReducer.evalElements(
                         ElementWrapper::isDisplayed,
                         firstElement.getElementWrappers(),
                         getModeSet(phraseData)
@@ -177,14 +183,14 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing Assertion " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
 
-            ElementMatch firstElement = list.getFirst();
+            ElementMatch firstElement = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
-                ValueWrapperCompareReducer.evalElements(
+                return    ValueWrapperCompareReducer.evalElements(
                         ElementWrapper::isEnabled,
                         firstElement.getElementWrappers(),
                         getModeSet(phraseData)
@@ -197,14 +203,14 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing Assertion " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
 
-            ElementMatch firstElement = list.getFirst();
+            ElementMatch firstElement = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
-                ValueWrapperCompareReducer.evalElements(
+                return    ValueWrapperCompareReducer.evalElements(
                         ElementWrapper::isSelected,
                         firstElement.getElementWrappers(),
                         getModeSet(phraseData)
@@ -217,14 +223,14 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing Assertion " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatches(),
                     new ElementMatcher()
-                            .mustMatchAll(ElementType.HTML_ELEMENT)
+                            .mustMatchAll(ElementType.RETURNS_VALUE)
             );
 
-            ElementMatch firstElement = list.getFirst();
+            ElementMatch firstElement = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
-                ValueWrapperCompareReducer.evalValues(
+                return   ValueWrapperCompareReducer.evalValues(
                         ValueWrapper::isTruthy,
                         firstElement.getValues(),
                         getModeSet(phraseData)
@@ -237,14 +243,14 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing Assertion " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatches(),
                     new ElementMatcher()
-                            .mustMatchAll(ElementType.HTML_ELEMENT)
+                            .mustMatchAll(ElementType.RETURNS_VALUE)
             );
 
-            ElementMatch firstElement = list.getFirst();
+            ElementMatch firstElement = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
-                ValueWrapperCompareReducer.evalValues(
+                return    ValueWrapperCompareReducer.evalValues(
                         ValueWrapper::isFalsy,
                         firstElement.getValues(),
                         getModeSet(phraseData)

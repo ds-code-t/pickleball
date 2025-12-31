@@ -7,6 +7,7 @@ import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 
 import tools.dscode.common.seleniumextensions.ElementWrapper;
+import tools.dscode.common.status.SoftRuntimeException;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.OperationsInterface;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHolderMatch;
@@ -147,7 +148,11 @@ public abstract class PhraseData extends PassedData {
 
         setNewContext(phraseNode.localStateBoolean("newStartContext"));
 
-
+        if (phraseType == null) {
+            System.out.println("No initial PhraseType set for '" + text + "'");
+        } else {
+            System.out.println("PhraseType: " + phraseType + " set for '" + text + "'");
+        }
     }
 
     public ElementMatch getElementMatch(MatchNode elementNode) {
@@ -279,8 +284,11 @@ public abstract class PhraseData extends PassedData {
 
 
     public void runOperation() {
+        System.out.println("@@runOperation: " + this);
+        System.out.println("@@actionOperation: " + actionOperation);
+        System.out.println("@@assertionOperation: " + assertionOperation);
         OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
-
+        System.out.println("@@operation: " + operation);
         operation.execute(this);
         if (result.failed()) {
             throw new RuntimeException("operation '" + operation + "' failed", result.error());
@@ -289,27 +297,64 @@ public abstract class PhraseData extends PassedData {
     }
 
     public boolean resolveResults() {
-        if (phraseType == PhraseType.CONTEXT)
+        System.out.println("\n@@resolveResults- " + this);
+        if (!isOperationPhrase)
             return true;
         if (!isChainStart) {
             return chainStartPhrase.resolveResults();
         }
 
+        boolean assertionPassed = getBooleanResult();
+
+
+        String assertionMessage = "Assertion phrase '" + text + "' evaluates to: " + assertionPassed;
+        if (!resultElements.isEmpty())
+            assertionMessage += " , elements:" + resultElements.stream()
+                    .map(Object::toString)
+                    .collect(Collectors.joining("\n", "\n", ""));
+
+
+        switch (getAssertionType()) {
+            case "ensure" -> {
+                if (!assertionPassed) {
+                    throw new RuntimeException("FAILED  " + assertionMessage);
+                }
+            }
+            case "verify" -> {
+                if (!assertionPassed) {
+                    throw new SoftRuntimeException("FAILED  " + assertionMessage);
+                }
+            }
+            case "conditional" -> {
+                phraseConditionalMode = assertionPassed ? 1 : -1;
+            }
+        }
+        return assertionPassed;
+    }
+
+    public boolean getBooleanResult() {
         boolean andConjunction = !conjunction.equals("or");
+        System.out.println("@@andConjunction- " + andConjunction);
 
         for (PhraseData resultPhrase : chainStartPhrase.resultPhrases) {
             Object resultObject = resultPhrase.result.value();
-            boolean isFalse = resultObject != null && (boolean) resultObject;
+            System.out.println("@@--resultObject- " + resultObject);
+
+            boolean isTrue = resultObject != null && (boolean) resultObject;
+            System.out.println("@@isTrue- " + isTrue);
+
             if (andConjunction) {
-                if (isFalse) {
+                if (!isTrue) {
                     return false; // AND: one failure breaks
                 }
             } else {
-                if (!isFalse) {
+                if (isTrue) {
                     return true; // OR: one success breaks
                 }
             }
         }
+        System.out.println("\n@@return-andConjunction- " + andConjunction);
+
         return andConjunction;
     }
 

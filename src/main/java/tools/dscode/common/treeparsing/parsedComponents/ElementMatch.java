@@ -28,6 +28,7 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyA
 
 public class ElementMatch {
 
+    public final String fullText;
     public final int startIndex;
     public final int position;
     public PhraseData parentPhrase;
@@ -54,7 +55,9 @@ public class ElementMatch {
     public Set<ExecutionDictionary.CategoryFlags> categoryFlags = new HashSet<>();
 
     public String toString() {
-        return (selectionType.isEmpty() ? "" : selectionType + " ") + (elementPosition.isEmpty() ? "" : elementPosition + " ") + textOps + " " + category + " , elementTypes: " + elementTypes + "";
+        if(previouslyReturnedValues == null)
+            return "No Resolved Values , Element: " + fullText;
+        return "Resolved Values: " + previouslyReturnedValues + " , Element: " + fullText;
     }
 
     public List<ValueWrapper> nonHTMLValues = new ArrayList<>();
@@ -105,14 +108,16 @@ public class ElementMatch {
         }
     }
 
-    public ElementMatch(PhraseData phraseData) {
+    protected ElementMatch(PhraseData phraseData) {
         this.parentPhrase = phraseData;
         isPlaceHolder = true;
         this.startIndex = -1;
         this.position = -1;
+        this.fullText = "PlaceHolder";
     }
 
     public ElementMatch(PhraseData phraseData, MatchNode elementNode) {
+        this.fullText = elementNode.getStringFromLocalState("fullText");
         this.parentPhrase = phraseData;
         this.startIndex = elementNode.start;
         this.position = elementNode.position;
@@ -272,19 +277,17 @@ public class ElementMatch {
 //        return returnList;
 //    }
 
+    private List<ValueWrapper> previouslyReturnedValues = null;
 
     public List<ValueWrapper> getValues() {
-        if(isPlaceHolder())
-        {
-
-
-        }
+        System.out.println("@@elementMatch-getValues(): " + this);
         List<ValueWrapper> returnList = new ArrayList<>();
         if (elementTypes.contains(ElementType.HTML_TYPE)) {
             getElementWrappers().forEach(e -> returnList.add(e.getElementReturnValue()));
         } else {
             returnList.addAll(nonHTMLValues);
         }
+        previouslyReturnedValues = new ArrayList<>(returnList);
         return returnList;
     }
 

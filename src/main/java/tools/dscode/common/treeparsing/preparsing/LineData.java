@@ -64,7 +64,7 @@ public abstract class LineData implements Cloneable {
                 .replaceAll("(\\d+)(?:\\s*(?:st|nd|rd|th)\\b)", "#$1")
                 .replaceAll("\\bverifies\\b", "verify")
                 .replaceAll("\\bensures\\b", "ensure")
-                .replaceAll("\\bno\\b|n't\\b", " not ").replaceAll("\\s+", " ");
+                .replaceAll("\\bnot\\b|n't\\b", " no ").replaceAll("\\s+", " ");
 
         // Split on UNMASKED delimiters in the fully-masked string
         StringBuilder buf = new StringBuilder();

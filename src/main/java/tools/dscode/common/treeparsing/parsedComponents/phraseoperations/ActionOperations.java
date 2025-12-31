@@ -27,15 +27,15 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE).mustNotMatchAny(ElementType.KEY_VALUE),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.KEY_VALUE)
             );
-
-            ElementMatch valueElement = list.getFirst();
-            ElementMatch keyElement = list.get(1);
+            
+            ElementMatch valueElement = phraseData.resultElements.getFirst();
+            ElementMatch keyElement = phraseData.resultElements.get(1);
             String keyName = keyElement == null ? "saved" : keyElement.getValue().toString();
             phraseData.result = Attempt.run(() -> {
                 for (ValueWrapper valueWrapper : valueElement.getValues()) {
@@ -43,6 +43,7 @@ public enum ActionOperations implements OperationsInterface {
                     System.out.println("Action: " + this.name() + " : '" + valueWrapper + "' to key: '" + keyName + "'");
                     getRunningStep().getStepParsingMap().put(keyName, valueWrapper.getValue());
                 }
+                return true;
             });
         }
     },
@@ -51,13 +52,14 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.TIME_VALUE, ElementType.FOLLOWING_OPERATION)
             );
-            ElementMatch waitElementMatch = list.getFirst();
+            ElementMatch waitElementMatch = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
                 waitForDuration(waitElementMatch.getValue().asDuration(waitElementMatch.category));
+                return true;
             });
         }
     },
@@ -66,19 +68,20 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
 
-            ElementMatch selection = list.getFirst();
-            ElementMatch dropDowns = list.get(1);
+            ElementMatch selection = phraseData.resultElements.getFirst();
+            ElementMatch dropDowns = phraseData.resultElements.get(1);
             phraseData.result = Attempt.run(() -> {
                 for (ElementWrapper elementWrapper : dropDowns.getElementWrappers()) {
                     selectDropdownByVisibleText(getDriver(), elementWrapper.getElement(), selection.getValue().toString());
                 }
+                return true;
             });
         }
     },
@@ -87,16 +90,17 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
 
-            ElementMatch element = list.getFirst();
+            ElementMatch element = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
                 for (ElementWrapper elementWrapper : element.getElementWrappers()) {
                     click(getDriver(), elementWrapper.getElement());
                 }
+                return true;
             });
         }
     },
@@ -105,16 +109,17 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
 
-            ElementMatch element = list.getFirst();
+            ElementMatch element = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
                 for (ElementWrapper elementWrapper : element.getElementWrappers()) {
                     doubleClick(getDriver(), elementWrapper.getElement());
                 }
+                return true;
             });
         }
     },
@@ -123,16 +128,17 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
 
-            ElementMatch element = list.getFirst();
+            ElementMatch element = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
                 for (ElementWrapper elementWrapper : element.getElementWrappers()) {
                     contextClick(getDriver(), elementWrapper.getElement());
                 }
+                return true;
             });
         }
     },
@@ -141,19 +147,20 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
 
-            ElementMatch value = list.getFirst();
-            ElementMatch inputElement = list.get(1);
+            ElementMatch value = phraseData.resultElements.getFirst();
+            ElementMatch inputElement = phraseData.resultElements.get(1);
             phraseData.result = Attempt.run(() -> {
                 for (ElementWrapper elementWrapper : inputElement.getElementWrappers()) {
                     typeText(getDriver(), elementWrapper.getElement(), value.getValue().toString());
                 }
+                return true;
             });
         }
     },
@@ -161,19 +168,20 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
 
-            ElementMatch value = list.getFirst();
-            ElementMatch inputElement = list.get(1);
+            ElementMatch value = phraseData.resultElements.getFirst();
+            ElementMatch inputElement = phraseData.resultElements.get(1);
             phraseData.result = Attempt.run(() -> {
                 for (ElementWrapper elementWrapper : inputElement.getElementWrappers()) {
                     clearAndType(getDriver(), elementWrapper.getElement(), value.getValue().toString());
                 }
+                return true;
             });
         }
     },
@@ -181,16 +189,17 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-            List<ElementMatch> list = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
 
-            ElementMatch element = list.getFirst();
+            ElementMatch element = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
                 for (ElementWrapper elementWrapper : element.getElementWrappers()) {
                     wheelScrollBy(getDriver(), elementWrapper.getElement());
                 }
+                return true;
             });
         }
     };

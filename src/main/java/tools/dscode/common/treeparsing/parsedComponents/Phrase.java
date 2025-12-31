@@ -38,6 +38,33 @@ public final class Phrase extends PhraseData {
 
     @Override
     public void runPhrase() {
+        System.out.println("@@runPhrase " + this);
+        System.out.println("@@phraseType " + phraseType);
+        System.out.println("@@phraseType " + phraseType);
+
+        if( phraseType == null && templatePhrase.phraseType !=null) {
+                if (!templatePhrase.getAction().isBlank()) {
+                    setAction(templatePhrase.getAction());
+                } else {
+                    if (!templatePhrase.getConditional().isBlank() && getConditional().isBlank()) {
+                        setConditional(templatePhrase.getConditional());
+                    }
+
+                    if (!templatePhrase.getAssertionType().isBlank() && getAssertionType().isBlank()) {
+                        setAssertionType(templatePhrase.getAssertionType());
+                    }
+
+                    if (!templatePhrase.getAssertion().isBlank() && getAssertion().isBlank()) {
+                        setAssertion(templatePhrase.getAssertion());
+                    }
+                }
+        }
+
+        if (!getAssertionType().isBlank() && getAssertion().isBlank()) {
+            setAssertion("true");
+        }
+
+
         parsedLine.executedPhrases.add(this);
 
         if (shouldRun()) {
@@ -52,7 +79,6 @@ public final class Phrase extends PhraseData {
             return;
         }
 
-//        parsedLine.startPhraseIndex = position;
 
         getElementMatches().forEach(e -> {
             if (e.elementTypes.contains(ElementType.HTML_TYPE)) e.contextWrapper = new ContextWrapper(e);
@@ -62,19 +88,7 @@ public final class Phrase extends PhraseData {
             contextPhrases.addAll(getPreviousPhrase().contextPhrases);
         }
 
-//        if (hasDOMInteraction) {
-//            syncWithDOM();
-//        }
 
-
-//        if (phraseType.equals(PhraseType.CONDITIONAL)) {
-//            runOperation();
-//        } else if (phraseType.equals(PhraseType.ASSERTION)) {
-//            runOperation();
-////            executeAssertions(this);
-//        } else if (phraseType.equals(PhraseType.ACTION)) {
-//            runOperation();
-//            executeAction(webDriver, this);
 
 
         if (isOperationPhrase) {
@@ -141,9 +155,9 @@ public final class Phrase extends PhraseData {
     }
 
     public PhraseData resolvePhrase() {
-        resolvedPhrase = new Phrase(text, termination, parsedLine);
-        resolvedPhrase.position = position;
-        resolvedPhrase.setPreviousPhrase(getPreviousPhrase());
+        setResolvedPhrase(new Phrase(text, termination, parsedLine));
+        getResolvedPhrase().position = position;
+        getResolvedPhrase().setPreviousPhrase(getPreviousPhrase());
 
 //        List<ElementMatch> nextElementMatches = new ArrayList<>();
 //        PhraseData nextPhrase = getNextPhrase();
@@ -153,8 +167,8 @@ public final class Phrase extends PhraseData {
 //        }
 
 
-        resolvedPhrase.setNextPhrase(getNextPhrase());
-        return resolvedPhrase;
+        getResolvedPhrase().setNextPhrase(getNextPhrase());
+        return getResolvedPhrase();
     }
 
 
@@ -190,46 +204,6 @@ public final class Phrase extends PhraseData {
     }
 
 
-//        if (lastOperationPhrase == null) {
-//            if (nextResolvedPhrase.isOperationPhrase) {
-//                nextResolvedPhrase.addToPhraseGroup(nextResolvedPhrase);
-//            }
-//        } else {
-//            nextResolvedPhrase.lastPhraseToInheritOperationFrom = lastOperationPhrase;
-//            if (nextResolvedPhrase.phraseType == PhraseType.ASSERTION) {
-//                if (nextResolvedPhrase.getAssertionType().isBlank()) {
-//                    nextResolvedPhrase.setAssertionType(lastOperationPhrase.getAssertionType());
-//                }
-//            } else if (nextResolvedPhrase.phraseType == null) {
-//                if (phraseType == PhraseType.ACTION) {
-//                    nextResolvedPhrase.setAction(lastOperationPhrase.getAction());
-//                } else if (phraseType == PhraseType.ASSERTION) {
-//                    nextResolvedPhrase.setAssertionType(lastOperationPhrase.getAssertionType());
-//                    nextResolvedPhrase.setAssertion(lastOperationPhrase.getAssertion());
-//                }
-//            }
-//
-//            if (nextResolvedPhrase.isOperationPhrase) {
-//                if (lastOperationPhrase.phraseType == nextResolvedPhrase.phraseType) {
-//                    lastOperationPhrase.addToPhraseGroup(nextResolvedPhrase);
-//                }
-//            }
-//
-//        }
-//
-//
-//        return nextResolvedPhrase;
-
-
-//    public void processPhraseResult() {
-//        String conjunctionString = conjunction.isBlank() ? "and" : conjunction;
-//        resultPhrases.
-//        if (phraseType == PhraseType.ASSERTION) {
-//            if (result.failed() && conjunctionString.equals("and")) {
-//                throw result.getRuntimeError(getAssertionType().equals("verify"));
-//            }
-//        }
-//    }
 
 
 }

@@ -40,7 +40,7 @@ public final class Attempt {
         }
     }
 
-    public static Result run(Runnable block) {
+    public static Result runVoid(Runnable block) {
         try {
             block.run();
             return new Result(null, null);

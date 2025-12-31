@@ -6,11 +6,14 @@ Feature: Addition
 
 
   Scenario Outline: sssgssatesssssf
+    * navigate to: URL.select
     @[DEBUG]
     * , from the Top Panel:
+  : * IF: "<Opel sd>" THEN: , I verify  "Get your own website" Link matches "^Gxet.*$"
+  : * , I verify  "Get your own website" Link equals  "Get your own websiteq"
 #  : * , enter "zz" in the "Name" Textbox
-  : * IF: <Work Group> THEN: , enter "AA" in the "Name" Textbox
-  : * IF: "<Work Group>" THEN: , enter "BB" in the "Name" Textbox
+#  : * IF: <Work Group> THEN: , enter "AA" in the "Name" Textbox
+#  : * IF: "<Work Group>" THEN: , enter "BB" in the "Name" Textbox
 
     Examples:
       | Work Group     |
