@@ -183,6 +183,10 @@ public class StepExtension extends StepData {
 
 
     public PickleStepTestStep resolveAndClone(ParsingMap parsingMap) {
+        System.out.println("@@resolveAndClone");
+        System.out.println("@@original-pickleStepTestStep.getStepLine: " +  pickleStepTestStep.getStepLine());
+        System.out.println("@@original-pickleStepTestStep.getUri: " +  pickleStepTestStep.getUri());
+        System.out.println("@@original-pickleStepTestStep.getId: " +  pickleStepTestStep.getId());
         PickleStepTestStep clonePickleStepTestStep = resolvePickleStepTestStep(pickleStepTestStep, parsingMap);
         if (definitionFlags.contains(DefinitionFlag.NO_LOGGING))
             clonePickleStepTestStep.setNoLogging(true);
