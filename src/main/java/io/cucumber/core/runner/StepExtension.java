@@ -112,6 +112,7 @@ public class StepExtension extends StepData {
     }
 
     public Result run() {
+        System.out.println("@@run: " + pickleStepTestStep.getStep().getText() + "");
         ExecutionMode executionMode = ExecutionMode.RUN;
         try {
             if (logAndIgnore) {
@@ -134,6 +135,15 @@ public class StepExtension extends StepData {
     }
 
     public Result execute(io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep, ExecutionMode executionMode) {
+
+        System.out.println("@@executionPickleStepTestStep: "  + executionPickleStepTestStep.getStep().getText() + "");
+        System.out.println("@@executionPickleStepTestStep.getUri: "  + executionPickleStepTestStep.getUri() + "");
+        System.out.println("@@executionPickleStepTestStep.getStepLine: "  + executionPickleStepTestStep.getStepLine() + "");
+        System.out.println("@@executionPickleStepTestStep.getId: "  + executionPickleStepTestStep.getId() + "");
+        System.out.println("@@executionPickleStepTestStep.getStep().getLine(): "  + executionPickleStepTestStep.getStep().getLine() + "");
+        System.out.println("@@executionPickleStepTestStep.getStep().getLocation(): "  + executionPickleStepTestStep.getStep().getLocation() + "");
+        System.out.println("@@executionPickleStepTestStep.getStep().getId(): "  + executionPickleStepTestStep.getStep().getId() + "");
+
         try {
             Object r = invokeAnyMethodOrThrow(executionPickleStepTestStep, "run", getTestCase(), getEventBus(), getTestCaseState(), executionMode);
         } catch (Throwable e) {
@@ -183,7 +193,7 @@ public class StepExtension extends StepData {
 
 
     public PickleStepTestStep resolveAndClone(ParsingMap parsingMap) {
-        System.out.println("@@resolveAndClone");
+        System.out.println("@@resolveAndClone: " + pickleStepTestStep.getStep().getText());
         System.out.println("@@original-pickleStepTestStep.getStepLine: " +  pickleStepTestStep.getStepLine());
         System.out.println("@@original-pickleStepTestStep.getUri: " +  pickleStepTestStep.getUri());
         System.out.println("@@original-pickleStepTestStep.getId: " +  pickleStepTestStep.getId());
