@@ -84,14 +84,15 @@ public class ElementMatch {
         if (wrappedElements != null) return wrappedElements;
         driver = parentPhrase.webDriver;
 
-        try {
-            wrappedElements = getWrappedElements(this);
-        } catch (Throwable t) {
-            if (!selectionType.equals("any") && parentPhrase.phraseType == PhraseData.PhraseType.ACTION) {
-                throw new RuntimeException("Failed to find WebElements for " + this, t);
-            }
-            wrappedElements = new ArrayList<>();
-        }
+        wrappedElements = getWrappedElements(this);
+//        try {
+//            wrappedElements = getWrappedElements(this);
+//        } catch (Throwable t) {
+//            if (!selectionType.equals("any") && parentPhrase.phraseType == PhraseData.PhraseType.ACTION) {
+//                throw new RuntimeException("Failed to find WebElements for " + this, t);
+//            }
+//            wrappedElements = new ArrayList<>();
+//        }
         parentPhrase.getWrappedElements().addAll(wrappedElements);
         return wrappedElements;
     }

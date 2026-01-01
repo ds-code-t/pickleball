@@ -13,7 +13,7 @@ public class DebugUtils {
 
     static {
 //        prefixes.add("@@");
-//        substrings.add("##");
+        substrings.add("##XPath:");
     }
 
     public static void printDebug(String message) {

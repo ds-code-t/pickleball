@@ -116,11 +116,11 @@ public class ContextWrapper {
                 xpath = xpath.replaceFirst("//", "descendant-or-self::");
         }
 
+        printDebug("##XPath: getElementListFromSearchContext\n" + prettyPrintXPath(xpath) +"\n----------------" );
         return searchContext.findElements(new By.ByXPath(xpath));
     }
 
     public static WebElement getElementFromSearchContext(SearchContext searchContext, XPathy xPathy) {
-
         List<WebElement> list = getElementListFromSearchContext(searchContext, xPathy);
         if (list.isEmpty()) return null;
         return list.getFirst();
