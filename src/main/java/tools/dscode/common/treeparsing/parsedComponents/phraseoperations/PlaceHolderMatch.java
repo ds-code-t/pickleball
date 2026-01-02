@@ -1,5 +1,6 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
+import io.cucumber.core.runner.StepExtension;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
@@ -9,6 +10,7 @@ import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import java.util.Collections;
 import java.util.List;
 
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 
 public class PlaceHolderMatch extends ElementMatch {
@@ -39,37 +41,49 @@ public class PlaceHolderMatch extends ElementMatch {
     }
 
 
-    public ElementMatch getReplacementElement() {
-        if(replacementElement != null) return replacementElement;
+    public void getReplacementElement() {
+        if(replacementElement != null) return;
         PhraseData currentPhrase = null;
-        ElementMatch returnElementMatch = null;
 
         if (elementMatcher.matches(ElementType.KEY_VALUE)) {
             currentPhrase = parentPhrase.getNextPhrase();
             while (currentPhrase != null) {
-                returnElementMatch = currentPhrase.getElementMatches().stream().filter(e -> elementMatcher.matches(e.elementTypes)).findFirst().orElse(null);
-                if (returnElementMatch != null) {
-                    replacementElement = returnElementMatch;
-                    return replacementElement;
+                replacementElement = currentPhrase.getElementMatches().stream().filter(e -> elementMatcher.matches(e.elementTypes)).findFirst().orElse(null);
+                if (replacementElement != null) {
+                    return;
                 }
                 if (currentPhrase.isOperationPhrase && currentPhrase.actionOperation != ActionOperations.SAVE)
                     break;
                 currentPhrase = currentPhrase.getNextPhrase();
             }
-            return replacementElement;
         } else {
-            currentPhrase = parentPhrase.getPreviousPhrase();
+            currentPhrase = getPreviousOrInheritedPhrase(parentPhrase);
             while (currentPhrase != null) {
-                returnElementMatch = currentPhrase.getElementMatches().stream().filter(e -> elementMatcher.matches(e.elementTypes)).findFirst().orElse(null);
-                if (returnElementMatch != null) {
-                    replacementElement = returnElementMatch;
-                    return replacementElement;
+                replacementElement = currentPhrase.getElementMatches().stream().filter(e -> elementMatcher.matches(e.elementTypes)).findFirst().orElse(null);
+                if (replacementElement != null) {
+                    return;
                 }
-                currentPhrase = currentPhrase.getPreviousPhrase();
+                currentPhrase = getPreviousOrInheritedPhrase(currentPhrase);
             }
-            return replacementElement;
         }
 
+    }
+
+    public PhraseData getPreviousOrInheritedPhrase(PhraseData phraseData) {
+        if(phraseData.getPreviousPhrase() !=null)
+            return phraseData.getPreviousPhrase();
+        StepExtension stepExtension = getRunningStep();
+        if(stepExtension.parentStep != null && stepExtension.parentStep.isDynamicStep &&  !stepExtension.parentStep.lineData.executedPhrases.isEmpty()){
+            return stepExtension.parentStep.lineData.executedPhrases.getLast();
+        }
+
+        for (int i = phraseData.parsedLine.inheritedContextPhrases.size() - 1; i >= 0; i--) {
+            List<PhraseData> inner = phraseData.parsedLine.inheritedContextPhrases.get(i);
+            if (!inner.isEmpty()) {
+                return inner.getLast();
+            }
+        }
+        return null;
     }
 
 }
