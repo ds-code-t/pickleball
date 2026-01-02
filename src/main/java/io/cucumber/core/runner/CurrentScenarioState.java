@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
@@ -32,6 +33,7 @@ import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_FALSE;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN;
 import static tools.dscode.common.util.Reflect.getProperty;
+import static tools.dscode.registry.GlobalRegistry.LOCAL;
 import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
 
 public class CurrentScenarioState extends ScenarioMapping {
@@ -56,7 +58,11 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 //    public ScenarioStep rootScenarioStep;
 
+    public static final ThreadLocal<CurrentScenarioState> currentScenarioState = new ThreadLocal<>();
+
     public CurrentScenarioState(TestCase testCase) {
+        LOCAL.set(new ConcurrentHashMap<>());
+        GlobalRegistry.putLocal(testCase.getClass().getCanonicalName(), testCase);
         this.testCase = testCase;
         this.pickle = (Pickle) getProperty(testCase, "pickle");
     }

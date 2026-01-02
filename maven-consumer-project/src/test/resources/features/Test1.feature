@@ -1,9 +1,17 @@
-Feature: Addition
+Feature: Additiontest
+
+  Scenario Outline: so test2
+    * , from the Top Panel:
+  : * , click Open Menu, and Save Code
+    Examples:
+      | Scenario |
+      | 1        |
+      | 2        |
 
   Scenario: test222
   @[DEBUG]
     * , from the Top Panel:
-    : * , click Open Menu, and Save Code
+  : * , click Open Menu, and Save Code
 
 #    : * , ensure Open Menu is displayed
 #    : * , if Open Menu is displayed, click it

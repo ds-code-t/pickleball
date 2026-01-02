@@ -50,7 +50,7 @@ public aspect RegisterBothByList {
         if (obj == null) return;
         if (looksAnonymousOrSynthetic(obj.getClass())) return;
         if (!matchesByName(obj)) return;
-
+        System.out.println("@@ GlobalRegistry.registerBoth(obj): " + obj.getClass().getName());
         GlobalRegistry.registerBoth(obj);
     }
 }

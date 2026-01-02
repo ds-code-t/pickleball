@@ -39,11 +39,14 @@ public final class GlobalRegistry {
     }
 
     public static void registerLocal(Object instance) {
+        System.out.println("@@LOCAL.get(): " + LOCAL.get());
         LOCAL.get().putIfAbsent(keyFor(instance.getClass()), instance);
         // System.out.println("[Reg][LOCAL ] " + instance.getClass().getName());
     }
 
     public static void registerBoth(Object instance) {
+        System.out.println("@@Thread: " + Thread.currentThread().getName());
+        System.out.println("@@Thread.currentThread().threadId(): " + Thread.currentThread().threadId());
         registerGlobal(instance);
         registerLocal(instance);
     }

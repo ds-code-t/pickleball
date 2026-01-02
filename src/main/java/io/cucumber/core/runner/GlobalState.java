@@ -12,6 +12,7 @@ import tools.dscode.common.reporting.WorkBook;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static io.cucumber.core.runner.CurrentScenarioState.currentScenarioState;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.registry.GlobalRegistry.localOrGlobalOf;
 
@@ -69,7 +70,8 @@ public class GlobalState {
     }
 
     public static io.cucumber.core.runner.CurrentScenarioState getCurrentScenarioState() {
-        return (CurrentScenarioState) getProperty(localOrGlobalOf(TestCase.class), "currentScenarioState");
+        return currentScenarioState.get();
+//        return (CurrentScenarioState) getProperty(localOrGlobalOf(TestCase.class), "currentScenarioState");
     }
 
     public static StepExtension getRunningStep() {

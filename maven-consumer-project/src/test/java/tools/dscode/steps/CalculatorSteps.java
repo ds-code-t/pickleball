@@ -11,7 +11,6 @@ import io.cucumber.java.en.*;
 import org.openqa.selenium.chrome.ChromeDriver;
 import tools.dscode.common.annotations.LifecycleHook;
 import tools.dscode.common.annotations.Phase;
-
 import tools.dscode.coredefinitions.NavigationSteps;
 import tools.dscode.registry.GlobalRegistry;
 
@@ -31,7 +30,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static tools.dscode.common.evaluations.AviatorFunctions.processTernaryExpression;
 import static tools.dscode.common.treeparsing.DefinitionContext.DEFAULT_EXECUTION_DICTIONARY;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;
-import static tools.dscode.registry.GlobalRegistry.LOCAL;
 
 public class CalculatorSteps {
     private int a, b, result;
