@@ -118,6 +118,31 @@ public class ElementMatch {
         this.fullText = "PlaceHolder";
     }
 
+    public ElementMatch(PhraseData phraseData, String category, TextOp... textOpsArgs) {
+        this.parentPhrase = phraseData;
+        isPlaceHolder = true;
+        this.startIndex = -1;
+        this.position = -1;
+        this.fullText = "Manually Set";
+        textOps.addAll(Arrays.asList(textOpsArgs));
+
+        ExecutionDictionary dict = getExecutionDictionary();
+        List<XPathy> elPredictXPaths = new ArrayList<>();
+
+        if (textOps.isEmpty())
+        {
+            ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, null, null);
+            elPredictXPaths.add(categoryResolution.xpath());
+        }
+
+        for (TextOp textOp : textOps) {
+            ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, textOp.text, textOp.op);
+            elPredictXPaths.add(categoryResolution.xpath());
+        }
+        xPathy = combineAnd(elPredictXPaths);
+    }
+
+
     public ElementMatch(PhraseData phraseData, MatchNode elementNode) {
 
         this.fullText = elementNode.getStringFromLocalState("fullText");

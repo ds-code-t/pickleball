@@ -1,11 +1,13 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
 import org.apache.poi.xssf.usermodel.XSSFPivotTable;
+import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
+import tools.dscode.common.util.FileUploadUtil;
 
 import java.util.List;
 
@@ -18,11 +20,29 @@ import static tools.dscode.common.domoperations.HumanInteractions.selectDropdown
 import static tools.dscode.common.domoperations.HumanInteractions.typeText;
 import static tools.dscode.common.domoperations.HumanInteractions.wheelScrollBy;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitForDuration;
+import static tools.dscode.common.treeparsing.DefinitionContext.FILE_INPUT;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
 import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
 
 public enum ActionOperations implements OperationsInterface {
+    ATTACH {
+        @Override
+        public void execute(PhraseData phraseData) {
+            System.out.println(phraseData + " : Executing " + this.name());
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+                    new ElementMatcher()
+                            .mustMatchAll(ElementType.RETURNS_VALUE)
+            );
 
+            ElementMatch pathElement = phraseData.resultElements.getFirst();
+            ElementMatch fileInput = new ElementMatch(phraseData, FILE_INPUT);
+            phraseData.result = Attempt.run(() -> {
+                WebElement inputElement = fileInput.getElementWrappers().getFirst().getElement();
+                FileUploadUtil.upload(getDriver(), inputElement, pathElement.getValue().toString());
+                return true;
+            });
+        }
+    },
     SAVE {
         @Override
         public void execute(PhraseData phraseData) {
@@ -33,7 +53,7 @@ public enum ActionOperations implements OperationsInterface {
                     new ElementMatcher()
                             .mustMatchAll(ElementType.KEY_VALUE)
             );
-            
+
             ElementMatch valueElement = phraseData.resultElements.getFirst();
             ElementMatch keyElement = phraseData.resultElements.get(1);
             String keyName = keyElement == null ? "saved" : keyElement.getValue().toString();
@@ -97,7 +117,7 @@ public enum ActionOperations implements OperationsInterface {
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
 
-            System.out.println("@WphraseData.resultElements: " +  phraseData.resultElements);
+            System.out.println("@WphraseData.resultElements: " + phraseData.resultElements);
 
             ElementMatch element = phraseData.resultElements.getFirst();
 

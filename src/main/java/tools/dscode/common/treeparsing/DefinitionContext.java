@@ -29,6 +29,9 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE
 
 public final class DefinitionContext {
 
+    public static final String FILE_INPUT = "InternalFileInput";
+
+
     public static final @Language("RegExp") String NUMERIC_TOKEN =
             "(?<!\\S)-?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?!\\S)";
 
@@ -244,7 +247,7 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite|save)(?:s|ed|ing|es)?\\b") {
+        ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite|save|attach)(?:s|ed|ing|es)?\\b") {
             @Override
             public String onCapture(MatchNode self) {
 
@@ -365,7 +368,16 @@ public final class DefinitionContext {
                             (category, v, op) ->
                                     XPathy.from(Tag.iframe).byAttribute(title).haveIt()
                     );
+
             category("IFrame").inheritsFrom("Frame");
+
+
+
+            category(FILE_INPUT)
+                    .and(
+                            (category, v, op) ->
+                                    XPathy.from(Tag.input).byAttribute(type).equals("file")
+                    );
 
 
             //
