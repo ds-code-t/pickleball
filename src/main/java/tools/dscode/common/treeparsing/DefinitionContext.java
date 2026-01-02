@@ -305,11 +305,11 @@ public final class DefinitionContext {
             @Override
             public String onSubstitute(MatchNode self) {
                 MatchNode parentNode = self.parent();
-                if(!parentNode.localStateBoolean("context", "action", "assertion")) {
-                    parentNode.putToLocalState("assertion", "equal");
-                    parentNode.putToLocalState("operationIndex",self.groups().start("defaultAssertion"));
+                System.out.println("@@itPlaceholder:  " + parentNode.localStateBoolean( "action", "assertion"));
+                if(parentNode.localStateBoolean( "action", "assertion")) {
+                    return " " +  PLACE_HOLDER_MATCH + " ";
                 }
-                return " " +  PLACE_HOLDER_MATCH + " ";
+                return self.token();
             }
         };
 
@@ -322,6 +322,7 @@ public final class DefinitionContext {
                   - valueMask
                   - phrase:
                     - predicate
+                    - itPlaceholder
                     - valueTransform
                     - elementMatch
                     - no

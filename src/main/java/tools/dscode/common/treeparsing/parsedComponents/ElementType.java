@@ -20,7 +20,7 @@ public enum ElementType {
     RETURNS_VALUE;
 
     public static final String VALUE_TYPE_MATCH = "InternalValueUnit";
-    public static final String PLACE_HOLDER_MATCH = "PLACEHOLDER";
+    public static final String PLACE_HOLDER_MATCH = "InternalPLACEHOLDER";
 
 
     private static final Map<String, ElementType> LOOKUP =

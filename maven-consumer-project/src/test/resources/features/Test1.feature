@@ -1,9 +1,11 @@
 Feature: Addition
 
-  Scenario: gene test1
+  Scenario: gene test2
   @[DEBUG]
     * , from the Top Panel:
-    : * , click Toggle Left Navigation button
+#    : * , click "Get your own website" Link
+#    : * , if "Get your own website" Link is displayed, click it
+    : * IF: "Get your own website" Link is displayed THEN: , click it
 
   Scenario: save test
     * , save 'Azzz2A' as "B"

@@ -69,7 +69,7 @@ public class ElementMatch {
     public int elementIndex;
 
 
-    private List<ElementWrapper> wrappedElements = null;
+    protected List<ElementWrapper> wrappedElements = null;
 
     WebDriver driver;
 
