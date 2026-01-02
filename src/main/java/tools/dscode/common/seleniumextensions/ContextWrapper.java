@@ -50,7 +50,6 @@ public class ContextWrapper {
         printDebug("\n##elementTerminalXPath ");
         prettyPrintXPath(elementTerminalXPath);
         printDebug("\n\n##");
-
         return getElementListFromSearchContext(searchContext, elementTerminalXPath);
 //        return searchContext.findElements(elementTerminalXPath.getLocator());
     }

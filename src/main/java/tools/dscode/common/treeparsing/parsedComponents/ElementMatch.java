@@ -178,16 +178,28 @@ public class ElementMatch {
                 }
             }
         }
-        for (TextOp textOp : textOps) {
 
-        }
-
+        System.out.println("@@elementMatch--: " + this);
+        System.out.println("@@categoryFlags: " + categoryFlags);
         if (!categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
             ExecutionDictionary dict = getExecutionDictionary();
             List<XPathy> elPredictXPaths = new ArrayList<>();
+            System.out.println("@@textOps--: " + textOps.size());
+
+            if (textOps.isEmpty())
+            {
+                ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, null, null);
+                System.out.println("@@categoryResolution: " + categoryResolution);
+                System.out.println("@@categoryResolution.xpath(): " + categoryResolution.xpath());
+                elPredictXPaths.add(categoryResolution.xpath());
+            }
+
             for (TextOp textOp : textOps) {
+                System.out.println("@@textOp--: " + textOp);
 
                 ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, textOp.text, textOp.op);
+                System.out.println("@@categoryResolution: " + categoryResolution);
+                System.out.println("@@categoryResolution.xpath(): " + categoryResolution.xpath());
                 elPredictXPaths.add(categoryResolution.xpath());
             }
 
@@ -299,8 +311,8 @@ public class ElementMatch {
 
     public List<ElementWrapper> getElementThrowErrorIfEmptyWithNoModifier() {
         List<ElementWrapper> returnElements = getElementWrappers();
-        if(returnElements.isEmpty() && (selectionType.equals("any") || selectionType.equals("none")))
-            throw new RuntimeException("No elements found for " + this);
+        if(returnElements.isEmpty() && !(selectionType.equals("any") || selectionType.equals("none")))
+            throw new RuntimeException("No elements found: " + this);
         return returnElements;
     }
 

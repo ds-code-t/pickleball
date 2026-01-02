@@ -1,5 +1,10 @@
 Feature: Addition
 
+  Scenario: gene test1
+  @[DEBUG]
+    * , from the Top Panel:
+    : * , click Toggle Left Navigation button
+
   Scenario: save test
     * , save 'Azzz2A' as "B"
     * , save "<B>" as "C"

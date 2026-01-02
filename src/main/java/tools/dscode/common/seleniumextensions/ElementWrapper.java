@@ -36,12 +36,15 @@ public class ElementWrapper {
 
         List<ElementWrapper> elementWrappers = new ArrayList<>();
         List<WebElement> elements = elementMatch.contextWrapper.getElements();
-
+        System.out.println("@@elements.size(: " + elements.size());
+        System.out.println("@@elements: " + elements);
 
         int index = 0;
         for (WebElement element : elements) {
             elementWrappers.add(new ElementWrapper(element, elementMatch, ++index));
         }
+        System.out.println("@@elementWrappers.size(): " + elementWrappers.size());
+        System.out.println("@@elementWrappers: " + elementWrappers);
         return elementWrappers;
     }
 
