@@ -8,10 +8,18 @@ Feature: Additiontest
       | 1        |
       | 2        |
 
-  Scenario: test222
-  @[DEBUG]
+  Scenario Outline: test222
+    @[DEBUG]
     * , from the Top Panel:
-  : * , click Open Menu, and Save Code
+  : * IF: "<link1>":
+  :: * , click Open Menu
+  : * IF: "<link2>":
+  :: * , click Save Code
+
+    Examples:
+      | Scenario | link1     | link2     |
+      | 1        | Open Menu |           |
+#      | 2        |           | Save Code |
 
 #    : * , ensure Open Menu is displayed
 #    : * , if Open Menu is displayed, click it

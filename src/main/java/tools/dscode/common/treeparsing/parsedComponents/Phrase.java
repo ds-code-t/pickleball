@@ -14,7 +14,7 @@ public final class Phrase extends PhraseData {
 
     public Phrase(String inputText, Character delimiter, LineData parsedLine) {
         super(inputText, delimiter, parsedLine);
-        if(!isOperationPhrase) {
+        if (!isOperationPhrase) {
             elementMatches = new ArrayList<>(elementMatches.stream().filter(e -> !e.isPlaceHolder()).toList());
         }
     }
@@ -31,8 +31,8 @@ public final class Phrase extends PhraseData {
         return phraseConditionalMode >= 0;
 
 
-//        phraseConditionalMode = previousPhrase == null ? 0 : previousPhrase.phraseConditionalMode;
-//        if (conditional.startsWith("else")) {
+//        phraseConditionalMode = getPreviousPhrase() == null ? 0 : getPreviousPhrase().phraseConditionalMode;
+//        if (getConditional().startsWith("else")) {
 //            parsedLine.lineConditionalMode *= -1;
 //            phraseConditionalMode = parsedLine.lineConditionalMode * -1;
 //        }
@@ -44,22 +44,22 @@ public final class Phrase extends PhraseData {
     @Override
     public void runPhrase() {
 
-        if( (phraseType == null || phraseType == PhraseType.ELEMENT_ONLY) && templatePhrase.phraseType !=null) {
-                if (!templatePhrase.getAction().isBlank()) {
-                    setAction(templatePhrase.getAction());
-                } else {
-                    if (!templatePhrase.getConditional().isBlank() && getConditional().isBlank()) {
-                        setConditional(templatePhrase.getConditional());
-                    }
-
-                    if (!templatePhrase.getAssertionType().isBlank() && getAssertionType().isBlank()) {
-                        setAssertionType(templatePhrase.getAssertionType());
-                    }
-
-                    if (!templatePhrase.getAssertion().isBlank() && getAssertion().isBlank()) {
-                        setAssertion(templatePhrase.getAssertion());
-                    }
+        if ((phraseType == null || phraseType == PhraseType.ELEMENT_ONLY) && templatePhrase.phraseType != null) {
+            if (!templatePhrase.getAction().isBlank()) {
+                setAction(templatePhrase.getAction());
+            } else {
+                if (!templatePhrase.getConditional().isBlank() && getConditional().isBlank()) {
+                    setConditional(templatePhrase.getConditional());
                 }
+
+                if (!templatePhrase.getAssertionType().isBlank() && getAssertionType().isBlank()) {
+                    setAssertionType(templatePhrase.getAssertionType());
+                }
+
+                if (!templatePhrase.getAssertion().isBlank() && getAssertion().isBlank()) {
+                    setAssertion(templatePhrase.getAssertion());
+                }
+            }
         }
 
         if (!getAssertionType().isBlank() && getAssertion().isBlank()) {
@@ -91,15 +91,18 @@ public final class Phrase extends PhraseData {
         }
 
 
-
-
         if (isOperationPhrase) {
             runOperation();
         } else if (phraseType.equals(PhraseType.CONTEXT)) {
             processContextPhrase();
         }
 
+        System.out.println("@@phrase running: " + this);
+        System.out.println("@@contextTermination: " + contextTermination);
+        System.out.println("@@phraseType: " + phraseType);
+        System.out.println("@@phraseConditionalMode: " + phraseConditionalMode);
         if (contextTermination) {
+            resolveResults();
             if (phraseType.equals(PhraseType.CONDITIONAL)) {
                 parsedLine.lineConditionalMode = phraseConditionalMode;
             } else if (termination.equals(':')) {
@@ -204,8 +207,6 @@ public final class Phrase extends PhraseData {
 
         return nextResolvedPhrase;
     }
-
-
 
 
 }

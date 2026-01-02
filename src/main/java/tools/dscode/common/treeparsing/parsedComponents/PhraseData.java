@@ -286,8 +286,6 @@ public abstract class PhraseData extends PassedData {
 
     public void runOperation() {
 
-
-
         OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
 
         operation.execute(this);
@@ -297,44 +295,46 @@ public abstract class PhraseData extends PassedData {
         chainStartPhrase.resultPhrases.add(this);
     }
 
+    Boolean previouslyResolvedBoolean = null;
     public boolean resolveResults() {
-
         if (!isOperationPhrase)
             return true;
         if (!isChainStart) {
             return chainStartPhrase.resolveResults();
         }
 
+        if(previouslyResolvedBoolean != null)
+            return previouslyResolvedBoolean;
+
         if(getAssertionType().isBlank())
             return true;
 
-        boolean assertionPassed = getBooleanResult();
-
-        String assertionMessage = "Assertion phrase '" + text + "' evaluates to: " + assertionPassed;
+        previouslyResolvedBoolean = getBooleanResult();
+        String assertionMessage = "Assertion phrase '" + text + "' evaluates to: " + previouslyResolvedBoolean;
         System.out.println(assertionMessage);
         if (!resultElements.isEmpty())
             assertionMessage += " , elements:" + resultElements.stream()
                     .map(Object::toString)
                     .collect(Collectors.joining("\n", "\n", ""));
 
-
-
         switch (getAssertionType()) {
             case "ensure" -> {
-                if (!assertionPassed) {
+                if (!previouslyResolvedBoolean) {
                     throw new RuntimeException("FAILED  " + assertionMessage);
                 }
             }
             case "verify" -> {
-                if (!assertionPassed) {
+                if (!previouslyResolvedBoolean) {
                     throw new SoftRuntimeException("FAILED  " + assertionMessage);
                 }
             }
             case "conditional" -> {
-                phraseConditionalMode = assertionPassed ? 1 : -1;
+                System.out.println("@@Conditional!!!");
+                phraseConditionalMode = previouslyResolvedBoolean ? 1 : -1;
             }
         }
-        return assertionPassed;
+
+        return previouslyResolvedBoolean;
     }
 
     public boolean getBooleanResult() {
