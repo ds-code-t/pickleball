@@ -11,6 +11,7 @@ import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
 import tools.dscode.common.reporting.WorkBook;
 import tools.dscode.common.status.SoftExceptionInterface;
+import tools.dscode.common.status.SoftRuntimeException;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 import tools.dscode.registry.GlobalRegistry;
@@ -20,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
@@ -147,11 +149,6 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
 
 
-
-
-
-
-
         if ((stepExtension.parentStep != null && stepExtension.parentStep.logAndIgnore) || stepExtension.inheritedLineData.lineConditionalMode < 0) {
             stepExtension.logAndIgnore = true;
         } else if (stepExtension.isDynamicStep) {
@@ -198,8 +195,6 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
 
 
-
-
         if (isScenarioComplete())
             return;
 
@@ -207,10 +202,6 @@ public class CurrentScenarioState extends ScenarioMapping {
         for (StepBase attachedStep : stepExtension.attachedSteps) {
             runStep((StepExtension) attachedStep);
         }
-
-
-
-
 
 
         if ((stepExtension.lineData.lineConditionalMode < 0 || stepExtension.logAndIgnore) && stepExtension.definitionFlags.contains(IGNORE_CHILDREN_IF_FALSE)) {
@@ -267,6 +258,22 @@ public class CurrentScenarioState extends ScenarioMapping {
     private boolean isScenarioHardFail = false;
     private boolean isScenarioSoftFail = false;
     private boolean isScenarioComplete = false;
+
+    public static void endScenario() {
+        getCurrentScenarioState().isScenarioComplete = true;
+    }
+
+    public static void failScenario(String failMessage) {
+        if (failMessage == null || failMessage.isBlank())
+            failMessage = "Manually Hard Failed Scenario";
+        throw new RuntimeException(failMessage.trim());
+    }
+
+    public static void softFailScenario(String failMessage) {
+        if (failMessage == null || failMessage.isBlank())
+            failMessage = "Manually Soft Failed Scenario";
+        throw new SoftRuntimeException(failMessage.trim());
+    }
 
     public boolean isScenarioFailed() {
         return isScenarioHardFail || isScenarioSoftFail;
