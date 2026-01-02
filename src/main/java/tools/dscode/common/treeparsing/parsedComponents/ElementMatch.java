@@ -36,7 +36,7 @@ public class ElementMatch {
     public static final String ELEMENT_RETURN_VALUE = "_elementReturnValue";
     public List<TextOp> textOps = new ArrayList<>();
     public String category;
-    public String selectionType;
+    public String selectionType = "";
     public String elementPosition;
     public List<String> valueTypes;
     public String state;
