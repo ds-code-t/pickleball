@@ -3,8 +3,10 @@ Feature: Addition
   Scenario: test222
   @[DEBUG]
     * , from the Top Panel:
-    : * , ensure Open Menu is displayed
-    : * , if Open Menu is displayed, click it
+    : * , click Open Menu, and Save Code
+
+#    : * , ensure Open Menu is displayed
+#    : * , if Open Menu is displayed, click it
 
 
   Scenario: gene test2

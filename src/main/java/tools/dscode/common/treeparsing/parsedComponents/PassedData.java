@@ -10,6 +10,7 @@ import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Asserti
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Attempt;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHolderMatch;
 
+import java.sql.SQLOutput;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -18,6 +19,7 @@ import java.util.Set;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.FOLLOWING_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.NO_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PRECEDING_OPERATION;
+import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
 
 
 public abstract class PassedData {
@@ -32,10 +34,7 @@ public abstract class PassedData {
     public PhraseData lastOperationPhrase;
 
     public boolean isSeparatorPhrase() {
-        if (isNewContext() || getPreviousPhrase() == null || getPreviousPhrase().contextTermination || !assertionType.isBlank())
-            return true;
-
-        return lastOperationPhrase == null || lastOperationPhrase.equals(this);
+        return (groupSeparator || isNewContext() || getPreviousPhrase() == null || getPreviousPhrase().contextTermination || !assertionType.isBlank());
     }
 
 
@@ -51,18 +50,16 @@ public abstract class PassedData {
         }
 
 
-
-
-        if (elementCount == 1) {
+        if (elementCount ==1) {
 //            if (phraseType == null) {
-            if (phraseType == null || (!getAssertion().isBlank() && getAssertionType().isBlank())) {
+            if (phraseType == ELEMENT_ONLY || (!getAssertion().isBlank() && getAssertionType().isBlank())) {
                 if (lastOperationPhrase == null || lastOperationPhrase.equals(this)) {
                     if (hasTerminationConditional()) {
                         setConditional("if");
                         lastOperationPhrase = (PhraseData) this;
                         PhraseData currentPhrase = (PhraseData) this;
                         while (currentPhrase != null) {
-                            if (currentPhrase.phraseType == null) {
+                            if (currentPhrase.phraseType == ELEMENT_ONLY) {
                                 currentPhrase.setAssertion("True");
                             }
                             if (currentPhrase.termination.equals('?'))
@@ -72,7 +69,7 @@ public abstract class PassedData {
                     }
                 }
             }
-            if (phraseType == null) {
+            if (phraseType == ELEMENT_ONLY) {
                 if (lastOperationPhrase == null || lastOperationPhrase.equals(this)) {
                     PhraseData currentPhrase = getNextPhrase().getResolvedPhrase();
                     while (currentPhrase != null) {
@@ -80,9 +77,11 @@ public abstract class PassedData {
                             if (!currentPhrase.getAction().isBlank()) {
                                 setAction(currentPhrase.getAction());
                                 operationIndex = firstElement.elementIndex + 1000;
+                                setElementGroupings();
                             } else if (!currentPhrase.getAssertion().isBlank()) {
                                 setAssertion(currentPhrase.getAssertion());
                                 operationIndex = firstElement.elementIndex + 1000;
+                                setElementGroupings();
                             }
                         }
                         currentPhrase = currentPhrase.getNextPhrase().getResolvedPhrase();
@@ -93,9 +92,11 @@ public abstract class PassedData {
                     if (!lastOperationPhrase.getAction().isBlank()) {
                         setAction(lastOperationPhrase.getAction());
                         operationIndex = 0;
+                        setElementGroupings();
                     } else if (!lastOperationPhrase.getAssertion().isBlank()) {
                         setAssertion(lastOperationPhrase.getAssertion());
                         operationIndex = 0;
+                        setElementGroupings();
                     }
                 }
             }
@@ -348,26 +349,33 @@ public abstract class PassedData {
 
         if (phraseType == null) {
             if (!elementMatches.isEmpty())
-                phraseType = PhraseData.PhraseType.ELEMENT_ONLY;
+                phraseType = ELEMENT_ONLY;
         }
 
 
         if (operationIndex != null) {
-            for (ElementMatch em : elementMatches) {
-                if (em.startIndex < operationIndex) {
-                    em.elementTypes.add(PRECEDING_OPERATION);
-                    elementMatchesProceedingOperation.add(em);
-                } else if (em.startIndex > operationIndex) {
-                    elementMatchesFollowingOperation.add(em);
-                    em.elementTypes.add(FOLLOWING_OPERATION);
-                }
-            }
-            elementBeforeOperation = elementMatchesProceedingOperation.isEmpty() ? null : elementMatchesProceedingOperation.getFirst();
-            elementAfterOperation = elementMatchesFollowingOperation.isEmpty() ? null : elementMatchesFollowingOperation.getFirst();
+            setElementGroupings();
         } else {
             elementMatches.forEach(em -> em.elementTypes.add(NO_OPERATION));
         }
 
+    }
+
+    public void setElementGroupings()
+    {
+        elementMatchesFollowingOperation = new ArrayList<>();
+        elementMatchesProceedingOperation = new ArrayList<>();
+        for (ElementMatch em : elementMatches) {
+            if (em.startIndex < operationIndex) {
+                em.elementTypes.add(PRECEDING_OPERATION);
+                elementMatchesProceedingOperation.add(em);
+            } else if (em.startIndex > operationIndex) {
+                elementMatchesFollowingOperation.add(em);
+                em.elementTypes.add(FOLLOWING_OPERATION);
+            }
+        }
+        elementBeforeOperation = elementMatchesProceedingOperation.isEmpty() ? null : elementMatchesProceedingOperation.getFirst();
+        elementAfterOperation = elementMatchesFollowingOperation.isEmpty() ? null : elementMatchesFollowingOperation.getFirst();
     }
 
     public String getConditional() {
@@ -403,7 +411,7 @@ public abstract class PassedData {
     public boolean setAssertion(String assertion) {
         if (assertion == null || assertion.isBlank()) return false;
         assertionOperation = AssertionOperations.fromString(assertion);
-        if (phraseType == null)
+        if (phraseType == null || phraseType == ELEMENT_ONLY)
             phraseType = PhraseData.PhraseType.ASSERTION;
         isOperationPhrase = true;
         this.assertion = assertion;
@@ -415,10 +423,12 @@ public abstract class PassedData {
         return assertionType;
     }
 
-    public void setAssertionType(String assertionType) {
+    public boolean setAssertionType(String assertionType) {
+        if (assertionType == null || assertionType.isBlank()) return false;
         this.assertionType = assertionType;
         isOperationPhrase = true;
         phraseType = assertionType.startsWith("conditional") ? PhraseData.PhraseType.CONDITIONAL : PhraseData.PhraseType.ASSERTION;
+        return true;
     }
 
     public PhraseData getResolvedPhrase() {
@@ -456,7 +466,7 @@ public abstract class PassedData {
     }
 
     public List<ElementMatch> getElementMatchesBeforeAndAfterOperation() {
-        if(elementBeforeOperation != null && elementAfterOperation != null)
+        if (elementBeforeOperation != null && elementAfterOperation != null)
             return List.of(elementBeforeOperation, elementAfterOperation);
         ElementMatch elementMatch1 = elementBeforeOperation == null ? new PlaceHolderMatch((PhraseData) this) : elementBeforeOperation;
         ElementMatch elementMatch2 = elementAfterOperation == null ? new PlaceHolderMatch((PhraseData) this) : elementAfterOperation;
@@ -494,7 +504,7 @@ public abstract class PassedData {
         phraseData.chainStartPhrase = phraseData;
         phraseData.chainStart = phraseData.position;
 
-        PhraseData nextResolvedPhrase =  phraseData.getNextPhrase() == null ? null :  phraseData.getNextPhrase().resolvePhrase();
+        PhraseData nextResolvedPhrase = phraseData.getNextPhrase() == null ? null : phraseData.getNextPhrase().resolvePhrase();
 
         if (nextResolvedPhrase == null || nextResolvedPhrase.isSeparatorPhrase()) {
             phraseData.chainEnd = phraseData.position;

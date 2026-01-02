@@ -44,10 +44,7 @@ public final class Phrase extends PhraseData {
     @Override
     public void runPhrase() {
 
-
-
-
-        if( phraseType == null && templatePhrase.phraseType !=null) {
+        if( (phraseType == null || phraseType == PhraseType.ELEMENT_ONLY) && templatePhrase.phraseType !=null) {
                 if (!templatePhrase.getAction().isBlank()) {
                     setAction(templatePhrase.getAction());
                 } else {
