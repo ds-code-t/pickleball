@@ -222,7 +222,7 @@ public abstract class PassedData {
     private PhraseData previousPhrase;
     private PhraseData nextPhrase;
 
-    private List<ElementMatch> elementMatches = new ArrayList<>();
+    protected List<ElementMatch> elementMatches = new ArrayList<>();
     private List<ElementMatch> elementMatchesProceedingOperation = new ArrayList<>();
     private List<ElementMatch> elementMatchesFollowingOperation = new ArrayList<>();
 

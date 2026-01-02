@@ -73,7 +73,7 @@ public class ElementMatch {
 
     WebDriver driver;
 
-    private boolean isPlaceHolder = false;
+    protected boolean isPlaceHolder = false;
     public boolean isPlaceHolder() {
         return isPlaceHolder;
     }
@@ -110,6 +110,7 @@ public class ElementMatch {
     }
 
     protected ElementMatch(PhraseData phraseData) {
+
         this.parentPhrase = phraseData;
         isPlaceHolder = true;
         this.startIndex = -1;
@@ -118,6 +119,7 @@ public class ElementMatch {
     }
 
     public ElementMatch(PhraseData phraseData, MatchNode elementNode) {
+
         this.fullText = elementNode.getStringFromLocalState("fullText");
         this.parentPhrase = phraseData;
         this.startIndex = elementNode.start;
@@ -179,27 +181,27 @@ public class ElementMatch {
             }
         }
 
-        System.out.println("@@elementMatch--: " + this);
-        System.out.println("@@categoryFlags: " + categoryFlags);
+
+
         if (!categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
             ExecutionDictionary dict = getExecutionDictionary();
             List<XPathy> elPredictXPaths = new ArrayList<>();
-            System.out.println("@@textOps--: " + textOps.size());
+
 
             if (textOps.isEmpty())
             {
                 ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, null, null);
-                System.out.println("@@categoryResolution: " + categoryResolution);
-                System.out.println("@@categoryResolution.xpath(): " + categoryResolution.xpath());
+
+
                 elPredictXPaths.add(categoryResolution.xpath());
             }
 
             for (TextOp textOp : textOps) {
-                System.out.println("@@textOp--: " + textOp);
+
 
                 ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, textOp.text, textOp.op);
-                System.out.println("@@categoryResolution: " + categoryResolution);
-                System.out.println("@@categoryResolution.xpath(): " + categoryResolution.xpath());
+
+
                 elPredictXPaths.add(categoryResolution.xpath());
             }
 
@@ -224,6 +226,8 @@ public class ElementMatch {
             nonHTMLValues.add(defaultText);
             elementTypes.add(RETURNS_VALUE);
         }
+
+
 
 
     }
@@ -293,7 +297,7 @@ public class ElementMatch {
     private List<ValueWrapper> previouslyReturnedValues = null;
 
     public List<ValueWrapper> getValues() {
-        System.out.println("@@elementMatch-getValues(): " + this);
+
         List<ValueWrapper> returnList = new ArrayList<>();
         if (elementTypes.contains(ElementType.HTML_TYPE)) {
             getElementWrappers().forEach(e -> returnList.add(e.getElementReturnValue()));
@@ -316,10 +320,17 @@ public class ElementMatch {
         return returnElements;
     }
 
+    public boolean hasElementWrappers(){
+        return !getElementWrappers().isEmpty();
+    }
+
     public List<ElementWrapper> getElementWrappers() {
+
+
         if (wrappedElements == null) {
             parentPhrase.syncWithDOM();
         }
+
         return wrappedElements;
     }
 

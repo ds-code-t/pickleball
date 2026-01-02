@@ -19,10 +19,10 @@
 //
 //io.cucumber.plugin.event.Location original = proceed();
 //
-//        System.out.println("@@TestCase.getLocation: original Location = " + original);
+
 //
 //        if (original == null) {
-//        System.out.println("@@TestCase.getLocation: original is null -> returning null");
+
 //            return null;
 //                    }
 //
@@ -33,19 +33,19 @@
 //java.net.URI uri = tc.getUri();
 //String uriStr = String.valueOf(uri);
 //
-//            System.out.println("@@TestCase.getLocation: tc.getUri() original = " + uriStr);
+
 //
 //String fixed = fixFeatureLocationForIntellij(uriStr);
 //
 //            if (!uriStr.equals(fixed)) {
-//        System.out.println("@@TestCase.getLocation: tc.getUri() fixed    = " + fixed);
+
 //            }
 //                    } catch (Throwable t) {
-//        System.out.println("@@TestCase.getLocation: FAILED to print related URI");
+
 //            t.printStackTrace(System.out);
 //        }
 //
-//                System.out.println("@@TestCase.getLocation: returning Location = " + original);
+
 //        return original;
 //    }
 //            }

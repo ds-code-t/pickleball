@@ -15,12 +15,12 @@
 //        && args(event) {
 //
 //    String original = proceed(event);
-//    System.out.println("@@extractLocation: original = " + original);
+
 //
 //    String fixed = fixFeatureLocationForIntellij(original);
 //
 //    if (!String.valueOf(original).equals(String.valueOf(fixed))) {
-//        System.out.println("@@extractLocation: fixed    = " + fixed);
+
 //    }
 //
 //    return fixed;

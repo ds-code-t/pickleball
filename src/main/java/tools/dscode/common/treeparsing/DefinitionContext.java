@@ -305,11 +305,11 @@ public final class DefinitionContext {
             @Override
             public String onSubstitute(MatchNode self) {
                 MatchNode parentNode = self.parent();
-                System.out.println("@@itPlaceholder:  " + parentNode.localStateBoolean( "action", "assertion"));
-                if(parentNode.localStateBoolean( "action", "assertion")) {
-                    return " " +  PLACE_HOLDER_MATCH + " ";
-                }
-                return self.token();
+                return " " +  PLACE_HOLDER_MATCH + " ";
+//                if(parentNode.localStateBoolean( "action", "assertion")) {
+//                    return " " +  PLACE_HOLDER_MATCH + " ";
+//                }
+//                return self.token();
             }
         };
 
@@ -479,7 +479,7 @@ public final class DefinitionContext {
             //
             // "*" fallback OR builders
             //
-            System.out.println("@@fall back category");
+
             category("*")
                     .or(
                             (category, v, op) ->

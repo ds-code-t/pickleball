@@ -20,6 +20,7 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.com
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.prettyPrintXPath;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.everyNth;
 import static tools.dscode.common.util.DebugUtils.printDebug;
+import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
 
 public class ContextWrapper {
 
@@ -116,6 +117,10 @@ public class ContextWrapper {
         }
 
         printDebug("##XPath: getElementListFromSearchContext\n" + prettyPrintXPath(xpath) +"\n----------------" );
+
+
+
+
         return searchContext.findElements(new By.ByXPath(xpath));
     }
 

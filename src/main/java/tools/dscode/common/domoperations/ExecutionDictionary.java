@@ -280,7 +280,7 @@ public class ExecutionDictionary {
             ValueWrapper value,
             Op op
     ) {
-        System.out.println("@@expandInternal: " + category + " " + value + " " + op + " " + map.keySet() + " ");
+
 
 
         List<String> lineage = resolveCategoryLineage(category);
@@ -290,7 +290,7 @@ public class ExecutionDictionary {
 
 
         for (String catKey : lineage) {
-            System.out.println("@@catKey: " + catKey + " " + map.containsKey(catKey) + " " + map.get(catKey) + "");
+
             var builders = map.get(catKey);
             if (builders != null) {
 
@@ -300,15 +300,15 @@ public class ExecutionDictionary {
             }
         }
 
-        System.out.println("@@allBuilders.size() " + allBuilders.size() + "");
+
         // 2) If nothing found yet in THIS map, decide whether to fallback to "*"
         if (allBuilders.isEmpty()) {
             // Only use "*" fallback if there are NO AND or OR builders
             // anywhere in the non-base lineage.
-            System.out.println("@@lineage: " + lineage + "");
+
             if (!hasAnyRegisteredBuilders(lineage)) {
                 var starList = map.get("*");
-                System.out.println("@@starList: " + starList);
+
                 if (starList == null || starList.isEmpty()) {
 
                     return List.of();
@@ -343,7 +343,7 @@ public class ExecutionDictionary {
     }
 
     public List<XPathy> expandOr(String category, ValueWrapper value, Op op) {
-        System.out.println("@@expandOr: " + category + " " + value + " " + op + " " + orReg.keySet() + " ");
+
         return expandInternal(orReg, category, value, op);
     }
 
@@ -394,7 +394,7 @@ public class ExecutionDictionary {
     }
 
     public Optional<XPathy> orAll(String category, ValueWrapper value, Op op) {
-        System.out.println("@@orAll: " + category + " " + value + " " + op + " " + orReg.keySet() + " ");
+
         Optional<XPathy> result = combine(expandOr(category, value, op), "or");
 
         return result;
@@ -405,7 +405,7 @@ public class ExecutionDictionary {
      * Delegates to resolveToXPathy and unwraps the result.
      */
     public XPathy andThenOr(String category, ValueWrapper value, Op op) {
-        System.out.println("@@andThenOr: " + category + " " + value + " " + op + " " + orReg.keySet() + " ");
+
 
         Optional<XPathy> result = resolveToXPathy(category, value, op);
 
@@ -428,11 +428,11 @@ public class ExecutionDictionary {
      * and return the result together with the resolved category flags.
      */
     public CategoryResolution andThenOrWithFlags(String category, ValueWrapper value, Op op) {
-        System.out.println("@@andThenOrWithFlags: " + category + " " + value + " " + op + " " + orReg.keySet() + " ");
+
         XPathy xpath = andThenOr(category, value, op); // preserves old behavior, including null
-        System.out.println("@@xpath-- " + xpath);
+
         Set<CategoryFlags> flags = getResolvedCategoryFlags(category);
-        System.out.println("@@xpath-- " + xpath);
+
         return new CategoryResolution(category, value, op, xpath, flags);
     }
 
@@ -440,7 +440,7 @@ public class ExecutionDictionary {
      * Optional-returning version of andThenOr.
      */
     public Optional<XPathy> resolveToXPathy(String category, ValueWrapper value, Op op) {
-        System.out.println("@@resolveToXPathy: " + category + " " + value + " " + op + " " + orReg.keySet() + " ");
+
         Optional<XPathy> orPart = orAll(category, value, op);
         Optional<XPathy> andPart = andAll(category, value, op);
 

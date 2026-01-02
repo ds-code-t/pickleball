@@ -90,19 +90,23 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-            System.out.println("@@phraseData.getElementMatchesFollowingOperation(): " + phraseData.getElementMatchesFollowingOperation());
+
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
-            System.out.println("@@ phraseData.resultElements: " +  phraseData.resultElements);
+
+            System.out.println("@WphraseData.resultElements: " +  phraseData.resultElements);
+
             ElementMatch element = phraseData.resultElements.getFirst();
+
             phraseData.result = Attempt.run(() -> {
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     click(getDriver(), elementWrapper.getElement());
                 }
                 return true;
             });
+
         }
     },
 

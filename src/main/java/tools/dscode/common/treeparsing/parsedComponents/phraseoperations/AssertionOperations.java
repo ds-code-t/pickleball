@@ -34,8 +34,7 @@ public enum AssertionOperations implements OperationsInterface {
 
             ElementMatch firstElement = phraseData.resultElements.getFirst();
             ElementMatch secondElement = phraseData.resultElements.get(1);
-            System.out.println("@@firstElement.getValues(): " + firstElement.getValues());
-            System.out.println("@@secondElement.getValues(): " + secondElement.getValues());
+
 
             phraseData.result = Attempt.run(() -> {
                  return ValueWrapperCompareReducer.eval(
@@ -105,11 +104,11 @@ public enum AssertionOperations implements OperationsInterface {
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.SECOND_ELEMENT)
             );
-            System.out.println("@@list: " + phraseData.resultElements);
+
             ElementMatch firstElement = phraseData.resultElements.getFirst();
             ElementMatch secondElement = phraseData.resultElements.get(1);
-            System.out.println("@@firstElement: " + firstElement);
-            System.out.println("@@secondElement: " + secondElement);
+
+
             phraseData.result = Attempt.run(() -> {
                 return ValueWrapperCompareReducer.eval(
                         ValueWrapperComparisons::matchesRegex,
@@ -176,6 +175,11 @@ public enum AssertionOperations implements OperationsInterface {
                         getModeSet(phraseData)
                 );
             });
+            
+
+
+
+
         }
     },
 

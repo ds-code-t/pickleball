@@ -62,12 +62,12 @@ public final class ValueWrapperComparisons {
 
         String left = stringValue(a, b);
         String right = stringValueOther(a, b);
-        System.out.println("@@equals: left: " + left + ", right: " + right + "");
-        System.out.println("@@eitherSingleQuoted(a, b) " + eitherSingleQuoted(a, b));
+
+
         boolean returnBool = eitherSingleQuoted(a, b)
                 ? StringUtils.equalsIgnoreCase(left, right)
                 : StringUtils.equals(left, right);
-        System.out.println("@@returnBool " + returnBool);
+
 
         return eitherSingleQuoted(a, b)
                 ? StringUtils.equalsIgnoreCase(left, right)
@@ -108,20 +108,20 @@ public final class ValueWrapperComparisons {
     }
 
     public static boolean matchesRegex(ValueWrapper a, ValueWrapper regex) {
-        System.out.println("@@matchesRegex: " + a + ", " + regex);
+
         if (a == null || regex == null) return false;
 
         String value = stringValue(a, regex);
-        System.out.println("@@value: " + value );
+
         String pattern = stringValueOther(a, regex);
-        System.out.println("@@pattern: " + pattern);
+
 
         if (value == null || pattern == null) return false;
 
         int flags = eitherSingleQuoted(a, regex)
                 ? Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
                 : 0;
-        System.out.println("@@Pattern.compile(pattern, flags).matcher(value).matches(): " + Pattern.compile(pattern, flags).matcher(value).matches());
+
         return Pattern.compile(pattern, flags).matcher(value).matches();
     }
 

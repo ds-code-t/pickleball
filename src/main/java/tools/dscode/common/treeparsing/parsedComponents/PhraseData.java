@@ -285,11 +285,11 @@ public abstract class PhraseData extends PassedData {
 
 
     public void runOperation() {
-        System.out.println("@@runOperation: " + this);
-        System.out.println("@@actionOperation: " + actionOperation);
-        System.out.println("@@assertionOperation: " + assertionOperation);
+
+
+
         OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
-        System.out.println("@@operation: " + operation);
+
         operation.execute(this);
         if (result.failed()) {
             throw new RuntimeException("operation '" + operation + "' failed", result.error());
@@ -298,21 +298,25 @@ public abstract class PhraseData extends PassedData {
     }
 
     public boolean resolveResults() {
-        System.out.println("\n@@resolveResults- " + this);
+
         if (!isOperationPhrase)
             return true;
         if (!isChainStart) {
             return chainStartPhrase.resolveResults();
         }
 
+        if(getAssertionType().isBlank())
+            return true;
+
         boolean assertionPassed = getBooleanResult();
 
-
         String assertionMessage = "Assertion phrase '" + text + "' evaluates to: " + assertionPassed;
+        System.out.println(assertionMessage);
         if (!resultElements.isEmpty())
             assertionMessage += " , elements:" + resultElements.stream()
                     .map(Object::toString)
                     .collect(Collectors.joining("\n", "\n", ""));
+
 
 
         switch (getAssertionType()) {
@@ -335,14 +339,14 @@ public abstract class PhraseData extends PassedData {
 
     public boolean getBooleanResult() {
         boolean andConjunction = !conjunction.equals("or");
-        System.out.println("@@andConjunction- " + andConjunction);
+
 
         for (PhraseData resultPhrase : chainStartPhrase.resultPhrases) {
             Object resultObject = resultPhrase.result.value();
-            System.out.println("@@--resultObject- " + resultObject);
+
 
             boolean isTrue = resultObject != null && (boolean) resultObject;
-            System.out.println("@@isTrue- " + isTrue);
+
 
             if (andConjunction) {
                 if (!isTrue) {
@@ -354,7 +358,7 @@ public abstract class PhraseData extends PassedData {
                 }
             }
         }
-        System.out.println("\n@@return-andConjunction- " + andConjunction);
+
 
         return andConjunction;
     }

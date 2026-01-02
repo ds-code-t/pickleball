@@ -1,11 +1,18 @@
 Feature: Addition
 
+  Scenario: test222
+  @[DEBUG]
+    * , from the Top Panel:
+    : * , ensure Open Menu is displayed
+    : * , if Open Menu is displayed, click it
+
+
   Scenario: gene test2
   @[DEBUG]
     * , from the Top Panel:
 #    : * , click "Get your own website" Link
-#    : * , if "Get your own website" Link is displayed, click it
-    : * IF: "Get your own website" Link is displayed THEN: , click it
+  : * , if "Get your own website" Link is displayed, click it
+#    : * IF: "Get your own website" Link is displayed THEN: , click it
 
   Scenario: save test
     * , save 'Azzz2A' as "B"

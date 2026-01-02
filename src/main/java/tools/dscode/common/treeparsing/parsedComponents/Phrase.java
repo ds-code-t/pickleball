@@ -6,12 +6,17 @@ import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 
+import java.util.ArrayList;
+
 
 public final class Phrase extends PhraseData {
 
 
     public Phrase(String inputText, Character delimiter, LineData parsedLine) {
         super(inputText, delimiter, parsedLine);
+        if(!isOperationPhrase) {
+            elementMatches = new ArrayList<>(elementMatches.stream().filter(e -> !e.isPlaceHolder()).toList());
+        }
     }
 
 
@@ -38,9 +43,9 @@ public final class Phrase extends PhraseData {
 
     @Override
     public void runPhrase() {
-        System.out.println("@@runPhrase " + this);
-        System.out.println("@@phraseType " + phraseType);
-        System.out.println("@@phraseType " + phraseType);
+
+
+
 
         if( phraseType == null && templatePhrase.phraseType !=null) {
                 if (!templatePhrase.getAction().isBlank()) {
