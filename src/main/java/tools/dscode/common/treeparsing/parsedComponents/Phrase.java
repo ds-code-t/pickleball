@@ -8,6 +8,8 @@ import tools.dscode.common.treeparsing.preparsing.LineData;
 
 import java.util.ArrayList;
 
+import static tools.dscode.common.treeparsing.DefinitionContext.FILE_INPUT;
+
 
 public final class Phrase extends PhraseData {
 
@@ -160,7 +162,11 @@ public final class Phrase extends PhraseData {
     }
 
     public PhraseData resolvePhrase() {
-        setResolvedPhrase(new Phrase(text, termination, parsedLine));
+        PhraseData resolvedPhrase = new Phrase(text, termination, parsedLine);
+        if(resolvedPhrase.getAction().startsWith("attach") && !resolvedPhrase.getElementMatches().stream().anyMatch(e -> e.elementTypes.contains(ElementType.HTML_TYPE))){
+            resolvedPhrase = new Phrase(resolvedPhrase.resolvedText.replaceFirst("\\battach(?:es|ed)?\\b", "attach " + FILE_INPUT + " "), termination, parsedLine);
+        }
+        setResolvedPhrase(resolvedPhrase);
         getResolvedPhrase().position = position;
         getResolvedPhrase().setPreviousPhrase(getPreviousPhrase());
 

@@ -26,7 +26,7 @@ public final class LeanWaits {
     }
 
     public static void waitForPhraseEntities( PhraseData parsingPhrase) {
-
+        System.out.println("@@waitForPhraseEntities: " + parsingPhrase);
         // SAFE version: never throws
         safeWaitForPageReady(parsingPhrase.webDriver, Duration.ofSeconds(60));
 

@@ -1,5 +1,9 @@
 Feature: Additiontest
 
+  Scenario: attach test2
+    * , from FrameResult:
+  : * , attach "test.xlsx"
+
   Scenario Outline: so test2
     * , from the Top Panel:
   : * , click Open Menu, and Save Code
@@ -17,8 +21,8 @@ Feature: Additiontest
   :: * , click Save Code
 
     Examples:
-      | Scenario | link1     | link2     |
-      | 1        | Open Menu |           |
+      | Scenario | link1     | link2 |
+      | 1        | Open Menu |       |
 #      | 2        |           | Save Code |
 
 #    : * , ensure Open Menu is displayed

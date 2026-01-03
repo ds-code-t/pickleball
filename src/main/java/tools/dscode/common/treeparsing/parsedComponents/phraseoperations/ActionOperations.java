@@ -31,14 +31,15 @@ public enum ActionOperations implements OperationsInterface {
             System.out.println(phraseData + " : Executing " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
+                            .mustMatchAll(ElementType.HTML_ELEMENT),
+                    new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE)
             );
-
-            ElementMatch pathElement = phraseData.resultElements.getFirst();
-            ElementMatch fileInput = new ElementMatch(phraseData, FILE_INPUT);
+            ElementMatch fileInputElement =  phraseData.resultElements.getFirst();
+            ElementMatch filePathElement =  phraseData.resultElements.get(1);
             phraseData.result = Attempt.run(() -> {
-                WebElement inputElement = fileInput.getElementWrappers().getFirst().getElement();
-                FileUploadUtil.upload(getDriver(), inputElement, pathElement.getValue().toString());
+                WebElement inputElement = fileInputElement.getElementWrappers().getFirst().getElement();
+                FileUploadUtil.upload(getDriver(), inputElement, filePathElement.getValue().toString());
                 return true;
             });
         }

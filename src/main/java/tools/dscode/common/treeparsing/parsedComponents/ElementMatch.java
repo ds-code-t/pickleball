@@ -18,9 +18,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
+import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETURNS_VALUE;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrOp;
@@ -118,31 +120,11 @@ public class ElementMatch {
         this.fullText = "PlaceHolder";
     }
 
-    public ElementMatch(PhraseData phraseData, String category, TextOp... textOpsArgs) {
-        this.parentPhrase = phraseData;
-        isPlaceHolder = true;
-        this.startIndex = -1;
-        this.position = -1;
-        this.fullText = "Manually Set";
-        textOps.addAll(Arrays.asList(textOpsArgs));
 
-        ExecutionDictionary dict = getExecutionDictionary();
-        List<XPathy> elPredictXPaths = new ArrayList<>();
-
-        if (textOps.isEmpty())
-        {
-            ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, null, null);
-            System.out.println("@@categoryResolution.xpath(): " + categoryResolution.xpath());
-            elPredictXPaths.add(categoryResolution.xpath());
-        }
-
-        for (TextOp textOp : textOps) {
-            ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, textOp.text, textOp.op);
-            elPredictXPaths.add(categoryResolution.xpath());
-        }
-        xPathy = combineAnd(elPredictXPaths);
-        System.out.println("@@Fileinput xPathy: " + xPathy);
-    }
+//    public List<ElementMatch> createElementMatchesFromString(String elementString) {
+//        MatchNode returnMatchNode = getNodeDictionary().parse(elementString);
+//        returnMatchNode.getOrderedChildren("elementMatch").stream().map(this::getElementMatch).collect(Collectors.toList())
+//    }
 
 
     public ElementMatch(PhraseData phraseData, MatchNode elementNode) {
