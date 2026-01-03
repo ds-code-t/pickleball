@@ -132,6 +132,7 @@ public class ElementMatch {
         if (textOps.isEmpty())
         {
             ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, null, null);
+            System.out.println("@@categoryResolution.xpath(): " + categoryResolution.xpath());
             elPredictXPaths.add(categoryResolution.xpath());
         }
 
@@ -140,6 +141,7 @@ public class ElementMatch {
             elPredictXPaths.add(categoryResolution.xpath());
         }
         xPathy = combineAnd(elPredictXPaths);
+        System.out.println("@@Fileinput xPathy: " + xPathy);
     }
 
 
