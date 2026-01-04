@@ -4,7 +4,7 @@ Feature: Additiontest
   Scenario: test
   @[DEBUG]
     * , from the Iframe:
-    : * , verify "This page is displayeds in an iframe" Text is displayed
+    : * , verify "This page is displayed in an iframe" Text is displayed
 
   Scenario: attach 4tt
     * , from the Top Panel:
@@ -24,7 +24,7 @@ Feature: Additiontest
   Scenario: attach test2
   @[DEBUG]
 #    * , from FrameResult:
-    * , in FrameResult , create and attach "xcszdftest2.xlsx"
+    * , in FrameResult , create and attach "eexcszdftest2.xlsx"
 
   Scenario Outline: so test2
     * , from the Top Panel:

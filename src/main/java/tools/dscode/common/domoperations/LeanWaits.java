@@ -124,9 +124,7 @@ public final class LeanWaits {
      *
      * NOTE: If the passed WebElement goes stale, re-locate it before calling this.
      */
-    public static WebElement waitForElementReady(WebDriver driver,
-                                                        WebElement element,
-                                                        Duration timeout) {
+    public static WebElement waitForElementReady(WebDriver driver, WebElement element, Duration timeout) {
         FluentWait<WebDriver> wait = new FluentWait<>(driver)
                 .withTimeout(timeout)
                 .pollingEvery(Duration.ofMillis(150))
@@ -134,57 +132,42 @@ public final class LeanWaits {
                 .ignoring(JavascriptException.class)
                 .ignoring(WebDriverException.class);
 
-        String elementString  = element.getText();
-        printDebug("##waitForElementReady: " + (elementString.length() > 200 ? elementString.substring(0, 200) : elementString));
-        System.out.println("Waiting for element to become ready " + timeout + "ms: " + element.toString());
         return wait.until(d -> {
             try {
-                if (element == null) {
-                    return null;
-                }
+                if (element == null) return null;
+
                 boolean displayed;
                 try {
                     displayed = element.isDisplayed();
                 } catch (StaleElementReferenceException stale) {
-                    // let caller re-locate if needed; continue polling until timeout
                     return null;
                 }
-                if (!displayed) {
-                    return null;
-                }
-                // Center into viewport to avoid sticky headers/partial visibility
+                if (!displayed) return null;
+
+                // optional: keep scrollIntoView
                 try {
                     ((JavascriptExecutor) d).executeScript(
                             "try{arguments[0].scrollIntoView({block:'center',inline:'center'});}catch(e){}",
                             element
                     );
-                } catch (JavascriptException ignored) {
+                } catch (JavascriptException ignored) {}
 
-                    // ignore and continue polling
-                }
-                // Small hover nudge for CSS :hover menus/tooltips
+                // optional: keep hover nudge
                 try {
                     new Actions(d).moveToElement(element)
                             .pause(Duration.ofMillis(100))
                             .perform();
-                } catch (WebDriverException ignored) {
-                    // hover failures shouldn't abort; just keep polling
-                }
-                // JS hit-test at center (shadow DOM aware) + style checks
-                Boolean ok;
-                try {
-                    ok = (Boolean) ((JavascriptExecutor) d).executeScript(HIT_TEST_JS, element);
-                } catch (JavascriptException ignored) {
-                    return null;
-                }
-                return Boolean.TRUE.equals(ok) ? element : null;
+                } catch (WebDriverException ignored) {}
+
+                // ✅ if we got here, it's "ready" under the new definition
+                return element;
 
             } catch (StaleElementReferenceException stale) {
-                // The reference is dead; the caller should re-locate and call again.
                 return null;
             }
         });
     }
+
 
     // --- minimal JS helpers (kept tiny) ---
 
@@ -250,4 +233,10 @@ public final class LeanWaits {
             const path = root && root.composedPath ? root.composedPath() : [];
             return Array.isArray(path) && path.includes(el);
             """;
+
+
+
+
+
+
 }
