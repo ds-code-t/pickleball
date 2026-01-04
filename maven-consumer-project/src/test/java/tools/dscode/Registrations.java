@@ -32,7 +32,7 @@ public class Registrations {
                 ctx
         );
 
-        dict.registerStartingIframe("FrameResult").and(
+        dict.registerTopLevelIframe("FrameResult").and(
                 (category, v, op) -> XPathy.from(Tag.iframe).byAttribute(id).equals("iframeResult")
         );
 

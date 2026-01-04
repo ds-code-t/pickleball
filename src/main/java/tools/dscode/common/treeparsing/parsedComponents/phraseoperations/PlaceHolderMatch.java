@@ -25,7 +25,7 @@ public class PlaceHolderMatch extends ElementMatch {
 
     @Override
     public String toString() {
-        return "PLACEHOLDER ElementType" + (elementMatcher == null ? "" : elementMatcher);
+        return "PLACEHOLDER , ElementType: " + (elementMatcher == null ? "" : elementMatcher);
     }
 
 //    List<ValueWrapper> placeHolderValues;

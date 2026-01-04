@@ -363,13 +363,16 @@ public final class DefinitionContext {
             //
             // Frame
             //
-            registerIframe("Frame")
+            registerIframe("Frame", "IFrame", "Iframe")
                     .and(
                             (category, v, op) ->
-                                    XPathy.from(Tag.iframe).byAttribute(title).haveIt()
+                                    XPathy.from(Tag.iframe)
+                    ).and(
+                            (category, v, op) ->
+                                    if(v)
+                                    XPathy.from(Tag.iframe)
                     );
 
-            registerIframe("IFrame").inheritsFrom("Frame");
 
 
 

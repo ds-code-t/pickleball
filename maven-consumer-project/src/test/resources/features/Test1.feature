@@ -1,6 +1,11 @@
 Feature: Additiontest
 
 
+  Scenario: test
+  @[DEBUG]
+    * , from the Iframe:
+    : * , verify "This page is displayeds in an iframe" Text is displayed
+
   Scenario: attach 4tt
     * , from the Top Panel:
   : * , attach "test.xlsx"

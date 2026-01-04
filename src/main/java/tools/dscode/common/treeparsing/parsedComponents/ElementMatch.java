@@ -144,7 +144,8 @@ public class ElementMatch {
             textOps.add(new TextOp(elementNode.getValueWrapper("text"), ExecutionDictionary.Op.EQUALS));
         }
 
-
+        System.out.println("@@category-:: " + category);
+        System.out.println("@@getExecutionDictionary().getResolvedCategoryFlags(category): "  +getExecutionDictionary().getResolvedCategoryFlags(category));
         categoryFlags.addAll(getExecutionDictionary().getResolvedCategoryFlags(category));
         this.elementTypes = ElementType.fromString(this.category);
 
@@ -189,7 +190,7 @@ public class ElementMatch {
 
 
 
-        if (!categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
+//        if (!categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
             ExecutionDictionary dict = getExecutionDictionary();
             List<XPathy> elPredictXPaths = new ArrayList<>();
 
@@ -197,17 +198,11 @@ public class ElementMatch {
             if (textOps.isEmpty())
             {
                 ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, null, null);
-
-
                 elPredictXPaths.add(categoryResolution.xpath());
             }
 
             for (TextOp textOp : textOps) {
-
-
                 ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, textOp.text, textOp.op);
-
-
                 elPredictXPaths.add(categoryResolution.xpath());
             }
 
@@ -217,7 +212,7 @@ public class ElementMatch {
                 ExecutionDictionary.Op op = getOpFromString(attribute.predicateType);
                 xPathy = applyAttrOp(xPathy, com.xpathy.Attribute.custom(attribute.attrName), op, attribute.predicateVal);
             }
-        }
+//        }
 
         if (elementTypes.contains(ElementType.HTML_TYPE)) {
             if (categoryFlags.contains(ExecutionDictionary.CategoryFlags.IFRAME)) {
@@ -253,7 +248,7 @@ public class ElementMatch {
 //    private List<PhraseData> phraseContextList;
 
     public List<PhraseData> getPhraseContextList() {
-        if (categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) return new ArrayList<>();
+//        if (categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) return new ArrayList<>();
 //        if (phraseContextList == null)
 //            phraseContextList = parentPhrase.processContextList();
 //        return phraseContextList;

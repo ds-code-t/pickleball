@@ -7,7 +7,6 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
-import org.openqa.selenium.json.JsonOutput;
 import tools.dscode.common.assertions.ValueWrapper;
 
 import java.util.*;
@@ -960,10 +959,10 @@ public class ExecutionDictionary {
      *
      * Flags: PAGE_CONTEXT + PAGE_TOP_CONTEXT (same semantics as startingContext()).
      */
-    public CategorySpec registerStartingIframe(String categoryName) {
-        Objects.requireNonNull(categoryName, "categoryName must not be null");
+    public CategorySpec registerTopLevelIframe(String... categoryNames) {
+        Objects.requireNonNull(categoryNames, "categoryNames must not be null");
 
-        return category(categoryName).flags(CategoryFlags.IFRAME).startingContext((category, value, op, driver, context) -> {
+        return categories(categoryNames).flags(CategoryFlags.IFRAME).startingContext((category, value, op, driver, context) -> {
             // 1) Always start from the top of the page context
             driver.switchTo().defaultContent();
 
@@ -995,36 +994,18 @@ public class ExecutionDictionary {
      *
      * Flags: PAGE_CONTEXT (same semantics as context()).
      */
-    public CategorySpec registerIframe(String categoryName) {
-        Objects.requireNonNull(categoryName, "categoryName must not be null");
-        System.out.println("@@registerIframe: " + categoryName);
-        return category(categoryName).flags(CategoryFlags.IFRAME).context((category, value, op, driver, context) -> {
-            System.out.println("@--context: " + context);
-
+    public CategorySpec registerIframe(String... categoryNames) {
+        Objects.requireNonNull(categoryNames, "categoryNames must not be null");
+        return categories(categoryNames).flags(CategoryFlags.IFRAME).context((category, value, op, driver, context) -> {
             // 1) Resolve the iframe/frame XPath from the category’s normal AND/OR registrations
             XPathy xpathy = andThenOr(category, value, op);
-            System.out.println("@--xpathy: " + xpathy);
             if (xpathy == null) {
                 return context;
             }
-            WebElement frameEl;
-            System.out.println("@@beforeTry");
-            try {
                 // 2) Find the iframe/frame element within the current SearchContext
-                frameEl = context.findElement(By.xpath(xpathy.getXpath()));
-                System.out.println("@@frameEl: " + frameEl);
-            }
-            catch (Throwable t)
-            {
-                System.out.println("@@throwable!! " + t.getMessage());
-                t.printStackTrace();
-                throw new RuntimeException("Could not find iframe/frame element for '" + categoryName + "'", t);
-            }
-            System.out.println("@@AfterCatch");
-            System.out.println("@--frameEl: " + frameEl);
+            WebElement  frameEl = context.findElement(By.xpath(xpathy.getXpath()));
             // 3) Switch into it and return driver
             driver.switchTo().frame(frameEl);
-            System.out.println("@--driver : " + driver);
             return driver;
         });
     }
@@ -1036,10 +1017,10 @@ public class ExecutionDictionary {
      *
      * Flags: PAGE_CONTEXT + PAGE_TOP_CONTEXT (same semantics as startingContext()).
      */
-    public CategorySpec registerStartingShadowRoot(String categoryName) {
-        Objects.requireNonNull(categoryName, "categoryName must not be null");
+    public CategorySpec registerTopLevelShadowRoot(String... categoryNames) {
+        Objects.requireNonNull(categoryNames, "categoryNames must not be null");
 
-        return category(categoryName).flags(CategoryFlags.SHADOW_HOST).startingContext((category, value, op, driver, context) -> {
+        return categories(categoryNames).flags(CategoryFlags.SHADOW_HOST).startingContext((category, value, op, driver, context) -> {
             // Always start from top-level document
             driver.switchTo().defaultContent();
 
@@ -1064,16 +1045,15 @@ public class ExecutionDictionary {
      *
      * Flags: PAGE_CONTEXT (same semantics as context()).
      */
-    public CategorySpec registerShadowRoot(String categoryName) {
-        Objects.requireNonNull(categoryName, "categoryName must not be null");
+    public CategorySpec registerShadowRoot(String... categoryNames) {
+        Objects.requireNonNull(categoryNames, "categoryNames must not be null");
 
-        return category(categoryName).flags(CategoryFlags.SHADOW_HOST).context((category, value, op, driver, context) -> {
+        return categories(categoryNames).flags(CategoryFlags.SHADOW_HOST).context((category, value, op, driver, context) -> {
             // Resolve XPath to the shadow host
             XPathy xpathy = andThenOr(category, value, op);
             if (xpathy == null) {
                 return context; // no-op: keep current context
             }
-
             // Find shadow host within current context
             WebElement host = context.findElement(By.xpath(xpathy.getXpath()));
 
