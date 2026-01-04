@@ -53,14 +53,6 @@ public final class LeanWaits {
             // Always wait for DOM attachment
             waitForElementPresent(driver, element, timeout);
 
-            // Visibility is best-effort; many valid elements (file inputs, hidden state nodes)
-            // will never be displayed, and that's OK here.
-            try {
-                waitForElementVisible(driver, element, timeout);
-            } catch (Exception ignored) {
-                // intentionally ignore visibility failures
-            }
-
         } catch (Exception e) {
             System.out.println("[WARN] Element did NOT become present: " + element);
             System.out.println("Cause: " + e);
