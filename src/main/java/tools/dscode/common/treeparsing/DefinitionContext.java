@@ -26,6 +26,7 @@ import static tools.dscode.common.treeparsing.RegexUtil.betweenWithEscapes;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.KEY_NAME;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
 
 public final class DefinitionContext {
 
@@ -366,7 +367,7 @@ public final class DefinitionContext {
             registerIframe("Frame", "IFrame", "Iframe")
                     .and(
                             (category, v, op) ->
-                                    XPathy.from(Tag.iframe).or(XPathy.from(Tag.frame))
+                                    combineOr(Tag.iframe, Tag.frame)
                     ).and(
                             (category, v, op) -> XPathyBuilder.build(Tag.any, id, v, op),
                             (category, v, op) -> XPathyBuilder.build(Tag.any, title, v, op),
