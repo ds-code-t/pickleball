@@ -50,13 +50,24 @@ public final class LeanWaits {
             Duration timeout
     ) {
         try {
-            waitForElementReady(driver, element, timeout);
+            // Always wait for DOM attachment
+            waitForElementPresent(driver, element, timeout);
+
+            // Visibility is best-effort; many valid elements (file inputs, hidden state nodes)
+            // will never be displayed, and that's OK here.
+            try {
+                waitForElementVisible(driver, element, timeout);
+            } catch (Exception ignored) {
+                // intentionally ignore visibility failures
+            }
+
         } catch (Exception e) {
-            System.out.println("[WARN] Element did NOT become ready: " + element);
+            System.out.println("[WARN] Element did NOT become present: " + element);
             System.out.println("Cause: " + e);
             e.printStackTrace(System.out);
         }
     }
+
 
     public static void safeWaitForPageReady(WebDriver driver, Duration timeout) {
         try {
@@ -117,58 +128,47 @@ public final class LeanWaits {
         });
     }
 
-    /**
-     * Concise, general element readiness (any tag/custom/shadow):
-     * visible, centered into view, and hit-testable (not covered).
-     * Returns the same element on success; throws TimeoutException on failure.
-     *
-     * NOTE: If the passed WebElement goes stale, re-locate it before calling this.
-     */
-    public static WebElement waitForElementReady(WebDriver driver, WebElement element, Duration timeout) {
+
+    public static WebElement waitForElementVisible(
+            WebDriver driver,
+            WebElement element,
+            Duration timeout
+    ) {
         FluentWait<WebDriver> wait = new FluentWait<>(driver)
                 .withTimeout(timeout)
                 .pollingEvery(Duration.ofMillis(150))
-                .ignoring(ElementClickInterceptedException.class)
-                .ignoring(JavascriptException.class)
+                .ignoring(StaleElementReferenceException.class)
                 .ignoring(WebDriverException.class);
 
         return wait.until(d -> {
-            try {
-                if (element == null) return null;
-
-                boolean displayed;
-                try {
-                    displayed = element.isDisplayed();
-                } catch (StaleElementReferenceException stale) {
-                    return null;
-                }
-                if (!displayed) return null;
-
-                // optional: keep scrollIntoView
-                try {
-                    ((JavascriptExecutor) d).executeScript(
-                            "try{arguments[0].scrollIntoView({block:'center',inline:'center'});}catch(e){}",
-                            element
-                    );
-                } catch (JavascriptException ignored) {
-
-                }
-
-                // optional: keep hover nudge
-                try {
-                    new Actions(d).moveToElement(element)
-                            .pause(Duration.ofMillis(100))
-                            .perform();
-                } catch (WebDriverException ignored) {}
-
-                // ✅ if we got here, it's "ready" under the new definition
-                return element;
-
-            } catch (StaleElementReferenceException stale) {
-                return null;
-            }
+            if (element == null) return null;
+            return element.isDisplayed() ? element : null;
         });
     }
+
+
+    private static final String IS_CONNECTED_JS =
+            "return arguments[0] && arguments[0].isConnected === true;";
+
+    public static WebElement waitForElementPresent(
+            WebDriver driver,
+            WebElement element,
+            Duration timeout
+    ) {
+        FluentWait<WebDriver> wait = new FluentWait<>(driver)
+                .withTimeout(timeout)
+                .pollingEvery(Duration.ofMillis(150))
+                .ignoring(StaleElementReferenceException.class)
+                .ignoring(WebDriverException.class);
+
+        return wait.until(d -> {
+            if (element == null) return null;
+            Boolean connected = (Boolean) ((JavascriptExecutor) d)
+                    .executeScript(IS_CONNECTED_JS, element);
+            return Boolean.TRUE.equals(connected) ? element : null;
+        });
+    }
+
 
 
     // --- minimal JS helpers (kept tiny) ---
