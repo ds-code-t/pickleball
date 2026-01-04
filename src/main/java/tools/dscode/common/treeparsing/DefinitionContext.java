@@ -366,11 +366,11 @@ public final class DefinitionContext {
             registerIframe("Frame", "IFrame", "Iframe")
                     .and(
                             (category, v, op) ->
-                                    XPathy.from(Tag.iframe)
+                                    XPathy.from(Tag.iframe).or(XPathy.from(Tag.frame))
                     ).and(
-                            (category, v, op) ->
-                                    if(v)
-                                    XPathy.from(Tag.iframe)
+                            (category, v, op) -> XPathyBuilder.build(Tag.any, id, v, op),
+                            (category, v, op) -> XPathyBuilder.build(Tag.any, title, v, op),
+                            (category, v, op) -> XPathyBuilder.build(Tag.any, name, v, op)
                     );
 
 
