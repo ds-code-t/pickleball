@@ -1,13 +1,25 @@
 Feature: Additiontest
 
+
+  Scenario: attach 4tt
+    * , from the Top Panel:
+  : * , attach "test.xlsx"
+
+
   Scenario: attach 3
+    * , from the Top Panel:
+  : * , attach "test.xlsx"
+
+  Scenario: attach 3b
+  @[DEBUG]
     * , from the Top Panel:
   : * , attach "test.xlsx"
 
 
   Scenario: attach test2
-    * , from FrameResult:
-  : * , attach "test.xlsx"
+  @[DEBUG]
+#    * , from FrameResult:
+    * , in FrameResult , create and attach "xcszdftest2.xlsx"
 
   Scenario Outline: so test2
     * , from the Top Panel:

@@ -15,6 +15,7 @@ public class DebugUtils {
 //        prefixes.add("@@");
 //        substrings.add("##XPath:");
         substrings.add("##XPath:");
+        substrings.add("##");
     }
 
     public static void printDebug(String message) {

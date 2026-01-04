@@ -11,18 +11,15 @@ import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Element
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
-import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETURNS_VALUE;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrOp;
@@ -84,7 +81,7 @@ public class ElementMatch {
 
 
         if (wrappedElements != null) return wrappedElements;
-        driver = parentPhrase.webDriver;
+        driver = parentPhrase.getDriver();
 
         wrappedElements = getWrappedElements(this);
 //        try {

@@ -54,7 +54,7 @@ public class ElementWrapper {
 
 
     private ElementWrapper(WebElement element, ElementMatch elementMatch, Integer matchIndex) {
-        this.driver = elementMatch.parentPhrase.webDriver;
+        this.driver = elementMatch.parentPhrase.getDriver();
         this.matchIndex = matchIndex;
         this.elementMatch = elementMatch;
         this.element = Objects.requireNonNull(element, "element must not be null");

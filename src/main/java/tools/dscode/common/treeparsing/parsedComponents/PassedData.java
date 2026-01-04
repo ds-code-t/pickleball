@@ -10,7 +10,6 @@ import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Asserti
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Attempt;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHolderMatch;
 
-import java.sql.SQLOutput;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -20,6 +19,7 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.FOLLO
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.NO_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PRECEDING_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
+import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
 
 
 public abstract class PassedData {
@@ -264,7 +264,7 @@ public abstract class PassedData {
     public List<ElementMatch> resultElements = new ArrayList<>();
     public List<PhraseData> resultPhrases = new ArrayList<>();
 
-    public WebDriver webDriver = null;
+    private WebDriver driver = null;
     public List<PhraseData> branchedPhrases = new ArrayList<>();
 
     public ElementWrapper contextElement;
@@ -331,6 +331,11 @@ public abstract class PassedData {
         elementMatches = elementMatchesInput.size() > 2 ? new ArrayList<>(elementMatchesInput.stream().filter(elementMatch -> !elementMatch.isPlaceHolder()).toList()) : new ArrayList<>(elementMatchesInput);
         elementMatches.forEach(elementMatch -> elementMatch.parentPhrase = (PhraseData) this);
         elementMatches.forEach(element -> categoryFlags.addAll(element.categoryFlags));
+        System.out.println("\n@@setElementMatches: " + this);
+        elementMatches.forEach( element -> {
+            System.out.println("@@element: " + element);
+            System.out.println("@@element.categoryFlags: " + element.categoryFlags);
+                });
         elementCount = elementMatches.size();
 //        selectionType = elementMatches.isEmpty() ? "" : elementMatches.getFirst().selectionType;
         if (elementCount > 0) {
@@ -534,4 +539,13 @@ public abstract class PassedData {
     }
 
 
+    public WebDriver getDriver() {
+        if(driver == null)
+            driver = getDefaultDriver();
+        return driver;
+    }
+
+    public void setDriver(WebDriver driver) {
+        this.driver = driver;
+    }
 }

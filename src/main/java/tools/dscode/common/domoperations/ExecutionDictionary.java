@@ -997,19 +997,34 @@ public class ExecutionDictionary {
      */
     public CategorySpec registerIframe(String categoryName) {
         Objects.requireNonNull(categoryName, "categoryName must not be null");
-
+        System.out.println("@@registerIframe: " + categoryName);
         return category(categoryName).flags(CategoryFlags.IFRAME).context((category, value, op, driver, context) -> {
+            System.out.println("@--context: " + context);
+
             // 1) Resolve the iframe/frame XPath from the category’s normal AND/OR registrations
             XPathy xpathy = andThenOr(category, value, op);
+            System.out.println("@--xpathy: " + xpathy);
             if (xpathy == null) {
-                return driver;
+                return context;
             }
-
-            // 2) Find the iframe/frame element within the current SearchContext
-            WebElement frameEl = context.findElement(By.xpath(xpathy.getXpath()));
-
+            WebElement frameEl;
+            System.out.println("@@beforeTry");
+            try {
+                // 2) Find the iframe/frame element within the current SearchContext
+                frameEl = context.findElement(By.xpath(xpathy.getXpath()));
+                System.out.println("@@frameEl: " + frameEl);
+            }
+            catch (Throwable t)
+            {
+                System.out.println("@@throwable!! " + t.getMessage());
+                t.printStackTrace();
+                throw new RuntimeException("Could not find iframe/frame element for '" + categoryName + "'", t);
+            }
+            System.out.println("@@AfterCatch");
+            System.out.println("@--frameEl: " + frameEl);
             // 3) Switch into it and return driver
             driver.switchTo().frame(frameEl);
+            System.out.println("@--driver : " + driver);
             return driver;
         });
     }

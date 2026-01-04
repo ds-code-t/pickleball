@@ -57,11 +57,13 @@ public enum ElementType {
 
 
     public static Set<ElementType> fromString(String raw) {
+        System.out.println("@@ElementFromString: " + raw + "");
         Set<ElementType> returnSet = new java.util.HashSet<>();
         String normalized = raw.trim()
                 .replace(' ', '_')
                 .replaceAll("S$", "")
                 .toUpperCase(Locale.ROOT);
+        System.out.println("@@normalized: " + normalized);
         if (normalized.startsWith(VALUE_TYPE_MATCH.toUpperCase(Locale.ROOT))) {
             switch (normalized.substring(VALUE_TYPE_MATCH.length())) {
                 case String x when x.equals(KEY_NAME) -> returnSet.add(KEY_VALUE);
@@ -73,8 +75,10 @@ public enum ElementType {
             return returnSet;
         }
 
-
+        System.out.println("@@LOOKUP " + LOOKUP);
+        System.out.println("@@returnSet1 " + returnSet);
         returnSet.add(LOOKUP.getOrDefault(normalized, HTML_TYPE));
+        System.out.println("@@returnSet2 " + returnSet);
 
         return returnSet;
     }

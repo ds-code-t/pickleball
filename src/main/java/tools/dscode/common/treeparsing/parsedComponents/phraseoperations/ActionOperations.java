@@ -1,6 +1,5 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
-import org.apache.poi.xssf.usermodel.XSSFPivotTable;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
@@ -8,8 +7,7 @@ import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.util.FileUploadUtil;
-
-import java.util.List;
+import tools.dscode.coredefinitions.GeneralSteps;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.domoperations.HumanInteractions.clearAndType;
@@ -20,11 +18,31 @@ import static tools.dscode.common.domoperations.HumanInteractions.selectDropdown
 import static tools.dscode.common.domoperations.HumanInteractions.typeText;
 import static tools.dscode.common.domoperations.HumanInteractions.wheelScrollBy;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitForDuration;
-import static tools.dscode.common.treeparsing.DefinitionContext.FILE_INPUT;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
-import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
 
 public enum ActionOperations implements OperationsInterface {
+    CREATE_AND_ATTACH {
+        @Override
+        public void execute(PhraseData phraseData) {
+            System.out.println(phraseData + " : Executing " + this.name());
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+                    new ElementMatcher()
+                            .mustMatchAll(ElementType.HTML_ELEMENT),
+                    new ElementMatcher()
+                            .mustMatchAll(ElementType.RETURNS_VALUE)
+            );
+            ElementMatch fileInputElement =  phraseData.resultElements.getFirst();
+            System.out.println("@@fileInputElement: " + fileInputElement);
+            System.out.println("@@fileInputElement.elementTypes: " + fileInputElement.elementTypes);
+            ElementMatch filePathElement =  phraseData.resultElements.get(1);
+            System.out.println("@@filePathElement: " + filePathElement);
+            phraseData.result = Attempt.run(() -> {
+                WebElement inputElement = fileInputElement.getElementWrappers().getFirst().getElement();
+                FileUploadUtil.createTempAndUpload(GeneralSteps.getDefaultDriver(), inputElement, filePathElement.getValue().toString());
+                return true;
+            });
+        }
+    },
     ATTACH {
         @Override
         public void execute(PhraseData phraseData) {
@@ -37,11 +55,12 @@ public enum ActionOperations implements OperationsInterface {
             );
             ElementMatch fileInputElement =  phraseData.resultElements.getFirst();
             System.out.println("@@fileInputElement: " + fileInputElement);
+            System.out.println("@@fileInputElement.elementTypes: " + fileInputElement.elementTypes);
             ElementMatch filePathElement =  phraseData.resultElements.get(1);
             System.out.println("@@filePathElement: " + filePathElement);
             phraseData.result = Attempt.run(() -> {
                 WebElement inputElement = fileInputElement.getElementWrappers().getFirst().getElement();
-                FileUploadUtil.upload(getDriver(), inputElement, filePathElement.getValue().toString());
+                FileUploadUtil.upload(GeneralSteps.getDefaultDriver(), inputElement, filePathElement.getValue().toString());
                 return true;
             });
         }
@@ -102,7 +121,7 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch dropDowns = phraseData.resultElements.get(1);
             phraseData.result = Attempt.run(() -> {
                 for (ElementWrapper elementWrapper : dropDowns.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    selectDropdownByVisibleText(getDriver(), elementWrapper.getElement(), selection.getValue().toString());
+                    selectDropdownByVisibleText(GeneralSteps.getDefaultDriver(), elementWrapper.getElement(), selection.getValue().toString());
                 }
                 return true;
             });
@@ -126,7 +145,7 @@ public enum ActionOperations implements OperationsInterface {
 
             phraseData.result = Attempt.run(() -> {
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    click(getDriver(), elementWrapper.getElement());
+                    click(GeneralSteps.getDefaultDriver(), elementWrapper.getElement());
                 }
                 return true;
             });
@@ -146,7 +165,7 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch element = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    doubleClick(getDriver(), elementWrapper.getElement());
+                    doubleClick(GeneralSteps.getDefaultDriver(), elementWrapper.getElement());
                 }
                 return true;
             });
@@ -165,7 +184,7 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch element = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    contextClick(getDriver(), elementWrapper.getElement());
+                    contextClick(GeneralSteps.getDefaultDriver(), elementWrapper.getElement());
                 }
                 return true;
             });
@@ -187,7 +206,7 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch inputElement = phraseData.resultElements.get(1);
             phraseData.result = Attempt.run(() -> {
                 for (ElementWrapper elementWrapper : inputElement.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    typeText(getDriver(), elementWrapper.getElement(), value.getValue().toString());
+                    typeText(GeneralSteps.getDefaultDriver(), elementWrapper.getElement(), value.getValue().toString());
                 }
                 return true;
             });
@@ -208,7 +227,7 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch inputElement = phraseData.resultElements.get(1);
             phraseData.result = Attempt.run(() -> {
                 for (ElementWrapper elementWrapper : inputElement.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    clearAndType(getDriver(), elementWrapper.getElement(), value.getValue().toString());
+                    clearAndType(GeneralSteps.getDefaultDriver(), elementWrapper.getElement(), value.getValue().toString());
                 }
                 return true;
             });
@@ -226,7 +245,7 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch element = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    wheelScrollBy(getDriver(), elementWrapper.getElement());
+                    wheelScrollBy(GeneralSteps.getDefaultDriver(), elementWrapper.getElement());
                 }
                 return true;
             });

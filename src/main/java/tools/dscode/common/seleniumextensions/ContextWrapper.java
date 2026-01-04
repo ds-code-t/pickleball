@@ -1,16 +1,12 @@
 package tools.dscode.common.seleniumextensions;
 
 import com.xpathy.XPathy;
-import io.cucumber.java.eo.Se;
 import org.openqa.selenium.By;
 import org.openqa.selenium.SearchContext;
-import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
-import tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly;
-import tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +16,6 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.com
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.prettyPrintXPath;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.everyNth;
 import static tools.dscode.common.util.DebugUtils.printDebug;
-import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
 
 public class ContextWrapper {
 
@@ -89,7 +84,7 @@ public class ContextWrapper {
                 }
 
                     printDebug("##searchContext-1 " + searchContext);
-                    searchContext = getExecutionDictionary().applyContextBuilder(phraseData.getFirstElement().category, phraseData.getFirstElement().defaultText, phraseData.getFirstElement().defaultTextOp, elementMatch.parentPhrase.webDriver, searchContext);
+                    searchContext = getExecutionDictionary().applyContextBuilder(phraseData.getFirstElement().category, phraseData.getFirstElement().defaultText, phraseData.getFirstElement().defaultTextOp, elementMatch.parentPhrase.getDriver(), searchContext);
                     printDebug("##searchContext-2 " + searchContext);
                 if(searchContext == null)
                     break;

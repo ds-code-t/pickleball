@@ -32,7 +32,7 @@ public class Registrations {
                 ctx
         );
 
-        dict.category("FrameResult").and(
+        dict.registerStartingIframe("FrameResult").and(
                 (category, v, op) -> XPathy.from(Tag.iframe).byAttribute(id).equals("iframeResult")
         );
 
@@ -56,7 +56,7 @@ public class Registrations {
             }
         });
 
-//        dict.category("IframeResult").flags(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT);
+        dict.category("IframeResult").flags(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT);
 
 //        XPathyRegistry.add("Zaaa", (v, op) ->
 //                orMap(

@@ -28,15 +28,17 @@ public final class LeanWaits {
     public static void waitForPhraseEntities( PhraseData parsingPhrase) {
         System.out.println("@@waitForPhraseEntities: " + parsingPhrase);
         // SAFE version: never throws
-        safeWaitForPageReady(parsingPhrase.webDriver, Duration.ofSeconds(60));
+        safeWaitForPageReady(parsingPhrase.getDriver(), Duration.ofSeconds(60));
 
         for (ElementMatch elementMatch : parsingPhrase.getElementMatches()) {
+            System.out.println("@@waitFor-elementMatch: " + elementMatch);
+            System.out.println("@@waitFor-elementTypes: " + elementMatch.elementTypes);
 
             if (elementMatch.elementTypes.contains(ElementType.HTML_ELEMENT)) {
 
                 elementMatch.findWrappedElements();
                 for (ElementWrapper elementWrapper : elementMatch.getElementWrappers()) {
-                    safeWaitForElementReady(parsingPhrase.webDriver, elementWrapper.element, Duration.ofSeconds(60));
+                    safeWaitForElementReady(parsingPhrase.getDriver(), elementWrapper.element, Duration.ofSeconds(60));
                 }
             }
         }

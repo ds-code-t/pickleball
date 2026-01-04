@@ -163,7 +163,7 @@ public final class Phrase extends PhraseData {
 
     public PhraseData resolvePhrase() {
         PhraseData resolvedPhrase = new Phrase(text, termination, parsedLine);
-        if(resolvedPhrase.getAction().startsWith("attach") && !resolvedPhrase.getElementMatches().stream().anyMatch(e -> e.elementTypes.contains(ElementType.HTML_TYPE))){
+        if(resolvedPhrase.getAction().endsWith("attach") && !resolvedPhrase.getElementMatches().stream().anyMatch(e -> e.elementTypes.contains(ElementType.HTML_TYPE))){
             resolvedPhrase = new Phrase(resolvedPhrase.resolvedText.replaceFirst("\\battach(?:es|ed)?\\b", "attach " + FILE_INPUT + " "), termination, parsedLine);
         }
         setResolvedPhrase(resolvedPhrase);

@@ -25,11 +25,7 @@ import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CON
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
-import static tools.dscode.common.treeparsing.parsedComponents.ElementType.FOLLOWING_OPERATION;
-import static tools.dscode.common.treeparsing.parsedComponents.ElementType.MULTIPLE_ELEMENTS_IN_PHRASE;
-import static tools.dscode.common.treeparsing.parsedComponents.ElementType.NO_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
-import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PRECEDING_OPERATION;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inBetweenOf;
@@ -56,9 +52,7 @@ public abstract class PhraseData extends PassedData {
             return element;
         }
         if (searchContext == null) {
-            if (webDriver == null)
-                webDriver = GeneralSteps.getDriver();
-            return webDriver;
+            return getDriver();
         }
 
         return searchContext;
@@ -265,8 +259,6 @@ public abstract class PhraseData extends PassedData {
 
 
     public void syncWithDOM() {
-        if (this.webDriver == null)
-            this.webDriver = GeneralSteps.getDriver();
         waitMilliseconds(1000);
         lifecycle.fire(Phase.BEFORE_DOM_LOAD_CHECK);
         waitForPhraseEntities(this);

@@ -5,7 +5,6 @@ import io.cucumber.java.en.When;
 import org.openqa.selenium.WebDriver;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
 
 public class NavigationSteps {
 
@@ -17,7 +16,7 @@ public class NavigationSteps {
     @When("^navigate to: (.*)$")
     public void i_navigate_to(String text) {
         text = "configs." + text;
-        WebDriver driver = GeneralSteps.getDriver();
+        WebDriver driver = GeneralSteps.getDefaultDriver();
         StepExtension stepExtension = getRunningStep();
         driver.get((String) stepExtension.getStepParsingMap().getAndResolve(text));
     }
