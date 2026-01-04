@@ -70,7 +70,7 @@ public final class DefinitionContext {
             public String onSubstitute(MatchNode self) {
                 String keyName = self.groups().get("keyName");
 
-                return keyName + " " + VALUE_TYPE_MATCH +  KEY_NAME;
+                return keyName + " " + VALUE_TYPE_MATCH + KEY_NAME;
             }
         };
 
@@ -113,7 +113,7 @@ public final class DefinitionContext {
         ParseNode phrase = new ParseNode("^(?<separatorA>\\bthen\\b)?(?<conjunction>\\b(?:and|or)\\b)?(?<separatorB>\\bthen\\b)?\\s*(?<conditional>\\b(?:else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
             @Override
             public String onCapture(MatchNode self) {
-                if (self.localStateBoolean("separatorA" , "separatorB")) {
+                if (self.localStateBoolean("separatorA", "separatorB")) {
                     self.putToLocalState("separator", "true");
                 }
                 String context = self.resolvedGroupText("context");
@@ -262,7 +262,7 @@ public final class DefinitionContext {
 //            @Override
 //            public String onCapture(MatchNode self) {
 //                self.parent().putToLocalState("keyName", self.resolvedGroupText("keyName"));
-////                return self.originalText();
+        ////                return self.originalText();
 //                return " ";
 //            }
 //        };
@@ -296,9 +296,9 @@ public final class DefinitionContext {
             @Override
             public String onSubstitute(MatchNode self) {
                 MatchNode parentNode = self.parent();
-                if(!parentNode.localStateBoolean("context", "action", "assertion")) {
+                if (!parentNode.localStateBoolean("context", "action", "assertion")) {
                     parentNode.putToLocalState("assertion", "equal");
-                    parentNode.putToLocalState("operationIndex",self.groups().start("defaultAssertion"));
+                    parentNode.putToLocalState("operationIndex", self.groups().start("defaultAssertion"));
                 }
                 return self.originalText();
             }
@@ -309,7 +309,7 @@ public final class DefinitionContext {
             @Override
             public String onSubstitute(MatchNode self) {
                 MatchNode parentNode = self.parent();
-                return " " +  PLACE_HOLDER_MATCH + " ";
+                return " " + PLACE_HOLDER_MATCH + " ";
 //                if(parentNode.localStateBoolean( "action", "assertion")) {
 //                    return " " +  PLACE_HOLDER_MATCH + " ";
 //                }
@@ -368,16 +368,11 @@ public final class DefinitionContext {
                     .and(
                             (category, v, op) ->
                                     combineOr(Tag.iframe, Tag.frame)
-                    ).and(
-                            (category, v, op) -> XPathyBuilder.build(Tag.any, id, v, op),
-                            (category, v, op) -> XPathyBuilder.build(Tag.any, title, v, op),
-                            (category, v, op) -> XPathyBuilder.build(Tag.any, name, v, op)
+                    ).or(
+                            (category, v, op) -> (v == null ? null : XPathyBuilder.build(Tag.any, id, v, op)),
+                            (category, v, op) -> (v == null ? null : XPathyBuilder.build(Tag.any, title, v, op)),
+                            (category, v, op) -> (v == null ? null : XPathyBuilder.build(Tag.any, name, v, op))
                     );
-
-
-
-
-
 
 
             category(FILE_INPUT)
