@@ -150,7 +150,9 @@ public final class LeanWaits {
                             "try{arguments[0].scrollIntoView({block:'center',inline:'center'});}catch(e){}",
                             element
                     );
-                } catch (JavascriptException ignored) {}
+                } catch (JavascriptException ignored) {
+
+                }
 
                 // optional: keep hover nudge
                 try {
