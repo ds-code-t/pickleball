@@ -363,13 +363,13 @@ public final class DefinitionContext {
             //
             // Frame
             //
-            category("Frame")
+            registerIframe("Frame")
                     .and(
                             (category, v, op) ->
                                     XPathy.from(Tag.iframe).byAttribute(title).haveIt()
                     );
 
-            category("IFrame").inheritsFrom("Frame");
+            registerIframe("IFrame").inheritsFrom("Frame");
 
 
 

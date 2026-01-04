@@ -36,7 +36,9 @@ public enum ActionOperations implements OperationsInterface {
                             .mustMatchAll(ElementType.RETURNS_VALUE)
             );
             ElementMatch fileInputElement =  phraseData.resultElements.getFirst();
+            System.out.println("@@fileInputElement: " + fileInputElement);
             ElementMatch filePathElement =  phraseData.resultElements.get(1);
+            System.out.println("@@filePathElement: " + filePathElement);
             phraseData.result = Attempt.run(() -> {
                 WebElement inputElement = fileInputElement.getElementWrappers().getFirst().getElement();
                 FileUploadUtil.upload(getDriver(), inputElement, filePathElement.getValue().toString());
