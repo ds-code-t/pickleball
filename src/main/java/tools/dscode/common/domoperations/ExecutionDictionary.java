@@ -8,6 +8,7 @@ import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
+import tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,7 +18,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.xpathy.Tag.any;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.toSelfStep;
+//import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.toSelfStep;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
 
 public class ExecutionDictionary {
@@ -324,7 +325,7 @@ public class ExecutionDictionary {
         // 4) Build XPaths
         List<XPathy> result = allBuilders.stream()
                 .map(b -> b.build(category, value, op))
-//          .filter(Objects::nonNull)
+          .filter(Objects::nonNull)
                 .toList();
 
 
@@ -359,31 +360,51 @@ public class ExecutionDictionary {
      * Combine a list of XPathy into a single XPathy using "and"/"or".
      */
     private Optional<XPathy> combine(List<XPathy> list, String joiner) {
-        if (list.isEmpty()) {
-            return Optional.empty();   // ← what you clearly intended
+        if (list == null || list.isEmpty()) {
+            return Optional.empty();
         }
 
-        // Make a defensive copy so we don't mutate caller's list
-        List<XPathy> sorted = new ArrayList<>(list.stream().filter(Objects::nonNull).toList());
+        // Filter FIRST (this is the critical fix)
+        List<XPathy> filtered = list.stream()
+                .filter(Objects::nonNull)
+                .filter(x -> {
+                    try {
+                        String xp = x.getXpath();
+                        return xp != null && !xp.isBlank();
+                    } catch (Exception e) {
+                        return false;
+                    }
+                })
+                .toList();
+
+        // If everything was null/blank -> treat as "no expression"
+        if (filtered.isEmpty()) {
+            return Optional.empty();
+        }
+
+        // Defensive copy so we don't mutate caller's list
+        List<XPathy> sorted = new ArrayList<>(filtered);
 
         // Sort by heuristic specificity score (lower is "better")
         sorted.sort(Comparator.comparingInt(x -> xpathSpecificityScore(x.getXpath())));
 
-
-
         // Build boolean expression over self::... steps
         String combinedExpr = sorted.stream()
                 .map(XPathy::getXpath)
-                .map(x -> toSelfStep(x))
-                .collect(java.util.stream.Collectors.joining(" " + joiner + " "));
+                .map(XPathyAssembly::toSelfStep)
+                .filter(s -> s != null && !s.isBlank() && !s.equals("self::*[]"))
+                .collect(Collectors.joining(" " + joiner + " "));
 
+
+        // If somehow we still ended up empty, bail out
+        if (combinedExpr.isBlank()) {
+            return Optional.empty();
+        }
 
         String fullXpath = "//*[" + combinedExpr + "]";
-
-        XPathy x = XPathy.from(fullXpath);
-
-        return Optional.of(x);
+        return Optional.of(XPathy.from(fullXpath));
     }
+
 
     public Optional<XPathy> andAll(String category, ValueWrapper value, Op op) {
 
@@ -455,8 +476,8 @@ public class ExecutionDictionary {
             return andPart;
         }
 
-        String andStep = toSelfStep(andPart.get().getXpath());
-        String orStep = toSelfStep(orPart.get().getXpath());
+        String andStep =  XPathyAssembly.toSelfStep(andPart.get().getXpath());
+        String orStep =  XPathyAssembly.toSelfStep(orPart.get().getXpath());
 
 
 
