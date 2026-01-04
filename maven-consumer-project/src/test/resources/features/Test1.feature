@@ -1,5 +1,10 @@
 Feature: Additiontest
 
+  Scenario: attach 3
+    * , from the Top Panel:
+  : * , attach "test.xlsx"
+
+
   Scenario: attach test2
     * , from FrameResult:
   : * , attach "test.xlsx"
