@@ -75,6 +75,9 @@ public final class MatchNode {
                       String originalText,
                       String token,
                       LinkedListMultimap<String, Object> globalState) {
+        System.out.println("@@MatchNode: " + originalText);
+        System.out.println("@@start: " + start);
+        System.out.println("@@ends: " + ends);
         this.parseNode = Objects.requireNonNull(parseNode, "parseNode");
         this.parent = parent;
         this.originalText = originalText;

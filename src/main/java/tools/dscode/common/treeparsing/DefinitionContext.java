@@ -286,17 +286,21 @@ public final class DefinitionContext {
                         .replaceAll("\\s+", " ")
                         .trim();
                 self.parent().putToLocalState("assertion", assertion);
+                System.out.println("@@assertion----: "+ assertion);
+                System.out.println("@@self.start: "+ self.start);
                 self.parent().putToLocalState("operationIndex", self.start);
                 return self.originalText();
             }
         };
 
 
-        ParseNode defaultAssertion = new ParseNode("<<elementMatch>>[^_]*\\s(?<defaultAssertion>is)\\s[^_]*<<elementMatch>>") {
+        ParseNode defaultAssertion = new ParseNode("<<elementMatch>>\\s*(?<defaultAssertion>is)\\s*<<elementMatch>>") {
             @Override
             public String onSubstitute(MatchNode self) {
+                System.out.println("@@defaultAssertion: " + self.originalText());
                 MatchNode parentNode = self.parent();
                 if (!parentNode.localStateBoolean("context", "action", "assertion")) {
+                    System.out.println("@@defaultAssertion-parentNode: " + parentNode);
                     parentNode.putToLocalState("assertion", "equal");
                     parentNode.putToLocalState("operationIndex", self.groups().start("defaultAssertion"));
                 }
@@ -308,12 +312,22 @@ public final class DefinitionContext {
         ParseNode itPlaceholder = new ParseNode("\\bit\\b") {
             @Override
             public String onSubstitute(MatchNode self) {
-                MatchNode parentNode = self.parent();
+//                MatchNode parentNode = self.parent();
                 return " " + PLACE_HOLDER_MATCH + " ";
 //                if(parentNode.localStateBoolean( "action", "assertion")) {
 //                    return " " +  PLACE_HOLDER_MATCH + " ";
 //                }
 //                return self.token();
+            }
+        };
+
+        ParseNode reindex = new ParseNode("<<elementMatch>>") {
+            @Override
+            public String onSubstitute(MatchNode self) {
+                System.out.println("@@reindex: " + self.originalText());
+                MatchNode elementMatchNode = self.getMatchNode(self.originalText());
+                elementMatchNode.start = self.start;
+                return self.originalText();
             }
         };
 
@@ -332,6 +346,7 @@ public final class DefinitionContext {
                     - no
                     - valueTypes
                     - assertionType
+                    - reindex
                     - action
                     - assertion
                     - defaultAssertion

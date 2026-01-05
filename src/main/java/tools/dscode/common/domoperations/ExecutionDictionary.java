@@ -100,8 +100,8 @@ public class ExecutionDictionary {
         category(CONTAINS_TEXT)
                 .and(
                         (category, v, op) -> {
-                            if (v == null || v.isNullOrBlank())
-                                return null;
+                            if (v == null || v.isNull())
+                                return XPathy.from("//*[descendant::text()]");
                             return any.byHaving(
                                     maybeDeepestMatches(XPathy.from("descendant-or-self::*")
                                             .byHaving(deepNormalizedText(v, op)))

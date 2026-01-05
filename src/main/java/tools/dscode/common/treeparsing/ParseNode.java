@@ -139,18 +139,23 @@ public class ParseNode {
 
     // ----- entry point for parsing -----
     public MatchNode initiateParsing(String input) {
+        System.out.println("@@initiateParsing: " + input);
         // Root "captures" the entire input once (no regex groups here)
         MatchNode top = createMatchNode(0, input.length(), this, null, input, null, 0, LinkedListMultimap.create());
 
         String transformed = onCapture(top);
+        System.out.println("@@transformed: " + transformed);
         top.setModifiedText(transformed);
+        System.out.println("@@transformed modifiedText: " +  top.modifiedText());
         top.setMaskedText(transformed);
+        System.out.println("@@transformed maskedText: " +  top.maskedText());
 
         // Children run sequentially over top.maskedText
         applyChildrenOverMasked(this, top);
 
         // Root post-order
         descendantsResolved(top);
+
         return top;
     }
 

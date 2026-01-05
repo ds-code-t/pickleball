@@ -2,7 +2,8 @@ Feature: Addition
 
   Scenario: sssst5ff55
   @[DEBUG]
-    * , switch to "Google" Window
+    * , verify Text is "Q"
+#    * , switch to "Google" Window
 
   Scenario: f test5ff55
   @[DEBUG]

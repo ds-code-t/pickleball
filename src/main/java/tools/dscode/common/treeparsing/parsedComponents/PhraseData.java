@@ -102,6 +102,7 @@ public abstract class PhraseData extends PassedData {
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
         operationIndex = (Integer) phraseNode.getFromLocalState("operationIndex");
+        System.out.println("@@operationIndex-pd: " + operationIndex);
         hasNo = phraseNode.localStateBoolean("no");
 //        hasNot = phraseNode.localStateBoolean("not");
 //        hasNone = phraseNode.localStateBoolean("none");
@@ -151,6 +152,8 @@ public abstract class PhraseData extends PassedData {
     }
 
     public ElementMatch getElementMatch(MatchNode elementNode) {
+        System.out.println("@@getElementMatch: " + elementNode.getStringFromLocalState("type"));
+        System.out.println("@@elementNode.start: " + elementNode.start);
         if (elementNode.getStringFromLocalState("type").equals(PLACE_HOLDER_MATCH)) {
             return new PlaceHolderMatch(this);
         } else {

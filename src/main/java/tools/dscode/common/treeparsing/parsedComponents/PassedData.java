@@ -328,11 +328,17 @@ public abstract class PassedData {
     }
 
     public void setElementMatches(List<ElementMatch> elementMatchesInput) {
+        System.out.println("@@setElementMatches: " + this + " " + elementMatchesInput.size());
+        System.out.println("@@elementMatchesInput: " + elementMatchesInput);
         elementMatches = elementMatchesInput.size() > 2 ? new ArrayList<>(elementMatchesInput.stream().filter(elementMatch -> !elementMatch.isPlaceHolder()).toList()) : new ArrayList<>(elementMatchesInput);
+        System.out.println("@@elementMatches1: " + elementMatches);
+
         elementMatches.forEach(elementMatch -> elementMatch.parentPhrase = (PhraseData) this);
         elementMatches.forEach(element -> categoryFlags.addAll(element.categoryFlags));
         elementCount = elementMatches.size();
 //        selectionType = elementMatches.isEmpty() ? "" : elementMatches.getFirst().selectionType;
+        System.out.println("@@elementMatches2: " + elementMatches);
+
         if (elementCount > 0) {
             firstElement = elementMatches.getFirst();
             firstElement.elementTypes.add(ElementType.FIRST_ELEMENT);
@@ -346,6 +352,7 @@ public abstract class PassedData {
                 firstElement.elementTypes.add(ElementType.SINGLE_ELEMENT_IN_PHRASE);
             }
         }
+        System.out.println("@@elementMatches3: " + elementMatches);
 
         if (phraseType == null) {
             if (!elementMatches.isEmpty())
@@ -358,14 +365,18 @@ public abstract class PassedData {
         } else {
             elementMatches.forEach(em -> em.elementTypes.add(NO_OPERATION));
         }
-
+        System.out.println("@@elementMatches4: " + elementMatches);
+        elementMatches.forEach(em -> System.out.println("@@ element: " + em + "  , elementTypes: " + em.elementTypes + ""));
     }
 
     public void setElementGroupings()
     {
         elementMatchesFollowingOperation = new ArrayList<>();
         elementMatchesProceedingOperation = new ArrayList<>();
+        System.out.println("@@operationIndex: " + operationIndex);
         for (ElementMatch em : elementMatches) {
+            System.out.println("@@elem: " + em);
+            System.out.println("@@em.startIndex: " + em.startIndex);
             if (em.startIndex < operationIndex) {
                 em.elementTypes.add(PRECEDING_OPERATION);
                 elementMatchesProceedingOperation.add(em);
