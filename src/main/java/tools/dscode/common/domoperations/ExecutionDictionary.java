@@ -14,6 +14,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -456,6 +457,8 @@ public class ExecutionDictionary {
         return new CategoryResolution(category, value, op, xpath, flags);
     }
 
+
+
     /**
      * Optional-returning version of andThenOr.
      */
@@ -493,6 +496,10 @@ public class ExecutionDictionary {
     }
 
 
+    final Pattern xPathScorePattern = Pattern.compile("\\bdisplay|height|width|visbility|collapse|opacity|hidden|style|not|ancestor|contains|descendant|translate|or\\b");
+
+
+
     // Heuristic scoring for XPath specificity / efficiency.
     // Lower score == considered "better"
     private int xpathSpecificityScore(String xpath) {
@@ -501,7 +508,7 @@ public class ExecutionDictionary {
         }
 
         String s = xpath.trim();
-        int score = 1000;
+        int score = Math.toIntExact(1000 + s.length() + (xPathScorePattern.matcher(s).results().count() * 10));
 
         // 1) Penalize wildcards and very generic patterns
         if (s.contains("//*")) {
@@ -512,6 +519,10 @@ public class ExecutionDictionary {
         }
         if (s.contains("self::*")) {
             score += 30;
+        }
+
+        if (s.contains("height")) {
+            score += 80;
         }
 
         // 2) Reward predicates: more predicates usually mean more selectivity

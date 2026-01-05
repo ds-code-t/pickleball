@@ -35,7 +35,6 @@ public final class LeanWaits {
             System.out.println("@@waitFor-elementTypes: " + elementMatch.elementTypes);
 
             if (elementMatch.elementTypes.contains(ElementType.HTML_ELEMENT)) {
-
                 elementMatch.findWrappedElements();
                 for (ElementWrapper elementWrapper : elementMatch.getElementWrappers()) {
                     safeWaitForElementReady(parsingPhrase.getDriver(), elementWrapper.element, Duration.ofSeconds(60));
