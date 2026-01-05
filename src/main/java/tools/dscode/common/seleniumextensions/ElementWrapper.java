@@ -82,7 +82,7 @@ public class ElementWrapper {
 
         // textContent (DOM text, not just visible text)
         String textContent = (String) js.executeScript(
-                "return arguments[0].textContent;", element
+                "return arguments[0].innerText;", element
         );
         attributeSnapshot.put("textContent", textContent == null ? "" : textContent);
 
