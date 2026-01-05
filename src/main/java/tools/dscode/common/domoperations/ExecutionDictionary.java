@@ -20,6 +20,7 @@ import java.util.stream.Stream;
 
 import static com.xpathy.Tag.any;
 //import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.toSelfStep;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.xpathSpecificityScore;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.maybeDeepestMatches;
 
@@ -496,71 +497,6 @@ public class ExecutionDictionary {
         return Optional.of(x);
     }
 
-
-    final Pattern xPathScorePattern = Pattern.compile("\\bdisplay|height|width|visbility|collapse|opacity|hidden|style|not|ancestor|contains|descendant|translate|or\\b");
-
-
-
-    // Heuristic scoring for XPath specificity / efficiency.
-    // Lower score == considered "better"
-    private int xpathSpecificityScore(String xpath) {
-        if (xpath == null || xpath.isBlank()) {
-            return Integer.MAX_VALUE;
-        }
-
-        String s = xpath.trim();
-        int score = Math.toIntExact(1000 + s.length() + (xPathScorePattern.matcher(s).results().count() * 10));
-
-        // 1) Penalize wildcards and very generic patterns
-        if (s.contains("//*")) {
-            score += 80;
-        }
-        if (s.matches(".*\\b\\*\\b.*")) { // any bare '*' node test
-            score += 50;
-        }
-        if (s.contains("self::*")) {
-            score += 30;
-        }
-
-        if (s.contains("height")) {
-            score += 80;
-        }
-
-        // 2) Reward predicates: more predicates usually mean more selectivity
-        int predicateCount = countChar(s, '[');
-        score -= predicateCount * 5;
-
-        // 3) Reward "strong" attributes
-        if (s.contains("@id")) {
-            score -= 40;
-        }
-        if (s.contains("@data-testid") || s.contains("@data-test") || s.contains("@data-")) {
-            score -= 25;
-        }
-        if (s.contains("@name")) {
-            score -= 15;
-        }
-        if (s.contains("@class")) {
-            score -= 10;
-        }
-
-        // 4) Reward custom element tags (web components)
-        if (s.matches(".*//[a-zA-Z0-9]+-[a-zA-Z0-9_-]+.*")) {
-            score -= 20;
-        }
-
-        // 5) Reward explicit tag at the root instead of wildcard
-        if (s.matches("^\\s*//[a-zA-Z].*")) {
-            score -= 10;
-        } else if (s.matches("^\\s*//\\*.*")) {
-            score += 10;
-        }
-
-        if (score < 0) score = 0;
-
-
-        return score;
-    }
 
     // Simple helper for counting characters (predicates, etc.)
     private int countChar(String s, char c) {

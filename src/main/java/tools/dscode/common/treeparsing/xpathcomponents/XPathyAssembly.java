@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public final class XPathyAssembly {
@@ -226,16 +227,20 @@ public final class XPathyAssembly {
         return prefix + step;
     }
 
+    static final Pattern xPathScorePattern = Pattern.compile("\\bdisplay|height|width|visbility|collapse|opacity|hidden|style|not|ancestor|contains|descendant|translate|or\\b");
 
     /** Heuristic specificity scoring. Lower score = "more specific". */
-    private static int xpathSpecificityScore(String xpath) {
+    public static int xpathSpecificityScore(String xpath) {
+        System.out.print("@@xpathSpecificityScore: " + xpath + "");
         String s = xpath.trim();
-        int score = 1000;
+
+        int score = Math.toIntExact(1000 + s.length() + (xPathScorePattern.matcher(s).results().count() * 10));
 
         // Penalize wildcards / generic patterns
         if (s.contains("//*")) {
-            score += 80;
+            score += 200;
         }
+
         if (s.matches(".*\\b\\*\\b.*")) {
             score += 50;
         }
@@ -273,6 +278,7 @@ public final class XPathyAssembly {
             score += 10;
         }
 
+        System.out.println(" -> " + score);
         return Math.max(score, 0);
     }
 
