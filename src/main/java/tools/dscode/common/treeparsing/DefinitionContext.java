@@ -445,7 +445,7 @@ public final class DefinitionContext {
                     )
                     .or(
                             (category, v, op) ->
-                                    XPathyBuilder.build(textarea, placeholder, v, op)
+                                    XPathyBuilder.buildIfAllTrue(textarea, placeholder, v, op, v != null)
                     );
 
             category(BASE_CATEGORY).and(

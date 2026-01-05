@@ -205,7 +205,7 @@ public final class XPathyUtils {
 
 
 
-    private static String normalizedAttrExpr(Attribute attr) {
+    private static String normalizedAttrExpr(String attr) {
         return "normalize-space(translate(@" + attr + ", " + toXPathLiteral(from) + " , " + toXPathLiteral(to) + "))";
     }
 
@@ -246,7 +246,7 @@ public final class XPathyUtils {
     }
 
 
-    public static XPathy applyAttrOp(XPathy base, Attribute attr, ExecutionDictionary.Op op, Object value) {
+    public static XPathy applyAttrOp(XPathy base, String attr, ExecutionDictionary.Op op, Object value) {
         if (attr == null) {
             return base;
         }

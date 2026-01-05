@@ -6,16 +6,32 @@ import com.xpathy.XPathy;
 import tools.dscode.common.domoperations.ExecutionDictionary.Op;
 import tools.dscode.common.assertions.ValueWrapper;
 
+import java.util.Arrays;
+import java.util.Objects;
+
 public final class XPathyBuilder {
 
     private static final String U = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     private static final String L = "abcdefghijklmnopqrstuvwxyz";
 
-    public static XPathy build(Tag tag, Attribute attr, ValueWrapper v, Op op) {
+    public static XPathy buildIfAllTrue(Tag tag, Attribute xPathyAttr, ValueWrapper v, Op op, boolean... bools) {
+        for (boolean b : bools) {
+            if (!b) return build(tag, xPathyAttr, v, op);
+        }
+        return build(tag, xPathyAttr, v, op);
+    }
+
+    public static XPathy buildIfNonNull(Tag tag, Attribute xPathyAttr, ValueWrapper v, Op op, Object... nonNulls) {
+        if(Arrays.stream(nonNulls).anyMatch(Objects::isNull)) return null;
+        return build(tag, xPathyAttr, v, op);
+    }
+
+    public static XPathy build(Tag tag, Attribute xPathyAttr, ValueWrapper v, Op op) {
         String t = (tag == null) ? "*" : tag.toString();
         XPathy base = XPathy.from("//" + t);
         Op o = (op == null) ? Op.DEFAULT : op;
-
+        String attr = (xPathyAttr == null) ? null :  xPathyAttr.toString();
+        if(!attr.startsWith("@")) attr = "@" + attr;
         // null ValueWrapper + (EQUALS/DEFAULT) => presence-only (attr) or no constraint (text)
         if (v == null && (o == Op.DEFAULT || o == Op.EQUALS)) {
             return (attr == null) ? base : XPathy.from("//" + t + "[" + attr + "]");
@@ -55,7 +71,7 @@ public final class XPathyBuilder {
         };
     }
 
-    private static XPathy applyNormalizedStringOp(XPathy base, Attribute attr, Op op, ValueWrapper v) {
+    private static XPathy applyNormalizedStringOp(XPathy base, String attr, Op op, ValueWrapper v) {
         boolean ci = v != null && v.type == ValueWrapper.ValueTypes.SINGLE_QUOTED;
         String value = ci ? v.asNormalizedText().toLowerCase() : v.asNormalizedText();
 
@@ -80,7 +96,7 @@ public final class XPathyBuilder {
         return XPathy.from("(" + base.getXpath() + ")[" + pred + "]");
     }
 
-    private static XPathy endsWithNormalized(String tag, Attribute attr, ValueWrapper v) {
+    private static XPathy endsWithNormalized(String tag, String attr, ValueWrapper v) {
         boolean ci = v != null && v.type == ValueWrapper.ValueTypes.SINGLE_QUOTED;
         String expected = ci ? v.asNormalizedText().toLowerCase() : v.asNormalizedText();
         expected = XPathyUtils.normalizeText(expected);
@@ -98,9 +114,10 @@ public final class XPathyBuilder {
     }
 
     // Use the same whitespace normalization tables from XPathyUtils (no duplication of the tables)
-    private static String normAttrExpr(Attribute attr) {
+    private static String normAttrExpr(String attr) {
         return "normalize-space(translate(" + attr + ", " + lit(XPathyUtils.from) + " , " + lit(XPathyUtils.to) + "))";
     }
+
 
     private static String normTextExpr() {
         return "normalize-space(translate(string(.), " + lit(XPathyUtils.from) + " , " + lit(XPathyUtils.to) + "))";

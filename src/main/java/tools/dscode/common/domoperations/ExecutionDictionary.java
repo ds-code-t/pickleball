@@ -578,6 +578,7 @@ public class ExecutionDictionary {
             dict.registerOrForCategories(categories, builders);
             return this;
         }
+        
 
         /**
          * Register AND-based builders for all categories in this spec on this dictionary instance.
