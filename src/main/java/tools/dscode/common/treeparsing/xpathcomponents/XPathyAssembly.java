@@ -241,6 +241,10 @@ public final class XPathyAssembly {
             score += 200;
         }
 
+        if (s.contains("//*[preceding") || s.contains("//*[following")) {
+            score += 500;
+        }
+
         if (s.matches(".*\\b\\*\\b.*")) {
             score += 50;
         }
