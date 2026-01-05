@@ -173,6 +173,7 @@ public final class WindowSwitch {
                         ? safeString(driver.getCurrentUrl())
                         : safeString(driver.getTitle());
 
+                System.out.println("@@actual: " + actual);
                 if (matchesAll(actual, textOps)) {
                     matches.add(h);
                 }
