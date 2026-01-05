@@ -101,7 +101,7 @@ public class ExecutionDictionary {
                 .and(
                         (category, v, op) -> {
                             if (v == null || v.isNull())
-                                return XPathy.from("//*[ancestor::body and descendant::text()]");
+                                return XPathy.from("//*[ancestor-or-self::body and descendant::text()]");
                             return any.byHaving(
                                     maybeDeepestMatches(XPathy.from("descendant-or-self::*")
                                             .byHaving(deepNormalizedText(v, op)))
