@@ -168,6 +168,7 @@ public final class WindowSwitch {
             for (String h : handles) {
                 System.out.println("@@WINDOW1: " + h);
                 driver.switchTo().defaultContent().switchTo().window(h);
+                driver.switchTo().defaultContent();
                 System.out.println("@@WINDOW2: " + h);
 
                 String actual = (property == Property.URL)
