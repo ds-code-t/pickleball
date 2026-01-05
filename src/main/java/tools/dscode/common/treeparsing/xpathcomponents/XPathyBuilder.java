@@ -16,7 +16,7 @@ public final class XPathyBuilder {
 
     public static XPathy buildIfAllTrue(Tag tag, Attribute xPathyAttr, ValueWrapper v, Op op, boolean... bools) {
         for (boolean b : bools) {
-            if (!b) return build(tag, xPathyAttr, v, op);
+            if (!b) return null;
         }
         return build(tag, xPathyAttr, v, op);
     }
