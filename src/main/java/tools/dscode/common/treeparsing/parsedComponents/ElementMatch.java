@@ -210,7 +210,7 @@ public class ElementMatch {
 
             for (Attribute attribute : attributes) {
                 ExecutionDictionary.Op op = getOpFromString(attribute.predicateType);
-                xPathy = applyAttrOp(xPathy, com.xpathy.Attribute.custom(attribute.attrName), op, attribute.predicateVal);
+                xPathy = applyAttrOp(xPathy, attribute.attrName, op, attribute.predicateVal);
             }
 //        }
 
