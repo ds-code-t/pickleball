@@ -48,10 +48,12 @@ public final class ValueWrapperCompareReducer {
             List<ElementWrapper> elements,
             Set<Mode> modeSet
     ) {
+
         Objects.requireNonNull(predicate, "predicate");
 
 //        EnumSet<Mode> modeSet = toModeSet(modes);
         Aggregation agg = aggregation(modeSet);
+
         boolean invertEach = perComparisonInvert(modeSet);
 
         if (elements.isEmpty())
@@ -66,6 +68,7 @@ public final class ValueWrapperCompareReducer {
 
             anyTrue |= r;
             allTrue &= r;
+
 
             // Short-circuit
             if (agg == Aggregation.ANY && anyTrue) return true;
@@ -157,8 +160,12 @@ public final class ValueWrapperCompareReducer {
      * NOT and UN both invert each comparison; if both present they cancel out.
      */
     private static boolean perComparisonInvert(Set<Mode> modeSet) {
+
         boolean not = modeSet.contains(Mode.NOT);
         boolean un = modeSet.contains(Mode.UN);
+
+
+
         return not ^ un; // XOR => true if exactly one is present
     }
 
@@ -219,7 +226,9 @@ public final class ValueWrapperCompareReducer {
 
     {
         boolean r = predicate.test(v);
+
         if (invertEach) r = !r;
+
 
         anyTrue |= r;
         allTrue &= r;

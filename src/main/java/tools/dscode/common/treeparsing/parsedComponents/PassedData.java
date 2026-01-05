@@ -331,11 +331,6 @@ public abstract class PassedData {
         elementMatches = elementMatchesInput.size() > 2 ? new ArrayList<>(elementMatchesInput.stream().filter(elementMatch -> !elementMatch.isPlaceHolder()).toList()) : new ArrayList<>(elementMatchesInput);
         elementMatches.forEach(elementMatch -> elementMatch.parentPhrase = (PhraseData) this);
         elementMatches.forEach(element -> categoryFlags.addAll(element.categoryFlags));
-        System.out.println("\n@@setElementMatches: " + this);
-        elementMatches.forEach( element -> {
-            System.out.println("@@element: " + element);
-            System.out.println("@@element.categoryFlags: " + element.categoryFlags);
-                });
         elementCount = elementMatches.size();
 //        selectionType = elementMatches.isEmpty() ? "" : elementMatches.getFirst().selectionType;
         if (elementCount > 0) {

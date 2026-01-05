@@ -43,7 +43,6 @@ public class Registrations {
                 webDriver.switchTo().defaultContent();
 
                 XPathy xpathy = dict.getCategoryXPathy("FrameResult");
-                System.out.println("@@ dict.getCategoryXPathy(\"Frame\"): " +  dict.getCategoryXPathy("Frame").getLocator());
                 WebElement frame = webDriver.findElement(xpathy.getLocator());
 
                 webDriver.switchTo().frame(frame);

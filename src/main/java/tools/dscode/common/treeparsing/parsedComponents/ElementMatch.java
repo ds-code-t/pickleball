@@ -144,8 +144,8 @@ public class ElementMatch {
             textOps.add(new TextOp(elementNode.getValueWrapper("text"), ExecutionDictionary.Op.EQUALS));
         }
 
-        System.out.println("@@category-:: " + category);
-        System.out.println("@@getExecutionDictionary().getResolvedCategoryFlags(category): "  +getExecutionDictionary().getResolvedCategoryFlags(category));
+
+
         categoryFlags.addAll(getExecutionDictionary().getResolvedCategoryFlags(category));
         this.elementTypes = ElementType.fromString(this.category);
 

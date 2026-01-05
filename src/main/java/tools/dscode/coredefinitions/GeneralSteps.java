@@ -129,7 +129,6 @@ public class GeneralSteps extends CoreSteps {
         System.out.println("Running Scenario: " + scenarioName);
         System.out.println("currentStep: " + currentStep);
         System.out.println("currentStep.childSteps.size(): " + currentStep.childSteps.size());
-        System.out.println("@@getCurrentScenarioState().id: " + getCurrentScenarioState().id);
     }
 
     @DefinitionFlags(DefinitionFlag.RUN_METHOD_DIRECTLY)

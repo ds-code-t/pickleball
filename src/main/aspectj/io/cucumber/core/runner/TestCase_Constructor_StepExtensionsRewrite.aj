@@ -45,7 +45,6 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
             Pickle pickle,
             boolean dryRun
     ) : ctorCall(id, testSteps, beforeHooks, afterHooks, pickle, dryRun) {
-        System.out.println("@@runnint TEstCase: " + pickle.getName());
         GlobalState.language = pickle.getLanguage();
         List original = testSteps;
 
@@ -56,8 +55,6 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
 
         // Build TestCase normally but with replaced list
         TestCase tc = (TestCase) proceed(id, replaced, beforeHooks, afterHooks, pickle, dryRun);
-
-        System.out.println("@@original " + original.size() + " steps, replaced with " + replaced.size());
 
         // Build extension list
         List<StepExtension> extensions = new ArrayList<>(original.size());
@@ -70,15 +67,11 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
         }
 
         tc.stepExtensions = extensions;
-        System.out.println("@@extensions " + extensions.size() + " tc.stepExtensions " + tc.stepExtensions);
 
         // ✅ New — assign CurrentScenarioState bound to this TestCase
         tc.currentScenarioState = new CurrentScenarioState(tc);
         currentScenarioState.set(tc.currentScenarioState);
-        System.out.println("@@tc.currentScenarioState: " + tc.currentScenarioState );
         tc.rootScenarioStep = ScenarioStep.createRootScenarioStep(tc);
-        System.out.println("@@ tc.rootScenarioStep: " +  tc.rootScenarioStep );
-        System.out.println("@@returning tc: " + tc.getTestSteps().size());
         return tc;
     }
 }

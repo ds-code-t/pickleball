@@ -309,6 +309,10 @@ public abstract class PhraseData extends PassedData {
                     .map(Object::toString)
                     .collect(Collectors.joining("\n", "\n", ""));
 
+
+        System.out.println("@previouslyResolvedBoolean: " + previouslyResolvedBoolean);
+
+
         switch (getAssertionType()) {
             case "ensure" -> {
                 if (!previouslyResolvedBoolean) {
@@ -321,7 +325,6 @@ public abstract class PhraseData extends PassedData {
                 }
             }
             case "conditional" -> {
-                System.out.println("@@Conditional!!!");
                 phraseConditionalMode = previouslyResolvedBoolean ? 1 : -1;
             }
         }

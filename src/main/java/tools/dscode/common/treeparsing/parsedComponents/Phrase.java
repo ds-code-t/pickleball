@@ -99,10 +99,6 @@ public final class Phrase extends PhraseData {
             processContextPhrase();
         }
 
-        System.out.println("@@phrase running: " + this);
-        System.out.println("@@contextTermination: " + contextTermination);
-        System.out.println("@@phraseType: " + phraseType);
-        System.out.println("@@phraseConditionalMode: " + phraseConditionalMode);
         if (contextTermination) {
             resolveResults();
             if (phraseType.equals(PhraseType.CONDITIONAL)) {
