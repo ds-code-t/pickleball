@@ -10,6 +10,7 @@
 
   "goog:chromeOptions": {
     "args": [
+      "--disable-print-preview",
       "--test-type",
       "--ignore-certificate-errors",
       "--ignore-certificate-errors-spki-list=",
