@@ -308,6 +308,7 @@ public class ElementMatch {
             WindowSwitch.WindowSelectionType windowSelectionType = WindowSwitch.WindowSelectionType.LOOKUP.get(normalized);
             System.out.println("@@windowSelectionType:::: " + windowSelectionType);
             returnList.addAll(WindowSwitch.findMatchingHandles(parentPhrase.getDriver(), windowSelectionType, textOps).stream().map(ValueWrapper::createValueWrapper).toList());
+            System.out.println("@@Windows-returnList:::: " + returnList);
         } else {
             returnList.addAll(nonHTMLValues);
         }

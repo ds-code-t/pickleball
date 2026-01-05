@@ -166,6 +166,7 @@ public final class WindowSwitch {
 
         try {
             for (String h : handles) {
+                System.out.println("@@WINDOW: " + h);
                 driver.switchTo().window(h);
 
                 String actual = (property == Property.URL)
