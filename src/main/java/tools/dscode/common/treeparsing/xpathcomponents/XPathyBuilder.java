@@ -31,8 +31,10 @@ public final class XPathyBuilder {
         XPathy base = XPathy.from("//" + t);
         Op o = (op == null) ? Op.DEFAULT : op;
         String attr = (xPathyAttr == null) ? null :  xPathyAttr.toString();
-        System.out.println("@@attr: " + attr);
+        System.out.println("@@attr1: " + attr);
         if(attr != null && !attr.startsWith("@")) attr = "@" + attr;
+        System.out.println("@@attr2: " + attr);
+        System.out.println("@@attr3: " + XPathy.from("//" + t + "[" + attr + "]"));
         // null ValueWrapper + (EQUALS/DEFAULT) => presence-only (attr) or no constraint (text)
         if (v == null && (o == Op.DEFAULT || o == Op.EQUALS)) {
             return (attr == null) ? base : XPathy.from("//" + t + "[" + attr + "]");

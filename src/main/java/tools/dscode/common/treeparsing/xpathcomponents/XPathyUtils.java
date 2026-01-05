@@ -206,7 +206,7 @@ public final class XPathyUtils {
 
 
     private static String normalizedAttrExpr(String attr) {
-        return "normalize-space(translate(@" + attr + ", " + toXPathLiteral(from) + " , " + toXPathLiteral(to) + "))";
+        return "normalize-space(translate(" + attr + ", " + toXPathLiteral(from) + " , " + toXPathLiteral(to) + "))";
     }
 
     private static String normalizedTextExpr() {
