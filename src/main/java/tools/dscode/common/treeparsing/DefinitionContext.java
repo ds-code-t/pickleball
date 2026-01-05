@@ -248,7 +248,7 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite|save|creates? and attach|attach)(?:s|ed|ing|es)?\\b") {
+        ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite|save|creates? and attach|attach|switch)(?:s|ed|ing|es)?\\b") {
             @Override
             public String onCapture(MatchNode self) {
 

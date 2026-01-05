@@ -2,12 +2,15 @@ package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
+import tools.dscode.common.browseroperations.WindowSwitch;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.util.FileUploadUtil;
 import tools.dscode.coredefinitions.GeneralSteps;
+
+import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.domoperations.HumanInteractions.clearAndType;
@@ -31,10 +34,10 @@ public enum ActionOperations implements OperationsInterface {
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE)
             );
-            ElementMatch fileInputElement =  phraseData.resultElements.getFirst();
+            ElementMatch fileInputElement = phraseData.resultElements.getFirst();
 
 
-            ElementMatch filePathElement =  phraseData.resultElements.get(1);
+            ElementMatch filePathElement = phraseData.resultElements.get(1);
 
             phraseData.result = Attempt.run(() -> {
                 WebElement inputElement = fileInputElement.getElementWrappers().getFirst().getElement();
@@ -53,10 +56,10 @@ public enum ActionOperations implements OperationsInterface {
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE)
             );
-            ElementMatch fileInputElement =  phraseData.resultElements.getFirst();
+            ElementMatch fileInputElement = phraseData.resultElements.getFirst();
 
 
-            ElementMatch filePathElement =  phraseData.resultElements.get(1);
+            ElementMatch filePathElement = phraseData.resultElements.get(1);
 
             phraseData.result = Attempt.run(() -> {
                 WebElement inputElement = fileInputElement.getElementWrappers().getFirst().getElement();
@@ -247,6 +250,27 @@ public enum ActionOperations implements OperationsInterface {
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     wheelScrollBy(GeneralSteps.getDefaultDriver(), elementWrapper.getElement());
                 }
+                return true;
+            });
+        }
+    },
+    SWITCH {
+        @Override
+        public void execute(PhraseData phraseData) {
+            System.out.println(phraseData + " : Executing " + this.name());
+            System.out.println("@@phraseData.getElementMatchesFollowingOperation(): " + phraseData.getElementMatchesFollowingOperation());
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+                    new ElementMatcher()
+                            .mustMatchAll(ElementType.BROWSER_WINDOW)
+            );
+
+            ElementMatch element = phraseData.resultElements.getFirst();
+            phraseData.result = Attempt.run(() -> {
+                List<ValueWrapper> handleWrappers = element.getValues();
+                if (handleWrappers.isEmpty() && !element.selectionType.equals("any")) {
+                    throw new RuntimeException("No matching Windows or Tabs found for " + element);
+                }
+                WindowSwitch.switchToHandleOrThrow(phraseData.getDriver(), handleWrappers.getFirst().getValue().toString());
                 return true;
             });
         }

@@ -39,6 +39,7 @@ public abstract class PassedData {
 
 
     public void setOperationInheritance() {
+        System.out.println("@@setOperationInheritance: " + this);
         if (isSeparatorPhrase()) {
             groupSeparator = true;
             lastOperationPhrase = isOperationPhrase ? (PhraseData) this : null;
@@ -48,7 +49,6 @@ public abstract class PassedData {
                 lastOperationPhrase = isOperationPhrase ? (PhraseData) this : null;
             }
         }
-
 
         if (elementCount ==1) {
 //            if (phraseType == null) {

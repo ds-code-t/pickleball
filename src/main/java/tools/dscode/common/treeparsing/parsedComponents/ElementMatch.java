@@ -3,6 +3,7 @@ package tools.dscode.common.treeparsing.parsedComponents;
 import com.xpathy.XPathy;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.assertions.ValueWrapper;
+import tools.dscode.common.browseroperations.WindowSwitch;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
@@ -54,7 +55,7 @@ public class ElementMatch {
     public Set<ExecutionDictionary.CategoryFlags> categoryFlags = new HashSet<>();
 
     public String toString() {
-        if(previouslyReturnedValues == null)
+        if (previouslyReturnedValues == null)
             return "No Resolved Values , Element: " + fullText;
         return "Resolved Values: " + previouslyReturnedValues + " , Element: " + fullText;
     }
@@ -73,6 +74,7 @@ public class ElementMatch {
     WebDriver driver;
 
     protected boolean isPlaceHolder = false;
+
     public boolean isPlaceHolder() {
         return isPlaceHolder;
     }
@@ -145,12 +147,8 @@ public class ElementMatch {
         }
 
 
-
         categoryFlags.addAll(getExecutionDictionary().getResolvedCategoryFlags(category));
         this.elementTypes = ElementType.fromString(this.category);
-
-
-
 
 
         if (elementNode.localStateBoolean("elPredicate")) {
@@ -188,32 +186,6 @@ public class ElementMatch {
             }
         }
 
-
-
-//        if (!categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
-            ExecutionDictionary dict = getExecutionDictionary();
-            List<XPathy> elPredictXPaths = new ArrayList<>();
-
-
-            if (textOps.isEmpty())
-            {
-                ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, null, null);
-                elPredictXPaths.add(categoryResolution.xpath());
-            }
-
-            for (TextOp textOp : textOps) {
-                ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, textOp.text, textOp.op);
-                elPredictXPaths.add(categoryResolution.xpath());
-            }
-
-            xPathy = combineAnd(elPredictXPaths);
-
-            for (Attribute attribute : attributes) {
-                ExecutionDictionary.Op op = getOpFromString(attribute.predicateType);
-                xPathy = applyAttrOp(xPathy, attribute.attrName, op, attribute.predicateVal);
-            }
-//        }
-
         if (elementTypes.contains(ElementType.HTML_TYPE)) {
             if (categoryFlags.contains(ExecutionDictionary.CategoryFlags.IFRAME)) {
                 elementTypes.add(ElementType.HTML_IFRAME);
@@ -229,6 +201,32 @@ public class ElementMatch {
         }
 
 
+        if (!elementTypes.contains(ElementType.HTML_TYPE)) {
+            return;
+        }
+
+//        if (!categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
+        ExecutionDictionary dict = getExecutionDictionary();
+        List<XPathy> elPredictXPaths = new ArrayList<>();
+
+
+        if (textOps.isEmpty()) {
+            ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, null, null);
+            elPredictXPaths.add(categoryResolution.xpath());
+        }
+
+        for (TextOp textOp : textOps) {
+            ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, textOp.text, textOp.op);
+            elPredictXPaths.add(categoryResolution.xpath());
+        }
+
+        xPathy = combineAnd(elPredictXPaths);
+
+        for (Attribute attribute : attributes) {
+            ExecutionDictionary.Op op = getOpFromString(attribute.predicateType);
+            xPathy = applyAttrOp(xPathy, attribute.attrName, op, attribute.predicateVal);
+        }
+//        }
 
 
     }
@@ -302,6 +300,14 @@ public class ElementMatch {
         List<ValueWrapper> returnList = new ArrayList<>();
         if (elementTypes.contains(ElementType.HTML_TYPE)) {
             getElementWrappers().forEach(e -> returnList.add(e.getElementReturnValue()));
+        } else if (elementTypes.contains(ElementType.BROWSER_WINDOW)) {
+            String normalized = category.toUpperCase().replaceAll("WINDOWS?", "").trim();
+            if (normalized.isBlank())
+                normalized = "TITLE";
+            System.out.println("@@normalized:::: " + normalized);
+            WindowSwitch.WindowSelectionType windowSelectionType = WindowSwitch.WindowSelectionType.LOOKUP.get(normalized);
+            System.out.println("@@windowSelectionType:::: " + windowSelectionType);
+            returnList.addAll(WindowSwitch.findMatchingHandles(parentPhrase.getDriver(), windowSelectionType, textOps).stream().map(ValueWrapper::createValueWrapper).toList());
         } else {
             returnList.addAll(nonHTMLValues);
         }
@@ -316,12 +322,12 @@ public class ElementMatch {
 
     public List<ElementWrapper> getElementThrowErrorIfEmptyWithNoModifier() {
         List<ElementWrapper> returnElements = getElementWrappers();
-        if(returnElements.isEmpty() && !(selectionType.equals("any") || selectionType.equals("none")))
+        if (returnElements.isEmpty() && !(selectionType.equals("any") || selectionType.equals("none")))
             throw new RuntimeException("No elements found: " + this);
         return returnElements;
     }
 
-    public boolean hasElementWrappers(){
+    public boolean hasElementWrappers() {
         return !getElementWrappers().isEmpty();
     }
 

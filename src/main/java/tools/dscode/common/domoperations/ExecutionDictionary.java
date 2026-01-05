@@ -46,7 +46,7 @@ public class ExecutionDictionary {
 
     public static final String VISIBILITY_FILTER = "VisibilityFilterInternalUSE";
 
-    public enum Op {DEFAULT, EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE}
+    public enum Op {DEFAULT, EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE, MATCHES}
 
     public enum CategoryFlags {PAGE_CONTEXT, PAGE_TOP_CONTEXT, ELEMENT_CONTEXT, SHADOW_HOST, IFRAME}
 
@@ -578,7 +578,7 @@ public class ExecutionDictionary {
             dict.registerOrForCategories(categories, builders);
             return this;
         }
-        
+
 
         /**
          * Register AND-based builders for all categories in this spec on this dictionary instance.

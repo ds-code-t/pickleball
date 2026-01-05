@@ -1,5 +1,9 @@
 Feature: Addition
 
+  Scenario: sssst5ff55
+  @[DEBUG]
+    * , switch to "Google" Window
+
   Scenario: f test5ff55
   @[DEBUG]
 #    * , verify "Show File-select Fields" Text is  displayed
@@ -36,7 +40,7 @@ Feature: Addition
 
   Scenario: ss3
     Then print aaa
-   Then print aaa
+    Then print aaa
     Given set CHROME
 #    * , from the Top Panel:
 #  : * , I click the "Get your own website" Link
@@ -53,7 +57,7 @@ Feature: Addition
 #    * , from the IframeResult, I enter "dd" in the "Last name:" Textbox
   @[DEBUG]
     * , from the Top Panel:
-    : * , I click the "Run ❯" Button
+  : * , I click the "Run ❯" Button
 #    * , I enter "dd" in the "Last name:" Textbox
 #    * , click "Essential QA Service" Qqq
 

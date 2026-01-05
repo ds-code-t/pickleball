@@ -188,6 +188,7 @@ public final class Phrase extends PhraseData {
     }
 
     public static PhraseData updateChainAndInheritances(PhraseData nextResolvedPhrase) {
+        System.out.println("@@nextResolvedPhrase: " + nextResolvedPhrase);
         nextResolvedPhrase.setOperationInheritance();
         if (nextResolvedPhrase.phraseType == PhraseType.CONTEXT)
             return nextResolvedPhrase;
