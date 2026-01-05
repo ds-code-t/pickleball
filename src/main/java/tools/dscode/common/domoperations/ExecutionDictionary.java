@@ -21,6 +21,7 @@ import java.util.stream.Stream;
 import static com.xpathy.Tag.any;
 //import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.toSelfStep;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.maybeDeepestMatches;
 
 public class ExecutionDictionary {
 
@@ -101,8 +102,8 @@ public class ExecutionDictionary {
                             if (v == null || v.isNullOrBlank())
                                 return null;
                             return any.byHaving(
-                                    XPathy.from("descendant-or-self::*")
-                                            .byHaving(deepNormalizedText(v, op))
+                                    maybeDeepestMatches(XPathy.from("descendant-or-self::*")
+                                            .byHaving(deepNormalizedText(v, op)))
                             );
                         }
                 );

@@ -277,6 +277,10 @@ public final class XPathyUtils {
     }
 
 
+    public static XPathy maybeDeepestMatches(XPathy xpathy) {
+        return XPathy.from(maybeDeepestMatches(xpathy.getXpath()));
+    }
+
     /**
      * If the XPath looks like a context-independent, absolute expression
      * (e.g. //div[@x], /html/body//a, (//div | //span[@x])),
