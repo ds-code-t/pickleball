@@ -1,8 +1,11 @@
 package tools.dscode.common.browseroperations;
 
+import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.Keys;
 import org.openqa.selenium.NoSuchWindowException;
 import org.openqa.selenium.WebDriver;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -16,23 +19,25 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.openqa.selenium.interactions.Actions;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch.TextOp;
 
 /**
  * Window/tab utilities (filtering + switching are decoupled).
- *
+ * <p>
  * Design:
  * 1) findMatchingHandles(...) returns a list of matching window handles (possibly empty).
- *    - It will temporarily switch while evaluating TITLE/URL predicates, then restores original focus.
+ * - It will temporarily switch while evaluating TITLE/URL predicates, then restores original focus.
  * 2) switchToHandleOrThrow(...) switches to a provided handle (must exist in getWindowHandles()).
- *
+ * <p>
  * Notes:
  * - Selenium does not expose "last focused" window; HISTORY provides optional "PREVIOUS".
  * - "NEW" here means "any handle that isn't the current handle" (popup / other tab).
  */
 public final class WindowSwitch {
 
-    private WindowSwitch() {}
+    private WindowSwitch() {
+    }
 
     public enum WindowSelectionType {
         URL,
@@ -60,14 +65,14 @@ public final class WindowSwitch {
 
     /**
      * Returns window handles matching the selection criteria.
-     *
+     * <p>
      * Behavior by type:
      * - FIRST/LAST: returns singleton list
      * - INDEX: returns singleton list (if in range), else empty
      * - NEW: returns all handles except the current handle (often 0 or 1, but can be more)
      * - PREVIOUS: returns the most recent still-open handle from history (singleton) or empty
      * - TITLE/URL: returns all handles whose title/url matches ALL provided TextOps
-     *
+     * <p>
      * For TITLE/URL:
      * - Temporarily switches to each handle to read title/url, then restores original focus.
      * - If textOps is null/empty: returns empty list (by design; avoids "match everything" surprises)
@@ -138,7 +143,9 @@ public final class WindowSwitch {
         return handle;
     }
 
-    /** Optional: clear the tracked focus history for a driver. */
+    /**
+     * Optional: clear the tracked focus history for a driver.
+     */
     public static void clearHistory(WebDriver driver) {
         if (driver == null) return;
         synchronized (HISTORY) {
@@ -150,7 +157,7 @@ public final class WindowSwitch {
     // Internals
     // --------------------------
 
-    private enum Property { URL, TITLE }
+    private enum Property {URL, TITLE}
 
     private static List<String> findByStringProperty(WebDriver driver,
                                                      List<String> handles,
@@ -167,19 +174,37 @@ public final class WindowSwitch {
         try {
             for (String h : handles) {
                 System.out.println("@@WINDOW1: " + h);
-                driver.switchTo().defaultContent().switchTo().window(h);
-                driver.switchTo().defaultContent();
+                driver.switchTo().window(h);
+
                 System.out.println("@@WINDOW2: " + h);
 
-                String actual = (property == Property.URL)
-                        ? safeString(driver.getCurrentUrl())
-                        : safeString(driver.getTitle());
+                String actual =
+                        (property == Property.URL)
+                                ? WindowSafeAccess.getUrlWithTimeout(driver, Duration.ofSeconds(2))
+                                : WindowSafeAccess.getTitleWithTimeout(driver, Duration.ofSeconds(2));
+
+                if (actual == null) {
+                    try {
+                        new Actions(driver).sendKeys(Keys.ESCAPE).perform();
+                    } catch (Throwable ignored) {
+                        System.out.println("@@ignored1 " + ignored.getMessage());
+                    }
+                    try {
+                        ((JavascriptExecutor) driver).executeScript("window.close();");
+                    } catch (Throwable ignored) {
+                        System.out.println("@@ignored2 " + ignored.getMessage());
+                    }
+                    System.out.println("@@WINDOW blocked (likely print preview), skipping");
+                    continue;
+                }
 
                 System.out.println("@@actual: " + actual);
+
                 if (matchesAll(actual, textOps)) {
                     matches.add(h);
                 }
             }
+
         } finally {
             safeSwitchRestore(driver, original);
         }
