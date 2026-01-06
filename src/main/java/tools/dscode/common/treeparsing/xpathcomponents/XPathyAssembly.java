@@ -244,6 +244,10 @@ public final class XPathyAssembly {
             score += 500;
         }
 
+        if (!s.contains("\"") && !s.contains("'")) {
+            score += 600;
+        }
+
         if (s.matches(".*\\b\\*\\b.*")) {
             score += 50;
         }

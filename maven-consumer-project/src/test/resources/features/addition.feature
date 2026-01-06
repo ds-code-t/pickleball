@@ -33,7 +33,7 @@ Feature: Addition
   Scenario:  test22
     * print ddd
   @[DEBUG]
-    Then set $(CHROME)
+    Then END SCENARIO
     Then , from the Frame, I click the "Create" Button
 
   Scenario: if test
