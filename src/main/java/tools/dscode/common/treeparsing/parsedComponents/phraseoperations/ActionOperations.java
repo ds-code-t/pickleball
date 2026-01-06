@@ -1,5 +1,6 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
+import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
@@ -22,6 +23,7 @@ import static tools.dscode.common.domoperations.HumanInteractions.selectDropdown
 import static tools.dscode.common.domoperations.HumanInteractions.typeText;
 import static tools.dscode.common.domoperations.HumanInteractions.wheelScrollBy;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitForDuration;
+import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
 import static tools.dscode.coredefinitions.GeneralSteps.getJavascriptExecutor;
 
@@ -147,11 +149,6 @@ public enum ActionOperations implements OperationsInterface {
             System.out.println("@WphraseData.resultElements: " + phraseData.resultElements);
 
             ElementMatch element = phraseData.resultElements.getFirst();
-            if (phraseData.resolvedText.toLowerCase().contains("print")) {
-                getJavascriptExecutor().executeScript(
-                        "window.print = function(){ /* suppressed for automation */ };"
-                );
-            }
 
             phraseData.result = Attempt.run(() -> {
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
@@ -279,6 +276,29 @@ public enum ActionOperations implements OperationsInterface {
                 WindowSwitch.switchToHandleOrThrow(phraseData.getDriver(), handleWrappers.getFirst().getValue().toString());
                 return true;
             });
+        }
+    },
+    CLOSE {
+        @Override
+        public void execute(PhraseData phraseData) {
+            System.out.println(phraseData + " : Executing " + this.name());
+
+
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+                    new ElementMatcher()
+                            .mustMatchAll(ElementType.HTML_ELEMENT)
+            );
+
+
+            ElementMatch element = phraseData.resultElements.getFirst();
+
+            phraseData.result = Attempt.run(() -> {
+                for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
+                    elementWrapper.close();
+                }
+                return true;
+            });
+
         }
     };
 

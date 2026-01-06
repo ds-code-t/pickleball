@@ -15,6 +15,7 @@ import static tools.dscode.common.domoperations.LeanWaits.safeWaitForElementRead
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.intersection;
 import static tools.dscode.common.domoperations.SeleniumUtils.union;
+import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementMatch.ELEMENT_RETURN_VALUE;
 
 
@@ -419,6 +420,13 @@ public class ElementWrapper {
 
     public boolean hasValue() {
         return !getElementReturnValue().isBlank();
+    }
+
+
+    public void close() {
+        String closeXpath = getExecutionDictionary().getCategoryXPathy("Close Button").getXpath().replaceFirst("^//","");
+        WebElement closeButton  = getElement().findElement(new By.ByXPath(closeXpath));
+        closeButton.click();
     }
 
 }

@@ -4,6 +4,7 @@ import com.xpathy.Attribute;
 import com.xpathy.Tag;
 import com.xpathy.XPathy;
 import org.intellij.lang.annotations.Language;
+import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathyBuilder;
 
@@ -250,7 +251,7 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite|save|creates? and attach|attach|switch)(?:s|ed|ing|es)?\\b") {
+        ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite|save|creates? and attach|attach|switch|close)(?:s|ed|ing|es)?\\b") {
             @Override
             public String onCapture(MatchNode self) {
 
@@ -453,8 +454,21 @@ public final class DefinitionContext {
                                             .or().byAttribute(Attribute.custom("aria-model")).equals("true")
                                             .or().byAttribute(id).equals("modal")
                     );
-
-
+            categories("Close Button")
+                    .and(
+                            (category, v, op) ->
+                                    combineOr(
+                                            XPathy.from(Tag.button),
+                                            XPathy.from(Tag.img).byAttribute(role).equals("button"),
+                                            XPathy.from(Tag.a).byAttribute(role).equals("button")
+                                    )
+                    )
+                    .or(
+                            (category, v, op) -> XPathyBuilder.build(any, id, ValueWrapper.createValueWrapper("'close'"), Op.STARTS_WITH),
+                            (category, v, op) -> XPathyBuilder.build(any, title, ValueWrapper.createValueWrapper("'close'"), Op.STARTS_WITH),
+                            (category, v, op) -> XPathyBuilder.build(any, name, ValueWrapper.createValueWrapper("'close'"), Op.STARTS_WITH),
+                            (category, v, op) -> XPathyBuilder.build(any, aria_label, ValueWrapper.createValueWrapper("'close'"), Op.STARTS_WITH)
+                    );
             //
             // Textbox  (two registration blocks preserved exactly)
             //
