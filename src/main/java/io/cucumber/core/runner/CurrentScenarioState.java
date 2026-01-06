@@ -172,7 +172,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     public void runningStep(StepExtension stepExtension) {
         System.out.println("Running " + stepExtension);
-        if (!shouldRun(stepExtension)){
+        if (!shouldRun(stepExtension)) {
             stepExtension.skipped = true;
             if (stepExtension.nextSibling != null) {
                 runStep((StepExtension) stepExtension.nextSibling);
@@ -193,7 +193,6 @@ public class CurrentScenarioState extends ScenarioMapping {
         Throwable throwable = result.getError();
 
 
-
         if (!result.getStatus().equals(Status.PASSED) && !result.getStatus().equals(Status.SKIPPED) && throwable == null) {
 
             if (status.equals(io.cucumber.plugin.event.Status.UNDEFINED))
@@ -209,6 +208,7 @@ public class CurrentScenarioState extends ScenarioMapping {
             else {
                 isScenarioHardFail = true;
                 isScenarioSoftFail = false;
+                isScenarioComplete = true;
             }
         }
 
@@ -303,10 +303,6 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     public boolean shouldRun(StepExtension stepExtension) {
 
-
-
-
-
         if (stepExtension.parentStep == null)
             return true;
 
@@ -326,7 +322,7 @@ public class CurrentScenarioState extends ScenarioMapping {
             return !isScenarioFailed();
 
 //        return !stepExtension.skipped;
-        return !isScenarioHardFail;
+        return !isScenarioComplete();
     }
 
 
