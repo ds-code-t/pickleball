@@ -125,9 +125,12 @@ public class StepExtension extends StepData {
             }
             executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
             executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
+
             io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep,executionMode);
+            System.out.println("@result==: " + result);
             return result;
         } catch (Throwable t) {
+
             Throwable cause = t instanceof InvocationTargetException ? t.getCause() : t;
             cause.printStackTrace();
             throw new RuntimeException(cause);

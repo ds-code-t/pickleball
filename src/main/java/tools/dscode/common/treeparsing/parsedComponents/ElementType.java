@@ -59,16 +59,16 @@ public enum ElementType {
 
     public static Set<ElementType> fromString(String raw) {
         Set<ElementType> returnSet = new java.util.HashSet<>();
-        System.out.println("@@raw: " + raw + "");
+
         if (raw.contains("Window")) {
             String windowNormalized = raw.replaceAll("Windows?", "").trim().toUpperCase(Locale.ROOT);
             if(windowNormalized.isBlank())
             {
                 windowNormalized = "TITLE";
             }
-            System.out.println("@@windowNormalized: " + windowNormalized);
+
             WindowSwitch.WindowSelectionType windowSelectionType = WindowSwitch.WindowSelectionType.LOOKUP.get(windowNormalized);
-            System.out.println("@@windowSelectionType: " + windowSelectionType);
+
             if (windowSelectionType != null) {
                 returnSet.add(BROWSER_TYPE);
                 returnSet.add(BROWSER_WINDOW);

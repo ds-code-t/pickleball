@@ -236,7 +236,7 @@ public final class WindowSwitch {
 
     private static boolean matchesAll(String actual, List<TextOp> textOps) {
         for (TextOp textOp : textOps) {
-            System.out.println("@@textOp: " + textOp + " actual=" + actual);
+
             if (textOp == null) continue;
             if (!matches(actual, textOp)) return false;
         }

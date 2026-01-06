@@ -1,6 +1,13 @@
 Feature: Additiontest
 
 
+  Scenario: click test
+  @[DEBUG]
+    * , from the Top Panel:
+    : * , click "aaa" Link, ensure  "Get your own website" Link is displayed
+    : * , ensure  "Get your own website" Link is displayed
+    : * , ensure  "Get your own website" Link is displayed
+
   Scenario Outline: statu test 1
     @[DEBUG]
     * , from the Top Panel:

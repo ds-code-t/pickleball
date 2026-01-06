@@ -24,7 +24,7 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing Assertion " + this.name());
-            System.out.println("@@phraseData.getElementMatchesBeforeAndAfterOperation(): " + phraseData.getElementMatchesBeforeAndAfterOperation());
+
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.FIRST_ELEMENT),
@@ -32,7 +32,7 @@ public enum AssertionOperations implements OperationsInterface {
                             .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.SECOND_ELEMENT)
             );
 
-            System.out.println("@@resultElements: " + phraseData.resultElements);
+
 
             ElementMatch firstElement = phraseData.resultElements.getFirst();
             ElementMatch secondElement = phraseData.resultElements.get(1);

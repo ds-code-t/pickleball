@@ -290,8 +290,8 @@ public final class DefinitionContext {
                         .replaceAll("\\s+", " ")
                         .trim();
                 self.parent().putToLocalState("assertion", assertion);
-                System.out.println("@@assertion----: " + assertion);
-                System.out.println("@@self.start: " + self.start);
+
+
                 self.parent().putToLocalState("operationIndex", self.start);
                 return self.originalText();
             }
@@ -301,10 +301,10 @@ public final class DefinitionContext {
         ParseNode defaultAssertion = new ParseNode("<<elementMatch>>\\s*(?<defaultAssertion>is)\\s*<<elementMatch>>") {
             @Override
             public String onSubstitute(MatchNode self) {
-                System.out.println("@@defaultAssertion: " + self.originalText());
+
                 MatchNode parentNode = self.parent();
                 if (!parentNode.localStateBoolean("context", "action", "assertion")) {
-                    System.out.println("@@defaultAssertion-parentNode: " + parentNode);
+
                     parentNode.putToLocalState("assertion", "equal");
                     parentNode.putToLocalState("operationIndex", self.groups().start("defaultAssertion"));
                 }
@@ -328,7 +328,7 @@ public final class DefinitionContext {
         ParseNode reindex = new ParseNode("<<elementMatch>>") {
             @Override
             public String onSubstitute(MatchNode self) {
-                System.out.println("@@reindex: " + self.originalText());
+
                 MatchNode elementMatchNode = self.getMatchNode(self.originalText());
                 elementMatchNode.start = self.start;
                 return self.originalText();
