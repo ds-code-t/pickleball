@@ -1,12 +1,31 @@
 Feature: Additiontest
 
 
+  Scenario Outline: test22
+    * Set report values
+      | xg | A   | B   | C   | D   | x   | y   | z   |
+      |    | <A> | <B> | <C> | <D> | <A> | <A> | <A> |
+
+    * ,verify "<A>1" equals "1"
+
+    * Set report values
+      | Q | r   |
+      | z | 222 |
+
+    Examples:
+      | Q | A | B | C | D |
+      |   | a | b |   |   |
+      |   | a | b |   |   |
+      |   |   | c | d |   |
+      |   |   | c | d | e |
+
+
   Scenario: click test
   @[DEBUG]
     * , from the Top Panel:
-    : * , click "aaa" Link, ensure  "Get your own website" Link is displayed
-    : * , ensure  "Get your own website" Link is displayed
-    : * , ensure  "Get your own website" Link is displayed
+  : * , click "aaa" Link, ensure  "Get your own website" Link is displayed
+  : * , ensure  "Get your own website" Link is displayed
+  : * , ensure  "Get your own website" Link is displayed
 
   Scenario Outline: statu test 1
     @[DEBUG]

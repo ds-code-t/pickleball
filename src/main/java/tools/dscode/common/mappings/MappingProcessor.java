@@ -212,17 +212,14 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 if (input.contains("{")) {
                     input = resolveCurly(input);
                 }
+                equalityCount =  input.equals(prev)? ++equalityCount : 0;
+            } while (equalityCount<2);
 
-                if (input.equals(prev))
-                    equalityCount++;
-                else
-                    equalityCount = 0;
-                if (input.contains("<?") && equalityCount > 1) {
-                    input = input.replaceAll("<\\?[^<>{}]+>", "");
-                    if (input.equals(prev))
-                        equalityCount = 0;
-                }
-            } while (equalityCount < 2);
+            String previousInput;
+            do {
+                previousInput = input;
+                input = input.replaceAll("<\\?[^<>{}]+>", "");
+            } while (previousInput.equals(input));
             return decodeBackToText(input);
         } catch (Throwable t) {
             throw new RuntimeException("Could not resolve'" + input + "'", t);
