@@ -1,5 +1,6 @@
 package tools.dscode.common.treeparsing;
 
+import com.xpathy.Attribute;
 import com.xpathy.Tag;
 import com.xpathy.XPathy;
 import org.intellij.lang.annotations.Language;
@@ -15,6 +16,7 @@ import static com.xpathy.Attribute.title;
 import static com.xpathy.Attribute.type;
 import static com.xpathy.Case.LOWER;
 import static com.xpathy.Tag.any;
+import static com.xpathy.Tag.div;
 import static com.xpathy.Tag.input;
 import static com.xpathy.Tag.select;
 import static com.xpathy.Tag.textarea;
@@ -286,8 +288,8 @@ public final class DefinitionContext {
                         .replaceAll("\\s+", " ")
                         .trim();
                 self.parent().putToLocalState("assertion", assertion);
-                System.out.println("@@assertion----: "+ assertion);
-                System.out.println("@@self.start: "+ self.start);
+                System.out.println("@@assertion----: " + assertion);
+                System.out.println("@@self.start: " + self.start);
                 self.parent().putToLocalState("operationIndex", self.start);
                 return self.originalText();
             }
@@ -384,9 +386,9 @@ public final class DefinitionContext {
                             (category, v, op) ->
                                     combineOr(Tag.iframe, Tag.frame)
                     ).or(
-                            (category, v, op) -> (v == null ? null : XPathyBuilder.build(Tag.any, id, v, op)),
-                            (category, v, op) -> (v == null ? null : XPathyBuilder.build(Tag.any, title, v, op)),
-                            (category, v, op) -> (v == null ? null : XPathyBuilder.build(Tag.any, name, v, op))
+                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(Tag.any, id, v, op, v != null),
+                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(Tag.any, title, v, op, v != null),
+                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(Tag.any, name, v, op, v != null)
                     );
 
 
@@ -410,7 +412,7 @@ public final class DefinitionContext {
             //
             // Button
             //
-            category("Button").inheritsFrom("forLabel", CONTAINS_TEXT)
+            category("Button").inheritsFrom("forLabel", "htmlNaming", CONTAINS_TEXT)
                     .or(
                             (category, v, op) -> XPathy.from(Tag.button),
                             (category, v, op) -> XPathy.from(Tag.img).byAttribute(role).equals("button"),
@@ -435,26 +437,36 @@ public final class DefinitionContext {
                     );
 
 
-            category("Dropdown").inheritsFrom("forLabel").and((category, v, op) ->
-                    XPathy.from(select)).or(
-                    (category, v, op) -> XPathyBuilder.build(select, id, v, op),
-                    (category, v, op) -> XPathyBuilder.build(select, title, v, op),
-                    (category, v, op) -> XPathyBuilder.build(select, name, v, op)
-            );
+            category("Dropdown").inheritsFrom("forLabel", "htmlNaming")
+                    .and((category, v, op) ->
+                            XPathy.from(select))
+                    .or(
+                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(select, id, v, op, v != null),
+                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(select, title, v, op, v != null),
+                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(select, name, v, op, v != null)
+                    );
+
+            categories("Dialog", "Modal").inheritsFrom(CONTAINS_TEXT, "forLabel", "htmlNaming")
+                    .and(
+                            (category, v, op) ->
+                                    XPathy.from(div).byAttribute(role).equals("dialog")
+                                            .or().byAttribute(Attribute.custom("aria-model")).equals("true")
+                                            .or().byAttribute(id).equals("modal")
+                    );
 
 
             //
             // Textbox  (two registration blocks preserved exactly)
             //
-            category("Textbox").inheritsFrom("forLabel")
+            category("Textbox").inheritsFrom("forLabel", "htmlNaming")
                     .and((category, v, op) ->
                             input.byAttribute(type).equals("text").or().byAttribute(type).equals("password").or().byAttribute(type).equals("email"))
                     .or(
                             (category, v, op) ->
-                                    XPathyBuilder.build(input, placeholder, v, op)
+                                    XPathyBuilder.buildIfAllTrue(input, placeholder, v, op, v != null)
                     );
 
-            category("Textarea").inheritsFrom("forLabel")
+            category("Textarea").inheritsFrom("forLabel", "htmlNaming")
                     .and((category, v, op) ->
                             XPathy.from(textarea)
                     )
@@ -497,13 +509,24 @@ public final class DefinitionContext {
 
 
             category("forLabel")
-                    .or((category, v, op) -> {
-                        if (v == null || v.isNullOrBlank()) {
-                            return null; // no label text to match, skip this builder
-                        }
-                        return new XPathy("//*[@id][@id = //*[normalize-space(text())='" + v + "']/@for]");
-                    });
+                    .or(
 
+                            (category, v, op) -> {
+                                if (v == null || v.isNullOrBlank()) {
+                                    return null; // no label text to match, skip this builder
+                                }
+                                return new XPathy("//*[@id][@id = //*[normalize-space(text())='" + v + "']/@for]");
+                            }
+                    );
+
+
+            category("htmlNaming")
+                    .or(
+                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(any, id, v, op, v != null),
+                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(any, title, v, op, v != null),
+                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(any, name, v, op, v != null),
+                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(any, aria_label, v, op, v != null)
+                    );
 
             //
             // "*" fallback OR builders
