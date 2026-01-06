@@ -13,6 +13,7 @@ import static com.xpathy.Attribute.id;
 import static com.xpathy.Attribute.name;
 import static com.xpathy.Attribute.placeholder;
 import static com.xpathy.Attribute.role;
+import static com.xpathy.Attribute.tabindex;
 import static com.xpathy.Attribute.title;
 import static com.xpathy.Attribute.type;
 import static com.xpathy.Case.LOWER;
@@ -469,6 +470,15 @@ public final class DefinitionContext {
                             (category, v, op) -> XPathyBuilder.build(any, name, ValueWrapper.createValueWrapper("'close'"), Op.STARTS_WITH),
                             (category, v, op) -> XPathyBuilder.build(any, aria_label, ValueWrapper.createValueWrapper("'close'"), Op.STARTS_WITH)
                     );
+
+
+            categories("Tab").inheritsFrom(CONTAINS_TEXT)
+                    .or(
+                            (category, v, op) -> XPathy.from(Tag.any.byAttribute(role).equals("tab")),
+                            (category, v, op) ->  XPathy.from(Tag.img).byAttribute(tabindex).haveIt()
+
+                    );
+
             //
             // Textbox  (two registration blocks preserved exactly)
             //
