@@ -122,6 +122,7 @@ public final class WindowSwitch {
      * @throws NoSuchWindowException with a descriptive message if handle is not present.
      */
     public static String switchToHandleOrThrow(WebDriver driver, String handle) {
+        System.out.println("Attempting to switch to Window/Tab: " + handle);
         Objects.requireNonNull(driver, "driver");
         if (handle == null || handle.isBlank()) {
             throw new NoSuchWindowException("Cannot switch window: handle was null/blank.");
@@ -170,13 +171,10 @@ public final class WindowSwitch {
 
         String original = safeCurrentHandle(driver);
         List<String> matches = new ArrayList<>();
-
+        System.out.println("Checking open Windows for a matching " + textOps);
         try {
             for (String h : handles) {
-                System.out.println("@@WINDOW1: " + h);
                 driver.switchTo().window(h);
-
-                System.out.println("@@WINDOW2: " + h);
 
                 String actual =
                         (property == Property.URL)
@@ -184,24 +182,13 @@ public final class WindowSwitch {
                                 : WindowSafeAccess.getTitleWithTimeout(driver, Duration.ofSeconds(2));
 
                 if (actual == null) {
-//                    try {
-//                        new Actions(driver).sendKeys(Keys.ESCAPE).perform();
-//                    } catch (Throwable ignored) {
-//                        System.out.println("@@ignored1 " + ignored.getMessage());
-//                    }
-//                    try {
-//                        ((JavascriptExecutor) driver).executeScript("window.close();");
-//                    } catch (Throwable ignored) {
-//                        System.out.println("@@ignored2 " + ignored.getMessage());
-//                    }
-//                    driver.close();
-                    System.out.println("@@WINDOW blocked (likely print preview), skipping");
                     continue;
                 }
 
-                System.out.println("@@actual: " + actual);
+                System.out.println("Window " + property + ": " + actual);
 
                 if (matchesAll(actual, textOps)) {
+                    System.out.println("Matched");
                     matches.add(h);
                 }
             }

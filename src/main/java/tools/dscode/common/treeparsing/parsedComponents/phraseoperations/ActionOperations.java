@@ -265,7 +265,6 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-            System.out.println("@@phraseData.getElementMatchesFollowingOperation(): " + phraseData.getElementMatchesFollowingOperation());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.BROWSER_WINDOW)
@@ -278,6 +277,7 @@ public enum ActionOperations implements OperationsInterface {
                     throw new RuntimeException("No matching Windows or Tabs found for " + element);
                 }
                 WindowSwitch.switchToHandleOrThrow(phraseData.getDriver(), handleWrappers.getFirst().getValue().toString());
+                phraseData.getDriver().close();
                 return true;
             });
         }
