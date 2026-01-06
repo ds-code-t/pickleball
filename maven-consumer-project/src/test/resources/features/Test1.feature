@@ -1,10 +1,31 @@
 Feature: Additiontest
 
 
+  Scenario Outline: statu test 1
+    @[DEBUG]
+    * , from the Top Panel:
+  : * , ensure  "<linkText>" Link is displayed
+
+    When RUN IF SCENARIO FAILED
+  : * Set report values
+    | A | status |
+    | 1 | FAIL   |
+
+    When RUN IF SCENARIO PASSING
+  : * Set report values
+    | A | status |
+    | 2 | PASS   |
+
+    Examples:
+      | linkText             |
+      | Get your own website |
+      | zz                   |
+
+
   Scenario: test
   @[DEBUG]
     * , from the Iframe:
-    : * , verify "This page is displayed in an iframe" Text is displayed
+  : * , verify "This page is displayed in an iframe" Text is displayed
 
   Scenario: attach 4tt
     * , from the Top Panel:
@@ -86,6 +107,7 @@ Feature: Additiontest
 
   Scenario: ssatesss
   @[DEBUG]
+    * , ensure  "Get your own website" Link is displayed
 #    * navigate to: URL.buttons
     * , from the Top Panel:
   : * Set report values

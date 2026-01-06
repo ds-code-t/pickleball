@@ -12,8 +12,8 @@ public class GlobalConstants {
     public static final String IGNORE_FAILURES = "IGNORE FAILURES";
     public static final String LOG_FAILURES_BUT_CONTINUE_SCENARIO = "LOG FAILURES BUT CONTINUE SCENARIO";
     public static final String RUN_IF_SCENARIO_FINISHED = "RUN IF SCENARIO FINISHED";
-    public static final String AND_SCENARIO_COMPLETE = "( AND SCENARIO FINISHED)?";
-    public static final String AND_IGNORE_FAILURES = "( AND IGNORE FAILURES)?";
+    public static final String AND_SCENARIO_COMPLETE = "(?: AND SCENARIO FINISHED)?";
+    public static final String AND_IGNORE_FAILURES = "(?: AND IGNORE FAILURES)?";
 
     public static final String K_RUNTIME = "io.cucumber.core.runtime.Runtime";
     public static final String K_FEATUREPARSER = "io.cucumber.core.feature.FeatureParser";
