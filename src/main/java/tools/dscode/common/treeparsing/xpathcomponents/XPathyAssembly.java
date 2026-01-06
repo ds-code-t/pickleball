@@ -227,7 +227,7 @@ public final class XPathyAssembly {
         return prefix + step;
     }
 
-    static final Pattern xPathScorePattern = Pattern.compile("\\bdisplay|height|width|visbility|collapse|opacity|hidden|style|not|ancestor|contains|descendant|translate|or\\b");
+    static final Pattern xPathScorePattern = Pattern.compile("\\bdisplay|height|width|visbility|collapse|opacity|hidden|style|not|ancestor|contains|descendant|translate|or|preceding|following|sibling\\b");
 
     /** Heuristic specificity scoring. Lower score = "more specific". */
     public static int xpathSpecificityScore(String xpath) {
@@ -240,7 +240,7 @@ public final class XPathyAssembly {
             score += 200;
         }
 
-        if (s.contains("//*[preceding") || s.contains("//*[following")) {
+        if (s.contains("*[preceding") || s.contains("*[following")) {
             score += 500;
         }
 
