@@ -424,7 +424,7 @@ public class ElementWrapper {
 
 
     public void close() {
-        String closeXpath = getExecutionDictionary().getCategoryXPathy("Close Button").getXpath().replaceFirst("^//","");
+        String closeXpath = getExecutionDictionary().getCategoryXPathy("Close Button").getXpath().replaceFirst("^//\\*","descendant-or-self::*");
         WebElement closeButton  = getElement().findElement(new By.ByXPath(closeXpath));
         closeButton.click();
     }
