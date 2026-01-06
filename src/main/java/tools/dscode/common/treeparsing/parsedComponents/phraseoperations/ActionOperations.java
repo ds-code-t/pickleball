@@ -277,7 +277,6 @@ public enum ActionOperations implements OperationsInterface {
                     throw new RuntimeException("No matching Windows or Tabs found for " + element);
                 }
                 WindowSwitch.switchToHandleOrThrow(phraseData.getDriver(), handleWrappers.getFirst().getValue().toString());
-                phraseData.getDriver().close();
                 return true;
             });
         }
