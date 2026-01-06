@@ -194,6 +194,7 @@ public final class WindowSwitch {
                     } catch (Throwable ignored) {
                         System.out.println("@@ignored2 " + ignored.getMessage());
                     }
+                    driver.close();
                     System.out.println("@@WINDOW blocked (likely print preview), skipping");
                     continue;
                 }
