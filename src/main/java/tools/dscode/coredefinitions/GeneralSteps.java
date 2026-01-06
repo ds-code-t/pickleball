@@ -5,6 +5,7 @@ import io.cucumber.core.runner.StepExtension;
 import io.cucumber.core.stepexpression.DocStringArgument;
 import io.cucumber.java.ParameterType;
 import io.cucumber.java.en.Given;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.chromium.ChromiumDriver;
@@ -37,7 +38,9 @@ import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort
 
 public class GeneralSteps extends CoreSteps {
 
-
+    public static JavascriptExecutor getJavascriptExecutor() {
+        return getDriver("BROWSER");
+    }
 
     public static ChromiumDriver getDefaultDriver() {
         return getDriver("BROWSER");

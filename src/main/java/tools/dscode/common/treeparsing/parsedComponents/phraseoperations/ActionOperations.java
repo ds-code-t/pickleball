@@ -1,5 +1,6 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.browseroperations.WindowSwitch;
@@ -22,6 +23,7 @@ import static tools.dscode.common.domoperations.HumanInteractions.typeText;
 import static tools.dscode.common.domoperations.HumanInteractions.wheelScrollBy;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitForDuration;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
+import static tools.dscode.coredefinitions.GeneralSteps.getJavascriptExecutor;
 
 public enum ActionOperations implements OperationsInterface {
     CREATE_AND_ATTACH {
@@ -145,6 +147,11 @@ public enum ActionOperations implements OperationsInterface {
             System.out.println("@WphraseData.resultElements: " + phraseData.resultElements);
 
             ElementMatch element = phraseData.resultElements.getFirst();
+            if (phraseData.resolvedText.toLowerCase().contains("print")) {
+                getJavascriptExecutor().executeScript(
+                        "window.print = function(){ /* suppressed for automation */ };"
+                );
+            }
 
             phraseData.result = Attempt.run(() -> {
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {

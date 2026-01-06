@@ -184,17 +184,17 @@ public final class WindowSwitch {
                                 : WindowSafeAccess.getTitleWithTimeout(driver, Duration.ofSeconds(2));
 
                 if (actual == null) {
-                    try {
-                        new Actions(driver).sendKeys(Keys.ESCAPE).perform();
-                    } catch (Throwable ignored) {
-                        System.out.println("@@ignored1 " + ignored.getMessage());
-                    }
-                    try {
-                        ((JavascriptExecutor) driver).executeScript("window.close();");
-                    } catch (Throwable ignored) {
-                        System.out.println("@@ignored2 " + ignored.getMessage());
-                    }
-                    driver.close();
+//                    try {
+//                        new Actions(driver).sendKeys(Keys.ESCAPE).perform();
+//                    } catch (Throwable ignored) {
+//                        System.out.println("@@ignored1 " + ignored.getMessage());
+//                    }
+//                    try {
+//                        ((JavascriptExecutor) driver).executeScript("window.close();");
+//                    } catch (Throwable ignored) {
+//                        System.out.println("@@ignored2 " + ignored.getMessage());
+//                    }
+//                    driver.close();
                     System.out.println("@@WINDOW blocked (likely print preview), skipping");
                     continue;
                 }
