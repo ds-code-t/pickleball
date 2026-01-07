@@ -375,15 +375,10 @@ public final class DefinitionContext {
         @Override
         protected void register() {
 
-//            registerDefaultStartingContext((category, v, op, ctx) -> {
-
-//                return wrapContext(ctx.switchTo().defaultContent());
-//            });
-
             //
             // Frame
             //
-            registerIframe("Frame", "IFrame", "Iframe")
+            registerIframe( "IFrame").children("Frame", "Frames", "IFrames", "Iframe", "Iframes")
                     .and(
                             (category, v, op) ->
                                     combineOr(Tag.iframe, Tag.frame)
@@ -401,20 +396,12 @@ public final class DefinitionContext {
                     );
 
 
-            //
-            // IframeResult
-            //
-//            category("IframeResult")
-//                    .and(
-//                            (category, v, op) ->
-//                                    XPathy.from(Tag.iframe).byAttribute(id).equals("iframeResult")
-//                    );
 
 
             //
             // Button
             //
-            category("Button").inheritsFrom("forLabel", "htmlNaming", CONTAINS_TEXT)
+            category("Button").children("Buttons").inheritsFrom("forLabel", "htmlNaming", CONTAINS_TEXT)
                     .or(
                             (category, v, op) -> XPathy.from(Tag.button),
                             (category, v, op) -> XPathy.from(Tag.img).byAttribute(role).equals("button"),
@@ -422,14 +409,14 @@ public final class DefinitionContext {
                     );
 
 
-            category("Submit Button").or(
+            category("Submit Button").children("Submit Buttons").or(
                     (category, v, op) -> input.byAttribute(type).equals("submit")
             );
 
             //
             // Link
             //
-            category("Link").inheritsFrom("Text")
+            category("Link").children("Links").inheritsFrom("Text")
                     .or(
                             (category, v, op) ->
                                     XPathy.from(any).byAttribute(role).equals("link")
@@ -439,7 +426,7 @@ public final class DefinitionContext {
                     );
 
 
-            category("Dropdown").inheritsFrom("forLabel", "htmlNaming")
+            category("Dropdown").children("Dropdowns").inheritsFrom("forLabel", "htmlNaming")
                     .and((category, v, op) ->
                             XPathy.from(select))
                     .or(
@@ -448,14 +435,14 @@ public final class DefinitionContext {
                             (category, v, op) -> XPathyBuilder.buildIfAllTrue(select, name, v, op, v != null)
                     );
 
-            categories("Dialog", "Modal").inheritsFrom(CONTAINS_TEXT, "forLabel", "htmlNaming")
+            category("Modal").children("Modals", "Dialog", "Dialogs").inheritsFrom(CONTAINS_TEXT, "forLabel", "htmlNaming")
                     .and(
                             (category, v, op) ->
                                     XPathy.from(div).byAttribute(role).equals("dialog")
                                             .or().byAttribute(Attribute.custom("aria-model")).equals("true")
                                             .or().byAttribute(id).equals("modal")
                     );
-            categories("Close Button")
+            category("Close Button").children("Close Buttons")
                     .and(
                             (category, v, op) ->
                                     combineOr(
@@ -472,7 +459,7 @@ public final class DefinitionContext {
                     );
 
 
-            categories("Tab").inheritsFrom(CONTAINS_TEXT)
+            category("Tab").children("Tabs").inheritsFrom(CONTAINS_TEXT)
                     .or(
                             (category, v, op) -> XPathy.from(Tag.any.byAttribute(role).equals("tab")),
                             (category, v, op) ->  XPathy.from(Tag.img).byAttribute(tabindex).haveIt()
@@ -482,7 +469,7 @@ public final class DefinitionContext {
             //
             // Textbox  (two registration blocks preserved exactly)
             //
-            category("Textbox").inheritsFrom("forLabel", "htmlNaming")
+            category("Textbox").children("Textboxes").inheritsFrom("forLabel", "htmlNaming")
                     .and((category, v, op) ->
                             input.byAttribute(type).equals("text").or().byAttribute(type).equals("password").or().byAttribute(type).equals("email"))
                     .or(
@@ -490,7 +477,7 @@ public final class DefinitionContext {
                                     XPathyBuilder.buildIfAllTrue(input, placeholder, v, op, v != null)
                     );
 
-            category("Textarea").inheritsFrom("forLabel", "htmlNaming")
+            category("Textarea").children("Textareas").inheritsFrom("forLabel", "htmlNaming")
                     .and((category, v, op) ->
                             XPathy.from(textarea)
                     )

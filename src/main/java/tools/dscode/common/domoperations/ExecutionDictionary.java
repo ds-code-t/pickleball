@@ -90,12 +90,8 @@ public class ExecutionDictionary {
     protected void register(){};
 
     private void defaultRegistrations() {
-//        registerDefaultStartingContext((category, v, op, ctx) -> {
 
-//            return wrapContext(((WebDriver)ctx).switchTo().defaultContent());
-//        });
-
-        category("Text").inheritsFrom(CONTAINS_TEXT);
+        category("Text").children("Texts").inheritsFrom(CONTAINS_TEXT);
 
         category(CONTAINS_TEXT)
                 .and(
@@ -538,14 +534,6 @@ public class ExecutionDictionary {
         return new CategoriesSpec(this, Arrays.asList(names));
     }
 
-    /**
-     * Start a fluent definition for a parent category whose children inherit from it,
-     * on this dictionary instance.
-     */
-    public ParentSpec parent(String parentName) {
-        return new ParentSpec(this, parentName);
-    }
-
     public CategorySpec registerDefaultStartingContext(ContextBuilder builder) {
         return category(STARTING_CONTEXT)
                 .context(builder)
@@ -570,6 +558,24 @@ public class ExecutionDictionary {
             // Make an unmodifiable defensive copy
             this.categories = List.copyOf(categories);
         }
+
+        /**
+         * Declare that the given child categories inherit from THIS category.
+         * Only valid when this spec contains exactly one category.
+         *
+         * Equivalent to: dict.categories(children).inheritsFrom(this.name())
+         */
+        public CategoriesSpec children(String... childCategories) {
+            Objects.requireNonNull(childCategories, "childCategories must not be null");
+
+            // must be a single category, because "Clickable" has to be 1 parent
+            String parent = name(); // your existing single-category guard
+
+            // Create a CategoriesSpec for the children and declare inheritance
+            return dict.categories(childCategories).inheritFrom(parent);
+        }
+
+
 
         /**
          * Register OR-based builders for all categories in this spec on this dictionary instance.
@@ -735,36 +741,6 @@ public class ExecutionDictionary {
          */
         public List<String> names() {
             return categories;
-        }
-    }
-
-    // ======================================================
-    // ParentSpec: fluent config for parent → children inheritance
-    // ======================================================
-
-    public static final class ParentSpec {
-        private final ExecutionDictionary dict;
-        private final String parent;
-
-        private ParentSpec(ExecutionDictionary dict, String parent) {
-            this.dict = Objects.requireNonNull(dict, "dict must not be null");
-            this.parent = Objects.requireNonNull(parent, "parent must not be null");
-        }
-
-        /**
-         * Declare that the given child categories inherit from this parent,
-         * on this dictionary instance.
-         */
-        public ParentSpec children(String... childCategories) {
-            dict.registerParentOfCategories(parent, childCategories);
-            return this;
-        }
-
-        /**
-         * Expose the parent category name.
-         */
-        public String name() {
-            return parent;
         }
     }
 

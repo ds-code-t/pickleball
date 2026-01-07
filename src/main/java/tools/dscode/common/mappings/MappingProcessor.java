@@ -200,26 +200,23 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     public String resolveAll(String input) {
         try {
-            int equalityCount = 0;
-            String prev;
+            String originalInput;
             do {
-                prev = input;
-                if (input.contains("<")) {
-                    input = resolveByMap(input);
-                } else {
-                    break;
-                }
-                if (input.contains("{")) {
-                    input = resolveCurly(input);
-                }
-                equalityCount =  input.equals(prev)? ++equalityCount : 0;
-            } while (equalityCount<2);
-
-            String previousInput;
-            do {
-                previousInput = input;
+                originalInput = input;
+                String prev;
+                do {
+                    prev = input;
+                    if (input.contains("<")) {
+                        input = resolveByMap(input);
+                    } else {
+                        break;
+                    }
+                    if (input.contains("{")) {
+                        input = resolveCurly(input);
+                    }
+                } while (!input.equals(prev));
                 input = input.replaceAll("<\\?[^<>{}]+>", "");
-            } while (previousInput.equals(input));
+            } while (!input.equals(originalInput));
             return decodeBackToText(input);
         } catch (Throwable t) {
             throw new RuntimeException("Could not resolve'" + input + "'", t);
