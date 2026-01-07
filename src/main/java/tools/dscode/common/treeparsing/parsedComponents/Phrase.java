@@ -46,11 +46,34 @@ public final class Phrase extends PhraseData {
 
     @Override
     public PhraseData runPhrase() {
+        System.out.println("\n@@runPhrase: " + this);
         executePhrase();
         PhraseData nextResolvedPhrase = getNextResolvedPhrase();
+
+
+
+
+        System.out.println("@@nextResolvedPhrase: " + nextResolvedPhrase);
         if (nextResolvedPhrase == null || nextResolvedPhrase.isChainStart || !branchedPhrases.isEmpty() || contextTermination) {
             resolveResults();
         }
+
+        System.out.println("@@contextTermination: " + contextTermination);
+        System.out.println("@@phraseType: " + phraseType);
+        if (contextTermination) {
+            if (phraseType.equals(PhraseType.CONDITIONAL)) {
+                parsedLine.lineConditionalMode = phraseConditionalMode;
+            } else if (termination.equals(':')) {
+                parsedLine.inheritedContextPhrases.add(contextPhrases);
+                parsedLine.lineConditionalMode = phraseConditionalMode;
+            } else {
+                parsedLine.inheritedContextPhrases.removeLast();
+            }
+        }
+
+        System.out.println("@@parsedLine.lineConditionalMode: " + parsedLine.lineConditionalMode);
+
+
         return nextResolvedPhrase;
     }
 
@@ -109,19 +132,6 @@ public final class Phrase extends PhraseData {
         } else if (phraseType.equals(PhraseType.CONTEXT)) {
             processContextPhrase();
         }
-
-        if (contextTermination) {
-//            resolveResults();
-            if (phraseType.equals(PhraseType.CONDITIONAL)) {
-                parsedLine.lineConditionalMode = phraseConditionalMode;
-            } else if (termination.equals(':')) {
-                parsedLine.inheritedContextPhrases.add(contextPhrases);
-                parsedLine.lineConditionalMode = phraseConditionalMode;
-            } else {
-                parsedLine.inheritedContextPhrases.removeLast();
-            }
-        }
-
     }
 
 

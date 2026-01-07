@@ -1,5 +1,14 @@
 Feature: Addition
 
+  Scenario Outline: if tezst8
+    * IF: "<A>":
+  : * , save "DD" as "FF"
+
+    Examples:
+      | A | B | C |
+      |   |   |   |
+
+
   Scenario: sssst5ff55
   @[DEBUG]
     * , from the Top Panel:
