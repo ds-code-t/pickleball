@@ -21,7 +21,6 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PRECE
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
 import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
 
-
 public abstract class PassedData {
 
     PhraseData chainStartPhrase;
@@ -36,7 +35,6 @@ public abstract class PassedData {
     public boolean isSeparatorPhrase() {
         return (groupSeparator || isNewContext() || getPreviousPhrase() == null || getPreviousPhrase().contextTermination || !assertionType.isBlank());
     }
-
 
     public void setOperationInheritance() {
         if (isSeparatorPhrase()) {
@@ -99,7 +97,6 @@ public abstract class PassedData {
                     }
                 }
             }
-
         }
 
         if (!isOperationPhrase)
@@ -110,114 +107,11 @@ public abstract class PassedData {
             return;
         }
 
-
         if (phraseType != null && lastOperationPhrase.phraseType != phraseType) {
             isChainStart = true;
             return;
         }
     }
-
-
-//    public boolean isGroupStart() {
-//
-//        if (groupSeparator) {
-//            lastOperationPhrase = isOperationPhrase ? (PhraseData) this : null;
-//            return true;
-//        }
-//
-//
-//        PhraseData prevPhrase = getPreviousPhrase();
-//        if (prevPhrase != null) {
-//
-//
-//        }
-//        while (prevPhrase != null) {
-//            if (prevPhrase.groupSeparator || prevPhrase.lastOperationPhrase) {
-//
-//            }
-//
-//            prevPhrase = prevPhrase.getPreviousPhrase();
-//        }
-//
-//        if (lastOperationPhrase == null)
-//            return true;
-//
-//        if (phraseType != null && prevOperationPhrase.phraseType != phraseType)
-//            return true;
-//
-//        if (!isOperationPhrase)
-//            return false;
-//
-//        String conditionalOrAssertionType = (getAssertionType() + getConditional()).trim().toLowerCase();
-//
-//        return !conditionalOrAssertionType.isBlank() && !conditionalOrAssertionType.contains("termination");
-//    }
-
-
-//    public PhraseData phraseGroupStart;
-//
-//
-//    public String phraseGroupConjunction = "";
-//
-//    private List<PhraseData> phraseGroup = new ArrayList<>();
-
-
-//    public void processPhraseGroup() {
-//
-//    }
-
-
-//    public List<ElementMatch> collectNextElements() {
-//        List<ElementMatch> returnList = new ArrayList<>();
-//        PhraseData nextPhrase = getNextPhrase();
-//        while (nextPhrase != null) {
-//            if (nextPhrase.isGroupStart())
-//                return returnList;
-//
-//            if (nextPhrase.elementCount == 1) {
-//
-//            }
-//
-//            nextPhrase = nextPhrase.getNextPhrase();
-//        }
-//        return false;
-//    }
-
-
-//
-//    public void addToPhraseGroup(PhraseData phraseData) {
-//        PhraseData currentPhrase = (PhraseData) this;
-//        PhraseData lastOperationPhrase = null;
-//
-//        if (phraseGroup.isEmpty()) {
-//            while (currentPhrase != null) {
-//                if (currentPhrase.isOperationPhrase) {
-//
-//                    if (lastOperationPhrase != null) {
-//                        if (currentPhrase.isGroupStart())
-//                            break;
-//
-//                    }
-//
-//                    if (!currentPhrase.conjunction.isBlank())
-//                        phraseGroupConjunction = currentPhrase.conjunction;
-//
-//                    lastOperationPhrase = currentPhrase;
-//                }
-//
-//
-//                currentPhrase = currentPhrase.getNextPhrase();
-//            }
-//            if (conjunction.isBlank())
-//                conjunction = "and";
-//        }
-//
-//
-//        phraseData.phraseGroupConjunction = phraseGroupConjunction;
-//        phraseData.phraseGroupStart = (PhraseData) this;
-//        phraseGroup.add(phraseData);
-//    }
-
 
     private PhraseData previousPhrase;
     private PhraseData nextPhrase;

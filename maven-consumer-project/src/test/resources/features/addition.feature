@@ -2,9 +2,8 @@ Feature: Addition
 
   Scenario: sssst5ff55
   @[DEBUG]
-#
-    * , switch to "Google" Window
-#    * , verify Text is "Q"
+    * , from the Top Panel:
+  : * , I click "Get your own website" Link
 
   Scenario: f test5ff55
   @[DEBUG]
