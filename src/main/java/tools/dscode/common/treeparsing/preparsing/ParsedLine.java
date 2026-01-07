@@ -29,16 +29,16 @@ public final class ParsedLine extends LineData {
     }
 
     public void runPhraseFromLine(PhraseData phrase) {
-        phrase.runPhrase();
-        if (phrase.getNextPhrase() == null) {
-            phrase.resolveResults();
+        PhraseData nextResolvedPhrase = phrase.runPhrase();
+        if (nextResolvedPhrase == null) {
+//            phrase.resolveResults();
             System.out.println("Step completed: " + executedPhrases);
             return;
         }
         if (phrase.branchedPhrases.isEmpty()) {
-            runPhraseFromLine(phrase.getNextResolvedPhrase());
+            runPhraseFromLine(nextResolvedPhrase);
         } else {
-            phrase.resolveResults();
+//            phrase.resolveResults();
             for (PhraseData clone : phrase.branchedPhrases) {
                 runPhraseFromLine(clone);
             }

@@ -250,7 +250,7 @@ public abstract class PhraseData extends PassedData {
     }
 
 
-    public abstract void runPhrase();
+    public abstract PhraseData runPhrase();
 
     public abstract PhraseData clonePhrase(PhraseData previous);
 

@@ -43,8 +43,19 @@ public final class Phrase extends PhraseData {
 
     }
 
+
     @Override
-    public void runPhrase() {
+    public PhraseData runPhrase() {
+        executePhrase();
+        PhraseData nextResolvedPhrase = getNextResolvedPhrase();
+        if (nextResolvedPhrase == null || nextResolvedPhrase.isChainStart || !branchedPhrases.isEmpty() || contextTermination) {
+            resolveResults();
+        }
+        return nextResolvedPhrase;
+    }
+
+
+    public void executePhrase() {
 
         if ((phraseType == null || phraseType == PhraseType.ELEMENT_ONLY) && templatePhrase.phraseType != null) {
             if (!templatePhrase.getAction().isBlank()) {
@@ -100,7 +111,7 @@ public final class Phrase extends PhraseData {
         }
 
         if (contextTermination) {
-            resolveResults();
+//            resolveResults();
             if (phraseType.equals(PhraseType.CONDITIONAL)) {
                 parsedLine.lineConditionalMode = phraseConditionalMode;
             } else if (termination.equals(':')) {
@@ -159,7 +170,7 @@ public final class Phrase extends PhraseData {
 
     public PhraseData resolvePhrase() {
         PhraseData resolvedPhrase = new Phrase(text, termination, parsedLine);
-        if(resolvedPhrase.getAction().endsWith("attach") && !resolvedPhrase.getElementMatches().stream().anyMatch(e -> e.elementTypes.contains(ElementType.HTML_TYPE))){
+        if (resolvedPhrase.getAction().endsWith("attach") && !resolvedPhrase.getElementMatches().stream().anyMatch(e -> e.elementTypes.contains(ElementType.HTML_TYPE))) {
             resolvedPhrase = new Phrase(resolvedPhrase.resolvedText.replaceFirst("\\battach(?:es|ed)?\\b", "attach " + FILE_INPUT + " "), termination, parsedLine);
         }
         setResolvedPhrase(resolvedPhrase);
@@ -180,6 +191,7 @@ public final class Phrase extends PhraseData {
 
 
     public PhraseData getNextResolvedPhrase() {
+        if (getNextPhrase() == null) return null;
         PhraseData nextResolvedPhrase = getNextPhrase().resolvePhrase();
         nextResolvedPhrase.setPreviousPhrase(this);
         this.setNextPhrase(nextResolvedPhrase);
@@ -196,8 +208,8 @@ public final class Phrase extends PhraseData {
         PhraseData previousPhrase = nextResolvedPhrase.getPreviousPhrase();
 
         if (nextResolvedPhrase.isChainStart) {
-            if (previousPhrase != null)
-                previousPhrase.resolveResults();
+//            if (previousPhrase != null)
+//                previousPhrase.resolveResults();
             setConjunctionChain(nextResolvedPhrase);
         } else {
             if (previousPhrase != null) {

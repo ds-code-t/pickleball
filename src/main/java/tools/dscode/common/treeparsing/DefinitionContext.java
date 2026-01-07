@@ -219,29 +219,6 @@ public final class DefinitionContext {
             }
         };
 
-//        ParseNode valueMatch = new ParseNode("\\s(?<value><<valueMask>>)(?<unitMatch>\\s+(?<unit>minute|second|number|text)s?\\b)?") {
-//            @Override
-//            public String onSubstitute(MatchNode self) {
-//                String count = self.resolvedGroupText("value");
-//                String unit = self.resolvedGroupText("unit");
-//                self.putToLocalState("value", count);
-//                self.putToLocalState("unit", unit);
-//                return self.token();
-//            }
-//        };
-
-//        ParseNode valueTypes = new ParseNode("\\s(?<valueTypes>(?:[a-z-]+\\s+of\\s+)+)?(?<val><<elementMatch>>|<<valueMatch>>)") {
-//            @Override
-//            public String onSubstitute(MatchNode self) {
-//                String elOrValToken = self.groups().get("val");
-//                MatchNode elOrValNode = self.getMatchNode(elOrValToken);
-//
-//                elOrValNode.putToLocalState("valueTypes", self.resolvedGroupText("valueTypes"));
-//
-        ////                return elOrValToken;
-//                return self.originalText();
-//            }
-//        };
 
         ParseNode assertionType = new ParseNode("\\b(ensure|verify)\\b") {
             @Override
@@ -261,15 +238,6 @@ public final class DefinitionContext {
                 return self.resolvedGroupText("base").replaceAll("move", "hover");
             }
         };
-
-//        ParseNode key = new ParseNode("\\bas\\s+(?<keyName><<valueMask>>)") {
-//            @Override
-//            public String onCapture(MatchNode self) {
-//                self.parent().putToLocalState("keyName", self.resolvedGroupText("keyName"));
-        ////                return self.originalText();
-//                return " ";
-//            }
-//        };
 
 
         ParseNode no = new ParseNode("\\bno\\b") {
@@ -316,12 +284,7 @@ public final class DefinitionContext {
         ParseNode itPlaceholder = new ParseNode("\\bit\\b") {
             @Override
             public String onSubstitute(MatchNode self) {
-//                MatchNode parentNode = self.parent();
                 return " " + PLACE_HOLDER_MATCH + " ";
-//                if(parentNode.localStateBoolean( "action", "assertion")) {
-//                    return " " +  PLACE_HOLDER_MATCH + " ";
-//                }
-//                return self.token();
             }
         };
 
@@ -356,19 +319,7 @@ public final class DefinitionContext {
                     - defaultAssertion
                 """);
 
-        // Build the hierarchy AFTER the nodes above exist
-//        ParseNode root = buildFromYaml("""
-//                line:
-//                  - quoteMask
-//                  - preProcess
-//                  - phrase:
-//                    - predicate
-//                    - elementMatch
-//                    - valueMatch
-//                    - assertionType
-//                    - assertion
-//                    - action
-//                """);
+
     };
 
     public static ExecutionDictionary DEFAULT_EXECUTION_DICTIONARY = new ExecutionDictionary() {
