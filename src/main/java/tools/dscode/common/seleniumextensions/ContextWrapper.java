@@ -94,7 +94,6 @@ public class ContextWrapper {
                 printDebug("phraseData4: " + phraseData.contextXPathy);
                 xPathyList.add(phraseData.contextXPathy);
             }
-
         }
 
         xPathyList.add(elementMatch.xPathy);
@@ -112,9 +111,6 @@ public class ContextWrapper {
         }
 
         printDebug("##XPath: getElementListFromSearchContext\n" + prettyPrintXPath(xpath) +"\n----------------" );
-
-
-
 
         return searchContext.findElements(new By.ByXPath(xpath));
     }

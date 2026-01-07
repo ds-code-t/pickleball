@@ -60,6 +60,7 @@ public enum ElementType {
     public static Set<ElementType> fromString(String raw) {
         Set<ElementType> returnSet = new java.util.HashSet<>();
 
+
         if (raw.contains("Window")) {
             String windowNormalized = raw.replaceAll("Windows?", "").trim().toUpperCase(Locale.ROOT);
             if(windowNormalized.isBlank())
@@ -74,6 +75,12 @@ public enum ElementType {
                 returnSet.add(BROWSER_WINDOW);
                 return returnSet;
             }
+        }
+
+        if (raw.matches("Alerts?")) {
+            returnSet.add(BROWSER_TYPE);
+            returnSet.add(ALERT);
+            return returnSet;
         }
 
         String normalized = raw.trim()

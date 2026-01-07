@@ -12,6 +12,7 @@ import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Element
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -19,6 +20,9 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
+import static tools.dscode.common.browseroperations.BrowserAlerts.getText;
+import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETURNS_VALUE;
@@ -308,7 +312,10 @@ public class ElementMatch {
             WindowSwitch.WindowSelectionType windowSelectionType = WindowSwitch.WindowSelectionType.LOOKUP.get(normalized);
 
             returnList.addAll(WindowSwitch.findMatchingHandles(parentPhrase.getDriver(), windowSelectionType, textOps).stream().map(ValueWrapper::createValueWrapper).toList());
-
+        } else if (elementTypes.contains(ElementType.ALERT)) {
+            if (isPresent(parentPhrase.getDriver())) {
+                returnList.add(createValueWrapper(getText(parentPhrase.getDriver())));
+            }
         } else {
             returnList.addAll(nonHTMLValues);
         }

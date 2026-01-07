@@ -15,6 +15,8 @@ import tools.dscode.coredefinitions.GeneralSteps;
 import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static tools.dscode.common.browseroperations.BrowserAlerts.accept;
+import static tools.dscode.common.browseroperations.BrowserAlerts.dismiss;
 import static tools.dscode.common.domoperations.HumanInteractions.clearAndType;
 import static tools.dscode.common.domoperations.HumanInteractions.click;
 import static tools.dscode.common.domoperations.HumanInteractions.contextClick;
@@ -299,6 +301,24 @@ public enum ActionOperations implements OperationsInterface {
                 return true;
             });
 
+        }
+    },
+    ACCEPT {
+        @Override
+        public void execute(PhraseData phraseData) {
+            System.out.println(phraseData + " : Executing " + this.name());
+            phraseData.result = Attempt.runVoid(() ->
+                    accept(GeneralSteps.getDefaultDriver())
+            );
+        }
+    },
+    DISMISS {
+        @Override
+        public void execute(PhraseData phraseData) {
+            System.out.println(phraseData + " : Executing " + this.name());
+            phraseData.result = Attempt.runVoid(() ->
+                    dismiss(GeneralSteps.getDefaultDriver())
+            );
         }
     };
 
