@@ -9,6 +9,7 @@ import static io.cucumber.core.runner.GlobalState.getRunningStep;
 public class NavigationSteps {
 
     @When("set {returnStepParameter}")
+    @When("^set (.+)$")
     public void setObject(Object object, String config) {
 
     }

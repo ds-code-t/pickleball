@@ -61,6 +61,7 @@ public class GeneralSteps extends CoreSteps {
     }
 
     @Given("navigate {returnStepParameter}")
+    @Given("^navigate (.+)$")
     public void navigateBrowser(ChromiumDriver driver, List<String> list) {
         driver.get(list.getFirst());
         waitForPageReady(driver, Duration.ofSeconds(60));
