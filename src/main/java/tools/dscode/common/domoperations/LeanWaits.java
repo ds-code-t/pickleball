@@ -18,6 +18,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.function.Function;
 
+import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public final class LeanWaits {
@@ -55,6 +56,11 @@ public final class LeanWaits {
         }
     }
 
+
+    public static void safeWaitForPageReady(WebDriver driver, Duration timeout, int startWaitMilliseconds) {
+        waitMilliseconds(startWaitMilliseconds);
+        safeWaitForPageReady(driver, timeout);
+    }
 
     public static void safeWaitForPageReady(WebDriver driver, Duration timeout) {
         try {

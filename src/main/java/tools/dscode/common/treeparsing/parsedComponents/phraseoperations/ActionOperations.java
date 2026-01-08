@@ -28,6 +28,7 @@ import static tools.dscode.common.domoperations.HumanInteractions.wheelScrollBy;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitForDuration;
+import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
 import static tools.dscode.coredefinitions.GeneralSteps.getJavascriptExecutor;
@@ -139,8 +140,7 @@ public enum ActionOperations implements OperationsInterface {
                 int count = 0;
                 for (ElementWrapper elementWrapper : dropDowns.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if(count>0) {
-                        Duration.ofMillis(100);
-                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60));
+                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
                     selectDropdownByVisibleText(GeneralSteps.getDefaultDriver(), elementWrapper.getElement(), selection.getValue().toString());
                     count++;
@@ -170,8 +170,7 @@ public enum ActionOperations implements OperationsInterface {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if(count>0) {
-                        Duration.ofMillis(100);
-                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60));
+                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
                     click(GeneralSteps.getDefaultDriver(), elementWrapper.getElement());
                     count++;
@@ -196,8 +195,7 @@ public enum ActionOperations implements OperationsInterface {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if(count>0) {
-                        Duration.ofMillis(100);
-                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60));
+                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
                     doubleClick(GeneralSteps.getDefaultDriver(), elementWrapper.getElement());
                     count++;
@@ -221,8 +219,7 @@ public enum ActionOperations implements OperationsInterface {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if(count>0) {
-                        Duration.ofMillis(100);
-                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60));
+                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
                     contextClick(GeneralSteps.getDefaultDriver(), elementWrapper.getElement());
                     count++;
@@ -249,8 +246,7 @@ public enum ActionOperations implements OperationsInterface {
                 int count = 0;
                 for (ElementWrapper elementWrapper : inputElement.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if(count>0) {
-                        Duration.ofMillis(100);
-                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60));
+                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
                     typeText(GeneralSteps.getDefaultDriver(), elementWrapper.getElement(), value.getValue().toString());
                     count++;
@@ -276,8 +272,7 @@ public enum ActionOperations implements OperationsInterface {
                 int count = 0;
                 for (ElementWrapper elementWrapper : inputElement.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if(count>0) {
-                        Duration.ofMillis(100);
-                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60));
+                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
                     clearAndType(GeneralSteps.getDefaultDriver(), elementWrapper.getElement(), value.getValue().toString());
                     count++;
@@ -300,8 +295,7 @@ public enum ActionOperations implements OperationsInterface {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if(count>0) {
-                        Duration.ofMillis(100);
-                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60));
+                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
                     wheelScrollBy(GeneralSteps.getDefaultDriver(), elementWrapper.getElement());
                     count++;
@@ -348,8 +342,7 @@ public enum ActionOperations implements OperationsInterface {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if(count>0) {
-                        Duration.ofMillis(100);
-                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60));
+                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
                     elementWrapper.close();
                     count++;
