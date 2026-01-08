@@ -319,6 +319,9 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch element = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
                 List<ValueWrapper> handleWrappers = element.getValues();
+
+                System.out.println("@@handleWrappers: " + handleWrappers);
+                System.out.println("@@handleWrappers.getFirst().getValue(): " + handleWrappers.getFirst().getValue());
                 if (handleWrappers.isEmpty() && !element.selectionType.equals("any")) {
                     throw new RuntimeException("No matching Windows or Tabs found for " + element);
                 }
