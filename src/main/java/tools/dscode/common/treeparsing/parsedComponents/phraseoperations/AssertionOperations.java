@@ -181,6 +181,7 @@ public enum AssertionOperations implements OperationsInterface {
                 phraseData.result = Attempt.run(() ->
                      (modeSet.contains(ValueWrapperCompareReducer.Mode.NOT) ^ !firstElement.getValues().isEmpty())
                 );
+                System.out.println("@@phraseData.result : " + phraseData.result);
                 return;
             }
             if (firstElement.getElementWrappers().isEmpty()) {

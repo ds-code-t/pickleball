@@ -314,7 +314,10 @@ public class ElementMatch {
             returnList.addAll(WindowSwitch.findMatchingHandles(parentPhrase.getDriver(), windowSelectionType, textOps).stream().map(ValueWrapper::createValueWrapper).toList());
         } else if (elementTypes.contains(ElementType.ALERT)) {
             if (isPresent(parentPhrase.getDriver())) {
+                System.out.println("@@isPresent");
+                System.out.println("@@getText(parentPhrase.getDriver()) " + getText(parentPhrase.getDriver()));
                 returnList.add(createValueWrapper(getText(parentPhrase.getDriver())));
+                System.out.println("@@returnList: " + returnList);
             }
         } else {
             returnList.addAll(nonHTMLValues);
