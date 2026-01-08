@@ -55,11 +55,11 @@ public class ReportingSteps {
         {
             String header = lists.getFirst().get(i);
             ValueWrapper value = createValueWrapper(lists.get(1).get(i));
-            System.out.println("@@header: " + header);
-            System.out.println("@@value: " + value);
-            System.out.println("@@value asBestGuessXlsxValue: " + value.asBestGuessXlsxValue());
-            System.out.println("@@value asBestGuessXlsxValue: " + (value.asBestGuessXlsxValue() == null ? "null" :value.asBestGuessXlsxValue().getClass()));
-            System.out.println("@@value getValue: " + value.getValue());
+
+
+
+
+
             report.put(rowKey, header , value.asBestGuessXlsxValue());
         }
     }

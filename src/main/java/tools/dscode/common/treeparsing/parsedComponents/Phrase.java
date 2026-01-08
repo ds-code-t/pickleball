@@ -46,20 +46,20 @@ public final class Phrase extends PhraseData {
 
     @Override
     public PhraseData runPhrase() {
-        System.out.println("\n@@runPhrase: " + this);
+
         executePhrase();
         PhraseData nextResolvedPhrase = getNextResolvedPhrase();
 
 
 
 
-        System.out.println("@@nextResolvedPhrase: " + nextResolvedPhrase);
+
         if (nextResolvedPhrase == null || nextResolvedPhrase.isChainStart || !branchedPhrases.isEmpty() || contextTermination) {
             resolveResults();
         }
 
-        System.out.println("@@contextTermination: " + contextTermination);
-        System.out.println("@@phraseType: " + phraseType);
+
+
         if (contextTermination) {
             if (phraseType.equals(PhraseType.CONDITIONAL)) {
                 parsedLine.lineConditionalMode = phraseConditionalMode;
@@ -71,7 +71,7 @@ public final class Phrase extends PhraseData {
             }
         }
 
-        System.out.println("@@parsedLine.lineConditionalMode: " + parsedLine.lineConditionalMode);
+
 
 
         return nextResolvedPhrase;

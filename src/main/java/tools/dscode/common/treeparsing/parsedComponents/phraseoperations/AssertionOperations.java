@@ -173,15 +173,16 @@ public enum AssertionOperations implements OperationsInterface {
 
             Set<ValueWrapperCompareReducer.Mode> modeSet = getModeSet(phraseData);
             ElementMatch firstElement = phraseData.resultElements.getFirst();
-            System.out.println("@@firstElement: " + firstElement);
-            System.out.println("@@firstElement.elementTypes: " + firstElement.elementTypes);
-            System.out.println("@@modeSet: " + modeSet);
+
+
+
             if (firstElement.elementTypes.contains(ElementType.ALERT) || firstElement.elementTypes.contains(ElementType.BROWSER_WINDOW)) {
-                System.out.println("@@!!!");
+
+
                 phraseData.result = Attempt.run(() ->
                      (modeSet.contains(ValueWrapperCompareReducer.Mode.NOT) ^ !firstElement.getValues().isEmpty())
                 );
-                System.out.println("@@phraseData.result : " + phraseData.result);
+
                 return;
             }
             if (firstElement.getElementWrappers().isEmpty()) {

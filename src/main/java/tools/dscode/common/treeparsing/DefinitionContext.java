@@ -58,23 +58,22 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode quoteMask = new ParseNode(betweenWithEscapes(BOOK_END, BOOK_END) + "|" + NUMERIC_TOKEN) {
-            @Override
-            public String onCapture(String s) {
-
-                return s.substring(1, s.length() - 1);
-            }
-        };
-
-        ParseNode position = new ParseNode("#\\d+");
-
-        ParseNode numericMask = new ParseNode(NUMERIC_TOKEN);
 
         ParseNode keyTransform = new ParseNode("\\bas\\s+(?<keyName><<quoteMask>>)(?!\\s*[A-Z])") {
             public String onSubstitute(MatchNode self) {
                 String keyName = self.groups().get("keyName");
 
                 return keyName + " " + VALUE_TYPE_MATCH + KEY_NAME;
+            }
+        };
+
+        ParseNode numericMask = new ParseNode(NUMERIC_TOKEN);
+
+        ParseNode quoteMask = new ParseNode(betweenWithEscapes(BOOK_END, BOOK_END)) {
+            @Override
+            public String onCapture(String s) {
+                System.out.println("##onCaputre quoteMask: " + s);
+                return s.substring(1, s.length() - 1);
             }
         };
 
@@ -86,34 +85,22 @@ public final class DefinitionContext {
         };
 
 
-//        ParseNode quoteMask = new ParseNode(betweenWithEscapes("\"", "\"")) {
-//            @Override
-//            public String onCapture(String s) {
-//                return s.substring(1, s.length() - 1);
-//            }
-//        };
 
 
-//        ParseNode preProcess = new ParseNode("^.*$") {
-//            @Override
-//            public String onCapture(String s) {
-//                return normalizeWhitespace(s)
-//                        .replaceAll("(?i)\\b(?:the|then|a)\\b", "")
-//                        .replaceAll("(\\d+)\\s*(?:st|nd|rd|th)", "#$1")
-//                        .replaceAll("\\bverifies\\b", "verify")
-//                        .replaceAll("\\bensures\\b", "ensure")
-//                        .replaceAll("\\bare\\b", "is")
-//                        .replaceAll("(?:\\bno|n't)\\b", " not ")
-//                        .replaceAll("\\bhave\\b", "has");
-//            }
-//
-//            public String onSubstitute(MatchNode self) {
-//                return self.modifiedText();
-//            }
-//        };
+        ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?!\\s*[A-Z])(?<unitMatch>\\s+(?<unit>second|minute|hour|day|week|month|year|time|number|integer|decimal|color|text)s?\\b)?") {
+            @Override
+            public String onSubstitute(MatchNode self) {
+                String value = " " + self.groups().get("value") + " ";
+                String unit = " " + VALUE_TYPE_MATCH + self.groups().getOrDefault("unit", "").trim().replaceAll("\\s$", "") + " ";
+
+                return value + unit;
+            }
+        };
+
+        ParseNode position = new ParseNode("#\\d+");
 
 
-        //
+
         ParseNode phrase = new ParseNode("^(?<separatorA>\\bthen\\b)?(?<conjunction>\\b(?:and|or)\\b)?(?<separatorB>\\bthen\\b)?\\s*(?<conditional>\\b(?:else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
             @Override
             public String onCapture(MatchNode self) {
@@ -208,17 +195,6 @@ public final class DefinitionContext {
         };
 
 
-        ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?!\\s*[A-Z])(?<unitMatch>\\s+(?<unit>second|minute|hour|day|week|month|year|time|number|integer|decimal|color|text)s?\\b)?") {
-            @Override
-            public String onSubstitute(MatchNode self) {
-
-                String value = " " + self.groups().get("value") + " ";
-                String unit = " " + VALUE_TYPE_MATCH + self.groups().getOrDefault("unit", "").trim().replaceAll("\\s$", "") + " ";
-
-                return value + unit;
-            }
-        };
-
 
         ParseNode assertionType = new ParseNode("\\b(ensure|verify)\\b") {
             @Override
@@ -232,7 +208,7 @@ public final class DefinitionContext {
         ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite|save|creates? and attach|attach|switch|close|accept|dismiss)(?:s|ed|ing|es)?\\b") {
             @Override
             public String onCapture(MatchNode self) {
-
+                System.out.println("##onCaputre action: " + self.originalText() + "");
                 self.parent().putToLocalState("action", self.resolvedGroupText("base"));
                 self.parent().putToLocalState("operationIndex", self.start);
                 return self.resolvedGroupText("base").replaceAll("move", "hover");

@@ -26,6 +26,7 @@ import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETURNS_VALUE;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrOp;
 
@@ -138,7 +139,13 @@ public class ElementMatch {
         this.position = elementNode.position;
         this.state = elementNode.getStringFromLocalState("state");
 
-        this.category = elementNode.getStringFromLocalState("type");
+
+        String categoryString = elementNode.getStringFromLocalState("type");
+
+
+
+        elementTypes = ElementType.fromString(categoryString);
+        category = categoryString.replaceFirst("^" + VALUE_TYPE_MATCH, "");
 
         this.elementPosition = elementNode.getStringFromLocalState("elementPosition");
         this.selectionType = elementNode.getStringFromLocalState("selectionType");
@@ -152,7 +159,6 @@ public class ElementMatch {
 
 
         categoryFlags.addAll(getExecutionDictionary().getResolvedCategoryFlags(category));
-        this.elementTypes = ElementType.fromString(this.category);
 
 
         if (elementNode.localStateBoolean("elPredicate")) {
@@ -313,11 +319,12 @@ public class ElementMatch {
 
             returnList.addAll(WindowSwitch.findMatchingHandles(parentPhrase.getDriver(), windowSelectionType, textOps).stream().map(ValueWrapper::createValueWrapper).toList());
         } else if (elementTypes.contains(ElementType.ALERT)) {
+
             if (isPresent(parentPhrase.getDriver())) {
-                System.out.println("@@isPresent");
-                System.out.println("@@getText(parentPhrase.getDriver()) " + getText(parentPhrase.getDriver()));
+
+
                 returnList.add(createValueWrapper(getText(parentPhrase.getDriver())));
-                System.out.println("@@returnList: " + returnList);
+
             }
         } else {
             returnList.addAll(nonHTMLValues);

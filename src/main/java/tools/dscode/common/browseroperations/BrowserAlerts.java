@@ -22,7 +22,7 @@ public final class BrowserAlerts {
      * @throws NoAlertPresentException if no alert is present
      */
     public static Alert getAlert(WebDriver driver) {
-        System.out.println("@@getAlert");
+
         return driver.switchTo().alert();
     }
 
@@ -50,7 +50,7 @@ public final class BrowserAlerts {
      * @throws NoAlertPresentException if no alert is present
      */
     public static String getText(WebDriver driver) {
-        System.out.println("@@getText");
+
         return getAlert(driver).getText();
     }
 
@@ -93,13 +93,13 @@ public final class BrowserAlerts {
      * Checks whether an alert is currently present.
      */
     public static boolean isPresent(WebDriver driver) {
-        System.out.println("@@isPresent");
+
         try {
             driver.switchTo().alert();
-            System.out.println("@@isPresent-true");
+
             return true;
         } catch (NoAlertPresentException e) {
-            System.out.println("@@isPresent-false " + e.getMessage());
+
             return false;
         }
     }

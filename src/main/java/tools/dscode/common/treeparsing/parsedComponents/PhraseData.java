@@ -296,23 +296,23 @@ public abstract class PhraseData extends PassedData {
 
     Boolean previouslyResolvedBoolean = null;
     public boolean resolveResults() {
-        System.out.println("@@resolveResults for: " + this );
+
         if (!isOperationPhrase)
             return true;
         if (!isChainStart) {
             return chainStartPhrase.resolveResults();
         }
-        System.out.println("@@previouslyResolvedBoolean1: " + previouslyResolvedBoolean);
+
         if(previouslyResolvedBoolean != null)
             return previouslyResolvedBoolean;
 
 
-        System.out.println("@@getAssertionType(): " + getAssertionType());
+
         if(getAssertionType().isBlank())
             return true;
 
         previouslyResolvedBoolean = getBooleanResult();
-        System.out.println("@@previouslyResolvedBoolean2: " + previouslyResolvedBoolean);
+
         String assertionMessage = "Assertion phrase '" + text + "' evaluates to: " + previouslyResolvedBoolean;
         System.out.println(assertionMessage);
         if (!resultElements.isEmpty())
@@ -334,12 +334,12 @@ public abstract class PhraseData extends PassedData {
                 }
             }
             case "conditional" -> {
-                System.out.println("@@previous-phraseConditionalMode: " + phraseConditionalMode);
+
                 phraseConditionalMode = previouslyResolvedBoolean ? 1 : -1;
-                System.out.println("@@NEW-phraseConditionalMode: " + phraseConditionalMode);
+
             }
         }
-        System.out.println("@@RETURN-previouslyResolvedBoolean: " + previouslyResolvedBoolean);
+
         return previouslyResolvedBoolean;
     }
 

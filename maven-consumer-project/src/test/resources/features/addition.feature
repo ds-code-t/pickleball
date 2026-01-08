@@ -1,8 +1,10 @@
 Feature: Addition
 
   Scenario Outline: if tezst8
-    * IF: "<A>":
-  : * , save "DD" as "FF"
+    @[DEBUG]
+    * set CHROME
+    * , wait for 5 seconds
+    * , verify Alert is displayed
 
     Examples:
       | A | B | C |
