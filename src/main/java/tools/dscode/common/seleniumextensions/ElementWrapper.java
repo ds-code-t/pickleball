@@ -17,6 +17,7 @@ import static tools.dscode.common.domoperations.SeleniumUtils.intersection;
 import static tools.dscode.common.domoperations.SeleniumUtils.union;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementMatch.ELEMENT_RETURN_VALUE;
+import static tools.dscode.common.util.DebugUtils.printDebug;
 
 
 public class ElementWrapper {
@@ -394,12 +395,10 @@ public class ElementWrapper {
         return sb.toString();
     }
 
-    // NOTE: You said this already exists somewhere:
-    // public List<WebElement> getElementList(WebDriver driver, String XPathyWithID) { ... }
-    // Here we just call it; you provide the implementation elsewhere.
+
     private List<WebElement> getElementList(WebDriver driver, String xpathyWithId) {
-        // placeholder so this compiles – remove if you already have it in a superclass/utility
-        throw new UnsupportedOperationException("getElementList must be implemented elsewhere");
+        printDebug("##XPath: ElementWrapper.getElementList:\n" + xpathyWithId +"\n----------------");
+        return elementMatch.contextWrapper.getFinalSearchContext().findElements(new By.ByXPath(xpathyWithId));
     }
 
     public boolean isDisplayed() {
