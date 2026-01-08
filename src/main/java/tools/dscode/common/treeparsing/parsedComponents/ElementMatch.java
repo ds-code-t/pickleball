@@ -4,7 +4,11 @@ import com.xpathy.XPathy;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.browseroperations.WindowSwitch;
+import tools.dscode.common.domoperations.EnabledDisabledConditions;
 import tools.dscode.common.domoperations.ExecutionDictionary;
+import tools.dscode.common.domoperations.elementstates.BinaryStateConditions;
+import tools.dscode.common.domoperations.elementstates.CollapsedExpandedConditions;
+import tools.dscode.common.domoperations.elementstates.RequiredInputConditions;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
@@ -23,12 +27,15 @@ import java.util.regex.Pattern;
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.browseroperations.BrowserAlerts.getText;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
+import static tools.dscode.common.domoperations.elementstates.BinaryStateConditions.offElement;
+import static tools.dscode.common.domoperations.elementstates.BinaryStateConditions.onElement;
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETURNS_VALUE;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrOp;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.normalizeText;
 
 
 public class ElementMatch {
@@ -51,9 +58,6 @@ public class ElementMatch {
     public ElementMatcher elementMatcher;
     public ContextWrapper contextWrapper;
     public List<String> defaultValueKeys = new ArrayList<>(List.of(ELEMENT_RETURN_VALUE, "value", "textContent"));
-//    public XPathChainResult matchedElements;
-    //        public Set<XPathyRegistry.HtmlType> htmlTypes;
-
     public ValueWrapper defaultText;
     public ExecutionDictionary.Op defaultTextOp;
 
@@ -66,10 +70,6 @@ public class ElementMatch {
     }
 
     public List<ValueWrapper> nonHTMLValues = new ArrayList<>();
-
-//    public enum SelectType {
-//        ANY, EVERY, FIRST, LAST
-//    }
 
     public int elementIndex;
 
@@ -91,21 +91,10 @@ public class ElementMatch {
         driver = parentPhrase.getDriver();
 
         wrappedElements = getWrappedElements(this);
-//        try {
-//            wrappedElements = getWrappedElements(this);
-//        } catch (Throwable t) {
-//            if (!selectionType.equals("any") && parentPhrase.phraseType == PhraseData.PhraseType.ACTION) {
-//                throw new RuntimeException("Failed to find WebElements for " + this, t);
-//            }
-//            wrappedElements = new ArrayList<>();
-//        }
+
         parentPhrase.getWrappedElements().addAll(wrappedElements);
         return wrappedElements;
     }
-
-
-//    public ExecutionDictionary.Op textOp;
-
 
     static final Pattern attributePattern = Pattern.compile("^(?<attrName>[a-z][a-z\\s]+)\\s+(?<predicate>.*)$");
 
@@ -125,12 +114,6 @@ public class ElementMatch {
     }
 
 
-//    public List<ElementMatch> createElementMatchesFromString(String elementString) {
-//        MatchNode returnMatchNode = getNodeDictionary().parse(elementString);
-//        returnMatchNode.getOrderedChildren("elementMatch").stream().map(this::getElementMatch).collect(Collectors.toList())
-//    }
-
-
     public ElementMatch(PhraseData phraseData, MatchNode elementNode) {
 
         this.fullText = elementNode.getStringFromLocalState("fullText");
@@ -141,7 +124,6 @@ public class ElementMatch {
 
 
         String categoryString = elementNode.getStringFromLocalState("type");
-
 
 
         elementTypes = ElementType.fromString(categoryString);
@@ -229,6 +211,61 @@ public class ElementMatch {
             ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, textOp.text, textOp.op);
             elPredictXPaths.add(categoryResolution.xpath());
         }
+
+        if (!state.isEmpty()) {
+            boolean un = state.startsWith("un");
+            if (un) state = state.substring(2);
+
+            switch (state) {
+
+                // Binary on/off (checked/selected/etc)
+                case "checked", "selected", "on" -> {
+                    elPredictXPaths.add(un
+                            ? BinaryStateConditions.offElement()
+                            : BinaryStateConditions.onElement());
+                }
+
+                // Enabled/disabled
+                case "disabled" -> {
+                    elPredictXPaths.add(un
+                            ? EnabledDisabledConditions.enabledElement()
+                            : EnabledDisabledConditions.disabledElement());
+                }
+
+                case "enabled" -> {
+                    // "unenabled" isn't really a thing, but handle it consistently:
+                    elPredictXPaths.add(un
+                            ? EnabledDisabledConditions.disabledElement()
+                            : EnabledDisabledConditions.enabledElement());
+                }
+
+                // Required / not required
+                case "required" -> {
+                    elPredictXPaths.add(un
+                            ? RequiredInputConditions.notRequiredElement()
+                            : RequiredInputConditions.requiredElement());
+                }
+
+                // Collapsed / expanded
+                case "expanded", "open" -> {
+                    elPredictXPaths.add(un
+                            ? CollapsedExpandedConditions.collapsedElement()
+                            : CollapsedExpandedConditions.expandedElement());
+                }
+
+                case "collapsed", "closed" -> {
+                    elPredictXPaths.add(un
+                            ? CollapsedExpandedConditions.expandedElement()
+                            : CollapsedExpandedConditions.collapsedElement());
+                }
+
+                // optional: ignore unknown state strings
+                default -> {
+                    throw new RuntimeException("Unknown state: " + state);
+                }
+            }
+        }
+
 
         xPathy = combineAnd(elPredictXPaths);
 

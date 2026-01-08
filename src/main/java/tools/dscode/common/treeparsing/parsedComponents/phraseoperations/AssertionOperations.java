@@ -177,12 +177,9 @@ public enum AssertionOperations implements OperationsInterface {
 
 
             if (firstElement.elementTypes.contains(ElementType.ALERT) || firstElement.elementTypes.contains(ElementType.BROWSER_WINDOW)) {
-
-
                 phraseData.result = Attempt.run(() ->
                      (modeSet.contains(ValueWrapperCompareReducer.Mode.NOT) ^ !firstElement.getValues().isEmpty())
                 );
-
                 return;
             }
             if (firstElement.getElementWrappers().isEmpty()) {

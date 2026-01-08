@@ -6,6 +6,7 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.annotations.LifecycleHook;
 import tools.dscode.common.annotations.Phase;
+import tools.dscode.common.domoperations.BinaryStateConditions;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 
 import static com.xpathy.Attribute.id;
@@ -17,6 +18,30 @@ import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDict
 import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public class Registrations {
+
+
+    public static void main(String[] args) {
+
+        System.out.println("=== BinaryStateConditions XPathy Outputs ===");
+        System.out.println();
+
+        print("onElement()", BinaryStateConditions.onElement());
+        print("offElement()", BinaryStateConditions.offElement());
+        print("checkedElement()", BinaryStateConditions.checkedElement());
+        print("selectedElement()", BinaryStateConditions.selectedElement());
+
+        System.out.println();
+        System.out.println("=== Done ===");
+    }
+
+    private static void print(String label, XPathy xpathy) {
+        System.out.println(label + ":");
+        System.out.println("  " + xpathy.getXpath());
+        System.out.println();
+    }
+
+
+
     @LifecycleHook(Phase.BEFORE_CUCUMBER_RUN)
     public static void beforeRun() {
 

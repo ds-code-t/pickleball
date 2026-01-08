@@ -4,7 +4,7 @@
 //import com.xpathy.Tag;
 //import com.xpathy.XPathy;
 //import tools.dscode.common.domoperations.ExecutionDictionary;
-//import tools.dscode.common.domoperations.VisibilityConditions;
+//import tools.dscode.common.domoperations.elementstates.VisibilityConditions;
 //
 //import java.util.Arrays;
 //import java.util.function.Function;

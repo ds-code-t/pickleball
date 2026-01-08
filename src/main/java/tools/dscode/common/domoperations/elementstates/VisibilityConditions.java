@@ -1,7 +1,6 @@
-package tools.dscode.common.domoperations;
+package tools.dscode.common.domoperations.elementstates;
 
 import com.xpathy.Condition;
-import com.xpathy.Tag;
 import com.xpathy.XPathy;
 
 import static com.xpathy.Attribute.style;
@@ -9,10 +8,7 @@ import static com.xpathy.Style.*;
 import static com.xpathy.Attribute.*;
 import static com.xpathy.Style.height;
 import static com.xpathy.Style.width;
-import com.xpathy.XPathy;
 
-import static com.xpathy.Tag.*;  // needed for wildcard tag: all tags → Tag.STAR if available
-import static com.xpathy.Condition.*;
 /**
  * Reusable XPathy conditions related to "visibility".
  *
@@ -38,7 +34,6 @@ import static com.xpathy.Condition.*;
  *    to allow raw XPath like `ancestor-or-self::*[...]`. That is not done
  *    here, because it cannot be implemented solely in this helper class.
  */
-import com.xpathy.XPathy;
 // existing imports...
 // import com.xpathy.Condition;
 // import static com.xpathy.Style.*;

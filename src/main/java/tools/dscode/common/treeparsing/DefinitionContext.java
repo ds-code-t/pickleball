@@ -9,6 +9,7 @@ import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathyBuilder;
 
 import static com.xpathy.Attribute.aria_label;
+import static com.xpathy.Attribute.checked;
 import static com.xpathy.Attribute.id;
 import static com.xpathy.Attribute.name;
 import static com.xpathy.Attribute.placeholder;
@@ -23,9 +24,9 @@ import static com.xpathy.Tag.input;
 import static com.xpathy.Tag.select;
 import static com.xpathy.Tag.textarea;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
-import static tools.dscode.common.domoperations.VisibilityConditions.extractPredicate;
-import static tools.dscode.common.domoperations.VisibilityConditions.invisible;
-import static tools.dscode.common.domoperations.VisibilityConditions.visible;
+import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.extractPredicate;
+import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.invisible;
+import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.visible;
 import static tools.dscode.common.treeparsing.RegexUtil.betweenWithEscapes;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.KEY_NAME;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
@@ -153,7 +154,7 @@ public final class DefinitionContext {
         };
 
 
-        ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any|none\\s+of|none|no)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed))\\s+)?(?<text><<valueMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*") {
+        ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any|none\\s+of|none|no)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed|required))\\s+)?(?<text><<valueMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*") {
             @Override
             public String onSubstitute(MatchNode self) {
                 self.putToLocalState("fullText", self.unmask(self.groups().get(0)));
@@ -411,6 +412,40 @@ public final class DefinitionContext {
                     .or(
                             (category, v, op) ->
                                     XPathyBuilder.buildIfAllTrue(textarea, placeholder, v, op, v != null)
+                    );
+
+
+            category("Radio Button").children("Radio Buttons").inheritsFrom("forLabel", "htmlNaming")
+                    .and((category, v, op) ->
+                            combineOr(
+                                    XPathy.from(input).byAttribute(type).equals("radio")
+                            )
+                    );
+
+            category("Check Box").children("Check Boxes").inheritsFrom("forLabel", "htmlNaming")
+                    .and((category, v, op) ->
+                            combineOr(
+                            XPathy.from(input).byAttribute(type).equals("checkbox"),
+                            XPathy.from(Tag.custom("mat-checkbox"))
+                            )
+                    );
+
+            category("Toggle").children("Toggles").inheritsFrom("forLabel", "htmlNaming")
+                    .and((category, v, op) ->
+                            combineOr(
+                                    XPathy.from(input).byAttribute(checked).haveIt(),
+                                    XPathy.from(input).byAttribute(Attribute.custom("aria-checked")).haveIt(),
+                                    XPathy.from(Tag.custom("mat-slide-toggle"))
+                            )
+                    );
+
+            category("Option").children("Options").inheritsFrom("forLabel", "htmlNaming")
+                    .and((category, v, op) ->
+                            combineOr(
+                                    XPathy.from(input).byAttribute(checked).haveIt(),
+                                    XPathy.from(input).byAttribute(Attribute.custom("aria-checked")).haveIt(),
+                                    XPathy.from(Tag.custom("mat-slide-toggle"))
+                            )
                     );
 
             category(BASE_CATEGORY).and(
