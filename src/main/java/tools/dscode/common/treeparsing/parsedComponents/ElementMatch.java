@@ -354,11 +354,18 @@ public class ElementMatch {
             getElementWrappers().forEach(e -> returnList.add(e.getElementReturnValue()));
         } else if (elementTypes.contains(ElementType.BROWSER_WINDOW)) {
             String normalized = category.toUpperCase().replaceAll("WINDOWS?", "").trim();
-            if (normalized.isBlank())
-                normalized = "TITLE";
-
+            if (normalized.isBlank()) {
+                if(textOps.isEmpty())
+                {
+                    normalized = "NEW";
+                }
+                else {
+                    normalized = "TITLE";
+                }
+            }
+            System.out.println("@@WINDOW - normalized: " + normalized + "");
             WindowSwitch.WindowSelectionType windowSelectionType = WindowSwitch.WindowSelectionType.LOOKUP.get(normalized);
-
+            System.out.println("@@WINDOW - windowSelectionType: " + windowSelectionType + "");
             returnList.addAll(WindowSwitch.findMatchingHandles(parentPhrase.getDriver(), windowSelectionType, textOps).stream().map(ValueWrapper::createValueWrapper).toList());
         } else if (elementTypes.contains(ElementType.ALERT)) {
 

@@ -1,7 +1,5 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
-import org.openqa.selenium.By;
-import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.browseroperations.WindowSwitch;
@@ -145,6 +143,7 @@ public enum ActionOperations implements OperationsInterface {
                     selectDropdownByVisibleText(GeneralSteps.getDefaultDriver(), elementWrapper.getElement(), selection.getValue().toString());
                     count++;
                 }
+                System.out.println("@@dropDowns.getElementWrappers().size() " + dropDowns.getElementWrappers().size());
                 return true;
             });
         }
