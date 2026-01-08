@@ -46,6 +46,7 @@ public final class WindowSwitch {
         FIRST,
         LAST,
         NEW,
+        NEXT,
         PREVIOUS;
 
         public static final Map<String, WindowSelectionType> LOOKUP =
@@ -103,7 +104,12 @@ public final class WindowSwitch {
                 System.out.println("@@NEW WINDOW");
                 String current = safeCurrentHandle(driver);
                 System.out.println("@@current: " + current + ", handles: " + handles + ", textOps: " + textOps);
-
+                yield handles.stream().filter(h -> !h.equals(current)).toList();
+            }
+            case NEXT -> {
+                System.out.println("@@NEW WINDOW");
+                String current = safeCurrentHandle(driver);
+                System.out.println("@@current: " + current + ", handles: " + handles + ", textOps: " + textOps);
                 yield handles.stream().filter(h -> !h.equals(current)).toList();
             }
 

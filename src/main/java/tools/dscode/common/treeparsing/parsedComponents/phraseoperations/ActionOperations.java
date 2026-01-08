@@ -319,13 +319,15 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch element = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
                 List<ValueWrapper> handleWrappers = element.getValues();
-
                 System.out.println("@@handleWrappers: " + handleWrappers);
-                System.out.println("@@handleWrappers.getFirst().getValue(): " + handleWrappers.getFirst().getValue());
+
                 if (handleWrappers.isEmpty() && !element.selectionType.equals("any")) {
                     throw new RuntimeException("No matching Windows or Tabs found for " + element);
                 }
-                WindowSwitch.switchToHandleOrThrow(phraseData.getDriver(), handleWrappers.getFirst().getValue().toString());
+                String windowHandle = element.category.toLowerCase().contains("new") || element.category.toLowerCase().contains("previous") ?
+                        handleWrappers.getLast().getValue().toString() : handleWrappers.getFirst().getValue().toString();
+                System.out.println("@@windowHandle: " + windowHandle);
+                WindowSwitch.switchToHandleOrThrow(phraseData.getDriver(), windowHandle);
                 return true;
             });
         }
