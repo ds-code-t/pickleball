@@ -77,9 +77,11 @@ public enum ElementType {
             }
         }
 
+        System.out.println("@@raw: " + raw + "");
         if (raw.matches("Alerts?")) {
             returnSet.add(BROWSER_TYPE);
             returnSet.add(ALERT);
+            System.out.println("@@returnSet: " + returnSet + "");
             return returnSet;
         }
 
