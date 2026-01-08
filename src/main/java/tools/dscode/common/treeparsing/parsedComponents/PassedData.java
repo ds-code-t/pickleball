@@ -192,7 +192,7 @@ public abstract class PassedData {
     //    public String keyName = "";
     public boolean isClone = false;
 
-    Integer operationIndex;
+    public Integer operationIndex;
 
 
     public PhraseData getPreviousPhrase() {

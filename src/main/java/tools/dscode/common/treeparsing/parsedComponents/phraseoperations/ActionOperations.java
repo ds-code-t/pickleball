@@ -155,7 +155,11 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
 
+            System.out.println("@@phraseData.getElementMatches(): " + phraseData.getElementMatches());
+            System.out.println("@@ phraseData.getFirstElement().startIndex: " +  phraseData.getFirstElement().startIndex);
+            System.out.println("@@phraseData.operationIndex: " +  phraseData.operationIndex);
 
+            System.out.println("@@phraseData.getElementMatchesFollowingOperation(): " + phraseData.getElementMatchesFollowingOperation());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)

@@ -227,13 +227,13 @@ public final class XPathyAssembly {
         return prefix + step;
     }
 
-    static final Pattern xPathScorePattern = Pattern.compile("\\bdisplay|height|width|visbility|collapse|opacity|hidden|style|not|ancestor|contains|descendant|translate|or|preceding|following|sibling\\b");
+    static final Pattern xPathScorePattern = Pattern.compile("\\bself|\\*|display|height|width|visbility|collapse|opacity|hidden|style|not|contains|translate|or|descendant|ancestor|preceding|following|sibling|parent|child\\b");
 
     /** Heuristic specificity scoring. Lower score = "more specific". */
     public static int xpathSpecificityScore(String xpath) {
         String s = xpath.trim();
 
-        int score = Math.toIntExact(1000 + s.length() + (xPathScorePattern.matcher(s).results().count() * 10));
+        int score = Math.toIntExact(1000 + s.length() + (xPathScorePattern.matcher(s).results().count() * 20));
 
         // Penalize wildcards / generic patterns
         if (s.contains("//*")) {
@@ -244,9 +244,11 @@ public final class XPathyAssembly {
             score += 500;
         }
 
-        if (!s.contains("\"") && !s.contains("'")) {
-            score += 600;
-        }
+        score += s.replaceAll("[^*]","").length() * 20;
+
+//        if (!s.contains("\"") && !s.contains("'")) {
+//            score += 600;
+//        }
 
         if (s.matches(".*\\b\\*\\b.*")) {
             score += 50;
@@ -263,9 +265,7 @@ public final class XPathyAssembly {
         if (s.contains("@id")) {
             score -= 40;
         }
-        if (s.contains("@data-testid") || s.contains("@data-test") || s.contains("@data-")) {
-            score -= 25;
-        }
+
         if (s.contains("@name")) {
             score -= 15;
         }

@@ -117,6 +117,7 @@ public class ElementMatch {
     public ElementMatch(PhraseData phraseData, MatchNode elementNode) {
 
         this.fullText = elementNode.getStringFromLocalState("fullText");
+        System.out.println("@@this.fullText: " + this.fullText);
         this.parentPhrase = phraseData;
         this.startIndex = elementNode.start;
         this.position = elementNode.position;
@@ -192,7 +193,8 @@ public class ElementMatch {
             elementTypes.add(RETURNS_VALUE);
         }
 
-
+        System.out.println("@@elementMAtch1 " + this);
+        System.out.println("@@elementMAtch1 elementTypes: " + this.elementTypes);
         if (!elementTypes.contains(ElementType.HTML_TYPE)) {
             return;
         }
@@ -212,14 +214,16 @@ public class ElementMatch {
             elPredictXPaths.add(categoryResolution.xpath());
         }
 
+        System.out.println("@@state: '" + state + "'");
+        System.out.println("@@BinaryStateConditions.onElement():\n" + BinaryStateConditions.onElement() );
         if (!state.isEmpty()) {
             boolean un = state.startsWith("un");
             if (un) state = state.substring(2);
 
             switch (state) {
-
                 // Binary on/off (checked/selected/etc)
                 case "checked", "selected", "on" -> {
+                    System.out.println("@@checkedddd!!!");
                     elPredictXPaths.add(un
                             ? BinaryStateConditions.offElement()
                             : BinaryStateConditions.onElement());
@@ -266,7 +270,7 @@ public class ElementMatch {
             }
         }
 
-
+        System.out.println("@@elPredictXPaths:\n" + elPredictXPaths);
         xPathy = combineAnd(elPredictXPaths);
 
         for (Attribute attribute : attributes) {
@@ -275,7 +279,8 @@ public class ElementMatch {
         }
 //        }
 
-
+        System.out.println("@@elementMAtch2 " + this);
+        System.out.println("@@elementMAtch2 elementTypes: " + this.elementTypes);
     }
 
     public static ExecutionDictionary.Op getOpFromString(String input) {

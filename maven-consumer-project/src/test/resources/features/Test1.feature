@@ -1,5 +1,8 @@
 Feature: Additiontest
 
+  Scenario: chckboxtest 2
+  @[DEBUG]
+    * , click any checked Checkbox
 
   Scenario Outline: test22
     * Set report values

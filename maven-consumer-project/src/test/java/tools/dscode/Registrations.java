@@ -6,8 +6,8 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.annotations.LifecycleHook;
 import tools.dscode.common.annotations.Phase;
-import tools.dscode.common.domoperations.BinaryStateConditions;
 import tools.dscode.common.domoperations.ExecutionDictionary;
+import tools.dscode.common.domoperations.elementstates.BinaryStateConditions;
 
 import static com.xpathy.Attribute.id;
 import static com.xpathy.Attribute.role;

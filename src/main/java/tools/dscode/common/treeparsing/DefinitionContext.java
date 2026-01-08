@@ -154,7 +154,8 @@ public final class DefinitionContext {
         };
 
 
-        ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any|none\\s+of|none|no)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed|required))\\s+)?(?<text><<valueMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*") {
+//        ParseNode elsementMatch = new ParseNode("(?:(?<selectionType>every|any|none\\s+of|none|no)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed|required))\\b\\s*)?(?<text><<valueMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*");
+        ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any|none\\s+of|none|no)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed|required))\\b\\s*)?(?<text><<valueMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*") {
             @Override
             public String onSubstitute(MatchNode self) {
                 self.putToLocalState("fullText", self.unmask(self.groups().get(0)));
@@ -212,6 +213,7 @@ public final class DefinitionContext {
                 System.out.println("##onCaputre action: " + self.originalText() + "");
                 self.parent().putToLocalState("action", self.resolvedGroupText("base"));
                 self.parent().putToLocalState("operationIndex", self.start);
+                System.out.println("@@action-operationIndex: " + self.start);
                 return self.resolvedGroupText("base").replaceAll("move", "hover");
             }
         };
@@ -238,6 +240,7 @@ public final class DefinitionContext {
 
 
                 self.parent().putToLocalState("operationIndex", self.start);
+                System.out.println("@@assertion-operationIndex: " + self.start);
                 return self.originalText();
             }
         };
@@ -252,6 +255,8 @@ public final class DefinitionContext {
 
                     parentNode.putToLocalState("assertion", "equal");
                     parentNode.putToLocalState("operationIndex", self.groups().start("defaultAssertion"));
+                    System.out.println("@@defaultAssertion-operationIndex: " + self.groups().start("defaultAssertion"));
+
                 }
                 return self.originalText();
             }
@@ -271,6 +276,7 @@ public final class DefinitionContext {
 
                 MatchNode elementMatchNode = self.getMatchNode(self.originalText());
                 elementMatchNode.start = self.start;
+                System.out.println("@@elementMatchNode.start: " + elementMatchNode.start);
                 return self.originalText();
             }
         };
