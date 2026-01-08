@@ -55,11 +55,6 @@ public class ReportingSteps {
         {
             String header = lists.getFirst().get(i);
             ValueWrapper value = createValueWrapper(lists.get(1).get(i));
-
-
-
-
-
             report.put(rowKey, header , value.asBestGuessXlsxValue());
         }
     }

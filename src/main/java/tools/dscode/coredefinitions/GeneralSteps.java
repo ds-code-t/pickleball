@@ -43,39 +43,31 @@ public class GeneralSteps extends CoreSteps {
     }
 
     public static ChromiumDriver getDefaultDriver() {
-
         return getDriver("BROWSER");
     }
 
     public static ChromiumDriver getDriver(String browserName) {
 
         Object returnObject = getScenarioObject(browserName);
-
         if (returnObject != null) return (ChromiumDriver) returnObject;
-
         returnObject = returnStepParameter(browserName);
-
         if (returnObject != null) return (ChromiumDriver) returnObject;
-
         return (ChromiumDriver) returnStepParameter("CHROME");
     }
 
     @Given("navigate {returnStepParameter}")
-    @Given("^navigate (.+)$")
     public void navigateBrowser(ChromiumDriver driver, List<String> list) {
         driver.get(list.getFirst());
         waitForPageReady(driver, Duration.ofSeconds(60));
     }
 
     public static Object returnStepParameter(String stepText) {
-
         return returnStepParameter(stepText, null);
     }
 
     //    @ParameterType("\\$\\(([^()]+)\\)")
     @ParameterType("([A-Za-z0-9_-]+)(:([A-Za-z0-9_-]+))?")
     public static Object returnStepParameter(String stepText, String key) {
-
         StepExtension currentStep = getRunningStep();
         Object existingObject = getScenarioObject(stepText);
         if (key == null || key.isBlank()) {
