@@ -422,7 +422,7 @@ public final class DefinitionContext {
                             )
                     );
 
-            category("Check Box").children("Check Boxes").inheritsFrom("forLabel", "htmlNaming")
+            category("Checkbox").children("Checkboxes").inheritsFrom("forLabel", "htmlNaming")
                     .and((category, v, op) ->
                             combineOr(
                             XPathy.from(input).byAttribute(type).equals("checkbox"),
