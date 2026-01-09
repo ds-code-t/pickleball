@@ -128,18 +128,23 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
             System.out.println("@@phraseData.getElementMatchesFollowingOperation(): " + phraseData.getElementMatchesFollowingOperation());
+
+            System.out.println("@@phraseData.getFirstElement().elementTypes " + phraseData.getFirstElement().elementTypes);
+            System.out.println("@@phraseData.getSecondElement().elementType: " + phraseData.getSecondElement().elementTypes);
+
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
-                            .mustMatchAtLeastOne(ElementType.RETURNS_VALUE),
+                            .mustMatchAtLeastOne(ElementType.RETURNS_VALUE).mustNotMatchAny(ElementType.HTML_DROPDOWN),
                     new ElementMatcher()
-                            .mustMatchAll(ElementType.HTML_ELEMENT)
+                            .mustMatchAll(ElementType.HTML_ELEMENT, ElementType.HTML_DROPDOWN)
             );
-            System.out.println("@@phraseData.resultElements: " + phraseData.resultElements);
 
+            System.out.println("@@phraseData.resultElements: " + phraseData.resultElements);
             ElementMatch selection = phraseData.resultElements.getFirst();
             ElementMatch dropDowns = phraseData.resultElements.get(1);
-            System.out.println("@@dropDowns.elementTypes: " + dropDowns.elementTypes);
             System.out.println("@@selection.elementTypes: " + selection.elementTypes);
+            System.out.println("@@dropDowns.elementTypes: " + dropDowns.elementTypes);
+
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper dropDownWrapper : dropDowns.getElementThrowErrorIfEmptyWithNoModifier()) {
