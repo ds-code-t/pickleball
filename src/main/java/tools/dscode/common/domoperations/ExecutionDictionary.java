@@ -41,12 +41,15 @@ public class ExecutionDictionary {
     public static final String STARTING_CONTEXT = "DefaultStartingContextInternalUSE";
     public static final String VISIBILITY_FILTER = "VisibilityFilterInternalUSE";
 
+
+    //TODO  HAS , HAS_NOT, and negative versions of all operations
     public enum Op {
-        DEFAULT, EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE, MATCHES;
+        DEFAULT, EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE, MATCHES, HAS , HAS_NOT;
 
 
         public static Op getOpFromString(String input) {
             return switch (input.trim().toLowerCase()) {
+                case String s when s.startsWith("has") -> s.contains("no")  ? Op.HAS_NOT : Op.HAS;
                 case String s when s.startsWith("equal") -> Op.EQUALS;
                 case String s when s.startsWith("contain") -> Op.CONTAINS;
                 case String s when s.startsWith("start") -> Op.STARTS_WITH;

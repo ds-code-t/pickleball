@@ -10,6 +10,15 @@ public class Attribute {
     ExecutionDictionary.Op predicateType;
     ValueWrapper predicateVal;
 
+    @Override
+    public String toString() {
+        return "Attribute{" +
+                "attrName='" + attrName + '\'' +
+                ", predicateType=" + predicateType +
+                ", predicateVal=" + predicateVal +
+                '}';
+    }
+
     public Attribute(String attrName, ExecutionDictionary.Op predicateType, ValueWrapper predicateVal) {
         this.attrName =  attrName;
         this.predicateType = predicateType;
@@ -17,8 +26,6 @@ public class Attribute {
     }
 
     public Attribute(String attrName, String predicateTypeString, ValueWrapper predicateVal) {
-        this.attrName =  attrName;
-        this.predicateType = getOpFromString(predicateTypeString);
-        this.predicateVal = predicateVal;
+        this(attrName, getOpFromString(predicateTypeString), predicateVal);
     }
 }

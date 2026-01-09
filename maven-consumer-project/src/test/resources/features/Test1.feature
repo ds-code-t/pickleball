@@ -3,7 +3,7 @@ Feature: Additiontest
   Scenario: chckboxtest 2
   @[DEBUG]
 #    Then , I select "Opel" in the "cars" Dropdown
-    Then , I select 'opel' Option in the "cars" Dropdown
+    Then , I select Option with a value containing "a" and with a value containing "d" in the "cars" Dropdown
 
 #    * , switch to New Window
 #    * , click any checked Checkbox

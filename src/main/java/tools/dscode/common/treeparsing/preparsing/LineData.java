@@ -58,6 +58,7 @@ public abstract class LineData implements Cloneable {
 
         String preParsedNormalized = normalizeWhitespace(fullyMasked)
 //                .replaceAll("\\b(?:the|then|a)\\b", "")
+                .replaceAll("\\bno\\s+attribute\\b", "noattribute")
                 .replaceAll("\\b(?:the|a)\\b", "")
                 .replaceAll("\\bare\\b", "is")
                 .replaceAll("\\bhave\\b", "has")

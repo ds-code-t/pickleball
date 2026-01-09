@@ -1,9 +1,11 @@
 package tools.dscode.common.treeparsing.xpathcomponents;
 
-import com.xpathy.Attribute;
+
 import com.xpathy.XPathy;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.domoperations.ExecutionDictionary;
+
+import java.util.Objects;
 
 public final class XPathyUtils {
 
@@ -11,19 +13,18 @@ public final class XPathyUtils {
         // utility class
     }
 
+    // =========================================================================
+    //  NON-MATCHING UTILITIES (kept)
+    // =========================================================================
+
     private static XPathy wrapWithPredicate(XPathy xp, String predicate) {
-        if (xp == null) {
-            throw new IllegalArgumentException("XPathy must not be null");
-        }
+        if (xp == null) throw new IllegalArgumentException("XPathy must not be null");
         String raw = xp.getXpath();
         if (raw == null || raw.isBlank()) {
             throw new IllegalArgumentException("XPathy xpath must not be null/blank");
         }
-        // (<expr>)[<predicate>]
         return new XPathy("(" + raw + ")[" + predicate + "]");
     }
-
-    // ---- Position helpers ---------------------------------------------------
 
     /**
      * Every nth match (1-based, multiples of step):
@@ -31,9 +32,7 @@ public final class XPathyUtils {
      * Expression: (<xpath>)[position() mod step = 0]
      */
     public static XPathy everyNth(XPathy xp, int step) {
-        if (step < 1) {
-            throw new IllegalArgumentException("step must be >= 1");
-        }
+        if (step < 1) throw new IllegalArgumentException("step must be >= 1");
         return wrapWithPredicate(xp, "position() mod " + step + " = 0");
     }
 
@@ -44,56 +43,135 @@ public final class XPathyUtils {
      * Expression: (<xpath>)[(position() - start) mod step = 0 and position() >= start]
      */
     public static XPathy everyNthFrom(XPathy xp, int start, int step) {
-        if (start < 1) {
-            throw new IllegalArgumentException("start must be >= 1");
-        }
-        if (step < 1) {
-            throw new IllegalArgumentException("step must be >= 1");
-        }
-        String predicate =
-                "(position() - " + start + ") mod " + step + " = 0 and position() >= " + start;
+        if (start < 1) throw new IllegalArgumentException("start must be >= 1");
+        if (step < 1) throw new IllegalArgumentException("step must be >= 1");
+        String predicate = "(position() - " + start + ") mod " + step + " = 0 and position() >= " + start;
         return wrapWithPredicate(xp, predicate);
     }
 
     // =========================================================================
-    //  WHITESPACE NORMALIZATION TABLE
+    //  WHITESPACE NORMALIZATION TABLE (kept public for ValueWrapper static import)
     // =========================================================================
 
     public static final String from = ""
-            + "\u0020"       // space
-            + "\u0009"       // tab
+            + "\u0020"        // space
+            + "\u0009"        // tab
             + ((char) 0x000A) // LF
             + ((char) 0x000D) // CR
-            + "\u00A0"       // NBSP
-            + "\u200B"       // ZWSP
-            + "\u200C"       // ZWNJ
-            + "\u200D"       // ZWJ
-            + "\uFEFF"       // ZERO WIDTH NBSP/BOM
-            + "\u1680"       // OGHAM SPACE MARK
-            + "\u180E"       // MONGOLIAN VOWEL SEPARATOR (deprecated but still found)
-            + "\u2000"       // EN QUAD
-            + "\u2001"       // EM QUAD
-            + "\u2002"       // EN SPACE
-            + "\u2003"       // EM SPACE
-            + "\u2004"       // THREE-PER-EM SPACE
-            + "\u2005"       // FOUR-PER-EM SPACE
-            + "\u2006"       // SIX-PER-EM SPACE
-            + "\u2007"       // FIGURE SPACE
-            + "\u2008"       // PUNCTUATION SPACE
-            + "\u2009"       // THIN SPACE
-            + "\u200A"       // HAIR SPACE
-            + "\u2028"       // LINE SEPARATOR
-            + "\u2029"       // PARAGRAPH SEPARATOR
-            + "\u202F"       // NARROW NBSP
-            + "\u205F"       // MMSP
-            + "\u3000";      // IDEOGRAPHIC SPACE
+            + "\u00A0"        // NBSP
+            + "\u200B"        // ZWSP
+            + "\u200C"        // ZWNJ
+            + "\u200D"        // ZWJ
+            + "\uFEFF"        // ZERO WIDTH NBSP/BOM
+            + "\u1680"        // OGHAM SPACE MARK
+            + "\u180E"        // MONGOLIAN VOWEL SEPARATOR (deprecated but still found)
+            + "\u2000"        // EN QUAD
+            + "\u2001"        // EM QUAD
+            + "\u2002"        // EN SPACE
+            + "\u2003"        // EM SPACE
+            + "\u2004"        // THREE-PER-EM SPACE
+            + "\u2005"        // FOUR-PER-EM SPACE
+            + "\u2006"        // SIX-PER-EM SPACE
+            + "\u2007"        // FIGURE SPACE
+            + "\u2008"        // PUNCTUATION SPACE
+            + "\u2009"        // THIN SPACE
+            + "\u200A"        // HAIR SPACE
+            + "\u2028"        // LINE SEPARATOR
+            + "\u2029"        // PARAGRAPH SEPARATOR
+            + "\u202F"        // NARROW NBSP
+            + "\u205F"        // MMSP
+            + "\u3000";       // IDEOGRAPHIC SPACE
 
     public static final String to = " ".repeat(from.length());
 
+    /**
+     * Java-side text normalization (kept public; ValueWrapper imports it).
+     */
+    public static String normalizeText(String rawText) {
+        if (rawText == null) return null;
+        return rawText.replaceAll("[" + from + "]", " ")
+                .replaceAll("\\s+", " ")
+                .strip();
+    }
+
     // =========================================================================
-    //  ASCII CASE-FOLD (XPath 1.0 friendly)
+    //  PUBLIC MATCHING APIs (ValueWrapper-only)
     // =========================================================================
 
+    /**
+     * ValueWrapper-driven deep text predicate as an XPathy (standalone predicate expression wrapped).
+     *
+     * Type-driven behavior:
+     * - DOUBLE_QUOTED + DEFAULT + everything else => normalized, case-sensitive
+     * - SINGLE_QUOTED => normalized, case-insensitive
+     * - BACK_TICKED => exact (no normalization/trimming/casefold)
+     * - NUMERIC/BOOLEAN => treated like DOUBLE_QUOTED for text matching
+     */
+    public static XPathy deepNormalizedText(ValueWrapper value, ExecutionDictionary.Op mode) {
+        Objects.requireNonNull(value, "value must not be null");
+        ExecutionDictionary.Op op = normalizeOp(mode);
+
+        String predicate = buildDeepTextPredicate(value, op);
+        return XPathy.from("(" + predicate + ")");
+    }
+
+    public static XPathy deepNormalizedText(ValueWrapper value) {
+        return deepNormalizedText(value, ExecutionDictionary.Op.EQUALS);
+    }
+
+    /**
+     * Builds a predicate (WITHOUT surrounding brackets) that matches an attribute
+     * using ValueWrapper type semantics.
+     *
+     * - Text types follow the same rules as deepNormalizedText(ValueWrapper,...)
+     * - NUMERIC supports EQUALS, GT, GTE, LT, LTE using number(@attr)
+     * - BOOLEAN supports EQUALS using presence semantics + explicit true/false-ish values
+     */
+    public static String attributePredicate(String attrName, ValueWrapper value, ExecutionDictionary.Op mode) {
+        if (attrName == null || attrName.isBlank()) throw new IllegalArgumentException("attrName must not be null/blank");
+        Objects.requireNonNull(value, "value must not be null");
+
+        ExecutionDictionary.Op op = normalizeOp(mode);
+        String attrExpr = "@" + attrName.trim();
+
+        return buildAttributePredicate(attrExpr, value, op);
+    }
+
+    /**
+     * Apply a ValueWrapper-based text predicate to an existing base XPath.
+     */
+    public static XPathy applyTextPredicate(XPathy base, ValueWrapper value, ExecutionDictionary.Op mode) {
+        Objects.requireNonNull(base, "base must not be null");
+        Objects.requireNonNull(value, "value must not be null");
+
+        ExecutionDictionary.Op op = normalizeOp(mode);
+        String pred = buildDeepTextPredicate(value, op);
+        return XPathy.from("(" + base.getXpath().trim() + ")[" + pred + "]");
+    }
+
+    /**
+     * Apply a ValueWrapper-based attribute predicate to an existing base XPath.
+     */
+    public static XPathy applyAttrPredicate(XPathy base, String attrName, ValueWrapper value, ExecutionDictionary.Op mode) {
+        Objects.requireNonNull(base, "base must not be null");
+        if (attrName == null || attrName.isBlank()) throw new IllegalArgumentException("attrName must not be null/blank");
+        Objects.requireNonNull(value, "value must not be null");
+
+        ExecutionDictionary.Op op = normalizeOp(mode);
+        String pred = buildAttributePredicate("@" + attrName.trim(), value, op);
+        return XPathy.from("(" + base.getXpath().trim() + ")[" + pred + "]");
+    }
+
+    // =========================================================================
+    //  CONSOLIDATED CORE MATCH LOGIC
+    // =========================================================================
+
+    private static ExecutionDictionary.Op normalizeOp(ExecutionDictionary.Op op) {
+        if (op == null || op == ExecutionDictionary.Op.DEFAULT) return ExecutionDictionary.Op.EQUALS;
+        return op;
+    }
+
+    // XPath 1.0 ASCII-only case folding
     private static final String A2Z = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     private static final String a2z = "abcdefghijklmnopqrstuvwxyz";
 
@@ -105,245 +183,113 @@ public final class XPathyUtils {
         return s == null ? null : s.toLowerCase();
     }
 
-    // =========================================================================
-    //  DEEP NORMALIZED TEXT
-    // =========================================================================
-
-    public static XPathy deepNormalizedText(String rawText) {
-        return deepNormalizedText(rawText, ExecutionDictionary.Op.EQUALS);
+    private static String rawValue(ValueWrapper vw) {
+        Object v = vw.getValue();
+        return v == null ? null : v.toString();
     }
 
-    /**
-     * Type-driven behavior:
-     * - DOUBLE_QUOTED (and all non-text types by default): normalized, case-sensitive
-     * - SINGLE_QUOTED: normalized, case-insensitive
-     * - BACK_TICKED: exact match (no normalization/trimming/casefold)
-     */
-    public static XPathy deepNormalizedText(ValueWrapper rawValue, ExecutionDictionary.Op mode) {
-        if (rawValue == null) {
-            throw new IllegalArgumentException("rawValue must not be null");
-        }
-        ExecutionDictionary.Op op = normalizeOp(mode);
-
-        return switch (rawValue.type) {
-            case BACK_TICKED -> deepExactText(rawValue.toString(), op);
-            case SINGLE_QUOTED -> deepNormalizedTextInternal(rawValue.asNormalizedText(), op, true);
-            default -> deepNormalizedTextInternal(rawValue.asNormalizedText(), op, false);
-        };
+    private static boolean isTextQuotedType(ValueWrapper.ValueTypes t) {
+        return t == ValueWrapper.ValueTypes.DOUBLE_QUOTED
+                || t == ValueWrapper.ValueTypes.SINGLE_QUOTED
+                || t == ValueWrapper.ValueTypes.BACK_TICKED;
     }
 
-    /**
-     * Preserves existing behavior (normalized, case-sensitive).
-     */
-    public static XPathy deepNormalizedText(String rawText, ExecutionDictionary.Op mode) {
-        return deepNormalizedTextInternal(rawText, normalizeOp(mode), false);
-    }
+    private static String buildDeepTextPredicate(ValueWrapper value, ExecutionDictionary.Op op) {
+        ValueWrapper.ValueTypes t = value.type;
 
-    private static XPathy deepNormalizedTextInternal(String rawText, ExecutionDictionary.Op mode, boolean caseInsensitive) {
-        if (rawText == null) {
-            throw new IllegalArgumentException("rawText must not be null");
-        }
-
-        // Existing Java-side normalization helper (kept)
-        String expected = normalizeText(rawText);
-
-        String norm = normalizedTextExpr(); // normalize-space(translate(string(.), ...))
-
-        String haystack = caseInsensitive ? caseFoldExpr(norm) : norm;
-        String needleVal = caseInsensitive ? caseFoldValue(expected) : expected;
-        String needle = toXPathLiteral(needleVal);
-
-        String predicate = buildTextPredicate(haystack, needle, mode);
-
-        return XPathy.from("(" + predicate + ")");
-    }
-
-    private static XPathy deepExactText(String rawText, ExecutionDictionary.Op mode) {
-        if (rawText == null) {
-            throw new IllegalArgumentException("rawText must not be null");
-        }
-        String expr = "string(.)";
-        String needle = toXPathLiteral(rawText);
-
-        String predicate = buildTextPredicate(expr, needle, mode);
-
-        return XPathy.from("(" + predicate + ")");
-    }
-
-    // =========================================================================
-    //  NEW: ATTRIBUTE PREDICATE BUILDER (returns String predicate without [])
-    // =========================================================================
-
-    /**
-     * Builds an XPath predicate (WITHOUT surrounding brackets) that matches an attribute
-     * using ValueWrapper type semantics.
-     *
-     * - DOUBLE_QUOTED / DEFAULT / other: normalized, case-sensitive text compare
-     * - SINGLE_QUOTED: normalized, case-insensitive text compare
-     * - BACK_TICKED: exact (no normalization)
-     * - NUMERIC: supports EQUALS, GT, GTE, LT, LTE using number(@attr)
-     * - BOOLEAN: supports EQUALS only (presence semantics + common explicit values)
-     */
-    public static String attributePredicate(String attrName, ValueWrapper value, ExecutionDictionary.Op mode) {
-        if (attrName == null || attrName.isBlank()) {
-            throw new IllegalArgumentException("attrName must not be null/blank");
-        }
-        if (value == null) {
-            throw new IllegalArgumentException("value must not be null");
-        }
-
-        ExecutionDictionary.Op op = normalizeOp(mode);
-
-        String attrExpr = "@" + attrName.trim();
-
-        return switch (value.type) {
-            case NUMERIC -> buildNumericAttrPredicate(attrExpr, value, op);
-            case BOOLEAN -> buildBooleanAttrPredicate(attrExpr, value, op);
-            case BACK_TICKED -> buildAttrTextPredicate(attrExpr, value.toString(), op, false, false);
-            case SINGLE_QUOTED -> buildAttrTextPredicate(attrExpr, value.asNormalizedText(), op, true, true);
-            default -> buildAttrTextPredicate(attrExpr, value.asNormalizedText(), op, true, false);
-        };
-    }
-
-    /**
-     * Convenience: apply attribute predicate to a base XPathy, returning a new XPathy.
-     * Does not replace or modify existing applyAttrOp overloads.
-     */
-    public static XPathy applyAttrPredicate(XPathy base, String attrName, ValueWrapper value, ExecutionDictionary.Op mode) {
-        if (base == null) {
-            throw new IllegalArgumentException("base must not be null");
-        }
-        String pred = attributePredicate(attrName, value, mode);
-        return XPathy.from("(" + base.getXpath().trim() + ")[" + pred + "]");
-    }
-
-    // =========================================================================
-    //  NORMALIZATION + LITERALS
-    // =========================================================================
-
-    public static String normalizeText(String rawText) {
-        return rawText.replaceAll("[" + from + "]", " ").replaceAll("\\s+", " ").strip();
-    }
-
-    private static String normalizeValue(Object value) {
-        if (value == null) {
-            return "";
-        }
-        return String.valueOf(value)
-                .replace('\u00A0', ' ')
-                .replaceAll("\\s+", " ")
-                .strip();
-    }
-
-    private static String toXPathLiteral(String s) {
-        if (s == null) return "''";
-        if (!s.contains("'")) {
-            return "'" + s + "'";
-        }
-        if (!s.contains("\"")) {
-            return "\"" + s + "\"";
-        }
-
-        // Contains both ' and " → use concat('foo', "'", 'bar')
-        StringBuilder sb = new StringBuilder("concat(");
-        String[] parts = s.split("'", -1); // keep empties
-        for (int i = 0; i < parts.length; i++) {
-            if (i > 0) {
-                sb.append(", \"'\", ");
+        // BACK_TICKED => exact string(.) compare, no normalization/casefold
+        if (t == ValueWrapper.ValueTypes.BACK_TICKED) {
+            String expected = rawValue(value);
+            if (expected == null) {
+                // exact null is impossible in XPath string(.); treat as equals empty string for safety
+                expected = "";
             }
-            sb.append("'").append(parts[i]).append("'");
-        }
-        sb.append(")");
-        return sb.toString();
-    }
-
-    private static String normalizedAttrExpr(String attrExpr) {
-        return "normalize-space(translate(" + attrExpr + ", " + toXPathLiteral(from) + " , " + toXPathLiteral(to) + "))";
-    }
-
-    private static String normalizedTextExpr() {
-        return "normalize-space(translate(string(.), " + toXPathLiteral(from) + " , " + toXPathLiteral(to) + "))";
-    }
-
-    // =========================================================================
-    //  PREDICATE BUILDERS (consolidated)
-    // =========================================================================
-
-    private static ExecutionDictionary.Op normalizeOp(ExecutionDictionary.Op op) {
-        if (op == null || op == ExecutionDictionary.Op.DEFAULT) {
-            return ExecutionDictionary.Op.EQUALS;
-        }
-        return op;
-    }
-
-    /**
-     * Builds a text predicate using the given haystack expression and a literal needle.
-     * needleLiteral must already be a valid XPath literal (e.g. 'foo', "foo", concat(...)).
-     */
-    private static String buildTextPredicate(String haystackExpr, String needleLiteral, ExecutionDictionary.Op op) {
-        return switch (op) {
-            case STARTS_WITH ->
-                    "starts-with(" + haystackExpr + ", " + needleLiteral + ")";
-            case CONTAINS ->
-                    "contains(" + haystackExpr + ", " + needleLiteral + ")";
-            case ENDS_WITH ->
-                    "substring(" +
-                            haystackExpr + ", " +
-                            "string-length(" + haystackExpr + ") - string-length(" + needleLiteral + ") + 1" +
-                            ") = " + needleLiteral;
-            case EQUALS ->
-                    haystackExpr + " = " + needleLiteral;
-            default ->
-                    throw new IllegalArgumentException("Unsupported mode: " + op);
-        };
-    }
-
-    private static String buildAttrTextPredicate(
-            String attrExpr,
-            String input,
-            ExecutionDictionary.Op op,
-            boolean normalized,
-            boolean caseInsensitive
-    ) {
-        if (input == null) {
-            // Only sensible for equals: absent attr
-            if (op == ExecutionDictionary.Op.EQUALS) {
-                return "not(" + attrExpr + ")";
-            }
-            throw new IllegalArgumentException("Cannot apply " + op + " to null attribute value");
+            return buildStringPredicate("string(.)", toXPathLiteral(expected), op);
         }
 
-        String expr;
-        String expected;
+        // Everything else => normalized-text matching.
+        // SINGLE_QUOTED => case-insensitive
+        boolean caseInsensitive = (t == ValueWrapper.ValueTypes.SINGLE_QUOTED);
 
-        if (normalized) {
-            expr = normalizedAttrExpr(attrExpr);
-            expected = normalizeText(input);
-        } else {
-            expr = attrExpr;     // exact (BACK_TICKED)
-            expected = input;
-        }
+        // Use normalizedTextExpr() for the DOM side;
+        // Use normalizeText(rawValue) for expected to ensure identical normalization strategy.
+        String domExpr = normalizedTextExpr();
+        String expected = normalizeText(rawValue(value));
+        if (expected == null) expected = "";
 
         if (caseInsensitive) {
-            expr = caseFoldExpr(expr);
+            domExpr = caseFoldExpr(domExpr);
             expected = caseFoldValue(expected);
         }
 
-        String needle = toXPathLiteral(expected);
-
-        return buildTextPredicate(expr, needle, op);
+        return buildStringPredicate(domExpr, toXPathLiteral(expected), op);
     }
 
-    private static String buildNumericAttrPredicate(String attrExpr, ValueWrapper value, ExecutionDictionary.Op op) {
-        String lhs = "number(" + attrExpr + ")";
+    private static String buildAttributePredicate(String attrExpr, ValueWrapper value, ExecutionDictionary.Op op) {
+        ValueWrapper.ValueTypes t = value.type;
+
+        // NUMERIC: comparisons against number(@attr)
+        if (t == ValueWrapper.ValueTypes.NUMERIC) {
+            return buildNumericPredicate("number(" + attrExpr + ")", value, op);
+        }
+
+        // BOOLEAN: presence semantics + explicit value strings some frameworks set
+        if (t == ValueWrapper.ValueTypes.BOOLEAN) {
+            return buildBooleanAttrPredicate(attrExpr, value, op);
+        }
+
+        // BACK_TICKED: exact @attr compare (no normalization/casefold)
+        if (t == ValueWrapper.ValueTypes.BACK_TICKED) {
+            String expected = rawValue(value);
+            if (expected == null) {
+                // Treat null as "attribute missing" on equals; otherwise invalid.
+                if (op == ExecutionDictionary.Op.EQUALS) return "not(" + attrExpr + ")";
+                throw new IllegalArgumentException("Cannot apply " + op + " to null BACK_TICKED attribute value");
+            }
+            return buildStringPredicate(attrExpr, toXPathLiteral(expected), op);
+        }
+
+        // Text-ish attribute comparisons (normalized)
+        boolean caseInsensitive = (t == ValueWrapper.ValueTypes.SINGLE_QUOTED);
+
+        String domExpr = normalizedAttrExpr(attrExpr);
+        String expected = normalizeText(rawValue(value));
+        if (expected == null) {
+            if (op == ExecutionDictionary.Op.EQUALS) return "not(" + attrExpr + ")";
+            throw new IllegalArgumentException("Cannot apply " + op + " to null attribute value");
+        }
+
+        if (caseInsensitive) {
+            domExpr = caseFoldExpr(domExpr);
+            expected = caseFoldValue(expected);
+        }
+
+        return buildStringPredicate(domExpr, toXPathLiteral(expected), op);
+    }
+
+    private static String buildStringPredicate(String haystackExpr, String needleLiteral, ExecutionDictionary.Op op) {
+        return switch (op) {
+            case EQUALS -> haystackExpr + " = " + needleLiteral;
+            case CONTAINS -> "contains(" + haystackExpr + ", " + needleLiteral + ")";
+            case STARTS_WITH -> "starts-with(" + haystackExpr + ", " + needleLiteral + ")";
+            case ENDS_WITH -> "substring(" +
+                    haystackExpr + ", " +
+                    "string-length(" + haystackExpr + ") - string-length(" + needleLiteral + ") + 1" +
+                    ") = " + needleLiteral;
+            default -> throw new IllegalArgumentException("Unsupported string op: " + op);
+        };
+    }
+
+    private static String buildNumericPredicate(String lhsNumberExpr, ValueWrapper value, ExecutionDictionary.Op op) {
+        // Uses your ValueWrapper numeric parsing (BigInteger-style); consistent with your semantics.
         String rhs = value.asBigInteger().toString();
 
         return switch (op) {
-            case EQUALS -> lhs + " = " + rhs;
-            case GT -> lhs + " > " + rhs;
-            case GTE -> lhs + " >= " + rhs;
-            case LT -> lhs + " < " + rhs;
-            case LTE -> lhs + " <= " + rhs;
+            case EQUALS -> lhsNumberExpr + " = " + rhs;
+            case GT -> lhsNumberExpr + " > " + rhs;
+            case GTE -> lhsNumberExpr + " >= " + rhs;
+            case LT -> lhsNumberExpr + " < " + rhs;
+            case LTE -> lhsNumberExpr + " <= " + rhs;
             default -> throw new IllegalArgumentException("Unsupported numeric op: " + op);
         };
     }
@@ -357,28 +303,31 @@ public final class XPathyUtils {
 
         boolean wantTrue;
         if (raw.isBlank()) {
-            wantTrue = true; // presence semantics
+            // e.g., @disabled (presence) semantics
+            wantTrue = true;
         } else if (raw.equals("true") || raw.equals("1") || raw.equals("yes") || raw.equals("y") || raw.equals("on")) {
             wantTrue = true;
         } else if (raw.equals("false") || raw.equals("0") || raw.equals("no") || raw.equals("n") || raw.equals("off")) {
             wantTrue = false;
         } else {
-            // Unknown token: treat as normalized, case-insensitive string match
-            return buildAttrTextPredicate(attrExpr, value.asNormalizedText(), ExecutionDictionary.Op.EQUALS, true, true);
+            // Unknown token -> treat as normalized, case-insensitive string compare on the attribute value
+            String domExpr = caseFoldExpr(normalizedAttrExpr(attrExpr));
+            String expected = caseFoldValue(normalizeText(raw));
+            return domExpr + " = " + toXPathLiteral(expected);
         }
 
-        // Normalize + casefold for explicit string values some frameworks use.
+        // Handle frameworks that set explicit "false"/"0" strings, while still supporting presence semantics.
         String norm = normalizedAttrExpr(attrExpr);
         String ciNorm = caseFoldExpr(norm);
 
         if (wantTrue) {
-            // present AND not explicitly false/0
+            // attribute exists AND not explicitly false/0
             return "(" + attrExpr + " and not(" +
                     ciNorm + " = " + toXPathLiteral("false") +
                     " or " + ciNorm + " = " + toXPathLiteral("0") +
                     "))";
         } else {
-            // absent OR explicitly false/0/empty
+            // attribute missing OR explicitly false/0/empty
             return "(" +
                     "not(" + attrExpr + ")" +
                     " or " + ciNorm + " = " + toXPathLiteral("false") +
@@ -389,59 +338,31 @@ public final class XPathyUtils {
     }
 
     // =========================================================================
-    //  EXISTING NORMALIZED OPS (kept, non-breaking)
+    //  XPATH NORMALIZATION EXPRESSIONS (single source of truth)
     // =========================================================================
 
-    private static XPathy applyNormalizedOp(
-            XPathy base,
-            ExecutionDictionary.Op op,
-            String normExpr,
-            String normalizedValue,
-            String label
-    ) {
-        if (op == null) {
-            return base;
-        }
-
-        String literal = toXPathLiteral(normalizedValue);
-
-        String predicate = switch (op) {
-            case EQUALS      -> "[" + normExpr + " = " + literal + "]";
-            case CONTAINS    -> "[contains(" + normExpr + ", " + literal + ")]";
-            case STARTS_WITH -> "[starts-with(" + normExpr + ", " + literal + ")]";
-            default -> {
-                String msg = "Unsupported " + label + " op: " + op;
-                throw new IllegalArgumentException(msg);
-            }
-        };
-
-        String out = "(" + base.getXpath().trim() + ")" + predicate;
-
-        return XPathy.from(out);
+    private static String normalizedAttrExpr(String attrExpr) {
+        return "normalize-space(translate(" + attrExpr + ", " + toXPathLiteral(from) + " , " + toXPathLiteral(to) + "))";
     }
 
-    public static XPathy applyAttrOp(XPathy base, String attr, ExecutionDictionary.Op op, Object value) {
-        if (attr == null) {
-            return base;
-        }
-
-        return applyNormalizedOp(
-                base,
-                op,
-                normalizedAttrExpr(attr),
-                normalizeValue(value),
-                "attr"
-        );
+    private static String normalizedTextExpr() {
+        return "normalize-space(translate(string(.), " + toXPathLiteral(from) + " , " + toXPathLiteral(to) + "))";
     }
 
-    public static XPathy applyTextOp(XPathy base, ExecutionDictionary.Op op, Object value) {
-        return applyNormalizedOp(
-                base,
-                op,
-                normalizedTextExpr(),
-                normalizeValue(value),
-                "text"
-        );
+    private static String toXPathLiteral(String s) {
+        if (s == null) return "''";
+        if (!s.contains("'")) return "'" + s + "'";
+        if (!s.contains("\"")) return "\"" + s + "\"";
+
+        // Contains both ' and " → use concat('foo', "'", 'bar')
+        StringBuilder sb = new StringBuilder("concat(");
+        String[] parts = s.split("'", -1);
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) sb.append(", \"'\", ");
+            sb.append("'").append(parts[i]).append("'");
+        }
+        sb.append(")");
+        return sb.toString();
     }
 
     // =========================================================================
@@ -466,12 +387,9 @@ public final class XPathyUtils {
         String normalized = xpath.strip();
 
         if (!looksAbsolutelyScoped(normalized)) {
-            // Context-dependent or weird-looking → don't transform
             return xpath;
         }
-
         if (looksLikeItUsesRelativeDots(normalized)) {
-            // Mixed absolute + .// or ./ etc → too risky → don't transform
             return xpath;
         }
 
@@ -480,43 +398,23 @@ public final class XPathyUtils {
                 "[not(descendant::*[count(. | " + wrapped + ") = count(" + wrapped + ")])]";
     }
 
-    /**
-     * Very simple heuristic:
-     *   - Strip leading whitespace and '('
-     *   - Expression is considered absolute if first non-paren char is '/'
-     *     (covers both '/' and '//' and things like (/html|//div)).
-     */
     private static boolean looksAbsolutelyScoped(String xpath) {
         int i = 0;
         int len = xpath.length();
-        while (i < len && Character.isWhitespace(xpath.charAt(i))) {
-            i++;
-        }
+        while (i < len && Character.isWhitespace(xpath.charAt(i))) i++;
         while (i < len && xpath.charAt(i) == '(') {
             i++;
-            while (i < len && Character.isWhitespace(xpath.charAt(i))) {
-                i++;
-            }
+            while (i < len && Character.isWhitespace(xpath.charAt(i))) i++;
         }
         if (i >= len) return false;
-        char c = xpath.charAt(i);
-        return c == '/';
+        return xpath.charAt(i) == '/';
     }
 
-    /**
-     * Cheap disqualifier: if we see obvious relative-dot patterns anywhere
-     * (./foo, .//bar, .., etc.), we bail out and don't transform.
-     *
-     * This is intentionally conservative: it may reject some XPaths
-     * that would actually be safe, but it won't break any.
-     */
     private static boolean looksLikeItUsesRelativeDots(String xpath) {
-        String s = xpath;
-        return s.contains(".//")
-                || s.contains("./")
-                || s.contains("..")
-                || s.contains(" | .")  // union with a dot-relative part
-                || s.startsWith(".")   // purely relative at top-level
-                ;
+        return xpath.contains(".//")
+                || xpath.contains("./")
+                || xpath.contains("..")
+                || xpath.contains(" | .")
+                || xpath.startsWith(".");
     }
 }

@@ -37,8 +37,7 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.HTML_
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETURNS_VALUE;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrOp;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.normalizeText;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrPredicate;
 
 
 public class ElementMatch {
@@ -167,15 +166,25 @@ public class ElementMatch {
 
         if (elementNode.localStateBoolean("atrPredicate")) {
             String atrPredicate = elementNode.getStringFromLocalState("atrPredicate");
-            for (String attr : atrPredicate.split("\\bwith\b")) {
-
+            for (String attr : atrPredicate.split("\\b(with|and)\\b")) {
+                attr = attr.replaceAll("\\b(?:with|and)\\b", "").trim();
+                if(attr.isBlank())
+                    continue;
                 Matcher m = attributePattern.matcher(attr.trim());
                 if (m.find()) {
                     String attrName = m.group("attrName");   // named group
+                    System.out.println("@@attrName: " + attrName);
                     String predicate = m.group("predicate");   // named group
-                    MatchNode predicateNode = elementNode.getMatchNode(predicate.trim());
-
-                    attributes.add(new Attribute(attrName, (String) predicateNode.getFromLocalState("predicateType"), predicateNode.getValueWrapper("predicateVal")));
+                    System.out.println("@@predicate: " + predicate);
+                    String predicateType = "has";
+                    ValueWrapper predicateVal = null;
+                    if (predicate != null) {
+                        MatchNode predicateNode = elementNode.getMatchNode(predicate.trim());
+                         predicateType = (String) predicateNode.getFromLocalState("predicateType");
+                         predicateVal = predicateNode.getValueWrapper("predicateVal");
+                    }
+                    System.out.println("@@NEW-attribute" + attributes.size() +" : " + attrName + " " + predicateType + " " + predicateVal);
+                    attributes.add(new Attribute(attrName, predicateType, predicateVal) );
                 } else {
                     throw new RuntimeException("Invalid attribute predicate: " + attr);
                 }
@@ -222,7 +231,7 @@ public class ElementMatch {
         }
 
         System.out.println("@@state: '" + state + "'");
-        System.out.println("@@BinaryStateConditions.onElement():\n" + BinaryStateConditions.onElement());
+        System.out.println("@@BinaryStateConditions.onElement():\n" + onElement());
         if (!state.isEmpty()) {
             boolean un = state.startsWith("un");
             if (un) state = state.substring(2);
@@ -232,8 +241,8 @@ public class ElementMatch {
                 case "checked", "selected", "on" -> {
                     System.out.println("@@checkedddd!!!");
                     elPredictXPaths.add(un
-                            ? BinaryStateConditions.offElement()
-                            : BinaryStateConditions.onElement());
+                            ? offElement()
+                            : onElement());
                 }
 
                 // Enabled/disabled
@@ -281,7 +290,8 @@ public class ElementMatch {
         xPathy = combineAnd(elPredictXPaths);
 
         for (Attribute attribute : attributes) {
-            xPathy = applyAttrOp(xPathy, attribute.attrName, attribute.predicateType, attribute.predicateVal);
+            System.out.println("@@attribute: " + attribute);
+            xPathy = applyAttrPredicate(xPathy, attribute.attrName, attribute.predicateVal, attribute.predicateType);
         }
 //        }
 

@@ -3,16 +3,15 @@ package tools.dscode.common.treeparsing.xpathcomponents;
 import com.xpathy.Attribute;
 import com.xpathy.Tag;
 import com.xpathy.XPathy;
-import tools.dscode.common.domoperations.ExecutionDictionary.Op;
 import tools.dscode.common.assertions.ValueWrapper;
+import tools.dscode.common.domoperations.ExecutionDictionary.Op;
 
 import java.util.Arrays;
 import java.util.Objects;
 
 public final class XPathyBuilder {
 
-    private static final String U = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    private static final String L = "abcdefghijklmnopqrstuvwxyz";
+    private XPathyBuilder() {}
 
     public static XPathy buildIfAllTrue(Tag tag, Attribute xPathyAttr, ValueWrapper v, Op op, boolean... bools) {
         for (boolean b : bools) {
@@ -22,124 +21,115 @@ public final class XPathyBuilder {
     }
 
     public static XPathy buildIfNonNull(Tag tag, Attribute xPathyAttr, ValueWrapper v, Op op, Object... nonNulls) {
-        if(Arrays.stream(nonNulls).anyMatch(Objects::isNull)) return null;
+        if (Arrays.stream(nonNulls).anyMatch(Objects::isNull)) return null;
         return build(tag, xPathyAttr, v, op);
     }
 
+    /**
+     * Builds: //tag[ predicate ]
+     *
+     * Delegates ALL string/attr matching to XPathyUtils ValueWrapper-based APIs.
+     * Only keeps small numeric-text handling here (because XPathyUtils numeric ops are attribute-focused).
+     */
     public static XPathy build(Tag tag, Attribute xPathyAttr, ValueWrapper v, Op op) {
         String t = (tag == null) ? "*" : tag.toString();
         XPathy base = XPathy.from("//" + t);
-        Op o = (op == null) ? Op.DEFAULT : op;
-        String attr = (xPathyAttr == null) ? null :  xPathyAttr.toString();
 
-        if(attr != null && !attr.startsWith("@")) attr = "@" + attr;
+        Op o = normalizeOp(op);
 
+        // Attribute name normalization (builder previously carried leading @ sometimes)
+        String attrName = (xPathyAttr == null) ? null : xPathyAttr.toString();
+        if (attrName != null) {
+            attrName = attrName.strip();
+            if (attrName.startsWith("@")) attrName = attrName.substring(1);
+            if (attrName.isBlank()) attrName = null;
+        }
 
-        // null ValueWrapper + (EQUALS/DEFAULT) => presence-only (attr) or no constraint (text)
+        // ---------------------------------------------------------------------
+        // Null ValueWrapper handling (preserve old intent)
+        //
+        // - If attr is present and v is null with (DEFAULT/EQUALS): presence-only predicate.
+        // - If text (attr == null) and v is null with (DEFAULT/EQUALS): no constraint.
+        // ---------------------------------------------------------------------
         if (v == null && (o == Op.DEFAULT || o == Op.EQUALS)) {
-            return (attr == null) ? base : XPathy.from("//" + t + "[" + attr + "]");
+            if (attrName == null) return base;
+            return XPathy.from("//" + t + "[@" + attrName + "]");
         }
 
-        String raw = (v == null) ? "" : v.asNormalizedText();
+        // If v is null but op isn't EQUALS/DEFAULT, previous code effectively treated it as empty.
+        // We'll match empty string/blank normalization instead (safe + deterministic).
+        ValueWrapper effective = (v == null) ? ValueWrapper.createValueWrapper("") : v;
+
+        // ---------------------------------------------------------------------
+        // Blank value wrapper: match blank text/attr after normalization
+        // (BACK_TICKED blank means exact empty; this still works because value is "")
+        // ---------------------------------------------------------------------
+        String raw = effective.toString(); // unquoted content for quoted types; raw string for others
         if (raw == null || raw.isBlank()) {
-            // blank value => match blank attr/text after normalization
-            String normExpr = (attr == null) ? normTextExpr() : normAttrExpr(attr);
-            return XPathy.from("//" + t + "[" + maybeCI(normExpr, v) + " = ''" + "]");
+            ValueWrapper blank = ValueWrapper.createValueWrapper("");
+            if (attrName == null) {
+                return XPathyUtils.applyTextPredicate(base, blank, Op.EQUALS);
+            }
+            return XPathyUtils.applyAttrPredicate(base, attrName, blank, Op.EQUALS);
         }
 
-        // Numeric ops
-        if (o == Op.GT || o == Op.GTE || o == Op.LT || o == Op.LTE) {
-            String lhsNum = (attr == null) ? "number(normalize-space(.))" : "number(" + attr + ")";
-            String opSym = switch (o) {
+        // ---------------------------------------------------------------------
+        // Numeric text comparisons (attr == null)
+        // XPathyUtils numeric ops are for ATTR predicates; builder used numeric on text too.
+        // Keep that capability here, still driven by ValueWrapper.
+        // ---------------------------------------------------------------------
+        if (attrName == null && isNumericOp(o)) {
+            // Use ValueWrapper numeric parsing semantics (BigInteger-based)
+            // For non-numeric wrappers, previous behavior would still try; we enforce numeric.
+            if (effective.type != ValueWrapper.ValueTypes.NUMERIC && !effective.isNumeric()) {
+                // fall back to string equals (old behavior was ambiguous); keep conservative
+                return XPathyUtils.applyTextPredicate(base, effective, Op.EQUALS);
+            }
+
+            String lhs = "number(normalize-space(.))";
+            String rhs = effective.asBigInteger().toString();
+            String sym = switch (o) {
                 case GT -> ">";
                 case GTE -> ">=";
                 case LT -> "<";
-                default -> "<="; // LTE
+                case LTE -> "<=";
+                default -> "="; // not reachable for isNumericOp except EQUALS in some flows
             };
-            return XPathy.from("//" + t + "[" + lhsNum + " " + opSym + " " + v.asNormalizedText() + "]");
+
+            return XPathy.from("//" + t + "[" + lhs + " " + sym + " " + rhs + "]");
         }
 
-        // EQUALS/DEFAULT should be numeric equality if the wrapper is NUMERIC
-        if ((o == Op.DEFAULT || o == Op.EQUALS) && v.type == ValueWrapper.ValueTypes.NUMERIC) {
-            String lhsNum = (attr == null) ? "number(normalize-space(.))" : "number(" + attr + ")";
-            return XPathy.from("//" + t + "[" + lhsNum + " = " + v.asNormalizedText() + "]");
+        // Numeric equality on text when wrapper is NUMERIC and op is DEFAULT/EQUALS
+        if (attrName == null && (o == Op.DEFAULT || o == Op.EQUALS) && effective.type == ValueWrapper.ValueTypes.NUMERIC) {
+            String lhs = "number(normalize-space(.))";
+            String rhs = effective.asBigInteger().toString();
+            return XPathy.from("//" + t + "[" + lhs + " = " + rhs + "]");
         }
 
-        // String ops (normalized) — delegate to XPathyUtils where possible
-        return switch (o) {
-            case CONTAINS, STARTS_WITH -> applyNormalizedStringOp(base, attr, o, v);
-            case ENDS_WITH -> endsWithNormalized(t, attr, v);
-            case DEFAULT, EQUALS -> applyNormalizedStringOp(base, attr, Op.EQUALS, v);
-            default -> applyNormalizedStringOp(base, attr, Op.EQUALS, v);
-        };
-    }
+        // ---------------------------------------------------------------------
+        // String/text operations (ValueWrapper-driven) for text or attribute
+        // Everything routes through XPathyUtils (no duplicated normalization/CI logic here).
+        // ---------------------------------------------------------------------
+        Op routed = (o == Op.DEFAULT) ? Op.EQUALS : o;
 
-    private static XPathy applyNormalizedStringOp(XPathy base, String attr, Op op, ValueWrapper v) {
-        boolean ci = v != null && v.type == ValueWrapper.ValueTypes.SINGLE_QUOTED;
-        String value = ci ? v.asNormalizedText().toLowerCase() : v.asNormalizedText();
-
-        if (!ci) {
-            return (attr == null)
-                    ? XPathyUtils.applyTextOp(base, op, value)
-                    : XPathyUtils.applyAttrOp(base, attr, op, value);
+        if (attrName == null) {
+            // text predicate on base
+            return XPathyUtils.applyTextPredicate(base, effective, routed);
         }
 
-        // Case-insensitive: rebuild predicate using the same normalization tables as XPathyUtils.
-        String normExpr = (attr == null) ? normTextExpr() : normAttrExpr(attr);
-        String lhs = "translate(" + normExpr + "," + lit(U) + "," + lit(L) + ")";
-        String rhs = lit(XPathyUtils.normalizeText(value));
-
-        String pred = switch (op) {
-            case EQUALS -> lhs + " = " + rhs;
-            case CONTAINS -> "contains(" + lhs + ", " + rhs + ")";
-            case STARTS_WITH -> "starts-with(" + lhs + ", " + rhs + ")";
-            default -> lhs + " = " + rhs;
-        };
-
-        return XPathy.from("(" + base.getXpath() + ")[" + pred + "]");
+        // attribute predicate on base (includes numeric + boolean semantics inside XPathyUtils)
+        return XPathyUtils.applyAttrPredicate(base, attrName, effective, routed);
     }
 
-    private static XPathy endsWithNormalized(String tag, String attr, ValueWrapper v) {
-        boolean ci = v != null && v.type == ValueWrapper.ValueTypes.SINGLE_QUOTED;
-        String expected = ci ? v.asNormalizedText().toLowerCase() : v.asNormalizedText();
-        expected = XPathyUtils.normalizeText(expected);
+    // =========================================================================
+    // Small helpers (non-redundant)
+    // =========================================================================
 
-        String normExpr = (attr == null) ? normTextExpr() : normAttrExpr(attr);
-        if (ci) normExpr = "translate(" + normExpr + "," + lit(U) + "," + lit(L) + ")";
-
-        String rhs = lit(expected);
-        String pred =
-                "substring(" + normExpr + ", " +
-                        "string-length(" + normExpr + ") - string-length(" + rhs + ") + 1" +
-                        ") = " + rhs;
-
-        return XPathy.from("//" + tag + "[" + pred + "]");
+    private static Op normalizeOp(Op op) {
+        return (op == null) ? Op.DEFAULT : op;
     }
 
-    // Use the same whitespace normalization tables from XPathyUtils (no duplication of the tables)
-    private static String normAttrExpr(String attr) {
-        return "normalize-space(translate(" + attr + ", " + lit(XPathyUtils.from) + " , " + lit(XPathyUtils.to) + "))";
+    private static boolean isNumericOp(Op op) {
+        return op == Op.GT || op == Op.GTE || op == Op.LT || op == Op.LTE;
     }
-
-
-    private static String normTextExpr() {
-        return "normalize-space(translate(string(.), " + lit(XPathyUtils.from) + " , " + lit(XPathyUtils.to) + "))";
-    }
-
-    private static String maybeCI(String normExpr, ValueWrapper v) {
-        if (v != null && v.type == ValueWrapper.ValueTypes.SINGLE_QUOTED) {
-            return "translate(" + normExpr + "," + lit(U) + "," + lit(L) + ")";
-        }
-        return normExpr;
-    }
-
-    // Minimal XPath literal helper (kept small on purpose)
-    private static String lit(String s) {
-        if (s.indexOf('\'') < 0) return "'" + s + "'";
-        if (s.indexOf('"') < 0) return "\"" + s + "\"";
-        // very rare: both quotes present; good enough for your “concise / minimal checks” requirement
-        return "concat('" + s.replace("'", "',\"'\",'") + "')";
-    }
-
-    private XPathyBuilder() {}
 }
