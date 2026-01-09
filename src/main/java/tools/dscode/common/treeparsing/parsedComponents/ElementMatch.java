@@ -292,6 +292,7 @@ public class ElementMatch {
         for (Attribute attribute : attributes) {
             System.out.println("@@attribute: " + attribute);
             xPathy = applyAttrPredicate(xPathy, attribute.attrName, attribute.predicateVal, attribute.predicateType);
+            System.out.println("@@xPathy with attributes===== " + xPathy);
         }
 //        }
 
