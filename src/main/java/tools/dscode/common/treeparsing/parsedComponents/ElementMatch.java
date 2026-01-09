@@ -27,10 +27,13 @@ import java.util.regex.Pattern;
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.browseroperations.BrowserAlerts.getText;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
+import static tools.dscode.common.domoperations.ExecutionDictionary.Op.getOpFromString;
 import static tools.dscode.common.domoperations.elementstates.BinaryStateConditions.offElement;
 import static tools.dscode.common.domoperations.elementstates.BinaryStateConditions.onElement;
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.HTML_DROPDOWN;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.HTML_OPTION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETURNS_VALUE;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
@@ -187,6 +190,10 @@ public class ElementMatch {
             } else {
                 elementTypes.add(ElementType.HTML_ELEMENT);
                 elementTypes.add(RETURNS_VALUE);
+                if (category.matches("Options?"))
+                    elementTypes.add(HTML_OPTION);
+                else if (category.matches("Dropdowns?"))
+                    elementTypes.add(HTML_DROPDOWN);
             }
         } else if (elementTypes.contains(ElementType.VALUE_TYPE)) {
             nonHTMLValues.add(defaultText);
@@ -215,7 +222,7 @@ public class ElementMatch {
         }
 
         System.out.println("@@state: '" + state + "'");
-        System.out.println("@@BinaryStateConditions.onElement():\n" + BinaryStateConditions.onElement() );
+        System.out.println("@@BinaryStateConditions.onElement():\n" + BinaryStateConditions.onElement());
         if (!state.isEmpty()) {
             boolean un = state.startsWith("un");
             if (un) state = state.substring(2);
@@ -274,8 +281,7 @@ public class ElementMatch {
         xPathy = combineAnd(elPredictXPaths);
 
         for (Attribute attribute : attributes) {
-            ExecutionDictionary.Op op = getOpFromString(attribute.predicateType);
-            xPathy = applyAttrOp(xPathy, attribute.attrName, op, attribute.predicateVal);
+            xPathy = applyAttrOp(xPathy, attribute.attrName, attribute.predicateType, attribute.predicateVal);
         }
 //        }
 
@@ -283,17 +289,17 @@ public class ElementMatch {
         System.out.println("@@elementMAtch2 elementTypes: " + this.elementTypes);
     }
 
-    public static ExecutionDictionary.Op getOpFromString(String input) {
-        return switch (input) {
-            case null -> null;
-            case String s when s.isBlank() -> null;
-            case String s when s.startsWith("equal") -> ExecutionDictionary.Op.EQUALS;
-            case String s when s.startsWith("contain") -> ExecutionDictionary.Op.CONTAINS;
-            case String s when s.startsWith("start") -> ExecutionDictionary.Op.STARTS_WITH;
-            case String s when s.startsWith("end") -> ExecutionDictionary.Op.ENDS_WITH;
-            default -> null;
-        };
-    }
+//    public static ExecutionDictionary.Op getOpFromString(String input) {
+//        return switch (input) {
+//            case null -> null;
+//            case String s when s.isBlank() -> null;
+//            case String s when s.startsWith("equal") -> ExecutionDictionary.Op.EQUALS;
+//            case String s when s.startsWith("contain") -> ExecutionDictionary.Op.CONTAINS;
+//            case String s when s.startsWith("start") -> ExecutionDictionary.Op.STARTS_WITH;
+//            case String s when s.startsWith("end") -> ExecutionDictionary.Op.ENDS_WITH;
+//            default -> null;
+//        };
+//    }
 
 //    private List<PhraseData> phraseContextList;
 
@@ -355,11 +361,9 @@ public class ElementMatch {
         } else if (elementTypes.contains(ElementType.BROWSER_WINDOW)) {
             String normalized = category.toUpperCase().replaceAll("WINDOWS?", "").trim();
             if (normalized.isBlank()) {
-                if(textOps.isEmpty())
-                {
+                if (textOps.isEmpty()) {
                     normalized = "NEW";
-                }
-                else {
+                } else {
                     normalized = "TITLE";
                 }
             }

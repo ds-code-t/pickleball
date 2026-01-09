@@ -2,7 +2,10 @@ Feature: Additiontest
 
   Scenario: chckboxtest 2
   @[DEBUG]
-    * , switch to New Window
+#    Then , I select "Opel" in the "cars" Dropdown
+    Then , I select 'opel' Option in the "cars" Dropdown
+
+#    * , switch to New Window
 #    * , click any checked Checkbox
 
   Scenario Outline: test22
@@ -115,7 +118,7 @@ Feature: Additiontest
 
 
   Scenario Outline: sssgssatesssssf
-    * navigate to: URL.select
+#    * navigate to: URL.select
     @[DEBUG]
     * , from the Top Panel:
   : * IF: "<Opel sd>" THEN: , I verify  "Get your own website" Link matches "^Gxet.*$"

@@ -4,12 +4,16 @@ import io.cucumber.java.eo.Se;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.Keys;
+import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.Select;
+import tools.dscode.common.assertions.ValueWrapper;
 
 import java.time.Duration;
+import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 
 public final class HumanInteractions {
@@ -25,31 +29,79 @@ public final class HumanInteractions {
     // =======================
 
 
-    /**
-     * Select an option from a native &lt;select&gt; dropdown by its visible text.
-     * <p>
-     * Primary path:
-     * - Scrolls the select into view center
-     * - Clicks to open the dropdown
-     * - Moves to the matching &lt;option&gt; and clicks it via Actions
-     * <p>
-     * Fallback:
-     * - JS: finds the option by normalized text, sets it selected, and fires input/change events.
-     */
-    public static void selectDropdownByVisibleText(WebDriver driver,
-                                                   WebElement element,
-                                                   String visibleText) {
-        Objects.requireNonNull(driver, "driver");
-        Objects.requireNonNull(element, "selectEl");
-        Objects.requireNonNull(visibleText, "visibleText");
-
-
+    public static void selectDropdownByIndex(WebDriver driver,
+                                             WebElement element,
+                                             int index) {
+        System.out.println("@@selectDropdownByIndex: " + element.getText());
+        System.out.println("@@index: " + index);
+        if (index < 0) {
+            throw new IllegalArgumentException("index must be >= 0");
+        }
 
         centerScroll(driver, element);
-        new Select(element).selectByVisibleText(visibleText);
-        // Find the matching option by normalized visible text
 
+        Select select = new Select(element);
+        int optionCount = select.getOptions().size();
+
+        if (index >= optionCount) {
+            throw new IllegalArgumentException(
+                    "index " + index + " out of bounds (options=" + optionCount + ")"
+            );
+        }
+        select.selectByIndex(index);
     }
+
+
+    public static void selectDropdownByVisibleText(WebDriver driver,
+                                                   WebElement container,
+                                                   ValueWrapper valueWrapper) {
+
+        String text = valueWrapper.asNormalizedText();
+        boolean caseSensitive = valueWrapper.type.equals(ValueWrapper.ValueTypes.DOUBLE_QUOTED);
+        String needle = caseSensitive ? text : text.toLowerCase(Locale.ROOT);
+
+        List<WebElement> matches = container.findElements(By.xpath(".//option | .//a"));
+        System.out.println("@@matches.size(): " + matches.size());
+        for (WebElement el : matches) {
+
+            System.out.println("@@el.getText(): " + el.getText());
+            System.out.println("@@el.getTagName(): " + el.getTagName());
+
+            String hay = el.getText()
+                    .trim()
+                    .replaceAll("\\s+", " ");
+            hay = caseSensitive ? hay : hay.toLowerCase(Locale.ROOT);
+
+            if (!hay.equals(needle)) continue;
+
+            if ("option".equalsIgnoreCase(el.getTagName())) {
+                WebElement selectEl = el.findElement(By.xpath("ancestor::select[1]"));
+                System.out.println("@@selectEl: " + selectEl.getText() + "");
+                centerScroll(driver, selectEl);
+
+                Select sel = new Select(selectEl);
+                List<WebElement> opts = sel.getOptions();
+                for (int i = 0; i < opts.size(); i++) {
+                    System.out.println("@@opts.get(i): " + opts.get(i).getText());
+                    if (opts.get(i).equals(el)) {
+                        sel.selectByIndex(i);
+                        return;
+                    }
+                }
+                sel.selectByVisibleText(el.getText());
+                return;
+            }
+
+            centerScroll(driver, el);
+            el.click();
+            return;
+        }
+
+        throw new NoSuchElementException("No matching <option> or <a> for text: " + text);
+    }
+
+
+
 
 
     /**

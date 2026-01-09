@@ -1,5 +1,6 @@
 package tools.dscode.common.seleniumextensions;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.openqa.selenium.*;
@@ -78,6 +79,7 @@ public class ElementWrapper {
             throw new IllegalArgumentException(
                     "WebDriver must implement JavascriptExecutor to use ElementWrapper");
         }
+
         // tagName
         String tagName = safeTagName(element);
         attributeSnapshot.put("tagName", tagName);
@@ -103,7 +105,34 @@ public class ElementWrapper {
         ObjectNode attrNode = attributeSnapshot.putObject("attributes");
         attrs.forEach(attrNode::put);
 
+        // ---- added: sibling indexes ----
+
+        int siblingIndex = ((Number) js.executeScript(
+                "var el = arguments[0];" +
+                        "var i = 0;" +
+                        "while (el.previousElementSibling) {" +
+                        "  el = el.previousElementSibling;" +
+                        "  i++;" +
+                        "}" +
+                        "return i;",
+                element
+        )).intValue();
+        attributeSnapshot.put("siblingIndex", siblingIndex);
+
+        int sameTagIndex = ((Number) js.executeScript(
+                "var el = arguments[0];" +
+                        "var tag = el.tagName;" +
+                        "var i = 0;" +
+                        "while (el.previousElementSibling) {" +
+                        "  el = el.previousElementSibling;" +
+                        "  if (el.tagName === tag) i++;" +
+                        "}" +
+                        "return i;",
+                element
+        )).intValue();
+        attributeSnapshot.put("sameTagIndex", sameTagIndex);
     }
+
 
     // -------------------------
     // Public API
@@ -426,6 +455,38 @@ public class ElementWrapper {
         String closeXpath = getExecutionDictionary().getCategoryXPathy("Close Button").getXpath().replaceFirst("^//\\*","descendant-or-self::*");
         WebElement closeButton  = getElement().findElement(new By.ByXPath(closeXpath));
         closeButton.click();
+    }
+
+    public String getSnapshotAttribute(String name) {
+        if (attributeSnapshot == null) return null;
+        return attributeSnapshot
+                .path("attributes")
+                .path(name)
+                .asText(null);
+    }
+
+
+    public String getSnapshotValue(String key) {
+        if (attributeSnapshot == null) return null;
+
+        if (attributeSnapshot.has(key))
+            return attributeSnapshot.get(key).asText(null);
+
+        return attributeSnapshot
+                .path("attributes")
+                .path(key)
+                .asText(null);
+    }
+
+    public String getTagName() {
+        return  attributeSnapshot.get("tagName").asText("");
+    }
+    public int getIndex() {
+        return attributeSnapshot.get("siblingIndex").intValue();
+    }
+
+    public int getSameTagIndex() {
+        return attributeSnapshot.get("sameTagIndex").intValue();
     }
 
 }

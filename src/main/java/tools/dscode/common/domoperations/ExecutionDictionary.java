@@ -41,7 +41,23 @@ public class ExecutionDictionary {
     public static final String STARTING_CONTEXT = "DefaultStartingContextInternalUSE";
     public static final String VISIBILITY_FILTER = "VisibilityFilterInternalUSE";
 
-    public enum Op {DEFAULT, EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE, MATCHES}
+    public enum Op {
+        DEFAULT, EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE, MATCHES;
+
+
+        public static Op getOpFromString(String input) {
+            return switch (input.trim().toLowerCase()) {
+                case String s when s.startsWith("equal") -> Op.EQUALS;
+                case String s when s.startsWith("contain") -> Op.CONTAINS;
+                case String s when s.startsWith("start") -> Op.STARTS_WITH;
+                case String s when s.startsWith("matches") -> Op.MATCHES;
+                case String s when s.startsWith("end") -> Op.ENDS_WITH;
+                case String s when s.startsWith("greater") -> s.contains("equal") ? Op.GTE : Op.GT;
+                case String s when s.startsWith("lesser") -> s.contains("equal") ? Op.LTE : Op.LT;
+                default -> null;
+            };
+        }
+    }
 
     public enum CategoryFlags {PAGE_CONTEXT, PAGE_TOP_CONTEXT, ELEMENT_CONTEXT, SHADOW_HOST, IFRAME}
 
@@ -299,7 +315,8 @@ public class ExecutionDictionary {
         return andThenOr(category, null, null);
     }
 
-    public record CategoryResolution(String category, ValueWrapper value, Op op, XPathy xpath, Set<CategoryFlags> flags) {
+    public record CategoryResolution(String category, ValueWrapper value, Op op, XPathy xpath,
+                                     Set<CategoryFlags> flags) {
     }
 
     public CategoryResolution andThenOrWithFlags(String category, ValueWrapper value, Op op) {

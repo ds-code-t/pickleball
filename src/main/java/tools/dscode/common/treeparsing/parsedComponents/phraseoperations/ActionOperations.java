@@ -1,5 +1,6 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
+import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.browseroperations.WindowSwitch;
@@ -20,6 +21,7 @@ import static tools.dscode.common.domoperations.HumanInteractions.clearAndType;
 import static tools.dscode.common.domoperations.HumanInteractions.click;
 import static tools.dscode.common.domoperations.HumanInteractions.contextClick;
 import static tools.dscode.common.domoperations.HumanInteractions.doubleClick;
+import static tools.dscode.common.domoperations.HumanInteractions.selectDropdownByIndex;
 import static tools.dscode.common.domoperations.HumanInteractions.selectDropdownByVisibleText;
 import static tools.dscode.common.domoperations.HumanInteractions.typeText;
 import static tools.dscode.common.domoperations.HumanInteractions.wheelScrollBy;
@@ -125,22 +127,41 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
+            System.out.println("@@phraseData.getElementMatchesFollowingOperation(): " + phraseData.getElementMatchesFollowingOperation());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE),
+                            .mustMatchAtLeastOne(ElementType.RETURNS_VALUE),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
+            System.out.println("@@phraseData.resultElements: " + phraseData.resultElements);
 
             ElementMatch selection = phraseData.resultElements.getFirst();
             ElementMatch dropDowns = phraseData.resultElements.get(1);
+            System.out.println("@@dropDowns.elementTypes: " + dropDowns.elementTypes);
+            System.out.println("@@selection.elementTypes: " + selection.elementTypes);
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
-                for (ElementWrapper elementWrapper : dropDowns.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if(count>0) {
+                for (ElementWrapper dropDownWrapper : dropDowns.getElementThrowErrorIfEmptyWithNoModifier()) {
+                    if (count > 0) {
                         safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
-                    selectDropdownByVisibleText(GeneralSteps.getDefaultDriver(), elementWrapper.getElement(), selection.getValue().toString());
+                    System.out.println("@@dropDownWrapper: " + dropDownWrapper);
+                    if (selection.elementTypes.contains(ElementType.HTML_TYPE)) {
+                        System.out.println("@@1");
+                        System.out.println("@@selection.xPathy: " + selection.xPathy);
+                        ElementWrapper optionElement = selection.getElementWrappers().getFirst();
+                        System.out.println("@@optionElement.attributeSnapshot: "   + optionElement.attributeSnapshot);
+                        if(optionElement.getTagName().equalsIgnoreCase("option")) {
+                            selectDropdownByIndex(GeneralSteps.getDefaultDriver(), dropDownWrapper.getElement(), optionElement.getSameTagIndex());
+                        }
+                        else {
+                            click(GeneralSteps.getDefaultDriver(), optionElement.getElement());
+                        }
+                    }
+                    else {
+                        selectDropdownByVisibleText(GeneralSteps.getDefaultDriver(), dropDownWrapper.getElement(), selection.getValue());
+                    }
                     count++;
                 }
                 System.out.println("@@dropDowns.getElementWrappers().size() " + dropDowns.getElementWrappers().size());
@@ -155,8 +176,8 @@ public enum ActionOperations implements OperationsInterface {
             System.out.println(phraseData + " : Executing " + this.name());
 
             System.out.println("@@phraseData.getElementMatches(): " + phraseData.getElementMatches());
-            System.out.println("@@ phraseData.getFirstElement().startIndex: " +  phraseData.getFirstElement().startIndex);
-            System.out.println("@@phraseData.operationIndex: " +  phraseData.operationIndex);
+            System.out.println("@@ phraseData.getFirstElement().startIndex: " + phraseData.getFirstElement().startIndex);
+            System.out.println("@@phraseData.operationIndex: " + phraseData.operationIndex);
 
             System.out.println("@@phraseData.getElementMatchesFollowingOperation(): " + phraseData.getElementMatchesFollowingOperation());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
@@ -172,7 +193,7 @@ public enum ActionOperations implements OperationsInterface {
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if(count>0) {
+                    if (count > 0) {
                         safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
                     click(GeneralSteps.getDefaultDriver(), elementWrapper.getElement());
@@ -197,7 +218,7 @@ public enum ActionOperations implements OperationsInterface {
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if(count>0) {
+                    if (count > 0) {
                         safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
                     doubleClick(GeneralSteps.getDefaultDriver(), elementWrapper.getElement());
@@ -221,7 +242,7 @@ public enum ActionOperations implements OperationsInterface {
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if(count>0) {
+                    if (count > 0) {
                         safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
                     contextClick(GeneralSteps.getDefaultDriver(), elementWrapper.getElement());
@@ -248,7 +269,7 @@ public enum ActionOperations implements OperationsInterface {
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : inputElement.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if(count>0) {
+                    if (count > 0) {
                         safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
                     typeText(GeneralSteps.getDefaultDriver(), elementWrapper.getElement(), value.getValue().toString());
@@ -274,7 +295,7 @@ public enum ActionOperations implements OperationsInterface {
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : inputElement.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if(count>0) {
+                    if (count > 0) {
                         safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
                     clearAndType(GeneralSteps.getDefaultDriver(), elementWrapper.getElement(), value.getValue().toString());
@@ -297,7 +318,7 @@ public enum ActionOperations implements OperationsInterface {
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if(count>0) {
+                    if (count > 0) {
                         safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
                     wheelScrollBy(GeneralSteps.getDefaultDriver(), elementWrapper.getElement());
@@ -349,7 +370,7 @@ public enum ActionOperations implements OperationsInterface {
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if(count>0) {
+                    if (count > 0) {
                         safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
                     elementWrapper.close();

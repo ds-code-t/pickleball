@@ -86,8 +86,6 @@ public final class DefinitionContext {
         };
 
 
-
-
         ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?!\\s*[A-Z])(?<unitMatch>\\s+(?<unit>second|minute|hour|day|week|month|year|time|number|integer|decimal|color|text)s?\\b)?") {
             @Override
             public String onSubstitute(MatchNode self) {
@@ -99,7 +97,6 @@ public final class DefinitionContext {
         };
 
         ParseNode position = new ParseNode("#\\d+");
-
 
 
         ParseNode phrase = new ParseNode("^(?<separatorA>\\bthen\\b)?(?<conjunction>\\b(?:and|or)\\b)?(?<separatorB>\\bthen\\b)?\\s*(?<conditional>\\b(?:else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
@@ -154,8 +151,8 @@ public final class DefinitionContext {
         };
 
 
-//        ParseNode elsementMatch = new ParseNode("(?:(?<selectionType>every|any|none\\s+of|none|no)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed|required))\\b\\s*)?(?<text><<valueMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*");
-        ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any|none\\s+of|none|no)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed|required))\\b\\s*)?(?<text><<valueMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*") {
+        //        ParseNode elsementMatch = new ParseNode("(?:(?<selectionType>every|any|none\\s+of|none|no)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\s+)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed|required))\\b\\s*)?(?<text><<valueMask>>)?\\s+(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*");
+        ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any|none\\s+of|none|no)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\s*\\b)?(?:(?<state>(?:un)?(?:checked|selected|enabled|disabled|expanded|collapsed|required))\\b\\s*)?(?<text><<valueMask>>)?\\s*\\b(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>\\bwith\\s+[a-z]+\\s+<<predicate>>\\s*)*") {
             @Override
             public String onSubstitute(MatchNode self) {
                 self.putToLocalState("fullText", self.unmask(self.groups().get(0)));
@@ -195,7 +192,6 @@ public final class DefinitionContext {
             }
 
         };
-
 
 
         ParseNode assertionType = new ParseNode("\\b(ensure|verify)\\b") {
@@ -312,7 +308,7 @@ public final class DefinitionContext {
             //
             // Frame
             //
-            registerIframe( "IFrame").children("Frame", "Frames", "IFrames", "Iframe", "Iframes")
+            registerIframe("IFrame").children("Frame", "Frames", "IFrames", "Iframe", "Iframes")
                     .and(
                             (category, v, op) ->
                                     combineOr(Tag.iframe, Tag.frame)
@@ -326,10 +322,8 @@ public final class DefinitionContext {
             category(FILE_INPUT)
                     .and(
                             (category, v, op) ->
-                                    XPathy.from(Tag.input).byAttribute(type).equals("file")
+                                    Tag.input.byAttribute(type).equals("file")
                     );
-
-
 
 
             //
@@ -396,7 +390,7 @@ public final class DefinitionContext {
             category("Tab").children("Tabs").inheritsFrom(CONTAINS_TEXT)
                     .or(
                             (category, v, op) -> XPathy.from(Tag.any.byAttribute(role).equals("tab")),
-                            (category, v, op) ->  XPathy.from(Tag.img).byAttribute(tabindex).haveIt()
+                            (category, v, op) -> XPathy.from(Tag.img).byAttribute(tabindex).haveIt()
 
                     );
 
@@ -424,34 +418,30 @@ public final class DefinitionContext {
             category("Radio Button").children("Radio Buttons").inheritsFrom("forLabel", "htmlNaming")
                     .and((category, v, op) ->
                             combineOr(
-                                    XPathy.from(input).byAttribute(type).equals("radio")
+                                    Tag.input.byAttribute(type).equals("radio")
                             )
                     );
 
             category("Checkbox").children("Checkboxes").inheritsFrom("forLabel", "htmlNaming")
                     .and((category, v, op) ->
                             combineOr(
-                            XPathy.from(input).byAttribute(type).equals("checkbox"),
-                            XPathy.from(Tag.custom("mat-checkbox"))
+                                    Tag.input.byAttribute(type).equals("checkbox"),
+                                    XPathy.from(Tag.custom("mat-checkbox"))
                             )
                     );
 
             category("Toggle").children("Toggles").inheritsFrom("forLabel", "htmlNaming")
                     .and((category, v, op) ->
                             combineOr(
-                                    XPathy.from(input).byAttribute(checked).haveIt(),
-                                    XPathy.from(input).byAttribute(Attribute.custom("aria-checked")).haveIt(),
+                                    Tag.input.byAttribute(checked).haveIt(),
+                                    Tag.input.byAttribute(Attribute.custom("aria-checked")).haveIt(),
                                     XPathy.from(Tag.custom("mat-slide-toggle"))
                             )
                     );
 
-            category("Option").children("Options").inheritsFrom("forLabel", "htmlNaming")
+            category("Option").children("Options").inheritsFrom(CONTAINS_TEXT)
                     .and((category, v, op) ->
-                            combineOr(
-                                    XPathy.from(input).byAttribute(checked).haveIt(),
-                                    XPathy.from(input).byAttribute(Attribute.custom("aria-checked")).haveIt(),
-                                    XPathy.from(Tag.custom("mat-slide-toggle"))
-                            )
+                            XPathy.from(Tag.option)
                     );
 
             category(BASE_CATEGORY).and(
