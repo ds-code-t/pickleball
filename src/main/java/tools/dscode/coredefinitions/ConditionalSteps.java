@@ -82,7 +82,7 @@ public class ConditionalSteps extends CoreSteps {
             boolean last = i == parts.size() - 1;
             TokenPart part = parts.get(i);
 
-
+            System.out.println("@@part.token(): " + part.token());
             switch (part.token()) {
                 case IF -> {
                     stepString += " , if " + part.text();
@@ -100,15 +100,19 @@ public class ConditionalSteps extends CoreSteps {
                     stepString += part.text();
                 }
             }
+
+            System.out.println("@@stepString: " + stepString);
             if(stepString.isBlank())
                 continue;
 
 
             if (part.token() == ConditionalToken.THEN) {
+                System.out.println("@@modifyStepExtension1: " + stepString);
                 StepExtension modifiedStep = lastNonThenStep.modifyStepExtension(stepString);
                 lastNonThenStep.addChildStep(modifiedStep);
 
             } else {
+                System.out.println("@@modifyStepExtension2: " + stepString);
                 StepExtension modifiedStep = currentStep.modifyStepExtension(stepString);
 //                modifiedStep.addDefinitionFlag(NO_LOGGING);
 //                modifiedStep.addDefinitionFlag(IGNORE_CHILDREN_IF_FALSE);
@@ -120,9 +124,12 @@ public class ConditionalSteps extends CoreSteps {
                 }
                 lastNonThenStep = modifiedStep;
                 if (part.token() == ConditionalToken.ELSE) {
-                    StepExtension modifiedStep2 = currentStep.modifyStepExtension(part.text());
-                    modifiedStep2.addDefinitionFlag(IGNORE_CHILDREN_IF_FALSE);
-                    lastNonThenStep.addChildStep(modifiedStep2);
+                    System.out.println("@@modifyStepExtension3: " + stepString);
+                    if(!part.text().isBlank()) {
+                        StepExtension modifiedStep2 = currentStep.modifyStepExtension(part.text());
+                        modifiedStep2.addDefinitionFlag(IGNORE_CHILDREN_IF_FALSE);
+                        lastNonThenStep.addChildStep(modifiedStep2);
+                    }
                 }
             }
             stepString = "";

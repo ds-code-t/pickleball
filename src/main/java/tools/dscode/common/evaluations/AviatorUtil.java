@@ -11,8 +11,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import static tools.dscode.common.evaluations.AviatorFunctions.processTernaryExpression;
-import static tools.dscode.common.util.DebugUtils.printDebug;
+
 import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 
 public final class AviatorUtil {
@@ -123,7 +122,8 @@ public final class AviatorUtil {
     }
 
     public static String preprocessExpression(String expression) {
-        return processTernaryExpression(expression);
+        return expression;
+//        return processTernaryExpression(expression);
     }
 
     /**

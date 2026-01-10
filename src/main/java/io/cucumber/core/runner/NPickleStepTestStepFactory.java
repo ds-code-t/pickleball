@@ -18,6 +18,7 @@ import static io.cucumber.core.runner.ArgStepFunctions.updatePickleStepDefinitio
 import static io.cucumber.core.runner.GlobalState.getCachingGlue;
 import static io.cucumber.core.runner.GlobalState.getGherkinDialect;
 import static io.cucumber.core.runner.modularexecutions.FilePathResolver.toAbsoluteFileUri;
+import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.util.DebugUtils.printDebug;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.invokeAnyMethod;
@@ -71,6 +72,7 @@ public class NPickleStepTestStepFactory {
 
 
     public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(String keyword, String stepText, String argument) {
+        System.out.println("@@getPickleStepTestStepFromStrings1: " + keyword + " " + stepText + "");
         Pickle pickle = createGherkinMessagesPickle(keyword, stepText, argument);
         Step onlyStep = pickle.getSteps().getFirst();
         PickleStepDefinitionMatch pickleStepDefinitionMatch = getStepDefinitionMatch(pickle.getUri(), onlyStep);
@@ -78,6 +80,7 @@ public class NPickleStepTestStepFactory {
     }
 
     public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(Pickle modelPickle, String keyword, String stepText, String argument) {
+        System.out.println("@@getPickleStepTestStepFromStrings2: " + keyword + " " + stepText + "");
         Pickle pickle = createGherkinMessagesPickle(keyword, stepText, argument);
         Step onlyStep = pickle.getSteps().getFirst();
         PickleStep pickleStep = (PickleStep) getProperty(onlyStep, "pickleStep");
@@ -88,6 +91,9 @@ public class NPickleStepTestStepFactory {
 
 
     public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(PickleStepTestStep modelStep, String keyword, String stepText, String argument) {
+        System.out.println("@@getPickleStepTestStepFromStrings3: " + keyword + " " + stepText + "");
+        new Exception().printStackTrace();
+        waitMilliseconds(500);
         Pickle pickle = createGherkinMessagesPickle(keyword, stepText, argument);
         Step onlyStep = pickle.getSteps().getFirst();
         PickleStep pickleStep = (PickleStep) getProperty(onlyStep, "pickleStep");

@@ -27,7 +27,7 @@ import static com.xpathy.Tag.any;
 import static com.xpathy.Tag.input;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import static tools.dscode.common.evaluations.AviatorFunctions.processTernaryExpression;
+
 import static tools.dscode.common.treeparsing.DefinitionContext.DEFAULT_EXECUTION_DICTIONARY;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;
 
@@ -35,12 +35,6 @@ public class CalculatorSteps {
     private int a, b, result;
 
 
-    public static void main(String[] args) {
-        String pre = "IF: 1 > 0 THEN:   print A ELSE: print 333";
-        String post = processTernaryExpression("IF: 1 > 0 THEN:   print A ELSE: print 333");
-
-
-    }
 
 
     @Given("config")

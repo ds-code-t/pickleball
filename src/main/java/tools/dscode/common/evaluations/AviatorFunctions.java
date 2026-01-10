@@ -115,66 +115,66 @@ public class AviatorFunctions {
         }
     }
 
-    public static final String operatorFlag = "\u206A\u208A";
-    static String IF = operatorFlag + "IF:", ELSE = operatorFlag + "ELSE:", ELSEIF = operatorFlag + "ELSEIF:",
-            THEN = operatorFlag + "THEN:";
+//    public static final String operatorFlag = "\u206A\u208A";
+//    static String IF = operatorFlag + "IF:", ELSE = operatorFlag + "ELSE:", ELSEIF = operatorFlag + "ELSEIF:",
+//            THEN = operatorFlag + "THEN:";
 
-    public static String processTernaryExpression(String fullString) {
-        fullString = fullString.replaceAll("\\bELSE-IF:", ELSEIF)
-                .replaceAll("\\bIF:", IF)
-                .replaceAll("\\bTHEN:", THEN)
-                .replaceAll("\\bELSE:", ELSE);
+//    public static String processTernaryExpression(String fullString) {
+//        fullString = fullString.replaceAll("\\bELSE-IF:", ELSEIF)
+//                .replaceAll("\\bIF:", IF)
+//                .replaceAll("\\bTHEN:", THEN)
+//                .replaceAll("\\bELSE:", ELSE);
+//
+//        Pattern p = Pattern.compile("(\\([^()]+\\))");
+//        String returnString = p.matcher(fullString)
+//                .replaceAll(m -> "(" + processTernaryString(m.group(1)) + ")");
+//
+//        return processTernaryString(returnString);
+//    }
 
-        Pattern p = Pattern.compile("(\\([^()]+\\))");
-        String returnString = p.matcher(fullString)
-                .replaceAll(m -> "(" + processTernaryString(m.group(1)) + ")");
+//    private static String processTernaryString(String input) {
+//
+//        if (!input.contains(operatorFlag))
+//            return input;
+//        input = input.replaceAll("^([^" + operatorFlag + "]*)" + "(" + ELSE + "|" + ELSEIF + ")",
+//            IF + " getBoolstate($1) $2 ");
+//        input = input.replaceAll(
+//            "((?:" + IF + "|" + ELSEIF + ")[^" + operatorFlag + "]*)(" + ELSE + "|" + ELSEIF + "|$)",
+//            " $1 " + THEN + " true $2 ");
+//        input = input.replaceAll("(" + THEN + "[^" + operatorFlag + "]*$)", " $1 " + ELSE + " false ");
+//        input = input.replaceAll(ELSEIF, " : " + IF);
+//        input = input.replaceAll(IF + "([^" + operatorFlag + "]*)" + THEN, "getBool($1) " + THEN);
+//        input = input.replaceAll(THEN, " ? ");
+//        input = input.replaceAll(ELSE, " : ");
+//        return input;
+//    }
+//
+//    private static String normalize(String s) {
+//        return s.trim().replaceAll("\\s+", " ");
+//    }
 
-        return processTernaryString(returnString);
-    }
+//    private static void runTest(String input, String expected) {
+//        String actual = processTernaryExpression(input);
+//        System.out.println("Input   : " + normalize(input));
+//        System.out.println("Expected: " + normalize(expected));
+//        System.out.println("Actual  : " + normalize(actual));
+//        System.out.println();
+//    }
 
-    private static String processTernaryString(String input) {
-
-        if (!input.contains(operatorFlag))
-            return input;
-        input = input.replaceAll("^([^" + operatorFlag + "]*)" + "(" + ELSE + "|" + ELSEIF + ")",
-            IF + " getBoolstate($1) $2 ");
-        input = input.replaceAll(
-            "((?:" + IF + "|" + ELSEIF + ")[^" + operatorFlag + "]*)(" + ELSE + "|" + ELSEIF + "|$)",
-            " $1 " + THEN + " true $2 ");
-        input = input.replaceAll("(" + THEN + "[^" + operatorFlag + "]*$)", " $1 " + ELSE + " false ");
-        input = input.replaceAll(ELSEIF, " : " + IF);
-        input = input.replaceAll(IF + "([^" + operatorFlag + "]*)" + THEN, "getBool($1) " + THEN);
-        input = input.replaceAll(THEN, " ? ");
-        input = input.replaceAll(ELSE, " : ");
-        return input;
-    }
-
-    private static String normalize(String s) {
-        return s.trim().replaceAll("\\s+", " ");
-    }
-
-    private static void runTest(String input, String expected) {
-        String actual = processTernaryExpression(input);
-        System.out.println("Input   : " + normalize(input));
-        System.out.println("Expected: " + normalize(expected));
-        System.out.println("Actual  : " + normalize(actual));
-        System.out.println();
-    }
-
-    public static void main(String[] args) {
-        runTest("IF: x > 3 THEN: 1 ELSE: 2",
-            "bool(x > 3) ? 1 : 2");
-
-        runTest("IF: x > 3 THEN: 1",
-            "bool(x > 3) ? 1 : false");
-
-        runTest("IF: x > 3 THEN: 1 ELSE-IF: y < 5 THEN: 2 ELSE: 3",
-            "bool(x > 3) ? 1 : bool(y < 5) ? 2 : 3");
-
-        runTest("(IF: flag THEN: a ELSE: b)",
-            "(bool(flag) ? a : b)");
-
-        runTest("z + (IF: cond THEN: foo ELSE: bar)",
-            "z + (bool(cond) ? foo : bar)");
-    }
+//    public static void main(String[] args) {
+//        runTest("IF: x > 3 THEN: 1 ELSE: 2",
+//            "bool(x > 3) ? 1 : 2");
+//
+//        runTest("IF: x > 3 THEN: 1",
+//            "bool(x > 3) ? 1 : false");
+//
+//        runTest("IF: x > 3 THEN: 1 ELSE-IF: y < 5 THEN: 2 ELSE: 3",
+//            "bool(x > 3) ? 1 : bool(y < 5) ? 2 : 3");
+//
+//        runTest("(IF: flag THEN: a ELSE: b)",
+//            "(bool(flag) ? a : b)");
+//
+//        runTest("z + (IF: cond THEN: foo ELSE: bar)",
+//            "z + (bool(cond) ? foo : bar)");
+//    }
 }
