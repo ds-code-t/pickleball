@@ -182,10 +182,12 @@ public enum AssertionOperations implements OperationsInterface {
                 );
                 return;
             }
+
             if (firstElement.getElementWrappers().isEmpty()) {
                 phraseData.result = new Attempt.Result(getModeSet(phraseData).contains(ValueWrapperCompareReducer.Mode.NOT), null);
                 return;
             }
+
             phraseData.result = Attempt.run(() -> {
                 return ValueWrapperCompareReducer.evalElements(
                         ElementWrapper::isDisplayed,

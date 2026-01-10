@@ -9,6 +9,7 @@ import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.status.SoftRuntimeException;
 import tools.dscode.common.treeparsing.MatchNode;
+import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ActionOperations;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.OperationsInterface;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHolderMatch;
 import tools.dscode.common.treeparsing.preparsing.LineData;
@@ -284,6 +285,9 @@ public abstract class PhraseData extends PassedData {
 
 
         OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
+        if(operation instanceof ActionOperations){
+            waitMilliseconds(300);
+        }
 
         operation.execute(this);
 
