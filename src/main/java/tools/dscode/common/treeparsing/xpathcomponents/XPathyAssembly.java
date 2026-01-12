@@ -241,8 +241,8 @@ public final class XPathyAssembly {
             score += 200;
         }
 
-        if (s.contains("preceding") || s.contains("following")) {
-            score += 500;
+        if (s.startsWith("//*[preceding") || s.startsWith("//*[following")) {
+            score += 10000;
         }
 
         score += s.replaceAll("[^*]","").length() * 20;
