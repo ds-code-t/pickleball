@@ -385,7 +385,9 @@ public final class XPathyUtils {
         if (xpath == null || xpath.isBlank()) return xpath;
 
         String normalized = xpath.strip();
-
+        System.out.println("@@maybeDeepestMatches: " +xpath);
+        System.out.println("@@looksAbsolutelyScoped: " +looksAbsolutelyScoped(xpath));
+        System.out.println("@@looksLikeItUsesRelativeDots: " +looksLikeItUsesRelativeDots(xpath));
         if (!looksAbsolutelyScoped(normalized)) {
             return xpath;
         }

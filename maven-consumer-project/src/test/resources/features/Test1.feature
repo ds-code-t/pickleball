@@ -1,5 +1,9 @@
 Feature: Additiontest
 
+  Scenario: tefsdf
+    @[DEBUG]
+      *,
+
   Scenario: chckboxtest 2
   @[DEBUG]
     * IF: "true":
