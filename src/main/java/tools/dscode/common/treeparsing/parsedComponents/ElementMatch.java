@@ -107,7 +107,7 @@ public class ElementMatch {
     }
 
     protected ElementMatch(PhraseData phraseData) {
-        System.out.println("@@PlaceHolderMatch2: " + phraseData);
+
 
         this.parentPhrase = phraseData;
         isPlaceHolder = true;
@@ -120,7 +120,7 @@ public class ElementMatch {
     public ElementMatch(PhraseData phraseData, MatchNode elementNode) {
 
         this.fullText = elementNode.getStringFromLocalState("fullText");
-        System.out.println("@@this.fullText: " + this.fullText);
+
         this.parentPhrase = phraseData;
         this.startIndex = elementNode.start;
         this.position = elementNode.position;
@@ -174,9 +174,9 @@ public class ElementMatch {
                 Matcher m = attributePattern.matcher(attr.trim());
                 if (m.find()) {
                     String attrName = m.group("attrName");   // named group
-                    System.out.println("@@attrName: " + attrName);
+
                     String predicate = m.group("predicate");   // named group
-                    System.out.println("@@predicate: " + predicate);
+
                     String predicateType = "has";
                     ValueWrapper predicateVal = null;
                     if (predicate != null) {
@@ -184,7 +184,7 @@ public class ElementMatch {
                          predicateType = (String) predicateNode.getFromLocalState("predicateType");
                          predicateVal = predicateNode.getValueWrapper("predicateVal");
                     }
-                    System.out.println("@@NEW-attribute" + attributes.size() +" : " + attrName + " " + predicateType + " " + predicateVal);
+
                     attributes.add(new Attribute(attrName, predicateType, predicateVal) );
                 } else {
                     throw new RuntimeException("Invalid attribute predicate: " + attr);
@@ -210,8 +210,8 @@ public class ElementMatch {
             elementTypes.add(RETURNS_VALUE);
         }
 
-        System.out.println("@@elementMAtch1 " + this);
-        System.out.println("@@elementMAtch1 elementTypes: " + this.elementTypes);
+
+
         if (!elementTypes.contains(ElementType.HTML_TYPE)) {
             return;
         }
@@ -231,8 +231,8 @@ public class ElementMatch {
             elPredictXPaths.add(categoryResolution.xpath());
         }
 
-        System.out.println("@@state: '" + state + "'");
-        System.out.println("@@BinaryStateConditions.onElement():\n" + onElement());
+
+
         if (!state.isEmpty()) {
             boolean un = state.startsWith("un");
             if (un) state = state.substring(2);
@@ -240,7 +240,7 @@ public class ElementMatch {
             switch (state) {
                 // Binary on/off (checked/selected/etc)
                 case "checked", "selected", "on" -> {
-                    System.out.println("@@checkedddd!!!");
+
                     elPredictXPaths.add(un
                             ? offElement()
                             : onElement());
@@ -287,18 +287,18 @@ public class ElementMatch {
             }
         }
 
-        System.out.println("@@elPredictXPaths:\n" + elPredictXPaths);
+
         xPathy = combineAnd(elPredictXPaths);
 
         for (Attribute attribute : attributes) {
-            System.out.println("@@attribute: " + attribute);
+
             xPathy = applyAttrPredicate(xPathy, attribute.attrName, attribute.predicateVal, attribute.predicateType);
-            System.out.println("@@xPathy with attributes===== " + xPathy);
+
         }
 //        }
 
-        System.out.println("@@elementMAtch2 " + this);
-        System.out.println("@@elementMAtch2 elementTypes: " + this.elementTypes);
+
+
     }
 
 //    public static ExecutionDictionary.Op getOpFromString(String input) {
@@ -379,9 +379,9 @@ public class ElementMatch {
                     normalized = "TITLE";
                 }
             }
-            System.out.println("@@WINDOW - normalized: " + normalized + "");
+
             WindowSwitch.WindowSelectionType windowSelectionType = WindowSwitch.WindowSelectionType.LOOKUP.get(normalized);
-            System.out.println("@@WINDOW - windowSelectionType: " + windowSelectionType + "");
+
             returnList.addAll(WindowSwitch.findMatchingHandles(parentPhrase.getDriver(), windowSelectionType, textOps).stream().map(ValueWrapper::createValueWrapper).toList());
         } else if (elementTypes.contains(ElementType.ALERT)) {
 

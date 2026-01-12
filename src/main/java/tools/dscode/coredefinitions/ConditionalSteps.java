@@ -7,10 +7,10 @@ package tools.dscode.coredefinitions;
 //
 //import static io.cucumber.core.runner.ScenarioState.getScenarioState;
 
+import io.cucumber.core.runner.StepData;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
-import tools.dscode.common.annotations.DefinitionFlags;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,9 +19,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_FALSE;
-import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.util.Reflect.getProperty;
 
 
@@ -70,8 +68,10 @@ public class ConditionalSteps extends CoreSteps {
     @Given("^(?:IF:|ELSE:|ELSE-IF:).*$")
     public static void runConditional() {
         StepExtension currentStep = getRunningStep();
-        currentStep.grandChildrenSteps.addAll(currentStep.childSteps);
-        currentStep.childSteps.clear();
+//        StepExtension parentStep = (StepExtension) currentStep.parentStep;
+
+//        currentStep.grandChildrenSteps.addAll(currentStep.childSteps);
+//        currentStep.childSteps.clear();
 
         String inputString = getProperty(getRunningStep().pickleStepTestStep, "unresolvedText").toString();
 
@@ -82,7 +82,7 @@ public class ConditionalSteps extends CoreSteps {
             boolean last = i == parts.size() - 1;
             TokenPart part = parts.get(i);
 
-            System.out.println("@@part.token(): " + part.token());
+
             switch (part.token()) {
                 case IF -> {
                     stepString += " , if " + part.text();
@@ -91,7 +91,7 @@ public class ConditionalSteps extends CoreSteps {
                     stepString += " , else if " + part.text();
                 }
                 case ELSE -> {
-                    stepString += " , else ";
+                    stepString += " , else : ";
                 }
                 case THEN -> {
                     stepString += part.text();
@@ -101,33 +101,40 @@ public class ConditionalSteps extends CoreSteps {
                 }
             }
 
-            System.out.println("@@stepString: " + stepString);
+
             if(stepString.isBlank())
                 continue;
 
 
             if (part.token() == ConditionalToken.THEN) {
-                System.out.println("@@modifyStepExtension1: " + stepString);
+
                 StepExtension modifiedStep = lastNonThenStep.modifyStepExtension(stepString);
+
+
                 lastNonThenStep.addChildStep(modifiedStep);
 
             } else {
-                System.out.println("@@modifyStepExtension2: " + stepString);
+
                 StepExtension modifiedStep = currentStep.modifyStepExtension(stepString);
+
+
+                currentStep.insertReplacement(modifiedStep);
 //                modifiedStep.addDefinitionFlag(NO_LOGGING);
 //                modifiedStep.addDefinitionFlag(IGNORE_CHILDREN_IF_FALSE);
 
-                currentStep.addChildStep(modifiedStep);
+
                 if (lastNonThenStep != null) {
                     modifiedStep.previousSibling = lastNonThenStep;
                     lastNonThenStep.nextSibling = modifiedStep;
                 }
                 lastNonThenStep = modifiedStep;
                 if (part.token() == ConditionalToken.ELSE) {
-                    System.out.println("@@modifyStepExtension3: " + stepString);
+
                     if(!part.text().isBlank()) {
                         StepExtension modifiedStep2 = currentStep.modifyStepExtension(part.text());
                         modifiedStep2.addDefinitionFlag(IGNORE_CHILDREN_IF_FALSE);
+
+
                         lastNonThenStep.addChildStep(modifiedStep2);
                     }
                 }

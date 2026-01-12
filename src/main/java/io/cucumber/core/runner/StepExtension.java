@@ -45,6 +45,7 @@ public class StepExtension extends StepData {
 
         this.methodName = this.method == null ? "" : this.method.getName();
         this.isDynamicStep = isCoreStep && methodName.equals("executeDynamicStep");
+        this.isCoreConditionalStep = isCoreStep && methodName.equals("runConditional");
 
         if (definitionFlags.contains(DefinitionFlag.NO_LOGGING))
             pickleStepTestStep.setNoLogging(true);
@@ -185,6 +186,8 @@ public class StepExtension extends StepData {
 
     public StepExtension modifyStepExtension(String newText) {
         StepExtension modifiedStep = new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep, pickleStepTestStep.getStep().getKeyword(), newText, getGherkinArgumentText(pickleStepTestStep.getStep())));
+
+
         modifiedStep.setStepParsingMap(getStepParsingMap());
         modifiedStep.parentStep = parentStep;
         modifiedStep.inheritedLineData = inheritedLineData.clone();

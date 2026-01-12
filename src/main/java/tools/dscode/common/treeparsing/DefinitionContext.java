@@ -208,7 +208,7 @@ public final class DefinitionContext {
                 System.out.println("##onCaputre action: " + self.originalText() + "");
                 self.parent().putToLocalState("action", self.resolvedGroupText("base"));
                 self.parent().putToLocalState("operationIndex", self.start);
-                System.out.println("@@action-operationIndex: " + self.start);
+
                 return self.resolvedGroupText("base").replaceAll("move", "hover");
             }
         };
@@ -235,7 +235,7 @@ public final class DefinitionContext {
 
 
                 self.parent().putToLocalState("operationIndex", self.start);
-                System.out.println("@@assertion-operationIndex: " + self.start);
+
                 return self.originalText();
             }
         };
@@ -250,7 +250,7 @@ public final class DefinitionContext {
 
                     parentNode.putToLocalState("assertion", "equal");
                     parentNode.putToLocalState("operationIndex", self.groups().start("defaultAssertion"));
-                    System.out.println("@@defaultAssertion-operationIndex: " + self.groups().start("defaultAssertion"));
+
 
                 }
                 return self.originalText();
@@ -271,7 +271,7 @@ public final class DefinitionContext {
 
                 MatchNode elementMatchNode = self.getMatchNode(self.originalText());
                 elementMatchNode.start = self.start;
-                System.out.println("@@elementMatchNode.start: " + elementMatchNode.start);
+
                 return self.originalText();
             }
         };

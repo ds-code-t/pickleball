@@ -83,9 +83,9 @@ public final class WindowSwitch {
                                                    List<TextOp> textOps) {
         Objects.requireNonNull(driver, "driver");
         Objects.requireNonNull(type, "type");
-        System.out.println("@@findMatchingHandles " + type + ", textOps: " + textOps);
+
         List<String> handles = orderedHandles(driver);
-        System.out.println("@@handles::: " + handles);
+
         if (handles.isEmpty()) return List.of();
 
         return switch (type) {
@@ -101,15 +101,15 @@ public final class WindowSwitch {
             }
 
             case NEW -> {
-                System.out.println("@@NEW WINDOW");
+
                 String current = safeCurrentHandle(driver);
-                System.out.println("@@current: " + current + ", handles: " + handles + ", textOps: " + textOps);
+
                 yield handles.stream().filter(h -> !h.equals(current)).toList();
             }
             case NEXT -> {
-                System.out.println("@@NEW WINDOW");
+
                 String current = safeCurrentHandle(driver);
-                System.out.println("@@current: " + current + ", handles: " + handles + ", textOps: " + textOps);
+
                 yield handles.stream().filter(h -> !h.equals(current)).toList();
             }
 

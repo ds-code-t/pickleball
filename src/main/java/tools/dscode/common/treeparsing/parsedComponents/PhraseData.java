@@ -103,7 +103,7 @@ public abstract class PhraseData extends PassedData {
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
         operationIndex = (Integer) phraseNode.getFromLocalState("operationIndex");
-        System.out.println("@@PD-operationIndex: " + operationIndex);
+
 
         hasNo = phraseNode.localStateBoolean("no");
 //        hasNot = phraseNode.localStateBoolean("not");
@@ -339,9 +339,7 @@ public abstract class PhraseData extends PassedData {
                 }
             }
             case "conditional" -> {
-
                 phraseConditionalMode = previouslyResolvedBoolean ? 1 : -1;
-
             }
         }
 

@@ -19,6 +19,7 @@ import static tools.dscode.common.mappings.MapConfigurations.MapType.STEP_MAP;
 
 public abstract class StepBase implements Cloneable {
     public boolean isDynamicStep;
+    public boolean isCoreConditionalStep;
     public boolean logAndIgnore = false;
     public boolean isClone = false;
     public List<StepBase> clones = new ArrayList<>();

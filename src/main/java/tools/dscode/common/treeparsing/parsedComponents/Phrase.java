@@ -1,6 +1,7 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 
+import io.cucumber.core.runner.StepExtension;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
@@ -8,6 +9,7 @@ import tools.dscode.common.treeparsing.preparsing.LineData;
 
 import java.util.ArrayList;
 
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.treeparsing.DefinitionContext.FILE_INPUT;
 
 
@@ -24,13 +26,28 @@ public final class Phrase extends PhraseData {
 
     boolean shouldRun() {
 
-        phraseConditionalMode = getPreviousPhrase() == null ? 0 : getPreviousPhrase().phraseConditionalMode;
+
+
+
+
 
         if (getConditional().startsWith("else")) {
-            phraseConditionalMode = phraseConditionalMode * -1;
+            if (getPreviousPhrase() == null) {
+                StepExtension currentStep = getRunningStep();
+
+                if (currentStep.previousSibling == null || currentStep.previousSibling.lineData.lineConditionalMode > -1) {
+                    phraseConditionalMode = 0;
+                }
+            } else if (getPreviousPhrase().phraseConditionalMode > -1)
+                phraseConditionalMode = 0;
+            else
+                phraseConditionalMode = 1;
+        } else {
+            phraseConditionalMode = getPreviousPhrase() == null ? 1 : getPreviousPhrase().phraseConditionalMode;
         }
 
-        return phraseConditionalMode >= 0;
+
+        return phraseConditionalMode > 0;
 
 
 //        phraseConditionalMode = getPreviousPhrase() == null ? 0 : getPreviousPhrase().phraseConditionalMode;
@@ -51,13 +68,9 @@ public final class Phrase extends PhraseData {
         PhraseData nextResolvedPhrase = getNextResolvedPhrase();
 
 
-
-
-
         if (nextResolvedPhrase == null || nextResolvedPhrase.isChainStart || !branchedPhrases.isEmpty() || contextTermination) {
             resolveResults();
         }
-
 
 
         if (contextTermination) {
@@ -70,8 +83,6 @@ public final class Phrase extends PhraseData {
                 parsedLine.inheritedContextPhrases.removeLast();
             }
         }
-
-
 
 
         return nextResolvedPhrase;
@@ -96,6 +107,11 @@ public final class Phrase extends PhraseData {
                     setAssertion(templatePhrase.getAssertion());
                 }
             }
+        }
+
+
+        if (phraseType == null && !getConditional().isBlank()) {
+            phraseType = PhraseType.CONDITIONAL;
         }
 
         if (!getAssertionType().isBlank() && getAssertion().isBlank()) {

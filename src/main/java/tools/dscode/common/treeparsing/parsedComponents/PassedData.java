@@ -133,7 +133,7 @@ public abstract class PassedData {
 
 
     public String body;
-    public int phraseConditionalMode = 0;
+    public int phraseConditionalMode = 1;
 
     public boolean isOperationPhrase;
     public boolean separator;

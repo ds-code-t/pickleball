@@ -156,19 +156,22 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
 
 
-        if ((stepExtension.parentStep != null && stepExtension.parentStep.logAndIgnore) || stepExtension.inheritedLineData.lineConditionalMode < 0) {
+        if ((stepExtension.parentStep != null && stepExtension.parentStep.logAndIgnore) || stepExtension.inheritedLineData.lineConditionalMode < 1) {
             stepExtension.logAndIgnore = true;
-        } else if (stepExtension.isDynamicStep) {
-            System.out.println("@@stepExtension.pickleStepTestStep.getStepText()======= " + stepExtension.pickleStepTestStep.getStepText());
-            System.out.println("@@stepExtension.previousSibling.lineData.lineConditionalMode======= " + (( stepExtension.previousSibling == null || stepExtension.previousSibling.lineData ==null ) ? "null" :  stepExtension.previousSibling.lineData.lineConditionalMode));
+        }
+//        else if (stepExtension.isDynamicStep) {
+
+
 //            String dynamicStepText = stepExtension.pickleStepTestStep.getStepText().toLowerCase().replaceAll(",|then|the|and|or|:", "").strip();
 //            if (dynamicStepText.startsWith("else") && !dynamicStepText.equals("else")) {
-            if (stepExtension.pickleStepTestStep.getStepText().toLowerCase().replaceAll(",|then|the|and|or", "").strip().startsWith("else")) {
-                if (stepExtension.previousSibling == null || stepExtension.previousSibling.lineData.lineConditionalMode > -1) {
-                    stepExtension.logAndIgnore = true;
-                }
-            }
-        }
+
+
+//            if (stepExtension.pickleStepTestStep.getStepText().toLowerCase().replaceAll(",|then|the|and|or", "").strip().startsWith("else")) {
+//                if (stepExtension.previousSibling == null || stepExtension.previousSibling.lineData.lineConditionalMode > -1) {
+//                    stepExtension.logAndIgnore = true;
+//                }
+//            }
+//        }
 
         runningStep(stepExtension);
     }
@@ -226,7 +229,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
 
 
-        if ((stepExtension.lineData.lineConditionalMode < 0 || stepExtension.logAndIgnore) && stepExtension.definitionFlags.contains(IGNORE_CHILDREN_IF_FALSE)) {
+        if (stepExtension.logAndIgnore && stepExtension.definitionFlags.contains(IGNORE_CHILDREN_IF_FALSE)) {
             return;
         }
 

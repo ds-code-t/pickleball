@@ -19,7 +19,7 @@ import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 public class PlaceHolderMatch extends ElementMatch {
     public PlaceHolderMatch(PhraseData phraseData) {
         super(phraseData);
-        System.out.println("@@PlaceHolderMatch1: " + phraseData);
+
         this.elementTypes = new HashSet<>();
         this.isPlaceHolder = true;
     }

@@ -72,7 +72,7 @@ public class NPickleStepTestStepFactory {
 
 
     public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(String keyword, String stepText, String argument) {
-        System.out.println("@@getPickleStepTestStepFromStrings1: " + keyword + " " + stepText + "");
+
         Pickle pickle = createGherkinMessagesPickle(keyword, stepText, argument);
         Step onlyStep = pickle.getSteps().getFirst();
         PickleStepDefinitionMatch pickleStepDefinitionMatch = getStepDefinitionMatch(pickle.getUri(), onlyStep);
@@ -80,7 +80,7 @@ public class NPickleStepTestStepFactory {
     }
 
     public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(Pickle modelPickle, String keyword, String stepText, String argument) {
-        System.out.println("@@getPickleStepTestStepFromStrings2: " + keyword + " " + stepText + "");
+
         Pickle pickle = createGherkinMessagesPickle(keyword, stepText, argument);
         Step onlyStep = pickle.getSteps().getFirst();
         PickleStep pickleStep = (PickleStep) getProperty(onlyStep, "pickleStep");
@@ -91,13 +91,17 @@ public class NPickleStepTestStepFactory {
 
 
     public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(PickleStepTestStep modelStep, String keyword, String stepText, String argument) {
-        System.out.println("@@getPickleStepTestStepFromStrings3: " + keyword + " " + stepText + "");
-        new Exception().printStackTrace();
-        waitMilliseconds(500);
+
         Pickle pickle = createGherkinMessagesPickle(keyword, stepText, argument);
+        System.out.println("@pickle: " + pickle);
         Step onlyStep = pickle.getSteps().getFirst();
+
+
         PickleStep pickleStep = (PickleStep) getProperty(onlyStep, "pickleStep");
+
         Step copiedStep = createGherkinMessagesStep(pickleStep, getGherkinDialect(), onlyStep.getPreviousGivenWhenThenKeyword(), modelStep.getStep().getLocation(), onlyStep.getKeyword());
+
+
         PickleStepDefinitionMatch pickleStepDefinitionMatch = getStepDefinitionMatch(modelStep.getUri(), copiedStep);
         return createPickleStepTestStep(modelStep.getUri(), copiedStep, pickleStepDefinitionMatch);
     }

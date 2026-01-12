@@ -1,7 +1,6 @@
 package io.cucumber.core.runner;
 
 
-import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.core.stepexpression.ExpressionArgument;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
@@ -9,11 +8,6 @@ import io.cucumber.plugin.event.Result;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.StepMapping;
 
-import tools.dscode.common.treeparsing.preparsing.LineData;
-import tools.dscode.common.treeparsing.preparsing.ParsedLine;
-import tools.dscode.coredefinitions.GeneralSteps;
-
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -22,6 +16,7 @@ import static tools.dscode.common.util.Reflect.getProperty;
 
 
 public abstract class StepData extends StepMapping {
+
 
     public int getNestingLevel() {
         return nestingLevel;
@@ -104,6 +99,17 @@ public abstract class StepData extends StepMapping {
         }
 
         return childSteps.getFirst();
+    }
+
+    public void insertReplacement(StepData replacement) {
+        replacement.previousSibling = previousSibling;
+        replacement.nextSibling = nextSibling;
+        if(nextSibling != null)
+            nextSibling.previousSibling = replacement;
+        nextSibling = replacement;
+        parentStep.childSteps.add(parentStep.childSteps.indexOf(this)+1, replacement);
+        replacement.childSteps.addAll(childSteps);
+        childSteps.clear();
     }
 
     public void addChildStep(StepData child) {

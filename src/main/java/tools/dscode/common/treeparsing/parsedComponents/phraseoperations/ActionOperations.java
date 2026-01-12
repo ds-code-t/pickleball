@@ -127,10 +127,10 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-            System.out.println("@@phraseData.getElementMatchesFollowingOperation(): " + phraseData.getElementMatchesFollowingOperation());
 
-            System.out.println("@@phraseData.getFirstElement().elementTypes " + phraseData.getFirstElement().elementTypes);
-            System.out.println("@@phraseData.getSecondElement().elementType: " + phraseData.getSecondElement().elementTypes);
+
+
+
 
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
@@ -139,11 +139,11 @@ public enum ActionOperations implements OperationsInterface {
                             .mustMatchAll(ElementType.HTML_ELEMENT, ElementType.HTML_DROPDOWN)
             );
 
-            System.out.println("@@phraseData.resultElements: " + phraseData.resultElements);
+
             ElementMatch selection = phraseData.resultElements.getFirst();
             ElementMatch dropDowns = phraseData.resultElements.get(1);
-            System.out.println("@@selection.elementTypes: " + selection.elementTypes);
-            System.out.println("@@dropDowns.elementTypes: " + dropDowns.elementTypes);
+
+
 
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
@@ -151,12 +151,12 @@ public enum ActionOperations implements OperationsInterface {
                     if (count > 0) {
                         safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
-                    System.out.println("@@dropDownWrapper: " + dropDownWrapper);
+
                     if (selection.elementTypes.contains(ElementType.HTML_TYPE)) {
-                        System.out.println("@@1");
-                        System.out.println("@@selection.xPathy: " + selection.xPathy);
+
+
                         ElementWrapper optionElement = selection.getElementWrappers().getFirst();
-                        System.out.println("@@optionElement.attributeSnapshot: "   + optionElement.attributeSnapshot);
+
                         if(optionElement.getTagName().equalsIgnoreCase("option")) {
                             selectDropdownByIndex(GeneralSteps.getDefaultDriver(), dropDownWrapper.getElement(), optionElement.getSameTagIndex());
                         }
@@ -169,7 +169,7 @@ public enum ActionOperations implements OperationsInterface {
                     }
                     count++;
                 }
-                System.out.println("@@dropDowns.getElementWrappers().size() " + dropDowns.getElementWrappers().size());
+
                 return true;
             });
         }
@@ -180,17 +180,17 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
 
-            System.out.println("@@phraseData.getElementMatches(): " + phraseData.getElementMatches());
-            System.out.println("@@ phraseData.getFirstElement().startIndex: " + phraseData.getFirstElement().startIndex);
-            System.out.println("@@phraseData.operationIndex: " + phraseData.operationIndex);
 
-            System.out.println("@@phraseData.getElementMatchesFollowingOperation(): " + phraseData.getElementMatchesFollowingOperation());
+
+
+
+
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
 
-            System.out.println("@WphraseData.resultElements: " + phraseData.resultElements);
+            System.out.println("@  " + phraseData.resultElements);
 
             ElementMatch element = phraseData.resultElements.getFirst();
 
@@ -345,14 +345,14 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch element = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
                 List<ValueWrapper> handleWrappers = element.getValues();
-                System.out.println("@@handleWrappers: " + handleWrappers);
+
 
                 if (handleWrappers.isEmpty() && !element.selectionType.equals("any")) {
                     throw new RuntimeException("No matching Windows or Tabs found for " + element);
                 }
                 String windowHandle = element.category.toLowerCase().contains("new") || element.category.toLowerCase().contains("previous") ?
                         handleWrappers.getLast().getValue().toString() : handleWrappers.getFirst().getValue().toString();
-                System.out.println("@@windowHandle: " + windowHandle);
+
                 WindowSwitch.switchToHandleOrThrow(phraseData.getDriver(), windowHandle);
                 return true;
             });

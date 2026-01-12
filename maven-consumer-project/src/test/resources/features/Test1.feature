@@ -2,7 +2,7 @@ Feature: Additiontest
 
   Scenario: chckboxtest 2
   @[DEBUG]
-    * IF: "<C>":
+    * IF: "true":
     :  * ,save "Z" as "z"
     * ELSE:
     :  * ,save "X" as "x"

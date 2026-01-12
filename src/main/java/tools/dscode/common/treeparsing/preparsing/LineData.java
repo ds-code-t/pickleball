@@ -18,7 +18,7 @@ import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
 
 public abstract class LineData implements Cloneable {
-    public int lineConditionalMode = 0;
+    public int lineConditionalMode = 1;
     public int startPhraseIndex = 0;
     //    public LineData inheritedLineData;
 //    public List<PhraseData> contextPhrases = new ArrayList<>();

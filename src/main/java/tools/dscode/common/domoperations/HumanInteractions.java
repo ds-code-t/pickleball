@@ -32,8 +32,8 @@ public final class HumanInteractions {
     public static void selectDropdownByIndex(WebDriver driver,
                                              WebElement element,
                                              int index) {
-        System.out.println("@@selectDropdownByIndex: " + element.getText());
-        System.out.println("@@index: " + index);
+
+
         if (index < 0) {
             throw new IllegalArgumentException("index must be >= 0");
         }
@@ -61,11 +61,11 @@ public final class HumanInteractions {
         String needle = caseSensitive ? text : text.toLowerCase(Locale.ROOT);
 
         List<WebElement> matches = container.findElements(By.xpath(".//option | .//a"));
-        System.out.println("@@matches.size(): " + matches.size());
+
         for (WebElement el : matches) {
 
-            System.out.println("@@el.getText(): " + el.getText());
-            System.out.println("@@el.getTagName(): " + el.getTagName());
+
+
 
             String hay = el.getText()
                     .trim()
@@ -76,13 +76,13 @@ public final class HumanInteractions {
 
             if ("option".equalsIgnoreCase(el.getTagName())) {
                 WebElement selectEl = el.findElement(By.xpath("ancestor::select[1]"));
-                System.out.println("@@selectEl: " + selectEl.getText() + "");
+
                 centerScroll(driver, selectEl);
 
                 Select sel = new Select(selectEl);
                 List<WebElement> opts = sel.getOptions();
                 for (int i = 0; i < opts.size(); i++) {
-                    System.out.println("@@opts.get(i): " + opts.get(i).getText());
+
                     if (opts.get(i).equals(el)) {
                         sel.selectByIndex(i);
                         return;
