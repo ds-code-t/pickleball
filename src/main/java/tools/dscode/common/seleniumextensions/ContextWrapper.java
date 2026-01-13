@@ -111,7 +111,7 @@ public class ContextWrapper {
                 xpath = xpath.replaceFirst("//", "descendant-or-self::");
         }
 
-        printDebug("##XPath: getElementListFromSearchContext\n" + prettyPrintXPath(xpath) +"\n----------------" );
+        printDebug("##XPath: getElementListFromSearchContext\n" + prettyPrintXPath(maybeDeepestMatches(xpath)) +"\n----------------" );
 
         return searchContext.findElements(new By.ByXPath(maybeDeepestMatches(xpath)));
     }
