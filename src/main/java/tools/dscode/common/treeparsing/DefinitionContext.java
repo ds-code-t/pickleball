@@ -476,6 +476,12 @@ public final class DefinitionContext {
                             XPathy.from(Tag.option)
                     );
 
+            category("Row").children("Rows").inheritsFrom(CONTAINS_TEXT)
+                    .and((category, v, op) ->
+                            XPathy.from(Tag.tr).or().byAttribute(role).equals("row")
+                    );
+
+
             category(BASE_CATEGORY).and(
                     (category, v, op) -> {
                         XPathy selfInvisible = any.byCondition(invisible());
