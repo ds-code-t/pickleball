@@ -22,6 +22,7 @@ import static com.xpathy.Attribute.type;
 import static com.xpathy.Case.LOWER;
 import static com.xpathy.Tag.any;
 import static com.xpathy.Tag.div;
+import static com.xpathy.Tag.i;
 import static com.xpathy.Tag.input;
 import static com.xpathy.Tag.select;
 import static com.xpathy.Tag.textarea;
@@ -346,6 +347,23 @@ public final class DefinitionContext {
                             (category, v, op) -> XPathy.from(Tag.button),
                             (category, v, op) -> XPathy.from(Tag.img).byAttribute(role).equals("button"),
                             (category, v, op) -> XPathy.from(Tag.a).byAttribute(role).equals("button")
+                    );
+
+            category("Expandable Section").children("Expandable Section").inheritsFrom( "htmlNaming", CONTAINS_TEXT)
+                    .and(
+                            (category, v, op) -> XPathy.from(div)
+                                    .byAttribute(class_).withCase(LOWER).contains("expand")
+                                    .or().byAttribute(class_).withCase(LOWER).contains("collapse")
+                    );
+
+
+            category("Expandable Icon").children("Expandable Icons").inheritsFrom("htmlNaming", CONTAINS_TEXT)
+                    .and(
+                            (category, v, op) -> XPathy.from(div)
+                                    .byAttribute(class_).withCase(LOWER).contains("expand")
+                                    .or().byAttribute(class_).withCase(LOWER).contains("collapse"),
+                            (category, v, op) -> XPathy.from(div).$descendant()
+                                    .$tag(i).byAttribute(class_).withCase(LOWER).contains("openclose")
                     );
 
             category("Submit Button").children("Submit Buttons").or(
