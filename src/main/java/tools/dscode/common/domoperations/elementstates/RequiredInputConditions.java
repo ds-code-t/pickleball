@@ -14,6 +14,7 @@ public final class RequiredInputConditions {
         String pred =
                 "descendant-or-self::*[" +
                         "(" +
+                        "(@validationtype='required') or " +
                         "(@required and not(@required='false' or @required='0')) or " +
                         "(@aria-required and not(@aria-required='false' or @aria-required='0')) or " +
                         "(@data-required and not(@data-required='false' or @data-required='0')) or " +
@@ -30,6 +31,7 @@ public final class RequiredInputConditions {
         String requiredPred =
                 "descendant-or-self::*[" +
                         "(" +
+                        "(@validationtype='required') or " +
                         "(@required and not(@required='false' or @required='0')) or " +
                         "(@aria-required and not(@aria-required='false' or @aria-required='0')) or " +
                         "(@data-required and not(@data-required='false' or @data-required='0')) or " +
