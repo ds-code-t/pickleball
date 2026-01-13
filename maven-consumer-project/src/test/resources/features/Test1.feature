@@ -1,7 +1,8 @@
 Feature: Additiontest
 
-  Scenario: tt
-    * location
+  Scenario: tt34f
+  @[DEBUG]
+    * , from the FrameResult, click any unchecked Checkboxes
 
   Scenario Outline: testlocation3
     * location

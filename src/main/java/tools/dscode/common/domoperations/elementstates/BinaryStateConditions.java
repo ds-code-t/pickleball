@@ -18,6 +18,10 @@ import static com.xpathy.Condition.*;
  *  - Condition helpers (off/notChecked/notSelected) are unchanged for compatibility,
  *    but note: using them on very broad selectors can still match unrelated elements,
  *    because "not(on)" is logically true for elements that don't participate at all.
+ *
+ * UPDATE:
+ *  - Treat @value='true' as an additional "on" signal for onElement()
+ *  - Treat @value='true' or @value='false' as a "binary candidate" signal for offElement()
  */
 public final class BinaryStateConditions {
 
@@ -93,6 +97,7 @@ public final class BinaryStateConditions {
      * that is considered "on" using both:
      *  - Condition-based rules (checked/selected/class tokens)
      *  - Raw XPath rules for ARIA/data-* state attributes
+     *  - Raw XPath rule for @value='true' (binary widgets that store state in value)
      */
     public static XPathy onElement() {
         XPathy any = new XPathy();
@@ -107,7 +112,8 @@ public final class BinaryStateConditions {
                         "@aria-checked='true' or @aria-checked='mixed' or " +
                         "@aria-selected='true' or " +
                         "@data-checked='true' or @data-selected='true' or " +
-                        "@data-state='checked' or @data-state='selected' or @data-state='on'" +
+                        "@data-state='checked' or @data-state='selected' or @data-state='on' or " +
+                        "@value='true'" + // NEW
                         ")";
 
         String finalXpath = base + "[" + predicate + " or " + rawOn + "]";
@@ -122,7 +128,7 @@ public final class BinaryStateConditions {
      *  - Now:         //*[(<candidatePred>) and not(<onPred>)]
      *
      * "Candidate" means the element appears to participate in a binary state pattern
-     * (checked/selected attrs, aria/data state attrs, or known class tokens).
+     * (checked/selected attrs, aria/data state attrs, known class tokens, or value='true|false').
      */
     public static XPathy offElement() {
         XPathy any = new XPathy();
@@ -241,7 +247,18 @@ public final class BinaryStateConditions {
                         "@data-checked or @data-selected or @data-state" +
                         ")";
 
-        return "(" + classCandidatePred + " or " + rawNativeCandidate + " or " + rawStateCandidate + ")";
+        // candidate via "value is explicitly boolean-ish"
+        String rawValueCandidate =
+                "(" +
+                        "@value='true' or @value='false'" + // NEW
+                        ")";
+
+        return "("
+                + classCandidatePred
+                + " or " + rawNativeCandidate
+                + " or " + rawStateCandidate
+                + " or " + rawValueCandidate
+                + ")";
     }
 
     /**

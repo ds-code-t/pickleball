@@ -235,13 +235,17 @@ public class ElementMatch {
 
 
         if (!state.isEmpty()) {
+            System.out.println("@@elementMatch: " + this);
+            System.out.println("@@state1: " + state);
             boolean un = state.startsWith("un");
+            System.out.println("@@un: " + un);
             if (un) state = state.substring(2);
+            System.out.println("@@state2: " + state);
 //            checked|selected|enabled|disabled|expanded|collapsed|required)
             switch (state) {
                 // Binary on/off (checked/selected/etc)
                 case "checked", "selected" -> {
-
+                    System.out.println("@@un? " + un);
                     elPredictXPaths.add(un
                             ? offElement()
                             : onElement());
