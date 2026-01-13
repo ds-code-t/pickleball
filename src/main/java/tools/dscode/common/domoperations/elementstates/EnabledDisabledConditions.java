@@ -1,4 +1,4 @@
-package tools.dscode.common.domoperations;
+package tools.dscode.common.domoperations.elementstates;
 
 import com.xpathy.Condition;
 import com.xpathy.XPathy;
@@ -9,17 +9,13 @@ import static com.xpathy.Condition.*;
 /**
  * Reusable XPathy conditions related to "enabled/disabled" state.
  *
- * What "disabled" typically looks like:
- *  - Standard HTML boolean attribute: @disabled (presence-only or disabled="true"/"disabled")
- *  - Accessibility state:            @aria-disabled="true"   (common on custom controls)
- *  - Framework conventions:
- *      * class contains "disabled", "is-disabled", "mat-button-disabled", etc.
- *      * data-* flags like @data-disabled="true" or @data-state="disabled"
+ * FIX:
+ *  - enabledElement() no longer matches "everything that is not disabled".
+ *    It now matches only elements that look like they participate in an enabled/disabled pattern
+ *    (a "candidate") AND are not disabled.
  *
- * This class provides:
- *  - Condition helpers usable with: someTag.byCondition(...)
- *  - XPathy helpers that include raw XPath for attributes not modeled in XPathy's Attribute enum
- *    (e.g. aria-disabled, data-disabled)
+ * Condition helpers are unchanged for compatibility, but note that enabled() = not(disabled())
+ * can still be too broad if applied to an unscoped selector.
  */
 public final class EnabledDisabledConditions {
 
@@ -39,7 +35,7 @@ public final class EnabledDisabledConditions {
         );
     }
 
-    /** Enabled is defined as NOT disabled(). */
+    /** Enabled is defined as NOT disabled(). (Logical negation; may be broad if unscoped.) */
     public static Condition enabled() {
         return not(disabled());
     }
@@ -72,7 +68,16 @@ public final class EnabledDisabledConditions {
         return new XPathy(finalXpath);
     }
 
-    /** Any element (//*) that is considered enabled (negation of disabledElement() predicate). */
+    /**
+     * Any element (//*) that is considered enabled.
+     *
+     * FIX:
+     *  - Previously: //*[not(disabledPred)]  (matched almost everything)
+     *  - Now:        //*[(candidatePred) and not(disabledPred)]
+     *
+     * "Candidate" means the element appears to participate in an enabled/disabled pattern
+     * (native disabled attr, aria/data flags, or disabled-ish class tokens).
+     */
     public static XPathy enabledElement() {
         XPathy any = new XPathy();
         String base = any.getXpath();
@@ -80,7 +85,9 @@ public final class EnabledDisabledConditions {
         String disabledXpath = disabledElement().getXpath();
         String disabledPred = extractPredicate(base, disabledXpath);
 
-        String finalXpath = base + "[not(" + disabledPred + ")]";
+        String candidatePred = buildEnabledDisabledCandidatePredicate(base);
+
+        String finalXpath = base + "[(" + candidatePred + ") and not(" + disabledPred + ")]";
         return new XPathy(finalXpath);
     }
 
@@ -114,6 +121,34 @@ public final class EnabledDisabledConditions {
                 attribute(class_).contains("mat-radio-disabled"),
                 attribute(class_).contains("p-disabled")
         );
+    }
+
+    /**
+     * Candidate predicate to avoid enabledElement() matching random nodes that simply
+     * aren't disabled.
+     *
+     * Candidate if either:
+     *  - has disabled-ish class tokens, OR
+     *  - has native @disabled, OR
+     *  - has aria/data state attributes that express disabled/enabled state.
+     */
+    private static String buildEnabledDisabledCandidatePredicate(String base) {
+        XPathy any = new XPathy();
+
+        // candidate via class tokens (Condition-based)
+        XPathy byCondCandidateClass = any.byCondition(disabledClassLike());
+        String classCandidatePred = extractPredicate(base, byCondCandidateClass.getXpath());
+
+        // candidate via native/aria/data presence (presence implies the pattern exists)
+        String rawCandidate =
+                "(" +
+                        "@disabled or " +
+                        "@aria-disabled or " +
+                        "@data-disabled or " +
+                        "@data-state" +
+                        ")";
+
+        return "(" + classCandidatePred + " or " + rawCandidate + ")";
     }
 
     /**

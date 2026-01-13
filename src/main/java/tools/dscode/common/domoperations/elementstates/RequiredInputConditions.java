@@ -9,18 +9,13 @@ import static com.xpathy.Condition.*;
 /**
  * Reusable XPathy conditions related to "required input" state.
  *
- * What "required" typically looks like:
- *  - Standard HTML boolean attribute: @required (presence-only or required="true"/"required")
- *  - Accessibility attribute:         @aria-required="true" (common on custom controls)
- *  - Framework conventions:
- *      * class tokens like "required", "is-required"
- *      * Angular validation classes like "ng-invalid-required" (seen in some setups)
- *      * data-* flags like @data-required="true" or @data-state="required"
+ * FIX:
+ *  - notRequiredElement() no longer matches "everything that is not required".
+ *    It now matches only elements that look like they participate in a required/not-required pattern
+ *    (a "candidate") AND are not required.
  *
- * This class provides:
- *  - Condition helpers usable with: someTag.byCondition(...)
- *  - XPathy helpers that include raw XPath for attrs not modeled in XPathy's Attribute constants
- *    (e.g. aria-required, data-required).
+ * Condition helpers are unchanged for compatibility, but note that notRequired() = not(required())
+ * can still be too broad if applied to an unscoped selector.
  */
 public final class RequiredInputConditions {
 
@@ -73,7 +68,16 @@ public final class RequiredInputConditions {
         return new XPathy(finalXpath);
     }
 
-    /** Any element (//*) that is considered not required (negation of requiredElement() predicate). */
+    /**
+     * Any element (//*) that is considered not required.
+     *
+     * FIX:
+     *  - Previously: //*[not(requiredPred)]  (matched almost everything)
+     *  - Now:        //*[(candidatePred) and not(requiredPred)]
+     *
+     * "Candidate" means the element appears to participate in a required/not-required pattern
+     * (native required attr, aria/data flags, or required-ish class tokens).
+     */
     public static XPathy notRequiredElement() {
         XPathy any = new XPathy();
         String base = any.getXpath();
@@ -81,7 +85,9 @@ public final class RequiredInputConditions {
         String requiredXpath = requiredElement().getXpath();
         String requiredPred = extractPredicate(base, requiredXpath);
 
-        String finalXpath = base + "[not(" + requiredPred + ")]";
+        String candidatePred = buildRequiredCandidatePredicate(base);
+
+        String finalXpath = base + "[(" + candidatePred + ") and not(" + requiredPred + ")]";
         return new XPathy(finalXpath);
     }
 
@@ -89,11 +95,6 @@ public final class RequiredInputConditions {
      * Internals
      * ------------------------------------------------------------------------- */
 
-    /**
-     * @required is often presence-only, but can appear as:
-     *  - required="required"
-     *  - required="true"
-     */
     private static Condition requiredAttributeLike() {
         return or(
                 attribute(required).haveIt(),
@@ -102,16 +103,40 @@ public final class RequiredInputConditions {
         );
     }
 
-    /**
-     * Framework class conventions (best-effort).
-     * Tune these for your component libraries / validators.
-     */
     private static Condition requiredClassLike() {
         return or(
                 attribute(class_).contains("required"),
                 attribute(class_).contains("is-required"),
                 attribute(class_).contains("ng-invalid-required")
         );
+    }
+
+    /**
+     * Candidate predicate to avoid notRequiredElement() matching random nodes that simply
+     * aren't required.
+     *
+     * Candidate if either:
+     *  - has required-ish class tokens, OR
+     *  - has native @required, OR
+     *  - has aria/data state attributes that express required-ness.
+     */
+    private static String buildRequiredCandidatePredicate(String base) {
+        XPathy any = new XPathy();
+
+        // candidate via class tokens (Condition-based)
+        XPathy byCondCandidateClass = any.byCondition(requiredClassLike());
+        String classCandidatePred = extractPredicate(base, byCondCandidateClass.getXpath());
+
+        // candidate via native/aria/data presence (presence implies the pattern exists)
+        String rawCandidate =
+                "(" +
+                        "@required or " +
+                        "@aria-required or " +
+                        "@data-required or " +
+                        "@data-state" +
+                        ")";
+
+        return "(" + classCandidatePred + " or " + rawCandidate + ")";
     }
 
     /**

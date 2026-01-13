@@ -4,10 +4,11 @@ import com.xpathy.XPathy;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.browseroperations.WindowSwitch;
-import tools.dscode.common.domoperations.EnabledDisabledConditions;
+
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.domoperations.elementstates.BinaryStateConditions;
 import tools.dscode.common.domoperations.elementstates.CollapsedExpandedConditions;
+import tools.dscode.common.domoperations.elementstates.EnabledDisabledConditions;
 import tools.dscode.common.domoperations.elementstates.RequiredInputConditions;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
@@ -236,10 +237,10 @@ public class ElementMatch {
         if (!state.isEmpty()) {
             boolean un = state.startsWith("un");
             if (un) state = state.substring(2);
-
+//            checked|selected|enabled|disabled|expanded|collapsed|required)
             switch (state) {
                 // Binary on/off (checked/selected/etc)
-                case "checked", "selected", "on" -> {
+                case "checked", "selected" -> {
 
                     elPredictXPaths.add(un
                             ? offElement()

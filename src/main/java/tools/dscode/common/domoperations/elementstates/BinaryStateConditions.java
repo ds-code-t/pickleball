@@ -10,26 +10,16 @@ import static com.xpathy.Condition.*;
  * Reusable XPathy conditions related to "binary on/off" state that is commonly expressed via
  * boolean-ish attributes (checked/selected) and framework conventions (class tokens, ARIA attributes, etc.).
  *
- * What this class provides:
- *  1) Condition helpers usable with: someTag.byCondition(...)
- *  2) XPathy helpers that can include raw XPath for attributes not modeled in XPathy's Attribute enum
- *     (e.g. aria-checked, aria-selected, data-*), while still reusing Condition where possible.
+ * FIX:
+ *  - offElement() no longer matches "everything that is not on".
+ *    It now matches only elements that look like a "binary-state candidate"
+ *    (i.e., they carry any checked/selected/aria/data/class signals) AND are not on.
  *
- * Notes / Heuristics:
- *  - Standard HTML boolean attributes:
- *      * @checked   (checkboxes, radios, toggles implemented with <input>)
- *      * @selected  (<option>)
- *    These are often represented as presence-only, but sometimes appear as checked="true"/"checked".
- *
- *  - Common framework patterns (best-effort; adjust to your UI stack):
- *      * class contains "checked" tokens (Angular Material, PrimeNG, etc.)
- *      * ARIA state attributes: @aria-checked / @aria-selected (raw XPath in this helper)
- *      * data-* state attributes like @data-checked / @data-selected (raw XPath in this helper)
- *
- * If you want to tune this to your specific app, edit the token lists below.
+ *  - Condition helpers (off/notChecked/notSelected) are unchanged for compatibility,
+ *    but note: using them on very broad selectors can still match unrelated elements,
+ *    because "not(on)" is logically true for elements that don't participate at all.
  */
 public final class BinaryStateConditions {
-
 
     private BinaryStateConditions() {
         // utility class
@@ -44,7 +34,8 @@ public final class BinaryStateConditions {
         return or(
                 checkedLike(),
                 selectedLike(),
-                checkedClassLike()
+                checkedClassLike(),
+                selectedClassLike()
         );
     }
 
@@ -107,11 +98,10 @@ public final class BinaryStateConditions {
         XPathy any = new XPathy();
         XPathy selfOnByCondition = any.byCondition(on());
 
-        String base = any.getXpath();                 // "//*"
-        String withPred = selfOnByCondition.getXpath(); // "//*[<predicate>]"
+        String base = any.getXpath();                    // "//*"
+        String withPred = selfOnByCondition.getXpath();  // "//*[<predicate>]"
         String predicate = extractPredicate(base, withPred);
 
-        // Add raw XPath "on" rules (ARIA/data-*) to the predicate:
         String rawOn =
                 "(" +
                         "@aria-checked='true' or @aria-checked='mixed' or " +
@@ -124,16 +114,26 @@ public final class BinaryStateConditions {
         return new XPathy(finalXpath);
     }
 
-    /** Same as {@link #onElement()} but negated (off). */
+    /**
+     * Off elements:
+     *
+     * FIX:
+     *  - Previously:  //*[not(<onPred>)]  (matched almost everything)
+     *  - Now:         //*[(<candidatePred>) and not(<onPred>)]
+     *
+     * "Candidate" means the element appears to participate in a binary state pattern
+     * (checked/selected attrs, aria/data state attrs, or known class tokens).
+     */
     public static XPathy offElement() {
         XPathy any = new XPathy();
         String base = any.getXpath();
-        String onXpath = onElement().getXpath();
 
-        // onElement is: "//*[ ... ]" -> extract its predicate then negate it
+        String onXpath = onElement().getXpath();
         String onPred = extractPredicate(base, onXpath);
 
-        String finalXpath = base + "[not(" + onPred + ")]";
+        String candidatePred = buildBinaryCandidatePredicate(base);
+
+        String finalXpath = base + "[(" + candidatePred + ") and not(" + onPred + ")]";
         return new XPathy(finalXpath);
     }
 
@@ -182,11 +182,6 @@ public final class BinaryStateConditions {
      * Internals
      * ------------------------------------------------------------------------- */
 
-    /**
-     * @checked is often presence-only, but can also be:
-     *  - checked="checked"
-     *  - checked="true"
-     */
     private static Condition checkedLike() {
         return or(
                 attribute(checked).haveIt(),
@@ -195,11 +190,6 @@ public final class BinaryStateConditions {
         );
     }
 
-    /**
-     * @selected is often presence-only, but can also be:
-     *  - selected="selected"
-     *  - selected="true"
-     */
     private static Condition selectedLike() {
         return or(
                 attribute(selected).haveIt(),
@@ -208,17 +198,13 @@ public final class BinaryStateConditions {
         );
     }
 
-    /**
-     * Framework class conventions (best-effort).
-     * Adjust these tokens to match your UI libraries.
-     */
     private static Condition checkedClassLike() {
         return or(
                 attribute(class_).contains("checked"),
                 attribute(class_).contains("is-checked"),
                 attribute(class_).contains("mat-checkbox-checked"),
                 attribute(class_).contains("mat-radio-checked"),
-                attribute(class_).contains("p-highlight") // e.g., PrimeNG uses p-highlight for selected-ish
+                attribute(class_).contains("p-highlight") // PrimeNG uses p-highlight for selected-ish
         );
     }
 
@@ -229,6 +215,33 @@ public final class BinaryStateConditions {
                 attribute(class_).contains("active"),
                 attribute(class_).contains("p-highlight")
         );
+    }
+
+    /**
+     * Build a predicate that identifies elements that likely participate in a binary-state pattern.
+     * This prevents offElement() from matching random elements that simply aren't "on".
+     */
+    private static String buildBinaryCandidatePredicate(String base) {
+        XPathy any = new XPathy();
+
+        // candidate via class tokens (Condition-based)
+        XPathy byCondCandidateClass = any.byCondition(or(checkedClassLike(), selectedClassLike()));
+        String classCandidatePred = extractPredicate(base, byCondCandidateClass.getXpath());
+
+        // candidate via native attrs (presence)
+        String rawNativeCandidate =
+                "(" +
+                        "@checked or @selected" +
+                        ")";
+
+        // candidate via ARIA/data-* presence (not values; presence means the pattern exists)
+        String rawStateCandidate =
+                "(" +
+                        "@aria-checked or @aria-selected or " +
+                        "@data-checked or @data-selected or @data-state" +
+                        ")";
+
+        return "(" + classCandidatePred + " or " + rawNativeCandidate + " or " + rawStateCandidate + ")";
     }
 
     /**
