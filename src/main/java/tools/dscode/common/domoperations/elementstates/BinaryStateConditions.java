@@ -10,18 +10,11 @@ import static com.xpathy.Condition.*;
  * Reusable XPathy conditions related to "binary on/off" state that is commonly expressed via
  * boolean-ish attributes (checked/selected) and framework conventions (class tokens, ARIA attributes, etc.).
  *
- * FIX:
- *  - offElement() no longer matches "everything that is not on".
- *    It now matches only elements that look like a "binary-state candidate"
- *    (i.e., they carry any checked/selected/aria/data/class signals) AND are not on.
- *
- *  - Condition helpers (off/notChecked/notSelected) are unchanged for compatibility,
- *    but note: using them on very broad selectors can still match unrelated elements,
- *    because "not(on)" is logically true for elements that don't participate at all.
- *
- * UPDATE:
- *  - Treat @value='true' as an additional "on" signal for onElement()
- *  - Treat @value='true' or @value='false' as a "binary candidate" signal for offElement()
+ * Key behaviors:
+ * - offElement() matches only "binary-state candidates" AND not(on).
+ * - Binary candidates now include common input types and ARIA roles (checkbox/radio/switch/toggle patterns),
+ *   so unchecked controls with no @checked/@selected are still detected as binary candidates.
+ * - @value='true'/'false' is treated as a LAST-RESORT state signal (only when no other state signals exist).
  */
 public final class BinaryStateConditions {
 
@@ -89,15 +82,15 @@ public final class BinaryStateConditions {
     }
 
     /* -------------------------------------------------------------------------
-     * Public XPathy API (supports raw XPath for attrs not in Attribute enum)
+     * Public XPathy API
      * ------------------------------------------------------------------------- */
 
     /**
      * Returns an XPathy locator for "any element" (//*)
-     * that is considered "on" using both:
+     * that is considered "on" using:
      *  - Condition-based rules (checked/selected/class tokens)
      *  - Raw XPath rules for ARIA/data-* state attributes
-     *  - Raw XPath rule for @value='true' (binary widgets that store state in value)
+     *  - Raw XPath @value='true' ONLY as a last resort (when no other state signals exist)
      */
     public static XPathy onElement() {
         XPathy any = new XPathy();
@@ -107,28 +100,42 @@ public final class BinaryStateConditions {
         String withPred = selfOnByCondition.getXpath();  // "//*[<predicate>]"
         String predicate = extractPredicate(base, withPred);
 
-        String rawOn =
+        // Primary "on" signals (non-value)
+        String rawOnPrimary =
                 "(" +
+                        "@checked or @selected or " +
                         "@aria-checked='true' or @aria-checked='mixed' or " +
                         "@aria-selected='true' or " +
+                        "@aria-pressed='true' or " +
                         "@data-checked='true' or @data-selected='true' or " +
-                        "@data-state='checked' or @data-state='selected' or @data-state='on' or " +
-                        "@value='true'" + // NEW
+                        "@data-state='checked' or @data-state='selected' or @data-state='on'" +
                         ")";
 
-        String finalXpath = base + "[" + predicate + " or " + rawOn + "]";
+        // NEW: value-based "on" is only used if NONE of the primary signals exist
+        // (so value doesn't override/compete with checked/selected/aria/data)
+        String rawOnValueFallback =
+                "(" +
+                        "@value='true' and not(" +
+                        "@checked or @selected or " +
+                        "@aria-checked or @aria-selected or @aria-pressed or " +
+                        "@data-checked or @data-selected or @data-state" +
+                        ")" +
+                        ")";
+
+        String finalXpath = base + "[(" + predicate + ") or " + rawOnPrimary + " or " + rawOnValueFallback + "]";
         return new XPathy(finalXpath);
     }
 
     /**
      * Off elements:
+     *  - Matches only binary-state candidates AND not(on).
      *
-     * FIX:
-     *  - Previously:  //*[not(<onPred>)]  (matched almost everything)
-     *  - Now:         //*[(<candidatePred>) and not(<onPred>)]
+     * This will now include unchecked <input type=checkbox|radio> even when @checked/@selected are absent,
+     * because those are considered binary candidates by type/role.
      *
-     * "Candidate" means the element appears to participate in a binary state pattern
-     * (checked/selected attrs, aria/data state attrs, known class tokens, or value='true|false').
+     * Additionally:
+     *  - If an element is a binary candidate and has no explicit state signals at all,
+     *    it will be treated as off (because it won't match onPred).
      */
     public static XPathy offElement() {
         XPathy any = new XPathy();
@@ -145,7 +152,7 @@ public final class BinaryStateConditions {
 
     /**
      * "Checked" locator with raw ARIA/data-* fallback.
-     * Useful for checkbox/radio/toggle UIs where the native <input> is hidden and state is on a wrapper.
+     * Note: does NOT use @value fallback because "checked" is a stronger semantic than value.
      */
     public static XPathy checkedElement() {
         XPathy any = new XPathy();
@@ -157,6 +164,7 @@ public final class BinaryStateConditions {
 
         String rawChecked =
                 "(" +
+                        "@checked or " +
                         "@aria-checked='true' or @aria-checked='mixed' or " +
                         "@data-checked='true' or @data-state='checked' or @data-state='on'" +
                         ")";
@@ -176,6 +184,7 @@ public final class BinaryStateConditions {
 
         String rawSelected =
                 "(" +
+                        "@selected or " +
                         "@aria-selected='true' or " +
                         "@data-selected='true' or @data-state='selected'" +
                         ")";
@@ -210,7 +219,7 @@ public final class BinaryStateConditions {
                 attribute(class_).contains("is-checked"),
                 attribute(class_).contains("mat-checkbox-checked"),
                 attribute(class_).contains("mat-radio-checked"),
-                attribute(class_).contains("p-highlight") // PrimeNG uses p-highlight for selected-ish
+                attribute(class_).contains("p-highlight")
         );
     }
 
@@ -226,6 +235,12 @@ public final class BinaryStateConditions {
     /**
      * Build a predicate that identifies elements that likely participate in a binary-state pattern.
      * This prevents offElement() from matching random elements that simply aren't "on".
+     *
+     * UPDATED:
+     *  - Includes common input types for checkboxes/radios (even when unchecked, no @checked attr)
+     *  - Includes common ARIA roles used for binary/toggle widgets
+     *  - Includes aria-pressed presence as a toggle signal
+     *  - Includes @value='true'/'false' as candidate (but value is only a fallback for ON)
      */
     private static String buildBinaryCandidatePredicate(String base) {
         XPathy any = new XPathy();
@@ -234,29 +249,54 @@ public final class BinaryStateConditions {
         XPathy byCondCandidateClass = any.byCondition(or(checkedClassLike(), selectedClassLike()));
         String classCandidatePred = extractPredicate(base, byCondCandidateClass.getXpath());
 
-        // candidate via native attrs (presence)
+        // candidate via native binary-ish attrs (presence)
         String rawNativeCandidate =
                 "(" +
                         "@checked or @selected" +
                         ")";
 
-        // candidate via ARIA/data-* presence (not values; presence means the pattern exists)
+        // candidate via ARIA/data-* presence (presence means the pattern exists)
         String rawStateCandidate =
                 "(" +
-                        "@aria-checked or @aria-selected or " +
+                        "@aria-checked or @aria-selected or @aria-pressed or " +
                         "@data-checked or @data-selected or @data-state" +
                         ")";
 
-        // candidate via "value is explicitly boolean-ish"
+        // NEW: candidate via common <input type=...> (case-insensitive)
+        String rawTypeCandidate =
+                "(" +
+                        "self::input[" +
+                        "translate(@type,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')='checkbox' or " +
+                        "translate(@type,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')='radio'" +
+                        "]" +
+                        ")";
+
+        // NEW: candidate via common ARIA roles for binary/toggle widgets (case-insensitive)
+        // includes a few common patterns beyond checkbox/radio/switch.
+        String rawRoleCandidate =
+                "(" +
+                        "@role and (" +
+                        "translate(@role,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')='checkbox' or " +
+                        "translate(@role,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')='radio' or " +
+                        "translate(@role,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')='switch' or " +
+                        "translate(@role,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')='menuitemcheckbox' or " +
+                        "translate(@role,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')='menuitemradio' or " +
+                        "translate(@role,'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz')='option'" +
+                        ")" +
+                        ")";
+
+        // candidate via explicit boolean-ish value
         String rawValueCandidate =
                 "(" +
-                        "@value='true' or @value='false'" + // NEW
+                        "@value='true' or @value='false'" +
                         ")";
 
         return "("
                 + classCandidatePred
                 + " or " + rawNativeCandidate
                 + " or " + rawStateCandidate
+                + " or " + rawTypeCandidate
+                + " or " + rawRoleCandidate
                 + " or " + rawValueCandidate
                 + ")";
     }
