@@ -349,22 +349,25 @@ public final class DefinitionContext {
                             (category, v, op) -> XPathy.from(Tag.a).byAttribute(role).equals("button")
                     );
 
-            category("Expandable Section").children("Expandable Section").inheritsFrom( "htmlNaming", CONTAINS_TEXT)
+            category("Expandable Section").children("Expandable Sections").inheritsFrom( "htmlNaming", CONTAINS_TEXT)
                     .and(
                             (category, v, op) -> XPathy.from(div)
                                     .byAttribute(class_).withCase(LOWER).contains("expand")
                                     .or().byAttribute(class_).withCase(LOWER).contains("collapse")
                     );
 
+            category("Expandable Header").children("Expandable Headers").inheritsFrom( "htmlNaming", CONTAINS_TEXT)
+                    .and(
+                            (category, v, op) -> XPathy.from(div)
+                                    .byAttribute(class_).withCase(LOWER).contains("header")
+                                    .and().byHaving().parent().byAttribute(class_).withCase(LOWER).contains("collapsible")
+                    );
 
             category("Expandable Icon").children("Expandable Icons").inheritsFrom("htmlNaming", CONTAINS_TEXT)
                     .and(
-                            (category, v, op) -> XPathy.from(div)
-                                    .byAttribute(class_).withCase(LOWER).contains("expand")
-                                    .or().byAttribute(class_).withCase(LOWER).contains("collapse"),
-                            (category, v, op) -> XPathy.from(div).$descendant()
-                                    .$tag(i).byAttribute(class_).withCase(LOWER).contains("openclose")
+                            (category, v, op) -> any.byAttribute(role).equals("button").and().byAttribute(Attribute.custom("aria-expanded")).haveIt()
                     );
+
 
             category("Submit Button").children("Submit Buttons").or(
                     (category, v, op) -> input.byAttribute(type).equals("submit")
