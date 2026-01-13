@@ -1,5 +1,17 @@
 Feature: Additiontest
 
+  Scenario: tt
+    * location
+
+  Scenario Outline: testlocation3
+    * location
+
+    Examples:
+      | s |
+      | 1 |
+      | 2 |
+      | 3 |
+
   Scenario: tefsdf
   @[DEBUG]
     * logTest

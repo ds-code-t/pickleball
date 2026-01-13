@@ -4,6 +4,7 @@ import com.xpathy.Attribute;
 import com.xpathy.Condition;
 import com.xpathy.Tag;
 import com.xpathy.XPathy;
+import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.Before;
 import io.cucumber.java.BeforeAll;
@@ -28,7 +29,9 @@ import static com.xpathy.Attribute.value;
 import static com.xpathy.Case.LOWER;
 import static com.xpathy.Tag.any;
 import static com.xpathy.Tag.input;
+import static io.cucumber.core.runner.CurrentScenarioState.getScenarioLogRoot;
 import static io.cucumber.core.runner.CurrentScenarioState.logToScenario;
+import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static org.assertj.core.api.Assertions.assertThat;
 
 
@@ -40,6 +43,16 @@ public class CalculatorSteps {
     private int a, b, result;
 
 
+    @Given("location")
+    public static void locationTest() {
+        Pickle  pickle = getCurrentScenarioState().pickle;
+        System.out.println("@@pickle1: " + pickle.getName());
+        System.out.println("@@pickle2: " + pickle.getLocation().getLine());
+        System.out.println("@@pickle3: " + pickle.getExamplesLocation());
+        if(pickle.getExamplesLocation() !=null && pickle.getExamplesLocation().isPresent()){
+            System.out.println("@@pickle.getExamplesLocation().get().getLine(): " + pickle.getExamplesLocation().get().getLine());
+        }
+    }
     @Given("logTest")
     public static void logTest() {
         WebDriver driver = getDefaultDriver();
