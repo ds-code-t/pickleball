@@ -328,7 +328,6 @@ public final class DefinitionContext {
                     );
 
 
-
             category("Icon").children("Icons").inheritsFrom("forLabel", CONTAINS_TEXT)
                     .or(
                             (category, v, op) -> XPathyBuilder.buildIfAllTrue(Tag.img, class_, ValueWrapper.createValueWrapper("'icon'"), Op.CONTAINS),
@@ -349,14 +348,16 @@ public final class DefinitionContext {
                             (category, v, op) -> XPathy.from(Tag.a).byAttribute(role).equals("button")
                     );
 
-            category("Expandable Section").children("Expandable Sections").inheritsFrom( "htmlNaming", CONTAINS_TEXT)
+            category("Expandable Section").children("Expandable Sections").inheritsFrom("htmlNaming", CONTAINS_TEXT)
                     .and(
-                            (category, v, op) -> XPathy.from(div)
-                                    .byAttribute(class_).withCase(LOWER).contains("expand")
-                                    .or().byAttribute(class_).withCase(LOWER).contains("collapse")
+                            (category, v, op) ->
+                                    combineOr(
+                                            XPathy.from(div).byAttribute(class_).withCase(LOWER).contains("expand"),
+                                            XPathy.from(div).byAttribute(class_).withCase(LOWER).contains("collapse")
+                                    )
                     );
 
-            category("Expandable Header").children("Expandable Headers").inheritsFrom( "htmlNaming", CONTAINS_TEXT)
+            category("Expandable Header").children("Expandable Headers").inheritsFrom("htmlNaming", CONTAINS_TEXT)
                     .and(
                             (category, v, op) -> XPathy.from(div)
                                     .byAttribute(class_).withCase(LOWER).contains("header")
@@ -378,11 +379,9 @@ public final class DefinitionContext {
             //
             category("Link").children("Links").inheritsFrom("Text")
                     .or(
-                            (category, v, op) ->
-                                    XPathy.from(any).byAttribute(role).equals("link")
-                                            .or().byAttribute(aria_label).equals("link"),
-                            (category, v, op) ->
-                                    XPathy.from(Tag.a)
+                            (category, v, op) -> XPathy.from(any).byAttribute(role).equals("link"),
+                            (category, v, op) -> XPathy.from(any).byAttribute(aria_label).equals("link"),
+                            (category, v, op) -> XPathy.from(Tag.a)
                     );
 
 
@@ -398,9 +397,11 @@ public final class DefinitionContext {
             category("Modal").children("Modals", "Dialog", "Dialogs").inheritsFrom(CONTAINS_TEXT, "forLabel", "htmlNaming")
                     .and(
                             (category, v, op) ->
-                                    XPathy.from(div).byAttribute(role).equals("dialog")
-                                            .or().byAttribute(Attribute.custom("aria-model")).equals("true")
-                                            .or().byAttribute(id).equals("modal")
+                                    combineOr(
+                                            XPathy.from(div).byAttribute(role).equals("dialog"),
+                                            XPathy.from(div).byAttribute(Attribute.custom("aria-model")).equals("true"),
+                                            XPathy.from(div).byAttribute(id).equals("modal")
+                                    )
                     );
             category("Close Button").children("Close Buttons")
                     .and(
@@ -431,7 +432,11 @@ public final class DefinitionContext {
             //
             category("Textbox").children("Textboxes").inheritsFrom("forLabel", "htmlNaming")
                     .and((category, v, op) ->
-                            input.byAttribute(type).equals("text").or().byAttribute(type).equals("password").or().byAttribute(type).equals("email"))
+                            combineOr(
+                                    input.byAttribute(type).equals("text"),
+                                    input.byAttribute(type).equals("password"),
+                                    input.byAttribute(type).equals("email"))
+                    )
                     .or(
                             (category, v, op) ->
                                     XPathyBuilder.buildIfAllTrue(input, placeholder, v, op, v != null)
@@ -478,8 +483,10 @@ public final class DefinitionContext {
 
             category("Row").children("Rows").inheritsFrom(CONTAINS_TEXT)
                     .and((category, v, op) ->
-                            XPathy.from(Tag.tr).or().byAttribute(role).equals("row")
-                    );
+                            combineOr(XPathy.from(Tag.tr),
+                                    any.byAttribute(role).equals("row")
+                            )
+                            );
 
 
             category(BASE_CATEGORY).and(
