@@ -15,6 +15,7 @@ import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDict
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.prettyPrintXPath;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.everyNth;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.maybeDeepestMatches;
 import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public class ContextWrapper {
@@ -112,7 +113,7 @@ public class ContextWrapper {
 
         printDebug("##XPath: getElementListFromSearchContext\n" + prettyPrintXPath(xpath) +"\n----------------" );
 
-        return searchContext.findElements(new By.ByXPath(xpath));
+        return searchContext.findElements(new By.ByXPath(maybeDeepestMatches(xpath)));
     }
 
     public static WebElement getElementFromSearchContext(SearchContext searchContext, XPathy xPathy) {
