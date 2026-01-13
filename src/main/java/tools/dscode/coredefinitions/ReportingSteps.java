@@ -5,6 +5,7 @@ import io.cucumber.java.en.When;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.reporting.Report;
 import tools.dscode.common.reporting.WorkBook;
+import tools.dscode.common.reporting.logging.Entry;
 
 
 import java.sql.SQLOutput;
@@ -13,6 +14,8 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 
+import static io.cucumber.core.runner.CurrentScenarioState.getScenarioLogRoot;
+import static io.cucumber.core.runner.CurrentScenarioState.logToScenario;
 import static io.cucumber.core.runner.GlobalState.enterInReport;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getReport;
@@ -70,4 +73,13 @@ public class ReportingSteps {
         return reportPath;
     }
 
-}
+
+    @When("^Scenario Log: (.*)$")
+    public void logEntry(String logEntry, DataTable dataTable) {
+        System.out.println("@@logEntry: " + logEntry);
+        System.out.println("@@dataTable: " + dataTable);
+        Entry entry = logToScenario(logEntry,dataTable).timestamp();
+        System.out.println("@@entry: " + entry);
+        System.out.println("@@entry.fields: " + entry.fields);
+        System.out.println("@@getScenarioLogRoot(): " + getScenarioLogRoot());    }
+    }

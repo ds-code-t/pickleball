@@ -63,8 +63,10 @@ dependencies {
     api("com.googlecode.aviator:aviator:5.4.3")
     api("com.ibm.jsonata4java:JSONata4Java:2.6.0")
 
+    // reports
+    api "com.aventstack:extentreports:5.1.2"
+
     implementation("io.github.classgraph:classgraph:4.8.184")
-//    implementation("org.apache.poi:poi:5.5.1")
     implementation("org.apache.poi:poi-ooxml:5.5.1")
 
     // AspectJ toolchain + runtime

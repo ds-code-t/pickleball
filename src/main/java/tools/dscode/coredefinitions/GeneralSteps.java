@@ -3,6 +3,8 @@ package tools.dscode.coredefinitions;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.core.stepexpression.DocStringArgument;
+import io.cucumber.java.AfterAll;
+import io.cucumber.java.BeforeAll;
 import io.cucumber.java.ParameterType;
 import io.cucumber.java.en.Given;
 import org.openqa.selenium.JavascriptExecutor;
@@ -14,6 +16,8 @@ import org.openqa.selenium.edge.EdgeOptions;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.DefinitionFlags;
+import tools.dscode.common.annotations.Phase;
+import tools.dscode.common.reporting.logging.Log;
 import tools.dscode.common.status.SoftRuntimeException;
 
 import java.time.Duration;
@@ -25,6 +29,7 @@ import static io.cucumber.core.runner.CurrentScenarioState.getScenarioObject;
 import static io.cucumber.core.runner.CurrentScenarioState.registerScenarioObject;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.GlobalConstants.INFO_STEP;
 import static tools.dscode.common.GlobalConstants.NEXT_SIBLING_STEP;
@@ -37,6 +42,20 @@ import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort
 
 
 public class GeneralSteps extends CoreSteps {
+
+    @BeforeAll
+    public static void beforeAll(){
+        System.out.println("@@BeforeAll");
+        lifecycle.fire(Phase.BEFORE_CUCUMBER_RUN);
+    }
+
+
+    @AfterAll
+    public static void afterAll(){
+        System.out.println("@@AfterAll");
+        Log.global().closeAll();
+        lifecycle.fire(Phase.AFTER_CUCUMBER_RUN);
+    }
 
     public static JavascriptExecutor getJavascriptExecutor() {
         return getDriver("BROWSER");

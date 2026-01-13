@@ -1,6 +1,7 @@
 package io.cucumber.core.runner;
 
 import io.cucumber.core.gherkin.Pickle;
+import io.cucumber.datatable.DataTable;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import org.openqa.selenium.WebDriver;
@@ -10,12 +11,15 @@ import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
 import tools.dscode.common.reporting.WorkBook;
+import tools.dscode.common.reporting.logging.Entry;
+import tools.dscode.common.reporting.logging.ExtentReportConverter;
 import tools.dscode.common.status.SoftExceptionInterface;
 import tools.dscode.common.status.SoftRuntimeException;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 import tools.dscode.registry.GlobalRegistry;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,10 +37,12 @@ import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_FALSE;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN;
 import static tools.dscode.common.util.Reflect.getProperty;
+import static tools.dscode.common.util.StringUtilities.safeFileName;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
 import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
 
 public class CurrentScenarioState extends ScenarioMapping {
+
     public final UUID id = UUID.randomUUID();
 
     public final TestCase testCase;
@@ -66,10 +72,39 @@ public class CurrentScenarioState extends ScenarioMapping {
         this.testCase = testCase;
         this.pickle = (Pickle) getProperty(testCase, "pickle");
     }
+    private Entry scenarioLog;
 
-//    private final LifecycleManager lifecycle = new LifecycleManager();
+    public static Entry getScenarioLogRoot() {
+        return getCurrentScenarioState().scenarioLog;
+    }
+
+    public static Entry logToScenario(String message) {
+        return logToScenario(message, null);
+    }
+    public static Entry logToScenario(String message, DataTable dataTable) {
+        Entry entry = getCurrentScenarioState().scenarioLog.child(message);
+        if (dataTable == null) return entry.timestamp();
+        List<List<String>> lists = dataTable.asLists();
+        if (lists.isEmpty()) return entry.timestamp();
+        if (lists.size() == 1){
+            lists.getFirst().forEach(entry::tag);
+            return entry.timestamp();
+        }
+        entry.fields.putAll(dataTable.asMap());
+        return entry.timestamp();
+    }
 
     public void startScenarioRun() {
+        scenarioLog =
+                Entry.of("Scenario 1")
+                        .tag("SCENARIO")
+                        .on(new ExtentReportConverter(
+                                Path.of("reports",  safeFileName(this.pickle.getName() + ".html"))
+                        ))
+                        .start();
+
+
+
         lifecycle.fire(Phase.BEFORE_SCENARIO_RUN);
         this.stepExtensions = (List<StepExtension>) getProperty(testCase, "stepExtensions");
         StepExtension rootScenarioStep = testCase.getRootScenarioStep();
@@ -107,6 +142,8 @@ public class CurrentScenarioState extends ScenarioMapping {
             lifecycle.fire(Phase.AFTER_SCENARIO_FAIL);
             throw t;
         }
+        getScenarioLogRoot().stop().close();
+
         lifecycle.fire(Phase.AFTER_SCENARIO_RUN);
 
         scenarioRunCleanUp();

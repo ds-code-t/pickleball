@@ -335,5 +335,16 @@ public class ValueWrapper {
     }
 
 
+//    public ValueWrapper normalizeAndReplaceAll(String regex, String replacement)
+//    {
+//        if(normalizedText == null) return null;
+//        return createValueWrapper("'" + normalizedText.replaceAll(regex, replacement) + "'");
+//    }
+
+    public ValueWrapper normalizeLowerCaseAndStripAllWhiteSpace()
+    {
+        if(normalizedText == null) return null;
+        return createValueWrapper("'" + normalizedText.toLowerCase().replaceAll("\\s+", "") + "'");
+    }
 
 }

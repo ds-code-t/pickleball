@@ -76,4 +76,25 @@ public class StringUtilities {
     }
 
 
+    public static String safeFileName(String input) {
+        if (input == null || input.isBlank()) return "_";
+
+        String name = input
+                .replaceAll("[^a-zA-Z0-9._-]", "_")   // illegal + unsafe chars
+                .replaceAll("_+", "_")                // collapse repeats
+                .replaceAll("^_+|_+$", "")             // trim edges
+                .replaceAll("[. ]+$", "");             // Windows trailing dot/space
+
+        if (name.isBlank()) name = "_";
+
+        String upper = name.toUpperCase();
+        if (upper.matches("CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9]")) {
+            name = "_" + name;
+        }
+
+        return name;
+    }
+
+
+
 }

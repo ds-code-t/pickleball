@@ -8,9 +8,12 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.java.Before;
 import io.cucumber.java.BeforeAll;
 import io.cucumber.java.en.*;
+import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import tools.dscode.common.annotations.LifecycleHook;
 import tools.dscode.common.annotations.Phase;
+import tools.dscode.common.reporting.logging.Entry;
+import tools.dscode.common.reporting.logging.Status;
 import tools.dscode.coredefinitions.NavigationSteps;
 import tools.dscode.registry.GlobalRegistry;
 
@@ -25,17 +28,35 @@ import static com.xpathy.Attribute.value;
 import static com.xpathy.Case.LOWER;
 import static com.xpathy.Tag.any;
 import static com.xpathy.Tag.input;
+import static io.cucumber.core.runner.CurrentScenarioState.logToScenario;
 import static org.assertj.core.api.Assertions.assertThat;
 
 
 import static tools.dscode.common.treeparsing.DefinitionContext.DEFAULT_EXECUTION_DICTIONARY;
+import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;
 
 public class CalculatorSteps {
     private int a, b, result;
 
 
+    @Given("logTest")
+    public static void logTest() {
+        WebDriver driver = getDefaultDriver();
+        Entry entry = logToScenario("logTest");
+        entry.child("child1").status(Status.FAIL).screenshot("Test").start().child("gradnchaild1").status(Status.PASS).timestamp().parent.stop();
+        entry.child("child2").status(Status.INFO).timestamp().child("gradnchaild2").screenshot("Test").status(Status.FAIL).timestamp();
+        entry.child("child3").status(Status.PASS).timestamp().child("gradnchaild3").screenshot().status(Status.INFO).timestamp();
+        entry.child("child2").status(Status.SKIP).timestamp().child("gradnchaild4").screenshot("4").status(Status.SKIP).timestamp();
 
+
+        entry.child("zchild1").status(Status.FAIL).start().child("zgradnchaild1").status(Status.PASS).timestamp().parent.stop()
+        .child("zchild2").status(Status.INFO).timestamp().child("zgzradnchaild2").status(Status.FAIL).timestamp()
+        .child("zchild3").status(Status.PASS).timestamp().child("zgradnchaild3").status(Status.INFO).timestamp()
+        .child("zchild2").status(Status.SKIP).timestamp().child("zgradnchaild4").screenshot("4).child(\"zgzradnchaild2\").status(Status.FAIL).timestamp()\n" +
+                        "        .child(\"zchild3\").status(Status.PASS).timestamp().child(\"zgradnchaild3\").status(Status.INFO).timestam").status(Status.SKIP).timestamp();
+
+    }
 
     @Given("config")
     public static void configs() {

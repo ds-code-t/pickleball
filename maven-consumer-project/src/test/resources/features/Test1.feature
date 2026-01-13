@@ -1,15 +1,24 @@
 Feature: Additiontest
 
   Scenario: tefsdf
-    @[DEBUG]
-      *,
+  @[DEBUG]
+    * logTest
+    * Scenario Log: "test1"
+    * Scenario Log: "test2"
+      | key1 | S |
+      | val1 | W |
+    * logTest
+    * Scenario Log: "test3"
+      | key1 | S  |
+      | val1 | W  |
+      | val2 | W2 |
 
   Scenario: chckboxtest 2
-  @[DEBUG]
+#  @[DEBUG]
     * IF: "true":
-    :  * ,save "Z" as "z"
+  :  * ,save "Z" as "z"
     * ELSE:
-    :  * ,save "X" as "x"
+  :  * ,save "X" as "x"
 #    Then , I select "Opel" in the "cars" Dropdown
 #    Then , I select 'opel' in the "cars" Dropdown
 #    * IF: 'opel' THEN: , I select it in the "cars" Dropdown

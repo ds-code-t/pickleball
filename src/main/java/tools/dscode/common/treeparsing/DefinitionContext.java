@@ -10,10 +10,12 @@ import tools.dscode.common.treeparsing.xpathcomponents.XPathyBuilder;
 
 import static com.xpathy.Attribute.aria_label;
 import static com.xpathy.Attribute.checked;
+import static com.xpathy.Attribute.class_;
 import static com.xpathy.Attribute.id;
 import static com.xpathy.Attribute.name;
 import static com.xpathy.Attribute.placeholder;
 import static com.xpathy.Attribute.role;
+import static com.xpathy.Attribute.src;
 import static com.xpathy.Attribute.tabindex;
 import static com.xpathy.Attribute.title;
 import static com.xpathy.Attribute.type;
@@ -325,16 +327,26 @@ public final class DefinitionContext {
                     );
 
 
-            //
-            // Button
-            //
+
+            category("Icon").children("Icons").inheritsFrom("forLabel", CONTAINS_TEXT)
+                    .or(
+                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(Tag.img, class_, ValueWrapper.createValueWrapper("'icon'"), Op.CONTAINS),
+                            (category, v, op) -> XPathy.from(Tag.i),
+                            (category, v, op) -> XPathy.from(Tag.any).byAttribute(role).withCase(LOWER).equals("icon")
+                    ).and(
+                            (category, v, op) -> {
+                                ValueWrapper strippedValue = v == null ? null : v.normalizeLowerCaseAndStripAllWhiteSpace();
+                                return XPathyBuilder.buildIfAllTrue(any, src, strippedValue, op, strippedValue != null);
+                            }
+                    );
+
+
             category("Button").children("Buttons").inheritsFrom("forLabel", "htmlNaming", CONTAINS_TEXT)
                     .or(
                             (category, v, op) -> XPathy.from(Tag.button),
                             (category, v, op) -> XPathy.from(Tag.img).byAttribute(role).equals("button"),
                             (category, v, op) -> XPathy.from(Tag.a).byAttribute(role).equals("button")
                     );
-
 
             category("Submit Button").children("Submit Buttons").or(
                     (category, v, op) -> input.byAttribute(type).equals("submit")
