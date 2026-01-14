@@ -164,7 +164,7 @@ public final class DefinitionContext {
                         .replaceAll("of", "").trim()
                         .replaceAll("no", "none"));
                 String elementPosition = self.resolvedGroupText("elementPosition");
-                if (elementPosition.isBlank() || elementPosition.equals("first"))
+                if (elementPosition.equals("first"))
                     elementPosition = "1";
                 self.putToLocalState("elementPosition", elementPosition.replaceAll("#", ""));
                 self.putToLocalState("state", self.resolvedGroupText("state"));
