@@ -54,14 +54,16 @@ public final class DeepestByLocator {
         Objects.requireNonNull(locator, "locator");
 
         List<WebElement> matches = context.findElements(locator);
+        System.out.println("@@locator: " + locator);
+        System.out.println("@@matches: " + matches);
+        System.out.println("@@matches.size: " + matches.size());
         if (matches.size() <= 1) return matches;
 
         By within = withinElementLocator(locator);
-
+        System.out.println("@@within: " + within);
         List<WebElement> out = new ArrayList<>(matches.size());
 
-        System.out.println("@@matches: " + matches);
-        System.out.println("@@matches.size: " + matches.size());
+
         for (WebElement el : matches) {
             List<WebElement> internal = el.findElements(within);
             System.out.println("@@internal: " + internal);
