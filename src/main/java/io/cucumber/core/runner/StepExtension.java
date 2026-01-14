@@ -5,6 +5,7 @@ import io.cucumber.docstring.DocString;
 import io.cucumber.messages.types.PickleStepArgument;
 import io.cucumber.plugin.event.Result;
 import tools.dscode.common.annotations.DefinitionFlag;
+import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 
@@ -17,10 +18,12 @@ import java.util.stream.Collectors;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.createGherkinMessagesStep;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
+import static io.cucumber.core.runner.CurrentScenarioState.getScenarioLogRoot;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getEventBus;
 import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
+import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleStepTestStep;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
@@ -126,8 +129,12 @@ public class StepExtension extends StepData {
             }
             executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
             executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
+            getScenarioLogRoot().child("STEP: " + executingPickleStepTestStep.getStepText()).start();
+            lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
+            io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep, executionMode);
+            lifecycle.fire(Phase.AFTER_SCENARIO_STEP);
+            getScenarioLogRoot().child("STEP: " + executingPickleStepTestStep.getStepText()).screenshot().stop();
 
-            io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep,executionMode);
             System.out.println("@result==: " + result);
             return result;
         } catch (Throwable t) {
@@ -139,14 +146,6 @@ public class StepExtension extends StepData {
     }
 
     public Result execute(io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep, ExecutionMode executionMode) {
-
-
-
-
-
-
-
-
 
         try {
             Object r = invokeAnyMethodOrThrow(executionPickleStepTestStep, "run", getTestCase(), getEventBus(), getTestCaseState(), executionMode);
@@ -199,8 +198,6 @@ public class StepExtension extends StepData {
 
 
     public PickleStepTestStep resolveAndClone(ParsingMap parsingMap) {
-
-
 
 
         PickleStepTestStep clonePickleStepTestStep = resolvePickleStepTestStep(pickleStepTestStep, parsingMap);
