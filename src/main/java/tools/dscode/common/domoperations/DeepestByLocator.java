@@ -84,14 +84,19 @@ public final class DeepestByLocator {
         List<WebElement> out = new ArrayList<>(matches.size());
         for (WebElement el : matches) {
             List<WebElement> internal = el.findElements(within);
+            System.out.println("@@internal: " + internal);
+            System.out.println("@@internal.size: " + internal.size());
+            boolean hasOtherMatchInside =
+                    internal.size() > 1 ||
+                            (internal.size() == 1 && !internal.get(0).equals(el));
 
-            boolean hasOtherMatchInside = internal.stream()
-                    .anyMatch(inner -> inner != el && !inner.equals(el));
 
             if (!hasOtherMatchInside) {
                 out.add(el);
             }
         }
+        System.out.println("@@out: " + out + "");
+        System.out.println("@@out.size: " + out.size() + "");
         return out;
     }
 
