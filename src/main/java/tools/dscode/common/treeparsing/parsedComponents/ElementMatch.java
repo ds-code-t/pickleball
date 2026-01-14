@@ -94,7 +94,8 @@ public class ElementMatch {
         driver = parentPhrase.getDriver();
 
         wrappedElements = getWrappedElements(this);
-
+        System.out.println("@@wrappedElements2: " +  wrappedElements);
+        System.out.println("@@wrappedElements-size: " + wrappedElements.size());
         parentPhrase.getWrappedElements().addAll(wrappedElements);
         return wrappedElements;
     }
