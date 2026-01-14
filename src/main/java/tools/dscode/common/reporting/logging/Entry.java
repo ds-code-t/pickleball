@@ -107,18 +107,22 @@ public class Entry {
     }
 
     public Entry screenshot(String name) {
-        emit((scope, converter) -> converter.screenshot(this, getDefaultDriver(), name));
-        return this;
+        return screenshot(getDefaultDriver(), name);
+
     }
-
-
 
     public Entry screenshot(WebDriver driver) {
         return screenshot(driver, null);
     }
 
     public Entry screenshot(WebDriver driver, String name) {
-        emit((scope, converter) -> converter.screenshot(this, driver, name));
+        try {
+            emit((scope, converter) -> converter.screenshot(this, driver, name));
+        }
+        catch (Throwable t)
+        {
+           this.child("Failed to take Screenshot due to '" + t.getMessage() + "'").event(t.getMessage()).timestamp();
+        }
         return this;
     }
 
