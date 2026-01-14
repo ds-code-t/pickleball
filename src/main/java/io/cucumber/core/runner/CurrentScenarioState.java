@@ -95,10 +95,10 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void startScenarioRun() {
-        String scenarioName = pickle.getName() + pickle.getLocation() +" " + pickle.getLocation().getLine();
+        String scenarioName = pickle.getName() + " , Line " + pickle.getLocation().getLine();
         System.out.println("Starting scenario: '" + scenarioName + "'");
         scenarioLog =
-                Entry.of("Scenario 1")
+                Entry.of(scenarioName)
                         .tag("SCENARIO")
                         .on(new ExtentReportConverter(
                                 Path.of("reports/extent",  safeFileName(scenarioName + ".html"))
