@@ -6,6 +6,7 @@ import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 
 import java.util.Objects;
+import java.util.Set;
 
 public final class XPathyUtils {
 
@@ -373,50 +374,20 @@ public final class XPathyUtils {
         return XPathy.from(maybeDeepestMatches(xpathy.getXpath()));
     }
 
-    /**
-     * If the XPath looks like a context-independent, absolute expression
-     * (e.g. //div[@x], /html/body//a, (//div | //span[@x])),
-     * wrap it so that it returns only nodes that are NOT ancestors of
-     * any other node in the original result.
-     *
-     * Otherwise, return the original XPath unchanged.
-     */
+
     public static String maybeDeepestMatches(String xpath) {
         if (xpath == null || xpath.isBlank()) return xpath;
 
-        String normalized = xpath.strip();
-        System.out.println("@@maybeDeepestMatches: " +xpath);
-        System.out.println("@@looksAbsolutelyScoped: " +looksAbsolutelyScoped(xpath));
-        System.out.println("@@looksLikeItUsesRelativeDots: " +looksLikeItUsesRelativeDots(xpath));
-        if (!looksAbsolutelyScoped(normalized)) {
-            return xpath;
-        }
-        if (looksLikeItUsesRelativeDots(normalized)) {
-            return xpath;
+        String expr = xpath.strip();
+
+        // If it's not an absolute/global selector, treat it as a predicate component.
+        if (!expr.startsWith("/")) {
+            expr = "//*[" + expr + "]";
         }
 
-        String wrapped = "(" + xpath + ")";
-        return wrapped +
-                "[not(descendant::*[count(. | " + wrapped + ") = count(" + wrapped + ")])]";
+        String base = "(" + expr + ")";
+        return base + "[not(ancestor::*[count(. | " + base + ") = count(" + base + ")])]";
     }
 
-    private static boolean looksAbsolutelyScoped(String xpath) {
-        int i = 0;
-        int len = xpath.length();
-        while (i < len && Character.isWhitespace(xpath.charAt(i))) i++;
-        while (i < len && xpath.charAt(i) == '(') {
-            i++;
-            while (i < len && Character.isWhitespace(xpath.charAt(i))) i++;
-        }
-        if (i >= len) return false;
-        return xpath.charAt(i) == '/';
-    }
 
-    private static boolean looksLikeItUsesRelativeDots(String xpath) {
-        return xpath.contains(".//")
-                || xpath.contains("./")
-                || xpath.contains("..")
-                || xpath.contains(" | .")
-                || xpath.startsWith(".");
-    }
 }

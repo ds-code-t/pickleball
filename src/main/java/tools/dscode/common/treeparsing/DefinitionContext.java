@@ -483,10 +483,8 @@ public final class DefinitionContext {
 
             category("Row").children("Rows").inheritsFrom(CONTAINS_TEXT)
                     .and((category, v, op) ->
-                            combineOr(XPathy.from(Tag.tr),
-                                    any.byAttribute(role).equals("row")
-                            )
-                            );
+                            XPathy.from("//*[self::tr or @role='row'][not(descendant::*[self::tr or @role='row'])]")
+                    );
 
 
             category(BASE_CATEGORY).and(

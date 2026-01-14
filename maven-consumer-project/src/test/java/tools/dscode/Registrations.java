@@ -27,8 +27,8 @@ public class Registrations {
 
         print("onElement()", BinaryStateConditions.onElement());
         print("offElement()", BinaryStateConditions.offElement());
-        print("checkedElement()", BinaryStateConditions.checkedElement());
-        print("selectedElement()", BinaryStateConditions.selectedElement());
+//        print("checkedElement()", BinaryStateConditions.checkedElement());
+//        print("selectedElement()", BinaryStateConditions.selectedElement());
 
         System.out.println();
         System.out.println("=== Done ===");

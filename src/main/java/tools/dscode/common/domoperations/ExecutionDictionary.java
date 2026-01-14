@@ -44,12 +44,12 @@ public class ExecutionDictionary {
 
     //TODO  HAS , HAS_NOT, and negative versions of all operations
     public enum Op {
-        DEFAULT, EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE, MATCHES, HAS , HAS_NOT;
+        DEFAULT, EQUALS, CONTAINS, STARTS_WITH, ENDS_WITH, GT, GTE, LT, LTE, MATCHES, HAS, HAS_NOT;
 
 
         public static Op getOpFromString(String input) {
             return switch (input.trim().toLowerCase()) {
-                case String s when s.startsWith("has") -> s.contains("no")  ? Op.HAS_NOT : Op.HAS;
+                case String s when s.startsWith("has") -> s.contains("no") ? Op.HAS_NOT : Op.HAS;
                 case String s when s.startsWith("equal") -> Op.EQUALS;
                 case String s when s.startsWith("contain") -> Op.CONTAINS;
                 case String s when s.startsWith("start") -> Op.STARTS_WITH;
@@ -92,20 +92,27 @@ public class ExecutionDictionary {
     }
 
     private void defaultRegistrations() {
-        category("Text").children("Texts").inheritsFrom(CONTAINS_TEXT);
+
+
+        category("Text").children("Texts").inheritsFrom(CONTAINS_TEXT).
+                and(
+                        (category, v, op) ->
+                        {
+                            if (v == null || v.isNull())
+                                return null;
+                            return XPathy.from("//*[count(descendant::node()) <= 12]");
+                        }
+                );
 
         category(CONTAINS_TEXT).and((category, v, op) -> {
             if (v == null || v.isNull())
                 return XPathy.from("//*[ancestor-or-self::body and descendant::text()]");
             return any.byHaving(
-                    maybeDeepestMatches(
-                            XPathy.from("descendant-or-self::*")
-                                    .byHaving(deepNormalizedText(v, op))
-                    )
+                    XPathy.from("descendant-or-self::*")
+                            .byHaving(deepNormalizedText(v, op))
             );
         });
     }
-
 
 
     //========================================================

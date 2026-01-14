@@ -2,7 +2,9 @@ Feature: Additiontest
 
   Scenario: tt34f
   @[DEBUG]
-    * , from the FrameResult, click any unchecked Checkboxes
+#    * , from the FrameResult, click any unchecked Checkboxes
+    * , from the FrameResult, verify the "I have a bike" Text is displayed
+#    * , from the FrameResult, click the "I have a bike" Checkbox
 
   Scenario Outline: testlocation3
     * location

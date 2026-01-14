@@ -11,11 +11,11 @@ import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import java.util.ArrayList;
 import java.util.List;
 
+import static tools.dscode.common.domoperations.DeepestByLocator.findDeepestWithRetry;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.prettyPrintXPath;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.everyNth;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.maybeDeepestMatches;
 import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public class ContextWrapper {
@@ -111,9 +111,10 @@ public class ContextWrapper {
                 xpath = xpath.replaceFirst("//", "descendant-or-self::");
         }
 
-        printDebug("##XPath: getElementListFromSearchContext\n" + prettyPrintXPath(maybeDeepestMatches(xpath)) +"\n----------------" );
+        printDebug("##XPath: getElementListFromSearchContext\n" + prettyPrintXPath(xpath) +"\n----------------" );
 
-        return searchContext.findElements(new By.ByXPath(maybeDeepestMatches(xpath)));
+        return findDeepestWithRetry(searchContext, new By.ByXPath(xpath));
+//        return searchContext.findElements(new By.ByXPath(xpath));
     }
 
     public static WebElement getElementFromSearchContext(SearchContext searchContext, XPathy xPathy) {
