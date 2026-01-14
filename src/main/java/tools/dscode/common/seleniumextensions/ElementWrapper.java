@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.openqa.selenium.*;
 import org.openqa.selenium.NoSuchElementException;
+import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.assertions.ValueWrapper;
 
@@ -41,10 +42,11 @@ public class ElementWrapper {
         List<WebElement> elements = elementMatch.contextWrapper.getElements();
 
         boolean singleElement = elementMatch.selectionType.isBlank();
+        boolean displayElement = !elementMatch.categoryFlags.contains(ExecutionDictionary.CategoryFlags.NON_DISPLAY_ELEMENT);
 
         int index = 0;
         for (WebElement element : elements) {
-            if (!element.isDisplayed())
+            if (displayElement && !element.isDisplayed())
                 continue;
             elementWrappers.add(new ElementWrapper(element, elementMatch, ++index));
             if (singleElement) break;

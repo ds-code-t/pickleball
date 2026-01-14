@@ -321,7 +321,7 @@ public final class DefinitionContext {
                     );
 
 
-            category(FILE_INPUT)
+            category(FILE_INPUT).flags(CategoryFlags.NON_DISPLAY_ELEMENT)
                     .and(
                             (category, v, op) ->
                                     Tag.input.byAttribute(type).equals("file")

@@ -62,7 +62,7 @@ public class ExecutionDictionary {
         }
     }
 
-    public enum CategoryFlags {PAGE_CONTEXT, PAGE_TOP_CONTEXT, ELEMENT_CONTEXT, SHADOW_HOST, IFRAME}
+    public enum CategoryFlags {PAGE_CONTEXT, PAGE_TOP_CONTEXT, ELEMENT_CONTEXT, SHADOW_HOST, IFRAME, NON_DISPLAY_ELEMENT}
 
     //========================================================
     // Instance state

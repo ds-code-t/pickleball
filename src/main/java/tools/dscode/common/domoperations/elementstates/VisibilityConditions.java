@@ -106,6 +106,7 @@ public final class VisibilityConditions {
                                 // allow missing semicolon / spaces a bit
                                 Condition.attribute(style).contains("display:none"),
                                 Condition.attribute(style).contains("display: none")
+//                                ,Condition.attribute(id).equals("statusDiv")
                         )
                 ),
 
