@@ -40,11 +40,14 @@ public class ElementWrapper {
         List<ElementWrapper> elementWrappers = new ArrayList<>();
         List<WebElement> elements = elementMatch.contextWrapper.getElements();
 
-
+        boolean singleElement = elementMatch.selectionType.isBlank();
 
         int index = 0;
         for (WebElement element : elements) {
+            if (!element.isDisplayed())
+                continue;
             elementWrappers.add(new ElementWrapper(element, elementMatch, ++index));
+            if (singleElement) break;
         }
 
         System.out.println("@@elementWrappers==: " + elementWrappers);
@@ -426,7 +429,7 @@ public class ElementWrapper {
 
 
     private List<WebElement> getElementList(WebDriver driver, String xpathyWithId) {
-        printDebug("##XPath: ElementWrapper.getElementList:\n" + xpathyWithId +"\n----------------");
+        printDebug("##XPath: ElementWrapper.getElementList:\n" + xpathyWithId + "\n----------------");
         return elementMatch.contextWrapper.getFinalSearchContext().findElements(new By.ByXPath(xpathyWithId));
     }
 
@@ -452,8 +455,8 @@ public class ElementWrapper {
 
 
     public void close() {
-        String closeXpath = getExecutionDictionary().getCategoryXPathy("Close Button").getXpath().replaceFirst("^//\\*","descendant-or-self::*");
-        WebElement closeButton  = getElement().findElement(new By.ByXPath(closeXpath));
+        String closeXpath = getExecutionDictionary().getCategoryXPathy("Close Button").getXpath().replaceFirst("^//\\*", "descendant-or-self::*");
+        WebElement closeButton = getElement().findElement(new By.ByXPath(closeXpath));
         closeButton.click();
     }
 
@@ -479,8 +482,9 @@ public class ElementWrapper {
     }
 
     public String getTagName() {
-        return  attributeSnapshot.get("tagName").asText("");
+        return attributeSnapshot.get("tagName").asText("");
     }
+
     public int getIndex() {
         return attributeSnapshot.get("siblingIndex").intValue();
     }

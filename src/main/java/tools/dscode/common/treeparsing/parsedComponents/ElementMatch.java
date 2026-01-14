@@ -109,8 +109,6 @@ public class ElementMatch {
     }
 
     protected ElementMatch(PhraseData phraseData) {
-
-
         this.parentPhrase = phraseData;
         isPlaceHolder = true;
         this.startIndex = -1;
