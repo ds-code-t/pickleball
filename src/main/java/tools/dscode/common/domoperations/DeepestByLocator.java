@@ -13,32 +13,13 @@ import java.util.Objects;
 
 public final class DeepestByLocator {
 
-    private DeepestByLocator() {
+    private DeepestByLocator() {}
+
+    public static List<WebElement> findDeepestWithRetry(SearchContext context, By locator) {
+        return findDeepestWithRetry(context, locator, Duration.ofSeconds(10));
     }
 
-    public static List<WebElement> findDeepestWithRetry(
-            SearchContext context,
-            By locator
-    ) {
-        return findDeepestWithRetry(context, locator, Duration.ofSeconds(2));
-    }
-
-
-    /**
-     * Calls {@link #findDeepest(SearchContext, By)} and retries every 3 seconds
-     * if a StaleElementReferenceException occurs, until the timeout is reached.
-     *
-     * @param context search context (WebDriver, WebElement, ShadowRoot)
-     * @param locator locator used to find elements
-     * @param timeout maximum time to keep retrying
-     * @return deepest elements
-     * @throws StaleElementReferenceException if still failing after timeout
-     */
-    public static List<WebElement> findDeepestWithRetry(
-            SearchContext context,
-            By locator,
-            Duration timeout
-    ) {
+    public static List<WebElement> findDeepestWithRetry(SearchContext context, By locator, Duration timeout) {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(locator, "locator");
         Objects.requireNonNull(timeout, "timeout");
@@ -55,24 +36,20 @@ public final class DeepestByLocator {
             }
         }
 
-        throw last != null
-                ? last
-                : new StaleElementReferenceException(
-                "Timed out retrying findDeepest due to stale elements"
-        );
+        throw last != null ? last
+                : new StaleElementReferenceException("Timed out retrying findDeepest due to stale elements");
     }
 
     /**
-     * Finds all elements matching {@code locator} within {@code context},
-     * then removes any element that contains another match of the same locator
-     * inside it (i.e., has internal matches).
-     * <p>
-     * Preserves original order.
+     * "Deepest" = keep only elements in matches that do NOT contain another element that is also in matches.
+     *
+     * Implementation:
+     * - matches = context.findElements(locator)
+     * - for each el in matches:
+     *     internal = el.findElements(withinElementLocator(locator))   // descendants (and maybe self)
+     *     if internal contains any element equal to some "other" in matches (other != el), drop el
      */
-    public static List<WebElement> findDeepest(
-            SearchContext context,
-            By locator
-    ) {
+    public static List<WebElement> findDeepest(SearchContext context, By locator) {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(locator, "locator");
 
@@ -82,48 +59,51 @@ public final class DeepestByLocator {
         By within = withinElementLocator(locator);
 
         List<WebElement> out = new ArrayList<>(matches.size());
+
+        System.out.println("@@matches: " + matches);
+        System.out.println("@@matches.size: " + matches.size());
         for (WebElement el : matches) {
             List<WebElement> internal = el.findElements(within);
             System.out.println("@@internal: " + internal);
             System.out.println("@@internal.size: " + internal.size());
-            boolean hasOtherMatchInside =
-                    internal.size() > 1 ||
-                            (internal.size() == 1 && !internal.get(0).equals(el));
+            boolean containsOtherTopLevelMatch = false;
 
+            // Look for any internal element that equals some other element in matches.
+            for (WebElement inner : internal) {
+                if (inner.equals(el)) continue; // ignore self if included
 
-            if (!hasOtherMatchInside) {
+                for (WebElement other : matches) {
+                    if (other.equals(el)) continue; // exclude current element
+                    if (inner.equals(other)) {
+                        containsOtherTopLevelMatch = true;
+                        break;
+                    }
+                }
+                if (containsOtherTopLevelMatch) break;
+            }
+
+            if (!containsOtherTopLevelMatch) {
                 out.add(el);
             }
         }
-        System.out.println("@@out: " + out + "");
-        System.out.println("@@out.size: " + out.size() + "");
+        System.out.println("@@out: " + out);
+        System.out.println("@@out.size: " + out.size());
         return out;
     }
 
     /**
-     * Converts a global locator into one that, when used with el.findElements(...),
-     * searches within the element subtree.
-     * <p>
-     * - XPath: best-effort conversion to relative XPath
-     * - Non-XPath: returned unchanged (already scoped by WebElement.findElements)
+     * Best-effort conversion so el.findElements(within) searches within el's subtree.
+     * - XPath "//..." or "/..." becomes ".//..." (may include self; we ignore self via equals check)
+     * - Non-XPath locators are already scoped under WebElement.findElements.
      */
     public static By withinElementLocator(By locator) {
         String s = locator.toString();
-
-        // Selenium's By#toString is typically "By.xpath: //div[@x]"
         String prefix = "By.xpath: ";
-        if (!s.startsWith(prefix)) {
-            return locator;
-        }
+        if (!s.startsWith(prefix)) return locator;
 
         String xp = s.substring(prefix.length()).trim();
-
-        if (xp.startsWith("//")) {
-            xp = ".//" + xp.substring(2);
-        } else if (xp.startsWith("/")) {
-            xp = ".//" + xp.substring(1);
-        }
-        // axis-started (descendant::, child::, etc.) already work as-is
+        if (xp.startsWith("//")) xp = ".//" + xp.substring(2);
+        else if (xp.startsWith("/")) xp = ".//" + xp.substring(1);
 
         return By.xpath(xp);
     }
