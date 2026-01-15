@@ -271,6 +271,7 @@ public enum ActionOperations implements OperationsInterface {
 
             ElementMatch value = phraseData.resultElements.getFirst();
             ElementMatch inputElement = phraseData.resultElements.get(1);
+            System.out.println("@@inputElement.getElementThrowErrorIfEmptyWithNoModifier(): " + inputElement.getElementThrowErrorIfEmptyWithNoModifier().size());
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : inputElement.getElementThrowErrorIfEmptyWithNoModifier()) {
