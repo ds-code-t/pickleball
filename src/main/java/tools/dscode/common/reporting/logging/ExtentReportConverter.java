@@ -112,7 +112,16 @@ public final class ExtentReportConverter extends BaseConverter {
             extent.flush();
         }
         dbg("CLOSE extent.flush() done");
+
+        try {
+            dbg("CLOSE bundling in-place -> " + reportFile.toAbsolutePath());
+            Path out = ExtentSingleFileBundler.bundleInPlace(reportFile.toAbsolutePath());
+            dbg("CLOSE bundling done -> " + out.toAbsolutePath());
+        } catch (Throwable t) {
+            dbg("CLOSE bundling FAILED: " + t.getClass().getSimpleName() + ": " + t.getMessage());
+        }
     }
+
 
     @Override
     public void onStart(Entry scope, Entry entry) {

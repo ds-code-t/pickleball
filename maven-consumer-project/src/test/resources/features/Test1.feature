@@ -1,6 +1,6 @@
 Feature: Additiontest
 
-  Scenario: tt34fs
+  Scenario: tt34fsdf
   @[DEBUG]
     * , from the FrameResult, verify "Tsry it" Button is displayed
     * , from the FrameResult, verify "Try it" Button is displayed
@@ -9,8 +9,14 @@ Feature: Additiontest
 #    * , from the FrameResult, verify the "I have a bike" Text is displayed
 #    * , from the FrameResult, click the "I have a bike" Checkbox
 
-  Scenario Outline: testlocation3
-    * location
+
+  @Testw1
+  Scenario Outline: qqtestloselect
+#    @[DEBUG]
+    * navigate to: URL.select
+    Then , from the FrameResult, I select "Opel" in the "cars" Dropdown
+    * , from the Top Panel:
+     : * , I verify  "Get your own website" Link matches "^Get.*$"
 
     Examples:
       | s |
