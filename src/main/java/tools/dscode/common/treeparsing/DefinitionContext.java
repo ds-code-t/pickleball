@@ -108,6 +108,7 @@ public final class DefinitionContext {
                 if (self.localStateBoolean("separatorA", "separatorB")) {
                     self.putToLocalState("separator", "true");
                 }
+
                 String context = self.resolvedGroupText("context");
 
                 if (!context.isEmpty() && Character.isUpperCase(context.charAt(0)))
@@ -115,7 +116,7 @@ public final class DefinitionContext {
                 self.putToLocalState("context", context.toLowerCase());
                 String conditional = self.resolvedGroupText("conditional");
                 self.putToLocalState("conditional", conditional);
-                
+
                 self.putToLocalState("conjunction", self.resolvedGroupText("conjunction"));
                 self.putToLocalState("body", self.resolvedGroupText("body"));
 //                String termination = self.resolvedGroupText("punc");

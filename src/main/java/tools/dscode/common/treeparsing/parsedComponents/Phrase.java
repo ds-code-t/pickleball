@@ -169,7 +169,6 @@ public final class Phrase extends PhraseData {
 
 
     public PhraseData cloneWithElementContext(ElementWrapper elementWrapper) {
-
         PhraseData clone = clonePhrase(getPreviousPhrase());
         clone.contextElement = elementWrapper;
         clone.categoryFlags.add(ExecutionDictionary.CategoryFlags.ELEMENT_CONTEXT);

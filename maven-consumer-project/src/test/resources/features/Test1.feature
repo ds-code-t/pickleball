@@ -7,12 +7,13 @@ Feature: Additiontest
 
 
   Scenario: tt34fsdf
-#  @[DEBUG]
-    * navigate to: URL.alert
-    * , wait 1 second
+  @[DEBUG]
+#    * navigate to: URL.alert
+#    * , wait 1 second
 #    * , from the FrameResult, verify "Tsry it" Button is displayed
 #    * , from the FrameResult, verify "Try it" Button is displayed
     * , from the FrameResult, click "Try it" Button
+    * , verify Alert equals "AA"
 #    * justwait
 #    * IF: "false":
 #    * IF: "false":

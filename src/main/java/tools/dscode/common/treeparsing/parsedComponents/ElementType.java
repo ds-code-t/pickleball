@@ -82,7 +82,7 @@ public enum ElementType {
         if (raw.matches("Alerts?")) {
             returnSet.add(BROWSER_TYPE);
             returnSet.add(ALERT);
-
+            returnSet.add(RETURNS_VALUE);
             return returnSet;
         }
 
