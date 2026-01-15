@@ -304,7 +304,6 @@ public abstract class PhraseData extends PassedData {
 
     Boolean previouslyResolvedBoolean = null;
     public boolean resolveResults() {
-        
         if (!isOperationPhrase)
             return true;
         if (!isChainStart) {
@@ -353,11 +352,7 @@ public abstract class PhraseData extends PassedData {
         
         boolean andConjunction = !conjunction.equals("or");
 
-        System.out.println("\n@@chainStartPhrase.resultPhrases.size()-- " + chainStartPhrase.resultPhrases.size());
-        System.out.println("\n@@chainStartPhrase.resultPhrases-- " + chainStartPhrase.resultPhrases);
-
         for (PhraseData resultPhrase : chainStartPhrase.resultPhrases) {
-            System.out.println("\n@@resultPhrase-- " + resultPhrase);
             Object resultObject = resultPhrase.result.value();
             
 

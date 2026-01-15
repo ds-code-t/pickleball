@@ -1,9 +1,40 @@
 Feature: Additiontest
 
+  Scenario: ddfsdfdsf
+    * IF: "z" equals "A":
+  :    Then , save "Q1" as "W"
+    * ELSE-IF: "B" equals "A":
+  :    Then , save "Q2" as "W"
+    * ELSE-IF: "C" equals "A":
+  :    Then , save "Q3" as "W"
+    * ELSE:
+  :    Then , save "Q4" as "W"
 
+
+    * IF: "N" equals "A":
+  :    Then , save "Q1" as "W"
+    * ELSE-IF: "A" equals "A":
+  :    Then , save "Q2" as "W"
+    * ELSE-IF: "A" equals "A":
+  :    Then , save "Q3" as "W"
+    * ELSE:
+  :    Then , save "Q4" as "W"
+
+  @TestQ
   Scenario: test rr
     * , verify "A" equals "A", or "A" equal "C"
 
+  Scenario: ddtt34fsdf
+  @[DEBUG]
+#    * navigate to: URL.alert
+#    * , wait 1 second
+#    * , from the FrameResult, verify "Tsry it" Button is displayed
+#    * , from the FrameResult, verify "Try it" Button is displayed
+    * , from the FrameResult, click "Try it" Button
+    * IF: Alert text is displayed:
+  :    Then , save Alert text  as "alert text", and dismiss the Alert
+    * ELSE:
+  :    Then , click "Cancel" Button
 
 
   Scenario: tt34fsdf
@@ -13,7 +44,12 @@ Feature: Additiontest
 #    * , from the FrameResult, verify "Tsry it" Button is displayed
 #    * , from the FrameResult, verify "Try it" Button is displayed
     * , from the FrameResult, click "Try it" Button
-    * , verify Alert equals "AA"
+    * IF: Alert text is displayed:
+  :    Then , save Alert text  as "alert text", and dismiss the Alert
+    * ELSE-IF: "Cancel" Button is displayed:
+  :    Then , click "Cancel" Button
+    * ELSE-IF: "Cancel" Button is displayed:
+  :    * , verify "F" equals "AA"
 #    * justwait
 #    * IF: "false":
 #    * IF: "false":

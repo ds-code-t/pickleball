@@ -28,16 +28,12 @@ public final class Phrase extends PhraseData {
     boolean shouldRun() {
 
 
-
-
-
-
         if (getConditional().startsWith("else")) {
             if (getPreviousPhrase() == null) {
                 StepExtension currentStep = getRunningStep();
-
                 if (currentStep.previousSibling == null || currentStep.previousSibling.lineData.lineConditionalMode > -1) {
                     phraseConditionalMode = 0;
+                    previouslyResolvedBoolean = false;
                 }
             } else if (getPreviousPhrase().phraseConditionalMode > -1)
                 phraseConditionalMode = 0;
@@ -46,7 +42,6 @@ public final class Phrase extends PhraseData {
         } else {
             phraseConditionalMode = getPreviousPhrase() == null ? 1 : getPreviousPhrase().phraseConditionalMode;
         }
-
 
         return phraseConditionalMode > 0;
 
