@@ -92,6 +92,7 @@ public abstract class PhraseData extends PassedData {
 
 
     public PhraseData(String inputText, Character delimiter, LineData lineData) {
+        System.out.println("@@PhraseData: " + inputText + "");
         parsedLine = lineData;
         text = inputText;
         resolvedText = getRunningStep().getStepParsingMap().resolveWholeText(text);
@@ -264,6 +265,7 @@ public abstract class PhraseData extends PassedData {
 
 
     public void syncWithDOM() {
+        System.out.println("@@syncWithDOM: " + this);
         waitMilliseconds(1000);
         lifecycle.fire(Phase.BEFORE_DOM_LOAD_CHECK);
         waitForPhraseEntities(this);

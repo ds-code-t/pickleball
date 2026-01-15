@@ -419,7 +419,7 @@ public class ElementMatch {
     }
 
     public List<ElementWrapper> getElementWrappers() {
-
+        System.out.println("@@getElementWrappers: " + parentPhrase + "");
 
         if (wrappedElements == null) {
             parentPhrase.syncWithDOM();
