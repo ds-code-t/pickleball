@@ -12,6 +12,7 @@ import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -130,9 +131,20 @@ public class StepExtension extends StepData {
             }
             executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
             executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
-            Entry stepEntry = getScenarioLogRoot().child("STEP: " + executingPickleStepTestStep.getStepText()).start();
+            stepEntry = getScenarioLogRoot().logInfo("STEP: " + executingPickleStepTestStep.getStepText()).start();
             lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
             io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep, executionMode);
+
+            if(result.getError() != null)
+            {
+                stepEntry.logError("Exception: " + result.getError().getClass().getName())
+                        .field("message", result.getError().getMessage())
+                        .field("trace", Arrays.stream(result.getError().getStackTrace())
+                                .map(StackTraceElement::toString)
+                                .toList())
+                        .timestamp();
+            }
+
             lifecycle.fire(Phase.AFTER_SCENARIO_STEP);
             stepEntry.screenshot("After Step").stop();
 

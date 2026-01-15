@@ -82,7 +82,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         return logToScenario(message, null);
     }
     public static Entry logToScenario(String message, DataTable dataTable) {
-        Entry entry = getCurrentScenarioState().scenarioLog.child(message);
+        Entry entry = getCurrentScenarioState().scenarioLog.logInfo(message);
         if (dataTable == null) return entry.timestamp();
         List<List<String>> lists = dataTable.asLists();
         if (lists.isEmpty()) return entry.timestamp();
@@ -248,7 +248,6 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
 
         if (throwable != null) {
-
             if (SoftExceptionInterface.class.isAssignableFrom(throwable.getClass()))
                 isScenarioSoftFail = true;
             else {
@@ -256,6 +255,7 @@ public class CurrentScenarioState extends ScenarioMapping {
                 isScenarioSoftFail = false;
                 isScenarioComplete = true;
             }
+            scenarioLog.fail("SCENARIO FAILED: " + throwable.getMessage());
         }
 
 

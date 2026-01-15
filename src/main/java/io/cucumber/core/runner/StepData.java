@@ -7,6 +7,7 @@ import io.cucumber.docstring.DocString;
 import io.cucumber.plugin.event.Result;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.StepMapping;
+import tools.dscode.common.reporting.logging.Entry;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -17,6 +18,7 @@ import static tools.dscode.common.util.Reflect.getProperty;
 
 public abstract class StepData extends StepMapping {
 
+    public Entry stepEntry;
 
     public int getNestingLevel() {
         return nestingLevel;

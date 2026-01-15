@@ -62,19 +62,88 @@ public class Entry {
 
     // ---- hierarchy ----
 
-    public Entry child(String text) {
+    private Entry logEntry(String text) {
         Entry e = new Entry(text, this, seqGen);
         if (sharedChildren) synchronized (children) { children.add(e); }
         else children.add(e);
         return e;
     }
 
+    // ---- child creators (NO emission / NOT timestamped) ----
+
+    /** Creates a child entry with INFO level (not timestamped / no converter emission). */
+    public Entry logInfo(String message) {
+        return logEntry(message).level(Level.INFO);
+    }
+
+    /** Creates a child entry with WARN level (not timestamped / no converter emission). */
+    public Entry logWarning(String message) {
+        return logEntry(message).level(Level.WARN);
+    }
+
+    /** Creates a child entry with ERROR level (not timestamped / no converter emission). */
+    public Entry logError(String message) {
+        return logEntry(message).level(Level.ERROR);
+    }
+
+
+
     public Entry event(String text) {
-        return child(text).timestamp();
+        return logEntry(text).timestamp();
     }
 
     public Entry span(String text) {
-        return child(text).start();
+        return logEntry(text).start();
+    }
+
+    // ---- fluent convenience (explicit semantics) ----
+
+    /** Creates a child entry with INFO semantics and timestamps it. */
+    public Entry info(String message) {
+        return logEntry(message).level(Level.INFO).status(Status.INFO).timestamp();
+    }
+
+    /** Creates a child entry with WARN semantics and timestamps it. */
+    public Entry warn(String message) {
+        return logEntry(message).level(Level.WARN).status(Status.WARN).timestamp();
+    }
+
+    /** Creates a child entry with ERROR semantics and timestamps it. */
+    public Entry error(String message) {
+        return logEntry(message).level(Level.ERROR).status(Status.FAIL).timestamp();
+    }
+
+    /** Applies PASS semantics to the current entry (no emission; call stop() explicitly for spans). */
+    public Entry pass() {
+        return level(Level.INFO).status(Status.PASS);
+    }
+
+    /** Applies PASS semantics to the current entry and (optionally) updates its text (no emission). */
+    public Entry pass(String message) {
+        if (message != null && !message.isBlank()) this.text = message;
+        return pass();
+    }
+
+    /** Applies FAIL semantics to the current entry (no emission; call stop() explicitly for spans). */
+    public Entry fail() {
+        return level(Level.ERROR).status(Status.FAIL);
+    }
+
+    /** Applies FAIL semantics to the current entry and (optionally) updates its text (no emission). */
+    public Entry fail(String message) {
+        if (message != null && !message.isBlank()) this.text = message;
+        return fail();
+    }
+
+    /** Applies SKIP semantics to the current entry (no emission; call stop() explicitly for spans). */
+    public Entry skip() {
+        return level(Level.WARN).status(Status.SKIP);
+    }
+
+    /** Applies SKIP semantics to the current entry and (optionally) updates its text (no emission). */
+    public Entry skip(String message) {
+        if (message != null && !message.isBlank()) this.text = message;
+        return skip();
     }
 
     public Entry up() {
@@ -96,11 +165,9 @@ public class Entry {
         return this;
     }
 
-
     public Entry attachScreenshot(String name, String path) {
         return attach(name, "image/png", path);
     }
-
 
     public Entry screenshot() {
         return screenshot(getDefaultDriver(), null);
@@ -108,7 +175,6 @@ public class Entry {
 
     public Entry screenshot(String name) {
         return screenshot(getDefaultDriver(), name);
-
     }
 
     public Entry screenshot(WebDriver driver) {
@@ -121,11 +187,12 @@ public class Entry {
         }
         catch (Throwable t)
         {
-           this.child("Failed to take Screenshot due to '" + t.getMessage() + "'").event(t.getMessage()).timestamp();
+            this.logEntry("Failed to take Screenshot due to '" + t.getMessage() + "'")
+                    .event(t.getMessage())
+                    .timestamp();
         }
         return this;
     }
-
 
     // ---- emission: ONLY here ----
 
@@ -148,7 +215,7 @@ public class Entry {
         this.status = status;
         stoppedAt = Instant.now();
         emit((s,c)->c.onStop(s,this));
-        if (extraText != null && !extraText.isBlank()) child(extraText).timestamp();
+        if (extraText != null && !extraText.isBlank()) logEntry(extraText).timestamp();
         return this;
     }
 
