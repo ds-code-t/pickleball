@@ -50,11 +50,13 @@ public final class DeepestByLocator {
      *     if internal contains any element equal to some "other" in matches (other != el), drop el
      */
     public static List<WebElement> findDeepest(SearchContext context, By locator) {
+        System.out.println("@@findDeepest " + locator);
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(locator, "locator");
 
         List<WebElement> matches = context.findElements(locator);
 
+        System.out.println("@@matches.size() " + matches.size());
 
 
         if (matches.size() <= 1) return matches;
@@ -66,7 +68,7 @@ public final class DeepestByLocator {
 
         for (WebElement el : matches) {
             List<WebElement> internal = el.findElements(within);
-
+            System.out.println("@@internal.size() " + internal.size());
 
             boolean containsOtherTopLevelMatch = false;
 
@@ -85,11 +87,12 @@ public final class DeepestByLocator {
             }
 
             if (!containsOtherTopLevelMatch) {
+                System.out.println("@@add: " + el);
                 out.add(el);
             }
         }
 
-
+        System.out.println("@@out.size() " + out.size());
         return out;
     }
 
