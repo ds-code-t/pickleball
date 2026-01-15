@@ -76,10 +76,10 @@ public class ReportingSteps {
 
     @When("^Scenario Log: (.*)$")
     public void logEntry(String logEntry, DataTable dataTable) {
-        System.out.println("@@logEntry: " + logEntry);
-        System.out.println("@@dataTable: " + dataTable);
+
+
         Entry entry = logToScenario(logEntry,dataTable).timestamp();
-        System.out.println("@@entry: " + entry);
-        System.out.println("@@entry.fields: " + entry.fields);
-        System.out.println("@@getScenarioLogRoot(): " + getScenarioLogRoot());    }
+
+
+    }
     }

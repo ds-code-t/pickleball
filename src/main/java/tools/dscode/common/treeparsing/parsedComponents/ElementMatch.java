@@ -94,8 +94,8 @@ public class ElementMatch {
         driver = parentPhrase.getDriver();
 
         wrappedElements = getWrappedElements(this);
-        System.out.println("@@wrappedElements2: " +  wrappedElements);
-        System.out.println("@@wrappedElements-size: " + wrappedElements.size());
+
+
         parentPhrase.getWrappedElements().addAll(wrappedElements);
         return wrappedElements;
     }
@@ -234,17 +234,17 @@ public class ElementMatch {
 
 
         if (!state.isEmpty()) {
-            System.out.println("@@elementMatch: " + this);
-            System.out.println("@@state1: " + state);
+
+
             boolean un = state.startsWith("un");
-            System.out.println("@@un: " + un);
+
             if (un) state = state.substring(2);
-            System.out.println("@@state2: " + state);
+
 //            checked|selected|enabled|disabled|expanded|collapsed|required)
             switch (state) {
                 // Binary on/off (checked/selected/etc)
                 case "checked", "selected" -> {
-                    System.out.println("@@un? " + un);
+
                     elPredictXPaths.add(un
                             ? offElement()
                             : onElement());

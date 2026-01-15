@@ -7,6 +7,7 @@ import io.cucumber.plugin.event.Result;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.mappings.ParsingMap;
+import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 
 import java.lang.reflect.InvocationTargetException;
@@ -129,13 +130,13 @@ public class StepExtension extends StepData {
             }
             executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
             executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
-            getScenarioLogRoot().child("STEP: " + executingPickleStepTestStep.getStepText()).start();
+            Entry stepEntry = getScenarioLogRoot().child("STEP: " + executingPickleStepTestStep.getStepText()).start();
             lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
             io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep, executionMode);
             lifecycle.fire(Phase.AFTER_SCENARIO_STEP);
-            getScenarioLogRoot().child("STEP: " + executingPickleStepTestStep.getStepText()).screenshot().stop();
+            stepEntry.screenshot("After Step").stop();
 
-            System.out.println("@result==: " + result);
+
             return result;
         } catch (Throwable t) {
 

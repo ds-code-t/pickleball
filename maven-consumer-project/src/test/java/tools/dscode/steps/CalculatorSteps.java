@@ -46,11 +46,11 @@ public class CalculatorSteps {
     @Given("location")
     public static void locationTest() {
         Pickle  pickle = getCurrentScenarioState().pickle;
-        System.out.println("@@pickle1: " + pickle.getName());
-        System.out.println("@@pickle2: " + pickle.getLocation().getLine());
-        System.out.println("@@pickle3: " + pickle.getExamplesLocation());
+
+
+
         if(pickle.getExamplesLocation() !=null && pickle.getExamplesLocation().isPresent()){
-            System.out.println("@@pickle.getExamplesLocation().get().getLine(): " + pickle.getExamplesLocation().get().getLine());
+
         }
     }
     @Given("logTest")

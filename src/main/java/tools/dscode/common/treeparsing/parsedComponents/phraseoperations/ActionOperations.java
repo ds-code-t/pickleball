@@ -190,7 +190,7 @@ public enum ActionOperations implements OperationsInterface {
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
 
-            System.out.println("@  " + phraseData.resultElements);
+
 
             ElementMatch element = phraseData.resultElements.getFirst();
 

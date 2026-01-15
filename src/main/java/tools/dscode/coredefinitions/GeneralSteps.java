@@ -45,14 +45,14 @@ public class GeneralSteps extends CoreSteps {
 
     @BeforeAll
     public static void beforeAll(){
-        System.out.println("@@BeforeAll");
+
         lifecycle.fire(Phase.BEFORE_CUCUMBER_RUN);
     }
 
 
     @AfterAll
     public static void afterAll(){
-        System.out.println("@@AfterAll");
+
         Log.global().closeAll();
         lifecycle.fire(Phase.AFTER_CUCUMBER_RUN);
     }

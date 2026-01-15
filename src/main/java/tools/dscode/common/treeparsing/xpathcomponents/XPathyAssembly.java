@@ -232,7 +232,7 @@ public final class XPathyAssembly {
     /** Heuristic specificity scoring. Lower score = "more specific". */
     public static int xpathSpecificityScore(String xpath) {
         String s = xpath.trim();
-        System.out.println("\n@@xpathSpecificityScore: " + s);
+
 
         int score = Math.toIntExact(1000 + s.length() + (xPathScorePattern.matcher(s).results().count() * 20));
 
@@ -286,7 +286,7 @@ public final class XPathyAssembly {
             score += 10;
         }
 
-        System.out.println("@@score: " + score);
+
         return Math.max(score, 0);
     }
 

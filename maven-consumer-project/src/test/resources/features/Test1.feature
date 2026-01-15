@@ -1,9 +1,12 @@
 Feature: Additiontest
 
-  Scenario: tt34f
+  Scenario: tt34fs
   @[DEBUG]
+    * , from the FrameResult, verify "Tsry it" Button is displayed
+    * , from the FrameResult, verify "Try it" Button is displayed
+    * , from the FrameResult, click "Try it" Button
 #    * , from the FrameResult, click any unchecked Checkboxes
-    * , from the FrameResult, verify the "I have a bike" Text is displayed
+#    * , from the FrameResult, verify the "I have a bike" Text is displayed
 #    * , from the FrameResult, click the "I have a bike" Checkbox
 
   Scenario Outline: testlocation3
