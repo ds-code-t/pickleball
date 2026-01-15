@@ -28,6 +28,7 @@ import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleStepTestStep;
+import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
 
 public class StepExtension extends StepData {
@@ -146,7 +147,20 @@ public class StepExtension extends StepData {
             }
 
             lifecycle.fire(Phase.AFTER_SCENARIO_STEP);
-            stepEntry.screenshot("After Step").stop();
+            if(webDriverUsed !=null) {
+                if(isPresent(webDriverUsed))
+                {
+                    stepEntry.info("Browser Alert is present, cannot take screenshot.");
+                    stepEntry.stop();
+                }
+                else {
+                    stepEntry.screenshot("After Step").stop();
+                }
+            }
+            else
+            {
+                stepEntry.stop();
+            }
 
 
             return result;

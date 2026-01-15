@@ -1,10 +1,67 @@
 Feature: Additiontest
 
   Scenario: tt34fsdf
-  @[DEBUG]
-    * , from the FrameResult, verify "Tsry it" Button is displayed
-    * , from the FrameResult, verify "Try it" Button is displayed
+#  @[DEBUG]
+    * navigate to: URL.alert
+    * , wait 1 second
+#    * , from the FrameResult, verify "Tsry it" Button is displayed
+#    * , from the FrameResult, verify "Try it" Button is displayed
     * , from the FrameResult, click "Try it" Button
+#    * justwait
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#    * IF: "false":
+#  : * , save  "Try it"  as "A"
+#  : * , save  "Try it" Button as "A"
+#  : * , save  "Try it" Button as "A"
+#  : * , save  "Try it" Button as "A"
+#  : * , wait 3 seconds
+#  : * , save  "Try it" Button as "A"
+#  : * , save  "Try it" Button as "A"
+#  : * , wait 3 seconds
+#  : * , verify  "Try it" Button is displayed
 #    * , from the FrameResult, click any unchecked Checkboxes
 #    * , from the FrameResult, verify the "I have a bike" Text is displayed
 #    * , from the FrameResult, click the "I have a bike" Checkbox
@@ -16,7 +73,7 @@ Feature: Additiontest
     * navigate to: URL.select
     Then , from the FrameResult, I select "Opel" in the "cars" Dropdown
     * , from the Top Panel:
-     : * , I verify  "Get your own website" Link matches "^Get.*$"
+  : * , I verify  "Get your own website" Link matches "^Get.*$"
 
     Examples:
       | s |

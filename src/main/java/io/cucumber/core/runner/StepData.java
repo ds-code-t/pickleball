@@ -5,6 +5,7 @@ import io.cucumber.core.stepexpression.ExpressionArgument;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.plugin.event.Result;
+import org.openqa.selenium.WebDriver;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.StepMapping;
 import tools.dscode.common.reporting.logging.Entry;
@@ -19,6 +20,8 @@ import static tools.dscode.common.util.Reflect.getProperty;
 public abstract class StepData extends StepMapping {
 
     public Entry stepEntry;
+
+    public WebDriver webDriverUsed = null;
 
     public int getNestingLevel() {
         return nestingLevel;

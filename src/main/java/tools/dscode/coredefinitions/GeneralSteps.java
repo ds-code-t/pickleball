@@ -8,6 +8,7 @@ import io.cucumber.java.BeforeAll;
 import io.cucumber.java.ParameterType;
 import io.cucumber.java.en.Given;
 import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.chromium.ChromiumDriver;
@@ -44,14 +45,14 @@ import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort
 public class GeneralSteps extends CoreSteps {
 
     @BeforeAll
-    public static void beforeAll(){
+    public static void beforeAll() {
 
         lifecycle.fire(Phase.BEFORE_CUCUMBER_RUN);
     }
 
 
     @AfterAll
-    public static void afterAll(){
+    public static void afterAll() {
 
         Log.global().closeAll();
         lifecycle.fire(Phase.AFTER_CUCUMBER_RUN);
@@ -66,7 +67,12 @@ public class GeneralSteps extends CoreSteps {
     }
 
     public static ChromiumDriver getDriver(String browserName) {
+        WebDriver webDriver = getChromiumDriver(browserName);
+        getRunningStep().webDriverUsed = webDriver;
+        return (ChromiumDriver) webDriver;
+    }
 
+    private static ChromiumDriver getChromiumDriver(String browserName) {
         Object returnObject = getScenarioObject(browserName);
         if (returnObject != null) return (ChromiumDriver) returnObject;
         returnObject = returnStepParameter(browserName);
@@ -179,7 +185,6 @@ public class GeneralSteps extends CoreSteps {
     public static void skippedStep(String message) {
         System.out.println("Skipping step: " + message);
     }
-
 
 
     @Given("^print (.*)$")

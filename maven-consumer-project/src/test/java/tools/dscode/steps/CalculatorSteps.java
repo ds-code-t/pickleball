@@ -43,6 +43,16 @@ public class CalculatorSteps {
     private int a, b, result;
 
 
+
+    @Given("justwait")
+    public static void justwait() {
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     @Given("location")
     public static void locationTest() {
         Pickle  pickle = getCurrentScenarioState().pickle;
@@ -57,17 +67,17 @@ public class CalculatorSteps {
     public static void logTest() {
         WebDriver driver = getDefaultDriver();
         Entry entry = logToScenario("logTest");
-        entry.child("child1").status(Status.FAIL).screenshot("Test").start().child("gradnchaild1").status(Status.PASS).timestamp().parent.stop();
-        entry.child("child2").status(Status.INFO).timestamp().child("gradnchaild2").screenshot("Test").status(Status.FAIL).timestamp();
-        entry.child("child3").status(Status.PASS).timestamp().child("gradnchaild3").screenshot().status(Status.INFO).timestamp();
-        entry.child("child2").status(Status.SKIP).timestamp().child("gradnchaild4").screenshot("4").status(Status.SKIP).timestamp();
+        entry.logInfo("child1").status(Status.FAIL).screenshot("Test").start().logInfo("gradnchaild1").status(Status.PASS).timestamp().parent.stop();
+        entry.logInfo("child2").status(Status.INFO).timestamp().logInfo("gradnchaild2").screenshot("Test").status(Status.FAIL).timestamp();
+        entry.logInfo("child3").status(Status.PASS).timestamp().logInfo("gradnchaild3").screenshot().status(Status.INFO).timestamp();
+        entry.logInfo("child2").status(Status.SKIP).timestamp().logInfo("gradnchaild4").screenshot("4").status(Status.SKIP).timestamp();
 
 
-        entry.child("zchild1").status(Status.FAIL).start().child("zgradnchaild1").status(Status.PASS).timestamp().parent.stop()
-        .child("zchild2").status(Status.INFO).timestamp().child("zgzradnchaild2").status(Status.FAIL).timestamp()
-        .child("zchild3").status(Status.PASS).timestamp().child("zgradnchaild3").status(Status.INFO).timestamp()
-        .child("zchild2").status(Status.SKIP).timestamp().child("zgradnchaild4").screenshot("4).child(\"zgzradnchaild2\").status(Status.FAIL).timestamp()\n" +
-                        "        .child(\"zchild3\").status(Status.PASS).timestamp().child(\"zgradnchaild3\").status(Status.INFO).timestam").status(Status.SKIP).timestamp();
+        entry.logInfo("zchild1").status(Status.FAIL).start().logInfo("zgradnchaild1").status(Status.PASS).timestamp().parent.stop()
+        .logInfo("zchild2").status(Status.INFO).timestamp().logInfo("zgzradnchaild2").status(Status.FAIL).timestamp()
+        .logInfo("zchild3").status(Status.PASS).timestamp().logInfo("zgradnchaild3").status(Status.INFO).timestamp()
+        .logInfo("zchild2").status(Status.SKIP).timestamp().logInfo("zgradnchaild4").screenshot("4).logInfo(\"zgzradnchaild2\").status(Status.FAIL).timestamp()\n" +
+                        "        .logInfo(\"zchild3\").status(Status.PASS).timestamp().logInfo(\"zgradnchaild3\").status(Status.INFO).timestam").status(Status.SKIP).timestamp();
 
     }
 
