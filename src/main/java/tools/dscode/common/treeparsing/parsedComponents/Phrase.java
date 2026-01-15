@@ -18,7 +18,7 @@ public final class Phrase extends PhraseData {
 
     public Phrase(String inputText, Character delimiter, LineData parsedLine) {
         super(inputText, delimiter, parsedLine);
-        System.out.println("@@phrase: " + inputText + "");
+
         if (!isOperationPhrase) {
             elementMatches = new ArrayList<>(elementMatches.stream().filter(e -> !e.isPlaceHolder()).toList());
         }
@@ -68,11 +68,9 @@ public final class Phrase extends PhraseData {
         executePhrase();
         PhraseData nextResolvedPhrase = getNextResolvedPhrase();
 
-
         if (nextResolvedPhrase == null || nextResolvedPhrase.isChainStart || !branchedPhrases.isEmpty() || contextTermination) {
             resolveResults();
         }
-
 
         if (contextTermination) {
             if (phraseType.equals(PhraseType.CONDITIONAL)) {
@@ -84,7 +82,6 @@ public final class Phrase extends PhraseData {
                 parsedLine.inheritedContextPhrases.removeLast();
             }
         }
-
 
         return nextResolvedPhrase;
     }

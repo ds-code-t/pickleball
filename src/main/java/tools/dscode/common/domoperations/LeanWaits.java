@@ -27,7 +27,7 @@ public final class LeanWaits {
     }
 
     public static void waitForPhraseEntities( PhraseData parsingPhrase) {
-        System.out.println("@@waitForPhraseEntities: " + parsingPhrase);
+
         // SAFE version: never throws
         safeWaitForPageReady(parsingPhrase.getDriver(), Duration.ofSeconds(60));
 
@@ -46,7 +46,7 @@ public final class LeanWaits {
             WebElement element,
             Duration timeout
     ) {
-        System.out.println("@@safeWaitForElementReady: " + element);
+
         try {
             // Always wait for DOM attachment
             waitForElementPresent(driver, element, timeout);
@@ -60,13 +60,13 @@ public final class LeanWaits {
 
 
     public static void safeWaitForPageReady(WebDriver driver, Duration timeout, int startWaitMilliseconds) {
-        System.out.println("@@waitForPhraseEntities1 ");
+
         waitMilliseconds(startWaitMilliseconds);
         safeWaitForPageReady(driver, timeout);
     }
 
     public static void safeWaitForPageReady(WebDriver driver, Duration timeout) {
-        System.out.println("@@waitForPhraseEntities2 ");
+
         try {
             waitForPageReady(driver, timeout);
         } catch (Exception e) {
@@ -83,7 +83,7 @@ public final class LeanWaits {
      * The total time for both phases will not exceed the given timeout.
      */
     public static void waitForPageReady(WebDriver driver, Duration timeout) {
-        System.out.println("@@waitForPageReady: ");
+
         final Instant start = Instant.now();
         final long timeoutMillis = timeout.toMillis();
 

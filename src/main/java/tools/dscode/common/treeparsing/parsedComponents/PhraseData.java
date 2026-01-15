@@ -92,7 +92,7 @@ public abstract class PhraseData extends PassedData {
 
 
     public PhraseData(String inputText, Character delimiter, LineData lineData) {
-        System.out.println("@@PhraseData: " + inputText + "");
+
         parsedLine = lineData;
         text = inputText;
         resolvedText = getRunningStep().getStepParsingMap().resolveWholeText(text);
@@ -124,6 +124,7 @@ public abstract class PhraseData extends PassedData {
         isContext = isTopContext || categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT);
 
         conjunction = phraseNode.getStringFromLocalState("conjunction");
+        
         position = lineData.phrases.size();
         context = phraseNode.getStringFromLocalState("context");
         if (getConditional().contains("if")) {
@@ -265,7 +266,7 @@ public abstract class PhraseData extends PassedData {
 
 
     public void syncWithDOM() {
-        System.out.println("@@syncWithDOM: " + this);
+
         waitMilliseconds(1000);
         lifecycle.fire(Phase.BEFORE_DOM_LOAD_CHECK);
         waitForPhraseEntities(this);
@@ -303,7 +304,7 @@ public abstract class PhraseData extends PassedData {
 
     Boolean previouslyResolvedBoolean = null;
     public boolean resolveResults() {
-
+        
         if (!isOperationPhrase)
             return true;
         if (!isChainStart) {
@@ -319,7 +320,7 @@ public abstract class PhraseData extends PassedData {
             return true;
 
         previouslyResolvedBoolean = getBooleanResult();
-
+        
         String assertionMessage = "Assertion phrase '" + text + "' evaluates to: " + previouslyResolvedBoolean;
         System.out.println(assertionMessage);
         if (!resultElements.isEmpty())
@@ -349,14 +350,20 @@ public abstract class PhraseData extends PassedData {
     }
 
     public boolean getBooleanResult() {
+        
         boolean andConjunction = !conjunction.equals("or");
 
+        System.out.println("\n@@chainStartPhrase.resultPhrases.size()-- " + chainStartPhrase.resultPhrases.size());
+        System.out.println("\n@@chainStartPhrase.resultPhrases-- " + chainStartPhrase.resultPhrases);
 
         for (PhraseData resultPhrase : chainStartPhrase.resultPhrases) {
+            System.out.println("\n@@resultPhrase-- " + resultPhrase);
             Object resultObject = resultPhrase.result.value();
-
+            
 
             boolean isTrue = resultObject != null && (boolean) resultObject;
+            
+            
 
 
             if (andConjunction) {

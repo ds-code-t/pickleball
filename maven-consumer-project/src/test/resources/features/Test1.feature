@@ -1,5 +1,11 @@
 Feature: Additiontest
 
+
+  Scenario: test rr
+    * , verify "A" equals "A", or "A" equal "C"
+
+
+
   Scenario: tt34fsdf
 #  @[DEBUG]
     * navigate to: URL.alert

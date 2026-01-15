@@ -102,7 +102,7 @@ public final class DefinitionContext {
         ParseNode position = new ParseNode("#\\d+");
 
 
-        ParseNode phrase = new ParseNode("^(?<separatorA>\\bthen\\b)?(?<conjunction>\\b(?:and|or)\\b)?(?<separatorB>\\bthen\\b)?\\s*(?<conditional>\\b(?:else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
+        ParseNode phrase = new ParseNode("^\\s*(?<separatorA>\\bthen\\b\\s*)?(?<conjunction>\\b(?:and|or)\\b\\s*)?(?<separatorB>\\bthen\\b\\s*)?\\s*(?<conditional>\\b(?:else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
             @Override
             public String onCapture(MatchNode self) {
                 if (self.localStateBoolean("separatorA", "separatorB")) {
@@ -115,6 +115,7 @@ public final class DefinitionContext {
                 self.putToLocalState("context", context.toLowerCase());
                 String conditional = self.resolvedGroupText("conditional");
                 self.putToLocalState("conditional", conditional);
+                
                 self.putToLocalState("conjunction", self.resolvedGroupText("conjunction"));
                 self.putToLocalState("body", self.resolvedGroupText("body"));
 //                String termination = self.resolvedGroupText("punc");
