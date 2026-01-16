@@ -120,7 +120,7 @@ public enum ActionOperations implements OperationsInterface {
                 waitForDuration(waitElementMatch.getValue().asDuration(waitElementMatch.category));
                 return true;
             });
-            phraseData.blurAfterOperation = true;
+//            phraseData.blurAfterOperation = true;
         }
     },
 
@@ -270,7 +270,7 @@ public enum ActionOperations implements OperationsInterface {
                 }
                 return true;
             });
-            phraseData.blurAfterOperation = true;
+//            phraseData.blurAfterOperation = true;
         }
     },
     OVERWRITE {
@@ -297,7 +297,7 @@ public enum ActionOperations implements OperationsInterface {
                 }
                 return true;
             });
-            phraseData.blurAfterOperation = true;
+//            phraseData.blurAfterOperation = true;
         }
     },
     SCROLL {

@@ -18,6 +18,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.function.Function;
 
+import static tools.dscode.common.domoperations.HumanInteractions.blur;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.util.DebugUtils.printDebug;
 
@@ -60,7 +61,7 @@ public final class LeanWaits {
 
 
     public static void safeWaitForPageReady(WebDriver driver, Duration timeout, int startWaitMilliseconds) {
-
+        blur(driver);
         waitMilliseconds(startWaitMilliseconds);
         safeWaitForPageReady(driver, timeout);
     }

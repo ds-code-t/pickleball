@@ -83,7 +83,6 @@ public final class Phrase extends PhraseData {
 
 
     public void executePhrase() {
-
         if ((phraseType == null || phraseType == PhraseType.ELEMENT_ONLY) && templatePhrase.phraseType != null) {
             if (!templatePhrase.getAction().isBlank()) {
                 setAction(templatePhrase.getAction());

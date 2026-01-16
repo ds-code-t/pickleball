@@ -422,7 +422,9 @@ public class ElementMatch {
 
 
         if (wrappedElements == null) {
-            parentPhrase.syncWithDOM();
+            if(!parentPhrase.getPreviousTerminator().equals(";")) {
+                parentPhrase.syncWithDOM();
+            }
         }
 
         return wrappedElements;
