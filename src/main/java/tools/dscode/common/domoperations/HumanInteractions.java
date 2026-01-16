@@ -1,6 +1,5 @@
 package tools.dscode.common.domoperations;
 
-import io.cucumber.java.eo.Se;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.Keys;
@@ -24,15 +23,21 @@ public final class HumanInteractions {
     private HumanInteractions() {
     }
 
+    public static void blur(WebDriver driver) {
+        ((JavascriptExecutor) driver).executeScript(
+                "if (document.activeElement) { document.activeElement.blur(); }"
+        );
+
+    }
+
+
     // =======================
     // Mouse interactions
     // =======================
 
-
     public static void selectDropdownByIndex(WebDriver driver,
                                              WebElement element,
                                              int index) {
-
 
         if (index < 0) {
             throw new IllegalArgumentException("index must be >= 0");
@@ -51,7 +56,6 @@ public final class HumanInteractions {
         select.selectByIndex(index);
     }
 
-
     public static void selectDropdownByVisibleText(WebDriver driver,
                                                    WebElement container,
                                                    ValueWrapper valueWrapper) {
@@ -63,9 +67,6 @@ public final class HumanInteractions {
         List<WebElement> matches = container.findElements(By.xpath(".//option | .//a"));
 
         for (WebElement el : matches) {
-
-
-
 
             String hay = el.getText()
                     .trim()
@@ -82,7 +83,6 @@ public final class HumanInteractions {
                 Select sel = new Select(selectEl);
                 List<WebElement> opts = sel.getOptions();
                 for (int i = 0; i < opts.size(); i++) {
-
                     if (opts.get(i).equals(el)) {
                         sel.selectByIndex(i);
                         return;
@@ -100,21 +100,19 @@ public final class HumanInteractions {
         throw new NoSuchElementException("No matching <option> or <a> for text: " + text);
     }
 
-
-
-
-
     /**
      * Move, hover briefly, and click. JS-dispatch fallback if Actions fails.
+     *
+     * IMPORTANT: Use element-targeted click(el) to avoid "active element" ambiguity.
      */
     public static void click(WebDriver driver, WebElement el) {
         Objects.requireNonNull(el);
         try {
-//            scrollElementNearTop(driver, el);
+            centerScroll(driver, el);
             new Actions(driver)
                     .moveToElement(el)
                     .pause(SHORT)
-                    .click()
+                    .click(el)            // <-- target element explicitly
                     .pause(SHORT)
                     .build().perform();
         } catch (RuntimeException e) {
@@ -128,10 +126,11 @@ public final class HumanInteractions {
     public static void doubleClick(WebDriver driver, WebElement el) {
         Objects.requireNonNull(el);
         try {
-//            scrollElementNearTop(driver, el);
+            centerScroll(driver, el);
             new Actions(driver)
                     .moveToElement(el).pause(SHORT)
-                    .doubleClick().pause(SHORT)
+                    .doubleClick(el)      // <-- target element explicitly
+                    .pause(SHORT)
                     .build().perform();
         } catch (RuntimeException e) {
             jsDispatchMouse(driver, el, "dblclick");
@@ -144,10 +143,11 @@ public final class HumanInteractions {
     public static void contextClick(WebDriver driver, WebElement el) {
         Objects.requireNonNull(el);
         try {
-//            scrollElementNearTop(driver, el);
+            centerScroll(driver, el);
             new Actions(driver)
                     .moveToElement(el).pause(MID)
-                    .contextClick().pause(SHORT)
+                    .contextClick(el)     // <-- target element explicitly
+                    .pause(SHORT)
                     .build().perform();
         } catch (RuntimeException e) {
             jsDispatchMouse(driver, el, "contextmenu");
@@ -160,7 +160,7 @@ public final class HumanInteractions {
     public static void hover(WebDriver driver, WebElement el) {
         Objects.requireNonNull(el);
         try {
-//            scrollElementNearTop(driver, el);
+            centerScroll(driver, el);
             new Actions(driver)
                     .moveToElement(el).pause(Duration.ofMillis(250))
                     .build().perform();
@@ -180,9 +180,11 @@ public final class HumanInteractions {
             centerScroll(driver, target);
             new Actions(driver)
                     .moveToElement(source).pause(SHORT)
-                    .clickAndHold().pause(MID)
+                    .clickAndHold(source)       // <-- target explicitly
+                    .pause(MID)
                     .moveToElement(target).pause(MID)
-                    .release().pause(SHORT)
+                    .release(target)            // <-- target explicitly
+                    .pause(SHORT)
                     .build().perform();
         } catch (RuntimeException e) {
             jsHtml5DragDrop(driver, source, target);
@@ -198,9 +200,11 @@ public final class HumanInteractions {
             centerScroll(driver, source);
             new Actions(driver)
                     .moveToElement(source).pause(SHORT)
-                    .clickAndHold().pause(MID)
+                    .clickAndHold(source)       // <-- target explicitly
+                    .pause(MID)
                     .moveByOffset(xOffset, yOffset).pause(MID)
-                    .release().pause(SHORT)
+                    .release()                  // release at current location
+                    .pause(SHORT)
                     .build().perform();
         } catch (RuntimeException e) {
             jsHtml5DragBy(driver, source, xOffset, yOffset);
@@ -231,43 +235,48 @@ public final class HumanInteractions {
     // =======================
 
     /**
-     * Focus element, clear (Ctrl/Cmd+A + Delete), then type text. JS fallback sets value + events.
+     * Focus element, clear (Ctrl/Cmd+A + Delete), then type text.
+     * JS fallback sets value + events.
+     *
+     * IMPORTANT: Use element-targeted sendKeys via WebElement to avoid "active element" bleed.
      */
     public static void clearAndType(WebDriver driver, WebElement el, CharSequence text) {
         Objects.requireNonNull(el);
+        final String s = text == null ? "" : text.toString();
         try {
-            centerScroll(driver, el);
-            new Actions(driver)
-                    .moveToElement(el).pause(SHORT)
-                    .click().pause(SHORT)
-                    .keyDown(osControlKey()).sendKeys("a").keyUp(osControlKey()).pause(SHORT)
-                    .sendKeys(Keys.DELETE).pause(SHORT)
-                    .sendKeys(text).pause(SHORT)
-                    .build().perform();
+            focus(driver, el);
+
+            // Prefer element-targeted operations.
+            // Using chord avoids Actions' reliance on the active element.
+            el.sendKeys(Keys.chord(osControlKey(), "a"));
+            el.sendKeys(Keys.DELETE);
+            if (!s.isEmpty()) el.sendKeys(s);
+
         } catch (RuntimeException e) {
-            jsSetValue(driver, el, text == null ? "" : text.toString(), true);
+            jsSetValue(driver, el, s, true);
         }
     }
 
     /**
-     * Focus element and type text as-is. JS fallback appends value + events.
+     * Focus element and type text as-is.
+     * JS fallback APPENDS (kept as-is); consider changing callers to use clearAndType if needed.
+     *
+     * IMPORTANT: Use element-targeted sendKeys via WebElement to avoid "active element" bleed.
      */
     public static void typeText(WebDriver driver, WebElement el, CharSequence text) {
         Objects.requireNonNull(el);
+        final String s = text == null ? "" : text.toString();
         try {
-            centerScroll(driver, el);
-            new Actions(driver)
-                    .moveToElement(el).pause(SHORT)
-                    .click().pause(SHORT)
-                    .sendKeys(text).pause(SHORT)
-                    .build().perform();
+            focus(driver, el);
+            if (!s.isEmpty()) el.sendKeys(s);
         } catch (RuntimeException e) {
-            jsAppendValue(driver, el, text == null ? "" : text.toString());
+            jsAppendValue(driver, el, s);
         }
     }
 
     /**
      * Send raw keys to the currently focused element (e.g., ENTER, ESC).
+     * NOTE: This intentionally targets the active element.
      */
     public static void sendKeys(WebDriver driver, CharSequence... keys) {
         try {
@@ -276,23 +285,20 @@ public final class HumanInteractions {
                     .sendKeys(keys).pause(SHORT)
                     .build().perform();
         } catch (RuntimeException e) {
-            // No JS fallback for global key events that target active element reliably
             throw e;
         }
     }
 
     /**
      * Press ENTER on an element (focus first).
+     *
+     * IMPORTANT: Use element-targeted sendKeys via WebElement to avoid "active element" bleed.
      */
     public static void pressEnter(WebDriver driver, WebElement el) {
         Objects.requireNonNull(el);
         try {
-            centerScroll(driver, el);
-            new Actions(driver)
-                    .moveToElement(el).pause(SHORT)
-                    .click().pause(SHORT)
-                    .sendKeys(Keys.ENTER).pause(SHORT)
-                    .build().perform();
+            focus(driver, el);
+            el.sendKeys(Keys.ENTER);
         } catch (RuntimeException e) {
             jsDispatchKeyboard(driver, el, "Enter");
         }
@@ -322,13 +328,59 @@ public final class HumanInteractions {
                 "try{arguments[0].scrollIntoView({block:'center',inline:'center'});}catch(e){}", el);
     }
 
+    /**
+     * Ensure element is scrolled into view and is actually the active element.
+     * This prevents Actions.sendKeys(...) style "bleed" across fields when focus is stolen.
+     */
+    private static void focus(WebDriver driver, WebElement el) {
+        centerScroll(driver, el);
+
+        // First attempt: element-targeted click via Actions (more "human" than JS focus alone)
+        try {
+            new Actions(driver)
+                    .moveToElement(el).pause(SHORT)
+                    .click(el).pause(SHORT)
+                    .build().perform();
+        } catch (RuntimeException ignore) {
+            // Ignore here; we'll attempt JS focus next
+        }
+
+        // Verify / force focus via JS if needed
+        if (!isActiveElement(driver, el)) {
+            jsFocus(driver, el);
+        }
+    }
+
+    private static boolean isActiveElement(WebDriver driver, WebElement el) {
+        try {
+            Object result = ((JavascriptExecutor) driver).executeScript(
+                    "return document.activeElement === arguments[0];", el);
+            return Boolean.TRUE.equals(result);
+        } catch (RuntimeException e) {
+            // If we can't verify, assume not focused so we can attempt jsFocus.
+            return false;
+        }
+    }
+
+    private static void jsFocus(WebDriver driver, WebElement el) {
+        ((JavascriptExecutor) driver).executeScript(
+                """
+                        const el = arguments[0];
+                        if(!el) return;
+                        try { el.focus && el.focus({preventScroll:true}); }
+                        catch(e) { try { el.focus && el.focus(); } catch(e2){} }
+                        """,
+                el
+        );
+    }
+
     private static void jsClick(WebDriver driver, WebElement el) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const el = arguments[0];
                         if(!el) return;
                         const fire = (type) => el.dispatchEvent(new MouseEvent(type, {bubbles:true, cancelable:true, view:window}));
-                        el.focus && el.focus({preventScroll:true});
+                        try { el.focus && el.focus({preventScroll:true}); } catch(e) { try{ el.focus && el.focus(); }catch(e2){} }
                         fire('mouseover'); fire('mousedown'); fire('mouseup'); fire('click');
                         """, el);
     }
@@ -379,7 +431,7 @@ public final class HumanInteractions {
                 """
                         const el = arguments[0], key = arguments[1];
                         if(!el) return;
-                        el.focus && el.focus({preventScroll:true});
+                        try { el.focus && el.focus({preventScroll:true}); } catch(e) { try{ el.focus && el.focus(); }catch(e2){} }
                         const opts = {bubbles:true, cancelable:true, key:key, code:key};
                         el.dispatchEvent(new KeyboardEvent('keydown', opts));
                         el.dispatchEvent(new KeyboardEvent('keypress', opts));
@@ -436,7 +488,6 @@ public final class HumanInteractions {
                         """, source, dx, dy);
     }
 
-
     /**
      * Normalize text similar to other utility normalization: collapse whitespace, strip, handle NBSP.
      */
@@ -459,11 +510,11 @@ public final class HumanInteractions {
                         const sel = arguments[0];
                         const targetText = arguments[1];
                         if (!sel) return;
-                        
+
                         const norm = s => String(s ?? '').replace(/\\s+/g, ' ').trim();
                         const wanted = norm(targetText);
                         let found = null;
-                        
+
                         const options = sel.options || [];
                         for (let i = 0; i < options.length; i++) {
                           const opt = options[i];
@@ -474,9 +525,9 @@ public final class HumanInteractions {
                             break;
                           }
                         }
-                        
+
                         if (!found) return;
-                        
+
                         // Fire events as a user-like change
                         sel.dispatchEvent(new Event('input',  {bubbles:true}));
                         sel.dispatchEvent(new Event('change', {bubbles:true}));
@@ -484,47 +535,4 @@ public final class HumanInteractions {
                 selectEl, visibleText
         );
     }
-
-
-//    public static void scrollElementNearTop(WebDriver driver, WebElement el) {
-//        Objects.requireNonNull(el);
-//
-//        JavascriptExecutor js = (JavascriptExecutor) driver;
-//
-//        // Get viewport height once
-//        long viewportHeight = ((Number) js.executeScript(
-//                "return (window.visualViewport && window.visualViewport.height) || window.innerHeight;"
-//        )).longValue();
-//
-//        // Use a small gap, e.g. 10% of viewport height
-//        long gapPx = Math.round(viewportHeight * 0.10); // 10% gap
-//
-//        // Measure initial element position
-//        long top = ((Number) js.executeScript(
-//                "return arguments[0].getBoundingClientRect().top;", el
-//        )).longValue();
-//
-//        // remaining distance until the element's top is at gapPx
-//        long remaining = top - gapPx;
-//
-//        // If already near the target gap, do nothing
-//        if (Math.abs(remaining) < 5) return;
-//
-//        // Scroll in small steps to mimic real mouse scrolling
-//        while (Math.abs(remaining) > 5) {
-//            int step = Math.toIntExact((int) Math.signum(remaining) * Math.min(80, Math.abs(remaining)));
-//            new Actions(driver)
-//                    .scrollByAmount(0, step)
-//                    .pause(Duration.ofMillis(40))
-//                    .perform();
-//
-//            // Re-measure and update remaining
-//            top = ((Number) js.executeScript(
-//                    "return arguments[0].getBoundingClientRect().top;", el
-//            )).longValue();
-//            remaining = top - gapPx;
-//        }
-//    }
-
-
 }

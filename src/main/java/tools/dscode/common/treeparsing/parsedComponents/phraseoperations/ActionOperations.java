@@ -17,6 +17,7 @@ import java.util.List;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.browseroperations.BrowserAlerts.accept;
 import static tools.dscode.common.browseroperations.BrowserAlerts.dismiss;
+import static tools.dscode.common.domoperations.HumanInteractions.blur;
 import static tools.dscode.common.domoperations.HumanInteractions.clearAndType;
 import static tools.dscode.common.domoperations.HumanInteractions.click;
 import static tools.dscode.common.domoperations.HumanInteractions.contextClick;
@@ -31,6 +32,7 @@ import static tools.dscode.common.domoperations.SeleniumUtils.waitForDuration;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
+import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
 import static tools.dscode.coredefinitions.GeneralSteps.getJavascriptExecutor;
 
 public enum ActionOperations implements OperationsInterface {
@@ -108,18 +110,17 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
 
-
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.TIME_VALUE, ElementType.FOLLOWING_OPERATION)
             );
             ElementMatch waitElementMatch = phraseData.resultElements.getFirst();
 
-
             phraseData.result = Attempt.run(() -> {
                 waitForDuration(waitElementMatch.getValue().asDuration(waitElementMatch.category));
                 return true;
             });
+            phraseData.blurAfterOperation = true;
         }
     },
 
@@ -128,10 +129,6 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
 
-
-
-
-
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAtLeastOne(ElementType.RETURNS_VALUE).mustNotMatchAny(ElementType.HTML_DROPDOWN),
@@ -139,11 +136,8 @@ public enum ActionOperations implements OperationsInterface {
                             .mustMatchAll(ElementType.HTML_ELEMENT, ElementType.HTML_DROPDOWN)
             );
 
-
             ElementMatch selection = phraseData.resultElements.getFirst();
             ElementMatch dropDowns = phraseData.resultElements.get(1);
-
-
 
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
@@ -180,17 +174,10 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
 
-
-
-
-
-
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
-
-
 
             ElementMatch element = phraseData.resultElements.getFirst();
 
@@ -283,6 +270,7 @@ public enum ActionOperations implements OperationsInterface {
                 }
                 return true;
             });
+            phraseData.blurAfterOperation = true;
         }
     },
     OVERWRITE {
@@ -309,6 +297,7 @@ public enum ActionOperations implements OperationsInterface {
                 }
                 return true;
             });
+            phraseData.blurAfterOperation = true;
         }
     },
     SCROLL {

@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
+import static tools.dscode.common.domoperations.HumanInteractions.blur;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
@@ -31,6 +32,7 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.aft
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inBetweenOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.insideOf;
+import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
 
 
 public abstract class PhraseData extends PassedData {
@@ -40,6 +42,7 @@ public abstract class PhraseData extends PassedData {
     public final Character termination; // nullable
     public final LineData parsedLine;
     private SearchContext searchContext;
+    public boolean blurAfterOperation = false;
 
 
     public SearchContext getSearchContext() {
@@ -298,7 +301,9 @@ public abstract class PhraseData extends PassedData {
             throw new RuntimeException("operation '" + operation + "' failed", result.error());
         }
 
-
+        if(blurAfterOperation && !termination.equals(';')){
+            blur(getDefaultDriver());
+        }
         chainStartPhrase.resultPhrases.add(this);
     }
 
