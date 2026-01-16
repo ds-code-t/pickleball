@@ -292,18 +292,14 @@ public abstract class PhraseData extends PassedData {
 
 
     public void runOperation() {
-        System.out.println("@@runOperation1");
         OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
         if(operation instanceof ActionOperations){
             waitMilliseconds(300);
         }
-        System.out.println("@@runOperation2");
         operation.execute(this);
-        System.out.println("@@runOperation3");
         if (result.failed()) {
             throw new RuntimeException("operation '" + operation + "' failed", result.error());
         }
-        System.out.println("@@runOperation4");
 
 //        if(blurAfterOperation && !termination.equals(';')){
 //            blur(getDefaultDriver());

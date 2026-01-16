@@ -1,13 +1,17 @@
-package tools.dscode.common.reporting.logging;
+package tools.dscode.common.reporting.logging.extentreporting;
 
 import com.aventstack.extentreports.ExtentReports;
 import com.aventstack.extentreports.ExtentTest;
 import com.aventstack.extentreports.MediaEntityBuilder;
 import com.aventstack.extentreports.reporter.ExtentSparkReporter;
+import tools.dscode.common.reporting.logging.Attachment;
+import tools.dscode.common.reporting.logging.BaseConverter;
+import tools.dscode.common.reporting.logging.Entry;
+import tools.dscode.common.reporting.logging.Level;
+import tools.dscode.common.reporting.logging.Status;
 
 import java.nio.file.Path;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**

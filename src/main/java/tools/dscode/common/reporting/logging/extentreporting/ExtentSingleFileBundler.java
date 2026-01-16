@@ -1,4 +1,4 @@
-package tools.dscode.common.reporting.logging;
+package tools.dscode.common.reporting.logging.extentreporting;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

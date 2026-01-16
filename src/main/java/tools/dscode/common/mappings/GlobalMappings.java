@@ -21,7 +21,6 @@ public class GlobalMappings extends NodeMap {
     private GlobalMappings() {
         super(MapConfigurations.MapType.GLOBAL_NODE);
         root.set(rootDirectory, FileAndDataParsing.buildJsonFromPath(rootDirectory));
-
     }
 
     private final ReadWriteLock rw = new ReentrantReadWriteLock();
