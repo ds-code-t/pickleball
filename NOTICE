@@ -1,0 +1,55 @@
+Pickleball
+Copyright © 2026 DSCode Tools
+
+This product includes software developed by third parties.
+
+────────────────────────────────────────────────────────────
+IMPORTANT NOTICE REGARDING MODIFIED COMPONENTS
+────────────────────────────────────────────────────────────
+
+This distribution contains bytecode-modified versions of the following
+Apache-licensed components, modified via AspectJ compile-time and
+binary weaving:
+
+- io.cucumber:cucumber-core
+- io.cucumber:cucumber-java
+- io.cucumber:cucumber-plugin
+- io.cucumber:messages
+- io.cucumber:gherkin
+
+The original source code for these components is available from:
+https://github.com/cucumber
+
+Modifications are performed at build time using AspectJ and do not
+represent upstream changes or endorsements.
+
+────────────────────────────────────────────────────────────
+THIRD-PARTY SOFTWARE
+────────────────────────────────────────────────────────────
+
+This product bundles or depends on the following major components:
+
+- Cucumber (Apache License 2.0)
+- JUnit Platform (Apache License 2.0)
+- Selenium (Apache License 2.0)
+- Google Guava (Apache License 2.0)
+- Jackson (Apache License 2.0)
+- Apache POI (Apache License 2.0)
+- ClassGraph (MIT License)
+- ExtentReports (Apache License 2.0)
+- ReportPortal Java Client (Apache License 2.0)
+- Aviator (Apache License 2.0)
+- JSONata4Java (Apache License 2.0)
+
+This product also includes:
+
+- AspectJ Runtime (Eclipse Public License 2.0)
+
+See THIRD-PARTY-NOTICES.md for full license texts and attributions.
+
+────────────────────────────────────────────────────────────
+TRADEMARK NOTICE
+────────────────────────────────────────────────────────────
+
+“Cucumber” is a trademark of SmartBear Software.
+This project is not affiliated with or endorsed by SmartBear Software.

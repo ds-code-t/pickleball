@@ -200,6 +200,11 @@ tasks.register('expandWoven', Sync) {
 }
 
 tasks.shadowJar {
+
+    from("LICENSE") { into "META-INF" }
+    from("NOTICE") { into "META-INF" }
+    from("THIRD-PARTY-NOTICES.md") { into "META-INF" }
+
     // use ajc output + woven deps
     dependsOn 'ajcMain', 'expandWoven', 'classes'
 
