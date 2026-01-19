@@ -431,18 +431,43 @@ nexusPublishing {
     }
 }
 
+// Decide what kind of publish this build is doing (based on requested task names)
+def requested = gradle.startParameter.taskNames*.toLowerCase()
+
+def isMavenLocalPublish =
+        requested.any { it.contains("publishtomavenlocal") }
+
+def isStagingPublish =
+        requested.any { it.contains("publishmavenpublicationtostagingrepository") } ||
+                requested.any { it.contains("publishallpublicationstostagingrepository") } ||
+                requested.any { it.contains("closeandrelease") } ||
+                requested.any { it.contains("releasesonatype") } ||
+                requested.any { it.contains("publishsonatype") }
+
+// If you *only* want signing for staging, keep it this strict:
+def signingIsRequired = isStagingPublish && !isMavenLocalPublish
+
+
 
 signing {
-    // Recommended for CI: in-memory keys, provided via gradle.properties or env vars
-    def key = (findProperty("signingKey") ?: System.getenv("SIGNING_KEY"))?.toString()
+    // Only require signing for the staging / Central flow
+    required { signingIsRequired }
+
+    def key  = (findProperty("signingKey") ?: System.getenv("SIGNING_KEY"))?.toString()
     def pass = (findProperty("signingPassword") ?: System.getenv("SIGNING_PASSWORD"))?.toString()
 
-    if (key) {
+    // Only configure keys when we actually intend to sign
+    if (signingIsRequired) {
+        if (!key) {
+            throw new GradleException(
+                    "Signing is required for staging publish, but no signingKey/SIGNING_KEY was provided."
+            )
+        }
         useInMemoryPgpKeys(key, pass)
+        sign(publishing.publications.named("maven").get())
     }
-
-    sign(publishing.publications.named("maven").get())
 }
+
 
 
 tasks.register("centralBundleZip", Zip) {
@@ -514,3 +539,9 @@ tasks.named("centralBundleZip", Zip) {
 // Lifecycle
 tasks.assemble { dependsOn tasks.shadowJar }
 tasks.test { useJUnitPlatform() }
+
+
+// If we're only doing publishToMavenLocal, never run signing tasks
+tasks.withType(Sign).configureEach {
+    onlyIf { !isMavenLocalPublish }
+}
