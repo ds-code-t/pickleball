@@ -2,10 +2,13 @@ plugins {
     id 'java-library'
     id 'com.github.johnrengelman.shadow' version '8.1.1'
     id 'maven-publish'
+    id 'signing'
+    id("io.github.gradle-nexus.publish-plugin") version "2.0.0"
 }
 
-group = findProperty('group') ?: 'tools.dscode'
-version = findProperty('version') ?: '1.0.0-SNAPSHOT'
+group = 'tools.dscode'
+version = '2.0.0'
+
 
 repositories {
     mavenCentral()
@@ -28,8 +31,17 @@ def toWeave = [
 
 java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }
+
+    // Maven Central expects these companion artifacts
+    withSourcesJar()
+    withJavadocJar()
 }
 
+// Optional: make javadoc generation less fragile on modern JDKs
+tasks.withType(Javadoc).configureEach {
+    options.addStringOption('Xdoclint:none', '-quiet')
+    options.encoding = 'UTF-8'
+}
 
 /* 👇 Add this new block right after the java { } block */
 sourceSets {
@@ -199,8 +211,42 @@ tasks.register('expandWoven', Sync) {
     }
 }
 
-tasks.shadowJar {
 
+def myLicense = file("LICENSE").canonicalFile
+def myNotice  = file("NOTICE").canonicalFile
+
+tasks.shadowJar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    // Exclude LICENSE/NOTICE coming from dependency jars, but keep *your* project ones.
+    exclude { FileTreeElement e ->
+        def p = e.path
+
+        // Match common license/notice paths that appear in dependency jars
+        boolean looksLikeLicenseOrNotice =
+                p == 'LICENSE' ||
+                        p == 'NOTICE' ||
+                        p.startsWith('META-INF/LICENSE') ||
+                        p.startsWith('META-INF/NOTICE') ||
+                        p ==~ /(?i)^LICENSE(\..+)?$/ ||
+                        p ==~ /(?i)^NOTICE(\..+)?$/ ||
+                        p ==~ /(?i)^META-INF\/LICENSE(\..+)?$/ ||
+                        p ==~ /(?i)^META-INF\/NOTICE(\..+)?$/
+
+        if (!looksLikeLicenseOrNotice) return false
+
+        // Keep the project's own LICENSE/NOTICE (wherever you copy them)
+        File src = e.file
+        if (src != null && src.exists()) {
+            def c = src.canonicalFile
+            if (c == myLicense || c == myNotice) return false
+        }
+
+        // Otherwise: it's from a dependency -> exclude it
+        return true
+    }
+
+    // Now you can safely add yours
     from("LICENSE") { into "META-INF" }
     from("NOTICE") { into "META-INF" }
     from("THIRD-PARTY-NOTICES.md") { into "META-INF" }
@@ -219,7 +265,6 @@ tasks.shadowJar {
 
     // put woven classes LAST so they overwrite any originals
     from(wovenExpanded)
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE  // last-wins merge
 
     // Only shade what we really need
     dependencies {
@@ -247,14 +292,55 @@ tasks.jar { enabled = false }
 
 // Publish shaded artifact; POM massaging kept as-is
 publishing {
+    repositories {
+        maven {
+            name = "staging"
+            url = layout.buildDirectory.dir("maven-central-staging")
+        }
+    }
     publications {
         create('maven', MavenPublication) { pub ->
             groupId = project.group as String
             artifactId = 'pickleball'
             version = project.version as String
 
+            // Publish the shaded jar as the primary artifact
             project.shadow.component(pub)
 
+            // Also publish sources + javadoc jars (required/expected by Central)
+            artifact(tasks.named("sourcesJar"))
+            artifact(tasks.named("javadocJar"))
+
+            pom {
+                name.set('pickleball')
+                description.set('Shaded, AspectJ-woven Cucumber bundle (overrides selected modules; publishes all other runtime deps for Maven consumers)')
+                url.set('https://github.com/ds-code-t/pickleball')
+
+                licenses {
+                    license {
+                        name.set('Apache License, Version 2.0')
+                        url.set('https://www.apache.org/licenses/LICENSE-2.0')
+                    }
+                }
+
+                // Required by Maven Central (SCM section)
+                scm {
+                    url.set('https://github.com/ds-code-t/pickleball')
+                    connection.set('scm:git:git://github.com/ds-code-t/pickleball.git')
+                    developerConnection.set('scm:git:ssh://git@github.com/ds-code-t/pickleball.git')
+                }
+
+                // Strongly expected for Central acceptance
+                developers {
+                    developer {
+                        id.set('ds-code-t')
+                        name.set('DSCode Tools')
+                        url.set('https://github.com/ds-code-t')
+                    }
+                }
+            }
+
+            // Keep your POM dependency massaging if you want (unchanged)
             pom.withXml {
                 def pomNode = asNode()
 
@@ -273,7 +359,6 @@ publishing {
                             "${node.get('groupId')[0].text()}:${node.get('artifactId')[0].text()}"
                         } as Set
 
-//                Set<String> shadedGA = (['org.aspectj:aspectjrt'] + toWeave.collect { "${it.group}:${it.name}" }) as Set
                 Set<String> shadedGA = (
                         ['org.aspectj:aspectjrt', 'io.github.classgraph:classgraph'] +
                                 toWeave.collect { "${it.group}:${it.name}" }
@@ -299,22 +384,10 @@ publishing {
                     }
                 }
             }
-
-            pom {
-                name.set('pickleball')
-                description.set('Shaded, AspectJ-woven Cucumber bundle (overrides selected modules; publishes all other runtime deps for Maven consumers)')
-                url.set('https://example.org/pickleball')
-                licenses {
-                    license {
-                        name.set('Apache License, Version 2.0')
-                        url.set('https://www.apache.org/licenses/LICENSE-2.0')
-                    }
-                }
-            }
         }
     }
-    repositories { mavenLocal() }
 }
+
 
 
 apply plugin: 'idea'
@@ -342,6 +415,100 @@ idea {
         scopes.RUNTIME.minus += [configurations.weaveLibs]
     }
 }
+
+
+
+nexusPublishing {
+    repositories {
+        sonatype {
+            // Most OSSRH accounts use s01; if your account is on the older host, change these to oss.sonatype.org
+            nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
+            snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
+
+            username.set((findProperty("ossrhUsername") ?: System.getenv("OSSRH_USERNAME"))?.toString())
+            password.set((findProperty("ossrhPassword") ?: System.getenv("OSSRH_PASSWORD"))?.toString())
+        }
+    }
+}
+
+
+signing {
+    // Recommended for CI: in-memory keys, provided via gradle.properties or env vars
+    def key = (findProperty("signingKey") ?: System.getenv("SIGNING_KEY"))?.toString()
+    def pass = (findProperty("signingPassword") ?: System.getenv("SIGNING_PASSWORD"))?.toString()
+
+    if (key) {
+        useInMemoryPgpKeys(key, pass)
+    }
+
+    sign(publishing.publications.named("maven").get())
+}
+
+
+tasks.register("centralBundleZip", Zip) {
+    dependsOn "publishMavenPublicationToStagingRepository"
+    archiveFileName.set("pickleball-${project.version}-central-bundle.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("central-bundle"))
+    from(layout.buildDirectory.dir("maven-central-staging"))
+}
+
+import java.security.MessageDigest
+
+def checksumFiles = { File f ->
+    def algos = ['MD5':'md5', 'SHA-1':'sha1']
+    algos.each { algo, ext ->
+        def md = MessageDigest.getInstance(algo)
+        f.withInputStream { is ->
+            byte[] buf = new byte[8192]
+            int r
+            while ((r = is.read(buf)) > 0) md.update(buf, 0, r)
+        }
+        def hex = md.digest().collect { String.format("%02x", it) }.join()
+        new File(f.parentFile, "${f.name}.${ext}").text = hex
+    }
+}
+
+tasks.named("centralBundleZip", Zip) {
+    dependsOn "generateCentralChecksums"
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    archiveFileName.set("pickleball-${project.version}-central-bundle.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("central-bundle"))
+
+    from(layout.buildDirectory.dir("maven-central-staging")) {
+        // ❌ Central does NOT want repository metadata
+        exclude "**/maven-metadata.xml"
+        exclude "**/maven-metadata.xml.*"
+
+        // ❌ Central does NOT want checksums of .asc files
+        exclude "**/*.asc.md5"
+        exclude "**/*.asc.sha1"
+        exclude "**/*.asc.sha256"
+        exclude "**/*.asc.sha512"
+    }
+}
+
+
+
+tasks.named("centralBundleZip", Zip) {
+    dependsOn "generateCentralChecksums"
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    archiveFileName.set("pickleball-${project.version}-central-bundle.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("central-bundle"))
+
+    // IMPORTANT: only one 'from'
+    from(layout.buildDirectory.dir("maven-central-staging")) {
+        exclude "**/maven-metadata.xml*"
+        exclude "**/*.asc.md5", "**/*.asc.sha1", "**/*.asc.sha256", "**/*.asc.sha512"
+    }
+}
+
+
+
+
 
 
 // Lifecycle

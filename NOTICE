@@ -3,53 +3,72 @@ Copyright © 2026 DSCode Tools
 
 This product includes software developed by third parties.
 
-────────────────────────────────────────────────────────────
-IMPORTANT NOTICE REGARDING MODIFIED COMPONENTS
-────────────────────────────────────────────────────────────
+──────────────────────────────────────────────────────────────────────────────
+NOTICE REGARDING MODIFIED THIRD-PARTY COMPONENTS
+──────────────────────────────────────────────────────────────────────────────
 
 This distribution contains bytecode-modified versions of the following
-Apache-licensed components, modified via AspectJ compile-time and
-binary weaving:
+components, modified via AspectJ compile-time and binary weaving:
 
-- io.cucumber:cucumber-core
-- io.cucumber:cucumber-java
-- io.cucumber:cucumber-plugin
-- io.cucumber:messages
-- io.cucumber:gherkin
+- io.cucumber:cucumber-core (MIT License)
+- io.cucumber:cucumber-java (MIT License)
+- io.cucumber:cucumber-plugin (MIT License)
+- io.cucumber:messages (MIT License)
+- io.cucumber:gherkin (MIT License)
 
-The original source code for these components is available from:
+The original upstream source for these components is available from:
 https://github.com/cucumber
 
-Modifications are performed at build time using AspectJ and do not
-represent upstream changes or endorsements.
+These modifications do not represent upstream changes, and do not imply
+upstream endorsement.
 
-────────────────────────────────────────────────────────────
+──────────────────────────────────────────────────────────────────────────────
 THIRD-PARTY SOFTWARE
-────────────────────────────────────────────────────────────
+──────────────────────────────────────────────────────────────────────────────
 
 This product bundles or depends on the following major components:
 
-- Cucumber (Apache License 2.0)
-- JUnit Platform (Apache License 2.0)
-- Selenium (Apache License 2.0)
-- Google Guava (Apache License 2.0)
-- Jackson (Apache License 2.0)
-- Apache POI (Apache License 2.0)
-- ClassGraph (MIT License)
-- ExtentReports (Apache License 2.0)
-- ReportPortal Java Client (Apache License 2.0)
-- Aviator (Apache License 2.0)
-- JSONata4Java (Apache License 2.0)
+Apache License 2.0:
+- Selenium
+- Google Guava
+- Jackson Databind
+- Apache POI
+- ExtentReports
+- ReportPortal Java Client
+- Aviator
+- JSONata4Java
 
-This product also includes:
+Eclipse Public License 2.0:
+- JUnit Platform / JUnit Jupiter
+- AspectJ Runtime / Tools
 
-- AspectJ Runtime (Eclipse Public License 2.0)
+MIT License:
+- Cucumber JVM
+- ClassGraph
+- Xpathy (verify license for libs/xpathy-3.0.0.jar)
 
-See THIRD-PARTY-NOTICES.md for full license texts and attributions.
+See THIRD-PARTY-NOTICES.md for details.
 
-────────────────────────────────────────────────────────────
+──────────────────────────────────────────────────────────────────────────────
 TRADEMARK NOTICE
-────────────────────────────────────────────────────────────
+──────────────────────────────────────────────────────────────────────────────
 
 “Cucumber” is a trademark of SmartBear Software.
 This project is not affiliated with or endorsed by SmartBear Software.
+
+──────────────────────────────────────────────────────────────────────────────
+UPSTREAM NOTICE ATTRIBUTIONS
+──────────────────────────────────────────────────────────────────────────────
+
+This product includes software developed by the Apache Software Foundation
+(http://www.apache.org/).
+
+This notice applies to the following Apache-licensed components bundled with
+this distribution, including but not limited to:
+
+- Apache POI
+- Selenium
+- Google Guava
+- Jackson Databind and related Jackson modules
+- ExtentReports
+- ReportPortal Java Client

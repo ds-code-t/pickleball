@@ -243,8 +243,8 @@ public final class QuoteParser extends LinkedHashMap<String, String> {
      * Restore current masked text using current map values, wrapping with each
      * value's original bookend, PLUS an extra bookend STRING on the outside.
      *
-     * Example (extraBookend = "<<"):
-     *   placeholder -> <<'inner'<<  or  <<"inner"<<  or  <<`inner`<<  or  <<'''inner'''<<
+     * Example (extraBookend = "&lt;&lt;"):
+     *   placeholder -> &lt;&lt;'inner'&lt;&lt;  or  &lt;&lt;"inner"&lt;&lt;  or  &lt;&lt;`inner`&lt;&lt;  or  &lt;&lt;'''inner'''&lt;&lt;
      */
     public String restoreWithOuterBookend(String extraBookend) {
         return restoreFromWithOuterBookend(masked, extraBookend);

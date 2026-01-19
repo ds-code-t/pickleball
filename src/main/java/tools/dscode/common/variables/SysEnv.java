@@ -30,7 +30,7 @@ public final class SysEnv {
                 .filter(Objects::nonNull)
                 .map(k -> k.toLowerCase().trim().startsWith(pickleBallVarPrefix)
                         ? k
-                        : pickleBallVarPrefix + k)
+                        : pickleBallVarPrefix + k.trim())
                 .toArray(String[]::new);
         return systemOrEnv(newKeys);
     }

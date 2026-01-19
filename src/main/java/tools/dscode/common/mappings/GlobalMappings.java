@@ -1,10 +1,13 @@
 package tools.dscode.common.mappings;
 
+import io.cucumber.java.cy_gb.Ond;
+
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static tools.dscode.common.util.DebugUtils.printDebug;
+import static tools.dscode.common.variables.SysEnv.getPickleBallProperty;
 
 /**
  * GlobalMappings Identical to NodeMap, but the public getters/setters are made
@@ -39,6 +42,8 @@ public class GlobalMappings extends NodeMap {
 
     @Override
     public Object get(String key) {
+        Object returnObj = getPickleBallProperty(key);
+        if (returnObj != null) return returnObj;
         r.lock();
         try {
             return super.get(key);
@@ -46,5 +51,4 @@ public class GlobalMappings extends NodeMap {
             r.unlock();
         }
     }
-
 }

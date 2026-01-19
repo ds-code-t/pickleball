@@ -11,6 +11,7 @@ import io.cucumber.core.runner.StepData;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
+import tools.dscode.common.annotations.DefinitionFlags;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,6 +21,8 @@ import java.util.regex.Pattern;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_FALSE;
+import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
+import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.util.Reflect.getProperty;
 
 
@@ -64,7 +67,7 @@ public class ConditionalSteps extends CoreSteps {
         return java.util.Collections.unmodifiableMap(m);
     }
 
-//    @DefinitionFlags(_NO_LOGGING)
+    @DefinitionFlags(_NO_LOGGING)
     @Given("^(?:IF:|ELSE:|ELSE-IF:).*$")
     public static void runConditional() {
         StepExtension currentStep = getRunningStep();
@@ -119,8 +122,8 @@ public class ConditionalSteps extends CoreSteps {
 
 
                 currentStep.insertReplacement(modifiedStep);
-//                modifiedStep.addDefinitionFlag(NO_LOGGING);
-//                modifiedStep.addDefinitionFlag(IGNORE_CHILDREN_IF_FALSE);
+                modifiedStep.addDefinitionFlag(NO_LOGGING);
+                modifiedStep.addDefinitionFlag(IGNORE_CHILDREN_IF_FALSE);
 
 
                 if (lastNonThenStep != null) {
