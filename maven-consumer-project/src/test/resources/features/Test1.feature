@@ -1,5 +1,6 @@
 Feature: Additiontest
 
+  @rrr1
   Scenario: ddfsdfdsf
     * IF: "z" equals "A":
   :    Then , save "Q1" as "W"
@@ -21,7 +22,7 @@ Feature: Additiontest
   :    Then , save "Q4" as "W"
 
   @TestQ
-  Scenario: test rr
+  Scenario: tqqqq
     * , verify "A" equals "A", or "A" equal "C"
 
   Scenario: ddtt34fsdf

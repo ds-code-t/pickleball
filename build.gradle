@@ -493,6 +493,31 @@ def checksumFiles = { File f ->
     }
 }
 
+def centralStagingDir = layout.buildDirectory.dir("maven-central-staging")
+
+tasks.register("generateCentralChecksums") {
+    group = "publishing"
+    description = "Generate .md5 and .sha1 checksums for Central upload bundle (excluding .asc and existing checksums)."
+    dependsOn "publishMavenPublicationToStagingRepository"
+
+    doLast {
+        File root = centralStagingDir.get().asFile
+        if (!root.exists()) {
+            throw new GradleException("Staging directory does not exist: ${root}")
+        }
+
+        fileTree(root).matching {
+            include "**/*"
+            exclude "**/*.md5", "**/*.sha1", "**/*.sha256", "**/*.sha512"
+            exclude "**/*.asc"                 // .asc should NOT have checksums :contentReference[oaicite:1]{index=1}
+            exclude "**/maven-metadata.xml*"
+        }.files.findAll { it.isFile() }.each { f ->
+            checksumFiles(f)
+        }
+    }
+}
+
+
 tasks.named("centralBundleZip", Zip) {
     dependsOn "generateCentralChecksums"
 
