@@ -245,6 +245,13 @@ public final class XPathyAssembly {
             score += 10000;
         }
 
+
+        if (s.contains("descendant::text()")) {
+            score += 4000;
+        }
+
+
+
         score += s.replaceAll("[^*]","").length() * 20;
 
 //        if (!s.contains("\"") && !s.contains("'")) {
