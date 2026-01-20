@@ -470,13 +470,6 @@ signing {
 
 
 
-tasks.register("centralBundleZip", Zip) {
-    dependsOn "publishMavenPublicationToStagingRepository"
-    archiveFileName.set("pickleball-${project.version}-central-bundle.zip")
-    destinationDirectory.set(layout.buildDirectory.dir("central-bundle"))
-    from(layout.buildDirectory.dir("maven-central-staging"))
-}
-
 import java.security.MessageDigest
 
 def checksumFiles = { File f ->
@@ -518,43 +511,22 @@ tasks.register("generateCentralChecksums") {
 }
 
 
-tasks.named("centralBundleZip", Zip) {
+tasks.register("centralBundleZip", Zip) {
+    group = "publishing"
+    description = "Create a Sonatype Central upload bundle zip from the local staging repository output."
+
     dependsOn "generateCentralChecksums"
 
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-
     archiveFileName.set("pickleball-${project.version}-central-bundle.zip")
     destinationDirectory.set(layout.buildDirectory.dir("central-bundle"))
 
-    from(layout.buildDirectory.dir("maven-central-staging")) {
-        // ❌ Central does NOT want repository metadata
-        exclude "**/maven-metadata.xml"
-        exclude "**/maven-metadata.xml.*"
-
-        // ❌ Central does NOT want checksums of .asc files
-        exclude "**/*.asc.md5"
-        exclude "**/*.asc.sha1"
-        exclude "**/*.asc.sha256"
-        exclude "**/*.asc.sha512"
-    }
-}
-
-
-
-tasks.named("centralBundleZip", Zip) {
-    dependsOn "generateCentralChecksums"
-
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-
-    archiveFileName.set("pickleball-${project.version}-central-bundle.zip")
-    destinationDirectory.set(layout.buildDirectory.dir("central-bundle"))
-
-    // IMPORTANT: only one 'from'
     from(layout.buildDirectory.dir("maven-central-staging")) {
         exclude "**/maven-metadata.xml*"
         exclude "**/*.asc.md5", "**/*.asc.sha1", "**/*.asc.sha256", "**/*.asc.sha512"
     }
 }
+
 
 
 
