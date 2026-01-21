@@ -73,8 +73,8 @@ public class ElementWrapper {
 
         // Build the persistent locating XPath (no JS).
         // Uses default attribute priority when varargs are omitted.
-        this.xpath1 = buildXPathForElement(element, 10, 10, "id", "data-user-id", "name", "title", "role", "aria-label", "class");
-        this.xpath2 = buildXPathForElement(element, 10, 10, "href", "target", "src", "onclick", "type", "index");
+        this.xpath1 = buildXPathForElement(element, 10, 10, List.of("id", "data-user-id"), List.of("name", "title"), List.of("role", "aria-label", "class"));
+        this.xpath2 = buildXPathForElement(element, 10, 10,  List.of("href", "target", "src", "index"), List.of("onclick", "type"));
 
 
     }
@@ -380,6 +380,141 @@ public class ElementWrapper {
         return "//" + tag + "[" + predicateBuilder + "]";
     }
 
+    private static String buildXPathForElement(
+            WebElement element,
+            int maxAncestorNodes,
+            int maxDescendantNodes,
+            List<String>... attrPriorityGroups
+    ) {
+
+        String tag = safeTagName(element);
+
+        // Default attribute groups if none supplied
+        List<List<String>> effectiveGroups =
+                (attrPriorityGroups == null || attrPriorityGroups.length == 0)
+                        ? List.of(List.of("id", "data-user-id"))
+                        : List.of(attrPriorityGroups);
+
+        String descAttrName = null;
+        String descAttrValue = null;
+
+        // ------------------------------------------------------------
+        // 1) Descendant-or-self search (single XPath per group)
+        // ------------------------------------------------------------
+        outerDesc:
+        for (List<String> group : effectiveGroups) {
+
+            // ---- self check first (priority preserved)
+            for (String attr : group) {
+                String selfVal = getAttrOrEmpty(element, attr);
+                if (!selfVal.isEmpty()) {
+                    descAttrName = attr;
+                    descAttrValue = selfVal;
+                    break outerDesc;
+                }
+            }
+
+            // ---- descendant search (single XPath using OR)
+            try {
+                String orPredicate = group.stream()
+                        .map(a -> "@" + a)
+                        .reduce((a, b) -> a + " or " + b)
+                        .orElse(null);
+
+                if (orPredicate == null) {
+                    continue;
+                }
+
+                String xpathExpr;
+                if (maxDescendantNodes > 0) {
+                    xpathExpr = "(.//*[" + orPredicate + "])[position() <= " + maxDescendantNodes + "]";
+                } else {
+                    xpathExpr = ".//*[" + orPredicate + "]";
+                }
+
+                WebElement d = element.findElement(By.xpath(xpathExpr));
+
+                // pick first attribute in group priority order
+                for (String attr : group) {
+                    String v = getAttrOrEmpty(d, attr);
+                    if (!v.isEmpty()) {
+                        descAttrName = attr;
+                        descAttrValue = v;
+                        break outerDesc;
+                    }
+                }
+            } catch (NoSuchElementException ignored) {
+            }
+        }
+
+        // ------------------------------------------------------------
+        // 2) Main predicate
+        // ------------------------------------------------------------
+        String mainPredicate;
+        if (descAttrName != null) {
+            mainPredicate = "descendant-or-self::*[@" + descAttrName + "="
+                    + quoteForXPath(descAttrValue) + "]";
+        } else {
+            mainPredicate = buildChildrenShapePredicate(element);
+        }
+
+        // ------------------------------------------------------------
+        // 3) Ancestor search (grouped attributes, depth-limited)
+        // ------------------------------------------------------------
+        String ancAttrName = null;
+        String ancAttrValue = null;
+
+        outerAnc:
+        for (List<String> group : effectiveGroups) {
+            WebElement current = element;
+            int checkedAncestors = 0;
+
+            while (true) {
+                if (maxAncestorNodes > 0 && checkedAncestors >= maxAncestorNodes) {
+                    break;
+                }
+
+                WebElement parent;
+                try {
+                    parent = current.findElement(By.xpath("parent::*"));
+                } catch (NoSuchElementException | InvalidSelectorException e) {
+                    break;
+                }
+
+                if (parent.equals(current)) {
+                    break;
+                }
+
+                current = parent;
+                checkedAncestors++;
+
+                for (String attr : group) {
+                    String v = getAttrOrEmpty(current, attr);
+                    if (!v.isEmpty()) {
+                        ancAttrName = attr;
+                        ancAttrValue = v;
+                        break outerAnc;
+                    }
+                }
+            }
+        }
+
+        // ------------------------------------------------------------
+        // 4) Assemble final XPath
+        // ------------------------------------------------------------
+        StringBuilder predicateBuilder = new StringBuilder();
+        predicateBuilder.append(mainPredicate);
+
+        if (ancAttrName != null) {
+            predicateBuilder.append(" and ancestor-or-self::*[@")
+                    .append(ancAttrName)
+                    .append("=")
+                    .append(quoteForXPath(ancAttrValue))
+                    .append("]");
+        }
+
+        return "//" + tag + "[" + predicateBuilder + "]";
+    }
 
 
     // Convenience overload: uses default attr priority
