@@ -73,8 +73,8 @@ public class ElementWrapper {
 
         // Build the persistent locating XPath (no JS).
         // Uses default attribute priority when varargs are omitted.
-        this.xpath1 = buildXPathForElement(element, "id", "data-user-id", "name", "title", "role", "aria-label", "class");
-        this.xpath2 = buildXPathForElement(element, "href", "target", "src", "onclick", "type", "index");
+        this.xpath1 = buildXPathForElement(element, 10, 10, "id", "data-user-id", "name", "title", "role", "aria-label", "class");
+        this.xpath2 = buildXPathForElement(element, 10, 10, "href", "target", "src", "onclick", "type", "index");
 
 
     }
@@ -265,7 +265,12 @@ public class ElementWrapper {
 
     }
 
-    private static String buildXPathForElement(WebElement element, String... attrPriority) {
+    private static String buildXPathForElement(
+            WebElement element,
+            int maxAncestorDepth,
+            int maxDescendantDepth,
+            String... attrPriority
+    ) {
 
         String tag = safeTagName(element);
 
@@ -274,26 +279,32 @@ public class ElementWrapper {
                 ? new String[]{"id", "data-user-id"}
                 : attrPriority;
 
-        // 1) Find closest self-or-descendant match for any of these attributes
+        // ------------------------------------------------------------
+        // 1) Find closest self-or-descendant match (depth-limited)
+        // ------------------------------------------------------------
         String descAttrName = null;
         String descAttrValue = null;
 
         outerDesc:
         for (String attr : effectiveAttrs) {
 
-
-            // check self first
+            // check self first (always allowed)
             String selfVal = getAttrOrEmpty(element, attr);
-
             if (!selfVal.isEmpty()) {
                 descAttrName = attr;
                 descAttrValue = selfVal;
                 break;
             }
 
-            // then any descendant (RELATIVE to element)
+            // descendant search (depth-limited)
             try {
-                String xpathExpr = ".//*[@" + attr + "]";
+                String xpathExpr;
+                if (maxDescendantDepth > 0) {
+                    xpathExpr = ".//*[count(ancestor::*) - count(ancestor::*[. = current()]) <= "
+                            + maxDescendantDepth + "][@" + attr + "]";
+                } else {
+                    xpathExpr = ".//*[@" + attr + "]";
+                }
 
                 WebElement d = element.findElement(By.xpath(xpathExpr));
                 String v = getAttrOrEmpty(d, attr);
@@ -306,7 +317,9 @@ public class ElementWrapper {
             }
         }
 
-        // 2) Build descendant-or-self predicate OR fallback to children-shape predicate
+        // ------------------------------------------------------------
+        // 2) Build descendant-or-self predicate OR fallback
+        // ------------------------------------------------------------
         String mainPredicate;
         if (descAttrName != null) {
             mainPredicate = "descendant-or-self::*[@" + descAttrName + "="
@@ -315,28 +328,36 @@ public class ElementWrapper {
             mainPredicate = buildChildrenShapePredicate(element);
         }
 
-        // 3) Build ancestor-or-self predicate using closest ancestor with prioritized attributes
-        // 3) Build ancestor-or-self predicate using closest ancestor with prioritized attributes
+        // ------------------------------------------------------------
+        // 3) Find closest ancestor match (depth-limited)
+        // ------------------------------------------------------------
         String ancAttrName = null;
         String ancAttrValue = null;
 
         outerAnc:
         for (String attr : effectiveAttrs) {
             WebElement current = element;
+            int depth = 0;
+
             while (true) {
+                if (maxAncestorDepth > 0 && depth >= maxAncestorDepth) {
+                    break;
+                }
+
                 WebElement parent;
                 try {
-                    // move up to the parent element first
                     parent = current.findElement(By.xpath("parent::*"));
                 } catch (NoSuchElementException | InvalidSelectorException e) {
-                    break; // hit the top (e.g. <html> or document boundary)
+                    break;
                 }
+
                 if (parent.equals(current)) {
                     break;
                 }
-                current = parent;
 
-                // NOW check the ancestor's attribute (self is never checked here)
+                current = parent;
+                depth++;
+
                 String v = getAttrOrEmpty(current, attr);
                 if (!v.isEmpty()) {
                     ancAttrName = attr;
@@ -346,7 +367,9 @@ public class ElementWrapper {
             }
         }
 
-
+        // ------------------------------------------------------------
+        // 4) Assemble final XPath
+        // ------------------------------------------------------------
         StringBuilder predicateBuilder = new StringBuilder();
         predicateBuilder.append(mainPredicate);
 
@@ -363,8 +386,11 @@ public class ElementWrapper {
 
 
     // Convenience overload: uses default attr priority
-    private static String buildXPathForElement(WebElement element) {
-        return buildXPathForElement(element, (String[]) null);
+    private static String buildXPathForElement(
+            WebElement element,
+            int maxAncestorDepth,
+            int maxDescendantDepth) {
+        return buildXPathForElement(element, maxAncestorDepth, maxDescendantDepth, (String[]) null);
     }
 
     /**
@@ -440,11 +466,18 @@ public class ElementWrapper {
     }
 
     public boolean screenReaderOnlyCheck() {
-        if (snapshotContainsAnyAttribute("aria-live", "aria-atomic", "aria-relevant")) {
+        if (possibleScreenReaderElement()) {
             return !getElement().isDisplayed();
         }
+        return false;
+    }
+
+    public boolean possibleScreenReaderElement() {
+        if (snapshotContainsAnyAttribute("aria-live", "aria-atomic", "aria-relevant")) {
+            return true;
+        }
         if (snapshotAttributeEqualsIgnoreCase("role", "status", "alert", "log", "timer", "marquee")) {
-            return !getElement().isDisplayed();
+            return true;
         }
         return false;
     }
