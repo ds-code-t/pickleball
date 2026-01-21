@@ -73,8 +73,8 @@ public class ElementWrapper {
 
         // Build the persistent locating XPath (no JS).
         // Uses default attribute priority when varargs are omitted.
-        this.xpath1 = buildXPathForElement(element, 10, 10, List.of("id", "data-user-id"), List.of("name", "title"), List.of("role", "aria-label", "class"));
-        this.xpath2 = buildXPathForElement(element, 10, 10,  List.of("href", "target", "src", "index"), List.of("onclick", "type"));
+        this.xpath1 = buildXPathForElement(element, 10, 30, List.of("id", "data-user-id"), List.of("name", "title"), List.of("role", "aria-label", "class"));
+        this.xpath2 = buildXPathForElement(element, 10, 15,  List.of("href", "target", "src", "index"));
 
 
     }
