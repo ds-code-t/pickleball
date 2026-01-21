@@ -105,8 +105,11 @@ public final class VisibilityConditions {
                                 Condition.style(display).equals("none"),
                                 // allow missing semicolon / spaces a bit
                                 Condition.attribute(style).contains("display:none"),
-                                Condition.attribute(style).contains("display: none")
-//                                ,Condition.attribute(id).equals("statusDiv")
+                                Condition.attribute(style).contains("display: none"),
+                                Condition.attribute(class_).contains("sr-only"),
+                                Condition.attribute(style).contains("visually-hidden"),
+                                Condition.attribute(style).contains("screen-reader-text"),
+                                Condition.attribute(style).contains("offscreen")
                         )
                 ),
 
@@ -207,7 +210,11 @@ public final class VisibilityConditions {
                 Condition.or(
                         Condition.style(display).equals("none"),
                         Condition.attribute(style).contains("display:none"),
-                        Condition.attribute(style).contains("display: none")
+                        Condition.attribute(style).contains("display: none"),
+                        Condition.attribute(class_).contains("sr-only"),
+                        Condition.attribute(style).contains("visually-hidden"),
+                        Condition.attribute(style).contains("screen-reader-text"),
+                        Condition.attribute(style).contains("offscreen")
                 ),
 
                 // visibility:hidden or collapse (mostly correct for ancestors; can be overridden)

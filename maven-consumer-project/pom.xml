@@ -46,12 +46,13 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.2.5</version>
+                <version>3.5.2</version>
                 <configuration>
-                    <useModulePath>false</useModulePath>
-                    <printSummary>true</printSummary>
+                    <forkCount>1</forkCount>
+                    <reuseForks>true</reuseForks>
                 </configuration>
             </plugin>
+
 
             <!-- Fail hard if Java < 21 -->
             <plugin>

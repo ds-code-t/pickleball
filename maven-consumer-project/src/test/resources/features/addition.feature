@@ -1,15 +1,29 @@
 Feature: Addition
 
+
+  @par1
   Scenario Outline: if tezst8
-    @[DEBUG]
-    * set CHROME
-    * , wait for 5 seconds
-    * , verify Alert is displayed
+  * , save "<A>" as "dd"
+    * , wait 5 seconds
+    * , save "<A>" as "ee"
 
     Examples:
       | A | B | C |
-      |   |   |   |
-
+      | 1  |   |   |
+      |  2 |   |   |
+      | 3  |   |   |
+      | 4  |   |   |
+      | 5  |   |   |
+      | 1  |   |   |
+      |  2 |   |   |
+      | 3  |   |   |
+      | 4  |   |   |
+      | 5  |   |   |
+      | 1  |   |   |
+      |  2 |   |   |
+      | 3  |   |   |
+      | 4  |   |   |
+      | 5  |   |   |
 
   Scenario: sssst5ff55
   @[DEBUG]

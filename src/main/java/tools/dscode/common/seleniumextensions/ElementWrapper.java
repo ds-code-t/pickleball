@@ -46,9 +46,10 @@ public class ElementWrapper {
 
         int index = 0;
         for (WebElement element : elements) {
-            if (displayElement && !element.isDisplayed())
+            ElementWrapper ew = new ElementWrapper(element, elementMatch, ++index);
+            if (displayElement && ew.screenReaderOnlyCheck())
                 continue;
-            elementWrappers.add(new ElementWrapper(element, elementMatch, ++index));
+            elementWrappers.add(ew);
             if (singleElement) break;
         }
 
@@ -84,7 +85,6 @@ public class ElementWrapper {
             throw new IllegalArgumentException(
                     "WebDriver must implement JavascriptExecutor to use ElementWrapper");
         }
-
         // tagName
         String tagName = safeTagName(element);
         attributeSnapshot.put("tagName", tagName);
@@ -437,6 +437,26 @@ public class ElementWrapper {
 
     public boolean isDisplayed() {
         return getElement().isDisplayed();
+    }
+
+    public boolean screenReaderOnlyCheck() {
+        if (attributeSnapshot.has("aria-live") || attributeSnapshot.has("aria-atomic") || attributeSnapshot.has("aria-relevant")) {
+            return !getElement().isDisplayed();
+        }
+        if (attributeSnapshot.has("role")) {
+            String role;
+            try {
+                role = attributeSnapshot.get("role").asText().toString().toLowerCase();
+            } catch (Exception e) {
+                return false;
+            }
+            System.out.println("@@role: " + role);
+            if (Set.of("status", "alert", "log", "timer", "marquee").contains(role)) {
+                return !getElement().isDisplayed();
+            }
+        }
+
+        return false;
     }
 
     public boolean isEnabled() {

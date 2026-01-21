@@ -1,0 +1,145 @@
+# ============================================================
+# CUCUMBER EXECUTION (JUnit Platform / JUnit 5 suite runner)
+# ============================================================
+
+# ----------------------------
+# 1) Discovery / wiring
+# ----------------------------
+
+# Glue packages (step defs, hooks). Comma-separated.
+# If you set GLUE in the suite class via @ConfigurationParameter, that can override/compete.
+#cucumber.glue=tools.dscode.steps,tools.dscode.zzzqqq
+
+# Feature paths (often unnecessary if your suite uses @SelectClasspathResource / @SelectPackages)
+# Use if you want property-driven feature selection instead of suite selectors.
+# Examples:
+#   cucumber.features=classpath:features
+#   cucumber.features=classpath:features/smoke
+#cucumber.features=classpath:features
+
+
+# ----------------------------
+# 2) Filtering
+# ----------------------------
+
+# Tag expression filter (best for CLI override)
+# Example:
+#   mvn test -Dcucumber.filter.tags="@smoke and not @wip"
+#cucumber.filter.tags=@smoke
+
+# Scenario name filter (regex). Useful when you want to run just one scenario by name.
+# Example:
+#   mvn test -Dcucumber.filter.name=".*Checkout.*"
+#cucumber.filter.name=.*Checkout.*
+
+
+# ----------------------------
+# 3) Execution behavior
+# ----------------------------
+
+# Dry-run: discover + match steps, but do not execute glue.
+# Useful for validating mappings in CI.
+# true|false
+#cucumber.execution.dry-run=false
+
+# Optional: custom object factory (DI / instantiation behavior)
+# Only set if you know you need it.
+#cucumber.object-factory=com.yourco.YourObjectFactory
+
+
+# ============================================================
+# PARALLEL SCENARIO EXECUTION
+# ============================================================
+
+# ----------------------------
+# 4) Cucumber parallel switch + thread strategy
+# ----------------------------
+
+# Master switch: allow Cucumber to execute scenarios concurrently
+# true|false
+cucumber.execution.parallel.enabled=true
+
+# Strategy: fixed | dynamic | custom
+cucumber.execution.parallel.config.strategy=fixed
+
+# FIXED strategy: number of worker threads
+cucumber.execution.parallel.config.fixed.parallelism=8
+
+# Optional cap (keep = parallelism unless you have a reason)
+#cucumber.execution.parallel.config.fixed.max-pool-size=8
+
+# DYNAMIC strategy: threads = availableProcessors * factor
+#cucumber.execution.parallel.config.strategy=dynamic
+#cucumber.execution.parallel.config.dynamic.factor=1.0
+
+# CUSTOM strategy: provide your own strategy class (advanced)
+#cucumber.execution.parallel.config.strategy=custom
+#cucumber.execution.parallel.config.custom.class=com.yourco.YourParallelStrategy
+
+
+# ----------------------------
+# 5) Prevent specific scenarios from running concurrently
+# ----------------------------
+# Use tags + exclusive resources to serialize access to shared things:
+# - single test account
+# - one browser profile
+# - one database, one tenant, etc.
+#
+# Syntax:
+#   cucumber.execution.exclusive-resources.<tag-without-@>.read=<resource>
+#   cucumber.execution.exclusive-resources.<tag-without-@>.read-write=<resource>
+#
+# Example: anything tagged @db gets exclusive write access to "database"
+#cucumber.execution.exclusive-resources.db.read-write=database
+#
+# Example: readers share, writers exclude
+#cucumber.execution.exclusive-resources.reads_db.read=database
+#cucumber.execution.exclusive-resources.writes_db.read-write=database
+
+
+# ============================================================
+# JUNIT (Jupiter) EXECUTION SETTINGS THAT CAN AFFECT CUCUMBER RUNS
+# ============================================================
+# Note: These are JUnit Jupiter keys. They don?t ?configure Cucumber?,
+# but they can affect concurrency/execution behavior in a mixed test run
+# and (depending on environment/version) help ensure parallel execution is actually used.
+
+# ----------------------------
+# 6) JUnit parallel execution (threading policy)
+# ----------------------------
+
+# Enable JUnit?s parallel execution support.
+# If you have *any* Jupiter tests alongside Cucumber, this matters.
+# Some setups also rely on it for consistent parallel execution behavior.
+junit.jupiter.execution.parallel.enabled=true
+
+# Default mode (same_thread | concurrent)
+junit.jupiter.execution.parallel.mode.default=concurrent
+junit.jupiter.execution.parallel.mode.classes.default=concurrent
+
+# Thread pool sizing used by JUnit?s parallel executor (fixed/dynamic/custom)
+junit.jupiter.execution.parallel.config.strategy=fixed
+junit.jupiter.execution.parallel.config.fixed.parallelism=8
+
+# Alternative dynamic sizing:
+#junit.jupiter.execution.parallel.config.strategy=dynamic
+#junit.jupiter.execution.parallel.config.dynamic.factor=1.0
+
+
+# ============================================================
+# CONFLICTS / PRECEDENCE (KEEP AS COMMENTS)
+# ============================================================
+
+# 1) If you set these in the suite class via @ConfigurationParameter, that hardcodes them:
+#    - cucumber.glue
+#    - cucumber.filter.tags
+#    - cucumber.filter.name
+# Prefer leaving the suite minimal and controlling these here / via -D on CLI.
+
+# 2) CLI -D properties typically override values from junit-platform.properties:
+#    mvn test -Dcucumber.filter.tags="@smoke"
+#    mvn test -Dcucumber.execution.parallel.config.fixed.parallelism=12
+
+# 3) Fork count is NOT configurable in junit-platform.properties.
+#    Forking is a Maven Surefire concern (pom.xml), not JUnit/Cucumber.
+#    If you want "same JVM", set surefire forkCount=1 (or 0 depending on your preference).
