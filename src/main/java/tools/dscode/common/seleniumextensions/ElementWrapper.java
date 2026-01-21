@@ -440,22 +440,12 @@ public class ElementWrapper {
     }
 
     public boolean screenReaderOnlyCheck() {
-        if (attributeSnapshot.has("aria-live") || attributeSnapshot.has("aria-atomic") || attributeSnapshot.has("aria-relevant")) {
+        if (snapshotContainsAnyAttribute("aria-live", "aria-atomic", "aria-relevant")) {
             return !getElement().isDisplayed();
         }
-        if (attributeSnapshot.has("role")) {
-            String role;
-            try {
-                role = attributeSnapshot.get("role").asText().toString().toLowerCase();
-            } catch (Exception e) {
-                return false;
-            }
-            System.out.println("@@role: " + role);
-            if (Set.of("status", "alert", "log", "timer", "marquee").contains(role)) {
-                return !getElement().isDisplayed();
-            }
+        if (snapshotAttributeEqualsIgnoreCase("role", "status", "alert", "log", "timer", "marquee")) {
+            return !getElement().isDisplayed();
         }
-
         return false;
     }
 
@@ -488,6 +478,41 @@ public class ElementWrapper {
                 .path("attributes")
                 .path(name)
                 .asText(null);
+    }
+
+
+    public boolean snapshotAttributeEqualsIgnoreCase(String name, String... candidates) {
+        if (attributeSnapshot == null || candidates == null) {
+            return false;
+        }
+        String value = attributeSnapshot
+                .path("attributes")
+                .path(name)
+                .asText(null);
+
+        if (value == null) {
+            return false;
+        }
+        for (String candidate : candidates) {
+            if (value.trim().equalsIgnoreCase(candidate.trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public boolean snapshotContainsAnyAttribute(String... keys) {
+        if (attributeSnapshot == null || keys == null || keys.length == 0) {
+            return false;
+        }
+        var attributesNode = attributeSnapshot.path("attributes");
+
+        for (String key : keys) {
+            if (key != null && attributesNode.has(key)) {
+                return true;
+            }
+        }
+        return false;
     }
 
 
