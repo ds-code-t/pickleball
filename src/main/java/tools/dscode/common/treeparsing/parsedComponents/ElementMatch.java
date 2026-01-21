@@ -31,6 +31,8 @@ import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.domoperations.ExecutionDictionary.Op.getOpFromString;
 import static tools.dscode.common.domoperations.elementstates.BinaryStateConditions.offElement;
 import static tools.dscode.common.domoperations.elementstates.BinaryStateConditions.onElement;
+import static tools.dscode.common.domoperations.elementstates.BlankElementConditions.blankElement;
+import static tools.dscode.common.domoperations.elementstates.BlankElementConditions.nonBlankElement;
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.HTML_DROPDOWN;
@@ -236,9 +238,9 @@ public class ElementMatch {
         if (!state.isEmpty()) {
 
 
-            boolean un = state.startsWith("un");
+            boolean un = state.startsWith("un") || state.startsWith("non");
 
-            if (un) state = state.substring(2);
+            if (un) state = state.replaceAll("^(?:un|non-?)","");
 
 //            checked|selected|enabled|disabled|expanded|collapsed|required)
             switch (state) {
@@ -248,6 +250,12 @@ public class ElementMatch {
                     elPredictXPaths.add(un
                             ? offElement()
                             : onElement());
+                }
+
+                case "blank" ,"empty" -> {
+                    elPredictXPaths.add(un
+                            ? blankElement()
+                            : nonBlankElement());
                 }
 
                 // Enabled/disabled
