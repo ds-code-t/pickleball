@@ -267,8 +267,8 @@ public class ElementWrapper {
 
     private static String buildXPathForElement(
             WebElement element,
-            int maxAncestorDepth,
-            int maxDescendantDepth,
+            int maxAncestorNodes,
+            int maxDescendantNodes,
             String... attrPriority
     ) {
 
@@ -279,16 +279,14 @@ public class ElementWrapper {
                 ? new String[]{"id", "data-user-id"}
                 : attrPriority;
 
-        // ------------------------------------------------------------
-        // 1) Find closest self-or-descendant match (depth-limited)
-        // ------------------------------------------------------------
+        // 1) Find closest self-or-descendant match for any of these attributes
         String descAttrName = null;
         String descAttrValue = null;
 
         outerDesc:
         for (String attr : effectiveAttrs) {
 
-            // check self first (always allowed)
+            // check self first
             String selfVal = getAttrOrEmpty(element, attr);
             if (!selfVal.isEmpty()) {
                 descAttrName = attr;
@@ -296,12 +294,13 @@ public class ElementWrapper {
                 break;
             }
 
-            // descendant search (depth-limited)
+            // then any descendant (RELATIVE to element), limited by node-position cap if configured
             try {
+                // NOTE: This is a node-count/position limit, NOT a true depth limit.
+                // It caps the number of matching nodes considered in document order.
                 String xpathExpr;
-                if (maxDescendantDepth > 0) {
-                    xpathExpr = ".//*[count(ancestor::*) - count(ancestor::*[. = current()]) <= "
-                            + maxDescendantDepth + "][@" + attr + "]";
+                if (maxDescendantNodes > 0) {
+                    xpathExpr = "(.//*[@" + attr + "])[position() <= " + maxDescendantNodes + "]";
                 } else {
                     xpathExpr = ".//*[@" + attr + "]";
                 }
@@ -317,9 +316,7 @@ public class ElementWrapper {
             }
         }
 
-        // ------------------------------------------------------------
-        // 2) Build descendant-or-self predicate OR fallback
-        // ------------------------------------------------------------
+        // 2) Build descendant-or-self predicate OR fallback to children-shape predicate
         String mainPredicate;
         if (descAttrName != null) {
             mainPredicate = "descendant-or-self::*[@" + descAttrName + "="
@@ -328,27 +325,28 @@ public class ElementWrapper {
             mainPredicate = buildChildrenShapePredicate(element);
         }
 
-        // ------------------------------------------------------------
-        // 3) Find closest ancestor match (depth-limited)
-        // ------------------------------------------------------------
+        // 3) Build ancestor-or-self predicate using closest ancestor with prioritized attributes
         String ancAttrName = null;
         String ancAttrValue = null;
 
         outerAnc:
         for (String attr : effectiveAttrs) {
             WebElement current = element;
-            int depth = 0;
+
+            // Walk up via parent::* but cap the number of nodes checked if configured.
+            int checkedAncestors = 0;
 
             while (true) {
-                if (maxAncestorDepth > 0 && depth >= maxAncestorDepth) {
+                if (maxAncestorNodes > 0 && checkedAncestors >= maxAncestorNodes) {
                     break;
                 }
 
                 WebElement parent;
                 try {
+                    // move up to the parent element first
                     parent = current.findElement(By.xpath("parent::*"));
                 } catch (NoSuchElementException | InvalidSelectorException e) {
-                    break;
+                    break; // hit the top (e.g. <html> or document boundary)
                 }
 
                 if (parent.equals(current)) {
@@ -356,8 +354,9 @@ public class ElementWrapper {
                 }
 
                 current = parent;
-                depth++;
+                checkedAncestors++;
 
+                // NOW check the ancestor's attribute (self is never checked here)
                 String v = getAttrOrEmpty(current, attr);
                 if (!v.isEmpty()) {
                     ancAttrName = attr;
@@ -367,9 +366,6 @@ public class ElementWrapper {
             }
         }
 
-        // ------------------------------------------------------------
-        // 4) Assemble final XPath
-        // ------------------------------------------------------------
         StringBuilder predicateBuilder = new StringBuilder();
         predicateBuilder.append(mainPredicate);
 
@@ -383,6 +379,7 @@ public class ElementWrapper {
 
         return "//" + tag + "[" + predicateBuilder + "]";
     }
+
 
 
     // Convenience overload: uses default attr priority

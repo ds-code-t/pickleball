@@ -113,17 +113,18 @@ Feature: Additiontest
 
   @Testw1
   Scenario Outline: qqtestloselect
-#    @[DEBUG]
+    @[DEBUG]
     * navigate to: URL.select
-    Then , from the FrameResult, I select "Opel" in the "cars" Dropdown
+#    Then , from the FrameResult, I select "Opel" in the "cars" Dropdown
     * , from the Top Panel:
-  : * , I verify  "Get your own website" Link matches "^Get.*$"
+  : * , I verify "Run ❯" Textbox is not displayed
+#  : * , I verify  "Get your website" Link is displayed
 
     Examples:
       | s |
       | 1 |
-      | 2 |
-      | 3 |
+#      | 2 |
+#      | 3 |
 
   Scenario: tefsdf
   @[DEBUG]

@@ -35,7 +35,7 @@ Feature: Addition
 #    * , verify "Show File-select Fields" Text is  displayed
     * , from the Top Panel:
 #  : * , I verify "Run ❯" Button is displayed
-  : * , I verify "Run ❯" Textbox is not displayed
+  : * , I verify "Run ❯" Button is displayed
 #  : * , I verify "Get your own website" Link is displayed
 #  : * , I verify "Get your own website" Link is not displayed, and "Get your own website" Link is displayed
 #  : * , I verify "Get your own website" Link is displayed
