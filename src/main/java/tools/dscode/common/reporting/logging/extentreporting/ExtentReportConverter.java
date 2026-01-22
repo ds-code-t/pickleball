@@ -62,31 +62,26 @@ public final class ExtentReportConverter extends BaseConverter {
         Path sparkDir = dir.resolve("spark");
 
         if (SPARK_ASSETS_READY) {
-            dbgStatic("spark assets already marked ready; skipping enableOfflineMode(true)");
             return;
         }
 
         synchronized (SPARK_ASSETS_LOCK) {
             if (SPARK_ASSETS_READY) {
-                dbgStatic("spark assets already marked ready inside lock; skipping");
                 return;
             }
 
             // If another earlier run (or previous JVM) already created them, we can also skip.
             if (looksLikeSparkAssetsExist(sparkDir)) {
-                dbgStatic("spark assets folder already exists and looks complete -> " + sparkDir);
                 SPARK_ASSETS_READY = true;
                 return;
             }
 
-            dbgStatic("creating spark offline assets once -> " + sparkDir);
             try {
                 spark.config().enableOfflineMode(true);
                 SPARK_ASSETS_READY = true;
-                dbgStatic("spark offline assets created");
             } catch (Throwable t) {
                 // If creation fails, do NOT mark ready; later attempt may succeed
-                dbgStatic("FAILED to create spark offline assets: " + t.getClass().getSimpleName() + ": " + t.getMessage());
+                System.out.println("FAILED to create spark offline assets: " + t.getClass().getSimpleName() + ": " + t.getMessage());
             }
         }
     }
@@ -103,10 +98,6 @@ public final class ExtentReportConverter extends BaseConverter {
         } catch (Throwable t) {
             return false;
         }
-    }
-
-    private static void dbgStatic(String s) {
-        if (DEBUG) System.out.println("[ExtentReportConverter] " + s);
     }
 
     @Override

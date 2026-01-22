@@ -171,7 +171,7 @@ public class ElementMatch {
             String atrPredicate = elementNode.getStringFromLocalState("atrPredicate");
             for (String attr : atrPredicate.split("\\b(with|and)\\b")) {
                 attr = attr.replaceAll("\\b(?:with|and)\\b", "").trim();
-                if(attr.isBlank())
+                if (attr.isBlank())
                     continue;
                 Matcher m = attributePattern.matcher(attr.trim());
                 if (m.find()) {
@@ -183,11 +183,11 @@ public class ElementMatch {
                     ValueWrapper predicateVal = null;
                     if (predicate != null) {
                         MatchNode predicateNode = elementNode.getMatchNode(predicate.trim());
-                         predicateType = (String) predicateNode.getFromLocalState("predicateType");
-                         predicateVal = predicateNode.getValueWrapper("predicateVal");
+                        predicateType = (String) predicateNode.getFromLocalState("predicateType");
+                        predicateVal = predicateNode.getValueWrapper("predicateVal");
                     }
 
-                    attributes.add(new Attribute(attrName, predicateType, predicateVal) );
+                    attributes.add(new Attribute(attrName, predicateType, predicateVal));
                 } else {
                     throw new RuntimeException("Invalid attribute predicate: " + attr);
                 }
@@ -213,7 +213,6 @@ public class ElementMatch {
         }
 
 
-
         if (!elementTypes.contains(ElementType.HTML_TYPE)) {
             return;
         }
@@ -234,14 +233,11 @@ public class ElementMatch {
         }
 
 
-
         if (!state.isEmpty()) {
-
 
             boolean un = state.startsWith("un") || state.startsWith("non");
 
-            if (un) state = state.replaceAll("^(?:un|non-?)","");
-
+            if (un) state = state.replaceAll("^(?:un|non-?)", "");
 //            checked|selected|enabled|disabled|expanded|collapsed|required)
             switch (state) {
                 // Binary on/off (checked/selected/etc)
@@ -252,10 +248,10 @@ public class ElementMatch {
                             : onElement());
                 }
 
-                case "blank" ,"empty" -> {
+                case "blank", "empty" -> {
                     elPredictXPaths.add(un
-                            ? blankElement()
-                            : nonBlankElement());
+                            ? nonBlankElement()
+                            : blankElement());
                 }
 
                 // Enabled/disabled
@@ -308,7 +304,6 @@ public class ElementMatch {
 
         }
 //        }
-
 
 
     }
@@ -430,7 +425,7 @@ public class ElementMatch {
 
 
         if (wrappedElements == null) {
-            if(!parentPhrase.getPreviousTerminator().equals(";")) {
+            if (!parentPhrase.getPreviousTerminator().equals(";")) {
                 parentPhrase.syncWithDOM();
             }
         }

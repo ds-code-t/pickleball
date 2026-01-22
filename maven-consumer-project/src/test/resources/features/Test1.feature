@@ -1,5 +1,9 @@
 Feature: Additiontest
 
+  Scenario: dfdf
+  @[DEBUG]
+    * , enter "a" in any empty Textboxes
+
   @rrr1
   Scenario: ddfsdfdsf
     * IF: "z" equals "A":
