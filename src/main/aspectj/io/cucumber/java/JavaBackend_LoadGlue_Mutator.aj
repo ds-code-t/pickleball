@@ -60,8 +60,8 @@ public aspect JavaBackend_LoadGlue_Mutator {
             throw new RuntimeException(e);
         }
 
-        DebugUtils.onMatch("##Glue modified-paths: ", msg -> {
-            for(URI uri : modified) System.out.println("URI: " + uri );;
+        DebugUtils.onMatch("##Glue final-URI: ", msg -> {
+            for(URI uri : modified) System.out.println(msg + uri );;
         });
 
         proceed(glue, modified);

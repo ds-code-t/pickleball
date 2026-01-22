@@ -23,6 +23,10 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
 
     public ScenarioStep io.cucumber.core.runner.TestCase.rootScenarioStep;
     public ScenarioStep io.cucumber.core.runner.TestCase.getRootScenarioStep() {
+        if(rootScenarioStep == null)
+        {
+            rootScenarioStep = ScenarioStep.createRootScenarioStep(this);
+        }
        return rootScenarioStep;
     }
     // ✅ New field introduced as requested
@@ -71,7 +75,7 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
         // ✅ New — assign CurrentScenarioState bound to this TestCase
         tc.currentScenarioState = new CurrentScenarioState(tc);
         currentScenarioState.set(tc.currentScenarioState);
-        tc.rootScenarioStep = ScenarioStep.createRootScenarioStep(tc);
+//        tc.rootScenarioStep = ScenarioStep.createRootScenarioStep(tc);
         return tc;
     }
 }

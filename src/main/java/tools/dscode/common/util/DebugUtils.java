@@ -13,6 +13,7 @@ public final class DebugUtils {
 //        prefixes.add("@@");
 //        substrings.add("##MatchNode:");
         substrings.add("##XPath:");
+        substrings.add("##Glue");
 //        substrings.add("##");
     }
 
