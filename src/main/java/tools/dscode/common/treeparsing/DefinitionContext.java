@@ -11,6 +11,7 @@ import tools.dscode.common.treeparsing.xpathcomponents.XPathyBuilder;
 import static com.xpathy.Attribute.aria_label;
 import static com.xpathy.Attribute.checked;
 import static com.xpathy.Attribute.class_;
+import static com.xpathy.Attribute.data_testid;
 import static com.xpathy.Attribute.id;
 import static com.xpathy.Attribute.name;
 import static com.xpathy.Attribute.placeholder;
@@ -442,6 +443,16 @@ public final class DefinitionContext {
                     .or(
                             (category, v, op) ->
                                     XPathyBuilder.buildIfAllTrue(input, placeholder, v, op, v != null)
+                    );
+
+            category("Date Textbox").children("Date Textboxes").inheritsFrom("Textbox")
+                    .and((category, v, op) ->
+                            combineOr(
+                                    input.byAttribute(Attribute.custom("data-ctl"))
+                                            .withCase(LOWER).contains("date"),
+                                    input.byAttribute(Attribute.custom("validationtype")).withCase(LOWER).contains("date"),
+                                    input.byAttribute(aria_label).withCase(LOWER).contains("date")
+                            )
                     );
 
             category("Textarea").children("Textareas").inheritsFrom("forLabel", "htmlNaming")
