@@ -4,26 +4,27 @@ Feature: Addition
   @par1
   Scenario Outline: if tezst8
   * , save "<A>" as "dd"
-    * , wait 5 seconds
+    * navigate to: URL.select
+    * , wait <B> seconds
     * , save "<A>" as "ee"
 
     Examples:
       | A | B | C |
-      | 1  |   |   |
-      |  2 |   |   |
-      | 3  |   |   |
-      | 4  |   |   |
-      | 5  |   |   |
-      | 1  |   |   |
-      |  2 |   |   |
-      | 3  |   |   |
-      | 4  |   |   |
-      | 5  |   |   |
-      | 1  |   |   |
-      |  2 |   |   |
-      | 3  |   |   |
-      | 4  |   |   |
-      | 5  |   |   |
+      | 1  | 60  |   |
+      |  2 | 60  |   |
+      | 3  |  60 |   |
+      | 4  | 60 |   |
+      | 5  | 60  |   |
+      | 6  | 1  |   |
+      | 7 | 1  |   |
+      | 8  | 1  |   |
+      | 9  |  1 |   |
+      | 10  | 1  |   |
+#      | 1  |   |   |
+#      |  2 |   |   |
+#      | 3  |   |   |
+#      | 4  |   |   |
+#      | 5  |   |   |
 
   Scenario: sssst5ff55
   @[DEBUG]

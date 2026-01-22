@@ -31,7 +31,6 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class ExtentReportConverter extends BaseConverter {
 
-    private static final boolean DEBUG = true;
 
     private final Object lock = new Object();
 
@@ -44,7 +43,6 @@ public final class ExtentReportConverter extends BaseConverter {
 
     public ExtentReportConverter(Path reportFile) {
         this.reportFile = reportFile;
-        dbg("CTOR reportFile=" + reportFile.toAbsolutePath());
 
         ExtentSparkReporter spark = new ExtentSparkReporter(reportFile.toString());
         spark.config().thumbnailForBase64(true);
@@ -53,7 +51,6 @@ public final class ExtentReportConverter extends BaseConverter {
         ensureSparkOfflineAssetsOnce(spark, reportFile);
 
         extent.attachReporter(spark);
-        dbg("CTOR attached spark reporter");
     }
 
     private static void ensureSparkOfflineAssetsOnce(ExtentSparkReporter spark, Path reportFile) {
@@ -102,40 +99,34 @@ public final class ExtentReportConverter extends BaseConverter {
 
     @Override
     protected void onClose() {
-        dbg("CLOSE extent.flush() -> " + reportFile.toAbsolutePath());
+        System.out.println("CLOSE extent.flush() -> " + reportFile.toAbsolutePath());
         synchronized (lock) {
             extent.flush();
         }
-        dbg("CLOSE extent.flush() done");
+        System.out.println("CLOSE extent.flush() done");
 
         try {
-            dbg("CLOSE bundling in-place -> " + reportFile.toAbsolutePath());
             Path out = ExtentSingleFileBundler.bundleInPlace(reportFile.toAbsolutePath());
-            dbg("CLOSE bundling done -> " + out.toAbsolutePath());
+            System.out.println("CLOSE bundling done -> " + out.toAbsolutePath());
         } catch (Throwable t) {
-            dbg("CLOSE bundling FAILED: " + t.getClass().getSimpleName() + ": " + t.getMessage());
+            System.out.println("CLOSE bundling FAILED: " + t.getClass().getSimpleName() + ": " + t.getMessage());
         }
     }
 
 
     @Override
     public void onStart(Entry scope, Entry entry) {
-        dbg("onStart scope=" + safe(scope.text) + " entry=" + safe(entry.text));
+        System.out.println("onStart scope=" + safe(scope.text) + " entry=" + safe(entry.text));
         emit(scope, entry, Phase.START);
     }
 
     @Override
     public void onTimestamp(Entry scope, Entry entry) {
-        dbg("onTimestamp scope=" + safe(scope.text) + " entry=" + safe(entry.text) + " attachments=" + entry.attachments.size());
         emit(scope, entry, Phase.TIMESTAMP);
     }
 
     @Override
     public void onStop(Entry scope, Entry entry) {
-        dbg("onStop scope=" + safe(scope.text)
-                + " entry=" + safe(entry.text)
-                + " attachments=" + entry.attachments.size()
-                + " status=" + entry.status);
         emit(scope, entry, Phase.STOP);
     }
 
@@ -144,8 +135,6 @@ public final class ExtentReportConverter extends BaseConverter {
 
         synchronized (lock) {
             ExtentTest node = ensureNode(s, scope, entry);
-            dbg("emit phase=" + phase + " ensuredNode entry=" + safe(entry.text) + " node=" + System.identityHashCode(node));
-
             applyMetaOncePerChange(s, entry, node);
 
             // Keep your original status behavior (blank message is fine; Spark shows status icon)
@@ -156,7 +145,6 @@ public final class ExtentReportConverter extends BaseConverter {
 
     private ScopeState initScope(Entry scope) {
         synchronized (lock) {
-            dbg("initScope scope=" + safe(scope.text) + " scopeId=" + safe(scope.id));
             ScopeState s = new ScopeState();
             s.root = extent.createTest(scope.text);
             s.nodes.put(scope.id, s.root);
@@ -181,9 +169,6 @@ public final class ExtentReportConverter extends BaseConverter {
         ExtentTest node = parent.createNode(entry.text);
         s.nodes.put(entry.id, node);
 
-        dbg("ensureNode created node entry=" + safe(entry.text)
-                + " parent=" + (entry.parent != null ? safe(entry.parent.text) : "<null>")
-                + " node=" + System.identityHashCode(node));
         return node;
     }
 
@@ -200,20 +185,15 @@ public final class ExtentReportConverter extends BaseConverter {
         Meta m = s.meta.computeIfAbsent(e.id, id -> new Meta());
 
         if (m.tagsN != tagsN) {
-            dbg("meta tags changed entry=" + safe(e.text) + " tagsN=" + tagsN);
             if (tagsN > 0) node.assignCategory(e.tags.toArray(String[]::new));
             m.tagsN = tagsN;
         }
 
         if (m.fieldsN != fieldsN) {
-            dbg("meta fields changed entry=" + safe(e.text) + " fieldsN=" + fieldsN + " fields=" + e.fields);
             if (fieldsN > 0) node.info("Fields: " + e.fields);
             m.fieldsN = fieldsN;
         }
 
-        if (m.attachesN != attachesN) {
-            dbg("meta attachments changed entry=" + safe(e.text) + " prev=" + m.attachesN + " now=" + attachesN);
-        }
 
         // Attach only newly-added attachments (by index)
         for (int i = m.attachesN; i < attachesN; i++) {
@@ -223,16 +203,10 @@ public final class ExtentReportConverter extends BaseConverter {
             String mime = a.mime() == null ? "" : a.mime();
             String data = a.path();
 
-            dbg("ATTACH[" + i + "] entry=" + safe(e.text)
-                    + " name=" + safe(name)
-                    + " mime=" + safe(mime)
-                    + " dataLen=" + (data == null ? -1 : data.length())
-                    + " dataHead=" + head(data, 40));
 
             if (mime.startsWith("image/")) {
                 attachImage(node, name, mime, data);
             } else {
-                dbg(" -> non-image attachment info()");
                 node.info(((a.name() == null || a.name().isBlank()) ? "Attachment" : a.name()) + ": " + data);
             }
         }
@@ -240,7 +214,6 @@ public final class ExtentReportConverter extends BaseConverter {
         m.attachesN = attachesN;
 
         if (m.level != e.level && e.level != null) {
-            dbg("meta level changed entry=" + safe(e.text) + " level=" + e.level);
             m.level = e.level;
             node.log(mapLevel(e.level), "");
         }
@@ -256,11 +229,7 @@ public final class ExtentReportConverter extends BaseConverter {
             if (mime.contains("base64")) {
                 String raw = rawBase64(data);
 
-                dbg(" -> attach base64 image as MEDIA (thumbnail/lightbox)");
-                dbg("    rawLen=" + (raw == null ? -1 : raw.length()) + " rawHead=" + head(raw, 48));
-
                 if (raw == null || raw.isBlank()) {
-                    dbg(" !! base64 data was null/blank; falling back to info()");
                     node.info(name + ": <empty base64>");
                     return;
                 }
@@ -272,7 +241,6 @@ public final class ExtentReportConverter extends BaseConverter {
 
             } else {
                 // Path-based screenshots (file exists relative to report, or absolute)
-                dbg(" -> attach path screenshot via addScreenCaptureFromPath path=" + safe(data));
                 if (data == null || data.isBlank()) {
                     node.info(name + ": <empty path>");
                     return;
@@ -280,7 +248,6 @@ public final class ExtentReportConverter extends BaseConverter {
                 node.addScreenCaptureFromPath(data, name);
             }
         } catch (Throwable ex) {
-            dbg(" !! EXCEPTION adding screenshot: " + ex.getClass().getSimpleName() + ": " + ex.getMessage());
             node.info(name + ": " + data);
         }
     }
@@ -336,11 +303,6 @@ public final class ExtentReportConverter extends BaseConverter {
         Level level;
     }
 
-    // ---- debug helpers ----
-
-    private static void dbg(String s) {
-        if (DEBUG) System.out.println("[ExtentReportConverter] " + s);
-    }
 
     private static String safe(String s) {
         return s == null ? "<null>" : s;
