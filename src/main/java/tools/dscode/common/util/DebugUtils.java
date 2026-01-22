@@ -1,15 +1,13 @@
 package tools.dscode.common.util;
 
-import io.cucumber.java.bs.A;
-
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
-public class DebugUtils {
+public final class DebugUtils {
 
-    public static List<String> prefixes = new ArrayList<>();
-    public static List<String> substrings = new ArrayList<>();
-
+    public static final List<String> prefixes = new ArrayList<>();
+    public static final List<String> substrings = new ArrayList<>();
 
     static {
 //        prefixes.add("@@");
@@ -18,26 +16,51 @@ public class DebugUtils {
 //        substrings.add("##");
     }
 
+    private DebugUtils() {
+        // utility class
+    }
+
     public static void printDebug(String message) {
-        if (message == null) return;
+        if (matches(message)) {
+            System.out.println(message);
+        }
+    }
+
+    /** Returns true if the message matches any configured prefix or substring rule. */
+    public static boolean matches(String message) {
+        if (message == null) return false;
 
         String trimmed = message.strip();
+        if (trimmed.isEmpty()) return false;
 
-        // Check prefixes
         for (String p : prefixes) {
-            if (trimmed.startsWith(p)) {
-                System.out.println(message);
-                return;
-            }
+            if (p != null && !p.isBlank() && trimmed.startsWith(p)) return true;
         }
-
-        // Check substrings
         for (String s : substrings) {
-            if (trimmed.contains(s)) {
-                System.out.println(message);
-                return;
-            }
+            if (s != null && !s.isBlank() && trimmed.contains(s)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Executes {@code logic} only when {@code message} matches the same rules as {@link #printDebug}.
+     * Lambdas passed here can capture local variables and members from the call site.
+     */
+    public static void onMatch(String message, Runnable logic) {
+        if (logic == null) return;
+        if (matches(message)) {
+            logic.run();
+        }
+    }
+
+    /**
+     * Variant that also passes the original message into the logic.
+     * Useful if you want to avoid capturing the message externally.
+     */
+    public static void onMatch(String message, java.util.function.Consumer<String> logic) {
+        if (logic == null) return;
+        if (matches(message)) {
+            logic.accept(message);
         }
     }
 }
-
