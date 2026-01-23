@@ -40,6 +40,9 @@ import static tools.dscode.common.GlobalConstants.SOFT_ERROR_STEP;
 import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort;
+import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
+import static tools.dscode.common.util.Reflect.getProperty;
+import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 
 
 public class GeneralSteps extends CoreSteps {
@@ -151,10 +154,13 @@ public class GeneralSteps extends CoreSteps {
     }
 
 
-    @Given("^" + SCENARIO_STEP + "(.*)$")
-    public static void scenarioStep(String scenarioName) {
+    @Given("^" + SCENARIO_STEP + "\\s*(?:.*)$")
+    public static void scenarioStep() {
+        waitMilliseconds(300);
         StepExtension currentStep = getRunningStep();
-        System.out.println("Running Scenario: " + scenarioName);
+        System.out.println("currentStep: " + currentStep);
+        System.out.println("currentStep.getUnmodifiedText(): " + currentStep.getUnmodifiedText());
+        System.out.println("currentStep.pickleStepTestStep: " + currentStep.pickleStepTestStep);
         System.out.println("currentStep: " + currentStep);
         System.out.println("currentStep.childSteps.size(): " + currentStep.childSteps.size());
     }
@@ -162,7 +168,15 @@ public class GeneralSteps extends CoreSteps {
     @DefinitionFlags(DefinitionFlag.RUN_METHOD_DIRECTLY)
     @Given(ROOT_STEP)
     public static void rootStep() {
-        System.out.println("Starting Scenario Run");
+//        System.out.println("Starting Scenario Run");
+
+
+
+
+//        Map<String, ?> localStepDefinitionsByPattern = (Map<String, ?>) getProperty(getLocalCachingGlue(), "stepDefinitionsByPattern");
+//        Map<String, ?> globalStepDefinitionsByPattern = (Map<String, ?>) getProperty(getCachingGlue(), "stepDefinitionsByPattern");
+
+
         getCurrentScenarioState().startScenarioRun();
     }
 

@@ -7,8 +7,6 @@ import io.cucumber.plugin.event.Result;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.mappings.ParsingMap;
-import tools.dscode.common.reporting.logging.Entry;
-import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
@@ -18,11 +16,10 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
-import static io.cucumber.core.gherkin.messages.NGherkinFactory.createGherkinMessagesStep;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
 import static io.cucumber.core.runner.CurrentScenarioState.getScenarioLogRoot;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
-import static io.cucumber.core.runner.GlobalState.getEventBus;
+import static io.cucumber.core.runner.GlobalState.getGlobalEventBus;
 import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
@@ -175,7 +172,7 @@ public class StepExtension extends StepData {
     public Result execute(io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep, ExecutionMode executionMode) {
 
         try {
-            Object r = invokeAnyMethodOrThrow(executionPickleStepTestStep, "run", getTestCase(), getEventBus(), getTestCaseState(), executionMode);
+            Object r = invokeAnyMethodOrThrow(executionPickleStepTestStep, "run", getTestCase(), getGlobalEventBus(), getTestCaseState(), executionMode);
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }

@@ -10,11 +10,15 @@ import tools.dscode.common.reporting.WorkBook;
 
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static io.cucumber.core.runner.CurrentScenarioState.currentScenarioState;
+import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.util.Reflect.getProperty;
+import static tools.dscode.registry.GlobalRegistry.localOf;
 import static tools.dscode.registry.GlobalRegistry.localOrGlobalOf;
+import static tools.dscode.registry.GlobalRegistry.runners;
 
 public class GlobalState {
     public static final LifecycleManager lifecycle = new LifecycleManager();
@@ -23,20 +27,87 @@ public class GlobalState {
         return localOrGlobalOf(io.cucumber.core.runtime.Runtime.class);
     }
 
-    public static io.cucumber.core.runner.Runner getRunner() {
-        return localOrGlobalOf(io.cucumber.core.runner.Runner.class);
+    public static Runner globalRunner = null;
+
+    public static Runner getGlobalRunner() {
+        int counter = 0;
+        while (globalRunner == null && counter++ < 10) {
+            for(Runner runner : runners) {
+                CachingGlue glue = (CachingGlue) getProperty(runner, "glue");
+                Map stepDefinitionsByPattern = (Map) getProperty(glue, "stepDefinitionsByPattern");
+                if(!stepDefinitionsByPattern.isEmpty())
+                {
+                    globalRunner = runner;
+                    globalCachingGlue = glue;
+                    break;
+                }
+            }
+            waitMilliseconds(1000);
+        }
+        runners.clear();
+        return globalRunner;
     }
 
-    public static CachingGlue getCachingGlue() {
-        return (CachingGlue) getProperty(getRunner(), "glue");
+    private static CachingGlue globalCachingGlue = null;
+
+    public static CachingGlue getGlobalCachingGlue() {
+        getGlobalRunner();
+        return globalCachingGlue;
     }
 
-    public static Options getOptions() {
-        return (Options) getProperty(getRunner(), "runnerOptions");
+//    public static io.cucumber.core.runner.Runner getRunner() {
+//        return localOrGlobalOf(io.cucumber.core.runner.Runner.class);
+//    }
+//
+//    public static io.cucumber.core.runner.Runner getLocalRunner() {
+
+//        return getLocal("io.cucumber.core.runner.Runner");
+//    }
+
+//
+//    public static Runner globalRunner = null;
+//
+//    public static CachingGlue globalGlue = null;
+//
+//    public static void setGlobalRunnerProperties(Runner runner) {
+//        CachingGlue glue = (CachingGlue) getProperty(runner, "glue");
+//        if (glue != null) {
+//            Map<String, CoreStepDefinition> stepDefinitionsByPattern = (Map<String, CoreStepDefinition>) getProperty(glue, "stepDefinitionsByPattern");
+
+//            if (!stepDefinitionsByPattern.isEmpty()) {
+
+//                globalRunner = runner;
+//                globalGlue = glue;
+//            }
+//        }
+//    }
+
+//    public static CachingGlue getLocalCachingGlue() {
+//        return (CachingGlue) getProperty(getLocalRunner(), "glue");
+//    }
+//
+//    public static CachingGlue getCachingGlue() {
+//        return (CachingGlue) getProperty(getRunner(), "glue");
+//    }
+
+
+
+
+//    public static Locale locale;
+//
+//    public static Locale getLocal() {
+//        if (locale == null) {
+//            locale = (Locale) invokeAnyMethod(getRunner(), "localeForPickle", getGherkinMessagesPickle());
+//        }
+//        return locale;
+//    }
+
+    public static Options getGlobalOptions() {
+        return (Options) getProperty(getGlobalRunner(), "runnerOptions");
     }
 
-    public static EventBus getEventBus() {
-        return (EventBus) getProperty(getRunner(), "bus");
+    public static EventBus getGlobalEventBus() {
+        return (EventBus) getProperty(getGlobalRunner(), "bus");
     }
 
     public static io.cucumber.core.gherkin.Pickle getPickleFromPickleTestStep(PickleStepTestStep pickleStepTestStep) {
@@ -129,9 +200,6 @@ public class GlobalState {
     }
 
 
-
-
-
     public static WorkBook getReport() {
         CurrentScenarioState currentScenarioState = getCurrentScenarioState();
         if (currentScenarioState.defaultReport == null) {
@@ -143,7 +211,7 @@ public class GlobalState {
     public static ConcurrentHashMap<String, WorkBook> workBookMap = new ConcurrentHashMap<>();
 
     public static WorkBook getReport(String reportPath) {
-        if(reportPath == null || reportPath.isBlank())
+        if (reportPath == null || reportPath.isBlank())
             return getReport();
         return workBookMap.computeIfAbsent(reportPath, k -> new WorkBook(reportPath));
     }

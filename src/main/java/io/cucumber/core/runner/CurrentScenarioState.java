@@ -47,6 +47,9 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     public final TestCase testCase;
     public final Pickle pickle;
+    public CachingGlue cachingGlue;
+    public Runner scenarioRunner;
+
     List<StepExtension> stepExtensions;
     StepExtension startStep;
     private TestCaseState testCaseState;
@@ -60,11 +63,10 @@ public class CurrentScenarioState extends ScenarioMapping {
     public boolean debugBrowser = false;
 
     WorkBook defaultReport;
-
-
 //    public ScenarioStep rootScenarioStep;
 
     public static final ThreadLocal<CurrentScenarioState> currentScenarioState = new ThreadLocal<>();
+
 
     public CurrentScenarioState(TestCase testCase) {
         LOCAL.set(new ConcurrentHashMap<>());
@@ -72,6 +74,16 @@ public class CurrentScenarioState extends ScenarioMapping {
         this.testCase = testCase;
         this.pickle = (Pickle) getProperty(testCase, "pickle");
     }
+
+
+    public static CachingGlue getGlue() {
+        return getCurrentScenarioState().cachingGlue;
+    }
+
+    public static Runner getRunner() {
+        return getCurrentScenarioState().scenarioRunner;
+    }
+
     private Entry scenarioLog;
 
     public static Entry getScenarioLogRoot() {
@@ -81,12 +93,13 @@ public class CurrentScenarioState extends ScenarioMapping {
     public static Entry logToScenario(String message) {
         return logToScenario(message, null);
     }
+
     public static Entry logToScenario(String message, DataTable dataTable) {
         Entry entry = getCurrentScenarioState().scenarioLog.logInfo(message);
         if (dataTable == null) return entry.timestamp();
         List<List<String>> lists = dataTable.asLists();
         if (lists.isEmpty()) return entry.timestamp();
-        if (lists.size() == 1){
+        if (lists.size() == 1) {
             lists.getFirst().forEach(entry::tag);
             return entry.timestamp();
         }
@@ -101,16 +114,17 @@ public class CurrentScenarioState extends ScenarioMapping {
                 Entry.of(scenarioName)
                         .tag("SCENARIO")
                         .on(new ExtentReportConverter(
-                                Path.of("reports/extent",  safeFileName(scenarioName + ".html"))
+                                Path.of("reports/extent", safeFileName(scenarioName + ".html"))
                         ))
                         .start();
 
 
-
         lifecycle.fire(Phase.BEFORE_SCENARIO_RUN);
         this.stepExtensions = (List<StepExtension>) getProperty(testCase, "stepExtensions");
-        StepExtension rootScenarioStep =
-                retry(4, 1_000, testCase::getRootScenarioStep);
+        StepExtension rootScenarioStep = testCase.getRootScenarioStep();
+
+//        StepExtension rootScenarioStep =
+//                retry(4, 1_000, testCase::getRootScenarioStep);
 
 
         rootScenarioStep.setStepParsingMap(getParsingMap());

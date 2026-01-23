@@ -22,7 +22,7 @@ public class GeneralUtils {
                 if (attempt >= maxAttempts) {
                     throw new RuntimeException(e);
                 }
-                System.out.println("@@retrying... attempt " + attempt + "");
+
                 waitMilliseconds(delayMillis);
             }
         }

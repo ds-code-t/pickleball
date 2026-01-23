@@ -22,6 +22,7 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
     public List<StepExtension> io.cucumber.core.runner.TestCase.stepExtensions;
 
     public ScenarioStep io.cucumber.core.runner.TestCase.rootScenarioStep;
+
     public ScenarioStep io.cucumber.core.runner.TestCase.getRootScenarioStep() {
         if(rootScenarioStep == null)
         {

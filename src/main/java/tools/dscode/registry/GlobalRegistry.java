@@ -1,12 +1,16 @@
 // src/main/java/tools/dscode/registry/GlobalRegistry.java
 package tools.dscode.registry;
 
+import io.cucumber.core.runner.Runner;
 import org.openqa.selenium.WebDriver;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import static io.cucumber.core.runner.GlobalState.globalRunner;
 
 public final class GlobalRegistry {
 
@@ -32,7 +36,12 @@ public final class GlobalRegistry {
         return normalizeKey(type.getName());
     }
 
+    public static List<Runner> runners = new ArrayList<>();
+
     public static void registerGlobal(Object instance) {
+        if(globalRunner == null  && instance instanceof Runner runner){
+            runners.add(runner);
+        }
         GLOBAL.putIfAbsent(keyFor(instance.getClass()), instance);
         // DEBUG (optional):
         // System.out.println("[Reg][GLOBAL] " + instance.getClass().getName());
@@ -40,10 +49,12 @@ public final class GlobalRegistry {
 
     public static void registerLocal(Object instance) {
         LOCAL.get().putIfAbsent(keyFor(instance.getClass()), instance);
-        // System.out.println("[Reg][LOCAL ] " + instance.getClass().getName());
+
+         System.out.println("[Reg][LOCAL ] " + instance.getClass().getName());
     }
 
     public static void registerBoth(Object instance) {
+
         registerGlobal(instance);
         registerLocal(instance);
     }
@@ -53,6 +64,9 @@ public final class GlobalRegistry {
     }
 
     public static <T> T getLocal(String key) {
+
+
+
         return (T) LOCAL.get().get(normalizeKey(key));
     }
 
