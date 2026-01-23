@@ -35,6 +35,7 @@ import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_PASSING;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_FALSE;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN;
+import static tools.dscode.common.util.GeneralUtils.retry;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
@@ -108,7 +109,10 @@ public class CurrentScenarioState extends ScenarioMapping {
 
         lifecycle.fire(Phase.BEFORE_SCENARIO_RUN);
         this.stepExtensions = (List<StepExtension>) getProperty(testCase, "stepExtensions");
-        StepExtension rootScenarioStep = testCase.getRootScenarioStep();
+        StepExtension rootScenarioStep =
+                retry(4, 1_000, testCase::getRootScenarioStep);
+
+
         rootScenarioStep.setStepParsingMap(getParsingMap());
         startStep = stepExtensions.stream().filter(s -> s.debugStartStep).findFirst().orElse(null);
         if (startStep != null) {
