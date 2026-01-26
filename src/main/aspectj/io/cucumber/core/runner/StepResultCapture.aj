@@ -2,8 +2,6 @@ package io.cucumber.core.runner;
 
 import io.cucumber.plugin.event.Result;
 
-import static tools.dscode.common.util.DebugUtils.printDebug;
-
 /**
  * Capture the step Result as soon as it is created inside TestStep.run(..),
  * independent of any logging suppression.

@@ -22,7 +22,7 @@ public final class WorkBook extends WorkSheet {
     public final Path outputFile;
     private final String defaultSheetName;
 
-    private final LinkedHashMap<String, SheetData> sheets = new LinkedHashMap<>();
+    final LinkedHashMap<String, SheetData> sheets = new LinkedHashMap<>();
     private final SheetDefaults globalDefaults = new SheetDefaults();
     private final DateTimeFormatter isoFallback = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
@@ -284,26 +284,55 @@ public final class WorkBook extends WorkSheet {
     public void write() throws IOException {
         final List<SheetSnapshot> snapshots;
         synchronized (this) {
-            // Only create Sheet1 if literally nothing exists.
             if (sheets.isEmpty()) {
                 ensureSheet(defaultSheetName);
             }
             snapshots = snapshotAllSheets();
         }
 
-        Path absoluteFile = outputFile.toAbsolutePath();
-        Path parent = absoluteFile.getParent();
+        Path target = outputFile.toAbsolutePath();
+        Path parent = target.getParent();
         if (parent != null) Files.createDirectories(parent);
 
-        Files.deleteIfExists(absoluteFile);
+        // Write to a temp file first (same directory so move is more likely atomic)
+        String baseName = target.getFileName().toString();
+        Path tmp = Files.createTempFile(parent, baseName + ".", ".tmp");
 
-        try (Workbook wb = new XSSFWorkbook()) {
-            for (SheetSnapshot s : snapshots) writeOneSheet(wb, s);
-            try (OutputStream out = Files.newOutputStream(absoluteFile)) {
-                wb.write(out);
+        try {
+            try (Workbook wb = new XSSFWorkbook()) {
+                for (SheetSnapshot s : snapshots) writeOneSheet(wb, s);
+                try (OutputStream out = Files.newOutputStream(tmp)) {
+                    wb.write(out);
+                }
             }
+
+            // Try to replace atomically. If the target is locked, this will throw.
+            try {
+                Files.move(tmp, target,
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (IOException replaceFailed) {
+                // If replace fails (commonly because target is open/locked), clean up temp
+                try { Files.deleteIfExists(tmp); } catch (IOException ignored) {}
+
+                // Option A: rethrow with a clearer message (recommended)
+                throw new IOException(
+                        "Failed to overwrite spreadsheet. The file may be open/locked: " + target,
+                        replaceFailed
+                );
+
+                // Option B (alternative): fallback to a new filename instead of failing:
+                // Path fallback = parent.resolve(stripExt(baseName) + "_" + System.currentTimeMillis() + ".xlsx");
+                // Files.move(tmp, fallback, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                // return;
+            }
+
+        } finally {
+            // If anything throws before move, make sure temp doesn't linger
+            try { Files.deleteIfExists(tmp); } catch (IOException ignored) {}
         }
     }
+
 
     // ---------------- Sheet storage types + ensureSheet ----------------
 
@@ -363,7 +392,7 @@ public final class WorkBook extends WorkSheet {
         final Map<String, ColumnType> declaredTypes = new HashMap<>();
     }
 
-    private static final class SheetData {
+    static final class SheetData {
         final String name;
 
         final LinkedHashMap<String, RowData> rowsByKey = new LinkedHashMap<>();

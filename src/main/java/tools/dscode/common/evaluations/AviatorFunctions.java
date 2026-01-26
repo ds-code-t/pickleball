@@ -8,12 +8,9 @@ import com.googlecode.aviator.runtime.type.AviatorNil;
 import com.googlecode.aviator.runtime.type.AviatorObject;
 import com.googlecode.aviator.runtime.type.AviatorString;
 
-import java.util.Arrays;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 import static tools.dscode.common.evaluations.AviatorUtil.isTruthy;
-import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public class AviatorFunctions {
 

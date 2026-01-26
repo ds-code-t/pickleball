@@ -15,7 +15,6 @@ import static com.xpathy.Attribute.type;
 import static com.xpathy.Case.LOWER;
 import static com.xpathy.Tag.input;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
-import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public class Registrations {
 
@@ -93,7 +92,7 @@ public class Registrations {
 
     @LifecycleHook(Phase.AFTER_CUCUMBER_RUN)
     public static void afterRun() {
-
+//        ThreadDumps.dumpStacksAsync("cucumber AFTER_CUCUMBER_RUN");
     }
 
     @LifecycleHook(Phase.BEFORE_SCENARIO_RUN)

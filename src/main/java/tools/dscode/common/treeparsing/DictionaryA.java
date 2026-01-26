@@ -7,7 +7,7 @@
 //import static tools.dscode.common.treeparsing.RegexUtil.betweenWithEscapes;
 //import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 //import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
-//import static tools.dscode.common.util.DebugUtils.printDebug;
+//import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 //
 ///**
 // * A small palette of nodes used by tests.

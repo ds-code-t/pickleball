@@ -8,8 +8,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 
-import static tools.dscode.common.util.DebugUtils.printDebug;
-
 /**
  * Adds a noLogging flag to TestStep. When true, suppresses event emission
  * for start/finish calls without modifying Cucumber source.

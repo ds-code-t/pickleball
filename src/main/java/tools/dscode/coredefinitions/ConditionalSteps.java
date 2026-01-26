@@ -1,13 +1,6 @@
 package tools.dscode.coredefinitions;
 
-//import io.cucumber.java.en.Given;
-//import tools.dscode.common.CoreSteps;
-//import tools.dscode.extensions.StepExtension;
-//import tools.dscode.extensions.StepData;
-//
-//import static io.cucumber.core.runner.ScenarioState.getScenarioState;
 
-import io.cucumber.core.runner.StepData;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;

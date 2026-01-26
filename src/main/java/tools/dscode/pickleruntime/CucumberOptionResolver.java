@@ -21,8 +21,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static tools.dscode.common.util.DebugUtils.printDebug;
-
 /**
  * Resolves Cucumber options from multiple sources and can bootstrap a global Runner
  * via io.cucumber.core.runner.RunnerRuntimeRegistry.

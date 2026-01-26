@@ -17,7 +17,6 @@ import java.util.Set;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static org.assertj.core.api.Assertions.assertThat;
-import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public class QSteps {
     private int a, b, result;

@@ -24,7 +24,6 @@ import static tools.dscode.common.mappings.NodeMap.MAPPER;
 import static tools.dscode.common.mappings.NodeMap.MapTypeKey;
 import static tools.dscode.common.mappings.NodeMap.toSafeJsonNode;
 import static tools.dscode.common.mappings.ValueFormatting.fromSafeJsonNode;
-import static tools.dscode.common.util.DebugUtils.printDebug;
 
 public final class Tokenized {
 

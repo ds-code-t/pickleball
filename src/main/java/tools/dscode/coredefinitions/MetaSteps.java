@@ -4,7 +4,6 @@ import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
 
 import static tools.dscode.common.GlobalConstants.defaultMatchFlag;
-import static tools.dscode.common.util.DebugUtils.printDebug;
 
 //import static tools.dscode.tools.dscode.coredefinitions.MetaSteps.defaultMatchFlag;
 

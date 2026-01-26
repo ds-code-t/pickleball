@@ -8,7 +8,6 @@ import java.util.UUID;
 
 import static io.cucumber.core.runner.CurrentScenarioState.currentScenarioState;
 import static io.cucumber.core.runner.PredefinedSteps.getRootStep;
-import static tools.dscode.common.util.DebugUtils.printDebug;
 
 /**
  * Rewrites TestCase construction so that:

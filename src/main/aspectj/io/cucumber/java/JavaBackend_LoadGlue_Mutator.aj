@@ -1,15 +1,14 @@
 // src/main/aspectj/io/cucumber/java/JavaBackend_LoadGlue_Mutator.aj
 package io.cucumber.java;
 
-import com.ctc.wstx.shaded.msv_core.util.Uri;
-import tools.dscode.common.util.DebugUtils;
+import tools.dscode.common.util.debug.DebugUtils;
 import tools.dscode.pickleruntime.CucumberOptionResolver;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 
-import static tools.dscode.common.util.DebugUtils.printDebug;
+import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 import static tools.dscode.pickleruntime.CucumberOptionResolver.glueDistinct;
 
 public aspect JavaBackend_LoadGlue_Mutator {

@@ -6,6 +6,7 @@ import com.xpathy.Tag;
 import com.xpathy.XPathy;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.datatable.DataTable;
+import io.cucumber.java.AfterAll;
 import io.cucumber.java.Before;
 import io.cucumber.java.BeforeAll;
 import io.cucumber.java.en.*;
@@ -19,6 +20,7 @@ import tools.dscode.coredefinitions.NavigationSteps;
 import tools.dscode.registry.GlobalRegistry;
 
 import java.util.List;
+import java.util.Map;
 
 import static com.xpathy.Attribute.aria_label;
 import static com.xpathy.Attribute.id;
@@ -40,6 +42,69 @@ import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;
 
 public class CalculatorSteps {
+
+//    static {
+//        System.out.println("@@static block CalculatorSteps");
+//        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+//            try {
+//            System.err.println("@@getAllStackTraces*******");
+//            System.err.println("@@getAllStackTraces******* 1 " + Thread.getAllStackTraces());
+//            System.err.println("@@getAllStackTraces0:: " + Thread.getAllStackTraces());
+//            System.err.println("@@getAllStackTraces1:: " + Thread.getAllStackTraces().entrySet().size());
+//            System.err.println("@@getAllStackTraces2:: " + Thread.getAllStackTraces().size());
+//            System.err.println("@@getAllStackTraces3:: " + Thread.getAllStackTraces());
+//            System.err.println("\n=== JVM shutdown hook: listing NON-DAEMON live threads ===:: ");
+//            System.err.println("@@getAllStackTraces---:: " + Thread.getAllStackTraces().entrySet().size());
+//            for (Map.Entry<Thread, StackTraceElement[]> e : Thread.getAllStackTraces().entrySet()) {
+//                Thread t = e.getKey();
+//                if (t.isAlive() && !t.isDaemon()) {
+//                    System.err.println("NON-DAEMON: " + t.getName()
+//                            + " state=" + t.getState()
+//                            + " group=" + (t.getThreadGroup() == null ? "null" : t.getThreadGroup().getName()));
+//                    StackTraceElement[] st = e.getValue();
+//                    // print a few frames (enough to identify owner)
+//                    for (int i = 0; i < Math.min(st.length, 12); i++) {
+//                        System.err.println("    at " + st[i]);
+//                    }
+//                }
+//            }
+//            System.err.println("=== end non-daemon threads ===\n");
+//            }
+//            catch (Throwable t){
+//                t.printStackTrace();
+//
+//            }
+//        }, "TestJvmThreadProbe-shutdown"));
+//
+//
+//    }
+
+
+
+//    @BeforeAll
+//    public static void beforeAll() {
+//        System.err.println("cucumber.plugin=" + System.getProperty("cucumber.plugin"));
+//        System.err.println("cucumber.publish.enabled=" + System.getProperty("cucumber.publish.enabled"));
+//        System.err.println("cucumber.execution.summary.print=" + System.getProperty("cucumber.execution.summary.print"));
+//        System.err.println("junit.jupiter.execution.parallel.enabled=" +
+//                System.getProperty("junit.jupiter.execution.parallel.enabled"));
+//        System.err.println("junit.jupiter.execution.parallel.mode.default=" +
+//                System.getProperty("junit.jupiter.execution.parallel.mode.default"));
+//
+//
+//    }
+
+//    @AfterAll
+//    public static void afterAll() {
+//        ThreadDumps.dumpStacksAsync("cucumber @AfterAll");
+//    }
+
+    @Given("test2")
+    public static void test2() {
+        System.out.println("@@test2!!!");
+
+    }
+
     private int a, b, result;
 
     @Given("error")

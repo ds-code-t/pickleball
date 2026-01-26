@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 import static tools.dscode.common.treeparsing.MatchNode.createMatchNode;
 import static tools.dscode.common.treeparsing.RegexUtil.TOKEN_END;
 import static tools.dscode.common.treeparsing.RegexUtil.TOKEN_START;
-import static tools.dscode.common.util.DebugUtils.printDebug;
+import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 
 
 public class ParseNode {

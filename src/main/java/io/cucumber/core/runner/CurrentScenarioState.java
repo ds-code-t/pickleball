@@ -5,6 +5,7 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import org.openqa.selenium.WebDriver;
+import org.opentest4j.AssertionFailedError;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
@@ -32,6 +33,7 @@ import java.util.stream.Stream;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
+import static org.junit.jupiter.api.Assertions.fail;
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FAILED;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_HARD_FAILED;
@@ -163,12 +165,16 @@ public class CurrentScenarioState extends ScenarioMapping {
         testCaseState = getTestCaseState();
 //        rootScenarioStep.runMethodDirectly = true;
         try {
+
             runStep(rootScenarioStep);
+
             if (isScenarioFailed())
                 lifecycle.fire(Phase.AFTER_SCENARIO_FAIL);
             else
                 lifecycle.fire(Phase.AFTER_SCENARIO_PASS);
+
         } catch (Throwable t) {
+
             lifecycle.fire(Phase.AFTER_SCENARIO_FAIL);
             throw t;
         }
@@ -205,6 +211,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void runStep(StepExtension stepExtension) {
+
 
         currentStep = stepExtension;
 
@@ -276,6 +283,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
         io.cucumber.plugin.event.Status status = result.getStatus();
         Throwable throwable = result.getError();
+
 
 
         if (!result.getStatus().equals(Status.PASSED) && !result.getStatus().equals(Status.SKIPPED) && throwable == null) {
@@ -370,7 +378,10 @@ public class CurrentScenarioState extends ScenarioMapping {
     public static void failScenario(String failMessage) {
         if (failMessage == null || failMessage.isBlank())
             failMessage = "Manually Hard Failed Scenario";
-        throw new RuntimeException(failMessage.trim());
+
+        fail(failMessage.trim());
+
+//        throw new AssertionFailedError(failMessage.trim());
     }
 
     public static void softFailScenario(String failMessage) {

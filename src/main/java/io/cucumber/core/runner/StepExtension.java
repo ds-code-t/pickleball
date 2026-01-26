@@ -4,11 +4,14 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.messages.types.PickleStepArgument;
 import io.cucumber.plugin.event.Result;
+import io.cucumber.plugin.event.Status;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.mappings.ParsingMap;
 
 import java.lang.reflect.InvocationTargetException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.regex.Matcher;
@@ -118,63 +121,60 @@ public class StepExtension extends StepData {
     public Result run() {
 
         ExecutionMode executionMode = ExecutionMode.RUN;
-        try {
-            if (logAndIgnore) {
-                executingPickleStepTestStep = pickleStepTestStep;
-                executionMode = ExecutionMode.SKIP;
-            } else if (isDynamicStep) {
-                executingPickleStepTestStep = pickleStepTestStep;
-            } else {
-                executingPickleStepTestStep = resolveAndClone(getStepParsingMap());
-            }
-            executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
-            executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
-            stepEntry = getScenarioLogRoot().logInfo("STEP: " + executingPickleStepTestStep.getStepText()).start();
-            lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
-            io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep, executionMode);
 
-            if(result.getError() != null)
-            {
-                stepEntry.logError("Exception: " + result.getError().getClass().getName())
-                        .field("message", result.getError().getMessage())
-                        .field("trace", Arrays.stream(result.getError().getStackTrace())
-                                .map(StackTraceElement::toString)
-                                .toList())
-                        .timestamp();
-            }
-
-            lifecycle.fire(Phase.AFTER_SCENARIO_STEP);
-            if(webDriverUsed !=null) {
-                if(isPresent(webDriverUsed))
-                {
-                    stepEntry.info("Browser Alert is present, cannot take screenshot.");
-                    stepEntry.stop();
-                }
-                else {
-                    stepEntry.screenshot("After Step").stop();
-                }
-            }
-            else
-            {
-                stepEntry.stop();
-            }
-
-
-            return result;
-        } catch (Throwable t) {
-
-            Throwable cause = t instanceof InvocationTargetException ? t.getCause() : t;
-            cause.printStackTrace();
-            throw new RuntimeException(cause);
+        if (logAndIgnore) {
+            executingPickleStepTestStep = pickleStepTestStep;
+            executionMode = ExecutionMode.SKIP;
+        } else if (isDynamicStep) {
+            executingPickleStepTestStep = pickleStepTestStep;
+        } else {
+            executingPickleStepTestStep = resolveAndClone(getStepParsingMap());
         }
+        executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
+        executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
+        stepEntry = getScenarioLogRoot().logInfo("STEP: " + executingPickleStepTestStep.getStepText()).start();
+        lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
+        io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep, executionMode);
+
+        if (result.getError() != null) {
+            stepEntry.logError("Exception: " + result.getError().getClass().getName())
+                    .field("message", result.getError().getMessage())
+                    .field("trace", Arrays.stream(result.getError().getStackTrace())
+                            .map(StackTraceElement::toString)
+                            .toList())
+                    .timestamp();
+        }
+
+        lifecycle.fire(Phase.AFTER_SCENARIO_STEP);
+        if (webDriverUsed != null) {
+            if (isPresent(webDriverUsed)) {
+                stepEntry.info("Browser Alert is present, cannot take screenshot.");
+                stepEntry.stop();
+            } else {
+                stepEntry.screenshot("After Step").stop();
+            }
+        } else {
+            stepEntry.stop();
+        }
+
+
+        return result;
+
     }
 
     public Result execute(io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep, ExecutionMode executionMode) {
 
+        Instant start = Instant.now();
         try {
             Object r = invokeAnyMethodOrThrow(executionPickleStepTestStep, "run", getTestCase(), getGlobalEventBus(), getTestCaseState(), executionMode);
-        } catch (Throwable e) {
-            throw new RuntimeException(e);
+
+        } catch (Throwable t) {
+
+            Throwable cause = t instanceof InvocationTargetException ? t.getCause() : t;
+
+            Duration duration = Duration.between(start, Instant.now());
+
+            return new Result(Status.FAILED, duration, cause);
         }
 
         return executionPickleStepTestStep.getLastResult();

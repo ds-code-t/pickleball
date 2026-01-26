@@ -16,7 +16,7 @@ import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDict
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.prettyPrintXPath;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.everyNth;
-import static tools.dscode.common.util.DebugUtils.printDebug;
+import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 
 public class ContextWrapper {
 

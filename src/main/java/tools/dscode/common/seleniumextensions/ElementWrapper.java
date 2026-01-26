@@ -1,6 +1,5 @@
 package tools.dscode.common.seleniumextensions;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.openqa.selenium.*;
@@ -19,7 +18,7 @@ import static tools.dscode.common.domoperations.SeleniumUtils.intersection;
 import static tools.dscode.common.domoperations.SeleniumUtils.union;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementMatch.ELEMENT_RETURN_VALUE;
-import static tools.dscode.common.util.DebugUtils.printDebug;
+import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 
 
 public class ElementWrapper {

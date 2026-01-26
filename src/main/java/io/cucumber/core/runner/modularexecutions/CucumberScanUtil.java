@@ -25,7 +25,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.modularexecutions.FilePathResolver.findFileDirectoryPaths;
-import static tools.dscode.common.util.DebugUtils.printDebug;
 import static tools.dscode.pickleruntime.CucumberOptionResolver.features;
 
 public final class CucumberScanUtil {

@@ -34,7 +34,7 @@
 //import static tools.dscode.common.domoperations.XPathyUtils.insideOf;
 //import static tools.dscode.common.domoperations.XPathyUtils.refine;
 //import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
-//import static tools.dscode.common.util.DebugUtils.printDebug;
+//import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 //import static tools.dscode.coredefinitions.GeneralSteps.getBrowser;
 //
 //public class PhraseExecution {

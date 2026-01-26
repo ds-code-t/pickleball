@@ -6,8 +6,6 @@ import io.cucumber.plugin.event.TestCase;
 import tools.dscode.common.annotations.DefinitionFlag;
 
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
-import static tools.dscode.common.GlobalConstants.ROOT_STEP;
-import static tools.dscode.common.util.DebugUtils.printDebug;
 
 
 public privileged aspect PickleStepTestStep_RunInterceptor {

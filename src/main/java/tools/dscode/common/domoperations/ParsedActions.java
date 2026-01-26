@@ -25,7 +25,7 @@
 //import static tools.dscode.common.domoperations.HumanInteractions.typeText;
 //import static tools.dscode.common.domoperations.HumanInteractions.wheelScrollBy;
 //import static tools.dscode.common.domoperations.SeleniumUtils.waitForDuration;
-//import static tools.dscode.common.util.DebugUtils.printDebug;
+//import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 //import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
 //
 //

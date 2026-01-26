@@ -41,8 +41,6 @@ import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
-import static tools.dscode.common.util.Reflect.getProperty;
-import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 
 
 public class GeneralSteps extends CoreSteps {
@@ -53,10 +51,8 @@ public class GeneralSteps extends CoreSteps {
         lifecycle.fire(Phase.BEFORE_CUCUMBER_RUN);
     }
 
-
     @AfterAll
     public static void afterAll() {
-
         Log.global().closeAll();
         lifecycle.fire(Phase.AFTER_CUCUMBER_RUN);
     }

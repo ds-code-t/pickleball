@@ -1,8 +1,7 @@
-package tools.dscode.common.util;
+package tools.dscode.common.util.debug;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 public final class DebugUtils {
 

@@ -8,16 +8,10 @@ import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
-import java.util.EnumSet;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
-import static tools.dscode.common.util.DebugUtils.printDebug;
-import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
 
 public enum AssertionOperations implements OperationsInterface {
 
