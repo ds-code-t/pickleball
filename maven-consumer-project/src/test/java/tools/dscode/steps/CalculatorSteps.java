@@ -42,7 +42,11 @@ import static tools.dscode.registry.GlobalRegistry.GLOBAL;
 public class CalculatorSteps {
     private int a, b, result;
 
-
+    @Given("error")
+    public static void errorTest() {
+        System.out.println("@@error!!!");
+        throw new RuntimeException("error test1");
+    }
 
     @Given("justwait")
     public static void justwait() {

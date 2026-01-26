@@ -11,19 +11,23 @@ import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
 import tools.dscode.common.reporting.WorkBook;
 import tools.dscode.common.reporting.logging.Entry;
-import tools.dscode.common.reporting.logging.extentreporting.ExtentReportConverter;
+import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
 import tools.dscode.common.status.SoftExceptionInterface;
 import tools.dscode.common.status.SoftRuntimeException;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.preparsing.ParsedLine;
+import tools.dscode.coredefinitions.ReportingSteps;
 import tools.dscode.registry.GlobalRegistry;
 
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
@@ -42,6 +46,8 @@ import static tools.dscode.registry.GlobalRegistry.LOCAL;
 import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
 
 public class CurrentScenarioState extends ScenarioMapping {
+
+    public List<Throwable> stepFailures = new ArrayList<>();
 
     public final UUID id = UUID.randomUUID();
 
@@ -113,13 +119,18 @@ public class CurrentScenarioState extends ScenarioMapping {
         scenarioLog =
                 Entry.of(scenarioName)
                         .tag("SCENARIO")
-                        .on(new ExtentReportConverter(
-                                Path.of("reports/extent", safeFileName(scenarioName + ".html"))
+                        .on(new SimpleHtmlReportConverter(
+                                Path.of("reports/tests", safeFileName(scenarioName + ".html"))
                         ))
                         .start();
 
 
         lifecycle.fire(Phase.BEFORE_SCENARIO_RUN);
+
+        ReportingSteps.setRow(null, null,List.of(
+                List.of( "Scenario Name", "Line", "STATUS", "INFO"),
+                List.of( pickle.getName(), String.valueOf(pickle.getLocation().getLine()), "", "Started")));
+
         this.stepExtensions = (List<StepExtension>) getProperty(testCase, "stepExtensions");
         StepExtension rootScenarioStep = testCase.getRootScenarioStep();
 
@@ -164,6 +175,17 @@ public class CurrentScenarioState extends ScenarioMapping {
         getScenarioLogRoot().stop().close();
 
         lifecycle.fire(Phase.AFTER_SCENARIO_RUN);
+
+        String infoMessage = stepFailures.isEmpty() ? "COMPLETED" : stepFailures.stream()
+                .flatMap(t -> Stream.iterate(t, Objects::nonNull, Throwable::getCause))
+                .map(Throwable::getMessage)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.joining(", "));
+
+        ReportingSteps.setRow(null, null,  List.of(
+                List.of( "STATUS", "INFO"),
+                List.of(  (isScenarioFailed()? "FAILED" : "PASSED"), infoMessage)));
 
         scenarioRunCleanUp();
 
@@ -272,6 +294,7 @@ public class CurrentScenarioState extends ScenarioMapping {
                 isScenarioSoftFail = false;
                 isScenarioComplete = true;
             }
+            stepFailures.add(throwable);
             scenarioLog.fail("SCENARIO FAILED: " + throwable.getMessage());
         }
 

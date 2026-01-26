@@ -2,7 +2,8 @@ Feature: Additiontest
 
   Scenario: dfdf
   @[DEBUG]
-    * , enter "a" in any empty Textboxes
+#    * navigate to: URL.textbox
+    * , enter "z" in any empty blank Date Textboxes
 
   @rrr1
   Scenario: ddfsdfdsf

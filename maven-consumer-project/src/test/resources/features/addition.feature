@@ -3,16 +3,17 @@ Feature: Addition
 
   @par1
   Scenario Outline: outlineTest <A>
-    * , save "<A>" as "dd"
-#    * navigate to: URL.select
+    * , save "<A>" as "zzzzzzdd<C>"
+    * navigate to: URL.select
+#    * error
     * , wait <B> seconds
-    * , save "<A>" as "ee"
+    * , save "<A>" as "<C>"
 
     Examples:
-      | A  | B | C |
-      | 1  | 5 |   |
-      | 2  | 5 |   |
-      | 3  | 5 |   |
+      | A | B | C    |
+      | 1 | 5 | qqqq |
+      | 2 | 5 | tttt |
+      | 3 | 5 | yyyy |
       | 4  | 5 |   |
       | 5  | 5 |   |
       | 6  | 1 |   |
@@ -20,11 +21,11 @@ Feature: Addition
       | 8  | 1 |   |
       | 9  | 1 |   |
       | 10 | 1 |   |
-      | 1  | 3 |   |
-      | 2  | 3 |   |
-      | 3  | 3 |   |
-      | 4  | 3 |   |
-      | 5  | 3 |   |
+#      | 1  | 3 |   |
+#      | 2  | 3 |   |
+#      | 3  | 3 |   |
+#      | 4  | 3 |   |
+#      | 5  | 3 |   |
 
   Scenario: sssst5ff55
   @[DEBUG]
