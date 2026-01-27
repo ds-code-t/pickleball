@@ -11,7 +11,6 @@ import tools.dscode.common.treeparsing.xpathcomponents.XPathyBuilder;
 import static com.xpathy.Attribute.aria_label;
 import static com.xpathy.Attribute.checked;
 import static com.xpathy.Attribute.class_;
-import static com.xpathy.Attribute.data_testid;
 import static com.xpathy.Attribute.id;
 import static com.xpathy.Attribute.name;
 import static com.xpathy.Attribute.placeholder;
@@ -539,9 +538,13 @@ public final class DefinitionContext {
                                 if (v == null || v.isNullOrBlank()) {
                                     return null; // no label text to match, skip this builder
                                 }
-
-
-                                return new XPathy( "//tr[count(td)=2 and normalize-space(string(td[1]))='" + v + "']/td[2]//*[self::select or self::input or self::textarea]");
+                                String textXpath = andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceAll("^//\\*", "");
+                                return new XPathy( "//*[self::select or self::input or self::textarea]\n" +
+                                        "  [ancestor::tr[count(td)=2" +
+                                        "     and count(descendant::*[self::select or self::input or self::textarea])=1" +
+                                        "     and td[1]" + textXpath +
+                                        "     and td[2][descendant::*[self::select or self::input or self::textarea]]" +
+                                        "  ]]");
                             }
                     );
 

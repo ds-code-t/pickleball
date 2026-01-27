@@ -3,7 +3,7 @@ Feature: Additiontest
   Scenario: dfdf
   @[DEBUG]
 #    * navigate to: URL.textbox
-    * , clear any  Textboxes
+    * , clear any  "First name:" Textboxes
 #    * , overwrite any  Textboxes with "z"
 
   @rrr1
