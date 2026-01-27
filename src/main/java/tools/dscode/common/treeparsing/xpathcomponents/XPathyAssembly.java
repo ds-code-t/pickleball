@@ -245,6 +245,9 @@ public final class XPathyAssembly {
             score += 10000;
         }
 
+        if (s.contains("ancestor")) {
+            score += 2000;
+        }
 
         if (s.contains("descendant::text()")) {
             score += 4000;

@@ -350,7 +350,7 @@ public final class DefinitionContext {
                             (category, v, op) -> XPathy.from(Tag.a).byAttribute(role).equals("button")
                     );
 
-            category("Section").children("Sections").inheritsFrom("htmlNaming", CONTAINS_TEXT)
+            category("Section").children("Sections")
                     .and(
                             (category, v, op) -> {
                                 if (v == null || v.isNull())
@@ -358,7 +358,7 @@ public final class DefinitionContext {
                                 String textXpath = andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceAll("^//\\*", "");
 
                                 return XPathy.from("//div" + textXpath + "[" +
-                                        "    descendant[self::select or self::input or self::textarea]" +
+                                        "    descendant::*[self::select or self::input or self::textarea]" +
                                         "    or" +
                                         "    count(child::*[.//text()]) >= 3" +
                                         "]");
