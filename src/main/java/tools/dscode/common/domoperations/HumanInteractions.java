@@ -257,6 +257,14 @@ public final class HumanInteractions {
         }
     }
 
+
+    public static void clear(WebDriver driver, WebElement el) {
+        Objects.requireNonNull(el);
+            focus(driver, el);
+            el.sendKeys(Keys.chord(osControlKey(), "a"));
+            el.sendKeys(Keys.DELETE);
+    }
+
     /**
      * Focus element and type text as-is.
      * JS fallback APPENDS (kept as-is); consider changing callers to use clearAndType if needed.

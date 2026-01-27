@@ -3,7 +3,8 @@ Feature: Additiontest
   Scenario: dfdf
   @[DEBUG]
 #    * navigate to: URL.textbox
-    * , enter "z" in any empty blank Date Textboxes
+    * , clear any  Textboxes
+#    * , overwrite any  Textboxes with "z"
 
   @rrr1
   Scenario: ddfsdfdsf

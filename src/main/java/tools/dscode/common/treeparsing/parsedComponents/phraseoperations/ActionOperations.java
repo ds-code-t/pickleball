@@ -18,6 +18,7 @@ import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.browseroperations.BrowserAlerts.accept;
 import static tools.dscode.common.browseroperations.BrowserAlerts.dismiss;
 import static tools.dscode.common.domoperations.HumanInteractions.blur;
+import static tools.dscode.common.domoperations.HumanInteractions.clear;
 import static tools.dscode.common.domoperations.HumanInteractions.clearAndType;
 import static tools.dscode.common.domoperations.HumanInteractions.click;
 import static tools.dscode.common.domoperations.HumanInteractions.contextClick;
@@ -151,14 +152,12 @@ public enum ActionOperations implements OperationsInterface {
 
                         ElementWrapper optionElement = selection.getElementWrappers().getFirst();
 
-                        if(optionElement.getTagName().equalsIgnoreCase("option")) {
+                        if (optionElement.getTagName().equalsIgnoreCase("option")) {
                             selectDropdownByIndex(GeneralSteps.getDefaultDriver(), dropDownWrapper.getElement(), optionElement.getSameTagIndex());
-                        }
-                        else {
+                        } else {
                             click(GeneralSteps.getDefaultDriver(), optionElement.getElement());
                         }
-                    }
-                    else {
+                    } else {
                         selectDropdownByVisibleText(GeneralSteps.getDefaultDriver(), dropDownWrapper.getElement(), selection.getValue());
                     }
                     count++;
@@ -272,19 +271,40 @@ public enum ActionOperations implements OperationsInterface {
 //            phraseData.blurAfterOperation = true;
         }
     },
+    CLEAR {
+        @Override
+        public void execute(PhraseData phraseData) {
+            System.out.println(phraseData + " : Executing " + this.name());
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+                    new ElementMatcher()
+                            .mustMatchAll(ElementType.HTML_ELEMENT)
+            );
+            ElementMatch inputElement = phraseData.resultElements.getFirst();
+            phraseData.result = Attempt.run(() -> {
+                int count = 0;
+                for (ElementWrapper elementWrapper : inputElement.getElementThrowErrorIfEmptyWithNoModifier()) {
+                    if (count > 0) {
+                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
+                    }
+                    clear(GeneralSteps.getDefaultDriver(), elementWrapper.getElement());
+                    count++;
+                }
+                return true;
+            });
+        }
+    },
     OVERWRITE {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE),
+                            .mustMatchAll(ElementType.HTML_ELEMENT),
                     new ElementMatcher()
-                            .mustMatchAll(ElementType.HTML_ELEMENT)
+                            .mustMatchAll(ElementType.RETURNS_VALUE)
             );
-
-            ElementMatch value = phraseData.resultElements.getFirst();
-            ElementMatch inputElement = phraseData.resultElements.get(1);
+            ElementMatch inputElement = phraseData.resultElements.getFirst();
+            ElementMatch value = phraseData.resultElements.get(1);
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : inputElement.getElementThrowErrorIfEmptyWithNoModifier()) {
@@ -296,7 +316,6 @@ public enum ActionOperations implements OperationsInterface {
                 }
                 return true;
             });
-//            phraseData.blurAfterOperation = true;
         }
     },
     SCROLL {
