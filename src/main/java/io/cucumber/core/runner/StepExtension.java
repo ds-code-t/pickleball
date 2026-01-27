@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
 import static io.cucumber.core.runner.CurrentScenarioState.getScenarioLogRoot;
+import static io.cucumber.core.runner.GlobalState.debugFlagString;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getGlobalEventBus;
 import static io.cucumber.core.runner.GlobalState.getTestCase;
@@ -74,7 +75,13 @@ public class StepExtension extends StepData {
         }
 
         stepTags.stream().filter(t -> t.startsWith("REF:")).forEach(t -> bookmarks.add(t.replaceFirst("REF:", "")));
-        debugStartStep = stepTags.stream().anyMatch(t -> t.startsWith("DEBUG"));
+        GlobalState.debugFlagString = stepTags.stream().filter(t -> t.startsWith("DEBUG")).findFirst().orElse("").toLowerCase();
+        debugStartStep = !debugFlagString.isBlank();
+        if(debugStartStep)
+        {
+            GlobalState.disableBaseElement = debugFlagString.contains("disablebaseelement");
+        }
+
         setNestingLevel((int) matcher.replaceAll("").chars().filter(ch -> ch == ':').count());
 
 

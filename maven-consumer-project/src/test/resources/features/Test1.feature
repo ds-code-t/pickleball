@@ -1,7 +1,7 @@
 Feature: Additiontest
 
   Scenario: dfdf
-  @[DEBUG]
+  @[DEBUG disableBaseElement]
 #    * navigate to: URL.textbox
     * , clear any  "First name:" Textboxes
 #    * , overwrite any  Textboxes with "z"

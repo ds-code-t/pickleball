@@ -21,6 +21,11 @@ import static tools.dscode.registry.GlobalRegistry.localOrGlobalOf;
 import static tools.dscode.registry.GlobalRegistry.runners;
 
 public class GlobalState {
+
+    public static String debugFlagString = "";
+
+    public static boolean disableBaseElement = false;
+
     public static final LifecycleManager lifecycle = new LifecycleManager();
 
     public static io.cucumber.core.runtime.Runtime getRuntime() {

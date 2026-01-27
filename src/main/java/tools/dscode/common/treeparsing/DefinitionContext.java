@@ -26,6 +26,7 @@ import static com.xpathy.Tag.i;
 import static com.xpathy.Tag.input;
 import static com.xpathy.Tag.select;
 import static com.xpathy.Tag.textarea;
+import static io.cucumber.core.runner.GlobalState.disableBaseElement;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.extractPredicate;
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.invisible;
@@ -517,6 +518,8 @@ public final class DefinitionContext {
 
             category(BASE_CATEGORY).and(
                     (category, v, op) -> {
+                        if(disableBaseElement)
+                            return null;
                         XPathy selfInvisible = any.byCondition(invisible());
                         String invisiblePredicate = extractPredicate("//*", selfInvisible.getXpath());
 

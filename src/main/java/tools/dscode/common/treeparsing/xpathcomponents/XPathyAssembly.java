@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static tools.dscode.common.util.debug.DebugUtils.printDebug;
+
 public final class XPathyAssembly {
 
     private XPathyAssembly() {
@@ -231,12 +233,14 @@ public final class XPathyAssembly {
 
     /** Heuristic specificity scoring. Lower score = "more specific". */
     public static int xpathSpecificityScore(String xpath) {
-        String s = xpath.replaceAll("\\s+", "");
-        System.out.println("\n@@xpathSpecificityScore: " + s);
+        String s = xpath.trim();
+        String noSpace = s.replaceAll("\\s+", "");
+        printDebug("##xpathSpecificityScore xpath: " + s);
+
 
         int score = Math.toIntExact(1000 + s.length() + (xPathScorePattern.matcher(s).results().count() * 20));
 
-        if (s.contains("//*[(not(")) {
+        if (noSpace.contains("//*[(not(")) {
             score += 20000;
         }
 
@@ -253,7 +257,7 @@ public final class XPathyAssembly {
             score += 2000;
         }
 
-        if (s.contains("descendant::text()")) {
+        if (noSpace.contains("descendant::text()")) {
             score += 4000;
         }
 
@@ -300,7 +304,7 @@ public final class XPathyAssembly {
             score += 10;
         }
 
-        System.out.println("@@score: " + score);
+        printDebug("##xpathSpecificityScore score: " + score);
 
         return Math.max(score, 0);
     }
