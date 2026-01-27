@@ -388,7 +388,7 @@ public final class DefinitionContext {
                     );
 
 
-            category("Dropdown").children("Dropdowns").inheritsFrom("forLabel", "htmlNaming")
+            category("Dropdown").children("Dropdowns").inheritsFrom("forLabel", "htmlNaming", "rowLabel")
                     .and((category, v, op) ->
                             XPathy.from(select))
                     .or(
@@ -433,7 +433,7 @@ public final class DefinitionContext {
             //
             // Textbox  (two registration blocks preserved exactly)
             //
-            category("Textbox").children("Textboxes").inheritsFrom("forLabel", "htmlNaming")
+            category("Textbox").children("Textboxes").inheritsFrom("forLabel", "htmlNaming" , "rowLabel")
                     .and((category, v, op) ->
                             combineOr(
                                     input.byAttribute(type).equals("text"),
@@ -445,7 +445,7 @@ public final class DefinitionContext {
                                     XPathyBuilder.buildIfAllTrue(input, placeholder, v, op, v != null)
                     );
 
-            category("Date Textbox").children("Date Textboxes").inheritsFrom("Textbox")
+            category("Date Textbox").children("Date Textboxes").inheritsFrom("Textbox" , "rowLabel")
                     .and((category, v, op) ->
                             combineOr(
                                     input.byAttribute(Attribute.custom("data-ctl"))
@@ -455,7 +455,7 @@ public final class DefinitionContext {
                             )
                     );
 
-            category("Textarea").children("Textareas").inheritsFrom("forLabel", "htmlNaming")
+            category("Textarea").children("Textareas").inheritsFrom("forLabel", "htmlNaming" , "rowLabel")
                     .and((category, v, op) ->
                             XPathy.from(textarea)
                     )
@@ -529,6 +529,19 @@ public final class DefinitionContext {
                                                 visiblePredicate +
                                                 " and not(ancestor::*[" + invisiblePredicate + "])]"
                                 );
+                            }
+                    );
+
+
+            category("rowLabel")
+                    .or(
+                            (category, v, op) -> {
+                                if (v == null || v.isNullOrBlank()) {
+                                    return null; // no label text to match, skip this builder
+                                }
+
+
+                                return new XPathy( "//tr[count(td)=2 and normalize-space(string(td[1]))='" + v + "']/td[2]//*[self::select or self::input or self::textarea]");
                             }
                     );
 
