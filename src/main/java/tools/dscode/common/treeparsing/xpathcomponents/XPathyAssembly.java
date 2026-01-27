@@ -245,7 +245,7 @@ public final class XPathyAssembly {
             score += 10000;
         }
 
-        if (s.contains("ancestor")) {
+        if (s.startsWith("//*[ancestor")) {
             score += 2000;
         }
 
