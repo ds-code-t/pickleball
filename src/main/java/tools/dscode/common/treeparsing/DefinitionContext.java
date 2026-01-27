@@ -360,7 +360,7 @@ public final class DefinitionContext {
                                 return XPathy.from("//div" + textXpath + "[" +
                                         "    descendant[self::select or self::input or self::textarea]" +
                                         "    or" +
-                                        "    count(children::*[.//text()]) >= 3" +
+                                        "    count(child::*[.//text()]) >= 3" +
                                         "]");
                             }
                     );
