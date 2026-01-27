@@ -102,13 +102,13 @@ public final class VisibilityConditions {
                 // -------------------------------------------------------------
                 Condition.not(
                         Condition.or(
+                                Condition.attribute(style).contains("screen-reader-text"),
                                 Condition.style(display).equals("none"),
                                 // allow missing semicolon / spaces a bit
                                 Condition.attribute(style).contains("display:none"),
                                 Condition.attribute(style).contains("display: none"),
                                 Condition.attribute(class_).contains("sr-only"),
                                 Condition.attribute(style).contains("visually-hidden"),
-                                Condition.attribute(style).contains("screen-reader-text"),
                                 Condition.attribute(style).contains("offscreen")
                         )
                 ),
