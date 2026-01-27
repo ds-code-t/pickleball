@@ -421,6 +421,119 @@ public class ExecutionDictionary {
             return this;
         }
 
+        /**
+         * Register the resolved XPathy of one or more other categories as OR-components
+         * for the category(ies) this spec is defining.
+         *
+         * Example:
+         *   category("newcategory").orCategories("CatA", "CatB");
+         *
+         * At runtime, resolving "newcategory" will include the OR parts from:
+         *   andThenOr("CatA", v, op) and andThenOr("CatB", v, op)
+         */
+        public CategorySpec orCategories(String... categoryNames) {
+            Objects.requireNonNull(categoryNames, "categoryNames must not be null");
+            if (categoryNames.length == 0) return this;
+
+            for (String host : categories) {
+                if (host == null || host.isBlank()) continue;
+
+                for (String ref : categoryNames) {
+                    if (ref == null || ref.isBlank()) continue;
+                    if (ref.equals(host)) continue; // avoid trivial self recursion
+
+                    dict.registerOrBuilder(host, (ignoredCategory, v, op) -> dict.andThenOr(ref, v, op));
+                }
+            }
+            return this;
+        }
+
+        /**
+         * Register the resolved XPathy of one or more other categories as AND-components
+         * for the category(ies) this spec is defining.
+         *
+         * Example:
+         *   category("newcategory").andCategories("CatA", "CatB");
+         *
+         * At runtime, resolving "newcategory" will include the AND parts from:
+         *   andThenOr("CatA", v, op) and andThenOr("CatB", v, op)
+         */
+        public CategorySpec andCategories(String... categoryNames) {
+            Objects.requireNonNull(categoryNames, "categoryNames must not be null");
+            if (categoryNames.length == 0) return this;
+
+            for (String host : categories) {
+                if (host == null || host.isBlank()) continue;
+
+                for (String ref : categoryNames) {
+                    if (ref == null || ref.isBlank()) continue;
+                    if (ref.equals(host)) continue; // avoid trivial self recursion
+
+                    dict.registerAndBuilder(host, (ignoredCategory, v, op) -> dict.andThenOr(ref, v, op));
+                }
+            }
+            return this;
+        }
+
+
+        // Add these two methods inside ExecutionDictionary.CategorySpec
+// (no other changes required)
+
+        public CategorySpec orAllCategories(String... categoryNames) {
+            Objects.requireNonNull(categoryNames, "categoryNames must not be null");
+            if (categoryNames.length == 0) return this;
+
+            // Register ONE OR builder per host category that, at runtime,
+            // resolves referenced categories and AND-combines them into a single XPathy.
+            for (String host : categories) {
+                if (host == null || host.isBlank()) continue;
+
+                dict.registerOrBuilder(host, (ignoredCategory, v, op) -> {
+                    // Collect resolved XPathy from each referenced category
+                    List<XPathy> parts = new ArrayList<>();
+                    for (String ref : categoryNames) {
+                        if (ref == null || ref.isBlank()) continue;
+                        if (ref.equals(host)) continue; // avoid trivial self recursion
+
+                        XPathy x = dict.andThenOr(ref, v, op);
+                        if (x != null) parts.add(x);
+                    }
+
+                    // Combine them into ONE "and" XPathy, return it as a single OR component
+                    return dict.combine(parts, "and").orElse(null);
+                });
+            }
+            return this;
+        }
+
+        public CategorySpec andAnyCategories(String... categoryNames) {
+            Objects.requireNonNull(categoryNames, "categoryNames must not be null");
+            if (categoryNames.length == 0) return this;
+
+            // Register ONE AND builder per host category that, at runtime,
+            // resolves referenced categories and OR-combines them into a single XPathy.
+            for (String host : categories) {
+                if (host == null || host.isBlank()) continue;
+
+                dict.registerAndBuilder(host, (ignoredCategory, v, op) -> {
+                    // Collect resolved XPathy from each referenced category
+                    List<XPathy> parts = new ArrayList<>();
+                    for (String ref : categoryNames) {
+                        if (ref == null || ref.isBlank()) continue;
+                        if (ref.equals(host)) continue; // avoid trivial self recursion
+
+                        XPathy x = dict.andThenOr(ref, v, op);
+                        if (x != null) parts.add(x);
+                    }
+
+                    // Combine them into ONE "or" XPathy, return it as a single AND component
+                    return dict.combine(parts, "or").orElse(null);
+                });
+            }
+            return this;
+        }
+
+
         // --- inheritance (single canonical method; alias kept) ---
         public CategorySpec inheritsFrom(String... parents) {
             for (String cat : categories) dict.registerCategoryInheritance(cat, parents);

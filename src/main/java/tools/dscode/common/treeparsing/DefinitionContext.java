@@ -330,7 +330,7 @@ public final class DefinitionContext {
                     );
 
 
-            category("Icon").children("Icons").inheritsFrom("forLabel", CONTAINS_TEXT)
+            category("Icon").children("Icons").andAnyCategories("forLabel", "htmlNaming" , CONTAINS_TEXT)
                     .or(
                             (category, v, op) -> XPathyBuilder.buildIfAllTrue(Tag.img, class_, ValueWrapper.createValueWrapper("'icon'"), Op.CONTAINS),
                             (category, v, op) -> XPathy.from(Tag.i),
@@ -343,7 +343,7 @@ public final class DefinitionContext {
                     );
 
 
-            category("Button").children("Buttons").inheritsFrom("forLabel", "htmlNaming", CONTAINS_TEXT)
+            category("Button").children("Buttons").andAnyCategories("forLabel", "htmlNaming", CONTAINS_TEXT)
                     .or(
                             (category, v, op) -> XPathy.from(Tag.button),
                             (category, v, op) -> XPathy.from(Tag.img).byAttribute(role).equals("button"),
@@ -366,7 +366,7 @@ public final class DefinitionContext {
                     );
 
 
-            category("Expandable Section").children("Expandable Sections").inheritsFrom("htmlNaming", CONTAINS_TEXT)
+            category("Expandable Section").children("Expandable Sections").andAnyCategories("htmlNaming", CONTAINS_TEXT)
                     .and(
                             (category, v, op) ->
                                     combineOr(
@@ -375,14 +375,14 @@ public final class DefinitionContext {
                                     )
                     );
 
-            category("Expandable Header").children("Expandable Headers").inheritsFrom("htmlNaming", CONTAINS_TEXT)
+            category("Expandable Header").children("Expandable Headers").andAnyCategories("htmlNaming", CONTAINS_TEXT)
                     .and(
                             (category, v, op) -> XPathy.from(div)
                                     .byAttribute(class_).withCase(LOWER).contains("header")
                                     .and().byHaving().parent().byAttribute(class_).withCase(LOWER).contains("collapsible")
                     );
 
-            category("Expandable Icon").children("Expandable Icons").inheritsFrom("htmlNaming", CONTAINS_TEXT)
+            category("Expandable Icon").children("Expandable Icons").andAnyCategories("htmlNaming", CONTAINS_TEXT)
                     .and(
                             (category, v, op) -> any.byAttribute(role).equals("button").and().byAttribute(Attribute.custom("aria-expanded")).haveIt()
                     );
@@ -403,7 +403,7 @@ public final class DefinitionContext {
                     );
 
 
-            category("Dropdown").children("Dropdowns").inheritsFrom("forLabel", "htmlNaming", "rowLabel")
+            category("Dropdown").children("Dropdowns").andAnyCategories("forLabel", "htmlNaming", "rowLabel")
                     .and((category, v, op) ->
                             XPathy.from(select))
                     .or(
@@ -412,7 +412,7 @@ public final class DefinitionContext {
                             (category, v, op) -> XPathyBuilder.buildIfAllTrue(select, name, v, op, v != null)
                     );
 
-            category("Modal").children("Modals", "Dialog", "Dialogs").inheritsFrom(CONTAINS_TEXT, "forLabel", "htmlNaming")
+            category("Modal").children("Modals", "Dialog", "Dialogs").andAnyCategories(CONTAINS_TEXT, "forLabel", "htmlNaming")
                     .and(
                             (category, v, op) ->
                                     combineOr(
@@ -448,7 +448,7 @@ public final class DefinitionContext {
             //
             // Textbox  (two registration blocks preserved exactly)
             //
-            category("Textbox").children("Textboxes").inheritsFrom("forLabel", "htmlNaming", "rowLabel")
+            category("Textbox").children("Textboxes").andAnyCategories("forLabel", "htmlNaming", "rowLabel")
                     .and((category, v, op) ->
                             combineOr(
                                     input.byAttribute(type).equals("text"),
@@ -460,7 +460,7 @@ public final class DefinitionContext {
                                     XPathyBuilder.buildIfAllTrue(input, placeholder, v, op, v != null)
                     );
 
-            category("Date Textbox").children("Date Textboxes").inheritsFrom("Textbox", "rowLabel")
+            category("Date Textbox").children("Date Textboxes").inheritsFrom("Textbox")
                     .and((category, v, op) ->
                             combineOr(
                                     input.byAttribute(Attribute.custom("data-ctl"))
@@ -470,7 +470,7 @@ public final class DefinitionContext {
                             )
                     );
 
-            category("Textarea").children("Textareas").inheritsFrom("forLabel", "htmlNaming", "rowLabel")
+            category("Textarea").children("Textareas").andAnyCategories("forLabel", "htmlNaming", "rowLabel")
                     .and((category, v, op) ->
                             XPathy.from(textarea)
                     )
@@ -480,14 +480,14 @@ public final class DefinitionContext {
                     );
 
 
-            category("Radio Button").children("Radio Buttons").inheritsFrom("forLabel", "htmlNaming")
+            category("Radio Button").children("Radio Buttons").andAnyCategories("forLabel", "htmlNaming", "rowLabel")
                     .and((category, v, op) ->
                             combineOr(
                                     Tag.input.byAttribute(type).equals("radio")
                             )
                     );
 
-            category("Checkbox").children("Checkboxes").inheritsFrom("forLabel", "htmlNaming")
+            category("Checkbox").children("Checkboxes").andAnyCategories("forLabel", "htmlNaming", "rowLabel")
                     .and((category, v, op) ->
                             combineOr(
                                     Tag.input.byAttribute(type).equals("checkbox"),
@@ -495,7 +495,7 @@ public final class DefinitionContext {
                             )
                     );
 
-            category("Toggle").children("Toggles").inheritsFrom("forLabel", "htmlNaming")
+            category("Toggle").children("Toggles").andAnyCategories("forLabel", "htmlNaming", "rowLabel")
                     .and((category, v, op) ->
                             combineOr(
                                     Tag.input.byAttribute(checked).haveIt(),
@@ -549,7 +549,7 @@ public final class DefinitionContext {
 
 
             category("rowLabel")
-                    .or(
+                    .and(
                             (category, v, op) -> {
                                 if (v == null || v.isNullOrBlank()) {
                                     return null; // no label text to match, skip this builder
@@ -566,7 +566,7 @@ public final class DefinitionContext {
 
 
             category("forLabel")
-                    .or(
+                    .and(
 
                             (category, v, op) -> {
                                 if (v == null || v.isNullOrBlank()) {
