@@ -18,7 +18,6 @@ public final class Phrase extends PhraseData {
 
     public Phrase(String inputText, Character delimiter, LineData parsedLine) {
         super(inputText, delimiter, parsedLine);
-
         if (!isOperationPhrase) {
             elementMatches = new ArrayList<>(elementMatches.stream().filter(e -> !e.isPlaceHolder()).toList());
         }

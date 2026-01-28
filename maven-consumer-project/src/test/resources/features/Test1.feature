@@ -2,10 +2,10 @@ Feature: Additiontest
 
   Scenario: dfdf
     Then , save "Q1" as "W"
-  @[DEBUG,noBase,##Specificity,##xscore]
+  @[DEBUG,noBase,##Specificity,##xscore,##parsing,##parsedata,##processContextList,##]
 #    * navigate to: URL.textbox
     * , in the "Attachments" Section:
-    : * , user clicks the "Show more" Button
+    : * , Then user clicks the "Show more" Button
 #    : * , clear any  "First name:" Textboxes
 #    * , overwrite any  Textboxes with "z"
 

@@ -32,6 +32,7 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.aft
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inBetweenOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.insideOf;
+import static tools.dscode.common.util.debug.DebugUtils.onMatch;
 import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
 
 
@@ -153,6 +154,9 @@ public abstract class PhraseData extends PassedData {
             }
         }
 
+        onMatch("##parsedata-newStartContext: " , (matchString) -> {
+            System.out.println(matchString +  "  , for : " + text + " \n " + phraseNode.localStateBoolean("newStartContext"));
+        });
 
         setNewContext(phraseNode.localStateBoolean("newStartContext"));
 
@@ -226,9 +230,8 @@ public abstract class PhraseData extends PassedData {
 
     public List<PhraseData> processContextList() {
 
-
         List<PhraseData> returnList = new ArrayList<>();
-        PhraseData defaultPhraseDataContext = new Phrase("from " + STARTING_CONTEXT, ',', parsedLine);
+        PhraseData defaultPhraseDataContext = new Phrase("From " + STARTING_CONTEXT, ',', parsedLine);
         returnList.add(defaultPhraseDataContext);
         for (List<PhraseData> inner : parsedLine.inheritedContextPhrases) {
             returnList.addAll(inner);
@@ -237,6 +240,10 @@ public abstract class PhraseData extends PassedData {
 
         for (int i = returnList.size() - 1; i >= 0; i--) {
             PhraseData phraseData = returnList.get(i);
+            onMatch("##processContextList:", (matchString) -> {
+                System.out.println(matchString +  " phraseData : " + phraseData);
+                System.out.println(matchString +  " phraseData.isNewContext() : " + phraseData.isNewContext());
+            });
 
             if(phraseData.isNewContext())
             {

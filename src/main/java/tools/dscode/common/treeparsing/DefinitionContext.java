@@ -38,6 +38,7 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
 import static tools.dscode.common.util.debug.DebugUtils.disableBaseElement;
+import static tools.dscode.common.util.debug.DebugUtils.onMatch;
 import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 
 public final class DefinitionContext {
@@ -113,6 +114,10 @@ public final class DefinitionContext {
                 if (separator.isEmpty())
                     separator = self.resolvedGroupText("separatorB");
 
+                onMatch("##parsing-phrase: '" + separator + "'", (matchString) -> {
+                    System.out.println(matchString + "  , for : " + self.originalText());
+                });
+
                 if (!separator.isEmpty()) {
                     self.putToLocalState("separator", "true");
                 }
@@ -141,9 +146,8 @@ public final class DefinitionContext {
                     self.localState().put("skip:assertionType", "true");
                     self.localState().put("skip:defaultAssertion", "true");
                 }
-                //            self.getAncestor("line").putToLocalState("phrase", self);
-//            return colorizeBookends(self.originalText(), BOLD(), BRIGHT_GREEN_TEXT());
-                return self.originalText();
+
+                return separator.isEmpty() ? self.originalText() : self.originalText().replaceFirst(separator, "");
             }
 
             @Override
@@ -364,8 +368,8 @@ public final class DefinitionContext {
                             (category, v, op) -> {
                                 if (v == null || v.isNull())
                                     return null;
-                                String textXpath = XPathy.from("descendant::*")
-                                        .byHaving(deepNormalizedText(v, op)).getXpath().replaceAll("^//\\*", "");
+                                String textXpath = "[" + XPathy.from("descendant::*")
+                                        .byHaving(deepNormalizedText(v, op)).getXpath().replaceAll("^//\\*", "") + "]";
                                 printDebug("##textXpath: " + textXpath);
                                 return XPathy.from("//div" + textXpath + "[" +
                                         "    descendant::*[self::select or self::input or self::textarea or self::textarea]" +

@@ -14,7 +14,9 @@ import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatcher;
+import tools.dscode.common.util.debug.DebugUtils;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -29,6 +31,7 @@ import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.browseroperations.BrowserAlerts.getText;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.domoperations.ExecutionDictionary.Op.getOpFromString;
+import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.domoperations.elementstates.BinaryStateConditions.offElement;
 import static tools.dscode.common.domoperations.elementstates.BinaryStateConditions.onElement;
 import static tools.dscode.common.domoperations.elementstates.BlankElementConditions.blankElement;
@@ -323,10 +326,10 @@ public class ElementMatch {
 //    private List<PhraseData> phraseContextList;
 
     public List<PhraseData> getPhraseContextList() {
-//        if (categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) return new ArrayList<>();
-//        if (phraseContextList == null)
-//            phraseContextList = parentPhrase.processContextList();
-//        return phraseContextList;
+        if(parentPhrase.isNewContext())
+        {
+            parentPhrase.contextPhrases.add(new Phrase("From " + STARTING_CONTEXT, ',', parentPhrase.parsedLine));
+        }
         return parentPhrase.processContextList();
     }
 
@@ -422,7 +425,9 @@ public class ElementMatch {
     }
 
     public List<ElementWrapper> getElementWrappers() {
-
+        DebugUtils.onMatch("##getElementWrappers", msg -> {
+            System.out.println("##getElementWrappers- wrappedElements: " + wrappedElements);
+        });
 
         if (wrappedElements == null) {
             if (!parentPhrase.getPreviousTerminator().equals(";")) {
