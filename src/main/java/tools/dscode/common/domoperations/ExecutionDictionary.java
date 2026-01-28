@@ -76,6 +76,9 @@ public class ExecutionDictionary {
     private final ConcurrentMap<String, ContextBuilder> contextReg = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Set<CategoryFlags>> categoryFlags = new ConcurrentHashMap<>();
 
+    // Per-instance cache: category -> resolved lineage (includes the category itself).
+// Safe for concurrent reads during XPath generation, and isolated per ExecutionDictionary instance.
+    private final ConcurrentMap<String, List<String>> lineageCache = new ConcurrentHashMap<>();
     //========================================================
     // Construction / registration hook
     //========================================================
@@ -131,7 +134,12 @@ public class ExecutionDictionary {
             if (parent.equals(category)) continue; // avoid trivial self-cycle
             categoryParents.put(category, parent);
         }
+
+        // Invalidate per-instance lineage cache (safe + minimal).
+        // Ensures correctness even if someone resolves before all registrations finish.
+        lineageCache.clear();
     }
+
 
     /**
      * Convenience method: declare that MANY categories inherit from ONE parent.
@@ -145,7 +153,11 @@ public class ExecutionDictionary {
             if (child.equals(parentCategory)) continue; // avoid trivial cycle
             registerCategoryInheritance(child, parentCategory);
         }
+
+        // registerCategoryInheritance already clears, but keeping this is harmless and explicit.
+        lineageCache.clear();
     }
+
 
     /**
      * Resolve full inheritance chain for a category.
@@ -153,24 +165,28 @@ public class ExecutionDictionary {
     private List<String> resolveCategoryLineage(String category) {
         if (category == null || category.isBlank()) return new ArrayList<>();
 
-        LinkedHashSet<String> ordered = new LinkedHashSet<>();
-        Deque<String> stack = new ArrayDeque<>();
-        stack.push(category);
+        // computeIfAbsent is concurrency-safe; list is immutable to prevent accidental mutation.
+        return lineageCache.computeIfAbsent(category, key -> {
+            LinkedHashSet<String> ordered = new LinkedHashSet<>();
+            Deque<String> stack = new ArrayDeque<>();
+            stack.push(key);
 
-        while (!stack.isEmpty()) {
-            String current = stack.pop();
-            if (!ordered.add(current)) continue;
+            while (!stack.isEmpty()) {
+                String current = stack.pop();
+                if (!ordered.add(current)) continue;
 
-            Collection<String> parents = categoryParents.get(current);
-            if (parents != null) {
-                for (String p : parents) {
-                    if (p != null && !p.equals(current)) stack.push(p);
+                Collection<String> parents = categoryParents.get(current);
+                if (parents != null) {
+                    for (String p : parents) {
+                        if (p != null && !p.equals(current)) stack.push(p);
+                    }
                 }
             }
-        }
 
-        return new ArrayList<>(ordered);
+            return List.copyOf(ordered); // immutable cached value
+        });
     }
+
 
     // ========================================================
     // OR / AND builder registries
@@ -345,10 +361,30 @@ public class ExecutionDictionary {
         if (andPart.isEmpty()) return orPart;
         if (orPart.isEmpty()) return andPart;
 
+        // Convert each part into a predicate step (self::... form)
         String andStep = XPathyAssembly.toSelfStep(andPart.get().getXpath());
-        String orStep = XPathyAssembly.toSelfStep(orPart.get().getXpath());
+        String orStep  = XPathyAssembly.toSelfStep(orPart.get().getXpath());
 
-        return Optional.of(XPathy.from("//*[(" + andStep + ") and (" + orStep + ")]"));
+        // Order them by specificity score (lower first, consistent with combine())
+        record Step(String step, int score) {}
+
+        List<Step> steps = new ArrayList<>(2);
+        if (andStep != null && !andStep.isBlank()) {
+            steps.add(new Step(andStep, xpathSpecificityScore(andPart.get().getXpath())));
+        }
+        if (orStep != null && !orStep.isBlank()) {
+            steps.add(new Step(orStep, xpathSpecificityScore(orPart.get().getXpath())));
+        }
+
+        if (steps.isEmpty()) return Optional.empty();
+        steps.sort(Comparator.comparingInt(Step::score));
+
+        String combined = steps.stream()
+                .map(Step::step)
+                .map(s -> "(" + s + ")")
+                .collect(Collectors.joining(" and "));
+
+        return Optional.of(XPathy.from("//*[" + combined + "]"));
     }
 
     private int countChar(String s, char c) {
