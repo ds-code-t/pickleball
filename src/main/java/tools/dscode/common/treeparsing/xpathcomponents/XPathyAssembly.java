@@ -229,7 +229,7 @@ public final class XPathyAssembly {
         return prefix + step;
     }
 
-    static final Pattern xPathScorePattern = Pattern.compile("\\bself|\\*|display|height|width|visbility|collapse|opacity|hidden|style|not|contains|translate|or|descendant|ancestor|preceding|following|sibling|parent|child\\b");
+    static final Pattern xPathScorePattern = Pattern.compile("\\bself|\\*|display|height|width|visibility|collapse|opacity|hidden|style|not|contains|translate|or|descendant|ancestor|preceding|following|sibling|parent|child\\b");
 
     /** Heuristic specificity scoring. Lower score = "more specific". */
     public static int xpathSpecificityScore(String xpath) {

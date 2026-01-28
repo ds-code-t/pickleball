@@ -414,13 +414,13 @@ public final class DefinitionContext {
                             (category, v, op) -> XPathyBuilder.buildIfAllTrue(select, name, v, op, v != null)
                     );
 
-            category("Modal").children("Modals", "Dialog", "Dialogs").andAnyCategories(CONTAINS_TEXT, "forLabel", "htmlNaming")
+            category("Modal").children("Modals", "Dialog", "Dialogs").inheritsFrom("Section").andAnyCategories(CONTAINS_TEXT, "forLabel", "htmlNaming")
                     .and(
                             (category, v, op) ->
                                     combineOr(
                                             XPathy.from(div).byAttribute(role).equals("dialog"),
                                             XPathy.from(div).byAttribute(Attribute.custom("aria-model")).equals("true"),
-                                            XPathy.from(div).byAttribute(id).equals("modal")
+                                            XPathy.from(div).byAttribute(id).equals("modalWrapper")
                                     )
                     );
             category("Close Button").children("Close Buttons")
