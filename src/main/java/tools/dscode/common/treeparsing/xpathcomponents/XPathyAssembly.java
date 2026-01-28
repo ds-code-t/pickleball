@@ -235,43 +235,47 @@ public final class XPathyAssembly {
     public static int xpathSpecificityScore(String xpath) {
         String s = xpath.trim();
         String noSpace = s.replaceAll("\\s+", "");
-        printDebug("##SpecificityScore xpath: " + s);
+        printDebug("\n##SpecificityScore xpath: " + s);
 
 
         int score = Math.toIntExact(1000 + s.length() + (xPathScorePattern.matcher(s).results().count() * 20));
-
+        printDebug("##Xscore score1: " + score);
         if (noSpace.contains("//*[(not(")) {
             score += 20000;
         }
+        printDebug("##Xscore score2: " + score);
 
         // Penalize wildcards / generic patterns
         if (s.contains("//*")) {
             score += 200;
         }
+        printDebug("##Xscore score3: " + score);
 
         if (noSpace.startsWith("//*[preceding") || noSpace.startsWith("//*[following") || noSpace.startsWith("//*[ancestor") || noSpace.startsWith("//*[descendant") )  {
             score += 10000;
         }
+        printDebug("##Xscore score4: " + score);
 
         if (noSpace.contains("descendant::text()")) {
             score += 4000;
         }
+        printDebug("##Xscore score4: " + score);
 
         // Reward predicates
         int predicateCount = countChar(noSpace, '*');
         score += predicateCount * 10;
 
-
+        printDebug("##Xscore score5: " + score);
         // Reward custom elements
         if (noSpace.matches("^//[a-zA-Z0-9]")) {
             score -= 5000;
         }
-
+        printDebug("##Xscore score6: " + score);
        if (noSpace.contains("\\*")) {
             score += 500;
         }
-
-        printDebug("##SpecificityScore score: " + score);
+        printDebug("##Xscore final: " + score);
+        printDebug("##SpecificityScore score final: " + score);
 
         return Math.max(score, 0);
     }

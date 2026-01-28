@@ -30,7 +30,7 @@ public final class DebugUtils {
                 tags.stream()
                         .filter(t -> t.startsWith("DEBUG"))
                         .flatMap(s -> Arrays.stream(s.split(",")))
-                        .filter(str -> !str.isBlank())
+                        .filter(str -> !str.isBlank()).map(s -> s.trim().toLowerCase())
                         .toList();
         if(debugFlags.isEmpty())
             return false;
@@ -56,7 +56,7 @@ public final class DebugUtils {
     public static boolean matches(String message) {
         if (message == null) return false;
 
-        String trimmed = message.strip();
+        String trimmed = message.strip().toLowerCase();
         if (trimmed.isEmpty()) return false;
 
         for (String p : prefixes) {

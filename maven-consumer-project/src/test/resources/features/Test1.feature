@@ -2,7 +2,7 @@ Feature: Additiontest
 
   Scenario: dfdf
     Then , save "Q1" as "W"
-  @[DEBUG,noBase,##Specificity]
+  @[DEBUG,noBase,##Specificity,##xscore]
 #    * navigate to: URL.textbox
     * , in the "Attachments" Section:
     : * , user clicks the "Show more" Button
