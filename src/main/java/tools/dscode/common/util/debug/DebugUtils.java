@@ -1,19 +1,45 @@
 package tools.dscode.common.util.debug;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 public final class DebugUtils {
 
     public static final List<String> prefixes = new ArrayList<>();
     public static final List<String> substrings = new ArrayList<>();
 
+
+    public static List<String> debugFlags;
+
+    public static boolean disableBaseElement = false;
+
     static {
 //        prefixes.add("@@");
 //        substrings.add("##MatchNode:");
         substrings.add("##XPath:");
-        substrings.add("##Glue");
+//        substrings.add("##Glue");
+//        substrings.add("##SpecificityScore");
 //        substrings.add("##");
+    }
+
+
+    public static boolean parseDebugString(List<String> stepTags) {
+        debugFlags =
+                stepTags.stream()
+                        .filter(Objects::nonNull)
+                        .flatMap(s -> Arrays.stream(s.split("\\s+")))
+                        .filter(str -> !str.isBlank())
+                        .toList();
+        if(debugFlags.isEmpty())
+            return false;
+        disableBaseElement = debugFlags.contains("noBase");
+        debugFlags.forEach(flag ->{
+            if(flag.startsWith("##"))
+                substrings.add(flag);
+        });
+        return true;
     }
 
     private DebugUtils() {

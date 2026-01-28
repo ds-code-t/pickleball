@@ -26,7 +26,7 @@ import static com.xpathy.Tag.i;
 import static com.xpathy.Tag.input;
 import static com.xpathy.Tag.select;
 import static com.xpathy.Tag.textarea;
-import static io.cucumber.core.runner.GlobalState.disableBaseElement;
+
 import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.extractPredicate;
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.invisible;
@@ -36,6 +36,7 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.KEY_N
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
+import static tools.dscode.common.util.debug.DebugUtils.disableBaseElement;
 
 public final class DefinitionContext {
 

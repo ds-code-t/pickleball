@@ -22,9 +22,6 @@ import static tools.dscode.registry.GlobalRegistry.runners;
 
 public class GlobalState {
 
-    public static String debugFlagString = "";
-
-    public static boolean disableBaseElement = false;
 
     public static final LifecycleManager lifecycle = new LifecycleManager();
 

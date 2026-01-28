@@ -8,6 +8,7 @@ import io.cucumber.plugin.event.Status;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.mappings.ParsingMap;
+import tools.dscode.common.util.debug.DebugUtils;
 
 import java.lang.reflect.InvocationTargetException;
 import java.time.Duration;
@@ -21,7 +22,6 @@ import java.util.stream.Collectors;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
 import static io.cucumber.core.runner.CurrentScenarioState.getScenarioLogRoot;
-import static io.cucumber.core.runner.GlobalState.debugFlagString;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getGlobalEventBus;
 import static io.cucumber.core.runner.GlobalState.getTestCase;
@@ -31,6 +31,7 @@ import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTe
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleStepTestStep;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
+import static tools.dscode.common.util.debug.DebugUtils.parseDebugString;
 
 public class StepExtension extends StepData {
     private static final Pattern pattern = Pattern.compile("@\\[([^\\[\\]]*)\\]");
@@ -75,12 +76,7 @@ public class StepExtension extends StepData {
         }
 
         stepTags.stream().filter(t -> t.startsWith("REF:")).forEach(t -> bookmarks.add(t.replaceFirst("REF:", "")));
-        GlobalState.debugFlagString = stepTags.stream().filter(t -> t.startsWith("DEBUG")).findFirst().orElse("").toLowerCase();
-        debugStartStep = !debugFlagString.isBlank();
-        if(debugStartStep)
-        {
-            GlobalState.disableBaseElement = debugFlagString.contains("disablebaseelement");
-        }
+        debugStartStep = parseDebugString(stepFlags);
 
         setNestingLevel((int) matcher.replaceAll("").chars().filter(ch -> ch == ':').count());
 

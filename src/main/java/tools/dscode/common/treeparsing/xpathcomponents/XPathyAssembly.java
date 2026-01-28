@@ -235,7 +235,7 @@ public final class XPathyAssembly {
     public static int xpathSpecificityScore(String xpath) {
         String s = xpath.trim();
         String noSpace = s.replaceAll("\\s+", "");
-        printDebug("##xpathSpecificityScore xpath: " + s);
+        printDebug("##SpecificityScore xpath: " + s);
 
 
         int score = Math.toIntExact(1000 + s.length() + (xPathScorePattern.matcher(s).results().count() * 20));
@@ -257,50 +257,21 @@ public final class XPathyAssembly {
             score += 4000;
         }
 
-
-
-        score += s.replaceAll("[^*]","").length() * 20;
-
-//        if (!s.contains("\"") && !s.contains("'")) {
-//            score += 600;
-//        }
-
-        if (s.matches(".*\\b\\*\\b.*")) {
-            score += 50;
-        }
-        if (s.contains("self::*")) {
-            score += 30;
-        }
-
         // Reward predicates
-        int predicateCount = countChar(s, '[');
-        score -= predicateCount * 5;
+        int predicateCount = countChar(noSpace, '*');
+        score += predicateCount * 10;
 
-        // Reward strong attributes
-        if (s.contains("@id")) {
-            score -= 40;
-        }
-
-        if (s.contains("@name")) {
-            score -= 15;
-        }
-        if (s.contains("@class")) {
-            score -= 10;
-        }
 
         // Reward custom elements
-        if (s.matches(".*//[a-zA-Z0-9]+-[a-zA-Z0-9_-]+.*")) {
-            score -= 20;
+        if (noSpace.matches("^//[a-zA-Z0-9]")) {
+            score -= 5000;
         }
 
-        // Prefer explicit tag at root vs wildcard
-        if (s.matches("^\\s*//[a-zA-Z].*")) {
-            score -= 10;
-        } else if (s.matches("^\\s*//\\*.*")) {
-            score += 10;
+       if (noSpace.contains("\\*")) {
+            score += 500;
         }
 
-        printDebug("##xpathSpecificityScore score: " + score);
+        printDebug("##SpecificityScore score: " + score);
 
         return Math.max(score, 0);
     }

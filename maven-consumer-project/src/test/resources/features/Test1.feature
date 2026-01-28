@@ -3,7 +3,9 @@ Feature: Additiontest
   Scenario: dfdf
   @[DEBUG disableBaseElement]
 #    * navigate to: URL.textbox
-    * , clear any  "First name:" Textboxes
+    * , in the "Attachments" Section:
+    : * , user clicks the "Show more" Button
+#    : * , clear any  "First name:" Textboxes
 #    * , overwrite any  Textboxes with "z"
 
   @rrr1
