@@ -34,7 +34,7 @@ public final class DebugUtils {
                         .toList();
         if(debugFlags.isEmpty())
             return false;
-        disableBaseElement = debugFlags.contains("noBase");
+        disableBaseElement = debugFlags.contains("nobase");
         debugFlags.forEach(flag ->{
             if(flag.startsWith("##"))
                 substrings.add(flag);

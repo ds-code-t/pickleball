@@ -36,7 +36,9 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.KEY_N
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
 import static tools.dscode.common.util.debug.DebugUtils.disableBaseElement;
+import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 
 public final class DefinitionContext {
 
@@ -104,17 +106,22 @@ public final class DefinitionContext {
         ParseNode position = new ParseNode("#\\d+");
 
 
-        ParseNode phrase = new ParseNode("^\\s*(?<separatorA>\\bthen\\b\\s*)?(?<conjunction>\\b(?:and|or)\\b\\s*)?(?<separatorB>\\bthen\\b\\s*)?\\s*(?<conditional>\\b(?:else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
+        ParseNode phrase = new ParseNode("^\\s*(?<separatorA>\\b[tT]hen\\b\\s*)?(?<conjunction>\\b(?:and|or)\\b\\s*)?(?<separatorB>\\b[tT]hen\\b\\s*)?\\s*(?<conditional>\\b(?:else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
             @Override
             public String onCapture(MatchNode self) {
-                if (self.localStateBoolean("separatorA", "separatorB")) {
+                String separator = self.resolvedGroupText("separatorA");
+                if (separator.isEmpty())
+                    separator = self.resolvedGroupText("separatorB");
+
+                if (!separator.isEmpty()) {
                     self.putToLocalState("separator", "true");
                 }
 
                 String context = self.resolvedGroupText("context");
 
-                if (!context.isEmpty() && Character.isUpperCase(context.charAt(0)))
+                if ((!context.isEmpty() && Character.isUpperCase(context.charAt(0))) || (!separator.isEmpty() && Character.isUpperCase(separator.charAt(0))))
                     self.putToLocalState("newStartContext", true);
+
                 self.putToLocalState("context", context.toLowerCase());
                 String conditional = self.resolvedGroupText("conditional");
                 self.putToLocalState("conditional", conditional);
@@ -332,7 +339,7 @@ public final class DefinitionContext {
                     );
 
 
-            category("Icon").children("Icons").andAnyCategories("forLabel", "htmlNaming" , CONTAINS_TEXT)
+            category("Icon").children("Icons").andAnyCategories("forLabel", "htmlNaming", CONTAINS_TEXT)
                     .or(
                             (category, v, op) -> XPathyBuilder.buildIfAllTrue(Tag.img, class_, ValueWrapper.createValueWrapper("'icon'"), Op.CONTAINS),
                             (category, v, op) -> XPathy.from(Tag.i),
@@ -357,16 +364,27 @@ public final class DefinitionContext {
                             (category, v, op) -> {
                                 if (v == null || v.isNull())
                                     return null;
-                                String textXpath = andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceAll("^//\\*", "");
-
+                                String textXpath = XPathy.from("descendant::*")
+                                        .byHaving(deepNormalizedText(v, op)).getXpath().replaceAll("^//\\*", "");
+                                printDebug("##textXpath: " + textXpath);
                                 return XPathy.from("//div" + textXpath + "[" +
-                                        "    descendant::*[self::select or self::input or self::textarea]" +
+                                        "    descendant::*[self::select or self::input or self::textarea or self::textarea]" +
                                         "    or" +
-                                        "    count(child::*[.//text()]) >= 3" +
+                                        "    count(child::*[.//text()]) >= 2" +
                                         "]");
                             }
                     );
 
+            category("Modal").children("Modals", "Dialog", "Dialogs").andAnyCategories(CONTAINS_TEXT, "forLabel", "htmlNaming")
+                    .and(
+                            (category, v, op) ->
+                                    combineOr(
+                                            XPathy.from(div).byAttribute(role).equals("dialog"),
+                                            XPathy.from(div).byAttribute(Attribute.custom("aria-model")).equals("true"),
+                                            XPathy.from(div).byAttribute(id).equals("modalWrapper")
+                                    ),
+                            (category, v, op) -> XPathy.from("//div[.//text()]")
+                    );
 
             category("Expandable Section").children("Expandable Sections").andAnyCategories("htmlNaming", CONTAINS_TEXT)
                     .and(
@@ -414,15 +432,7 @@ public final class DefinitionContext {
                             (category, v, op) -> XPathyBuilder.buildIfAllTrue(select, name, v, op, v != null)
                     );
 
-            category("Modal").children("Modals", "Dialog", "Dialogs").inheritsFrom("Section").andAnyCategories(CONTAINS_TEXT, "forLabel", "htmlNaming")
-                    .and(
-                            (category, v, op) ->
-                                    combineOr(
-                                            XPathy.from(div).byAttribute(role).equals("dialog"),
-                                            XPathy.from(div).byAttribute(Attribute.custom("aria-model")).equals("true"),
-                                            XPathy.from(div).byAttribute(id).equals("modalWrapper")
-                                    )
-                    );
+
             category("Close Button").children("Close Buttons")
                     .and(
                             (category, v, op) ->
@@ -519,7 +529,7 @@ public final class DefinitionContext {
 
             category(BASE_CATEGORY).and(
                     (category, v, op) -> {
-                        if(disableBaseElement)
+                        if (disableBaseElement)
                             return null;
                         XPathy selfInvisible = any.byCondition(invisible());
                         String invisiblePredicate = extractPredicate("//*", selfInvisible.getXpath());
