@@ -238,10 +238,10 @@ public final class XPathyAssembly {
         printDebug("\n##SpecificityScore xpath: " + s);
 
 
-        int score = Math.toIntExact(1000 + s.length() + (xPathScorePattern.matcher(s).results().count() * 20));
+        int score = Math.toIntExact(1000 + s.length() + (xPathScorePattern.matcher(s).results().count()));
         printDebug("##Xscore score1: " + score);
         if (noSpace.contains("//*[(not(")) {
-            score += 20000;
+            score += 50000;
         }
         printDebug("##Xscore score2: " + score);
 

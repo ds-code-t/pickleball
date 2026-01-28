@@ -18,7 +18,7 @@ public final class DebugUtils {
     static {
 //        prefixes.add("@@");
 //        substrings.add("##MatchNode:");
-        substrings.add("##XPath:");
+        substrings.add("##xpath:");
 //        substrings.add("##Glue");
 //        substrings.add("##SpecificityScore");
 //        substrings.add("##");
