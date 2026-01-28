@@ -380,11 +380,13 @@ public final class DefinitionContext {
                                 String textXpath = "[" + XPathy.from("descendant::*")
                                         .byHaving(deepNormalizedText(v, op)).getXpath().replaceAll("^//\\*", "") + "]";
                                 printDebug("##textXpath Section: " + textXpath);
-                                String xpath1 = XPathy.from("//div" + textXpath + "[" +
+                                String xpath1 = XPathy.from("//div" + textXpath +
+                                        "[self::div[" +
                                         "    descendant::*[self::select or self::input or self::textarea or self::textarea]" +
                                         "    or" +
-                                        "    count(child::*[.//text()]) >= 2" +
-                                        "]").getXpath();
+                                        "    self::div[count(child::*[.//text()]) >= 2" +
+                                        "    and not(child::span)]" +
+                                        "]]").getXpath();
 
                                 return XPathy.from(deepestOnlyXPath(xpath1));
                             }
