@@ -25,11 +25,11 @@ public final class DebugUtils {
     }
 
 
-    public static boolean parseDebugString(List<String> stepTags) {
+    public static boolean parseDebugString(List<String> tags) {
         debugFlags =
-                stepTags.stream()
-                        .filter(Objects::nonNull)
-                        .flatMap(s -> Arrays.stream(s.split("\\s+")))
+                tags.stream()
+                        .filter(t -> t.startsWith("DEBUG"))
+                        .flatMap(s -> Arrays.stream(s.split(",")))
                         .filter(str -> !str.isBlank())
                         .toList();
         if(debugFlags.isEmpty())

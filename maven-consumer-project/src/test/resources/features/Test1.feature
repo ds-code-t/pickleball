@@ -1,7 +1,8 @@
 Feature: Additiontest
 
   Scenario: dfdf
-  @[DEBUG disableBaseElement]
+    Then , save "Q1" as "W"
+  @[DEBUG,noBase,##Specificity]
 #    * navigate to: URL.textbox
     * , in the "Attachments" Section:
     : * , user clicks the "Show more" Button

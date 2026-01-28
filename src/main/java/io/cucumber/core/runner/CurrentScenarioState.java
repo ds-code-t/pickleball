@@ -149,7 +149,6 @@ public class CurrentScenarioState extends ScenarioMapping {
                 rootScenarioStep.childSteps.add(currentStep);
                 currentStep = (StepExtension) currentStep.nextSibling;
             }
-            System.out.println("@@startStep.pickleStepTestStep.getStepText(): " + startStep.pickleStepTestStep.getStepText());
             debugBrowser = true;
         }
         rootScenarioStep.runMethodDirectly = true;
