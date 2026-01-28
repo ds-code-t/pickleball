@@ -243,6 +243,11 @@ public final class XPathyAssembly {
         if (noSpace.contains("//*[(not(")) {
             score += 50000;
         }
+
+        if (noSpace.contains("count(child::*[.//text()])")) {
+            score -= 50000;
+        }
+
         printDebug("##Xscore score2: " + score);
 
         // Penalize wildcards / generic patterns
