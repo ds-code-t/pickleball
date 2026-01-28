@@ -370,24 +370,46 @@ public final class XPathyUtils {
     //  DEEPEST MATCH LOGIC (unchanged)
     // =========================================================================
 
-    public static XPathy maybeDeepestMatches(XPathy xpathy) {
-        return XPathy.from(maybeDeepestMatches(xpathy.getXpath()));
+    public static XPathy deepestOnlyXPath(XPathy xpathy) {
+        return XPathy.from(deepestOnlyXPath(xpathy.getXpath()));
     }
 
 
-    public static String maybeDeepestMatches(String xpath) {
-        if (xpath == null || xpath.isBlank()) return xpath;
-
-        String expr = xpath.strip();
-
-        // If it's not an absolute/global selector, treat it as a predicate component.
-        if (!expr.startsWith("/")) {
-            expr = "//*[" + expr + "]";
+    /**
+     * Given an XPath that selects a set of nodes, returns a new XPath that selects
+     * only the "deepest" matches (i.e., excludes any match that contains another
+     * match inside it).
+     *
+     * Assumptions:
+     * - XPath 1.0 compatible
+     * - Input XPath starts with "//" (as requested)
+     * - Input XPath contains at least one predicate "[...]" that defines the match
+     */
+    public static String deepestOnlyXPath(String xpath1) {
+        if (xpath1 == null) {
+            throw new IllegalArgumentException("xpath1 cannot be null");
         }
 
-        String base = "(" + expr + ")";
-        return base + "[not(ancestor::*[count(. | " + base + ") = count(" + base + ")])]";
+        String x = xpath1.trim();
+        if (!x.startsWith("//")) {
+            throw new IllegalArgumentException("Expected xpath1 to start with '//' but was: " + x);
+        }
+
+        int firstBracket = x.indexOf('[');
+        if (firstBracket < 0) {
+            // No predicate to reuse -> can't safely build a "same match" test without parsing.
+            // Return unchanged rather than generating a wrong XPath.
+            return x;
+        }
+
+        // Reuse the predicate part as the "same match" definition, but relative to the candidate node.
+        String predicate = x.substring(firstBracket);          // "[ ... ]"
+        String inner = "descendant::*" + predicate;            // "descendant::*[ ... ]"
+
+        // Exclude any node that has a descendant which would also match the same predicate.
+        return x + "[not(" + inner + ")]";
     }
+
 
 
 }

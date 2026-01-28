@@ -244,9 +244,9 @@ public final class XPathyAssembly {
             score += 50000;
         }
 
-        if (noSpace.contains("count(child::*[.//text()])")) {
-            score -= 50000;
-        }
+//        if (noSpace.contains("count(child::*[.//text()])")) {
+//            score -= 50000;
+//        }
 
         printDebug("##Xscore score2: " + score);
 

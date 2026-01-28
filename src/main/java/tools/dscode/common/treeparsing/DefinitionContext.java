@@ -37,6 +37,7 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepestOnlyXPath;
 import static tools.dscode.common.util.debug.DebugUtils.disableBaseElement;
 import static tools.dscode.common.util.debug.DebugUtils.onMatch;
 import static tools.dscode.common.util.debug.DebugUtils.printDebug;
@@ -379,11 +380,13 @@ public final class DefinitionContext {
                                 String textXpath = "[" + XPathy.from("descendant::*")
                                         .byHaving(deepNormalizedText(v, op)).getXpath().replaceAll("^//\\*", "") + "]";
                                 printDebug("##textXpath Section: " + textXpath);
-                                return XPathy.from("//div" + textXpath + "[" +
+                                String xpath1 = XPathy.from("//div" + textXpath + "[" +
                                         "    descendant::*[self::select or self::input or self::textarea or self::textarea]" +
                                         "    or" +
                                         "    count(child::*[.//text()]) >= 2" +
-                                        "]");
+                                        "]").getXpath();
+
+                                return XPathy.from(deepestOnlyXPath(xpath1));
                             }
                     );
 

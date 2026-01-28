@@ -6,7 +6,9 @@ Feature: Additiontest
 #    * , verify  "First name:" Textbox is displayed
 #    * , verify  "First name:" Text is displayed
 #    * , verify  Textbox is displayed
+    * , verify "Attachments" Section is displayed
     * , clear  "First name:" Textboxes
+
 
 
 

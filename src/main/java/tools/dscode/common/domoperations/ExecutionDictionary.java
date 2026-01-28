@@ -21,7 +21,6 @@ import java.util.stream.Stream;
 import static com.xpathy.Tag.any;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.xpathSpecificityScore;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.maybeDeepestMatches;
 
 public class ExecutionDictionary {
 
