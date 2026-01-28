@@ -124,7 +124,11 @@ public final class DefinitionContext {
 
                 String context = self.resolvedGroupText("context");
 
-                if ((!context.isEmpty() && Character.isUpperCase(context.charAt(0))) || (!separator.isEmpty() && Character.isUpperCase(separator.charAt(0))))
+
+
+                boolean upperCaseContext = !context.isEmpty() && Character.isUpperCase(context.charAt(0));
+
+                if (upperCaseContext || (!separator.isEmpty() && Character.isUpperCase(separator.charAt(0))))
                     self.putToLocalState("newStartContext", true);
 
                 self.putToLocalState("context", context.toLowerCase());
@@ -147,7 +151,11 @@ public final class DefinitionContext {
                     self.localState().put("skip:defaultAssertion", "true");
                 }
 
-                return separator.isEmpty() ? self.originalText() : self.originalText().replaceFirst(separator, "");
+                String returnString = separator.isEmpty() ? self.originalText() : self.originalText().replaceFirst(separator, "");
+                if (upperCaseContext)
+                    return returnString.replaceFirst(context, context.toLowerCase());
+
+                return returnString;
             }
 
             @Override
@@ -370,7 +378,7 @@ public final class DefinitionContext {
                                     return null;
                                 String textXpath = "[" + XPathy.from("descendant::*")
                                         .byHaving(deepNormalizedText(v, op)).getXpath().replaceAll("^//\\*", "") + "]";
-                                printDebug("##textXpath: " + textXpath);
+                                printDebug("##textXpath Section: " + textXpath);
                                 return XPathy.from("//div" + textXpath + "[" +
                                         "    descendant::*[self::select or self::input or self::textarea or self::textarea]" +
                                         "    or" +
@@ -464,16 +472,12 @@ public final class DefinitionContext {
             //
             // Textbox  (two registration blocks preserved exactly)
             //
-            category("Textbox").children("Textboxes").andAnyCategories("forLabel", "htmlNaming", "rowLabel")
+            category("Textbox").children("Textboxes").andAnyCategories("forLabel", "htmlNaming", "rowLabel", "placeholderLabel")
                     .and((category, v, op) ->
                             combineOr(
                                     input.byAttribute(type).equals("text"),
                                     input.byAttribute(type).equals("password"),
                                     input.byAttribute(type).equals("email"))
-                    )
-                    .or(
-                            (category, v, op) ->
-                                    XPathyBuilder.buildIfAllTrue(input, placeholder, v, op, v != null)
                     );
 
             category("Date Textbox").children("Date Textboxes").inheritsFrom("Textbox")
@@ -486,13 +490,9 @@ public final class DefinitionContext {
                             )
                     );
 
-            category("Textarea").children("Textareas").andAnyCategories("forLabel", "htmlNaming", "rowLabel")
+            category("Textarea").children("Textareas").andAnyCategories("forLabel", "htmlNaming", "rowLabel", "placeholderLabel")
                     .and((category, v, op) ->
                             XPathy.from(textarea)
-                    )
-                    .or(
-                            (category, v, op) ->
-                                    XPathyBuilder.buildIfAllTrue(textarea, placeholder, v, op, v != null)
                     );
 
 
@@ -573,6 +573,7 @@ public final class DefinitionContext {
                                     return null; // no label text to match, skip this builder
                                 }
                                 String textXpath = andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceAll("^//\\*", "");
+                                printDebug("##textXpath rowLabel: " + textXpath);
                                 return new XPathy("//*[self::select or self::input or self::textarea]\n" +
                                         "  [ancestor::tr[count(td)=2" +
                                         "     and count(descendant::*[self::select or self::input or self::textarea])=1" +
@@ -583,14 +584,30 @@ public final class DefinitionContext {
                     );
 
 
+            category("placeholderLabel")
+                    .and(
+                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(any, placeholder, v, op, v != null)
+                    );
+
+
             category("forLabel")
                     .and(
-
                             (category, v, op) -> {
                                 if (v == null || v.isNullOrBlank()) {
                                     return null; // no label text to match, skip this builder
                                 }
-                                return new XPathy("//*[@id][@id = //*[normalize-space(text())='" + v + "']/@for]");
+                                String textXpath = andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceAll("^//\\*", "");
+                                printDebug("##textXpath forLabel:1 " + textXpath);
+                                onMatch("##textXpath forLabel:2 ", (matchedString) ->
+                                        System.out.println(matchedString + combineOr(
+                                                new XPathy("//*[@id][@id = //*" + textXpath + "/@for]"),
+                                                new XPathy("//*[preceding-sibling::*[1][self::label" + textXpath + "]]")
+                                        ))
+                                );
+                                return combineOr(
+                                        new XPathy("//*[@id][@id = //*" + textXpath + "/@for]"),
+                                        new XPathy("//*[preceding-sibling::*[1][self::label" + textXpath + "]]")
+                                );
                             }
                     );
 

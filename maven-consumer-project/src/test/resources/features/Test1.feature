@@ -1,5 +1,16 @@
 Feature: Additiontest
 
+  Scenario: dfdfdddww
+    Then , save "Q1" as "W"
+  @[DEBUG,noBase,##Specificity,##xscore,##parsing,##parsedata,##processContextList,##]
+#    * , verify  "First name:" Textbox is displayed
+#    * , verify  "First name:" Text is displayed
+#    * , verify  Textbox is displayed
+    * , clear  "First name:" Textboxes
+
+
+
+
   Scenario: dfdf
     Then , save "Q1" as "W"
   @[DEBUG,noBase,##Specificity,##xscore,##parsing,##parsedata,##processContextList,##]

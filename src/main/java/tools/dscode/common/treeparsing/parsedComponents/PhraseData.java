@@ -231,27 +231,23 @@ public abstract class PhraseData extends PassedData {
     public List<PhraseData> processContextList() {
 
         List<PhraseData> returnList = new ArrayList<>();
-        PhraseData defaultPhraseDataContext = new Phrase("From " + STARTING_CONTEXT, ',', parsedLine);
-        returnList.add(defaultPhraseDataContext);
+        returnList.add(new Phrase("From " + STARTING_CONTEXT, ',', parsedLine));
         for (List<PhraseData> inner : parsedLine.inheritedContextPhrases) {
             returnList.addAll(inner);
         }
         returnList.addAll(contextPhrases);
+
 
         for (int i = returnList.size() - 1; i >= 0; i--) {
             PhraseData phraseData = returnList.get(i);
             onMatch("##processContextList:", (matchString) -> {
                 System.out.println(matchString +  " phraseData : " + phraseData);
                 System.out.println(matchString +  " phraseData.isNewContext() : " + phraseData.isNewContext());
+                System.out.println(matchString +  " phraseData.getFirstElement() : " + phraseData.getFirstElement());
+                System.out.println((matchString + " phraseData.categoryFlags: : " + phraseData.categoryFlags));
             });
 
-            if(phraseData.isNewContext())
-            {
-                returnList = returnList.subList(i, returnList.size());
-                returnList.addFirst(defaultPhraseDataContext);
-                return returnList;
-            }
-            if (phraseData.contextElement != null  || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT) || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.ELEMENT_CONTEXT)) {
+            if (phraseData.contextElement != null  || phraseData.isNewContext() || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT) || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.ELEMENT_CONTEXT)) {
                 return returnList.subList(i, returnList.size());
             }
         }
