@@ -249,12 +249,8 @@ public final class XPathyAssembly {
             score += 200;
         }
 
-        if (s.startsWith("//*[preceding") || s.startsWith("//*[following")) {
+        if (noSpace.startsWith("//*[preceding") || noSpace.startsWith("//*[following") || noSpace.startsWith("//*[ancestor") || noSpace.startsWith("//*[descendant") )  {
             score += 10000;
-        }
-
-        if (s.startsWith("//*[ancestor")) {
-            score += 2000;
         }
 
         if (noSpace.contains("descendant::text()")) {
