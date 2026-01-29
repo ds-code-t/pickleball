@@ -245,29 +245,35 @@ public final class XPathyAssembly {
      */
     public static int xpathSpecificityScore(String xpath) {
         printDebug("\n##SpecificityScore xpath: " + xpath);
+        xpath  = xpath.trim();
 
+        int score = countChar(xpath, '*') * 10;
+
+        if (xpath.startsWith("//*[preceding") || xpath.startsWith("//*[following") || xpath.startsWith("//*[ancestor") || xpath.startsWith("//*[descendant")) {
+            score += 10_000_000;
+        }
+
+        if (!xpath.startsWith("//*")) {
+            score -= 10_000_000;
+        }
+
+        printDebug("##Xscore score1: " + score);
         String noSpace = xpath
                 .replaceAll("\\bor\\b|\\|", match1s)
                 .replaceAll("(?:\\bcount|not|descendant|ancestor|preceding|following\\b)|//", match2s)
                 .replaceAll("(?:\\btranslate|contains|starts-with|position\\b)", match3s)
                 .replaceAll("\\s+|\\(|\\)", "");
 
-        int score = countChar(noSpace, '*') * 10;
+
         score += countChar(noSpace, match1) * 1000;
         score += countChar(noSpace, match2) * 500;
         score += countChar(noSpace, match3) * 100;
 
-        printDebug("##Xscore score1: " + score);
+        printDebug("##Xscore score2: " + score);
 
         if (noSpace.contains("//*[not")) {
             score += 50_000;
         }
-        printDebug("##Xscore score2: " + score);
-
-        if (noSpace.startsWith("//*[preceding") || noSpace.startsWith("//*[following") || noSpace.startsWith("//*[ancestor") || noSpace.startsWith("//*[descendant")) {
-            score += 5_000_000;
-        }
-
         printDebug("##Xscore score3: " + score);
 
         if (noSpace.contains("'screen-reader-text'")) {
@@ -278,11 +284,6 @@ public final class XPathyAssembly {
 
         if (noSpace.contains("descendant::text")) {
             score += 3_000;
-        }
-        printDebug("##Xscore score5: " + score);
-
-        if (!noSpace.startsWith("//*")) {
-            score -= 10_000_000;
         }
 
         printDebug("##Xscore final: " + score);
