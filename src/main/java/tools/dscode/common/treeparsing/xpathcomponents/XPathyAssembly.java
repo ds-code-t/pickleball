@@ -259,8 +259,8 @@ public final class XPathyAssembly {
 
         printDebug("##Xscore score1: " + score);
         String noSpace = xpath
-                .replaceAll("\\bor\\b|\\|", match1s)
-                .replaceAll("(?:\\bcount|not|descendant|ancestor|preceding|following\\b)|//", match2s)
+                .replaceAll("\\b(?:or|body)\\b|\\|", match1s)
+                .replaceAll("(?:\\b::text|count|not|descendant|ancestor|preceding|following\\b)|//", match2s)
                 .replaceAll("(?:\\btranslate|contains|starts-with|position\\b)", match3s)
                 .replaceAll("\\s+|\\(|\\)", "");
 
@@ -278,12 +278,6 @@ public final class XPathyAssembly {
 
         if (noSpace.contains("'screen-reader-text'")) {
             score += 10_000_000;
-        }
-
-        printDebug("##Xscore score4: " + score);
-
-        if (noSpace.contains("descendant::text")) {
-            score += 3_000;
         }
 
         printDebug("##Xscore final: " + score);

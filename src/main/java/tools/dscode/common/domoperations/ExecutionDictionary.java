@@ -101,14 +101,14 @@ public class ExecutionDictionary {
                         (category, v, op) ->
                         {
                             if (v == null || v.isNull())
-                                return null;
+                                return XPathy.from("//*[ancestor-or-self::body and descendant::text()]");
                             return XPathy.from("//*[count(descendant::node()) <= 12]");
                         }
                 );
 
         category(CONTAINS_TEXT).and((category, v, op) -> {
             if (v == null || v.isNull())
-                return XPathy.from("//*[ancestor-or-self::body and descendant::text()]");
+                return null;
             return any.byHaving(
                     XPathy.from("descendant-or-self::*")
                             .byHaving(deepNormalizedText(v, op))
