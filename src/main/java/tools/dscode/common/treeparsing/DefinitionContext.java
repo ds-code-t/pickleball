@@ -385,7 +385,7 @@ public final class DefinitionContext {
                                         "    descendant::*[self::select or self::input or self::textarea or self::textarea]" +
                                         "    or" +
                                         "    self::div[" +
-                                        "    not(child::span) and descendant::div" +
+                                        "    descendant::div" +
                                         "    and not(contains( translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'header' ))" +
                                         "    and count(child::*[.//text()]) >= 2" +
                                         "    ]" +
