@@ -385,9 +385,9 @@ public final class DefinitionContext {
                                         "    descendant::*[self::select or self::input or self::textarea or self::textarea]" +
                                         "    or" +
                                         "    self::div[" +
-                                        "    and not(child::span) and descendant::div" +
+                                        "    not(child::span) and descendant::div" +
                                         "    and not(contains( translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'header' ))" +
-                                        "    count(child::*[.//text()]) >= 2" +
+                                        "    and count(child::*[.//text()]) >= 2" +
                                         "    ]" +
                                         "]]").getXpath();
 
