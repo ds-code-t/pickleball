@@ -265,13 +265,15 @@ public final class XPathyAssembly {
         printDebug("##Xscore score2: " + score);
 
         if (noSpace.startsWith("//*[preceding") || noSpace.startsWith("//*[following") || noSpace.startsWith("//*[ancestor") || noSpace.startsWith("//*[descendant")) {
-            score += 1_000_000;
+            score += 5_000_000;
         }
+
         printDebug("##Xscore score3: " + score);
 
         if (noSpace.contains("'screen-reader-text'")) {
             score += 10_000_000;
         }
+
         printDebug("##Xscore score4: " + score);
 
         if (noSpace.contains("descendant::text")) {
