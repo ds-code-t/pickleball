@@ -445,12 +445,12 @@ public final class DefinitionContext {
 
             category("Dropdown").children("Dropdowns").andAnyCategories("forLabel", "htmlNaming", "rowLabel")
                     .and((category, v, op) ->
-                            XPathy.from(select))
-                    .or(
-                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(select, id, v, op, v != null),
-                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(select, title, v, op, v != null),
-                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(select, name, v, op, v != null)
-                    );
+                            XPathy.from("//select"));
+//                    .or(
+//                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(select, id, v, op, v != null),
+//                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(select, title, v, op, v != null),
+//                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(select, name, v, op, v != null)
+//                    );
 
 
             category("Close Button").children("Close Buttons")
