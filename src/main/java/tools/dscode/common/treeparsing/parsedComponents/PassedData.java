@@ -47,8 +47,7 @@ public abstract class PassedData {
             }
         }
 
-        if (elementCount ==1) {
-//            if (phraseType == null) {
+        if (elementCount >0) {
             if (phraseType == ELEMENT_ONLY || (!getAssertion().isBlank() && getAssertionType().isBlank())) {
                 if (lastOperationPhrase == null || lastOperationPhrase.equals(this)) {
                     if (hasTerminationConditional()) {

@@ -136,10 +136,12 @@ Feature: Additiontest
   @Testw1
   Scenario Outline: qqtestloselect
     @[DEBUG]
-    * navigate to: URL.select
-#    Then , from the FrameResult, I select "Opel" in the "cars" Dropdown
-    * , from the Top Panel:
-  : * , I verify "Run ❯" Textbox is not displayed
+#    * navigate to: URL.select
+#    Then , from the FrameResult, I select "Opel" in the "cars" Dropdown, and 'volvo'  in the "cars" Dropdown
+#    Then , from the FrameResult, I select last Option in the "cars" Dropdown
+    Then , from the FrameResult, I select last Option in the "cars" Dropdown, and first Option in the "cars" Dropdown
+#    * , from the Top Panel:
+#  : * , I verify "Run ❯" Textbox is not displayed
 #  : * , I verify  "Get your website" Link is displayed
 
     Examples:
