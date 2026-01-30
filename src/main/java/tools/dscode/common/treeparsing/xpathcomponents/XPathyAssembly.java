@@ -69,7 +69,6 @@ public final class XPathyAssembly {
      * result = //*[ancestor::div[contains(@class,'classA')]]
      */
     public static XPathy insideOf(XPathy anchor) {
-        System.out.println("@@anchor: " + anchor);
         String step = asRelativeStep(anchor);
 
       if(step.startsWith("select[")){
@@ -153,12 +152,9 @@ public final class XPathyAssembly {
      * Combine all XPathy with logical AND: //*[ self::... and self::... and ... ]
      */
     public static XPathy combineAnd(List<XPathy> list) {
-        System.out.println("@@combineAnd0: " + list + "");
         if (list.size() == 1) return list.getFirst();
         List<XPathy> sorted = new ArrayList<>(list);
         sorted.sort(Comparator.comparingInt(x -> xpathSpecificityScore(x.getXpath())));
-        System.out.println("@@combineAnd1: " + sorted + "");
-        System.out.println("@@combineAnd2: " + combineAndFinal(sorted) + "");
         return combineAndFinal(sorted);
     }
 

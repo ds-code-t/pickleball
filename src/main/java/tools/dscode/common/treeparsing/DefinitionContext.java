@@ -602,12 +602,12 @@ public final class DefinitionContext {
                                 printDebug("##textXpath forLabel:1 " + textXpath);
                                 onMatch("##textXpath forLabel:2 ", (matchedString) ->
                                         System.out.println(matchedString + combineOr(
-                                                new XPathy("//*[@id][@id = //*" + textXpath + "/@for]"),
+                                                new XPathy( "//*[@id = (//*" + textXpath + "[@for][1]/@for)]"),
                                                 new XPathy("//*[preceding-sibling::*[1][self::label" + textXpath + "]]")
                                         ))
                                 );
                                 return combineOr(
-                                        new XPathy("//*[@id][@id = //*" + textXpath + "/@for]"),
+                                        new XPathy( "//*[@id = (//*" + textXpath + "[@for][1]/@for)]"),
                                         new XPathy("//*[preceding-sibling::*[1][self::label" + textXpath + "]]")
                                 );
                             }
