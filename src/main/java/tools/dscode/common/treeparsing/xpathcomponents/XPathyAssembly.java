@@ -72,7 +72,7 @@ public final class XPathyAssembly {
         String step = asRelativeStep(anchor);
 
         if (step.startsWith("select[")) {
-            String expr = "//*[ancestor::*[position()<=5][self::" + step + "]]";
+            String expr = "//*[ancestor::*[position()<=3][self::" + step + "][1]]";
             return new XPathy(expr);
         }
 
@@ -268,15 +268,16 @@ public final class XPathyAssembly {
         printDebug("##Xscore score1: " + score);
         if (xpath.startsWith("//*[preceding") || xpath.startsWith("//*[following") || xpath.startsWith("//*[ancestor") || xpath.startsWith("//*[descendant")) {
             score += 10_000_000;
-            String firstTag = xpath.split("::")[1].trim();
+            String firstTag = xpath.split("::",2)[1].trim();
             if (!firstTag.startsWith("*")) {
                 score -= 1_000_000;
                 if (!firstTag.startsWith("div")) {
                     score -= 1_000_000;
                 }
             }
-            if (firstTag.matches("^\\*|[a-zA-Z]+\\[position")) {
-                score -= 1_000_000;
+            firstTag = firstTag.split("\\[",2)[1].trim();
+            if (firstTag.startsWith("position")) {
+                score -= 1_500_000;
             }
         }
 
