@@ -71,6 +71,12 @@ public final class XPathyAssembly {
     public static XPathy insideOf(XPathy anchor) {
         System.out.println("@@anchor: " + anchor);
         String step = asRelativeStep(anchor);
+
+      if(step.startsWith("select[")){
+          String expr = "//*[ancestor::*[position()<=5][self::" + step + "]]";
+          return new XPathy(expr);
+      }
+
         String expr = "//*[ancestor::" + step + "]";
         return new XPathy(expr);
     }

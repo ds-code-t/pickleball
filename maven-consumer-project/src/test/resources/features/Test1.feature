@@ -7,10 +7,10 @@ Feature: Additiontest
 
 #    * , verify the "cars" Menu is displayed
 #    * , verify the "cars" Menu is displayed
-    * ,  verify the "cars" Dropdown is displayed
+#    * ,  verify the "cars" Dropdown is displayed
 #    * ,  verify the Option is displayed
 #    * , in the "cars" Dropdown, verify the Option is displayed
-#    * , in the "cars" Dropdown, verify the last Option is displayed
+    * , in the "cars" Dropdown, verify the last Option is displayed
 
 #    * , verify  "First name:" Textbox is displayed
 #    * , verify  "First name:" Text is displayed
