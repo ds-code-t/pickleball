@@ -2,12 +2,20 @@ Feature: Additiontest
 
   Scenario: dfdfdddww
     Then , save "Q1" as "W"
-  @[DEBUG,noBase,##Specificity,##xscore,##parsing,##parsedata,##processContextList,##]
+#  @[DEBUG,noBase,##Specificity,##xscore,##textXpath,##]
+  @[DEBUG,nobase]
+
+#    * , verify the "cars" Menu is displayed
+#    * , verify the "cars" Menu is displayed
+    * ,  verify the Option is displayed
+    * , in the "cars" Dropdown, verify the Option is displayed
+#    * , in the "cars" Dropdown, verify the last Option is displayed
+
 #    * , verify  "First name:" Textbox is displayed
 #    * , verify  "First name:" Text is displayed
 #    * , verify  Textbox is displayed
-    * , verify "Attachments" Section is displayed
-    * , clear  "First name:" Textboxes
+#    * , verify "Attachments" Section is displayed
+#    * , clear  "First name:" Textboxes
 
 
 

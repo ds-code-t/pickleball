@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static tools.dscode.common.util.debug.DebugUtils.printDebug;
+import static tools.dscode.common.util.debug.DebugUtils.substrings;
 
 public final class XPathyAssembly {
 
@@ -68,6 +69,7 @@ public final class XPathyAssembly {
      * result = //*[ancestor::div[contains(@class,'classA')]]
      */
     public static XPathy insideOf(XPathy anchor) {
+        System.out.println("@@anchor: " + anchor);
         String step = asRelativeStep(anchor);
         String expr = "//*[ancestor::" + step + "]";
         return new XPathy(expr);
@@ -135,25 +137,51 @@ public final class XPathyAssembly {
     }
 
 
+//
+//    public static XPathy combineAnd2(List<XPathy> list) {
+//        if (list.size() == 1) return list.getFirst();
+//        return XPathy.from(combine(list, "and").getXpath().replace("[]", ""));
+//    }
+
     /**
      * Combine all XPathy with logical AND: //*[ self::... and self::... and ... ]
      */
     public static XPathy combineAnd(List<XPathy> list) {
-
-        return XPathy.from(combine(list, "and").getXpath().replace("[]", ""));
+        if (list.size() == 1) return list.getFirst();
+        List<XPathy> sorted = new ArrayList<>(list);
+        sorted.sort(Comparator.comparingInt(x -> xpathSpecificityScore(x.getXpath())));
+        return combineAndFinal(sorted);
     }
+
+
+    public static XPathy combineAndFinal(List<XPathy> list) {
+        XPathy first = list.getFirst();
+        if (list.size() == 1) return first;
+        List<String> xpathStrings = list.stream().map(xPathy -> xPathy.getXpath().trim()).toList();
+        if(xpathStrings.stream().allMatch(s -> s.startsWith("//*"))){
+           return XPathy.from("//*" + xpathStrings.stream().map(string -> string.substring(3)).collect(Collectors.joining("")));
+        }
+        if (!xpathStrings.getFirst().startsWith("//*") && xpathStrings.getFirst().startsWith("//")) {
+            return XPathy.from(xpathStrings.getFirst() + combineAndFinal(list.subList(1, list.size())).getXpath().replace("[]", "").replaceFirst("^//\\*",""));
+        } else {
+            return XPathy.from(combine(list, "and").getXpath().replace("[]", ""));
+        }
+    }
+
 
     /**
      * Combine all XPathy with logical OR: //*[ self::... or self::... or ... ]
      */
     public static XPathy combineOr(List<XPathy> list) {
-
-        return combine(list, "or");
+        if (list.size() == 1) return list.getFirst();
+        List<XPathy> sorted = new ArrayList<>(list);
+        sorted.sort(Comparator.comparingInt(x -> xpathSpecificityScore(x.getXpath())));
+        return combine(sorted, "or");
     }
 
 
     private static XPathy combine(List<XPathy> list, String joiner) {
-        // Debug sanity checks
+        if (list.size() == 1) return list.getFirst();
         for (int i = 0; i < list.size(); i++) {
             if (list.get(i) == null) {
                 throw new IllegalStateException("Null XPathy at index " + i);
@@ -163,10 +191,9 @@ public final class XPathyAssembly {
             }
         }
 
-        List<XPathy> sorted = new ArrayList<>(list);
-        sorted.sort(Comparator.comparingInt(x -> xpathSpecificityScore(x.getXpath())));
 
-        String combinedExpr = sorted.stream()
+
+        String combinedExpr = list.stream()
                 .map(XPathy::getXpath)
                 .map(XPathyAssembly::toSelfStep)
                 .collect(Collectors.joining(" " + joiner + " "));
@@ -207,29 +234,15 @@ public final class XPathyAssembly {
                 .replaceFirst("^//", "")     // //...
                 .replaceFirst("^/", "");     // /...
 
-        // 4. If nothing was stripped (no leading /), we still want self::...
-        //    Otherwise, we now have something like:
-        //      "span[@class='A']"
-        //      "*[ancestor::div]"
-        //      "input[@type='text'][1]"
+
         String step = stripped;
 
-        // 5. If step already starts with an axis, just restore prefix + step
         if (step.matches("^[A-Za-z-]+::.*")) {
             return prefix + step;
         }
 
-        // 6. Turn it into self::nodeTest...[predicates...]
-        //    Handle wildcard vs. named node test
-        if (step.startsWith("*")) {
-            // "*[...]" -> "self::*[...]"
-            step = "self::*" + step.substring(1);
-        } else {
-            // "span[@class='A']" -> "self::span[@class='A']"
-            step = "self::" + step;
-        }
+        step = "self::" + step;
 
-        // 7. Put leading parentheses back
         return prefix + step;
     }
 
@@ -245,7 +258,7 @@ public final class XPathyAssembly {
      */
     public static int xpathSpecificityScore(String xpath) {
         printDebug("\n##SpecificityScore xpath: " + xpath);
-        xpath  = xpath.trim();
+        xpath = xpath.trim();
 
         int score = countChar(xpath, '*') * 10;
 

@@ -74,6 +74,7 @@ public class ExecutionDictionary {
     private final ConcurrentMap<String, CopyOnWriteArrayList<Builder>> andReg = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ContextBuilder> contextReg = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Set<CategoryFlags>> categoryFlags = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, XPathy> baseReg = new ConcurrentHashMap<>();
 
     // Per-instance cache: category -> resolved lineage (includes the category itself).
 // Safe for concurrent reads during XPath generation, and isolated per ExecutionDictionary instance.
@@ -185,6 +186,25 @@ public class ExecutionDictionary {
             return List.copyOf(ordered); // immutable cached value
         });
     }
+
+    private void registerBaseXpath(String category, XPathy base) {
+        Objects.requireNonNull(category, "category must not be null");
+        Objects.requireNonNull(base, "base xpath must not be null");
+        baseReg.put(category, base);
+    }
+
+    private XPathy getBaseXpath(String category) {
+        if (category == null || category.isBlank()) return null;
+
+        // Prefer the most-specific category first, then parents (matches your lineage order)
+        List<String> lineage = resolveCategoryLineage(category);
+        for (String catKey : lineage) {
+            XPathy base = baseReg.get(catKey);
+            if (base != null) return base;
+        }
+        return null;
+    }
+
 
 
     // ========================================================
@@ -353,16 +373,19 @@ public class ExecutionDictionary {
     }
 
     public Optional<XPathy> resolveToXPathy(String category, ValueWrapper value, Op op) {
+        XPathy base = getBaseXpath(category); // <-- resolve base first
+
         Optional<XPathy> orPart = orAll(category, value, op);
         Optional<XPathy> andPart = andAll(category, value, op);
 
-        if (andPart.isEmpty() && orPart.isEmpty()) return Optional.empty();
-        if (andPart.isEmpty()) return orPart;
-        if (orPart.isEmpty()) return andPart;
+        // If nothing else exists (or everything filtered out), return base if present
+        if (andPart.isEmpty() && orPart.isEmpty()) {
+            return base == null ? Optional.empty() : Optional.of(base);
+        }
 
         // Convert each part into a predicate step (self::... form)
-        String andStep = XPathyAssembly.toSelfStep(andPart.get().getXpath());
-        String orStep  = XPathyAssembly.toSelfStep(orPart.get().getXpath());
+        String andStep = andPart.map(xPathy -> XPathyAssembly.toSelfStep(xPathy.getXpath())).orElse(null);
+        String orStep = orPart.map(xPathy -> XPathyAssembly.toSelfStep(xPathy.getXpath())).orElse(null);
 
         // Order them by specificity score (lower first, consistent with combine())
         record Step(String step, int score) {}
@@ -444,6 +467,21 @@ public class ExecutionDictionary {
             dict.registerParentOfCategories(parent(), childCategories);
             return this;
         }
+
+        public CategorySpec addBase(String xpath) {
+            return addBase(XPathy.from(xpath));
+        }
+
+        public CategorySpec addBase(XPathy xpath) {
+            Objects.requireNonNull(xpath, "xpath must not be null");
+
+            for (String cat : categories) {
+                if (cat == null || cat.isBlank()) continue;
+                dict.registerBaseXpath(cat, xpath);
+            }
+            return this;
+        }
+
 
         // --- builders ---
         public CategorySpec or(Builder... builders) {

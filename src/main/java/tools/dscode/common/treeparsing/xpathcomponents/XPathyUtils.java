@@ -147,7 +147,8 @@ public final class XPathyUtils {
 
         ExecutionDictionary.Op op = normalizeOp(mode);
         String pred = buildDeepTextPredicate(value, op);
-        return XPathy.from("(" + base.getXpath().trim() + ")[" + pred + "]");
+        return XPathy.from( base.getXpath().trim() + "[" + pred + "]");
+//        return XPathy.from("(" + base.getXpath().trim() + ")[" + pred + "]");
     }
 
     /**
@@ -160,7 +161,8 @@ public final class XPathyUtils {
 
         ExecutionDictionary.Op op = normalizeOp(mode);
         String pred = buildAttributePredicate("@" + attrName.trim(), value, op);
-        return XPathy.from("(" + base.getXpath().trim() + ")[" + pred + "]");
+        return XPathy.from(base.getXpath().trim() + "[" + pred + "]");
+//        return XPathy.from("(" + base.getXpath().trim() + ")[" + pred + "]");
     }
 
     // =========================================================================
