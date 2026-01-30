@@ -3,12 +3,13 @@ Feature: Additiontest
   Scenario: dfdfdddww
     Then , save "Q1" as "W"
 #  @[DEBUG,noBase,##Specificity,##xscore,##textXpath,##]
-  @[DEBUG,nobase]
+  @[DEBUG,nobase,##Specificity,##xscore]
 
 #    * , verify the "cars" Menu is displayed
 #    * , verify the "cars" Menu is displayed
-    * ,  verify the Option is displayed
-    * , in the "cars" Dropdown, verify the Option is displayed
+    * ,  verify the "cars" Dropdown is displayed
+#    * ,  verify the Option is displayed
+#    * , in the "cars" Dropdown, verify the Option is displayed
 #    * , in the "cars" Dropdown, verify the last Option is displayed
 
 #    * , verify  "First name:" Textbox is displayed

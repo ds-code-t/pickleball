@@ -374,7 +374,8 @@ public class ExecutionDictionary {
 
     public Optional<XPathy> resolveToXPathy(String category, ValueWrapper value, Op op) {
         XPathy base = getBaseXpath(category); // <-- resolve base first
-
+        System.out.println("@@category: " + category);
+        System.out.println("@@base: " + base);
         Optional<XPathy> orPart = orAll(category, value, op);
         Optional<XPathy> andPart = andAll(category, value, op);
 
@@ -399,14 +400,20 @@ public class ExecutionDictionary {
         }
 
         if (steps.isEmpty()) return Optional.empty();
+        System.out.println("@@steps1: " + steps);
         steps.sort(Comparator.comparingInt(Step::score));
-
+        System.out.println("@@steps2: " + steps);
         String combined = steps.stream()
                 .map(Step::step)
                 .map(s -> "(" + s + ")")
                 .collect(Collectors.joining(" and "));
+        System.out.println("@@combined: " + combined);
+        String prefix = (base != null && base.getXpath() != null && !base.getXpath().isBlank())
+                ? base.getXpath().trim()
+                : "//*";
+        System.out.println("@@prefix: " + prefix);
+        return Optional.of(XPathy.from(prefix + "[" + combined + "]"));
 
-        return Optional.of(XPathy.from("//*[" + combined + "]"));
     }
 
     private int countChar(String s, char c) {
