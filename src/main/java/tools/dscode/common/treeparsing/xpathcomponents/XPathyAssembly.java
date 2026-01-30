@@ -71,10 +71,10 @@ public final class XPathyAssembly {
     public static XPathy insideOf(XPathy anchor) {
         String step = asRelativeStep(anchor);
 
-      if(step.startsWith("select[")){
-          String expr = "//*[ancestor::*[position()<=5][self::" + step + "]]";
-          return new XPathy(expr);
-      }
+        if (step.startsWith("select[")) {
+            String expr = "//*[ancestor::*[position()<=5][self::" + step + "]]";
+            return new XPathy(expr);
+        }
 
         String expr = "//*[ancestor::" + step + "]";
         return new XPathy(expr);
@@ -163,11 +163,11 @@ public final class XPathyAssembly {
         XPathy first = list.getFirst();
         if (list.size() == 1) return first;
         List<String> xpathStrings = list.stream().map(xPathy -> xPathy.getXpath().trim()).toList();
-        if(xpathStrings.stream().allMatch(s -> s.startsWith("//*"))){
-           return XPathy.from("//*" + xpathStrings.stream().map(string -> string.substring(3)).collect(Collectors.joining("")));
+        if (xpathStrings.stream().allMatch(s -> s.startsWith("//*"))) {
+            return XPathy.from("//*" + xpathStrings.stream().map(string -> string.substring(3)).collect(Collectors.joining("")));
         }
         if (!xpathStrings.getFirst().startsWith("//*") && xpathStrings.getFirst().startsWith("//")) {
-            return XPathy.from(xpathStrings.getFirst() + combineAndFinal(list.subList(1, list.size())).getXpath().replace("[]", "").replaceFirst("^//\\*",""));
+            return XPathy.from(xpathStrings.getFirst() + combineAndFinal(list.subList(1, list.size())).getXpath().replace("[]", "").replaceFirst("^//\\*", ""));
         } else {
             return XPathy.from(combine(list, "and").getXpath().replace("[]", ""));
         }
@@ -195,7 +195,6 @@ public final class XPathyAssembly {
                 throw new IllegalStateException("Null xpath string at index " + i);
             }
         }
-
 
 
         String combinedExpr = list.stream()
@@ -269,15 +268,15 @@ public final class XPathyAssembly {
         printDebug("##Xscore score1: " + score);
         if (xpath.startsWith("//*[preceding") || xpath.startsWith("//*[following") || xpath.startsWith("//*[ancestor") || xpath.startsWith("//*[descendant")) {
             score += 10_000_000;
-            if(xpath.contains("select") || xpath.contains("option")){
-                score -= 1_000_000;
-            }
             String firstTag = xpath.split("::")[1].trim();
-            if(!firstTag.startsWith("*")){
+            if (!firstTag.startsWith("*")) {
                 score -= 1_000_000;
-                if(!firstTag.startsWith("div")){
+                if (!firstTag.startsWith("div")) {
                     score -= 1_000_000;
                 }
+            }
+            if (firstTag.matches("^\\*|[a-zA-Z]+\\[position")) {
+                score -= 1_000_000;
             }
         }
 
