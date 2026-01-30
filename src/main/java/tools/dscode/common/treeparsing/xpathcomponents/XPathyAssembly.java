@@ -266,16 +266,28 @@ public final class XPathyAssembly {
         xpath = xpath.trim();
 
         int score = countChar(xpath, '*') * 10;
-
+        printDebug("##Xscore score1: " + score);
         if (xpath.startsWith("//*[preceding") || xpath.startsWith("//*[following") || xpath.startsWith("//*[ancestor") || xpath.startsWith("//*[descendant")) {
             score += 10_000_000;
+            if(xpath.contains("select") || xpath.contains("option")){
+                score -= 1_000_000;
+            }
+            String firstTag = xpath.split("::")[1].trim();
+            if(!firstTag.startsWith("*")){
+                score -= 1_000_000;
+                if(!firstTag.startsWith("div")){
+                    score -= 1_000_000;
+                }
+            }
         }
+
+        printDebug("##Xscore score2: " + score);
 
         if (!xpath.startsWith("//*")) {
             score -= 10_000_000;
         }
 
-        printDebug("##Xscore score1: " + score);
+        printDebug("##Xscore score3: " + score);
         String noSpace = xpath
                 .replaceAll("\\b(?:or|body)\\b|\\|", match1s)
                 .replaceAll("(?:\\b::text|count|not|descendant|ancestor|preceding|following\\b)|//", match2s)
@@ -287,12 +299,12 @@ public final class XPathyAssembly {
         score += countChar(noSpace, match2) * 500;
         score += countChar(noSpace, match3) * 100;
 
-        printDebug("##Xscore score2: " + score);
+        printDebug("##Xscore score4: " + score);
 
         if (noSpace.contains("//*[not")) {
             score += 50_000;
         }
-        printDebug("##Xscore score3: " + score);
+        printDebug("##Xscore score5: " + score);
 
         if (noSpace.contains("'screen-reader-text'")) {
             score += 10_000_000;

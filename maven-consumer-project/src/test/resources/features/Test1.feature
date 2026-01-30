@@ -10,9 +10,9 @@ Feature: Additiontest
 #    * ,  verify the "cars" Dropdown is displayed
 #    * ,  verify the Option is displayed
 #    * , in the "cars" Dropdown, verify the Option is displayed
-    * , verify "Choose (a car):" Dropdown is displayed
-    * , in the "Choose (a car):" Dropdown, verify the last Option is displayed
-    * , select the last Option "Choose (a car):" Dropdown
+    * , verify "Birth month:" Dropdown is displayed
+    * , in the "Birth month:" Dropdown, verify the last Option is displayed
+    * , select the last Option "Birth month:" Dropdown
 
 #    * , verify  "First name:" Textbox is displayed
 #    * , verify  "First name:" Text is displayed

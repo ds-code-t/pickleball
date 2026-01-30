@@ -608,7 +608,7 @@ public final class DefinitionContext {
                                 );
                                 return combineOr(
                                         new XPathy( "//*[@id = (//*" + textXpath + "[@for][1]/@for)]"),
-                                        new XPathy("//*[preceding-sibling::*[1][self::label" + textXpath + "]]")
+                                        new XPathy("//*[preceding-sibling::label[1][self::label" + textXpath + "]]")
                                 );
                             }
                     );
