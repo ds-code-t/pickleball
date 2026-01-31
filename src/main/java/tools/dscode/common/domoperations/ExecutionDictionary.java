@@ -10,6 +10,7 @@ import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly;
 
+import java.sql.SQLOutput;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -373,10 +374,13 @@ public class ExecutionDictionary {
     }
 
     public Optional<XPathy> resolveToXPathy(String category, ValueWrapper value, Op op) {
+        System.out.println("\n=================\n@@##resolveToXPathy: " + category + ", " + value + ", " + op);
         XPathy base = getBaseXpath(category); // <-- resolve base first
+        System.out.println("@@##base: " + base);
         Optional<XPathy> orPart = orAll(category, value, op);
+        System.out.println("@@##orPart: " + orPart.map(x -> x.getXpath()).orElse(null));
         Optional<XPathy> andPart = andAll(category, value, op);
-
+        System.out.println("@@##andPart: " + andPart.map(x -> x.getXpath()).orElse(null));
         // If nothing else exists (or everything filtered out), return base if present
         if (andPart.isEmpty() && orPart.isEmpty()) {
             return base == null ? Optional.empty() : Optional.of(base);
@@ -385,7 +389,8 @@ public class ExecutionDictionary {
         // Convert each part into a predicate step (self::... form)
         String andStep = andPart.map(xPathy -> XPathyAssembly.toSelfStep(xPathy.getXpath())).orElse(null);
         String orStep = orPart.map(xPathy -> XPathyAssembly.toSelfStep(xPathy.getXpath())).orElse(null);
-
+        System.out.println("@@##andStep: " + andStep);
+        System.out.println("@@##orStep: " + orStep);
         // Order them by specificity score (lower first, consistent with combine())
         record Step(String step, int score) {}
 
@@ -406,6 +411,10 @@ public class ExecutionDictionary {
         String prefix = (base != null && base.getXpath() != null && !base.getXpath().isBlank())
                 ? base.getXpath().trim()
                 : "//*";
+
+        System.out.println("\n@@##combined1: " + combined);
+        System.out.println("@@##combined2: " + prefix + "[" + combined + "]");
+
         return Optional.of(XPathy.from(prefix + "[" + combined + "]"));
 
     }

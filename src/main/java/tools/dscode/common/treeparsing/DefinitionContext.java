@@ -600,16 +600,21 @@ public final class DefinitionContext {
                                 }
                                 String textXpath = andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceAll("^//\\*", "");
                                 printDebug("##textXpath forLabel:1 " + textXpath);
-                                onMatch("##textXpath forLabel:2 ", (matchedString) ->
-                                        System.out.println(matchedString + combineOr(
-                                                new XPathy( "//*[@id = (//*" + textXpath + "[@for][1]/@for)]"),
-                                                new XPathy("//*[preceding-sibling::*[1][self::label" + textXpath + "]]")
-                                        ))
+
+
+                                XPathy returnXpath = combineOr(
+                                        new XPathy( "//*[@id = (ancestor::div[3]//descendant::*" + textXpath + "[@for][1]/@for)]"),
+                                        new XPathy("//*[ancestor-or-self::*[position() <= 7]" +
+                                                "  [preceding-sibling::*[1]  " +
+                                                textXpath +
+                                                "    [not(descendant::button or descendant::input or descendant::textarea or descendant::select or descendant::a)]" +
+                                                "  ]" +
+                                                "]")
                                 );
-                                return combineOr(
-                                        new XPathy( "//*[@id = (//*" + textXpath + "[@for][1]/@for)]"),
-                                        new XPathy("//*[preceding-sibling::label[1][self::label" + textXpath + "]]")
-                                );
+                                printDebug("##textXpath forLabel:2 " + returnXpath);
+                            return returnXpath;
+//                                        new XPathy("//*[ancestor-or-self::*[position() <= 5][preceding-sibling::*[1][not(descendant::*[self::button or self::input or self::textarea or self::select or self::a])][self::*" + textXpath + "]]")
+
                             }
                     );
 

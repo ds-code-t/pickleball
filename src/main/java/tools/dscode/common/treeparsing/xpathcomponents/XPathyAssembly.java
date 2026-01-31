@@ -2,14 +2,17 @@ package tools.dscode.common.treeparsing.xpathcomponents;
 
 import com.xpathy.Tag;
 import com.xpathy.XPathy;
+import org.apache.poi.xssf.usermodel.XSSFPivotTable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static tools.dscode.common.util.debug.DebugUtils.debugFlags;
 import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 import static tools.dscode.common.util.debug.DebugUtils.substrings;
 
@@ -207,48 +210,73 @@ public final class XPathyAssembly {
     }
 
 
-    /**
-     * Normalize an XPath into a "self::..." step usable inside a predicate.
-     * <p>
-     * Examples:
-     * //span[@class='A']                   -> self::span[@class='A']
-     * //*[ancestor::div[@class='content']] -> self::*[ancestor::div[@class='content']]
-     * (//*)[contains(@class,'btn')]        -> self::*[contains(@class,'btn')]
-     */
+
+    private static final java.util.concurrent.atomic.AtomicInteger selfCounter = new java.util.concurrent.atomic.AtomicInteger(1);
+
+    private static final Pattern SELF_WRAP =
+            Pattern.compile(
+                    "^[^a-zA-Z]*self::[A-Za-z*]+\\[(\\d+)>-(\\d+)\\].*\\[\\1>-\\2\\][^a-zA-Z]*$",
+                    Pattern.DOTALL
+            );
+
+
     public static String toSelfStep(String xpath) {
+        System.out.println("\n@@##toSelfStep1 : " + xpath + "");
         String s = xpath.trim();
-
-        // 1. Preserve leading parentheses, operate on the core after them
-        int coreStart = 0;
-        while (coreStart < s.length() && s.charAt(coreStart) == '(') {
-            coreStart++;
+        while(s.startsWith("(") && s.endsWith(")"))
+        {
+            s = s.substring(1,s.length()-1);
         }
-        String prefix = s.substring(0, coreStart); // "(((..."
-        String core = s.substring(coreStart);    // everything after '('s
+        if (SELF_WRAP.matcher(s).matches()) {
+            System.out.println("@@already wrapped: " + xpath);
+            if(s.startsWith("//*[self")){
+                return s.substring(4,s.length()-1);
+            }
+            return xpath;
+        }
 
-        // 2. If core already starts with an axis, keep whole string as-is
-        if (core.matches("^[A-Za-z-]+::.*")) {
+
+        if (s.matches("^[A-Za-z-]+::.*")) {
             return s;
         }
+        String stripped = s
+                .replaceFirst("^[\\./]+", "").trim();     // /...
 
-        // 3. Strip leading //, /, .//, ./ from the core
-        String stripped = core
-                .replaceFirst("^\\.//", "")  // .//...
-                .replaceFirst("^\\./", "")   // ./...
-                .replaceFirst("^//", "")     // //...
-                .replaceFirst("^/", "");     // /...
-
+        System.out.println("@@stripped: " + stripped);
+//        if(stripped.startsWith("self::"))
+//            return xpath;
 
         String step = stripped;
 
         if (step.matches("^[A-Za-z-]+::.*")) {
-            return prefix + step;
+            return step;
         }
 
-        step = "self::" + step;
 
-        return prefix + step;
+        int id = selfCounter.incrementAndGet();
+        int nestingCount = countIdPairs(step);
+        step = step.replaceFirst("^([a-zA-Z*]+)" , "self::$1["+ id + ">-" + nestingCount + "]") + "["+ id + ">-" + nestingCount + "]";
+        System.out.println("\n@@##toSelfStep2 : " +  step + "");
+        return  step;
     }
+
+    private static final Pattern ID_PAIR_PATTERN =
+            Pattern.compile("\\[\\d+>-\\d+\\]");
+
+    public static int countIdPairs(String input) {
+        if (input == null || input.isEmpty()) {
+            return 0;
+        }
+
+        Matcher m = ID_PAIR_PATTERN.matcher(input);
+        int count = 0;
+
+        while (m.find()) {
+            count++;
+        }
+        return count;
+    }
+
 
     public static final char match1 = '\u206A';
     public static final char match2 = '\u207A';
@@ -329,35 +357,86 @@ public final class XPathyAssembly {
         return prettyPrintXPath(xpathy.getXpath());
     }
 
+    // Boundary is either a full self-step with tag OR a bare tag
+    private static final Pattern BOUNDARY =
+            Pattern.compile("self::[A-Za-z*]+\\[\\d+>-\\d+\\]|\\[\\d+>-\\d+\\]");
+
+    // Extract b from any tag [a>-b]
+    private static final Pattern PSEUDO_TAG =
+            Pattern.compile("\\[(\\d+)>-(\\d+)\\]");
+
+    public static Boolean stripPseudoTags = null;
+    public static Boolean normalizeWhiteSpace = null;
+
     public static String prettyPrintXPath(String xpath) {
         if (xpath == null) return null;
 
-        // Split before "self::*" only when NOT preceded by '-'
-        String[] parts = xpath.split("(?<!-)(?=self::\\*)");
+        if (stripPseudoTags == null) stripPseudoTags = substrings.contains("pseudotags");
+        if (normalizeWhiteSpace == null) normalizeWhiteSpace = !substrings.contains("normalizexpaths");
+
+        final int threshold = 20;
+        final String indentUnit = " ";
+
+        List<String> parts = splitAtBoundaries(xpath);
 
         StringBuilder sb = new StringBuilder();
-        int indent = 0;
-
         for (String part : parts) {
             String trimmed = part.trim();
+            if (trimmed.isEmpty()) continue;
 
-            // If part begins with a closing paren, reduce indent
-            if (trimmed.startsWith(")")) {
-                indent = Math.max(0, indent - 1);
+            // indent based on the FIRST pseudo tag found in this chunk (if any)
+            int indentLevel = 0;
+            Matcher t = PSEUDO_TAG.matcher(trimmed);
+            if (t.find()) {
+                int b = Integer.parseInt(t.group(2));
+                indentLevel = Math.max(0, threshold - b);
             }
 
-            sb.append("    ".repeat(indent))
+            if (stripPseudoTags) {
+                trimmed = PSEUDO_TAG.matcher(trimmed).replaceAll("");
+            }
+
+            if (normalizeWhiteSpace) {
+                trimmed = trimmed.replaceAll("[\\p{Z}\\s\\p{Cf}\\p{Cc}]+", " ").trim();
+            }
+
+            sb.append(indentUnit.repeat(indentLevel))
                     .append(trimmed)
-                    .append("\n");
-
-            // Increase indent if the part begins with or contains a new self::*
-            if (trimmed.contains("self::*") && !trimmed.startsWith("-self::*")) {
-                indent++;
-            }
+                    .append('\n');
         }
 
         return sb.toString();
     }
 
+    private static List<String> splitAtBoundaries(String s) {
+        List<Integer> starts = new ArrayList<>();
+        Matcher m = BOUNDARY.matcher(s);
 
+        while (m.find()) {
+            starts.add(m.start());
+        }
+
+        // No boundaries found -> single chunk
+        if (starts.isEmpty()) return List.of(s);
+
+        List<String> parts = new ArrayList<>();
+
+        // Keep any prefix before the first boundary
+        int first = starts.get(0);
+        if (first > 0) {
+            parts.add(s.substring(0, first));
+        }
+
+        // Slice boundary-to-boundary
+        for (int i = 0; i < starts.size(); i++) {
+            int from = starts.get(i);
+            int to = (i + 1 < starts.size()) ? starts.get(i + 1) : s.length();
+            parts.add(s.substring(from, to));
+        }
+
+        return parts;
+    }
 }
+
+
+
