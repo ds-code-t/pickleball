@@ -229,12 +229,14 @@ public final class XPathyAssembly {
         }
         if (SELF_WRAP.matcher(s).matches()) {
             System.out.println("@@already wrapped: " + xpath);
-
             if(s.startsWith("//*[self")){
                 System.out.println("@@wrappedreturn1: " + s.substring(4,s.length()-1));
                 return s.substring(4,s.length()-1);
+            } else   if(s.startsWith("//*[(self")){
+                System.out.println("@@wrappedreturn2: " + s.substring(4,s.length()-1));
+                return s.substring(5,s.length()-2);
             }
-            System.out.println("@@wrappedreturn2: " + xpath);
+            System.out.println("@@wrappedreturn3: " + xpath);
 
             return xpath;
         }
