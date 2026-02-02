@@ -75,6 +75,13 @@ dependencies {
     api("com.googlecode.aviator:aviator:5.4.3")
     api("com.ibm.jsonata4java:JSONata4Java:2.6.0")
 
+    // data formatting
+    api 'org.jetbrains:annotations:26.0.2-1'
+
+    // service calls
+    api('com.salesforce.revoman:revoman:0.81.0')
+    api('io.rest-assured:rest-assured:6.0.0')
+
     // logging and reports
     api "com.aventstack:extentreports:5.1.2"
     api 'com.epam.reportportal:client-java:5.4.8'
@@ -103,8 +110,7 @@ dependencies {
     implementation 'org.seleniumhq.selenium:selenium-java:4.38.0'
 //    implementation 'com.github.Volta-Jebaprashanth:xpathy:3.0.0'
     implementation files('libs/xpathy-3.0.0.jar')
-    // misc
-    implementation 'org.jetbrains:annotations:26.0.2-1'
+
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -274,6 +280,7 @@ tasks.shadowJar {
         exclude(dependency("io.cucumber:cucumber-plugin:${cucumberVersion}"))
         exclude(dependency("io.cucumber:messages:${messagesVersion}"))
         exclude(dependency("io.cucumber:gherkin:${gherkinVersion}"))
+        exclude(dependency('org.jetbrains:annotations:26.0.2-1'))
     }
 
     // ✅ ensure service descriptors are merged for discovery

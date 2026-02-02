@@ -1,5 +1,6 @@
 package tools.dscode.steps;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.xpathy.Attribute;
 import com.xpathy.Condition;
 import com.xpathy.Tag;
@@ -16,6 +17,7 @@ import tools.dscode.common.annotations.LifecycleHook;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Status;
+import tools.dscode.common.servicecalls.JacksonUtils;
 import tools.dscode.coredefinitions.NavigationSteps;
 import tools.dscode.registry.GlobalRegistry;
 
@@ -40,8 +42,72 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static tools.dscode.common.treeparsing.DefinitionContext.DEFAULT_EXECUTION_DICTIONARY;
 import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;
-
+import org.intellij.lang.annotations.Language;
 public class CalculatorSteps {
+
+
+    public static void main(String[] args) {
+
+        JsonNode j = JacksonUtils.toJSON("""
+                     {
+                     "name": "John"
+                     }
+                """);
+
+
+        JsonNode jsonNode = JacksonUtils.toJSON( """
+                {
+                  "name": "John",
+                  "age": 30
+                  }
+                """);
+
+
+
+        JsonNode yamlNode =  JacksonUtils.toYAML("""
+
+                        name: John
+
+
+                age: 30""");
+
+        JsonNode xmlNode = JacksonUtils.
+                toXML(
+                        """
+                                <person>
+                                  <name>John</
+                                    name>
+                                  <age>30</age>
+                                </person>""");
+        String formattedJson = JacksonUtils.formatJSON(
+                """
+
+                            {
+                          "name": "John",
+                          "age": 30
+                        }""");
+        System.out.println(
+                formattedJson);
+
+        String
+                formattedYaml = JacksonUtils
+                .formatYAML("""
+
+                                name: John
+
+
+                        age: 30""");
+        System.out.println(formattedYaml);
+
+        String formattedXml = JacksonUtils.formatXML(
+                """
+                        <person>
+                          <name>John</name>
+                          <age>30</age>
+                        </person>""");
+        System.out.println(formattedXml);
+
+    }
 
 //    static {
 //        System.out.println("@@static block CalculatorSteps");
@@ -78,7 +144,6 @@ public class CalculatorSteps {
 //
 //
 //    }
-
 
 
 //    @BeforeAll
@@ -124,14 +189,14 @@ public class CalculatorSteps {
 
     @Given("location")
     public static void locationTest() {
-        Pickle  pickle = getCurrentScenarioState().pickle;
+        Pickle pickle = getCurrentScenarioState().pickle;
 
 
-
-        if(pickle.getExamplesLocation() !=null && pickle.getExamplesLocation().isPresent()){
+        if (pickle.getExamplesLocation() != null && pickle.getExamplesLocation().isPresent()) {
 
         }
     }
+
     @Given("logTest")
     public static void logTest() {
         WebDriver driver = getDefaultDriver();
@@ -143,9 +208,9 @@ public class CalculatorSteps {
 
 
         entry.logInfo("zchild1").status(Status.FAIL).start().logInfo("zgradnchaild1").status(Status.PASS).timestamp().parent.stop()
-        .logInfo("zchild2").status(Status.INFO).timestamp().logInfo("zgzradnchaild2").status(Status.FAIL).timestamp()
-        .logInfo("zchild3").status(Status.PASS).timestamp().logInfo("zgradnchaild3").status(Status.INFO).timestamp()
-        .logInfo("zchild2").status(Status.SKIP).timestamp().logInfo("zgradnchaild4").screenshot("4).logInfo(\"zgzradnchaild2\").status(Status.FAIL).timestamp()\n" +
+                .logInfo("zchild2").status(Status.INFO).timestamp().logInfo("zgzradnchaild2").status(Status.FAIL).timestamp()
+                .logInfo("zchild3").status(Status.PASS).timestamp().logInfo("zgradnchaild3").status(Status.INFO).timestamp()
+                .logInfo("zchild2").status(Status.SKIP).timestamp().logInfo("zgradnchaild4").screenshot("4).logInfo(\"zgzradnchaild2\").status(Status.FAIL).timestamp()\n" +
                         "        .logInfo(\"zchild3\").status(Status.PASS).timestamp().logInfo(\"zgradnchaild3\").status(Status.INFO).timestam").status(Status.SKIP).timestamp();
 
     }

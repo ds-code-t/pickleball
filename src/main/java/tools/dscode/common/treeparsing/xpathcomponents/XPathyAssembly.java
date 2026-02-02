@@ -229,9 +229,13 @@ public final class XPathyAssembly {
         }
         if (SELF_WRAP.matcher(s).matches()) {
             System.out.println("@@already wrapped: " + xpath);
+
             if(s.startsWith("//*[self")){
+                System.out.println("@@wrappedreturn1: " + s.substring(4,s.length()-1));
                 return s.substring(4,s.length()-1);
             }
+            System.out.println("@@wrappedreturn2: " + xpath);
+
             return xpath;
         }
 
@@ -371,7 +375,7 @@ public final class XPathyAssembly {
     public static String prettyPrintXPath(String xpath) {
         if (xpath == null) return null;
 
-        if (stripPseudoTags == null) stripPseudoTags = substrings.contains("pseudotags");
+        if (stripPseudoTags == null) stripPseudoTags = !substrings.contains("pseudotags");
         if (normalizeWhiteSpace == null) normalizeWhiteSpace = !substrings.contains("normalizexpaths");
 
         final int threshold = 20;
