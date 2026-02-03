@@ -573,7 +573,7 @@ public final class DefinitionContext {
                                     return null; // no label text to match, skip this builder
                                 }
 //                                String textXpath = andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceAll("^//\\*", "");
-                                String textXpath =    XPathy.from("any")
+                                String textXpath =    XPathy.from(any)
                                         .byHaving(deepNormalizedText(v, op)).getXpath().replaceAll("^//\\*", "");
                                 printDebug("##textXpath rowLabel: " + textXpath);
 
