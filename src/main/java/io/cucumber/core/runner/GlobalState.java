@@ -22,6 +22,7 @@ import static tools.dscode.registry.GlobalRegistry.runners;
 
 public class GlobalState {
 
+    public static WorkBook defaultReport;
 
     public static final LifecycleManager lifecycle = new LifecycleManager();
 
@@ -203,11 +204,10 @@ public class GlobalState {
 
 
     public static WorkBook getReport() {
-        CurrentScenarioState currentScenarioState = getCurrentScenarioState();
-        if (currentScenarioState.defaultReport == null) {
-            currentScenarioState.defaultReport = getReport("reports/report.xlsx");
+        if (defaultReport == null) {
+            defaultReport = getReport("reports/report.xlsx");
         }
-        return currentScenarioState.defaultReport;
+        return defaultReport;
     }
 
     public static ConcurrentHashMap<String, WorkBook> workBookMap = new ConcurrentHashMap<>();

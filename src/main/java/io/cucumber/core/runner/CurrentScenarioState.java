@@ -70,9 +70,6 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     public boolean debugBrowser = false;
 
-    WorkBook defaultReport;
-//    public ScenarioStep rootScenarioStep;
-
     public static final ThreadLocal<CurrentScenarioState> currentScenarioState = new ThreadLocal<>();
 
 
