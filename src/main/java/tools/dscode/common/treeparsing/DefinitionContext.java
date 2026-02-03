@@ -578,8 +578,8 @@ public final class DefinitionContext {
                                 printDebug("##textXpath rowLabel: " + textXpath);
 
                                 return new XPathy(
-                                        "//*[ancestor-or-self::*[position() <= 5]" +
-                                                "       [preceding-sibling::*" +
+                                        "//*[ancestor-or-self::*[position() <= 5][not(descendant::text())][count(descendant::*[self::button or self::input or self::textarea or self::select]) = 1]" +
+                                                "       [preceding-sibling::*[count(descendant::div//text())<2]" +
                                                 "           [" +
                                                 "               normalize-space(.)!='' or " +
                                                 "               descendant::*[self::button or self::input or self::textarea or self::select]" +
@@ -588,19 +588,6 @@ public final class DefinitionContext {
                                                 "]"
                                 );
 
-
-//                                return new XPathy("//*[self::select or self::input or self::textarea]" +
-//                                        "  [ancestor::td[preceding-sibling::td" + textXpath + "][" +
-//                                        "     preceding-sibling::td[not(descendant::*[self::button or self::input or self::textarea or self::select or self::a])" +
-//                                        "     or self::td[normalize-space(.) = '']" +
-//                                        "     or self::td" + textXpath +
-//                                        "  ]]]");
-
-
-//                                        "     preceding-sibling::*[1][not(descendant::*[self::button or self::input or self::textarea or self::select or self::a])][self::*" + textXpath + "]]" +
-//                                        "     and td[1]" + textXpath +
-//                                        "     and td[2][descendant::*[self::select or self::input or self::textarea]]" +
-//                                        "  ]]");
                             }
                     );
 
