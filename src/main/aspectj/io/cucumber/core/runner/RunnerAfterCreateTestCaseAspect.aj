@@ -31,7 +31,7 @@ public aspect RunnerAfterCreateTestCaseAspect {
         testCase.currentScenarioState.scenarioRunner = runner;
         testCase.currentScenarioState.cachingGlue = glue;
         System.out.printf(
-                "@@afterCreateTestCase: runner=%s glue=%s pickle=%s testCase=%s%n",
+                "AfterCreateTestCase: runner=%s glue=%s pickle=%s testCase=%s%n",
                 runner,
                 glue,
                 pickle.getUri(),

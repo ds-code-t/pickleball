@@ -78,16 +78,13 @@ public class Registrations {
                                     "     and td[2][descendant::*[self::select or self::input or self::textarea]]" +
                                     "  ]]");
 
-                            System.out.println("@@cellLabel: " + xPathy.getXpath() + "");
                             return xPathy;
-
                         }
                 );
 
         dict.category("idMatch")
                 .or(
                         (category, v, op) ->{ XPathy x = XPathyBuilder.buildIfAllTrue(any, id, v, op, v != null);
-                            System.out.println("@@idMatch:" + x.getXpath());
                             return x;
                         }
                 );

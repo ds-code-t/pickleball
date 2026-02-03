@@ -221,23 +221,17 @@ public final class XPathyAssembly {
 
 
     public static String toSelfStep(String xpath) {
-        System.out.println("\n@@##toSelfStep1 : " + xpath + "");
         String s = xpath.trim();
         while(s.startsWith("(") && s.endsWith(")"))
         {
             s = s.substring(1,s.length()-1);
         }
         if (SELF_WRAP.matcher(s).matches()) {
-            System.out.println("@@already wrapped: " + xpath);
             if(s.startsWith("//*[self")){
-                System.out.println("@@wrappedreturn1: " + s.substring(4,s.length()-1));
                 return s.substring(4,s.length()-1);
             } else   if(s.startsWith("//*[(self")){
-                System.out.println("@@wrappedreturn2: " + s.substring(4,s.length()-1));
                 return s.substring(5,s.length()-2);
             }
-            System.out.println("@@wrappedreturn3: " + xpath);
-
             return xpath;
         }
 
@@ -248,7 +242,6 @@ public final class XPathyAssembly {
         String stripped = s
                 .replaceFirst("^[\\./]+", "").trim();     // /...
 
-        System.out.println("@@stripped: " + stripped);
 //        if(stripped.startsWith("self::"))
 //            return xpath;
 
@@ -262,7 +255,6 @@ public final class XPathyAssembly {
         int id = selfCounter.incrementAndGet();
         int nestingCount = countIdPairs(step);
         step = step.replaceFirst("^([a-zA-Z*]+)" , "self::$1["+ id + ">-" + nestingCount + "]") + "["+ id + ">-" + nestingCount + "]";
-        System.out.println("\n@@##toSelfStep2 : " +  step + "");
         return  step;
     }
 
