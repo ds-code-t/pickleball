@@ -126,7 +126,6 @@ public final class DefinitionContext {
                 String context = self.resolvedGroupText("context");
 
 
-
                 boolean upperCaseContext = !context.isEmpty() && Character.isUpperCase(context.charAt(0));
 
                 if (upperCaseContext || (!separator.isEmpty() && Character.isUpperCase(separator.charAt(0))))
@@ -451,7 +450,6 @@ public final class DefinitionContext {
                     .addBase("//select");
 
 
-
             category("Close Button").children("Close Buttons")
                     .and(
                             (category, v, op) ->
@@ -576,13 +574,28 @@ public final class DefinitionContext {
                                 }
                                 String textXpath = andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceAll("^//\\*", "");
                                 printDebug("##textXpath rowLabel: " + textXpath);
-                                return new XPathy("//*[self::select or self::input or self::textarea]" +
-                                        "  [ancestor::td[" +
-                                        "     preceding-sibling::td[not(descendant::*[self::button or self::input or self::textarea or self::select or self::a])]" +
-                                        "     or self::td[normalize-space(.) = '']" +
-                                        "     or self::td" + textXpath +
-                                        "  ]]]");
 
+                                return new XPathy(
+                                        "//*[ancestor-or-self::*[position() <= 5]" +
+                                                "       [preceding-sibling::*" +
+                                                "           [" +
+                                                "               normalize-space(.)!='' or " +
+                                                "               descendant::*[self::button or self::input or self::textarea or self::select]" +
+                                                "           ][1]" + textXpath +
+                                                "       ]" +
+                                                "]"
+
+
+
+                                );
+
+
+//                                return new XPathy("//*[self::select or self::input or self::textarea]" +
+//                                        "  [ancestor::td[preceding-sibling::td" + textXpath + "][" +
+//                                        "     preceding-sibling::td[not(descendant::*[self::button or self::input or self::textarea or self::select or self::a])" +
+//                                        "     or self::td[normalize-space(.) = '']" +
+//                                        "     or self::td" + textXpath +
+//                                        "  ]]]");
 
 
 //                                        "     preceding-sibling::*[1][not(descendant::*[self::button or self::input or self::textarea or self::select or self::a])][self::*" + textXpath + "]]" +
@@ -610,7 +623,7 @@ public final class DefinitionContext {
 
 
                                 XPathy returnXpath = combineOr(
-                                        new XPathy( "//*[@id = (ancestor::div[3]//descendant::*" + textXpath + "[@for][1]/@for)]"),
+                                        new XPathy("//*[@id = (ancestor::div[3]//descendant::*" + textXpath + "[@for][1]/@for)]"),
                                         new XPathy("//*[ancestor-or-self::*[position() <= 7]" +
                                                 "  [preceding-sibling::*[1]  " +
                                                 textXpath +
@@ -619,7 +632,7 @@ public final class DefinitionContext {
                                                 "]")
                                 );
                                 printDebug("##textXpath forLabel:2 " + returnXpath);
-                            return returnXpath;
+                                return returnXpath;
 //                                        new XPathy("//*[ancestor-or-self::*[position() <= 5][preceding-sibling::*[1][not(descendant::*[self::button or self::input or self::textarea or self::select or self::a])][self::*" + textXpath + "]]")
 
                             }
