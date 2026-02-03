@@ -12,6 +12,7 @@ Feature: Additiontest
 #    * , in the "cars" Dropdown, verify the Option is displayed
 #    * , verify "Birth month:" Dropdown is displayed
 #    * , in the "Birth month:" Dropdown, verify the last Option is displayed
+
     * , select the last Option "cars" Dropdown
     * , select the last Option "Choose a car:" Dropdown
 

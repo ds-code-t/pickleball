@@ -576,12 +576,19 @@ public final class DefinitionContext {
                                 }
                                 String textXpath = andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceAll("^//\\*", "");
                                 printDebug("##textXpath rowLabel: " + textXpath);
-                                return new XPathy("//*[self::select or self::input or self::textarea]\n" +
-                                        "  [ancestor::tr[count(td)=2" +
-                                        "     and count(descendant::*[self::select or self::input or self::textarea])=1" +
-                                        "     and td[1]" + textXpath +
-                                        "     and td[2][descendant::*[self::select or self::input or self::textarea]]" +
-                                        "  ]]");
+                                return new XPathy("//*[self::select or self::input or self::textarea]" +
+                                        "  [ancestor::td[" +
+                                        "     preceding-sibling::td[not(descendant::*[self::button or self::input or self::textarea or self::select or self::a])]" +
+                                        "     or self::td[normalize-space(.) = '']" +
+                                        "     or self::td" + textXpath +
+                                        "  ]]]");
+
+
+
+//                                        "     preceding-sibling::*[1][not(descendant::*[self::button or self::input or self::textarea or self::select or self::a])][self::*" + textXpath + "]]" +
+//                                        "     and td[1]" + textXpath +
+//                                        "     and td[2][descendant::*[self::select or self::input or self::textarea]]" +
+//                                        "  ]]");
                             }
                     );
 
