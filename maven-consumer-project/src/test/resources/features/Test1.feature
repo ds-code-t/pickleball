@@ -1,5 +1,11 @@
 Feature: Additiontest
 
+  Scenario: dfsdfgh4
+  @[DEBUG,nosbase,##Specificity,##xscore,##textXpath,##pseudotags,##nosrmalizexpaths]
+    * , from the Top Panel:
+    :  * , verify "Account Number" Text is displayed
+
+
   Scenario: dfdfdddww
 #    Then , save "Q1" as "W"
 #  @[DEBUG,noBase,##Specificity,##xscore,##textXpath,##]

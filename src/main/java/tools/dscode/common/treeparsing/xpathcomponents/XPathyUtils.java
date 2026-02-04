@@ -200,33 +200,41 @@ public final class XPathyUtils {
     private static String buildDeepTextPredicate(ValueWrapper value, ExecutionDictionary.Op op) {
         ValueWrapper.ValueTypes t = value.type;
 
-        // BACK_TICKED => exact string(.) compare, no normalization/casefold
-        if (t == ValueWrapper.ValueTypes.BACK_TICKED) {
-            String expected = rawValue(value);
-            if (expected == null) {
-                // exact null is impossible in XPath string(.); treat as equals empty string for safety
-                expected = "";
-            }
-            return buildStringPredicate("string(.)", toXPathLiteral(expected), op);
-        }
-
-        // Everything else => normalized-text matching.
-        // SINGLE_QUOTED => case-insensitive
         boolean caseInsensitive = (t == ValueWrapper.ValueTypes.SINGLE_QUOTED);
 
-        // Use normalizedTextExpr() for the DOM side;
-        // Use normalizeText(rawValue) for expected to ensure identical normalization strategy.
-        String domExpr = normalizedTextExpr();
-        String expected = normalizeText(rawValue(value));
-        if (expected == null) expected = "";
+        // Build the DOM-side expression evaluated per TEXT NODE (.)
+        String textNodeExpr;
+        if (t == ValueWrapper.ValueTypes.BACK_TICKED) {
+            // exact: no normalization/casefold
+            textNodeExpr = ".";
+        } else {
+            // normalized-text matching (your existing normalization strategy)
+            textNodeExpr = "normalize-space(translate(., " + toXPathLiteral(from) + " , " + toXPathLiteral(to) + "))";
+            if (caseInsensitive) {
+                textNodeExpr = caseFoldExpr(textNodeExpr);
+            }
+        }
 
+        // Expected value
+        String expected = rawValue(value);
+        if (expected == null) expected = "";
+        if (t != ValueWrapper.ValueTypes.BACK_TICKED) {
+            expected = normalizeText(expected);
+            if (expected == null) expected = "";
+        }
         if (caseInsensitive) {
-            domExpr = caseFoldExpr(domExpr);
             expected = caseFoldValue(expected);
         }
 
-        return buildStringPredicate(domExpr, toXPathLiteral(expected), op);
+        String needleLiteral = toXPathLiteral(expected);
+
+        // Build comparison op against the per-text-node expression
+        String textPredicate = buildStringPredicate(textNodeExpr, needleLiteral, op);
+
+        // Filter out text nodes that are inside field-accessibility descendants
+        return ".//text()[not(ancestor::*[position()<=5][contains(@class, 'field-accessibility')]) and " + textPredicate + "]";
     }
+
 
     private static String buildAttributePredicate(String attrExpr, ValueWrapper value, ExecutionDictionary.Op op) {
         ValueWrapper.ValueTypes t = value.type;
