@@ -69,7 +69,7 @@ public class Registrations {
                                 return null; // no label text to match, skip this builder
                             }
                             String textXpath = dict.andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceAll("^//\\*", "");
-                            printDebug("##textXpath rowLabel: " + textXpath);
+                            printDebug("##textXpath genericLabel: " + textXpath);
 
                             XPathy xPathy =  new XPathy("//*[self::select or self::input or self::textarea]" +
                                     "  [ancestor::tr[count(td)=2" +

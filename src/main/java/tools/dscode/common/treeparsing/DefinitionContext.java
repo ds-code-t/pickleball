@@ -446,7 +446,7 @@ public final class DefinitionContext {
                     );
 
 
-            category("Dropdown").children("Dropdowns").andAnyCategories("forLabel", "htmlNaming", "rowLabel")
+            category("Dropdown").children("Dropdowns").andAnyCategories("forLabel", "htmlNaming", "genericLabel")
                     .addBase("//select");
 
 
@@ -477,7 +477,7 @@ public final class DefinitionContext {
             //
             // Textbox  (two registration blocks preserved exactly)
             //
-            category("Textbox").children("Textboxes").andAnyCategories("forLabel", "htmlNaming", "rowLabel", "placeholderLabel")
+            category("Textbox").children("Textboxes").andAnyCategories("forLabel", "htmlNaming", "genericLabel", "placeholderLabel")
                     .addBase("//input")
                     .and((category, v, op) ->
                             combineOr(
@@ -497,15 +497,15 @@ public final class DefinitionContext {
                             )
                     );
 
-            category("Textarea").children("Textareas").andAnyCategories("forLabel", "htmlNaming", "rowLabel", "placeholderLabel")
+            category("Textarea").children("Textareas").andAnyCategories("forLabel", "htmlNaming", "genericLabel", "placeholderLabel")
                     .addBase("//textarea");
 
 
-            category("Radio Button").children("Radio Buttons").andAnyCategories("forLabel", "htmlNaming", "rowLabel")
+            category("Radio Button").children("Radio Buttons").andAnyCategories("forLabel", "htmlNaming", "genericLabel")
                     .addBase("//input[@type='radio']");
 
 
-            category("Checkbox").children("Checkboxes").andAnyCategories("forLabel", "htmlNaming", "rowLabel")
+            category("Checkbox").children("Checkboxes").andAnyCategories("forLabel", "htmlNaming", "genericLabel")
                     .and((category, v, op) ->
                             combineOr(
                                     Tag.input.byAttribute(type).equals("checkbox"),
@@ -513,7 +513,7 @@ public final class DefinitionContext {
                             )
                     );
 
-            category("Toggle").children("Toggles").andAnyCategories("forLabel", "htmlNaming", "rowLabel")
+            category("Toggle").children("Toggles").andAnyCategories("forLabel", "htmlNaming", "genericLabel")
                     .and((category, v, op) ->
                             combineOr(
                                     Tag.input.byAttribute(checked).haveIt(),
@@ -566,27 +566,30 @@ public final class DefinitionContext {
                     );
 
 
-            category("rowLabel")
+            category("genericLabel")
                     .and(
                             (category, v, op) -> {
                                 if (v == null || v.isNullOrBlank()) {
                                     return null; // no label text to match, skip this builder
                                 }
 //                                String textXpath = andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceAll("^//\\*", "");
-                                String textXpath =    XPathy.from(any)
+                                String textXpath = XPathy.from(any)
                                         .byHaving(deepNormalizedText(v, op)).getXpath().replaceAll("^//\\*", "");
-                                printDebug("##textXpath rowLabel: " + textXpath);
+                                printDebug("##textXpath genericLabel: " + textXpath);
 
-                                return new XPathy(
-                                        "//*[ancestor-or-self::*[position() <= 5][not(descendant::text())][count(descendant::*[self::button or self::input or self::textarea or self::select]) = 1]" +
+                                XPathy returnXpathy = new XPathy(
+                                        "//*[ancestor-or-self::*[position() <= 5]" +
+                                                singleControlElementContainer +
                                                 "       [preceding-sibling::*[count(descendant::div//text())<2]" +
                                                 "           [" +
                                                 "               normalize-space(.)!='' or " +
-                                                "               descendant::*[self::button or self::input or self::textarea or self::select]" +
-                                                "           ][1]" + textXpath +
+                                                "               descendant::*[self::input or self::textarea or self::select]" +
+                                                "           ][1]" + textXpath + "[not(descendant::*[self::input or self::textarea or self::select][@type='hidden'])]" +
                                                 "       ]" +
                                                 "]"
                                 );
+                                printDebug("##returnXpathy-" + category + ": " + returnXpathy.getXpath());
+                                return returnXpathy;
 
                             }
                     );

@@ -25,6 +25,20 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNo
 
 public class ExecutionDictionary {
 
+
+    public static final String singleControlElementContainer =
+            "       [" +
+                    "   count(descendant::*[self::input or self::textarea or self::select][@type='hidden']) = 1" +
+                    "   and descendant::*[self::input or self::textarea or self::select]" +
+                    "   [" +
+                    "       not(preceding-sibling::*[normalize-space(string(.)) != ''])" +
+                    "       and " +
+                    "       not(following-sibling::*[normalize-space(string(.)) != ''])" +
+                    "   ]" +
+                    "]";
+
+
+
     @FunctionalInterface
     public interface Builder {
         XPathy build(String category, ValueWrapper value, Op op);
