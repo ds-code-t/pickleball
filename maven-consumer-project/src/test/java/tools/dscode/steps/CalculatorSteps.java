@@ -110,7 +110,6 @@ public class CalculatorSteps {
     }
 
 //    static {
-//        System.out.println("@@static block CalculatorSteps");
 //        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 //            try {
 //            System.err.println("@@getAllStackTraces*******");
@@ -166,7 +165,6 @@ public class CalculatorSteps {
 
     @Given("test2")
     public static void test2() {
-        System.out.println("@@test2!!!");
 
     }
 
@@ -174,7 +172,6 @@ public class CalculatorSteps {
 
     @Given("error")
     public static void errorTest() {
-        System.out.println("@@error!!!");
         throw new RuntimeException("error test1");
     }
 

@@ -13,7 +13,6 @@ import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ActionO
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.OperationsInterface;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHolderMatch;
 import tools.dscode.common.treeparsing.preparsing.LineData;
-import tools.dscode.coredefinitions.GeneralSteps;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,17 +22,16 @@ import java.util.stream.Collectors;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
-import static tools.dscode.common.domoperations.HumanInteractions.blur;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
+import static tools.dscode.common.treeparsing.parsedComponents.Phrase.updateChainAndInheritances;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inBetweenOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.insideOf;
 import static tools.dscode.common.util.debug.DebugUtils.onMatch;
-import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
 
 
 public abstract class PhraseData extends PassedData {
@@ -43,6 +41,21 @@ public abstract class PhraseData extends PassedData {
     public final Character termination; // nullable
     public final LineData parsedLine;
     private SearchContext searchContext;
+    public PhraseData repeatedPhraseMaster = null;
+    public boolean shouldRepeatPhrase = false;
+    boolean invertConditional = false;
+
+    List<Object> repetitionContext = new ArrayList<>();
+
+
+    public PhraseData cloneRepeatedPhrase() {
+        PhraseData clone = clonePhrase(getPreviousPhrase());
+        updateChainAndInheritances(clone);
+        clone.repeatedPhraseMaster = this;
+        clone.shouldRepeatPhrase =false;
+        repeatedPhrases.add(clone);
+        return clone;
+    }
 
     public String getPreviousTerminator() {
         return getPreviousPhrase() == null ? "" : getPreviousPhrase().termination.toString();
@@ -112,14 +125,23 @@ public abstract class PhraseData extends PassedData {
         MatchNode returnMatchNode = getNodeDictionary().parse(resolvedText);
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
+
+        String conditional = phraseNode.getStringFromLocalState("conditional");
+        if (conditional.equalsIgnoreCase("until"))
+        {
+            conditional = "if";
+            shouldRepeatPhrase = true;
+            invertConditional = true;
+        }
+        setConditional(conditional);
+
         operationIndex = (Integer) phraseNode.getFromLocalState("operationIndex");
 
 
         hasNo = phraseNode.localStateBoolean("no");
-//        hasNot = phraseNode.localStateBoolean("not");
-//        hasNone = phraseNode.localStateBoolean("none");
-//        keyName = phraseNode.getStringFromLocalState("keyName");
-        setConditional(phraseNode.getStringFromLocalState("conditional"));
+
+
+
         body = phraseNode.getStringFromLocalState("body");
         separator = phraseNode.localStateBoolean("separator");
         setElementMatches(phraseNode.getOrderedChildren("elementMatch").stream().map(this::getElementMatch).collect(Collectors.toList()));
@@ -165,6 +187,8 @@ public abstract class PhraseData extends PassedData {
         } else {
             System.out.println("PhraseType: " + phraseType + " set for '" + text + "'");
         }
+
+
     }
 
     public ElementMatch getElementMatch(MatchNode elementNode) {
@@ -251,12 +275,10 @@ public abstract class PhraseData extends PassedData {
                 return returnList.subList(i, returnList.size());
             }
         }
-
         return returnList;
     }
 
     public static XPathy getXPathyContext(String context, List<ElementMatch> elements) {
-
         if (elements.isEmpty()) return null;
         XPathy xPathy = elements.getFirst().xPathy;
         if (xPathy == null) return null;
@@ -335,13 +357,17 @@ public abstract class PhraseData extends PassedData {
 
         previouslyResolvedBoolean = getBooleanResult();
         
-        String assertionMessage = "Assertion phrase '" + text + "' evaluates to: " + previouslyResolvedBoolean;
+        String assertionMessage = "Assertion phrase '" + resolvedText + "' evaluates to: " + previouslyResolvedBoolean;
         System.out.println(assertionMessage);
         if (!resultElements.isEmpty())
             assertionMessage += " , elements:" + resultElements.stream()
                     .map(Object::toString)
                     .collect(Collectors.joining("\n", "\n", ""));
 
+        if(invertConditional)
+        {
+            previouslyResolvedBoolean = !previouslyResolvedBoolean;
+        }
 
 
         switch (getAssertionType()) {

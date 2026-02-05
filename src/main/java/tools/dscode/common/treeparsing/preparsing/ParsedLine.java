@@ -1,5 +1,6 @@
 package tools.dscode.common.treeparsing.preparsing;
 
+import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import java.util.ArrayList;
@@ -28,6 +29,8 @@ public final class ParsedLine extends LineData {
         runPhraseFromLine(updateChainAndInheritances(phrase.resolvePhrase()));
     }
 
+
+    @Override
     public void runPhraseFromLine(PhraseData phrase) {
         PhraseData nextResolvedPhrase = phrase.runPhrase();
         if (nextResolvedPhrase == null) {
@@ -35,7 +38,16 @@ public final class ParsedLine extends LineData {
             System.out.println("Step completed: " + executedPhrases);
             return;
         }
-        if (phrase.branchedPhrases.isEmpty()) {
+        if (phrase.shouldRepeatPhrase) {
+            while(true) {
+                PhraseData repeatedPhraseClone = phrase.cloneRepeatedPhrase();
+                runPhraseFromLine(repeatedPhraseClone);
+                if(repeatedPhraseClone.phraseConditionalMode < 1)
+                {
+                    break;
+                }
+            }
+        } else if (phrase.branchedPhrases.isEmpty()) {
             runPhraseFromLine(nextResolvedPhrase);
         } else {
 //            phrase.resolveResults();

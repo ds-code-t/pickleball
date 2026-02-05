@@ -26,12 +26,12 @@ import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
 
 public abstract class PassedData {
 
-    PhraseData chainStartPhrase;
+    public PhraseData chainStartPhrase;
     int chainStart;
     int chainEnd;
 
     boolean groupSeparator = false;
-    boolean isChainStart = false;
+    public boolean isChainStart = false;
 
     public PhraseData lastOperationPhrase;
 
@@ -127,14 +127,12 @@ public abstract class PassedData {
     private final List<ElementMatch> valueTypeEntryElementMatches = new ArrayList<>();
 
     public List<ElementMatch> getValueTypeEntryElementMatches() {
-        System.out.println("@@valueTypeElementMatches1: " + valueTypeEntryElementMatches);
         if(valueTypeEntryElementMatches.isEmpty())
         {
             if(previousPhrase != null) {
                 valueTypeEntryElementMatches.addAll(previousPhrase.getValueTypeEntryElementMatches());
             }
         }
-        System.out.println("@@valueTypeElementMatches2: " + valueTypeEntryElementMatches);
         return valueTypeEntryElementMatches;
     }
 
@@ -142,14 +140,12 @@ public abstract class PassedData {
     final List<ElementMatch> webElementMatches = new ArrayList<>();
 
     public List<ElementMatch> getWebElementMatches() {
-        System.out.println("@@webElementMatches1: " + webElementMatches);
         if(webElementMatches.isEmpty())
         {
             if(previousPhrase != null) {
                 webElementMatches.addAll(previousPhrase.webElementMatches);
             }
         }
-        System.out.println("@@webElementMatches2: " + webElementMatches);
         return webElementMatches;
     }
 
@@ -192,6 +188,7 @@ public abstract class PassedData {
 
     private WebDriver driver = null;
     public List<PhraseData> branchedPhrases = new ArrayList<>();
+    public List<PhraseData> repeatedPhrases = new ArrayList<>();
 
     public ElementWrapper contextElement;
 

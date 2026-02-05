@@ -83,7 +83,7 @@ public enum ActionOperations implements OperationsInterface {
     SAVE {
         @Override
         public void execute(PhraseData phraseData) {
-            System.out.println(phraseData + " : Executing " + this.name());
+//            System.out.println(phraseData + " : Executing " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE).mustNotMatchAny(ElementType.KEY_VALUE),
@@ -396,8 +396,6 @@ public enum ActionOperations implements OperationsInterface {
                     if(shouldEnterText) {
                         for (ElementMatch valueElement : phraseData.getValueTypeEntryElementMatches()) {
                             ValueWrapper valueWrapper = valueElement.getValue();
-                            System.out.println("@@valueWrapper: " + valueWrapper);
-                            System.out.println("@@valueWrapper.type: " + valueWrapper.type);
                             if (valueWrapper.type == ValueWrapper.ValueTypes.BACK_TICKED) {
                                 sendComplexKeys(getDefaultDriver(), webElement, valueWrapper.toString());
                             } else {

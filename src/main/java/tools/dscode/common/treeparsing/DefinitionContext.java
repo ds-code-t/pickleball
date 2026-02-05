@@ -108,7 +108,7 @@ public final class DefinitionContext {
         ParseNode position = new ParseNode("#\\d+");
 
 
-        ParseNode phrase = new ParseNode("^\\s*(?<separatorA>\\b[tT]hen\\b\\s*)?(?<conjunction>\\b(?:and|or)\\b\\s*)?(?<separatorB>\\b[tT]hen\\b\\s*)?\\s*(?<conditional>\\b(?:else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
+        ParseNode phrase = new ParseNode("^\\s*(?<separatorA>\\b[tT]hen\\b\\s*)?(?<conjunction>\\b(?:and|or)\\b\\s*)?(?<separatorB>\\b[tT]hen\\b\\s*)?\\s*(?<conditional>\\b(?:until|else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
             @Override
             public String onCapture(MatchNode self) {
                 String separator = self.resolvedGroupText("separatorA");
@@ -134,6 +134,10 @@ public final class DefinitionContext {
                 self.putToLocalState("context", context.toLowerCase());
                 String conditional = self.resolvedGroupText("conditional");
                 self.putToLocalState("conditional", conditional);
+                if(conditional.equalsIgnoreCase("until"))
+                {
+                    conditional = "if";
+                }
 
                 self.putToLocalState("conjunction", self.resolvedGroupText("conjunction"));
                 self.putToLocalState("body", self.resolvedGroupText("body"));

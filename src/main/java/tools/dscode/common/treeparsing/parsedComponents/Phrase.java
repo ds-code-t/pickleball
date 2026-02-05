@@ -66,6 +66,8 @@ public final class Phrase extends PhraseData {
             resolveResults();
         }
 
+        System.out.println("@@contextTermination:  " + contextTermination);
+
         if (contextTermination) {
             if (phraseType.equals(PhraseType.CONDITIONAL)) {
                 parsedLine.lineConditionalMode = phraseConditionalMode;
@@ -82,6 +84,11 @@ public final class Phrase extends PhraseData {
 
 
     public void executePhrase() {
+        System.out.println("@@executePhrase1: "  + this);
+        System.out.println("@@phraseType1: "  + phraseType);
+        System.out.println("@@templatePhrase.phraseType1: "  + templatePhrase.phraseType);
+        System.out.println("@@templatePhrase.getConditional()1: "  + templatePhrase.getConditional());
+        System.out.println("@@templatePhrase.getAction()1: "  + templatePhrase.getAction());
         if ((phraseType == null || phraseType == PhraseType.ELEMENT_ONLY) && templatePhrase.phraseType != null) {
             if (!templatePhrase.getAction().isBlank()) {
                 setAction(templatePhrase.getAction());
@@ -99,6 +106,15 @@ public final class Phrase extends PhraseData {
                 }
             }
         }
+        System.out.println("@@executePhrase2: "  + this);
+        System.out.println("@@phraseType2: "  + phraseType);
+        System.out.println("@@templatePhrase.phraseType2: "  + templatePhrase.phraseType);
+        System.out.println("@@templatePhrase.getConditional()2: "  + templatePhrase.getConditional());
+        System.out.println("@@templatePhrase.getAction()2: "  + templatePhrase.getAction());
+
+
+        System.out.println("@@getAssertionType()3: "  + getAssertionType());
+        System.out.println("@@getAssertion()3: "  + getAssertion());
 
 
         if (phraseType == null && !getConditional().isBlank()) {
@@ -108,7 +124,10 @@ public final class Phrase extends PhraseData {
         if (!getAssertionType().isBlank() && getAssertion().isBlank()) {
             setAssertion("true");
         }
+        System.out.println("@@getAssertionType()4: "  + getAssertionType());
+        System.out.println("@@getAssertion()4: "  + getAssertion());
 
+        System.out.println("@@isOperationPhrase4: "  + isOperationPhrase);
 
         parsedLine.executedPhrases.add(this);
 
@@ -133,6 +152,12 @@ public final class Phrase extends PhraseData {
             contextPhrases.addAll(getPreviousPhrase().contextPhrases);
         }
 
+        if (shouldRepeatPhrase) {
+            return;
+//            PhraseData repeatedPhraseClone = clonePhrase(getPreviousPhrase());
+//            repeatedPhraseClone.shouldRepeatPhrase = false;
+//            branchedPhrases.add(repeatedPhraseClone);
+        }
 
         if (isOperationPhrase) {
             runOperation();
@@ -159,6 +184,7 @@ public final class Phrase extends PhraseData {
             contextPhrases.add(this);
         }
     }
+
 
 
     public PhraseData cloneWithElementContext(ElementWrapper elementWrapper) {
@@ -216,13 +242,11 @@ public final class Phrase extends PhraseData {
     }
 
     public static PhraseData updateChainAndInheritances(PhraseData nextResolvedPhrase) {
-
         nextResolvedPhrase.setOperationInheritance();
         if (nextResolvedPhrase.phraseType == PhraseType.CONTEXT)
             return nextResolvedPhrase;
 
         PhraseData previousPhrase = nextResolvedPhrase.getPreviousPhrase();
-
         if (nextResolvedPhrase.isChainStart) {
 //            if (previousPhrase != null)
 //                previousPhrase.resolveResults();

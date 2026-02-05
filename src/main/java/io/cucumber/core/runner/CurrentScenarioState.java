@@ -126,9 +126,9 @@ public class CurrentScenarioState extends ScenarioMapping {
 
         lifecycle.fire(Phase.BEFORE_SCENARIO_RUN);
 
-        ReportingSteps.setRow(null, null,List.of(
-                List.of( "Scenario Name", "Line", "STATUS", "INFO"),
-                List.of( pickle.getName(), String.valueOf(pickle.getLocation().getLine()), "", "Started")));
+        ReportingSteps.setRow(null, null, List.of(
+                List.of("Scenario Name", "Line", "STATUS", "INFO"),
+                List.of(pickle.getName(), String.valueOf(pickle.getLocation().getLine()), "", "Started")));
 
         this.stepExtensions = (List<StepExtension>) getProperty(testCase, "stepExtensions");
         StepExtension rootScenarioStep = testCase.getRootScenarioStep();
@@ -186,9 +186,9 @@ public class CurrentScenarioState extends ScenarioMapping {
                 .distinct()
                 .collect(Collectors.joining(", "));
 
-        ReportingSteps.setRow(null, null,  List.of(
-                List.of( "STATUS", "INFO"),
-                List.of(  (isScenarioFailed()? "FAILED" : "PASSED"), infoMessage)));
+        ReportingSteps.setRow(null, null, List.of(
+                List.of("STATUS", "INFO"),
+                List.of((isScenarioFailed() ? "FAILED" : "PASSED"), infoMessage)));
 
         scenarioRunCleanUp();
 
@@ -282,7 +282,6 @@ public class CurrentScenarioState extends ScenarioMapping {
         Throwable throwable = result.getError();
 
 
-
         if (!result.getStatus().equals(Status.PASSED) && !result.getStatus().equals(Status.SKIPPED) && throwable == null) {
 
             if (status.equals(io.cucumber.plugin.event.Status.UNDEFINED))
@@ -319,34 +318,54 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
         if (!stepExtension.definitionFlags.contains(IGNORE_CHILDREN)) {
-            List<StepExtension> repeatSteps = getNestedRepetitions(stepExtension);
-            for (StepExtension repeatStep : repeatSteps) {
-                StepExtension firstChild = (StepExtension) repeatStep.initializeChildSteps();
-
-                if (firstChild != null) {
-                    runStep(firstChild);
-
+            PhraseData lastPhrase = getLastPhrase(stepExtension);
+            System.out.println("@@lastPhrase: "  + lastPhrase  + (lastPhrase == null? "null"  : lastPhrase.shouldRepeatPhrase ) );
+            if (lastPhrase != null && lastPhrase.shouldRepeatPhrase) {
+                while (true) {
+                    PhraseData repeatedPhraseClone = lastPhrase.cloneRepeatedPhrase();
+                    lastPhrase.parsedLine.runPhraseFromLine(repeatedPhraseClone);
+                    if (repeatedPhraseClone.phraseConditionalMode < 1) {
+                        break;
+                    }
+                    StepExtension repeatedStep = (StepExtension) stepExtension.clone();
+                    repeatedStep.lineData.inheritedContextPhrases.getLast().add(repeatedPhraseClone);
+                    StepExtension firstChild = (StepExtension) repeatedStep.initializeChildSteps();
+                    if (firstChild != null) {
+                        runStep(firstChild);
+                    }
+                }
+            } else {
+                List<StepExtension> repeatSteps = getNestedRepetitions(stepExtension, lastPhrase);
+                for (StepExtension repeatStep : repeatSteps) {
+                    StepExtension firstChild = (StepExtension) repeatStep.initializeChildSteps();
+                    if (firstChild != null) {
+                        runStep(firstChild);
+                    }
                 }
             }
-        }
 
-        if (stepExtension.nextSibling != null) {
-            runStep((StepExtension) stepExtension.nextSibling);
+            if (stepExtension.nextSibling != null) {
+                runStep((StepExtension) stepExtension.nextSibling);
+            }
         }
     }
 
-    public List<StepExtension> getNestedRepetitions(StepExtension stepExtension) {
-        List<StepExtension> returnList = new ArrayList<>();
-
-        List<PhraseData> branchedPhrases = null;
+    public PhraseData getLastPhrase(StepExtension stepExtension) {
         try {
-            branchedPhrases = stepExtension.lineData.inheritedContextPhrases.getLast().getLast().branchedPhrases;
-        } catch (Throwable ignored) {
-            returnList.add(stepExtension);
-            return returnList;
+            return stepExtension.lineData.inheritedContextPhrases.getLast().getLast();
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    public List<StepExtension> getNestedRepetitions(StepExtension stepExtension, PhraseData lastPhrase) {
+
+        if (lastPhrase == null || lastPhrase.branchedPhrases.isEmpty()) {
+            return new ArrayList<>(List.of(stepExtension));
         }
 
-        for (PhraseData branch : branchedPhrases) {
+        List<StepExtension> returnList = new ArrayList<>();
+        for (PhraseData branch : lastPhrase.branchedPhrases) {
             try {
                 StepExtension branchStep = (StepExtension) stepExtension.clone();
                 branchStep.lineData.inheritedContextPhrases.getLast().add(branch);
@@ -355,10 +374,6 @@ public class CurrentScenarioState extends ScenarioMapping {
                 t.printStackTrace();
                 throw new RuntimeException(t);
             }
-        }
-
-        if (branchedPhrases.isEmpty()) {
-            returnList.add(stepExtension);
         }
         return returnList;
     }

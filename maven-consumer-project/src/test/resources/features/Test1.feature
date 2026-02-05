@@ -1,5 +1,15 @@
 Feature: Additiontest
 
+  Scenario: until test1
+    * , save "a" as "A"
+#    * , if "<A>", wait 1 second
+#    * , until "<A>" equals "aaa", save "<A>a" as "A" , wait 1 second
+    * , until "<A>" equals "aaaaa":
+    :  * , save "<A>a" as "A" , wait 1 second
+    * , if "<A>" equals "a":
+  :  * , save "<A>a" as "A" , wait 1 second
+
+
   Scenario: dfsdfgh4
   @[DEBUG,nosbase,##Specificity,##xscore,##textXpath,##pseudotags,##nosrmalizexpaths]
     * , from the Top Panel:

@@ -37,6 +37,8 @@ public abstract class LineData implements Cloneable {
         return this.original + " " + phrases;
     }
 
+    public abstract void runPhraseFromLine(PhraseData phrase);
+
     public LineData(String input, Collection<Character> delimiters) {
 
         this.original = stripObscureNonText(Objects.requireNonNull(input, "input"));
