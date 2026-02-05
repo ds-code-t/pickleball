@@ -1,6 +1,6 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
-import org.openqa.selenium.By;
+import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.browseroperations.WindowSwitch;
@@ -12,6 +12,7 @@ import tools.dscode.common.util.FileUploadUtil;
 import tools.dscode.coredefinitions.GeneralSteps;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
@@ -25,16 +26,14 @@ import static tools.dscode.common.domoperations.HumanInteractions.contextClick;
 import static tools.dscode.common.domoperations.HumanInteractions.doubleClick;
 import static tools.dscode.common.domoperations.HumanInteractions.selectDropdownByIndex;
 import static tools.dscode.common.domoperations.HumanInteractions.selectDropdownByVisibleText;
+import static tools.dscode.common.domoperations.HumanInteractions.sendKeys;
 import static tools.dscode.common.domoperations.HumanInteractions.typeText;
 import static tools.dscode.common.domoperations.HumanInteractions.wheelScrollBy;
+import static tools.dscode.common.domoperations.KeyParser.sendComplexKeys;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
-import static tools.dscode.common.domoperations.LeanWaits.waitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitForDuration;
-import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
-import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
 import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
-import static tools.dscode.coredefinitions.GeneralSteps.getJavascriptExecutor;
 
 public enum ActionOperations implements OperationsInterface {
     CREATE_AND_ATTACH {
@@ -106,11 +105,20 @@ public enum ActionOperations implements OperationsInterface {
         }
     },
 
+    TAB {
+        @Override
+        public void execute(PhraseData phraseData) {
+            System.out.println(phraseData + " : Executing " + this.name());
+            sendKeys(getDefaultDriver(), Keys.chord(Keys.CONTROL, Keys.SHIFT));
+        }
+    },
+
+
     WAIT {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-
+            blur(GeneralSteps.getDefaultDriver());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.TIME_VALUE, ElementType.FOLLOWING_OPERATION)
@@ -243,79 +251,25 @@ public enum ActionOperations implements OperationsInterface {
             });
         }
     },
-
     ENTER {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.HTML_ELEMENT)
-            );
-
-            ElementMatch value = phraseData.resultElements.getFirst();
-            ElementMatch inputElement = phraseData.resultElements.get(1);
-            phraseData.result = Attempt.run(() -> {
-                int count = 0;
-                for (ElementWrapper elementWrapper : inputElement.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if (count > 0) {
-                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
-                    }
-                    typeText(GeneralSteps.getDefaultDriver(), elementWrapper.getElement(), value.getValue().toString());
-                    count++;
-                }
-                return true;
-            });
-//            phraseData.blurAfterOperation = true;
+            textOperation(phraseData, false, true);
         }
     },
     CLEAR {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.HTML_ELEMENT)
-            );
-            ElementMatch inputElement = phraseData.resultElements.getFirst();
-            phraseData.result = Attempt.run(() -> {
-                int count = 0;
-                for (ElementWrapper elementWrapper : inputElement.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if (count > 0) {
-                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
-                    }
-                    clear(GeneralSteps.getDefaultDriver(), elementWrapper.getElement());
-                    count++;
-                }
-                return true;
-            });
+            textOperation(phraseData, true, false);
         }
     },
     OVERWRITE {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.HTML_ELEMENT),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE)
-            );
-            ElementMatch inputElement = phraseData.resultElements.getFirst();
-            ElementMatch value = phraseData.resultElements.get(1);
-            phraseData.result = Attempt.run(() -> {
-                int count = 0;
-                for (ElementWrapper elementWrapper : inputElement.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if (count > 0) {
-                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
-                    }
-                    clearAndType(GeneralSteps.getDefaultDriver(), elementWrapper.getElement(), value.getValue().toString());
-                    count++;
-                }
-                return true;
-            });
+            textOperation(phraseData, true, true);
         }
     },
     SCROLL {
@@ -417,6 +371,51 @@ public enum ActionOperations implements OperationsInterface {
     public static ActionOperations fromString(String input) {
         return OperationsInterface.requireOperationEnum(ActionOperations.class, input);
     }
+
+
+
+    public void textOperation(PhraseData phraseData , boolean shouldClear, boolean shouldEnterText)
+    {
+        List<ElementMatch> elementMatches = phraseData.browserElement != null ? new ArrayList<>() : phraseData.getWebElementMatches();
+        if (elementMatches.isEmpty()) {
+            elementMatches.add(null);
+        }
+        phraseData.result = Attempt.run(() -> {
+            int count = 0;
+            for (ElementMatch inputElement : elementMatches) {
+                List<ElementWrapper> elementWrappers = inputElement == List.of(null) ? null : inputElement.getElementThrowErrorIfEmptyWithNoModifier();
+                for (ElementWrapper elementWrapper : elementWrappers) {
+                    WebElement webElement = elementWrapper == null ? null : elementWrapper.getElement();
+                    if (count > 0) {
+                        safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
+                    }
+                    if(shouldClear)
+                    {
+                        clear(GeneralSteps.getDefaultDriver(), webElement);
+                    }
+                    if(shouldEnterText) {
+                        for (ElementMatch valueElement : phraseData.getValueTypeEntryElementMatches()) {
+                            ValueWrapper valueWrapper = valueElement.getValue();
+                            System.out.println("@@valueWrapper: " + valueWrapper);
+                            System.out.println("@@valueWrapper.type: " + valueWrapper.type);
+                            if (valueWrapper.type == ValueWrapper.ValueTypes.BACK_TICKED) {
+                                sendComplexKeys(getDefaultDriver(), webElement, valueWrapper.toString());
+                            } else {
+                                typeText(GeneralSteps.getDefaultDriver(), webElement, valueWrapper.toString());
+                            }
+                        }
+                    }
+                    count++;
+                }
+            }
+            return true;
+        });
+
+    }
+
+
+
+
 
 
 }

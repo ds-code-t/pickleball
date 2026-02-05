@@ -3,7 +3,12 @@ Feature: Additiontest
   Scenario: dfsdfgh4
   @[DEBUG,nosbase,##Specificity,##xscore,##textXpath,##pseudotags,##nosrmalizexpaths]
     * , from the Top Panel:
-    :  * , verify "Account Number" Text is displayed
+    :  * , enter `SHIFT[a b c]`  in  "Account Number" Textbox
+    :  * , enter `CONTROL + SHIFT + LEFT`  in  "Account Number" Textbox
+#    :  * , enter `CONTROL + SHIFT[RIGHT]`  in  "Account Number" Textbox
+#    :  * , enter `CONTROL + SHIFT[T]`
+#    :  * , enter `SHIFT[a] SHIFT[A] SHIFT[7]`  in  "Account Number" Textbox
+#    :  * , verify "Account Number" Text is displayed
 
 
   Scenario: dfdfdddww

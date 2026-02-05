@@ -15,9 +15,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.BROWSER;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.FOLLOWING_OPERATION;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.HTML_ELEMENT;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.NO_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PRECEDING_OPERATION;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
 import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
 
@@ -115,9 +118,40 @@ public abstract class PassedData {
     private PhraseData previousPhrase;
     private PhraseData nextPhrase;
 
+     public ElementMatch browserElement;
     protected List<ElementMatch> elementMatches = new ArrayList<>();
     private List<ElementMatch> elementMatchesProceedingOperation = new ArrayList<>();
     private List<ElementMatch> elementMatchesFollowingOperation = new ArrayList<>();
+
+
+    private final List<ElementMatch> valueTypeEntryElementMatches = new ArrayList<>();
+
+    public List<ElementMatch> getValueTypeEntryElementMatches() {
+        System.out.println("@@valueTypeElementMatches1: " + valueTypeEntryElementMatches);
+        if(valueTypeEntryElementMatches.isEmpty())
+        {
+            if(previousPhrase != null) {
+                valueTypeEntryElementMatches.addAll(previousPhrase.getValueTypeEntryElementMatches());
+            }
+        }
+        System.out.println("@@valueTypeElementMatches2: " + valueTypeEntryElementMatches);
+        return valueTypeEntryElementMatches;
+    }
+
+
+    final List<ElementMatch> webElementMatches = new ArrayList<>();
+
+    public List<ElementMatch> getWebElementMatches() {
+        System.out.println("@@webElementMatches1: " + webElementMatches);
+        if(webElementMatches.isEmpty())
+        {
+            if(previousPhrase != null) {
+                webElementMatches.addAll(previousPhrase.webElementMatches);
+            }
+        }
+        System.out.println("@@webElementMatches2: " + webElementMatches);
+        return webElementMatches;
+    }
 
 //    private SearchContext currentSearchContext;
 
@@ -257,6 +291,10 @@ public abstract class PassedData {
         elementMatchesFollowingOperation = new ArrayList<>();
         elementMatchesProceedingOperation = new ArrayList<>();
         for (ElementMatch em : elementMatches) {
+            if(em.elementTypes.contains(BROWSER))
+            {
+                browserElement = em;
+            }
             if (em.startIndex < operationIndex) {
                 em.elementTypes.add(PRECEDING_OPERATION);
                 elementMatchesProceedingOperation.add(em);
@@ -265,6 +303,34 @@ public abstract class PassedData {
                 em.elementTypes.add(FOLLOWING_OPERATION);
             }
         }
+        if(elementMatchesProceedingOperation.isEmpty())
+        {
+            elementMatchesFollowingOperation.forEach(em -> {
+                if(  em.elementTypes.contains(VALUE_TYPE)){
+                    valueTypeEntryElementMatches.add(em);
+                }
+               else if(em.elementTypes.contains(HTML_ELEMENT)){
+                    webElementMatches.add(em);
+                }
+            });
+        }
+        if(webElementMatches.isEmpty())
+        {
+            elementMatchesProceedingOperation.forEach(em -> {
+                if(  em.elementTypes.contains(HTML_ELEMENT)){
+                    webElementMatches.add(em);
+                }
+            });
+        }
+        if(valueTypeEntryElementMatches.isEmpty())
+        {
+            elementMatchesProceedingOperation.forEach(em -> {
+                if(  em.elementTypes.contains(VALUE_TYPE)){
+                    valueTypeEntryElementMatches.add(em);
+                }
+            });
+        }
+
         elementBeforeOperation = elementMatchesProceedingOperation.isEmpty() ? null : elementMatchesProceedingOperation.getFirst();
         elementAfterOperation = elementMatchesFollowingOperation.isEmpty() ? null : elementMatchesFollowingOperation.getFirst();
     }

@@ -62,6 +62,12 @@ public enum ElementType {
         Set<ElementType> returnSet = new java.util.HashSet<>();
 
 
+        if (raw.equals("Browser")) {
+            returnSet.add(BROWSER_TYPE);
+            returnSet.add(BROWSER_WINDOW);
+            return returnSet;
+        }
+
         if (raw.contains("Window")) {
             String windowNormalized = raw.replaceAll("Windows?", "").trim().toUpperCase(Locale.ROOT);
             if(windowNormalized.isBlank())

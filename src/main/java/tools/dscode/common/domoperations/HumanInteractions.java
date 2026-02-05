@@ -272,7 +272,11 @@ public final class HumanInteractions {
      * IMPORTANT: Use element-targeted sendKeys via WebElement to avoid "active element" bleed.
      */
     public static void typeText(WebDriver driver, WebElement el, CharSequence text) {
-        Objects.requireNonNull(el);
+       if(el == null)
+       {
+           typeText(driver, text);
+           return;
+       }
         final String s = text == null ? "" : text.toString();
         try {
             focus(driver, el);
@@ -281,6 +285,36 @@ public final class HumanInteractions {
             jsAppendValue(driver, el, s);
         }
     }
+
+
+    public static void typeText(WebDriver driver, CharSequence text) {
+        final String s = text == null ? "" : text.toString();
+        try {
+            if (!s.isEmpty()) {
+                new Actions(driver).sendKeys(s).perform();
+            }
+        } catch (RuntimeException e) {
+            // Best-effort fallback: append to active element if possible
+            jsAppendValueToActive(driver, s);
+        }
+    }
+
+    private static void jsAppendValueToActive(WebDriver driver, String text) {
+        if (text == null || text.isEmpty()) return;
+        ((JavascriptExecutor) driver).executeScript(
+                """
+                const el = document.activeElement;
+                if (el && 'value' in el) {
+                    el.value += arguments[0];
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                """,
+                text
+        );
+    }
+
+
 
     /**
      * Send raw keys to the currently focused element (e.g., ENTER, ESC).
