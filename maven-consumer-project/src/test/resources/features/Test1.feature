@@ -445,7 +445,7 @@ Feature: Additiontest
 
   Scenario: testqwq
 #  @[DEBUG,##SpecificityScore,##Xscore]
-  @[DEBUG,##ContextWrapper]
+  @[DEBUG,##ContextWrapper,nobase,##processContextList]
 #    Then , I select "Opel" in the "cars" Dropdown
 #    Then IF: "Asdd Rdfds "   THEN: , I select "Opel" in the "cars" Dropdown
 #    Then , IF: "Asdd Rdfds "   THEN: , I select "Opel" in the "cars" Dropdown, and click the Submit Button

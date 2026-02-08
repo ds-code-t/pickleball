@@ -10,11 +10,17 @@ import tools.dscode.common.treeparsing.preparsing.LineData;
 import java.util.ArrayList;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.treeparsing.DefinitionContext.FILE_INPUT;
 
 
 public final class Phrase extends PhraseData {
 
+
+    public Phrase(LineData parsedLine) {
+        super("From " + STARTING_CONTEXT , ',' , parsedLine);
+        isStartingContext = true;
+    }
 
     public Phrase(String inputText, Character delimiter, LineData parsedLine) {
         super(inputText, delimiter, parsedLine);
@@ -48,7 +54,7 @@ public final class Phrase extends PhraseData {
 
     @Override
     public PhraseData runPhrase() {
-
+        System.out.println("@@runPhrase: " + this);
         executePhrase();
         PhraseData nextResolvedPhrase = getNextResolvedPhrase();
 
@@ -87,10 +93,10 @@ public final class Phrase extends PhraseData {
     public void executePhrase() {
         System.out.println("@@executePhrase1: "  + this);
         System.out.println("@@phraseType1: "  + phraseType);
-        System.out.println("@@templatePhrase.phraseType1: "  + templatePhrase.phraseType);
-        System.out.println("@@templatePhrase.getConditional()1: "  + templatePhrase.getConditional());
-        System.out.println("@@templatePhrase.getAction()1: "  + templatePhrase.getAction());
-        if ((phraseType == null || phraseType == PhraseType.ELEMENT_ONLY) && templatePhrase.phraseType != null) {
+//        System.out.println("@@templatePhrase.phraseType1: "  + templatePhrase.phraseType);
+//        System.out.println("@@templatePhrase.getConditional()1: "  + templatePhrase.getConditional());
+//        System.out.println("@@templatePhrase.getAction()1: "  + templatePhrase.getAction());
+        if ((phraseType == null || phraseType == PhraseType.ELEMENT_ONLY) && (templatePhrase != null && templatePhrase.phraseType != null)) {
             if (!templatePhrase.getAction().isBlank()) {
                 setAction(templatePhrase.getAction());
             } else {
@@ -109,9 +115,9 @@ public final class Phrase extends PhraseData {
         }
         System.out.println("@@executePhrase2: "  + this);
         System.out.println("@@phraseType2: "  + phraseType);
-        System.out.println("@@templatePhrase.phraseType2: "  + templatePhrase.phraseType);
-        System.out.println("@@templatePhrase.getConditional()2: "  + templatePhrase.getConditional());
-        System.out.println("@@templatePhrase.getAction()2: "  + templatePhrase.getAction());
+//        System.out.println("@@templatePhrase.phraseType2: "  + templatePhrase.phraseType);
+//        System.out.println("@@templatePhrase.getConditional()2: "  + templatePhrase.getConditional());
+//        System.out.println("@@templatePhrase.getAction()2: "  + templatePhrase.getAction());
 
 
         System.out.println("@@getAssertionType()3: "  + getAssertionType());
@@ -181,9 +187,12 @@ public final class Phrase extends PhraseData {
                 }
                 System.out.println("No elements match for " + getFirstElement() + ", skipping subsequent phrases");
             }
+            System.out.println("@@11");
             for (ElementWrapper elementWrapper : getWrappedElements()) {
+                System.out.println("@@22: " + branchedPhrases.size());
                 branchedPhrases.add(cloneWithElementContext(elementWrapper));
             }
+            System.out.println("@@contextPhrases: " + contextPhrases.size());
             contextPhrases.add(this);
         }
 
@@ -193,6 +202,7 @@ public final class Phrase extends PhraseData {
 
 
     public PhraseData cloneWithElementContext(ElementWrapper elementWrapper) {
+        System.out.println("@@cloneWithElementContext: " + this);
         PhraseData clone = clonePhrase(getPreviousPhrase());
         clone.contextElement = elementWrapper;
         clone.categoryFlags.add(ExecutionDictionary.CategoryFlags.ELEMENT_CONTEXT);
@@ -214,6 +224,7 @@ public final class Phrase extends PhraseData {
 
     @Override
     public PhraseData clonePhrase(PhraseData previous) {
+        System.out.println("@@clonePhrase: " + this);
         Phrase clone = new Phrase(text, termination, parsedLine);
         clone.phraseConditionalMode = phraseConditionalMode;
         clone.result = null;
@@ -229,6 +240,7 @@ public final class Phrase extends PhraseData {
     }
 
     public PhraseData resolvePhrase() {
+        System.out.println("@@resolvePhrase: " + this);
         PhraseData resolvedPhrase = new Phrase(text, termination, parsedLine);
         if (resolvedPhrase.getAction().endsWith("attach") && !resolvedPhrase.getElementMatches().stream().anyMatch(e -> e.elementTypes.contains(ElementType.HTML_TYPE))) {
             resolvedPhrase = new Phrase(resolvedPhrase.resolvedText.replaceFirst("\\battach(?:es|ed)?\\b", "attach " + FILE_INPUT + " "), termination, parsedLine);
@@ -251,8 +263,10 @@ public final class Phrase extends PhraseData {
 
 
     public PhraseData getNextResolvedPhrase() {
+        System.out.println("@@getNextResolvedPhrase: " + this);
         if (getNextPhrase() == null) return null;
         PhraseData nextResolvedPhrase = getNextPhrase().resolvePhrase();
+        System.out.println("@@nextResolvedPhrase: " + nextResolvedPhrase);
         nextResolvedPhrase.setPreviousPhrase(this);
         this.setNextPhrase(nextResolvedPhrase);
 

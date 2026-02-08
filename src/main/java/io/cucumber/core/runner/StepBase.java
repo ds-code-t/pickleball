@@ -27,7 +27,7 @@ public abstract class StepBase implements Cloneable {
 
     protected boolean runMethodDirectly = false;
     public boolean debugStartStep = false;
-    public LineData inheritedLineData;
+//    public LineData inheritedLineData;
     public LineData lineData;
     public io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep;
     public io.cucumber.core.runner.PickleStepTestStep executingPickleStepTestStep;

@@ -129,6 +129,7 @@ public class ContextWrapper {
 
     public void initializeElementXPaths(List<XPathy> xPathyList) {
         if (elementTerminalXPath != null) return;
+        System.out.println("@@xPathyList: " + xPathyList);
 //        XPathy xPathy = combineAnd(xPathyList);
 //        elementPath = XPathy.from(XPathyUtils.maybeDeepestMatches(xPathy.getXpath()));
         elementPath = combineAnd(xPathyList);

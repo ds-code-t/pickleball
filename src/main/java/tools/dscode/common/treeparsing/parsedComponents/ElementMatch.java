@@ -326,17 +326,11 @@ public class ElementMatch {
 //    private List<PhraseData> phraseContextList;
 
     public List<PhraseData> getPhraseContextList() {
-
-
-
-
+        System.out.println("@@getPhraseContextList()1: " + this);
+        System.out.println("@@parentPhrase.isNewContext(): " + parentPhrase.isNewContext());
         if(parentPhrase.isNewContext())
         {
-            PhraseData startingContextPhrase = new Phrase("From " + STARTING_CONTEXT, ',', parentPhrase.parsedLine);
-
-
-
-
+            PhraseData startingContextPhrase = new Phrase( parentPhrase.parsedLine);
             parentPhrase.contextPhrases.add(startingContextPhrase);
             return List.of(startingContextPhrase);
         }

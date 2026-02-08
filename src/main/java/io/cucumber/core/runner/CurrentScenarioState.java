@@ -208,34 +208,6 @@ public class CurrentScenarioState extends ScenarioMapping {
     public void runStep(StepExtension stepExtension) {
         currentStep = stepExtension;
         stepExtension.lineData = new ParsedLine(stepExtension.getUnmodifiedText());
-        StepBase stepBase = stepExtension;
-        while (true) {
-            stepBase = stepBase.parentStep;
-            System.out.println("@@stepBase: " + stepBase + "");
-            if (stepBase == null) {
-                stepExtension.inheritedLineData = new ParsedLine();
-                break;
-            }
-            System.out.println("@@stepBase.lineData: " + stepBase.lineData + "");
-            if (stepBase.lineData != null) {
-                stepExtension.inheritedLineData = stepBase.lineData.clone();
-                break;
-            }
-        }
-
-
-        System.out.println("@@stepExtension: " + stepExtension+ "");
-        System.out.println("@@stepExtension.parentStep: " + stepExtension.parentStep + "");
-        System.out.println("@@stepExtension.parentStep.lineData: " + (stepExtension.parentStep == null ? "null" : stepExtension.parentStep.lineData + ""));
-        System.out.println("@@stepExtension.inheritedLineData: " + stepExtension.inheritedLineData + "");
-//        stepExtension.lineData = new ParsedLine(stepExtension.getUnmodifiedText());
-        if (stepExtension.inheritedLineData != null) {
-            System.out.println("@@stepExtension.inheritedLineData.inheritedContextPhrases: " + stepExtension.inheritedLineData.inheritedContextPhrases+ "");
-            stepExtension.lineData.inheritedContextPhrases.addAll(stepExtension.inheritedLineData.inheritedContextPhrases);
-        }
-        System.out.println("@@stepExtension.inheritedLineData.inheritedContextPhrases: " + stepExtension.inheritedLineData.inheritedContextPhrases+ "");
-
-        stepExtension.lineData.inheritedPhrase =  stepExtension.parentStep == null ? null :  stepExtension.parentStep.lineData.inheritancePhrase;
         stepExtension.lineData.setInheritance(stepExtension);
 
         runningStep(stepExtension);

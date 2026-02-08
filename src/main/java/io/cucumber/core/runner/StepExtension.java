@@ -244,8 +244,6 @@ public class StepExtension extends StepData {
 
         modifiedStep.setStepParsingMap(getStepParsingMap());
         modifiedStep.parentStep = parentStep;
-        modifiedStep.inheritedLineData = inheritedLineData.clone();
-
         modifiedStep.nestingLevel = nestingLevel;
 //        modifiedStep.pickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
         return modifiedStep;

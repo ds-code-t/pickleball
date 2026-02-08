@@ -227,7 +227,7 @@ public abstract class PassedData {
 
 
     public PhraseData getPreviousPhrase() {
-        PhraseData prevPhrase = previousPhrase == null ? ((PhraseData) this).parsedLine.inheritancePhrase : previousPhrase;
+        PhraseData prevPhrase = previousPhrase == null ? ((PhraseData) this).parsedLine.inheritedPhrase : previousPhrase;
         if (prevPhrase == null || prevPhrase.getResolvedPhrase() == null)
             return prevPhrase;
         return prevPhrase.getResolvedPhrase();
@@ -392,6 +392,7 @@ public abstract class PassedData {
     }
 
     public void setResolvedPhrase(PhraseData resolvedPhrase) {
+        System.out.println("@@setResolvedPhrase: " + resolvedPhrase);
         this.resolvedPhrase = resolvedPhrase;
         resolvedPhrase.templatePhrase = (PhraseData) this;
     }

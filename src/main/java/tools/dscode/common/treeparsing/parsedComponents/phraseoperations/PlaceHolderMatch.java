@@ -80,35 +80,21 @@ public class PlaceHolderMatch extends ElementMatch {
 
             }
         } else {
-            currentPhrase = getPreviousOrInheritedPhrase(parentPhrase);
+            currentPhrase = parentPhrase.getPreviousPhrase();
             while (currentPhrase != null) {
                 replacementElement = currentPhrase.getElementMatches().stream().filter(e -> elementMatcher.matches(e.elementTypes)).findFirst().orElse(null);
                 if (replacementElement != null) {
                     return;
                 }
-                currentPhrase = getPreviousOrInheritedPhrase(currentPhrase);
+                currentPhrase = currentPhrase.getPreviousPhrase();
 
             }
         }
 
     }
 
-    public PhraseData getPreviousOrInheritedPhrase(PhraseData phraseData) {
-
-        if (phraseData.getPreviousPhrase() != null)
-            return phraseData.getPreviousPhrase();
-        StepExtension stepExtension = getRunningStep();
-        if (stepExtension.parentStep != null && stepExtension.parentStep.isDynamicStep && !stepExtension.parentStep.lineData.executedPhrases.isEmpty()) {
-            return stepExtension.parentStep.lineData.executedPhrases.getLast();
-        }
-
-        for (int i = phraseData.parsedLine.inheritedContextPhrases.size() - 1; i >= 0; i--) {
-            List<PhraseData> inner = phraseData.parsedLine.inheritedContextPhrases.get(i);
-            if (!inner.isEmpty()) {
-                return inner.getLast();
-            }
-        }
-        return null;
-    }
+//    public PhraseData getPreviousOrInheritedPhrase(PhraseData phraseData) {
+//        return phraseData.getPreviousPhrase() == null ? phraseData.parsedLine.inheritancePhrase : phraseData.getPreviousPhrase();
+//    }
 
 }

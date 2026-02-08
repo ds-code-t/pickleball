@@ -780,7 +780,7 @@ public class ExecutionDictionary {
             return cb.build(category, value, op, webDriver, context);
         } catch (Throwable t) {
             System.out.println("Could not return SearchContext for '" + category + "'");
-            return null;
+            throw new RuntimeException("Could not return SearchContext for '" + category + "'", t);
         }
     }
 

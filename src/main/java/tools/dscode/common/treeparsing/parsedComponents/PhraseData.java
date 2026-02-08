@@ -34,7 +34,7 @@ import static tools.dscode.common.util.debug.DebugUtils.onMatch;
 
 
 public abstract class PhraseData extends PassedData {
-
+    boolean isStartingContext;
     public final String text;
     public final String resolvedText;
     public final Character termination; // nullable
@@ -43,8 +43,16 @@ public abstract class PhraseData extends PassedData {
 //    public PhraseData repeatedPhraseMaster = null;
     public boolean shouldRepeatPhrase = false;
     boolean invertConditional = false;
-
     List<Object> repetitionContext = new ArrayList<>();
+
+//    public PhraseData(LineData lineData) {
+//        isStartingContext = true;
+//        text = "From " + STARTING_CONTEXT;
+//        resolvedText = text;
+//        termination = ',';
+//        parsedLine = lineData;
+//    }
+
 
 
 //    public PhraseData cloneRepeatedPhrase() {
@@ -113,6 +121,7 @@ public abstract class PhraseData extends PassedData {
 
 
     public PhraseData(String inputText, Character delimiter, LineData lineData) {
+        isStartingContext = false;
 
         parsedLine = lineData;
         text = inputText;
@@ -252,14 +261,11 @@ public abstract class PhraseData extends PassedData {
 
 
     public List<PhraseData> processContextList() {
-
+        System.out.println("@@processContextList()11: " + this);
+        System.out.println("@@contextPhrases: " + contextPhrases);
         List<PhraseData> returnList = new ArrayList<>();
-        returnList.add(new Phrase("From " + STARTING_CONTEXT, ',', parsedLine));
-        for (List<PhraseData> inner : parsedLine.inheritedContextPhrases) {
-            returnList.addAll(inner);
-        }
-        returnList.addAll(contextPhrases);
 
+        returnList.addAll(contextPhrases);
 
         for (int i = returnList.size() - 1; i >= 0; i--) {
             PhraseData phraseData = returnList.get(i);
@@ -269,9 +275,13 @@ public abstract class PhraseData extends PassedData {
                 System.out.println(matchString +  " phraseData.getFirstElement() : " + phraseData.getFirstElement());
                 System.out.println((matchString + " phraseData.categoryFlags: : " + phraseData.categoryFlags));
             });
-
-            if (phraseData.contextElement != null  || phraseData.isNewContext() || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT) || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.ELEMENT_CONTEXT)) {
+            if (phraseData.isStartingContext )
+            {
                 return returnList.subList(i, returnList.size());
+            }
+            if (phraseData.contextElement != null  || phraseData.isNewContext() || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT) || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.ELEMENT_CONTEXT)) {
+                returnList =  returnList.subList(i, returnList.size());
+                returnList.addFirst(new Phrase(phraseData.parsedLine));
             }
         }
         return returnList;

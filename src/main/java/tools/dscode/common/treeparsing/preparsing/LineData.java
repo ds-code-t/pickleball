@@ -23,7 +23,7 @@ public abstract class LineData implements Cloneable {
     public int startPhraseIndex = 0;
     //    public LineData inheritedLineData;
 //    public List<PhraseData> contextPhrases = new ArrayList<>();
-    public List<List<PhraseData>> inheritedContextPhrases = new ArrayList<>();
+//    public List<List<PhraseData>> inheritedContextPhrases = new ArrayList<>();
     private final String original;
     public String runningText = ", ";
     private final QuoteParser qp;
@@ -198,20 +198,9 @@ public abstract class LineData implements Cloneable {
     public LineData clone() {
         try {
             LineData copy = (LineData) super.clone();
-
-            copy.inheritedContextPhrases = new ArrayList<>(this.inheritedContextPhrases.size());
-
-            // clone each inner list wrapper, but keep the same PhraseData objects
-            for (List<PhraseData> inner : this.inheritedContextPhrases) {
-                List<PhraseData> innerCopy =
-                        (inner == null ? null : new ArrayList<>(inner));  // shallow copy of inner list
-                copy.inheritedContextPhrases.add(innerCopy);
-                if(this.inheritedPhrase != null)
-                {
-                    copy.inheritedPhrase = this.inheritedPhrase.cloneInheritedPhrase();
-                }
+            if (this.inheritedPhrase != null) {
+                copy.inheritedPhrase = this.inheritedPhrase.cloneInheritedPhrase();
             }
-
             return copy;
         } catch (CloneNotSupportedException e) {
             throw new AssertionError("Clone should be supported", e);
