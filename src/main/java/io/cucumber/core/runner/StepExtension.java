@@ -15,6 +15,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -127,6 +128,7 @@ public class StepExtension extends StepData {
             executingPickleStepTestStep = pickleStepTestStep;
             executionMode = ExecutionMode.SKIP;
         } else if (isDynamicStep) {
+            overrideLoggingText = lineData.runningText;
             executingPickleStepTestStep = pickleStepTestStep;
         } else {
             executingPickleStepTestStep = resolveAndClone(getStepParsingMap());
@@ -206,6 +208,34 @@ public class StepExtension extends StepData {
     @Override
     public String toString() {
         return "SE: " + pickleStepTestStep.getStep().getText();
+    }
+
+
+    public List<StepExtension> insertStepsByString(List<String> newStepStrings) {
+        List<StepExtension> newSteps = new ArrayList<>();
+        for(String newStepString : newStepStrings) {
+            newSteps.add(modifyStepExtension(newStepString));
+        }
+        insertSteps(newSteps);
+        return newSteps;
+    }
+
+    public void insertSteps(List<StepExtension> newSteps) {
+        if(newSteps == null || newSteps.isEmpty()) return;
+        StepBase nextStep = this.nextSibling;
+        StepExtension lastStep = this;
+        for(StepExtension newStep : newSteps) {
+            lastStep.nextSibling = newStep;
+            newStep.previousSibling = lastStep;
+        }
+        if(nextStep != null) {
+            nextStep.previousSibling = lastStep;
+            lastStep.nextSibling = nextStep;
+        }
+        lastStep.childSteps.addAll(childSteps);
+        lastStep.grandChildrenSteps.addAll(grandChildrenSteps);
+        childSteps.clear();
+        grandChildrenSteps.clear();
     }
 
     public StepExtension modifyStepExtension(String newText) {

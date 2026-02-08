@@ -1,7 +1,10 @@
 package tools.dscode.coredefinitions;
 
+import io.cucumber.core.runner.StepExtension;
 import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
+import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
+import tools.dscode.common.treeparsing.preparsing.LineData;
 import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 
 
@@ -12,9 +15,8 @@ import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionar
 public class DynamicSteps  extends CoreSteps {
     @Given("^,(.*)$")
     public void executeDynamicStep(String stepText) {
-
-
-
-        getRunningStep().lineData.runPhrases();
+        StepExtension currentStep = getRunningStep();
+        currentStep.insertStepsByString(currentStep.lineData.lineComponents);
+        currentStep.lineData.runPhrases();
     }
 }

@@ -225,10 +225,12 @@ public abstract class PassedData {
     public Integer operationIndex;
 
 
+
     public PhraseData getPreviousPhrase() {
-        if (previousPhrase == null || previousPhrase.getResolvedPhrase() == null)
-            return previousPhrase;
-        return previousPhrase.getResolvedPhrase();
+        PhraseData prevPhrase = previousPhrase == null ? ((PhraseData) this).parsedLine.inheritancePhrase : previousPhrase;
+        if (prevPhrase == null || prevPhrase.getResolvedPhrase() == null)
+            return prevPhrase;
+        return prevPhrase.getResolvedPhrase();
     }
 
     public void setPreviousPhrase(PhraseData previousPhrase) {

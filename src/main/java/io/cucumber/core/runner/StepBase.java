@@ -6,6 +6,7 @@ import io.cucumber.docstring.DocString;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
+import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 import tools.dscode.coredefinitions.GeneralSteps;
 
@@ -85,6 +86,10 @@ public abstract class StepBase implements Cloneable {
 
     public abstract Collection<ConditionalStates> getConditionalStates();
 
+//    public StepBase clone(PhraseData) {
+//
+//
+//    }
 
     @Override
     public StepBase clone() {

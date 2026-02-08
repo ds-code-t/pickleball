@@ -39,44 +39,44 @@ public class ContextWrapper {
 
 
     public List<WebElement> getElements() {
-        printDebug("\n##getElements: " + elementMatch);
+        printDebug("\n##ContextWrapper- getElements: " + elementMatch);
         SearchContext searchContext = getFinalSearchContext();
         if(searchContext == null) return new ArrayList<>();
-        printDebug("\n##searchContext: " + searchContext.getClass().getSimpleName());
-        printDebug("\n##elementMatch.parentPhrase: " + elementMatch.parentPhrase);
-        printDebug("\n##elementTerminalXPath ");
+        printDebug("####ContextWrapper-searchContext: " + searchContext.getClass().getSimpleName());
+        printDebug("####ContextWrapper-elementMatch.parentPhrase: " + elementMatch.parentPhrase);
+        printDebug("####ContextWrapper-elementTerminalXPath ");
         prettyPrintXPath(elementTerminalXPath);
-        printDebug("\n\n##");
+        printDebug("\n\n##ContextWrapper-end##");
         return getElementListFromSearchContext(searchContext, elementTerminalXPath);
 //        return searchContext.findElements(elementTerminalXPath.getLocator());
     }
 
     public SearchContext getFinalSearchContext() {
-        printDebug("\n##getFinalSearchContext11");
-        printDebug("\n##getFinalSearchContext: " + elementMatch.category + " , " + elementMatch.parentPhrase);
-        printDebug("\n##elementMatch.parentPhrase.contextElement: " + elementMatch.parentPhrase.contextElement);
+        printDebug("\n##ContextWrapper-getFinalSearchContext11");
+        printDebug("\n##ContextWrapper-getFinalSearchContext: " + elementMatch.category + " , " + elementMatch.parentPhrase);
+        printDebug("\n##ContextWrapper-elementMatch.parentPhrase.contextElement: " + elementMatch.parentPhrase.contextElement);
         SearchContext searchContext = elementMatch.parentPhrase.getSearchContext();
         List<PhraseData> contextList = elementMatch.getPhraseContextList();
-        printDebug("## contextList.size(): " + contextList.size());
-        printDebug("##searchContext1: " + searchContext.getClass().getSimpleName());
+        printDebug("##ContextWrapper-contextList.size(): " + contextList.size());
+        printDebug("##ContextWrapper-searchContext1: " + searchContext.getClass().getSimpleName());
         List<XPathy> xPathyList = new ArrayList<>();
-        printDebug("\n------\n##currentPhrase: " + elementMatch.parentPhrase);
+        printDebug("\n------\n##ContextWrapper-currentPhrase: " + elementMatch.parentPhrase);
         for (int j = 0; j < contextList.size(); j++) {
             PhraseData phraseData = contextList.get(j);
 
-            printDebug("##phraseData1: " + phraseData);
-            printDebug("##phraseData--phraseData.contextElement : " + phraseData.contextElement);
-            printDebug("##phraseData--phraseData.categoryFlag : " + phraseData.categoryFlags);
+            printDebug("##ContextWrapper-phraseData1: " + phraseData);
+            printDebug("##ContextWrapper-phraseData--phraseData.contextElement : " + phraseData.contextElement);
+            printDebug("##ContextWrapper-phraseData--phraseData.categoryFlag : " + phraseData.categoryFlags);
 
             if (phraseData.contextElement != null) {
-                printDebug("##psearchContext1: " + searchContext);
+                printDebug("#ContextWrapper-#psearchContext1: " + searchContext);
                 searchContext = phraseData.getSearchContext();
-                printDebug("##psearchContext2: " + searchContext);
-                printDebug("##phraseData.getSearchContext()222: " + phraseData.getSearchContext());
+                printDebug("##ContextWrapper-psearchContext2: " + searchContext);
+                printDebug("##ContextWrapper-phraseData.getSearchContext()222: " + phraseData.getSearchContext());
             } else if (phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
-                printDebug("##phraseData2: " + xPathyList);
-                printDebug("##phraseData.searchContext: " + phraseData.getSearchContext());
-                printDebug("##xPathyList:= " + xPathyList);
+                printDebug("##ContextWrapper-phraseData2: " + xPathyList);
+                printDebug("##ContextWrapper-phraseData.searchContext: " + phraseData.getSearchContext());
+                printDebug("##ContextWrapper-xPathyList:= " + xPathyList);
                 if (!xPathyList.isEmpty()) {
                     XPathy combinedXPathy = combineAnd(xPathyList);
                     searchContext = getElementFromSearchContext(searchContext, combinedXPathy);
@@ -84,13 +84,13 @@ public class ContextWrapper {
                     xPathyList.clear();
                 }
 
-                    printDebug("##searchContext-1 " + searchContext);
+                    printDebug("##ContextWrapper-searchContext-1 " + searchContext);
                     searchContext = getExecutionDictionary().applyContextBuilder(phraseData.getFirstElement().category, phraseData.getFirstElement().defaultText, phraseData.getFirstElement().defaultTextOp, elementMatch.parentPhrase.getDriver(), searchContext);
-                    printDebug("##searchContext-2 " + searchContext);
+                    printDebug("##ContextWrapper-searchContext-2 " + searchContext);
                 if(searchContext == null)
                     break;
 
-                printDebug("##searchContext2: " + (searchContext == null ? "null" : searchContext.getClass().getSimpleName()));
+                printDebug("##ContextWrapper-searchContext2: " + (searchContext == null ? "null" : searchContext.getClass().getSimpleName()));
             } else {
                 printDebug("phraseData4: " + phraseData.contextXPathy);
                 xPathyList.add(phraseData.contextXPathy);
@@ -98,7 +98,7 @@ public class ContextWrapper {
         }
 
         xPathyList.add(elementMatch.xPathy);
-        printDebug("##xPathyList: " + xPathyList);
+        printDebug("##ContextWrapper-xPathyList: " + xPathyList);
         initializeElementXPaths(xPathyList);
         return searchContext;
     }

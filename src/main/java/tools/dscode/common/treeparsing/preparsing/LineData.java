@@ -1,5 +1,6 @@
 package tools.dscode.common.treeparsing.preparsing;
 
+import io.cucumber.core.runner.StepBase;
 import tools.dscode.common.mappings.QuoteParser;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
@@ -24,6 +25,7 @@ public abstract class LineData implements Cloneable {
 //    public List<PhraseData> contextPhrases = new ArrayList<>();
     public List<List<PhraseData>> inheritedContextPhrases = new ArrayList<>();
     private final String original;
+    public String runningText = ", ";
     private final QuoteParser qp;
     private final BracketMasker bm;
     private final String fullyMasked;
@@ -31,35 +33,70 @@ public abstract class LineData implements Cloneable {
     public final List<PhraseData> executedPhrases = new ArrayList<>();
     private final Set<Character> delimiters; // characters that cause a split
     //    public final List<PhraseData> contextPhrases = new ArrayList<>();
+    public PhraseData inheritancePhrase;
+    public PhraseData inheritedPhrase;
+    public int inheritedConditionalState;
+    public int previousSiblingConditionalState = 1;
+    public StepBase stepExtension;
+
+
+    public void setInheritance(StepBase currentStep) {
+        stepExtension = currentStep;
+
+        PhraseData previousSiblingInheritancePhrase = currentStep.previousSibling == null ? null : currentStep.previousSibling.lineData.inheritancePhrase;
+        previousSiblingConditionalState = previousSiblingInheritancePhrase == null ? 1 : previousSiblingInheritancePhrase.phraseConditionalMode;
+
+        StepBase parentStep = currentStep.parentStep;
+        inheritedPhrase = parentStep == null ? null : parentStep.lineData.inheritancePhrase;
+        inheritedConditionalState = inheritedPhrase == null ? 1 : inheritedPhrase.phraseConditionalMode;
+
+        currentStep.logAndIgnore =
+                inheritedConditionalState < 1
+                        || (parentStep != null && parentStep.logAndIgnore);
+    }
+
+    public List<String> lineComponents = new ArrayList<>();
 
     @Override
     public String toString() {
-        return this.original + " " + phrases;
+        return this.runningText;
     }
 
     public abstract void runPhraseFromLine(PhraseData phrase);
 
-    public LineData(String input, Collection<Character> delimiters) {
+    public LineData(String input, Collection<Character> phraseSeparators) {
+        input = stripObscureNonText(Objects.requireNonNull(input, "input"));
+        Objects.requireNonNull(phraseSeparators, "phraseSeparators");
 
-        this.original = stripObscureNonText(Objects.requireNonNull(input, "input"));
-        Objects.requireNonNull(delimiters, "delimiters");
-//        if (delimiters.isEmpty())
-//            throw new IllegalArgumentException("Delimiters cannot be empty");
-        this.delimiters = Collections.unmodifiableSet(new LinkedHashSet<>(delimiters));
+        // Build our own delimiter set (no side effects on caller)
+        LinkedHashSet<Character> delims = new LinkedHashSet<>(phraseSeparators);
+        delims.add('.'); // always allow '.' as a delimiter
+        this.delimiters = Collections.unmodifiableSet(delims);
+
+        // Ensure non-blank input ends with a delimiter
+        if (!input.isBlank()) {
+            String t = input.stripTrailing();
+            char last = t.charAt(t.length() - 1);
+            if (!this.delimiters.contains(last)) {
+                input = t + "."; // note: uses stripped version so you don't keep trailing whitespace
+            } else {
+                input = t; // optional: normalize away trailing whitespace consistently
+            }
+        }
+
+        this.original = input;
 
         // 1) Mask quotes first
         this.qp = new QuoteParser(input);
         String afterQuotes = qp.masked();
 
-        // 2) Mask brackets second (BracketMasker is in the same package)
+        // 2) Mask brackets second
         this.bm = new BracketMasker(afterQuotes);
-        fullyMasked = bm.masked();
+        this.fullyMasked = bm.masked();
 
-        if (!original.startsWith(","))
-            return;
+        if (!original.startsWith(",")) return;
 
         String preParsedNormalized = normalizeWhitespace(fullyMasked)
-//                .replaceAll("\\b(?:the|then|a)\\b", "")
                 .replaceAll("\\bno\\s+attribute\\b", "noattribute")
                 .replaceAll("\\b(?:the|a)\\b", "")
                 .replaceAll("\\bare\\b", "is")
@@ -67,33 +104,25 @@ public abstract class LineData implements Cloneable {
                 .replaceAll("(\\d+)(?:\\s*(?:st|nd|rd|th)\\b)", "#$1")
                 .replaceAll("\\bverifies\\b", "verify")
                 .replaceAll("\\bensures\\b", "ensure")
-                .replaceAll("\\bnot\\b|n't\\b", " no ").replaceAll("\\s+", " ");
+                .replaceAll("\\bnot\\b|n't\\b", " no ")
+                .replaceAll("\\s+", " ");
 
-        // Split on UNMASKED delimiters in the fully-masked string
         StringBuilder buf = new StringBuilder();
 
+        int sentenceCount = 0;
         for (int i = 0; i < preParsedNormalized.length(); i++) {
             char c = preParsedNormalized.charAt(i);
             if (this.delimiters.contains(c)) {
-                // Unmask in reverse order for the chunk before the delimiter
                 String chunk = buf.toString();
-
-
                 String unmasked = qp.restoreFromWithOuterBookend(bm.restoreFrom(chunk), BOOK_END);
-
                 if (!unmasked.isBlank()) {
-                    this.phrases.add(new Phrase(unmasked, c, this));
+                    addPhrase(unmasked, c, sentenceCount);
                 }
                 buf.setLength(0);
+                if (c != ',') sentenceCount++;
             } else {
                 buf.append(c);
             }
-        }
-        // Final chunk (no trailing delimiter)
-        String lastChunk = buf.toString();
-        if (!lastChunk.isBlank()) {
-            String unmaskedLast = qp.restoreFromWithOuterBookend(bm.restoreFrom(lastChunk), BOOK_END);
-            this.phrases.add(new Phrase(unmaskedLast, ' ', this));
         }
 
         PhraseData lastPhrase = null;
@@ -102,74 +131,24 @@ public abstract class LineData implements Cloneable {
                 phrase.setPreviousPhrase(lastPhrase);
                 lastPhrase.setNextPhrase(phrase);
             }
-//
-//            if (lastPhrase != null) {
-//                if (phrase.phraseType == null) {
-//                    if (lastPhrase.phraseType == PhraseData.PhraseType.ACTION) {
-//                        if (!phrase.getElementMatches().isEmpty()) {
-//                            phrase.phraseType = PhraseData.PhraseType.ACTION;
-//                            phrase.setAction(lastPhrase.getAction());
-//                            phrase.isOperationPhrase = true;
-//                        }
-//                    }
-//                }
-//            }
-
             lastPhrase = phrase;
-
         }
-
-//        checkForMissingData();
-//
-//
-//        PhraseData currentPhrase = this.phrases.isEmpty() ? null : this.phrases.getFirst();
-//        lastPhrase = null;
-//
-//        while (currentPhrase != null) {
-//            if (currentPhrase.phraseType == null) {
-//                if (!currentPhrase.getElementMatches().isEmpty()) {
-//                    if (lastPhrase != null) {
-//                        if (currentPhrase.missingData && !currentPhrase.hasTextToResolve) {
-//                            if(!lastPhrase.getAction().isBlank())
-//                            {
-//                                currentPhrase.setAction(lastPhrase.getAction());
-//                            }
-//
-//                        }
-//                    }
-//
-//
-//                    lastPhrase = currentPhrase;
-//                    currentPhrase = currentPhrase.getNextPhrase();
-//                }
-//
-//
-//            }
-//
-//        }
-
     }
 
-//    private boolean checkForMissingData() {
-//        boolean anyMissingData = false;
-//        for (PhraseData phrase : this.phrases) {
-//            if (phrase.phraseType == null) {
-//                phrase.missingData = true;
-//                anyMissingData = true;
-//            }
-//
-//            if (phrase.phraseType == PhraseData.PhraseType.CONDITIONAL && phrase.getAssertion().isBlank()) {
-//                phrase.missingData = true;
-//                anyMissingData = true;
-//            }
-//
-//            if (phrase.phraseType == PhraseData.PhraseType.ASSERTION && (phrase.getAssertion().isBlank() || phrase.getAssertionType().isBlank())) {
-//                phrase.missingData = true;
-//                anyMissingData = true;
-//            }
-//        }
-//        return anyMissingData;
-//    }
+
+    public void addPhrase(String phraseText, char termination, int lineComponentIndex) {
+        String phraseString = phraseText.replace(BOOK_END, "") + termination;
+        if (lineComponentIndex == 0) {
+            phrases.add(new Phrase(phraseText, termination, this));
+            runningText += phraseString;
+        } else {
+            if (lineComponents.size() < lineComponentIndex) {
+                lineComponents.add(", " + phraseString);
+            } else {
+                lineComponents.set(lineComponentIndex - 1, lineComponents.get(lineComponentIndex - 1).concat(phraseText + " " + termination));
+            }
+        }
+    }
 
 
     /**
@@ -227,6 +206,10 @@ public abstract class LineData implements Cloneable {
                 List<PhraseData> innerCopy =
                         (inner == null ? null : new ArrayList<>(inner));  // shallow copy of inner list
                 copy.inheritedContextPhrases.add(innerCopy);
+                if(this.inheritedPhrase != null)
+                {
+                    copy.inheritedPhrase = this.inheritedPhrase.cloneInheritedPhrase();
+                }
             }
 
             return copy;

@@ -210,7 +210,6 @@ public final class XPathyAssembly {
     }
 
 
-
     private static final java.util.concurrent.atomic.AtomicInteger selfCounter = new java.util.concurrent.atomic.AtomicInteger(1);
 
     private static final Pattern SELF_WRAP =
@@ -222,15 +221,14 @@ public final class XPathyAssembly {
 
     public static String toSelfStep(String xpath) {
         String s = xpath.trim();
-        while(s.startsWith("(") && s.endsWith(")"))
-        {
-            s = s.substring(1,s.length()-1);
+        while (s.startsWith("(") && s.endsWith(")")) {
+            s = s.substring(1, s.length() - 1);
         }
         if (SELF_WRAP.matcher(s).matches()) {
-            if(s.startsWith("//*[self")){
-                return s.substring(4,s.length()-1);
-            } else   if(s.startsWith("//*[(self")){
-                return s.substring(5,s.length()-2);
+            if (s.startsWith("//*[self")) {
+                return s.substring(4, s.length() - 1);
+            } else if (s.startsWith("//*[(self")) {
+                return s.substring(5, s.length() - 2);
             }
             return xpath;
         }
@@ -254,8 +252,8 @@ public final class XPathyAssembly {
 
         int id = selfCounter.incrementAndGet();
         int nestingCount = countIdPairs(step);
-        step = step.replaceFirst("^([a-zA-Z*]+)" , "self::$1["+ id + ">-" + nestingCount + "]") + "["+ id + ">-" + nestingCount + "]";
-        return  step;
+        step = step.replaceFirst("^([a-zA-Z*]+)", "self::$1[" + id + ">-" + nestingCount + "]") + "[" + id + ">-" + nestingCount + "]";
+        return step;
     }
 
     private static final Pattern ID_PAIR_PATTERN =
@@ -294,16 +292,21 @@ public final class XPathyAssembly {
         printDebug("##Xscore score1: " + score);
         if (xpath.startsWith("//*[preceding") || xpath.startsWith("//*[following") || xpath.startsWith("//*[ancestor") || xpath.startsWith("//*[descendant")) {
             score += 10_000_000;
-            String firstTag = xpath.split("::",2)[1].trim();
-            if (!firstTag.startsWith("*")) {
-                score -= 1_000_000;
-                if (!firstTag.startsWith("div")) {
+            String firstTag = "";
+            if (xpath.contains("::")) {
+                firstTag = xpath.split("::", 2)[1].trim();
+                if (!firstTag.startsWith("*")) {
                     score -= 1_000_000;
+                    if (!firstTag.startsWith("div")) {
+                        score -= 1_000_000;
+                    }
                 }
             }
-            firstTag = firstTag.split("\\[",2)[1].trim();
-            if (firstTag.startsWith("position")) {
-                score -= 1_500_000;
+            if (xpath.contains("\\[")) {
+                firstTag = firstTag.split("\\[", 2)[1].trim();
+                if (firstTag.startsWith("position")) {
+                    score -= 1_500_000;
+                }
             }
         }
 

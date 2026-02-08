@@ -117,6 +117,7 @@ public abstract class StepData extends StepMapping {
         childSteps.clear();
     }
 
+
     public void addChildStep(StepData child) {
         StepBase lastChild = childSteps.size() == 0 ? null : childSteps.getLast();
         if (lastChild != null) {

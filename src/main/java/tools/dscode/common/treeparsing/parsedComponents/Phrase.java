@@ -29,8 +29,7 @@ public final class Phrase extends PhraseData {
 
         if (getConditional().startsWith("else")) {
             if (getPreviousPhrase() == null) {
-                StepExtension currentStep = getRunningStep();
-                if (currentStep.previousSibling == null || currentStep.previousSibling.lineData.lineConditionalMode > -1) {
+                if (parsedLine.previousSiblingConditionalState > -1) {
                     phraseConditionalMode = 0;
                     previouslyResolvedBoolean = false;
                 }
@@ -43,15 +42,6 @@ public final class Phrase extends PhraseData {
         }
 
         return phraseConditionalMode > 0;
-
-
-//        phraseConditionalMode = getPreviousPhrase() == null ? 0 : getPreviousPhrase().phraseConditionalMode;
-//        if (getConditional().startsWith("else")) {
-//            parsedLine.lineConditionalMode *= -1;
-//            phraseConditionalMode = parsedLine.lineConditionalMode * -1;
-//        }
-//        phraseConditionalMode = phraseConditionalMode * -1;
-//        return phraseConditionalMode >= 0;
 
     }
 
@@ -69,15 +59,26 @@ public final class Phrase extends PhraseData {
         System.out.println("@@contextTermination:  " + contextTermination);
 
         if (contextTermination) {
-            if (phraseType.equals(PhraseType.CONDITIONAL)) {
+            if (termination.equals(':') || termination.equals('?')) {
                 parsedLine.lineConditionalMode = phraseConditionalMode;
-            } else if (termination.equals(':')) {
-                parsedLine.inheritedContextPhrases.add(contextPhrases);
-                parsedLine.lineConditionalMode = phraseConditionalMode;
-            } else {
-                parsedLine.inheritedContextPhrases.removeLast();
+                parsedLine.inheritancePhrase = this;
             }
         }
+//            if (phraseType.equals(PhraseType.CONDITIONAL)) {
+//                parsedLine.lineConditionalMode = phraseConditionalMode;
+//            } else if (termination.equals(':')) {
+//                parsedLine.inheritedContextPhrases.add(contextPhrases);
+//                parsedLine.lineConditionalMode = phraseConditionalMode;
+//            }
+////            else {
+////                parsedLine.inheritedContextPhrases.removeLast();
+////            }
+//        }
+//
+//        if(contextTermination  && !termination.equals('.'))
+//        {
+//            parsedLine.passedPhrase = this;
+//        }
 
         return nextResolvedPhrase;
     }
@@ -158,7 +159,7 @@ public final class Phrase extends PhraseData {
 //            repeatedPhraseClone.shouldRepeatPhrase = false;
 //            branchedPhrases.add(repeatedPhraseClone);
         }
-
+        System.out.println("@@@@isOperationPhrase ? "  + isOperationPhrase);
         if (isOperationPhrase) {
             runOperation();
         } else if (phraseType.equals(PhraseType.CONTEXT)) {
@@ -168,6 +169,8 @@ public final class Phrase extends PhraseData {
 
 
     void processContextPhrase() {
+        System.out.println("@@processContextPhrase(): " + this);
+        System.out.println("@@getFirstElement().selectionType.isEmpty(): " + getFirstElement().selectionType.isEmpty());
         if (getFirstElement().selectionType.isEmpty()) {
             contextPhrases.add(this);
         } else {
@@ -183,6 +186,8 @@ public final class Phrase extends PhraseData {
             }
             contextPhrases.add(this);
         }
+
+        System.out.println("@@contextPhrases:: : " + contextPhrases);
     }
 
 
@@ -195,9 +200,22 @@ public final class Phrase extends PhraseData {
     }
 
 
+
+
+    @Override
+    public PhraseData cloneInheritedPhrase() {
+        PhraseData clonedPhrase =  clonePhrase(getPreviousPhrase());
+        clonedPhrase.branchedPhrases.addAll(branchedPhrases);
+        clonedPhrase.contextPhrases.addAll(contextPhrases);
+        clonedPhrase.shouldRepeatPhrase = shouldRepeatPhrase;
+        clonedPhrase.setResolvedPhrase(clonedPhrase);
+        return clonedPhrase;
+    }
+
     @Override
     public PhraseData clonePhrase(PhraseData previous) {
         Phrase clone = new Phrase(text, termination, parsedLine);
+        clone.phraseConditionalMode = phraseConditionalMode;
         clone.result = null;
         clone.isClone = true;
         clone.position = position;

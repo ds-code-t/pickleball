@@ -26,7 +26,6 @@ import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
-import static tools.dscode.common.treeparsing.parsedComponents.Phrase.updateChainAndInheritances;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inBetweenOf;
@@ -41,21 +40,21 @@ public abstract class PhraseData extends PassedData {
     public final Character termination; // nullable
     public final LineData parsedLine;
     private SearchContext searchContext;
-    public PhraseData repeatedPhraseMaster = null;
+//    public PhraseData repeatedPhraseMaster = null;
     public boolean shouldRepeatPhrase = false;
     boolean invertConditional = false;
 
     List<Object> repetitionContext = new ArrayList<>();
 
 
-    public PhraseData cloneRepeatedPhrase() {
-        PhraseData clone = clonePhrase(getPreviousPhrase());
-        updateChainAndInheritances(clone);
-        clone.repeatedPhraseMaster = this;
-        clone.shouldRepeatPhrase =false;
-        repeatedPhrases.add(clone);
-        return clone;
-    }
+//    public PhraseData cloneRepeatedPhrase() {
+//        PhraseData clone = clonePhrase(getPreviousPhrase());
+//        updateChainAndInheritances(clone);
+//        clone.repeatedPhraseMaster = this;
+//        clone.shouldRepeatPhrase =false;
+//        repeatedPhrases.add(clone);
+//        return clone;
+//    }
 
     public String getPreviousTerminator() {
         return getPreviousPhrase() == null ? "" : getPreviousPhrase().termination.toString();
@@ -121,7 +120,7 @@ public abstract class PhraseData extends PassedData {
         hasResolvedText = !text.trim().equalsIgnoreCase(resolvedText.trim());
         hasTextToResolve = hasResolvedText || text.matches(".*<.*>.*");
         termination = delimiter;
-        contextTermination = termination.equals('.') || termination.equals(':') || termination.equals('?');
+        contextTermination = !termination.equals(',');
         MatchNode returnMatchNode = getNodeDictionary().parse(resolvedText);
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
@@ -296,6 +295,7 @@ public abstract class PhraseData extends PassedData {
 
     public abstract PhraseData runPhrase();
 
+    public abstract PhraseData cloneInheritedPhrase();
     public abstract PhraseData clonePhrase(PhraseData previous);
 
     public abstract PhraseData resolvePhrase();

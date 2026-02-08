@@ -5,12 +5,10 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import org.openqa.selenium.WebDriver;
-import org.opentest4j.AssertionFailedError;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
-import tools.dscode.common.reporting.WorkBook;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
 import tools.dscode.common.status.SoftExceptionInterface;
@@ -33,6 +31,7 @@ import java.util.stream.Stream;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
+import static io.cucumber.core.runner.StepLogic.stepCloner;
 import static org.junit.jupiter.api.Assertions.fail;
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_FAILED;
@@ -41,7 +40,6 @@ import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_PASSING;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_FALSE;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN;
-import static tools.dscode.common.util.GeneralUtils.retry;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
@@ -208,52 +206,37 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void runStep(StepExtension stepExtension) {
-
-
         currentStep = stepExtension;
-
-
         stepExtension.lineData = new ParsedLine(stepExtension.getUnmodifiedText());
         StepBase stepBase = stepExtension;
         while (true) {
             stepBase = stepBase.parentStep;
+            System.out.println("@@stepBase: " + stepBase + "");
             if (stepBase == null) {
                 stepExtension.inheritedLineData = new ParsedLine();
                 break;
             }
-
+            System.out.println("@@stepBase.lineData: " + stepBase.lineData + "");
             if (stepBase.lineData != null) {
-
-
                 stepExtension.inheritedLineData = stepBase.lineData.clone();
-
-
                 break;
             }
         }
 
+
+        System.out.println("@@stepExtension: " + stepExtension+ "");
+        System.out.println("@@stepExtension.parentStep: " + stepExtension.parentStep + "");
+        System.out.println("@@stepExtension.parentStep.lineData: " + (stepExtension.parentStep == null ? "null" : stepExtension.parentStep.lineData + ""));
+        System.out.println("@@stepExtension.inheritedLineData: " + stepExtension.inheritedLineData + "");
 //        stepExtension.lineData = new ParsedLine(stepExtension.getUnmodifiedText());
         if (stepExtension.inheritedLineData != null) {
+            System.out.println("@@stepExtension.inheritedLineData.inheritedContextPhrases: " + stepExtension.inheritedLineData.inheritedContextPhrases+ "");
             stepExtension.lineData.inheritedContextPhrases.addAll(stepExtension.inheritedLineData.inheritedContextPhrases);
         }
+        System.out.println("@@stepExtension.inheritedLineData.inheritedContextPhrases: " + stepExtension.inheritedLineData.inheritedContextPhrases+ "");
 
-
-        if ((stepExtension.parentStep != null && stepExtension.parentStep.logAndIgnore) || stepExtension.inheritedLineData.lineConditionalMode < 1) {
-            stepExtension.logAndIgnore = true;
-        }
-//        else if (stepExtension.isDynamicStep) {
-
-
-//            String dynamicStepText = stepExtension.pickleStepTestStep.getStepText().toLowerCase().replaceAll(",|then|the|and|or|:", "").strip();
-//            if (dynamicStepText.startsWith("else") && !dynamicStepText.equals("else")) {
-
-
-//            if (stepExtension.pickleStepTestStep.getStepText().toLowerCase().replaceAll(",|then|the|and|or", "").strip().startsWith("else")) {
-//                if (stepExtension.previousSibling == null || stepExtension.previousSibling.lineData.lineConditionalMode > -1) {
-//                    stepExtension.logAndIgnore = true;
-//                }
-//            }
-//        }
+        stepExtension.lineData.inheritedPhrase =  stepExtension.parentStep == null ? null :  stepExtension.parentStep.lineData.inheritancePhrase;
+        stepExtension.lineData.setInheritance(stepExtension);
 
         runningStep(stepExtension);
     }
@@ -318,65 +301,23 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
         if (!stepExtension.definitionFlags.contains(IGNORE_CHILDREN)) {
-            PhraseData lastPhrase = getLastPhrase(stepExtension);
-            System.out.println("@@lastPhrase: "  + lastPhrase  + (lastPhrase == null? "null"  : lastPhrase.shouldRepeatPhrase ) );
-            if (lastPhrase != null && lastPhrase.shouldRepeatPhrase) {
-                while (true) {
-                    PhraseData repeatedPhraseClone = lastPhrase.cloneRepeatedPhrase();
-                    lastPhrase.parsedLine.runPhraseFromLine(repeatedPhraseClone);
-                    if (repeatedPhraseClone.phraseConditionalMode < 1) {
-                        break;
-                    }
-                    StepExtension repeatedStep = (StepExtension) stepExtension.clone();
-                    repeatedStep.lineData.inheritedContextPhrases.getLast().add(repeatedPhraseClone);
-                    StepExtension firstChild = (StepExtension) repeatedStep.initializeChildSteps();
-                    if (firstChild != null) {
-                        runStep(firstChild);
-                    }
-                }
-            } else {
-                List<StepExtension> repeatSteps = getNestedRepetitions(stepExtension, lastPhrase);
-                for (StepExtension repeatStep : repeatSteps) {
+              List<StepExtension> clonedSteps = stepCloner(stepExtension);
+                for (StepExtension repeatStep : clonedSteps) {
                     StepExtension firstChild = (StepExtension) repeatStep.initializeChildSteps();
                     if (firstChild != null) {
                         runStep(firstChild);
                     }
                 }
-            }
+        }
 
-            if (stepExtension.nextSibling != null) {
-                runStep((StepExtension) stepExtension.nextSibling);
-            }
+        if (stepExtension.nextSibling != null) {
+            runStep((StepExtension) stepExtension.nextSibling);
         }
     }
 
-    public PhraseData getLastPhrase(StepExtension stepExtension) {
-        try {
-            return stepExtension.lineData.inheritedContextPhrases.getLast().getLast();
-        } catch (Throwable t) {
-            return null;
-        }
-    }
 
-    public List<StepExtension> getNestedRepetitions(StepExtension stepExtension, PhraseData lastPhrase) {
 
-        if (lastPhrase == null || lastPhrase.branchedPhrases.isEmpty()) {
-            return new ArrayList<>(List.of(stepExtension));
-        }
 
-        List<StepExtension> returnList = new ArrayList<>();
-        for (PhraseData branch : lastPhrase.branchedPhrases) {
-            try {
-                StepExtension branchStep = (StepExtension) stepExtension.clone();
-                branchStep.lineData.inheritedContextPhrases.getLast().add(branch);
-                returnList.add(branchStep);
-            } catch (Throwable t) {
-                t.printStackTrace();
-                throw new RuntimeException(t);
-            }
-        }
-        return returnList;
-    }
 
 
     private boolean isScenarioHardFail = false;

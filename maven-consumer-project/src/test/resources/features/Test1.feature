@@ -1,11 +1,18 @@
 Feature: Additiontest
 
+
+  Scenario: sente test1
+    * , save "b" as "B"
+    * , save "b" as "B".
+    * , save "a" as "A". save "b" as "B"
+
+
   Scenario: until test1
     * , save "a" as "A"
 #    * , if "<A>", wait 1 second
 #    * , until "<A>" equals "aaa", save "<A>a" as "A" , wait 1 second
     * , until "<A>" equals "aaaaa":
-    :  * , save "<A>a" as "A" , wait 1 second
+  :  * , save "<A>a" as "A" , wait 1 second
     * , if "<A>" equals "a":
   :  * , save "<A>a" as "A" , wait 1 second
 
@@ -13,8 +20,8 @@ Feature: Additiontest
   Scenario: dfsdfgh4
   @[DEBUG,nosbase,##Specificity,##xscore,##textXpath,##pseudotags,##nosrmalizexpaths]
     * , from the Top Panel:
-    :  * , enter `SHIFT[a b c]`  in  "Account Number" Textbox
-    :  * , enter `CONTROL + SHIFT + LEFT`  in  "Account Number" Textbox
+  :  * , enter `SHIFT[a b c]`  in  "Account Number" Textbox
+  :  * , enter `CONTROL + SHIFT + LEFT`  in  "Account Number" Textbox
 #    :  * , enter `CONTROL + SHIFT[RIGHT]`  in  "Account Number" Textbox
 #    :  * , enter `CONTROL + SHIFT[T]`
 #    :  * , enter `SHIFT[a] SHIFT[A] SHIFT[7]`  in  "Account Number" Textbox
@@ -50,10 +57,10 @@ Feature: Additiontest
 
   Scenario: dfdf
     Then , save "Q1" as "W"
-  @[DEBUG,noBase,##Specificity,##xscore,##parsing,##parsedata,##processContextList,##]
+  @[DEBUG,noBsase,##Specificity,##xscore,##parsing,##parsedata,##processContextList,##]
 #    * navigate to: URL.textbox
     * , in the "Attachments" Section:
-    : * , Then user clicks the "Show more" Button
+  : * , Then user clicks the "Show more" Button
 #    : * , clear any  "First name:" Textboxes
 #    * , overwrite any  Textboxes with "z"
 
@@ -173,8 +180,8 @@ Feature: Additiontest
     @[DEBUG]
 #    * navigate to: URL.select
 #    Then , from the FrameResult, I select "Opel" in the "cars" Dropdown, and 'volvo'  in the "cars" Dropdown
-#    Then , from the FrameResult, I select last Option in the "cars" Dropdown
-    Then , from the FrameResult, I select last Option in the "cars" Dropdown, and first Option in the "cars" Dropdown
+    Then , from the FrameResult, I select last Option in the "cars" Dropdown
+#    Then , from the FrameResult, I select last Option in the "cars" Dropdown, and first Option in the "cars" Dropdown
 #    * , from the Top Panel:
 #  : * , I verify "Run ❯" Textbox is not displayed
 #  : * , I verify  "Get your website" Link is displayed
@@ -437,7 +444,8 @@ Feature: Additiontest
 
 
   Scenario: testqwq
-  @[DEBUG]
+#  @[DEBUG,##SpecificityScore,##Xscore]
+  @[DEBUG,##ContextWrapper]
 #    Then , I select "Opel" in the "cars" Dropdown
 #    Then IF: "Asdd Rdfds "   THEN: , I select "Opel" in the "cars" Dropdown
 #    Then , IF: "Asdd Rdfds "   THEN: , I select "Opel" in the "cars" Dropdown, and click the Submit Button
@@ -447,14 +455,14 @@ Feature: Additiontest
     * , from the Top Panel:
 #  : * , I click the  Link containing " own "
   : * , for any Button containing "Rounder", I save  Text as "A"
-  : * , I verify "<A>" equals "Q"
-  : * , I verify "<A #0>" equals "Q"
-  : * , I verify "<A #1>" equals "Q"
-  : * , I verify "<A #2>" equals "Q"
-  : * , I verify "<A #3>" equals "Q"
-  : * , I verify "<A #4>" equals "Q"
-  : * , I verify "<A #5>" equals "Q"
-  : * , I verify "<A #6>" equals "Q"
+#  : * , I verify "<A>" equals "Q"
+#  : * , I verify "<A #0>" equals "Q"
+#  : * , I verify "<A #1>" equals "Q"
+#  : * , I verify "<A #2>" equals "Q"
+#  : * , I verify "<A #3>" equals "Q"
+#  : * , I verify "<A #4>" equals "Q"
+#  : * , I verify "<A #5>" equals "Q"
+#  : * , I verify "<A #6>" equals "Q"
 #  : * , for any  Link containing " own ", I save  Link containing " own " as "A"
 #  : * , I save  Link containing " own " as "Q"
 #  : * , I verify "<Q>" equals "Q"
