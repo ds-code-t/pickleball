@@ -31,9 +31,14 @@ Feature: Additiontest
   Scenario: dfdfdddww
 #    Then , save "Q1" as "W"
 #  @[DEBUG,noBase,##Specificity,##xscore,##textXpath,##]
-  @[DEBUG,nobase,##Specificity,##xscore,##textXpath,##pseudotags,##nosrmalizexpaths]
-    * , from the Top Panel:
-  :   * , enter "zz" in the "Name" Textbox
+  @[DEBUG,nobase,##Specificity,##xscore,##textXpath,##pseudotags,##nosrmalizexpaths,##]
+#  @[DEBUG]
+    * , enter "aa" in the "First name:" Textbox
+    * , enter "zz" in the "Last name:" Textbox
+
+#    * , from the Top Panel:
+#  :   * , enter "aa" in the "First name:" Textbox
+#  :   * , enter "zz" in the "Last name:" Textbox
 #    * , verify the "cars" Menu is displayed
 #    * , verify the "cars" Menu is displayed
 #    * ,  verify the "cars" Dropdown is displayed
@@ -329,8 +334,9 @@ Feature: Additiontest
 
 
   Scenario Outline: sssgssatesssssf
-#    * navigate to: URL.select
+
     @[DEBUG]
+    * navigate to: URL.select
     * , from the Top Panel:
   : * IF: "<Opel sd>" THEN: , I verify  "Get your own website" Link matches "^Gxet.*$"
   : * , I verify  "Get your own website" Link equals  "Get your own websiteq"
@@ -343,10 +349,12 @@ Feature: Additiontest
       | ASddfg Redfsdf |
 
 
-  Scenario: gssatesssssf
+  Scenario: gssatesssssfs
   @[DEBUG]
-    * , from the Top Panel:
-  : * , enter "AA" in the "Name" Textbox
+#    * navigate to: URL.select
+#    * , from the Top Panel:
+#  : * , enter "AA" in the "Choose a car:" Textbox
+   * , enter "AA" in the "Choose a car:" Textbox
 
 
   Scenario: ssatesss

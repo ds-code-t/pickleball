@@ -44,29 +44,10 @@ public abstract class PhraseData extends PassedData {
     boolean invertConditional = false;
     List<Object> repetitionContext = new ArrayList<>();
 
-//    public PhraseData(LineData lineData) {
-//        isStartingContext = true;
-//        text = "From " + STARTING_CONTEXT;
-//        resolvedText = text;
-//        termination = ',';
-//        parsedLine = lineData;
-//    }
-
-
-//    public PhraseData cloneRepeatedPhrase() {
-//        PhraseData clone = clonePhrase(getPreviousPhrase());
-//        updateChainAndInheritances(clone);
-//        clone.repeatedPhraseMaster = this;
-//        clone.shouldRepeatPhrase =false;
-//        repeatedPhrases.add(clone);
-//        return clone;
-//    }
 
     public String getPreviousTerminator() {
         return getPreviousPhrase() == null ? "" : getPreviousPhrase().termination.toString();
     }
-
-    private String previousTerminator = "";
 
 
     public SearchContext getSearchContext() {
@@ -206,56 +187,18 @@ public abstract class PhraseData extends PassedData {
     }
 
 
-//    public void initialization()
-//    {
-//        if ( !operationPhrase || elementCount>2) {
-//            setElementMatches(new ArrayList<>(getElementMatches().stream().filter(elementMatch -> !elementMatch.isPlaceHolder()).toList()));
-//        }
-//
-//        if (elementCount > 0) {
-//            firstElement = elementMatches.getFirst();
-//            firstElement.elementTypes.add(ElementType.FIRST_ELEMENT);
-//            firstElement.elementTypes.forEach(elementType -> elementMap1.put(elementType, firstElement));
-//            lastElement = elementMatches.getLast();
-//            lastElement.elementTypes.add(ElementType.LAST_ELEMENT);
-//            if (elementCount > 1) {
-//                elementMatches.forEach(elementMatch -> elementMatch.elementTypes.add(MULTIPLE_ELEMENTS_IN_PHRASE));
-//                secondElement = elementMatches.get(1);
-//                secondElement.elementTypes.add(ElementType.SECOND_ELEMENT);
-//                secondElement.elementTypes.forEach(elementType -> elementMap2.put(elementType, secondElement));
-//            } else {
-//                firstElement.elementTypes.add(ElementType.SINGLE_ELEMENT_IN_PHRASE);
-//            }
-//        }
-//
-//
-//
-//        if (phraseType == null) {
-//            if (!elementMatches.isEmpty())
-//                phraseType = PhraseType.ELEMENT_ONLY;
-//        }
-//
-//
-//
-//        if (operationIndex != null) {
-//            for (ElementMatch em : elementMatches) {
-//                if (em.startIndex < operationIndex) {
-//                    em.elementTypes.add(PRECEDING_OPERATION);
-//                    elementMatchesProceedingOperation.add(em);
-//                } else if (em.startIndex > operationIndex) {
-//                    elementMatchesFollowingOperation.add(em);
-//                    em.elementTypes.add(FOLLOWING_OPERATION);
-//                }
-//            }
-//            elementBeforeOperation = elementMatchesProceedingOperation.isEmpty() ? null : elementMatchesProceedingOperation.getFirst();
-//            elementAfterOperation = elementMatchesFollowingOperation.isEmpty() ? null : elementMatchesFollowingOperation.getFirst();
-//        } else {
-//            elementMatches.forEach(em -> em.elementTypes.add(NO_OPERATION));
-//        }
-//
-//    }
+
 
     public List<PhraseData> getPhraseContextList() {
+        List<PhraseData> contextList = getContextListFromInheritedPhrases();
+
+        if(contextList.isEmpty() || !contextList.getFirst().isStartingContext)
+            contextList.addFirst(new Phrase(parsedLine));
+
+        return contextList;
+    }
+
+    private List<PhraseData> getContextListFromInheritedPhrases() {
         List<PhraseData> contextList = new ArrayList<>();
         PhraseData currentPhrase = this;
         int counter = 0;
@@ -272,23 +215,10 @@ public abstract class PhraseData extends PassedData {
                 }
             }
 
-            if (currentPhrase.isStartingContext) {
-                return contextList;
-            }
-
-
-            if (currentPhrase.contextElement != null ||  currentPhrase.isTopContext)
+            if (currentPhrase.isStartingContext || currentPhrase.isNewContext() || currentPhrase.contextElement != null ||  currentPhrase.isTopContext)
             {
-//                contextList.addFirst(currentPhrase);
                 return contextList;
             }
-            if (currentPhrase.isNewContext())
-            {
-//                contextList.addFirst(currentPhrase);
-                contextList.addFirst(new Phrase(parsedLine));
-                return contextList;
-            }
-
 
             currentPhrase = currentPhrase.getPreviousPhrase();
         }
@@ -296,30 +226,7 @@ public abstract class PhraseData extends PassedData {
         return contextList;
     }
 
-//    public List<PhraseData> processContextList() {
-//        List<PhraseData> returnList = new ArrayList<>();
-//
-//        returnList.addAll(contextPhrases);
-//
-//        for (int i = returnList.size() - 1; i >= 0; i--) {
-//            PhraseData phraseData = returnList.get(i);
-//            onMatch("##processContextList:", (matchString) -> {
-//                System.out.println(matchString +  " phraseData : " + phraseData);
-//                System.out.println(matchString +  " phraseData.isNewContext() : " + phraseData.isNewContext());
-//                System.out.println(matchString +  " phraseData.getFirstElement() : " + phraseData.getFirstElement());
-//                System.out.println((matchString + " phraseData.categoryFlags: : " + phraseData.categoryFlags));
-//            });
-//            if (phraseData.isStartingContext )
-//            {
-//                return returnList.subList(i, returnList.size());
-//            }
-//            if (phraseData.contextElement != null  || phraseData.isNewContext() || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT) || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.ELEMENT_CONTEXT)) {
-//                returnList =  returnList.subList(i, returnList.size());
-//                returnList.addFirst(new Phrase(phraseData.parsedLine));
-//            }
-//        }
-//        return returnList;
-//    }
+
 
     public static XPathy getXPathyContext(String context, List<ElementMatch> elements) {
         if (elements.isEmpty()) return null;
@@ -455,9 +362,7 @@ public abstract class PhraseData extends PassedData {
             }
         }
 
-
         return andConjunction;
     }
-
 
 }

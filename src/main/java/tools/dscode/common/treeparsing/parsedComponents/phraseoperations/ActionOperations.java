@@ -383,7 +383,7 @@ public enum ActionOperations implements OperationsInterface {
         phraseData.result = Attempt.run(() -> {
             int count = 0;
             for (ElementMatch inputElement : elementMatches) {
-                List<ElementWrapper> elementWrappers = inputElement == List.of(null) ? null : inputElement.getElementThrowErrorIfEmptyWithNoModifier();
+                List<ElementWrapper> elementWrappers = inputElement ==  null ? List.of(null)  : inputElement.getElementThrowErrorIfEmptyWithNoModifier();
                 for (ElementWrapper elementWrapper : elementWrappers) {
                     WebElement webElement = elementWrapper == null ? null : elementWrapper.getElement();
                     if (count > 0) {
