@@ -28,24 +28,15 @@ public final class ParsedLine extends LineData {
 
     @Override
     public void runPhrases() {
-        System.out.println("@@runPhrases1 " + this);
         PhraseData phrase = phrases.get(startPhraseIndex);
-        System.out.println("@@phrase= " + phrase);
         runPhraseFromLine(updateChainAndInheritances(phrase.resolvePhrase()));
     }
 
 
     @Override
     public void runPhraseFromLine(PhraseData phrase) {
-        System.out.println("@@runPhraseFromLine - " + phrase);
-        System.out.println("@@phrase.branchedPhrases.size() - 11 - " + phrase.branchedPhrases.size());
-        System.out.println("@@phrase.branchedPhrases - 11 -" + phrase.branchedPhrases);
-        System.out.println("@@phrase.shouldRepeatPhrase - 11 - " + phrase.shouldRepeatPhrase);
         PhraseData nextResolvedPhrase = phrase.runPhrase();
-        System.out.println("@@nextResolvedPhrase - " + nextResolvedPhrase);
-        System.out.println("@@phrase.branchedPhrases.size() - 22 - " + phrase.branchedPhrases.size());
-        System.out.println("@@phrase.branchedPhrases - 22 - " + phrase.branchedPhrases);
-        System.out.println("@@phrase.shouldRepeatPhrase - 22 - " + phrase.shouldRepeatPhrase);
+
 
         if (nextResolvedPhrase == null) {
             System.out.println("Step completed: " + executedPhrases);
@@ -64,7 +55,6 @@ public final class ParsedLine extends LineData {
         } else {
 //            phrase.resolveResults();
             for (PhraseData clone : phrase.branchedPhrases) {
-                System.out.println("@@running-branche: " + clone);
                 runPhraseFromLine(clone);
             }
         }

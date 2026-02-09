@@ -325,19 +325,17 @@ public class ElementMatch {
 
 //    private List<PhraseData> phraseContextList;
 
-    public List<PhraseData> getPhraseContextList() {
-        System.out.println("@@getPhraseContextList()1: " + this);
-        System.out.println("@@parentPhrase.isNewContext(): " + parentPhrase.isNewContext());
-        if(parentPhrase.isNewContext())
-        {
-            PhraseData startingContextPhrase = new Phrase( parentPhrase.parsedLine);
-            parentPhrase.contextPhrases.add(startingContextPhrase);
-            return List.of(startingContextPhrase);
-        }
-
-
-        return parentPhrase.processContextList();
-    }
+//    public List<PhraseData> getPhraseContextList() {
+//        if(parentPhrase.isNewContext())
+//        {
+//            PhraseData startingContextPhrase = new Phrase( parentPhrase.parsedLine);
+//            parentPhrase.contextPhrases.add(startingContextPhrase);
+//            return List.of(startingContextPhrase);
+//        }
+//
+//
+//        return parentPhrase.processContextList();
+//    }
 
 
     public String getDefaultElementValue(ElementWrapper elementWrapper) {
@@ -435,12 +433,12 @@ public class ElementMatch {
             System.out.println("##getElementWrappers- wrappedElements: " + wrappedElements);
         });
 
+
         if (wrappedElements == null) {
             if (!parentPhrase.getPreviousTerminator().equals(";")) {
                 parentPhrase.syncWithDOM();
             }
         }
-
         return wrappedElements;
     }
 

@@ -445,7 +445,7 @@ Feature: Additiontest
 
   Scenario: testqwq
 #  @[DEBUG,##SpecificityScore,##Xscore]
-  @[DEBUG,##ContextWrapper,nobase,##processContextList]
+  @[DEBUG,##ContextWrapper,nobase,##processContextList,##pseudotags]
 #    Then , I select "Opel" in the "cars" Dropdown
 #    Then IF: "Asdd Rdfds "   THEN: , I select "Opel" in the "cars" Dropdown
 #    Then , IF: "Asdd Rdfds "   THEN: , I select "Opel" in the "cars" Dropdown, and click the Submit Button
@@ -454,7 +454,9 @@ Feature: Additiontest
 #  * , verify Text containing "The select element"  is displayed
     * , from the Top Panel:
 #  : * , I click the  Link containing " own "
-  : * , for any Button containing "Rounder", I save  Text as "A"
+  : * , I save  Text as "A"
+  : * , verify "<A>" equals "B"
+#  : * , for any Button containing "Rounder", I save  Text as "A"
 #  : * , I verify "<A>" equals "Q"
 #  : * , I verify "<A #0>" equals "Q"
 #  : * , I verify "<A #1>" equals "Q"

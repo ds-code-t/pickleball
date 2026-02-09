@@ -51,13 +51,18 @@ public class ContextWrapper {
 //        return searchContext.findElements(elementTerminalXPath.getLocator());
     }
 
+
+
+
+
     public SearchContext getFinalSearchContext() {
         printDebug("\n##ContextWrapper-getFinalSearchContext11");
         printDebug("\n##ContextWrapper-getFinalSearchContext: " + elementMatch.category + " , " + elementMatch.parentPhrase);
         printDebug("\n##ContextWrapper-elementMatch.parentPhrase.contextElement: " + elementMatch.parentPhrase.contextElement);
         SearchContext searchContext = elementMatch.parentPhrase.getSearchContext();
-        List<PhraseData> contextList = elementMatch.getPhraseContextList();
+        List<PhraseData> contextList = elementMatch.parentPhrase.getPhraseContextList();
         printDebug("##ContextWrapper-contextList.size(): " + contextList.size());
+        printDebug("##ContextWrapper-contextList::::: " + contextList);
         printDebug("##ContextWrapper-searchContext1: " + searchContext.getClass().getSimpleName());
         List<XPathy> xPathyList = new ArrayList<>();
         printDebug("\n------\n##ContextWrapper-currentPhrase: " + elementMatch.parentPhrase);
@@ -129,7 +134,6 @@ public class ContextWrapper {
 
     public void initializeElementXPaths(List<XPathy> xPathyList) {
         if (elementTerminalXPath != null) return;
-        System.out.println("@@xPathyList: " + xPathyList);
 //        XPathy xPathy = combineAnd(xPathyList);
 //        elementPath = XPathy.from(XPathyUtils.maybeDeepestMatches(xPathy.getXpath()));
         elementPath = combineAnd(xPathyList);

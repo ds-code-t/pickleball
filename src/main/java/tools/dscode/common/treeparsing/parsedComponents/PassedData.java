@@ -151,7 +151,7 @@ public abstract class PassedData {
 
 //    private SearchContext currentSearchContext;
 
-    public List<PhraseData> contextPhrases = new ArrayList<>();
+//    public List<PhraseData> contextPhrases = new ArrayList<>();
 
 //    public String selectionType = "";
 
@@ -204,7 +204,7 @@ public abstract class PassedData {
     public String context = "";
     public boolean isFrom;
     public boolean isTopContext;
-    public boolean isContext;
+    public boolean isPageContext;
 
 
     private String action = "";
@@ -392,7 +392,6 @@ public abstract class PassedData {
     }
 
     public void setResolvedPhrase(PhraseData resolvedPhrase) {
-        System.out.println("@@setResolvedPhrase: " + resolvedPhrase);
         this.resolvedPhrase = resolvedPhrase;
         resolvedPhrase.templatePhrase = (PhraseData) this;
     }

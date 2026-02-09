@@ -111,16 +111,19 @@ public class ExecutionDictionary {
 
     private void defaultRegistrations() {
 
+        category("Text").children("Texts").context((category, v, op, webDriver, ctx) ->
+                ctx
+        );
 
-        category("Text").children("Texts").inheritsFrom(CONTAINS_TEXT).
-                and(
-                        (category, v, op) ->
-                        {
-                            if (v == null || v.isNull())
-                                return XPathy.from("//*[ancestor-or-self::body and descendant::text()]");
-                            return XPathy.from("//*[count(descendant::node()) <= 12]");
-                        }
-                );
+//        category("Text").children("Texts").inheritsFrom(CONTAINS_TEXT).
+//                and(
+//                        (category, v, op) ->
+//                        {
+//                            if (v == null || v.isNull())
+//                                return XPathy.from("//*[ancestor-or-self::body and descendant::text()]");
+//                            return XPathy.from("//*[count(descendant::node()) <= 12]");
+//                        }
+//                );
 
         category(CONTAINS_TEXT).and((category, v, op) -> {
             if (v == null || v.isNull())

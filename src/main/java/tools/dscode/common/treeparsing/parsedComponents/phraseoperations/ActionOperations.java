@@ -90,7 +90,6 @@ public enum ActionOperations implements OperationsInterface {
                     new ElementMatcher()
                             .mustMatchAll(ElementType.KEY_VALUE)
             );
-            System.out.println("@@phraseData.resultElements: " + phraseData.resultElements);
 
             ElementMatch valueElement = phraseData.resultElements.getFirst();
             ElementMatch keyElement = phraseData.resultElements.get(1);

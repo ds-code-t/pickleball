@@ -54,7 +54,6 @@ public final class Phrase extends PhraseData {
 
     @Override
     public PhraseData runPhrase() {
-        System.out.println("@@runPhrase: " + this);
         executePhrase();
         PhraseData nextResolvedPhrase = getNextResolvedPhrase();
 
@@ -62,7 +61,6 @@ public final class Phrase extends PhraseData {
             resolveResults();
         }
 
-        System.out.println("@@contextTermination:  " + contextTermination);
 
         if (contextTermination) {
             if (termination.equals(':') || termination.equals('?')) {
@@ -91,11 +89,6 @@ public final class Phrase extends PhraseData {
 
 
     public void executePhrase() {
-        System.out.println("@@executePhrase1: "  + this);
-        System.out.println("@@phraseType1: "  + phraseType);
-//        System.out.println("@@templatePhrase.phraseType1: "  + templatePhrase.phraseType);
-//        System.out.println("@@templatePhrase.getConditional()1: "  + templatePhrase.getConditional());
-//        System.out.println("@@templatePhrase.getAction()1: "  + templatePhrase.getAction());
         if ((phraseType == null || phraseType == PhraseType.ELEMENT_ONLY) && (templatePhrase != null && templatePhrase.phraseType != null)) {
             if (!templatePhrase.getAction().isBlank()) {
                 setAction(templatePhrase.getAction());
@@ -113,15 +106,6 @@ public final class Phrase extends PhraseData {
                 }
             }
         }
-        System.out.println("@@executePhrase2: "  + this);
-        System.out.println("@@phraseType2: "  + phraseType);
-//        System.out.println("@@templatePhrase.phraseType2: "  + templatePhrase.phraseType);
-//        System.out.println("@@templatePhrase.getConditional()2: "  + templatePhrase.getConditional());
-//        System.out.println("@@templatePhrase.getAction()2: "  + templatePhrase.getAction());
-
-
-        System.out.println("@@getAssertionType()3: "  + getAssertionType());
-        System.out.println("@@getAssertion()3: "  + getAssertion());
 
 
         if (phraseType == null && !getConditional().isBlank()) {
@@ -131,10 +115,6 @@ public final class Phrase extends PhraseData {
         if (!getAssertionType().isBlank() && getAssertion().isBlank()) {
             setAssertion("true");
         }
-        System.out.println("@@getAssertionType()4: "  + getAssertionType());
-        System.out.println("@@getAssertion()4: "  + getAssertion());
-
-        System.out.println("@@isOperationPhrase4: "  + isOperationPhrase);
 
         parsedLine.executedPhrases.add(this);
 
@@ -146,7 +126,7 @@ public final class Phrase extends PhraseData {
         }
 
         if (contextElement != null) {
-            contextPhrases.add(this);
+//            contextPhrases.add(this);
             return;
         }
 
@@ -155,9 +135,9 @@ public final class Phrase extends PhraseData {
             if (e.elementTypes.contains(ElementType.HTML_TYPE)) e.contextWrapper = new ContextWrapper(e);
         });
 
-        if (getPreviousPhrase() != null && !getPreviousPhrase().contextTermination) {
-            contextPhrases.addAll(getPreviousPhrase().contextPhrases);
-        }
+//        if (getPreviousPhrase() != null && !getPreviousPhrase().contextTermination) {
+//            contextPhrases.addAll(getPreviousPhrase().contextPhrases);
+//        }
 
         if (shouldRepeatPhrase) {
             return;
@@ -165,7 +145,6 @@ public final class Phrase extends PhraseData {
 //            repeatedPhraseClone.shouldRepeatPhrase = false;
 //            branchedPhrases.add(repeatedPhraseClone);
         }
-        System.out.println("@@@@isOperationPhrase ? "  + isOperationPhrase);
         if (isOperationPhrase) {
             runOperation();
         } else if (phraseType.equals(PhraseType.CONTEXT)) {
@@ -175,11 +154,8 @@ public final class Phrase extends PhraseData {
 
 
     void processContextPhrase() {
-        System.out.println("@@processContextPhrase(): " + this);
-        System.out.println("@@getFirstElement().selectionType.isEmpty(): " + getFirstElement().selectionType.isEmpty());
-        if (getFirstElement().selectionType.isEmpty()) {
-            contextPhrases.add(this);
-        } else {
+        if (!getFirstElement().selectionType.isEmpty()) {
+
 //            syncWithDOM();
             if (getFirstElement().getElementWrappers().isEmpty()) {
                 if (!getFirstElement().selectionType.equals("any")) {
@@ -187,23 +163,18 @@ public final class Phrase extends PhraseData {
                 }
                 System.out.println("No elements match for " + getFirstElement() + ", skipping subsequent phrases");
             }
-            System.out.println("@@11");
             for (ElementWrapper elementWrapper : getWrappedElements()) {
-                System.out.println("@@22: " + branchedPhrases.size());
                 branchedPhrases.add(cloneWithElementContext(elementWrapper));
             }
-            System.out.println("@@contextPhrases: " + contextPhrases.size());
-            contextPhrases.add(this);
         }
-
-        System.out.println("@@contextPhrases:: : " + contextPhrases);
     }
 
 
 
     public PhraseData cloneWithElementContext(ElementWrapper elementWrapper) {
-        System.out.println("@@cloneWithElementContext: " + this);
+//        char c = termination == ':' ? ',' : termination;
         PhraseData clone = clonePhrase(getPreviousPhrase());
+//        PhraseData clone = clonePhrase(getPreviousPhrase(), c);
         clone.contextElement = elementWrapper;
         clone.categoryFlags.add(ExecutionDictionary.CategoryFlags.ELEMENT_CONTEXT);
         return clone;
@@ -216,7 +187,6 @@ public final class Phrase extends PhraseData {
     public PhraseData cloneInheritedPhrase() {
         PhraseData clonedPhrase =  clonePhrase(getPreviousPhrase());
         clonedPhrase.branchedPhrases.addAll(branchedPhrases);
-        clonedPhrase.contextPhrases.addAll(contextPhrases);
         clonedPhrase.shouldRepeatPhrase = shouldRepeatPhrase;
         clonedPhrase.setResolvedPhrase(clonedPhrase);
         return clonedPhrase;
@@ -224,8 +194,13 @@ public final class Phrase extends PhraseData {
 
     @Override
     public PhraseData clonePhrase(PhraseData previous) {
-        System.out.println("@@clonePhrase: " + this);
-        Phrase clone = new Phrase(text, termination, parsedLine);
+        return clonePhrase(previous, null);
+    }
+
+
+
+    public PhraseData clonePhrase(PhraseData previous, Character newTermination) {
+        Phrase clone = new Phrase(text, (newTermination == null ? termination : newTermination), parsedLine);
         clone.phraseConditionalMode = phraseConditionalMode;
         clone.result = null;
         clone.isClone = true;
@@ -240,7 +215,6 @@ public final class Phrase extends PhraseData {
     }
 
     public PhraseData resolvePhrase() {
-        System.out.println("@@resolvePhrase: " + this);
         PhraseData resolvedPhrase = new Phrase(text, termination, parsedLine);
         if (resolvedPhrase.getAction().endsWith("attach") && !resolvedPhrase.getElementMatches().stream().anyMatch(e -> e.elementTypes.contains(ElementType.HTML_TYPE))) {
             resolvedPhrase = new Phrase(resolvedPhrase.resolvedText.replaceFirst("\\battach(?:es|ed)?\\b", "attach " + FILE_INPUT + " "), termination, parsedLine);
@@ -263,10 +237,8 @@ public final class Phrase extends PhraseData {
 
 
     public PhraseData getNextResolvedPhrase() {
-        System.out.println("@@getNextResolvedPhrase: " + this);
         if (getNextPhrase() == null) return null;
         PhraseData nextResolvedPhrase = getNextPhrase().resolvePhrase();
-        System.out.println("@@nextResolvedPhrase: " + nextResolvedPhrase);
         nextResolvedPhrase.setPreviousPhrase(this);
         this.setNextPhrase(nextResolvedPhrase);
 

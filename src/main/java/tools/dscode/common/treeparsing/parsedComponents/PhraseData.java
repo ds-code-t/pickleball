@@ -21,7 +21,6 @@ import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
-import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
@@ -40,7 +39,7 @@ public abstract class PhraseData extends PassedData {
     public final Character termination; // nullable
     public final LineData parsedLine;
     private SearchContext searchContext;
-//    public PhraseData repeatedPhraseMaster = null;
+    //    public PhraseData repeatedPhraseMaster = null;
     public boolean shouldRepeatPhrase = false;
     boolean invertConditional = false;
     List<Object> repetitionContext = new ArrayList<>();
@@ -52,7 +51,6 @@ public abstract class PhraseData extends PassedData {
 //        termination = ',';
 //        parsedLine = lineData;
 //    }
-
 
 
 //    public PhraseData cloneRepeatedPhrase() {
@@ -135,8 +133,7 @@ public abstract class PhraseData extends PassedData {
         assert phraseNode != null;
 
         String conditional = phraseNode.getStringFromLocalState("conditional");
-        if (conditional.equalsIgnoreCase("until"))
-        {
+        if (conditional.equalsIgnoreCase("until")) {
             conditional = "if";
             shouldRepeatPhrase = true;
             invertConditional = true;
@@ -149,21 +146,20 @@ public abstract class PhraseData extends PassedData {
         hasNo = phraseNode.localStateBoolean("no");
 
 
-
         body = phraseNode.getStringFromLocalState("body");
         separator = phraseNode.localStateBoolean("separator");
         setElementMatches(phraseNode.getOrderedChildren("elementMatch").stream().map(this::getElementMatch).collect(Collectors.toList()));
-
 
 //        components.forEach(component -> component.parentPhrase = this);
 //        elements = getNextComponents(-1, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
 //        values = getNextComponents(-1, "valueMatch").stream().map(m -> (ValueMatch) m).toList();
 //        elementMatch = elementMatches.isEmpty() ? null : elementMatches.getFirst();
         isTopContext = categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT);
-        isContext = isTopContext || categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT);
+        isPageContext = isTopContext || categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT);
+
 
         conjunction = phraseNode.getStringFromLocalState("conjunction");
-        
+
         position = lineData.phrases.size();
         context = phraseNode.getStringFromLocalState("context");
         if (getConditional().contains("if")) {
@@ -184,8 +180,8 @@ public abstract class PhraseData extends PassedData {
             }
         }
 
-        onMatch("##parsedata-newStartContext: " , (matchString) -> {
-            System.out.println(matchString +  "  , for : " + text + " \n " + phraseNode.localStateBoolean("newStartContext"));
+        onMatch("##parsedata-newStartContext: ", (matchString) -> {
+            System.out.println(matchString + "  , for : " + text + " \n " + phraseNode.localStateBoolean("newStartContext"));
         });
 
         setNewContext(phraseNode.localStateBoolean("newStartContext"));
@@ -259,33 +255,71 @@ public abstract class PhraseData extends PassedData {
 //
 //    }
 
+    public List<PhraseData> getPhraseContextList() {
+        List<PhraseData> contextList = new ArrayList<>();
+        PhraseData currentPhrase = this;
+        int counter = 0;
+        while (currentPhrase != null) {
+            counter++;
 
-    public List<PhraseData> processContextList() {
-        System.out.println("@@processContextList()11: " + this);
-        System.out.println("@@contextPhrases: " + contextPhrases);
-        List<PhraseData> returnList = new ArrayList<>();
+            if (counter > 1) {
+                if (currentPhrase.termination != ',' && currentPhrase.termination != ':') {
+                    return contextList;
+                }
 
-        returnList.addAll(contextPhrases);
+                if (currentPhrase.phraseType == PhraseType.CONTEXT) {
+                    contextList.addFirst(currentPhrase);
+                }
+            }
 
-        for (int i = returnList.size() - 1; i >= 0; i--) {
-            PhraseData phraseData = returnList.get(i);
-            onMatch("##processContextList:", (matchString) -> {
-                System.out.println(matchString +  " phraseData : " + phraseData);
-                System.out.println(matchString +  " phraseData.isNewContext() : " + phraseData.isNewContext());
-                System.out.println(matchString +  " phraseData.getFirstElement() : " + phraseData.getFirstElement());
-                System.out.println((matchString + " phraseData.categoryFlags: : " + phraseData.categoryFlags));
-            });
-            if (phraseData.isStartingContext )
+            if (currentPhrase.isStartingContext) {
+                return contextList;
+            }
+
+
+            if (currentPhrase.contextElement != null ||  currentPhrase.isTopContext)
             {
-                return returnList.subList(i, returnList.size());
+//                contextList.addFirst(currentPhrase);
+                return contextList;
             }
-            if (phraseData.contextElement != null  || phraseData.isNewContext() || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT) || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.ELEMENT_CONTEXT)) {
-                returnList =  returnList.subList(i, returnList.size());
-                returnList.addFirst(new Phrase(phraseData.parsedLine));
+            if (currentPhrase.isNewContext())
+            {
+//                contextList.addFirst(currentPhrase);
+                contextList.addFirst(new Phrase(parsedLine));
+                return contextList;
             }
+
+
+            currentPhrase = currentPhrase.getPreviousPhrase();
         }
-        return returnList;
+
+        return contextList;
     }
+
+//    public List<PhraseData> processContextList() {
+//        List<PhraseData> returnList = new ArrayList<>();
+//
+//        returnList.addAll(contextPhrases);
+//
+//        for (int i = returnList.size() - 1; i >= 0; i--) {
+//            PhraseData phraseData = returnList.get(i);
+//            onMatch("##processContextList:", (matchString) -> {
+//                System.out.println(matchString +  " phraseData : " + phraseData);
+//                System.out.println(matchString +  " phraseData.isNewContext() : " + phraseData.isNewContext());
+//                System.out.println(matchString +  " phraseData.getFirstElement() : " + phraseData.getFirstElement());
+//                System.out.println((matchString + " phraseData.categoryFlags: : " + phraseData.categoryFlags));
+//            });
+//            if (phraseData.isStartingContext )
+//            {
+//                return returnList.subList(i, returnList.size());
+//            }
+//            if (phraseData.contextElement != null  || phraseData.isNewContext() || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT) || phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.ELEMENT_CONTEXT)) {
+//                returnList =  returnList.subList(i, returnList.size());
+//                returnList.addFirst(new Phrase(phraseData.parsedLine));
+//            }
+//        }
+//        return returnList;
+//    }
 
     public static XPathy getXPathyContext(String context, List<ElementMatch> elements) {
         if (elements.isEmpty()) return null;
@@ -306,6 +340,7 @@ public abstract class PhraseData extends PassedData {
     public abstract PhraseData runPhrase();
 
     public abstract PhraseData cloneInheritedPhrase();
+
     public abstract PhraseData clonePhrase(PhraseData previous);
 
     public abstract PhraseData resolvePhrase();
@@ -335,7 +370,7 @@ public abstract class PhraseData extends PassedData {
 
     public void runOperation() {
         OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
-        if(operation instanceof ActionOperations){
+        if (operation instanceof ActionOperations) {
             waitMilliseconds(300);
         }
         operation.execute(this);
@@ -350,6 +385,7 @@ public abstract class PhraseData extends PassedData {
     }
 
     Boolean previouslyResolvedBoolean = null;
+
     public boolean resolveResults() {
         if (!isOperationPhrase)
             return true;
@@ -357,16 +393,15 @@ public abstract class PhraseData extends PassedData {
             return chainStartPhrase.resolveResults();
         }
 
-        if(previouslyResolvedBoolean != null)
+        if (previouslyResolvedBoolean != null)
             return previouslyResolvedBoolean;
 
 
-
-        if(getAssertionType().isBlank())
+        if (getAssertionType().isBlank())
             return true;
 
         previouslyResolvedBoolean = getBooleanResult();
-        
+
         String assertionMessage = "Assertion phrase '" + resolvedText + "' evaluates to: " + previouslyResolvedBoolean;
         System.out.println(assertionMessage);
         if (!resultElements.isEmpty())
@@ -374,8 +409,7 @@ public abstract class PhraseData extends PassedData {
                     .map(Object::toString)
                     .collect(Collectors.joining("\n", "\n", ""));
 
-        if(invertConditional)
-        {
+        if (invertConditional) {
             previouslyResolvedBoolean = !previouslyResolvedBoolean;
         }
 
@@ -400,16 +434,14 @@ public abstract class PhraseData extends PassedData {
     }
 
     public boolean getBooleanResult() {
-        
+
         boolean andConjunction = !conjunction.equals("or");
 
         for (PhraseData resultPhrase : chainStartPhrase.resultPhrases) {
             Object resultObject = resultPhrase.result.value();
-            
+
 
             boolean isTrue = resultObject != null && (boolean) resultObject;
-            
-            
 
 
             if (andConjunction) {
