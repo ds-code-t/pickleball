@@ -2,9 +2,15 @@ Feature: Additiontest
 
 
   Scenario: sente test1
-    * , save "b" as "B"
-    * , save "b" as "B".
-    * , save "a" as "A". save "b" as "B"
+  @[DEBUG]
+    * , from the Top Panel:
+    : * , click the "Run ❯" Button, and the "Get your website" Link, and wait 2 seconds
+#    * , switch Window
+#    * , switch Window
+#    * , switch Window
+#    * , save "b" as "B"
+#    * , save "b" as "B".
+#    * , save "a" as "A". save "b" as "B"
 
 
   Scenario: until test1
