@@ -19,7 +19,7 @@ public final class Phrase extends PhraseData {
 
     public Phrase(LineData parsedLine) {
         super("From " + STARTING_CONTEXT , ',' , parsedLine);
-        isStartingContext = true;
+        isTopContext = true;
     }
 
     public Phrase(String inputText, Character delimiter, LineData parsedLine) {

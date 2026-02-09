@@ -33,7 +33,7 @@ import static tools.dscode.common.util.debug.DebugUtils.onMatch;
 
 
 public abstract class PhraseData extends PassedData {
-    boolean isStartingContext;
+//    boolean isStartingContext;
     public final String text;
     public final String resolvedText;
     public final Character termination; // nullable
@@ -100,8 +100,6 @@ public abstract class PhraseData extends PassedData {
 
 
     public PhraseData(String inputText, Character delimiter, LineData lineData) {
-        isStartingContext = false;
-
         parsedLine = lineData;
         text = inputText;
         resolvedText = getRunningStep().getStepParsingMap().resolveWholeText(text);
@@ -192,7 +190,7 @@ public abstract class PhraseData extends PassedData {
     public List<PhraseData> getPhraseContextList() {
         List<PhraseData> contextList = getContextListFromInheritedPhrases();
 
-        if(contextList.isEmpty() || !contextList.getFirst().isStartingContext)
+        if(contextList.isEmpty() || (!contextList.getFirst().isTopContext && contextList.getFirst().contextElement == null))
             contextList.addFirst(new Phrase(parsedLine));
 
         return contextList;
@@ -215,7 +213,7 @@ public abstract class PhraseData extends PassedData {
                 }
             }
 
-            if (currentPhrase.isStartingContext || currentPhrase.isNewContext() || currentPhrase.contextElement != null ||  currentPhrase.isTopContext)
+            if (currentPhrase.isTopContext || currentPhrase.isNewContext() || currentPhrase.contextElement != null)
             {
                 return contextList;
             }
