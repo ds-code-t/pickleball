@@ -206,10 +206,10 @@ public final class XPathyUtils {
         String textNodeExpr;
         if (t == ValueWrapper.ValueTypes.BACK_TICKED) {
             // exact: no normalization/casefold
-            textNodeExpr = ".";
+            textNodeExpr = "string(.)";
         } else {
             // normalized-text matching (your existing normalization strategy)
-            textNodeExpr = "normalize-space(translate(., " + toXPathLiteral(from) + " , " + toXPathLiteral(to) + "))";
+            textNodeExpr = "normalize-space(translate(string(.), " + toXPathLiteral(from) + " , " + toXPathLiteral(to) + "))";
             if (caseInsensitive) {
                 textNodeExpr = caseFoldExpr(textNodeExpr);
             }
@@ -232,7 +232,7 @@ public final class XPathyUtils {
         String textPredicate = buildStringPredicate(textNodeExpr, needleLiteral, op);
 
         // Filter out text nodes that are inside field-accessibility descendants
-        return ".//text()[not(ancestor::*[position()<=5][contains(@class, 'field-accessibility')]) and " + textPredicate + "]";
+        return " not(ancestor::*[position()<=5][contains(@class, 'field-accessibility')]) and " + textPredicate + " ";
     }
 
 

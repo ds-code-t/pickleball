@@ -48,6 +48,7 @@ public abstract class LineData implements Cloneable {
 
         StepBase parentStep = currentStep.parentStep;
         inheritedPhrase = parentStep == null ? null : parentStep.lineData.inheritancePhrase;
+
         inheritedConditionalState = inheritedPhrase == null ? 1 : inheritedPhrase.phraseConditionalMode;
 
         currentStep.logAndIgnore =

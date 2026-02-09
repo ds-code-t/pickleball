@@ -2,9 +2,12 @@ Feature: Additiontest
 
 
   Scenario: sente test1
-  @[DEBUG]
+  @[DEBUG,##]
+    * navigate to: URL.textbox
     * , from the Top Panel:
-    : * , click the "Run ❯" Button, and the "Get your website" Link, and wait 2 seconds
+    : * IF: "aa" THEN: , click "Get your own website" Link
+
+#    : * , click the "Run ❯" Button, and the "Get your website" Link, and wait 2 seconds
 #    * , switch Window
 #    * , switch Window
 #    * , switch Window

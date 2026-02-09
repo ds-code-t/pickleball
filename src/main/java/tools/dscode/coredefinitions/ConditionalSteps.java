@@ -80,10 +80,10 @@ public class ConditionalSteps extends CoreSteps {
 
             switch (part.token()) {
                 case IF -> {
-                    stepString += " , if " + part.text();
+                    stepString += " , if " + part.text() + " : ";
                 }
                 case ELSE_IF -> {
-                    stepString += " , else if " + part.text();
+                    stepString += " , else if " + part.text() + " : ";
                 }
                 case ELSE -> {
                     stepString += " , else : ";
@@ -101,14 +101,12 @@ public class ConditionalSteps extends CoreSteps {
 
 
             if (part.token() == ConditionalToken.THEN) {
-
                 StepExtension modifiedStep = lastNonThenStep.modifyStepExtension(stepString);
 
 
                 lastNonThenStep.addChildStep(modifiedStep);
 
             } else {
-
                 StepExtension modifiedStep = currentStep.modifyStepExtension(stepString);
 
 

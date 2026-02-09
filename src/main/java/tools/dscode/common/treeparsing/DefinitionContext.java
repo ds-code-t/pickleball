@@ -442,7 +442,7 @@ public final class DefinitionContext {
             //
             // Link
             //
-            category("Link").children("Links").inheritsFrom("Text")
+            category("Link").children("Links").inheritsFrom(CONTAINS_TEXT)
                     .or(
                             (category, v, op) -> XPathy.from(any).byAttribute(role).equals("link"),
                             (category, v, op) -> XPathy.from(any).byAttribute(aria_label).equals("link"),
