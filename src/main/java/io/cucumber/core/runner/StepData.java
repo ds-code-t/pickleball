@@ -108,9 +108,10 @@ public abstract class StepData extends StepMapping {
 
     public void insertReplacement(StepData replacement) {
         replacement.previousSibling = previousSibling;
-        replacement.nextSibling = nextSibling;
-        if(nextSibling != null)
+        if(nextSibling != null) {
+            replacement.nextSibling = nextSibling;
             nextSibling.previousSibling = replacement;
+        }
         nextSibling = replacement;
         parentStep.childSteps.add(parentStep.childSteps.indexOf(this)+1, replacement);
         replacement.childSteps.addAll(childSteps);
@@ -119,7 +120,7 @@ public abstract class StepData extends StepMapping {
 
 
     public void addChildStep(StepData child) {
-        StepBase lastChild = childSteps.size() == 0 ? null : childSteps.getLast();
+        StepBase lastChild = childSteps.isEmpty() ? null : childSteps.getLast();
         if (lastChild != null) {
             lastChild.nextSibling = child;
             child.previousSibling = lastChild;

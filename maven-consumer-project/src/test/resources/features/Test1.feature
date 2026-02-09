@@ -32,9 +32,26 @@ Feature: Additiontest
 #    Then , save "Q1" as "W"
 #  @[DEBUG,noBase,##Specificity,##xscore,##textXpath,##]
   @[DEBUG,nobase,##Specificity,##xscore,##textXpath,##pseudotags,##nosrmalizexpaths,##]
-#  @[DEBUG]
-    * , enter "aa" in the "First name:" Textbox
-    * , enter "zz" in the "Last name:" Textbox
+     * , from the Top Panel:
+    : * , I verify  "Get your website" Link is displayed. I verify  "Get your website" Link is displayed
+#    : * , click the "Get your website" Link
+    : * IF: the "Get your website" Link is displayed:
+    :: * , click the "Get your website" Link
+
+
+
+#   * , verify the "cars" Dropdown is displayed
+#   * IF: the "cars" Dropdown is displayed:
+#  : * , select the last Option from the  "cars" Dropdown
+
+    #    * , from the Top Panel:
+#    : * , verify the "cars" Dropdown is displayed
+#    : * IF: the "cars" Dropdown is displayed:
+#    :: * , select the last Option from the  "cars" Dropdown
+
+#    * IF: "First name:" Textbox is displayed:
+#    : * , enter "aa" in the "First name:" Textbox
+#    : * , enter "zz" in the "Last name:" Textbox
 
 #    * , from the Top Panel:
 #  :   * , enter "aa" in the "First name:" Textbox

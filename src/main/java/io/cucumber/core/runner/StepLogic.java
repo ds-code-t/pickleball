@@ -9,7 +9,7 @@ public class StepLogic {
 
     public static List<StepExtension> stepCloner(StepExtension stepExtension) {
         PhraseData inheritedPhrase = stepExtension.lineData.inheritedPhrase;
-        if (inheritedPhrase == null)
+        if (inheritedPhrase == null || inheritedPhrase.branchedPhrases.isEmpty())
         {
             return new ArrayList<>(List.of((StepExtension) stepExtension.clone()));
         }
