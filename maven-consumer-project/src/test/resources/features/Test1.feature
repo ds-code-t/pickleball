@@ -1,6 +1,22 @@
 Feature: Additiontest
 
 
+  Scenario: ttt
+  @[DEBUG,##]
+    * , from the Top Panel:
+   : * , wait on Loading
+   : * , wait on Textbox
+  : * , wait on Loading
+  : * , wait on Textbox
+  : * , wait on Loading
+  : * , wait on Textbox
+#    * , save "a" as "A"
+##    * , if "<A>" equals "a", save "b" as "b"
+##    * , if "<A>" equals "aa", save "b" as "b"
+##    * , until "<A>" equals "aaaa" , wait 1 seconds ,  save "a<A>" as "A"
+#    * , until "<A>" equals "aaaa":
+#  : * , wait 1 seconds ,  save "a<A>" as "A"
+
   Scenario: sente test1
   @[DEBUG,##]
     * navigate to: URL.textbox

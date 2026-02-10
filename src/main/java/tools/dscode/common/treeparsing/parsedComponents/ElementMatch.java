@@ -435,9 +435,10 @@ public class ElementMatch {
 
 
         if (wrappedElements == null) {
-            if (!parentPhrase.getPreviousTerminator().equals(";")) {
+            if (!parentPhrase.getPreviousTerminator().equals(";"))
+                findWrappedElements();
+            else
                 parentPhrase.syncWithDOM();
-            }
         }
         return wrappedElements;
     }

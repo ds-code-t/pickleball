@@ -165,7 +165,8 @@ public abstract class StepData extends StepMapping {
 
 
     public String getUnmodifiedText() {
-        return (String) getProperty(pickleStepTestStep.getStep(), "text");
+//        return pickleStepTestStep.getStep().step .getOriginalText();
+        return (String) getProperty(getProperty(pickleStepTestStep.getStep(), "pickleStep"), "text");
     }
 
 }

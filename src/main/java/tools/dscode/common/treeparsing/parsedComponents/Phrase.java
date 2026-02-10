@@ -1,7 +1,6 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 
-import io.cucumber.core.runner.StepExtension;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
@@ -9,7 +8,6 @@ import tools.dscode.common.treeparsing.preparsing.LineData;
 
 import java.util.ArrayList;
 
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.treeparsing.DefinitionContext.FILE_INPUT;
 
@@ -18,7 +16,7 @@ public final class Phrase extends PhraseData {
 
 
     public Phrase(LineData parsedLine) {
-        super("From " + STARTING_CONTEXT , ',' , parsedLine);
+        super("From " + STARTING_CONTEXT, ',', parsedLine);
         isTopContext = true;
     }
 
@@ -56,8 +54,7 @@ public final class Phrase extends PhraseData {
     public PhraseData runPhrase() {
         executePhrase();
         PhraseData nextResolvedPhrase = getNextResolvedPhrase();
-
-        if (nextResolvedPhrase == null || nextResolvedPhrase.isChainStart || !branchedPhrases.isEmpty() || contextTermination) {
+        if (!repeatRootPhrase && (nextResolvedPhrase == null || nextResolvedPhrase.isChainStart || !branchedPhrases.isEmpty() || contextTermination)) {
             resolveResults();
         }
 
@@ -138,13 +135,12 @@ public final class Phrase extends PhraseData {
 //        if (getPreviousPhrase() != null && !getPreviousPhrase().contextTermination) {
 //            contextPhrases.addAll(getPreviousPhrase().contextPhrases);
 //        }
-
-        if (shouldRepeatPhrase) {
+        if (chainStartPhrase != null && chainStartPhrase.repeatRootPhrase) {
+            repeatRootPhrase = true;
             return;
-//            PhraseData repeatedPhraseClone = clonePhrase(getPreviousPhrase());
-//            repeatedPhraseClone.shouldRepeatPhrase = false;
-//            branchedPhrases.add(repeatedPhraseClone);
         }
+
+
         if (isOperationPhrase) {
             runOperation();
         } else if (phraseType.equals(PhraseType.CONTEXT)) {
@@ -170,7 +166,6 @@ public final class Phrase extends PhraseData {
     }
 
 
-
     public PhraseData cloneWithElementContext(ElementWrapper elementWrapper) {
 //        char c = termination == ':' ? ',' : termination;
         PhraseData clone = clonePhrase(getPreviousPhrase());
@@ -181,13 +176,11 @@ public final class Phrase extends PhraseData {
     }
 
 
-
-
     @Override
     public PhraseData cloneInheritedPhrase() {
-        PhraseData clonedPhrase =  clonePhrase(getPreviousPhrase());
+        PhraseData clonedPhrase = clonePhrase(getPreviousPhrase());
         clonedPhrase.branchedPhrases.addAll(branchedPhrases);
-        clonedPhrase.shouldRepeatPhrase = shouldRepeatPhrase;
+//        clonedPhrase.repeatRootPhrase = repeatRootPhrase;
         clonedPhrase.setResolvedPhrase(clonedPhrase);
         return clonedPhrase;
     }
@@ -197,8 +190,33 @@ public final class Phrase extends PhraseData {
         return clonePhrase(previous, null);
     }
 
+    @Override
+    public PhraseData cloneRepeatedChain() {
 
+        PhraseData chainStartClone = null;
+        PhraseData lastClone = chainStartPhrase.getPreviousPhrase();
+       for (int p = 0; p< chainStartPhrase.repeatedChain.size(); p++) {
+           PhraseData currentPhrase = chainStartPhrase.repeatedChain.get(p);
+           PhraseData currentClone = currentPhrase.clonePhrase(lastClone, null);
+           if(p ==0)
+           {
+               chainStartClone = currentClone;
+               currentClone.isChainStart = true;
+               branchedPhrases.add(currentPhrase);
+           }
+           else {
+               lastClone.setNextPhrase(currentClone);
+           }
+           currentClone.chainStartPhrase = chainStartClone;
+           currentClone.shouldRepeatPhrase = true;
+           currentClone.repeatRootPhrase = false;
+           chainStartClone.repeatedChain.add(currentClone);
+           lastClone = currentClone;
+       }
+        return chainStartClone;
+    }
 
+    @Override
     public PhraseData clonePhrase(PhraseData previous, Character newTermination) {
         Phrase clone = new Phrase(text, (newTermination == null ? termination : newTermination), parsedLine);
         clone.phraseConditionalMode = phraseConditionalMode;

@@ -38,7 +38,6 @@ public class ExecutionDictionary {
                     "]";
 
 
-
     @FunctionalInterface
     public interface Builder {
         XPathy build(String category, ValueWrapper value, Op op);
@@ -111,19 +110,20 @@ public class ExecutionDictionary {
 
     private void defaultRegistrations() {
 
-        category("Text").children("Texts").context((category, v, op, webDriver, ctx) ->
-                ctx
-        );
+//        category("Text").children("Texts").context((category, v, op, webDriver, ctx) ->
+//                ctx
+//        );
 
-//        category("Text").children("Texts").inheritsFrom(CONTAINS_TEXT).
-//                and(
-//                        (category, v, op) ->
-//                        {
-//                            if (v == null || v.isNull())
+        category("Text").children("Texts").inheritsFrom(CONTAINS_TEXT).
+                and(
+                        (category, v, op) ->
+                        {
+                            if (v == null || v.isNull())
+                                return null;
 //                                return XPathy.from("//*[ancestor-or-self::body and descendant::text()]");
-//                            return XPathy.from("//*[count(descendant::node()) <= 12]");
-//                        }
-//                );
+                            return XPathy.from("//*[count(descendant::node()) <= 12]");
+                        }
+                );
 
         category(CONTAINS_TEXT).and((category, v, op) -> {
             if (v == null || v.isNull())
@@ -222,7 +222,6 @@ public class ExecutionDictionary {
         }
         return null;
     }
-
 
 
     // ========================================================
@@ -403,7 +402,8 @@ public class ExecutionDictionary {
         String andStep = andPart.map(xPathy -> XPathyAssembly.toSelfStep(xPathy.getXpath())).orElse(null);
         String orStep = orPart.map(xPathy -> XPathyAssembly.toSelfStep(xPathy.getXpath())).orElse(null);
         // Order them by specificity score (lower first, consistent with combine())
-        record Step(String step, int score) {}
+        record Step(String step, int score) {
+        }
 
         List<Step> steps = new ArrayList<>(2);
         if (andStep != null && !andStep.isBlank()) {
@@ -515,12 +515,12 @@ public class ExecutionDictionary {
         /**
          * Register the resolved XPathy of one or more other categories as OR-components
          * for the category(ies) this spec is defining.
-         *
+         * <p>
          * Example:
-         *   category("newcategory").orCategories("CatA", "CatB");
-         *
+         * category("newcategory").orCategories("CatA", "CatB");
+         * <p>
          * At runtime, resolving "newcategory" will include the OR parts from:
-         *   andThenOr("CatA", v, op) and andThenOr("CatB", v, op)
+         * andThenOr("CatA", v, op) and andThenOr("CatB", v, op)
          */
         public CategorySpec orCategories(String... categoryNames) {
             Objects.requireNonNull(categoryNames, "categoryNames must not be null");
@@ -542,12 +542,12 @@ public class ExecutionDictionary {
         /**
          * Register the resolved XPathy of one or more other categories as AND-components
          * for the category(ies) this spec is defining.
-         *
+         * <p>
          * Example:
-         *   category("newcategory").andCategories("CatA", "CatB");
-         *
+         * category("newcategory").andCategories("CatA", "CatB");
+         * <p>
          * At runtime, resolving "newcategory" will include the AND parts from:
-         *   andThenOr("CatA", v, op) and andThenOr("CatB", v, op)
+         * andThenOr("CatA", v, op) and andThenOr("CatB", v, op)
          */
         public CategorySpec andCategories(String... categoryNames) {
             Objects.requireNonNull(categoryNames, "categoryNames must not be null");

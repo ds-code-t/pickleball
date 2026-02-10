@@ -32,6 +32,8 @@ import static tools.dscode.common.domoperations.HumanInteractions.wheelScrollBy;
 import static tools.dscode.common.domoperations.KeyParser.sendComplexKeys;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitForDuration;
+import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
+import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
 import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
 
@@ -118,15 +120,29 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-            blur(GeneralSteps.getDefaultDriver());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.TIME_VALUE, ElementType.FOLLOWING_OPERATION)
+                    new ElementMatcher().mustMatchAtLeastOne(ElementType.TIME_VALUE, ElementType.HTML_ELEMENT)
             );
             ElementMatch waitElementMatch = phraseData.resultElements.getFirst();
 
             phraseData.result = Attempt.run(() -> {
-                waitForDuration(waitElementMatch.getValue().asDuration(waitElementMatch.category));
+                if (waitElementMatch.elementTypes.contains(ElementType.HTML_ELEMENT)) {
+                    safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
+                    boolean waitingOnLoading = waitElementMatch.elementTypes.contains(ElementType.HTML_LOADING);
+                    while (true) {
+                        List<ElementWrapper> wrappers = getWrappedElements(waitElementMatch);
+                        if (wrappers.isEmpty()) {
+                            if (waitingOnLoading)
+                                return true;
+                        } else if (!waitingOnLoading) {
+                            return true;
+                        }
+                        System.out.println("Waiting on " +(waitingOnLoading? "LOADING" : waitElementMatch ));
+                        waitMilliseconds(3000);
+                    }
+                } else {
+                    waitForDuration(waitElementMatch.getValue().asDuration(waitElementMatch.category));
+                }
                 return true;
             });
 //            phraseData.blurAfterOperation = true;
@@ -371,9 +387,7 @@ public enum ActionOperations implements OperationsInterface {
     }
 
 
-
-    public void textOperation(PhraseData phraseData , boolean shouldClear, boolean shouldEnterText)
-    {
+    public void textOperation(PhraseData phraseData, boolean shouldClear, boolean shouldEnterText) {
         List<ElementMatch> elementMatches = phraseData.browserElement != null ? new ArrayList<>() : phraseData.getWebElementMatches();
         if (elementMatches.isEmpty()) {
             elementMatches.add(null);
@@ -381,17 +395,16 @@ public enum ActionOperations implements OperationsInterface {
         phraseData.result = Attempt.run(() -> {
             int count = 0;
             for (ElementMatch inputElement : elementMatches) {
-                List<ElementWrapper> elementWrappers = inputElement ==  null ? List.of(null)  : inputElement.getElementThrowErrorIfEmptyWithNoModifier();
+                List<ElementWrapper> elementWrappers = inputElement == null ? List.of(null) : inputElement.getElementThrowErrorIfEmptyWithNoModifier();
                 for (ElementWrapper elementWrapper : elementWrappers) {
                     WebElement webElement = elementWrapper == null ? null : elementWrapper.getElement();
                     if (count > 0) {
                         safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
-                    if(shouldClear)
-                    {
+                    if (shouldClear) {
                         clear(GeneralSteps.getDefaultDriver(), webElement);
                     }
-                    if(shouldEnterText) {
+                    if (shouldEnterText) {
                         for (ElementMatch valueElement : phraseData.getValueTypeEntryElementMatches()) {
                             ValueWrapper valueWrapper = valueElement.getValue();
                             if (valueWrapper.type == ValueWrapper.ValueTypes.BACK_TICKED) {
@@ -408,10 +421,6 @@ public enum ActionOperations implements OperationsInterface {
         });
 
     }
-
-
-
-
 
 
 }

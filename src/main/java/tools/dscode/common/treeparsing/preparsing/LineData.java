@@ -63,7 +63,7 @@ public abstract class LineData implements Cloneable {
         return this.runningText;
     }
 
-    public abstract void runPhraseFromLine(PhraseData phrase);
+    public abstract PhraseData runPhraseFromLine(PhraseData phrase);
 
     public LineData(String input, Collection<Character> phraseSeparators) {
         input = stripObscureNonText(Objects.requireNonNull(input, "input"));

@@ -13,6 +13,7 @@ import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
 import tools.dscode.common.status.SoftExceptionInterface;
 import tools.dscode.common.status.SoftRuntimeException;
+import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 import tools.dscode.coredefinitions.ReportingSteps;
@@ -209,7 +210,6 @@ public class CurrentScenarioState extends ScenarioMapping {
         currentStep = stepExtension;
         stepExtension.lineData = new ParsedLine(stepExtension.getUnmodifiedText());
         stepExtension.lineData.setInheritance(stepExtension);
-
         runningStep(stepExtension);
     }
 
@@ -273,20 +273,35 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
         if (!stepExtension.definitionFlags.contains(IGNORE_CHILDREN)) {
-              List<StepExtension> clonedSteps = stepCloner(stepExtension);
+            if(stepExtension.lineData.inheritancePhrase != null && stepExtension.lineData.inheritancePhrase.repeatRootPhrase)
+            {
+                while(true) {
+                    PhraseData clonedChainStart = stepExtension.lineData.inheritancePhrase.cloneRepeatedChain();
+                    clonedChainStart.parsedLine.runPhraseFromLine(clonedChainStart);
+                    if(clonedChainStart.phraseConditionalMode < 1) break;
+
+                    StepExtension firstChild = (StepExtension) ((StepExtension) stepExtension.clone()).initializeChildSteps();
+                    if (firstChild != null) {
+                        runStep(firstChild);
+                    }
+                }
+            }
+            else {
+
+                List<StepExtension> clonedSteps = stepCloner(stepExtension);
                 for (StepExtension repeatStep : clonedSteps) {
                     StepExtension firstChild = (StepExtension) repeatStep.initializeChildSteps();
                     if (firstChild != null) {
                         runStep(firstChild);
                     }
                 }
+            }
         }
 
         if (stepExtension.nextSibling != null) {
             runStep((StepExtension) stepExtension.nextSibling);
         }
     }
-
 
 
 

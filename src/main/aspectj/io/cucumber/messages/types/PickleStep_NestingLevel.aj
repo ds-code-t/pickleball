@@ -15,6 +15,6 @@ public aspect PickleStep_NestingLevel {
     String around(io.cucumber.messages.types.PickleStep self) : getTextExec(self) {
         String base = self.overrideLoggingText == null ? proceed(self) : self.overrideLoggingText;
         int n = self.nestingLevel;
-        return (n > 0 ? " : ".repeat(n) : "") + base;
+        return (n > 0 ? " : ".repeat(n-1) : "") + base;
     }
 }

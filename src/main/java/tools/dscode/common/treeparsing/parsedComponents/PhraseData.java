@@ -41,7 +41,10 @@ public abstract class PhraseData extends PassedData {
     private SearchContext searchContext;
     //    public PhraseData repeatedPhraseMaster = null;
     public boolean shouldRepeatPhrase = false;
-    boolean invertConditional = false;
+    public boolean repeatRootPhrase = false;
+    public List<PhraseData> repeatedChain = new ArrayList<>();
+//    public boolean evaluateResults = true;
+//    boolean invertConditional = false;
     List<Object> repetitionContext = new ArrayList<>();
 
 
@@ -114,8 +117,9 @@ public abstract class PhraseData extends PassedData {
         String conditional = phraseNode.getStringFromLocalState("conditional");
         if (conditional.equalsIgnoreCase("until")) {
             conditional = "if";
-            shouldRepeatPhrase = true;
-            invertConditional = true;
+            repeatRootPhrase = true;
+//            evaluateResults = false;
+//            invertConditional = true;
         }
         setConditional(conditional);
 
@@ -246,6 +250,9 @@ public abstract class PhraseData extends PassedData {
 
     public abstract PhraseData cloneInheritedPhrase();
 
+    public abstract PhraseData cloneRepeatedChain();
+
+    public abstract PhraseData clonePhrase(PhraseData previous, Character newTermination);
     public abstract PhraseData clonePhrase(PhraseData previous);
 
     public abstract PhraseData resolvePhrase();
@@ -289,6 +296,18 @@ public abstract class PhraseData extends PassedData {
         chainStartPhrase.resultPhrases.add(this);
     }
 
+    public void runUntilOperation() {
+        OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
+        if (operation instanceof ActionOperations) {
+            waitMilliseconds(300);
+        }
+        operation.execute(this);
+        if (result.failed()) {
+            throw new RuntimeException("operation '" + operation + "' failed", result.error());
+        }
+        chainStartPhrase.resultPhrases.add(this);
+    }
+
     Boolean previouslyResolvedBoolean = null;
 
     public boolean resolveResults() {
@@ -314,9 +333,10 @@ public abstract class PhraseData extends PassedData {
                     .map(Object::toString)
                     .collect(Collectors.joining("\n", "\n", ""));
 
-        if (invertConditional) {
-            previouslyResolvedBoolean = !previouslyResolvedBoolean;
-        }
+//        if (invertConditional) {
+//            previouslyResolvedBoolean = !previouslyResolvedBoolean;
+//        }
+
 
 
         switch (getAssertionType()) {
@@ -332,6 +352,15 @@ public abstract class PhraseData extends PassedData {
             }
             case "conditional" -> {
                 phraseConditionalMode = previouslyResolvedBoolean ? 1 : -1;
+                if(shouldRepeatPhrase) {
+                    if(phraseConditionalMode <= 0) {
+                        phraseConditionalMode = 1;
+                    }
+                    else
+                    {
+                        phraseConditionalMode = 0;
+                    }
+                }
             }
         }
 
