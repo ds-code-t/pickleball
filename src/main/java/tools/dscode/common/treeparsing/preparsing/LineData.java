@@ -43,11 +43,11 @@ public abstract class LineData implements Cloneable {
     public void setInheritance(StepBase currentStep) {
         stepExtension = currentStep;
 
-        PhraseData previousSiblingInheritancePhrase = currentStep.previousSibling == null ? null : currentStep.previousSibling.lineData.inheritancePhrase;
+        PhraseData previousSiblingInheritancePhrase = currentStep.previousSibling == null  || currentStep.previousSibling.lineData == null ? null : currentStep.previousSibling.lineData.inheritancePhrase;
         previousSiblingConditionalState = previousSiblingInheritancePhrase == null ? 1 : previousSiblingInheritancePhrase.phraseConditionalMode;
 
         StepBase parentStep = currentStep.parentStep;
-        inheritedPhrase = parentStep == null ? null : parentStep.lineData.inheritancePhrase;
+        inheritedPhrase = parentStep == null || parentStep.lineData == null ? null : parentStep.lineData.inheritancePhrase;
 
         inheritedConditionalState = inheritedPhrase == null ? 1 : inheritedPhrase.phraseConditionalMode;
 
