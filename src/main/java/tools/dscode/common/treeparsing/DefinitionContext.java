@@ -593,10 +593,6 @@ public final class DefinitionContext {
                                 if (v == null || v.isNullOrBlank()) {
                                     return null; // no label text to match, skip this builder
                                 }
-//                                String textXpath = andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceAll("^//\\*", "");
-                                String textXpath = XPathy.from(any)
-                                        .byHaving(deepNormalizedText(v, op)).getXpath().replaceAll("^//\\*", "");
-                                printDebug("##textXpath genericLabel: " + textXpath);
 
                                 XPathy returnXpathy = new XPathy(
                                         "//*[ancestor-or-self::*[position() <= 5]" +
@@ -605,7 +601,7 @@ public final class DefinitionContext {
                                                 "           [" +
                                                 "               normalize-space(.)!='' or " +
                                                 "               descendant::*[self::input or self::textarea or self::select]" +
-                                                "           ][1]" + textXpath + "[not(descendant::*[self::input or self::textarea or self::select][@type='hidden'])]" +
+                                                "           ][1]       " + getContainsText(v, op) + "          [not(descendant::*[self::input or self::textarea or self::select][@type='hidden'])]" +
                                                 "       ]" +
                                                 "]"
                                 );
@@ -628,16 +624,13 @@ public final class DefinitionContext {
                                 if (v == null || v.isNullOrBlank()) {
                                     return null; // no label text to match, skip this builder
                                 }
-                                String textXpath = andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceAll("^//\\*", "");
-                                printDebug("##textXpath forLabel:1 " + textXpath);
-
 
                                 XPathy returnXpath = combineOr(
-                                        new XPathy("//*[@id = (ancestor::div[3]//descendant::*" + textXpath + "[@for][1]/@for)]"),
+                                        new XPathy("//*[@id = (ancestor::div[3]//descendant::*" +  getDirectText(v, op) + "[@for][1]/@for)]"),
                                         new XPathy("//*[ancestor-or-self::*[position() <= 7]" +
-                                                "  [preceding-sibling::*[1]  " +
-                                                textXpath +
-                                                "    [not(descendant::button or descendant::input or descendant::textarea or descendant::select or descendant::a)]" +
+                                                "  [preceding-sibling::*[1]        " +
+                                                getContainsText(v, op) +
+                                                "         [not(descendant::button or descendant::input or descendant::textarea or descendant::select or descendant::a)]" +
                                                 "  ]" +
                                                 "]")
                                 );

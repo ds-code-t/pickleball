@@ -1,6 +1,11 @@
 Feature: Additiontest
 
 
+  Scenario: tttdfsdgf
+  @[DEBUG,##,nobase]
+    * , from the Top Panel:
+  : * , verify "Your name:" Textbox is displayed
+
   Scenario: ttt
   @[DEBUG,##]
     * , from the Top Panel:

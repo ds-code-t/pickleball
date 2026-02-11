@@ -232,7 +232,8 @@ public final class XPathyUtils {
         String textPredicate = buildStringPredicate(textNodeExpr, needleLiteral, op);
 
         // Filter out text nodes that are inside field-accessibility descendants
-        return " not(ancestor::*[position()<=5][contains(@class, 'field-accessibility')]) and " + textPredicate + " ";
+        return textPredicate;
+//        return " not(ancestor::*[position()<=5][contains(@class, 'field-accessibility')]) and " + textPredicate + " ";
     }
 
 

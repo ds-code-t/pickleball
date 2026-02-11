@@ -28,13 +28,13 @@ public class ExecutionDictionary {
 
     public static final String singleControlElementContainer =
             "       [" +
-                    "   count(descendant::*[self::input or self::textarea or self::select][not(@type='hidden')]) = 1" +
-                    "   and descendant::*[self::input or self::textarea or self::select]" +
-                    "   [" +
-                    "       not(preceding-sibling::*[normalize-space(string(.)) != ''])" +
-                    "       and " +
-                    "       not(following-sibling::*[normalize-space(string(.)) != ''])" +
-                    "   ]" +
+                    "   count(descendant-or-self::*[self::input or self::textarea or self::select][not(@type='hidden')]) = 1" +
+                    "   and descendant-or-self::*[self::input or self::textarea or self::select][not(@type='hidden')]" +
+//                    "   [" +
+//                    "       not(preceding-sibling::*[normalize-space(string(.)) != ''])" +
+//                    "       and " +
+//                    "       not(following-sibling::*[normalize-space(string(.)) != ''])" +
+//                    "   ]" +
                     "]";
 
 
@@ -49,6 +49,7 @@ public class ExecutionDictionary {
     }
 
     // Default base category that *every* category implicitly inherits from
+    public static final String DIRECT_TEXT = "DirectTextInternalUSE";
     public static final String CONTAINS_TEXT = "ContainsTextInternalUSE";
     public static final String BASE_CATEGORY = "BaseCategoryInternalUSE";
     public static final String STARTING_CONTEXT = "DefaultStartingContextInternalUSE";
@@ -108,6 +109,13 @@ public class ExecutionDictionary {
     protected void register() {
     }
 
+    public String getContainsText(ValueWrapper v, Op op){
+        return  andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceFirst("^//\\*","");
+    }
+    public String getDirectText(ValueWrapper v, Op op){
+        return  andThenOr(DIRECT_TEXT, v, op).getXpath().replaceFirst("^//\\*","");
+    }
+
     private void defaultRegistrations() {
 
 //        category("Text").children("Texts").context((category, v, op, webDriver, ctx) ->
@@ -131,6 +139,13 @@ public class ExecutionDictionary {
             return any.byHaving(
                     XPathy.from("descendant-or-self::*")
                             .byHaving(deepNormalizedText(v, op))
+            );
+        });
+
+        category(DIRECT_TEXT).and((category, v, op) -> {
+            if (v == null || v.isNull())
+                return null;
+            return any.byHaving(deepNormalizedText(v, op)
             );
         });
     }
