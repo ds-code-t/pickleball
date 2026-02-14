@@ -66,7 +66,6 @@ public class NPickleStepTestStepFactory {
 
 
     public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(String keyword, String stepText, String argument) {
-
         Pickle pickle = createGherkinMessagesPickle(keyword, stepText, argument);
         Step onlyStep = pickle.getSteps().getFirst();
         PickleStepDefinitionMatch pickleStepDefinitionMatch = getStepDefinitionMatch(pickle.getUri(), onlyStep);

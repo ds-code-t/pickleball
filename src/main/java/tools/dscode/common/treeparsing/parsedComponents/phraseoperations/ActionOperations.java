@@ -265,6 +265,13 @@ public enum ActionOperations implements OperationsInterface {
             });
         }
     },
+    PRESS {
+        @Override
+        public void execute(PhraseData phraseData) {
+            System.out.println(phraseData + " : Executing " + this.name());
+            textOperation(phraseData, false, true, true);
+        }
+    },
     ENTER {
         @Override
         public void execute(PhraseData phraseData) {
@@ -388,39 +395,95 @@ public enum ActionOperations implements OperationsInterface {
 
 
     public void textOperation(PhraseData phraseData, boolean shouldClear, boolean shouldEnterText) {
-        List<ElementMatch> elementMatches = phraseData.browserElement != null ? new ArrayList<>() : phraseData.getWebElementMatches();
-        if (elementMatches.isEmpty()) {
-            elementMatches.add(null);
-        }
+        textOperation(phraseData, shouldClear, shouldEnterText, false);
+    }
+
+    public void textOperation(PhraseData phraseData,
+                              boolean shouldClear,
+                              boolean shouldEnterText,
+                              boolean enterKeys) {
+
+        // Keep your original semantics:
+        // - if browserElement != null -> act once with null element
+        // - else -> use htmlElementMatches; if empty -> act once with null element
+        List<ElementMatch> elementMatches =
+                (phraseData.browserElement != null) ? List.of() : phraseData.htmlElementMatches;
+
+        // Precompute values once (so we don't re-walk value matches per input)
+        List<ValueWrapper> valuesToEnter = phraseData.getValueTypeEntryElementMatches()
+                .stream()
+                .map(ElementMatch::getValue)
+                .toList();
+
         phraseData.result = Attempt.run(() -> {
             int count = 0;
-            for (ElementMatch inputElement : elementMatches) {
-                List<ElementWrapper> elementWrappers = inputElement == null ? List.of(null) : inputElement.getElementThrowErrorIfEmptyWithNoModifier();
-                for (ElementWrapper elementWrapper : elementWrappers) {
-                    WebElement webElement = elementWrapper == null ? null : elementWrapper.getElement();
+
+            // If no matches, do the operation once with null (no looping hacks).
+            if (elementMatches == null || elementMatches.isEmpty()) {
+                applyTextOps(null, valuesToEnter, shouldClear, shouldEnterText, enterKeys);
+                return true;
+            }
+
+            for (ElementMatch inputMatch : elementMatches) {
+                // If match is null, do the operation once with null and continue.
+                if (inputMatch == null) {
+                    applyTextOps(null, valuesToEnter, shouldClear, shouldEnterText, enterKeys);
+                    continue;
+                }
+
+                List<ElementWrapper> wrappers = inputMatch.getElementThrowErrorIfEmptyWithNoModifier();
+
+                // If wrappers empty, do the operation once with null (matches your prior behavior).
+                if (wrappers == null || wrappers.isEmpty()) {
+                    applyTextOps(null, valuesToEnter, shouldClear, shouldEnterText, enterKeys);
+                    continue;
+                }
+
+                for (ElementWrapper wrapper : wrappers) {
+                    WebElement webElement = (wrapper == null) ? null : wrapper.getElement();
+
                     if (count > 0) {
                         safeWaitForPageReady(GeneralSteps.getDefaultDriver(), Duration.ofSeconds(60), 300);
                     }
-                    if (shouldClear) {
-                        clear(GeneralSteps.getDefaultDriver(), webElement);
-                    }
-                    if (shouldEnterText) {
-                        for (ElementMatch valueElement : phraseData.getValueTypeEntryElementMatches()) {
-                            ValueWrapper valueWrapper = valueElement.getValue();
-                            if (valueWrapper.type == ValueWrapper.ValueTypes.BACK_TICKED) {
-                                sendComplexKeys(getDefaultDriver(), webElement, valueWrapper.toString());
-                            } else {
-                                typeText(GeneralSteps.getDefaultDriver(), webElement, valueWrapper.toString());
-                            }
-                        }
-                    }
+
+                    applyTextOps(webElement, valuesToEnter, shouldClear, shouldEnterText, enterKeys);
                     count++;
                 }
             }
+
             return true;
         });
-
     }
+
+    private void applyTextOps(WebElement webElement,
+                              List<ValueWrapper> valuesToEnter,
+                              boolean shouldClear,
+                              boolean shouldEnterText,
+                              boolean enterKeys) {
+
+        if (shouldClear) {
+            clear(GeneralSteps.getDefaultDriver(), webElement);
+        }
+
+        if (!shouldEnterText) {
+            return;
+        }
+
+        for (ValueWrapper value : valuesToEnter) {
+            String text = value.toString();
+
+            if (enterKeys || value.type == ValueWrapper.ValueTypes.BACK_TICKED) {
+                sendComplexKeys(getDefaultDriver(), webElement, text.toUpperCase());
+            } else {
+                typeText(GeneralSteps.getDefaultDriver(), webElement, text);
+            }
+            waitMilliseconds(300);
+        }
+    }
+
+
+
+
 
 
 }

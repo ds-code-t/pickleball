@@ -18,7 +18,7 @@ public final class JacksonUtils {
     private JacksonUtils() {
     }
 
-    public static JsonNode toJSON( @Language("JSON") @NotNull String jsonString) {
+    public static JsonNode toJSON(@Language("JSON") @NotNull String jsonString) {
         try {
             return JSON_MAPPER.readTree(jsonString);
         } catch (IOException e) {
@@ -26,7 +26,7 @@ public final class JacksonUtils {
         }
     }
 
-    public static JsonNode toYAML (@Language("YAML") @NotNull String yamlString) {
+    public static JsonNode toYAML(@Language("YAML") @NotNull String yamlString) {
         try {
             return YAML_MAPPER.readTree(yamlString);
         } catch (IOException e) {
@@ -34,7 +34,7 @@ public final class JacksonUtils {
         }
     }
 
-    public static JsonNode toXML( @Language("XML") @NotNull String xmlString) {
+    public static JsonNode toXML(@Language("XML") @NotNull String xmlString) {
         try {
             return XML_MAPPER.readTree(xmlString);
         } catch (IOException e) {
@@ -44,7 +44,7 @@ public final class JacksonUtils {
 
 
     @Language("JSON")
-    public static String formatJSON(@Language("JSON") @NotNull  String jsonString) {
+    public static String formatJSON(@Language("JSON") @NotNull String jsonString) {
         try {
             JsonNode node = JSON_MAPPER.readTree(jsonString);
             return JSON_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(node);
@@ -54,7 +54,7 @@ public final class JacksonUtils {
     }
 
     @Language("YAML")
-    public static String formatYAML(@Language("YAML") @NotNull  String yamlString) {
+    public static String formatYAML(@Language("YAML") @NotNull String yamlString) {
         try {
             JsonNode node = YAML_MAPPER.readTree(yamlString);
             return YAML_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(node);
@@ -64,7 +64,7 @@ public final class JacksonUtils {
     }
 
     @Language("XML")
-    public static String formatXML( @Language("XML") @NotNull String xmlString) {
+    public static String formatXML(@Language("XML") @NotNull String xmlString) {
         try {
             JsonNode node = XML_MAPPER.readTree(xmlString);
             return XML_MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(node);
@@ -74,53 +74,13 @@ public final class JacksonUtils {
     }
 
     public static void main(String[] args) {
-        JsonNode jsonNode = JacksonUtils.toJSON("""
-                {
-                  "name": "John",
-                  "age": 30
-                }""");
+        toJSON(
 
-
-        JsonNode yamlNode = JacksonUtils.toYAML("""
-                name: John
-                age: 30""");
-
-    JsonNode xmlNode = JacksonUtils.
-                toXML(
-                        """
-                        <person>
-                          <name>John</name>
-                          <age>30</age>
-                        </person>""");
-
-
-                String formattedJson = JacksonUtils.formatJSON(
                 """
-            
-                {
-              "name": "John",
-              "age": 30
-            }""");
-        System.out.println(
-                formattedJson);
-
-        String
-                formattedYaml = JacksonUtils
-                .formatYAML("""
-            
-                    name: John
-            
-            
-            age: 30""");
-        System.out.println(formattedYaml);
-
-        String formattedXml = JacksonUtils.formatXML(
+                        {
+                        "A": "Some text"
+                        }
                         """
-                                <person>
-                                  <name>John</name>
-                                  <age>30</age>
-                                </person>""");
-        System.out.println(formattedXml);
-
-}
+        );
+    }
 }

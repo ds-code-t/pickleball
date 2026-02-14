@@ -14,7 +14,7 @@ import static tools.dscode.common.variables.SysEnv.getPickleBallProperty;
  */
 public class GlobalMappings extends NodeMap {
 
-    static final String rootDirectory = "configs";
+    public static final String rootDirectory = "configs";
 
     public final static GlobalMappings GLOBALS = new GlobalMappings();
 

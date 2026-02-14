@@ -134,8 +134,7 @@ public final class DefinitionContext {
                 self.putToLocalState("context", context.toLowerCase());
                 String conditional = self.resolvedGroupText("conditional");
                 self.putToLocalState("conditional", conditional);
-                if(conditional.equalsIgnoreCase("until"))
-                {
+                if (conditional.equalsIgnoreCase("until")) {
                     conditional = "if";
                 }
 
@@ -351,18 +350,18 @@ public final class DefinitionContext {
             category("Loading").flags()
                     .or(
                             (category, v, op) ->
-                                   XPathy.from("//*[" +
-                                           "       self::progress" +
-                                           "    or self::meter" +
-                                           "    or @aria-busy = 'true'" +
-                                           "    or @role = 'progressbar'" +
-                                           "    or @role = 'status'" +
-                                           "    or (@role = 'progressbar' and (@aria-valuenow or @aria-valuemin or @aria-valuemax))" +
-                                           "    or @data-loading = 'true'" +
-                                           "    or @data-state = 'loading'" +
-                                           "    or contains(@data-testid, 'loading')" +
-                                           "    or contains(@data-testid, 'spinner')" +
-                                           "]")
+                                    XPathy.from("//*[" +
+                                            "       self::progress" +
+                                            "    or self::meter" +
+                                            "    or @aria-busy = 'true'" +
+                                            "    or @role = 'progressbar'" +
+                                            "    or @role = 'status'" +
+                                            "    or (@role = 'progressbar' and (@aria-valuenow or @aria-valuemin or @aria-valuemax))" +
+                                            "    or @data-loading = 'true'" +
+                                            "    or @data-state = 'loading'" +
+                                            "    or contains(@data-testid, 'loading')" +
+                                            "    or contains(@data-testid, 'spinner')" +
+                                            "]")
                     );
 
             category(FILE_INPUT).flags(CategoryFlags.NON_DISPLAY_ELEMENT)
@@ -500,11 +499,12 @@ public final class DefinitionContext {
             //
             category("Textbox").children("Textboxes").andAnyCategories("forLabel", "htmlNaming", "genericLabel", "placeholderLabel")
                     .addBase("//input")
-                    .and((category, v, op) ->
-                            combineOr(
-                                    input.byAttribute(type).equals("text"),
-                                    input.byAttribute(type).equals("password"),
-                                    input.byAttribute(type).equals("email"))
+                    .or(
+                            (category, v, op) -> input.byAttribute(type).equals("text"),
+                            (category, v, op) -> input.byAttribute(type).equals("password"),
+                            (category, v, op) -> input.byAttribute(type).equals("email"),
+                            (category, v, op) -> input.byAttribute(type).equals("number"),
+                            (category, v, op) -> input.byAttribute(Attribute.custom("data-ctl")).contains("TextInput")
                     );
 
             category("Date Textbox").children("Date Textboxes").inheritsFrom("Textbox")
@@ -626,7 +626,7 @@ public final class DefinitionContext {
                                 }
 
                                 XPathy returnXpath = combineOr(
-                                        new XPathy("//*[@id = (ancestor::div[3]//descendant::*" +  getDirectText(v, op) + "[@for][1]/@for)]"),
+                                        new XPathy("//*[@id = (ancestor::div[3]//descendant::*" + getDirectText(v, op) + "[@for][1]/@for)]"),
                                         new XPathy("//*[ancestor-or-self::*[position() <= 7]" +
                                                 "  [preceding-sibling::*[1]        " +
                                                 getContainsText(v, op) +

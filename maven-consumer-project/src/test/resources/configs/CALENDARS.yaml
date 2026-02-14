@@ -1,0 +1,27 @@
+DefaultCalendar:
+  TimeZone: America/New_York
+
+  # Optional: default output presentation for BusinessTime.toString()/render()
+  DefaultOutputPattern: "yyyy-MM-dd HH:mm:ss VV"
+  DefaultOutputZone: America/New_York
+
+  Open:
+    - "MON-FRI 0900-1200 1300-1700"
+
+  Closed:
+    # Lunch closure (every weekday)
+    - "MON-FRI 1200-1300"
+
+    # --- Common US bank holidays (explicit 2026 dates) ---
+    - "1 JAN 2026"      # New Year's Day
+    - "19 JAN 2026"     # Martin Luther King Jr. Day
+    - "16 FEB 2026"     # Presidents' Day (Washington's Birthday)
+    - "25 MAY 2026"     # Memorial Day
+    - "19 JUN 2026"     # Juneteenth
+    - "3 JUL 2026"      # Independence Day (observed; July 4 is Saturday in 2026)
+    - "7 SEP 2026"      # Labor Day
+    - "12 OCT 2026"     # Columbus Day / Indigenous Peoples' Day (Fed holiday)
+    - "11 NOV 2026"     # Veterans Day
+    - "26 NOV 2026"     # Thanksgiving Day
+    - "25 DEC 2026"     # Christmas Day
+  

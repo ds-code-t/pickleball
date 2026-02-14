@@ -130,7 +130,6 @@ public class Registrations {
         dict.registerDefaultStartingContext((category, v, op, webDriver, ctx) ->
         {
             try {
-                System.out.println("@@@ Switching to default context");
                 webDriver.switchTo().defaultContent();
 
                 XPathy xpathy = dict.getCategoryXPathy("FrameResult");

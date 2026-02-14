@@ -29,8 +29,6 @@ public final class Phrase extends PhraseData {
 
 
     boolean shouldRun() {
-
-
         if (getConditional().startsWith("else")) {
             if (getPreviousPhrase() == null) {
                 if (parsedLine.previousSiblingConditionalState > -1) {
@@ -44,9 +42,7 @@ public final class Phrase extends PhraseData {
         } else {
             phraseConditionalMode = getPreviousPhrase() == null ? 1 : getPreviousPhrase().phraseConditionalMode;
         }
-
         return phraseConditionalMode > 0;
-
     }
 
 

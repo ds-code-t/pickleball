@@ -31,6 +31,7 @@ import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleStepTestStep;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
+import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
 import static tools.dscode.common.util.debug.DebugUtils.parseDebugString;
 
@@ -147,7 +148,9 @@ public class StepExtension extends StepData {
                             .toList())
                     .timestamp();
         }
-
+        if (webDriverUsed != null) {
+            safeWaitForPageReady(webDriverUsed, Duration.ofSeconds(5), 200);
+        }
         lifecycle.fire(Phase.AFTER_SCENARIO_STEP);
         if (webDriverUsed != null) {
             if (isPresent(webDriverUsed)) {
@@ -240,13 +243,28 @@ public class StepExtension extends StepData {
 
     public StepExtension modifyStepExtension(String newText) {
         StepExtension modifiedStep = new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep, pickleStepTestStep.getStep().getKeyword(), newText, getGherkinArgumentText(pickleStepTestStep.getStep())));
-
-
         modifiedStep.setStepParsingMap(getStepParsingMap());
         modifiedStep.parentStep = parentStep;
         modifiedStep.nestingLevel = nestingLevel;
         modifiedStep.lineData = lineData.clone();
         return modifiedStep;
+    }
+
+    public StepExtension createNewStepExtension(String stepText) {
+        PickleStepTestStep  newPickleStepTestStep = getPickleStepTestStepFromStrings(pickleStepTestStep.getStep().getKeyword(), stepText, "");
+        StepExtension modifiedStep = new StepExtension(testCase, newPickleStepTestStep);
+        modifiedStep.setStepParsingMap(getStepParsingMap());
+        modifiedStep.parentStep = parentStep;
+        modifiedStep.nestingLevel = nestingLevel;
+//        modifiedStep.lineData = lineData.clone();
+        return modifiedStep;
+    }
+
+    public String resolveStepFromString(String stepText) {
+        StepExtension newStepExtension = createNewStepExtension(stepText);
+        Object obj = newStepExtension.runAndGetReturnValue();
+        if(obj == null) return null;
+        return obj.toString();
     }
 
 

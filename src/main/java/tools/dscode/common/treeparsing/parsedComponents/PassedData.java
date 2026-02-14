@@ -137,9 +137,10 @@ public abstract class PassedData {
     }
 
 
-    final List<ElementMatch> webElementMatches = new ArrayList<>();
+    public final List<ElementMatch> webElementMatches = new ArrayList<>();
+    public final List<ElementMatch>htmlElementMatches = new ArrayList<>();
 
-    public List<ElementMatch> getWebElementMatches() {
+    public List<ElementMatch> getClosestWebElementMatches() {
         if(webElementMatches.isEmpty())
         {
             if(previousPhrase != null) {
@@ -290,7 +291,10 @@ public abstract class PassedData {
         elementMatchesFollowingOperation = new ArrayList<>();
         elementMatchesProceedingOperation = new ArrayList<>();
         for (ElementMatch em : elementMatches) {
-            if(em.elementTypes.contains(BROWSER))
+            System.out.println("@@em:");
+            if(em.elementTypes.contains(HTML_ELEMENT)) {
+                htmlElementMatches.add(em);
+            } else if(em.elementTypes.contains(BROWSER))
             {
                 browserElement = em;
             }

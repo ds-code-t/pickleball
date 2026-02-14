@@ -15,6 +15,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static tools.dscode.common.evaluations.AviatorUtil.eval;
 import static tools.dscode.common.evaluations.AviatorUtil.evalToBoolean;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
@@ -28,26 +30,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
     protected final List<MapConfigurations.MapType> keyOrder = new ArrayList<>();
     protected final List<MapConfigurations.MapType> singletonOrder = new ArrayList<>();
 
-//    public void copyParsingMap(ParsingMap parsingMap) {
-//        maps.clear();
-//        keyOrder.clear();
-//        maps.putAll(parsingMap.getMaps());
-//        keyOrder.addAll(parsingMap.keyOrder());
-//    }
-//
-//    public void copyParsingMapToRootStep(ParsingMap parsingMap) {
-//        maps.clear();
-//        keyOrder.clear();
-//        Set<MapConfigurations.MapType> exclude = EnumSet.of(MapConfigurations.MapType.PASSED_MAP, MapConfigurations.MapType.EXAMPLE_MAP);
-//        maps.putAll(Multimaps.filterKeys(parsingMap.getMaps(), k -> !exclude.contains(k)));
-//        keyOrder.addAll(parsingMap.keyOrder());
-//    }
-
-//    public MappingProcessor(ParsingMap parsingMap) {
-//        copyParsingMap(parsingMap);
-//        addMaps(new NodeMap(MapConfigurations.MapType.RUN_MAP));
-//        addMaps(new NodeMap(MapConfigurations.MapType.SINGLETON));
-//    }
 
     public MappingProcessor() {
         // Defensive copy to make key order immutable
@@ -207,8 +189,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     prev = input;
                     if (input.contains("<")) {
                         input = resolveByMap(input);
-                    } else {
-                        break;
                     }
                     if (input.contains("{")) {
                         input = resolveCurly(input);
@@ -218,7 +198,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
             } while (!input.equals(originalInput));
             return decodeBackToText(input);
         } catch (Throwable t) {
-            throw new RuntimeException("Could not resolve'" + input + "'", t);
+            t.printStackTrace();
+            throw new RuntimeException("Could not resolve '" + input + "' due to '" + t.getMessage() + "'", t);
         }
     }
 
@@ -231,8 +212,11 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
             while (m.find()) {
                 key = m.group(1);
-
-                replacement = get(key);
+                if (key.startsWith("$")) {
+                    replacement = getRunningStep().resolveStepFromString(key.substring(1));
+                } else {
+                    replacement = get(key);
+                }
                 if (replacement != null)
                     break;
             }
@@ -245,11 +229,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 stringReplacement = key.startsWith("?") ? "<" + key + ">" : "<?" + key + ">";
             }
             m.appendReplacement(sb, stringReplacement);
-
             m.appendTail(sb);
             return sb.toString();
         } catch (Throwable t) {
-            throw new RuntimeException("Could not resolve by map '" + s + "'", t);
+            throw new RuntimeException("Could not resolve by map '" + s + "' due to: " + t.getMessage(), t);
         }
     }
 
@@ -410,6 +393,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
         return String.valueOf(obj);
     }
+
 
     @Override
     public String toString() {

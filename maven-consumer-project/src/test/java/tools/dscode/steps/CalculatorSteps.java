@@ -18,6 +18,9 @@ import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Status;
 import tools.dscode.common.servicecalls.JacksonUtils;
+import tools.dscode.common.servicecalls.ToJsonNode;
+import tools.dscode.common.util.datetime.BusinessCalendar;
+import tools.dscode.common.util.datetime.CalendarRegistry;
 import tools.dscode.coredefinitions.NavigationSteps;
 import tools.dscode.registry.GlobalRegistry;
 
@@ -36,14 +39,61 @@ import static com.xpathy.Tag.input;
 import static io.cucumber.core.runner.CurrentScenarioState.getScenarioLogRoot;
 import static io.cucumber.core.runner.CurrentScenarioState.logToScenario;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static org.assertj.core.api.Assertions.assertThat;
 
 
+import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
+import static tools.dscode.common.servicecalls.ToJsonNode.sjson;
 import static tools.dscode.common.treeparsing.DefinitionContext.DEFAULT_EXECUTION_DICTIONARY;
+import static tools.dscode.common.util.datetime.CalendarRegistry.DEFAULT_CALENDAR;
+import static tools.dscode.common.util.datetime.CalendarRegistry.calendar;
+import static tools.dscode.common.util.datetime.CalendarRegistry.getCalendar;
 import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;
 import org.intellij.lang.annotations.Language;
 public class CalculatorSteps {
+
+
+    @Given("^capitalize:(.*)$")
+    public static String gettext(String text) {
+
+        sjson(        """
+                        {
+                        "A": "Some text"
+                        }
+                        """);
+
+        new ToJsonNode.JsonRecord( """
+                        {
+                        "A": "Some text"
+                        }
+                        """);
+
+        ToJsonNode t = new ToJsonNode(
+        """
+                        {
+                        "A": "Some text"
+                        }
+                        """
+        );
+
+        t.json2 =      """
+                        {
+                        "A": "Some text"
+                        }
+                        """;
+
+        t.json3 =      """
+                        {
+                        "A": "Some text"
+                        }
+                        """;
+
+        System.out.println("capitalizing: " + text);
+        return text.toUpperCase();
+    }
+
 
 
     public static void main(String[] args) {

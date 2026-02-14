@@ -1,10 +1,21 @@
 Feature: Additiontest
 
 
+  Scenario: aaasdsave2
+  * DateTime:now
+#    * capitalizeeee
+    * , save "<$DateTime:now>"  as "A"
+#    * , save "<$capitalizeeee>"  as "A"
+#    * , save "{1+1}"  as "A"
+
   Scenario: tttdfsdgf
-  @[DEBUG,##,nobase]
-    * , from the Top Panel:
-  : * , verify "Your name:" Textbox is displayed
+  @[DEBUG]
+    * , enter "123" in  "First  name:" Textbox, press "TAB" , and enter "456"
+#    * , enter "123" in  "First  name:" Textbox
+#    * , verify "First  name:" Textbox is displayed
+#    * navigate to: URL.textbox
+#    * , from the Top Panel:
+#  : * , verify "Your name:" Textbox is displayed
 
   Scenario: ttt
   @[DEBUG,##]
