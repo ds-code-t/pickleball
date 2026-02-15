@@ -52,8 +52,15 @@ public class RestAssuredUtil {
         }
         if (config.has("body")) {
             JsonNode bodyNode = config.get("body");
-            spec.body(bodyNode.isTextual() ? bodyNode.asText() : bodyNode);
+
+            // Always give RestAssured a String to avoid its Jackson module auto-discovery
+            String bodyString = bodyNode.isTextual()
+                    ? bodyNode.asText()
+                    : bodyNode.toString(); // JSON text
+
+            spec.body(bodyString);
         }
+
         if (config.has("contentType")) {
             spec.contentType(config.get("contentType").asText());
         }
@@ -94,6 +101,21 @@ public class RestAssuredUtil {
             spec.urlEncodingEnabled(config.get("urlEncodingEnabled").asBoolean());
         }
         return spec;
+    }
+
+    public static Response execute(RequestSpecification spec, JsonNode config) {
+        String method = config.has("method") ? config.get("method").asText("GET") : "GET";
+        String endpoint = config.has("endpoint") ? config.get("endpoint").asText() : "";
+
+        return switch (method.toUpperCase()) {
+            case "POST"   -> spec.post(endpoint);
+            case "PUT"    -> spec.put(endpoint);
+            case "DELETE" -> spec.delete(endpoint);
+            case "PATCH"  -> spec.patch(endpoint);
+            case "OPTIONS"-> spec.options(endpoint);
+            case "HEAD"   -> spec.head(endpoint);
+            default       -> spec.get(endpoint);
+        };
     }
 
 

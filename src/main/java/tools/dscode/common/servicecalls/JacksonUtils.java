@@ -18,6 +18,41 @@ public final class JacksonUtils {
     private JacksonUtils() {
     }
 
+    /**
+     * Best-effort parsing:
+     *  - If it parses as JSON -> return JSON node
+     *  - Else if parses as XML -> return XML-as-tree node
+     *  - Else if parses as YAML -> return YAML-as-tree node
+     *  - Else -> return text node
+     */
+    public static JsonNode parseBodyAuto(@NotNull String body) {
+        String s = body.trim();
+        if (s.isEmpty()) {
+            return JSON_MAPPER.getNodeFactory().textNode("");
+        }
+
+        // quick “likely” hints (still try/verify by parsing)
+        boolean likelyJson = s.startsWith("{") || s.startsWith("[");
+        boolean likelyXml  = s.startsWith("<");
+
+        // Try most likely first, then fall back
+        if (likelyJson) {
+            try { return JSON_MAPPER.readTree(s); } catch (Exception ignore) {}
+        }
+        if (likelyXml) {
+            try { return XML_MAPPER.readTree(s); } catch (Exception ignore) {}
+        }
+
+        // General fallbacks
+        try { return JSON_MAPPER.readTree(s); } catch (Exception ignore) {}
+        try { return XML_MAPPER.readTree(s); } catch (Exception ignore) {}
+        try { return YAML_MAPPER.readTree(s); } catch (Exception ignore) {}
+
+        // Unknown format -> keep raw
+        return JSON_MAPPER.getNodeFactory().textNode(body);
+    }
+
+
     public static JsonNode toJSON(@Language("JSON") @NotNull String jsonString) {
         try {
             return JSON_MAPPER.readTree(jsonString);
