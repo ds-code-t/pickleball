@@ -107,7 +107,10 @@ dependencies {
 
 
     // xpath and selenium
-    implementation 'org.seleniumhq.selenium:selenium-java:4.38.0'
+    implementation('org.seleniumhq.selenium:selenium-java') {
+        version { strictly('[4.0,5.0)') }
+    }
+
 //    implementation 'com.github.Volta-Jebaprashanth:xpathy:3.0.0'
     implementation files('libs/xpathy-3.0.0.jar')
 
@@ -385,16 +388,7 @@ publishing {
                                     !(ra.moduleVersion.id.group == project.group && ra.name == 'pickleball')
                         }
 
-                rtArtifacts.each { ra ->
-                    def ga = "${ra.moduleVersion.id.group}:${ra.name}"
-                    if (!existing.contains(ga)) {
-                        def d = depsNode.appendNode('dependency')
-                        d.appendNode('groupId', ra.moduleVersion.id.group)
-                        d.appendNode('artifactId', ra.name)
-                        d.appendNode('version', ra.moduleVersion.id.version)
-                        d.appendNode('scope', 'compile')
-                    }
-                }
+
             }
         }
     }
