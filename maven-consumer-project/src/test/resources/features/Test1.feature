@@ -19,9 +19,11 @@ Feature: Additiontest
 #    * , save "<$capitalizeeee>"  as "A"
 #    * , save "{1+1}"  as "A"
 
-  Scenario: tttdfsdgf
-  @[DEBUG]
-    * , enter "123" in  "First  name:" Textbox, press "TAB" , and enter "456"
+  Scenario: stttdfsdgf
+  @[DEBUG,##MatchNode]
+    * , enter "123" in 1st "First name:" Textbox
+#    * , enter "456" in 2nd Textbox
+#    * , enter "123" in  "First  name:" Textbox, press "TAB" , and enter "456"
 #    * , enter "123" in  "First  name:" Textbox
 #    * , verify "First  name:" Textbox is displayed
 #    * navigate to: URL.textbox
