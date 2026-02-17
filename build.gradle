@@ -93,7 +93,7 @@ dependencies {
     // AspectJ toolchain + runtime
     ajcTools "org.aspectj:aspectjtools:${aspectjVersion}"
     ajcRuntime "org.aspectj:aspectjrt:${aspectjVersion}"
-    implementation "org.aspectj:aspectjrt:${aspectjVersion}" // shaded into pickleball
+//    implementation "org.aspectj:aspectjrt:${aspectjVersion}" // shaded into pickleball
 
     // Declare weave targets, compile visibility, and runtime graph entries
     toWeave.each { gav ->
@@ -223,6 +223,8 @@ def myLicense = file("LICENSE").canonicalFile
 def myNotice  = file("NOTICE").canonicalFile
 
 tasks.shadowJar {
+    configurations = [project.configurations.ajcRuntime]
+
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
     // Exclude LICENSE/NOTICE coming from dependency jars, but keep *your* project ones.
@@ -270,18 +272,18 @@ tasks.shadowJar {
         includeEmptyDirs = false
     }
 
+
+    // Bundle local xpathy jar into the shaded jar (since Maven consumers can't resolve files(...) deps)
+    from({ zipTree(file("libs/xpathy-3.0.0.jar")) }) {
+        // keep signatures out (common for shaded jars)
+        exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
+        // optional: avoid duplicate manifests
+        exclude 'META-INF/MANIFEST.MF'
+    }
+
     // put woven classes LAST so they overwrite any originals
     from(wovenExpanded)
 
-    // Only shade what we really need
-    dependencies {
-        exclude(dependency("io.cucumber:cucumber-core:${cucumberVersion}"))
-        exclude(dependency("io.cucumber:cucumber-java:${cucumberVersion}"))
-        exclude(dependency("io.cucumber:cucumber-plugin:${cucumberVersion}"))
-        exclude(dependency("io.cucumber:messages:${messagesVersion}"))
-        exclude(dependency("io.cucumber:gherkin:${gherkinVersion}"))
-        exclude(dependency('org.jetbrains:annotations:26.0.2-1'))
-    }
 
     // ✅ ensure service descriptors are merged for discovery
     mergeServiceFiles {
@@ -292,6 +294,8 @@ tasks.shadowJar {
 
     exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
     zip64 = true
+
+
 }
 
 
@@ -368,7 +372,7 @@ publishing {
                         } as Set
 
                 Set<String> shadedGA = (
-                        ['org.aspectj:aspectjrt', 'io.github.classgraph:classgraph'] +
+                        ['org.aspectj:aspectjrt'] +
                                 toWeave.collect { "${it.group}:${it.name}" }
                 ) as Set
 
