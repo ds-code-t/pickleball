@@ -2,6 +2,7 @@ Feature: Additiontest
 
 
   Scenario: aaasdsave2
+  @[DEBUG]
   * DateTime:now
 #    * capitalizeeee
     * , save "<$DateTime:now>"  as "A"

@@ -7,7 +7,7 @@ plugins {
 }
 
 group = 'tools.dscode'
-version = '2.0.2'
+version = '2.0.3'
 
 
 repositories {
@@ -37,6 +37,8 @@ java {
     withJavadocJar()
 }
 
+
+
 // Optional: make javadoc generation less fragile on modern JDKs
 tasks.withType(Javadoc).configureEach {
     options.addStringOption('Xdoclint:none', '-quiet')
@@ -63,7 +65,16 @@ configurations {
 }
 
 dependencies {
-    api("io.cucumber:cucumber-junit-platform-engine:7.27.2")
+    api("io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}") {
+        // Prevent consumers from pulling the UNWOVEN cucumber internals transitively
+        exclude group: "io.cucumber", module: "cucumber-core"
+        exclude group: "io.cucumber", module: "cucumber-java"
+        exclude group: "io.cucumber", module: "cucumber-plugin"
+        exclude group: "io.cucumber", module: "messages"
+        exclude group: "io.cucumber", module: "gherkin"
+    }
+
+
     api("org.junit.platform:junit-platform-suite-api:1.10.2")
     api("org.junit.platform:junit-platform-suite-engine:1.10.2")
     api("org.junit.jupiter:junit-jupiter-api:5.10.2")
@@ -95,15 +106,18 @@ dependencies {
     ajcRuntime "org.aspectj:aspectjrt:${aspectjVersion}"
 //    implementation "org.aspectj:aspectjrt:${aspectjVersion}" // shaded into pickleball
 
-    // Declare weave targets, compile visibility, and runtime graph entries
+// Declare weave targets + compile visibility (but DO NOT publish as transitive deps)
+// The woven bytecode is bundled into the shadow jar via from(wovenExpanded).
     toWeave.each { gav ->
-        weaveLibs "${gav.group}:${gav.name}:${gav.version}"
+        weaveLibs  "${gav.group}:${gav.name}:${gav.version}"
         compileOnly "${gav.group}:${gav.name}:${gav.version}"
-        implementation "${gav.group}:${gav.name}:${gav.version}"
+        testImplementation "${gav.group}:${gav.name}:${gav.version}" // only if your tests need it
     }
 
-    // BOM for alignment (optional but nice to keep)
-    implementation platform("io.cucumber:cucumber-bom:${cucumberVersion}")
+
+// Align all io.cucumber modules in THIS build, and also share alignment intent with consumers (Gradle)
+    api(platform("io.cucumber:cucumber-bom:${cucumberVersion}"))
+
 
 
     // xpath and selenium
@@ -111,7 +125,6 @@ dependencies {
         version { strictly('[4.0,5.0)') }
     }
 
-//    implementation 'com.github.Volta-Jebaprashanth:xpathy:3.0.0'
     implementation files('libs/xpathy-3.0.0.jar')
 
 }
@@ -289,11 +302,8 @@ tasks.shadowJar {
 
 
     // ✅ ensure service descriptors are merged for discovery
-    mergeServiceFiles {
-        include 'META-INF/services/io.cucumber.core.backend.Backend'
-        include 'META-INF/services/io.cucumber.core.backend.ObjectFactory'
-        include 'META-INF/services/org.junit.platform.engine.TestEngine'
-    }
+    mergeServiceFiles()
+
 
     exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
     zip64 = true
@@ -313,16 +323,19 @@ publishing {
             url = layout.buildDirectory.dir("maven-central-staging")
         }
     }
+
     publications {
         create('maven', MavenPublication) { pub ->
             groupId = project.group as String
             artifactId = 'pickleball'
             version = project.version as String
 
-            // Publish the shaded jar as the primary artifact
-            project.shadow.component(pub)
+            // Publish the shaded jar as THE main artifact
+            artifact(tasks.named("shadowJar")) {
+                builtBy tasks.named("shadowJar")
+            }
 
-            // Also publish sources + javadoc jars (required/expected by Central)
+            // Also publish sources + javadoc jars (expected by Central)
             artifact(tasks.named("sourcesJar"))
             artifact(tasks.named("javadocJar"))
 
@@ -338,14 +351,12 @@ publishing {
                     }
                 }
 
-                // Required by Maven Central (SCM section)
                 scm {
                     url.set('https://github.com/ds-code-t/pickleball')
                     connection.set('scm:git:git://github.com/ds-code-t/pickleball.git')
                     developerConnection.set('scm:git:ssh://git@github.com/ds-code-t/pickleball.git')
                 }
 
-                // Strongly expected for Central acceptance
                 developers {
                     developer {
                         id.set('ds-code-t')
@@ -355,44 +366,128 @@ publishing {
                 }
             }
 
-            // Keep your POM dependency massaging if you want (unchanged)
+            // --- FIX: Build a correct POM dependencies list ---
             pom.withXml {
                 def pomNode = asNode()
 
-                groovy.util.Node depsNode
+                // Ensure <dependencies> exists
                 def depsNodeList = pomNode.get('dependencies') as groovy.util.NodeList
-                if (depsNodeList && depsNodeList.size() > 0) {
-                    depsNode = (groovy.util.Node) depsNodeList[0]
-                } else {
-                    depsNode = pomNode.appendNode('dependencies')
-                }
+                def depsNode = (depsNodeList && depsNodeList.size() > 0)
+                        ? (groovy.util.Node) depsNodeList[0]
+                        : pomNode.appendNode('dependencies')
 
-                Set<String> existing = depsNode.children()
-                        .findAll { it instanceof groovy.util.Node && ((groovy.util.Node) it).name() == 'dependency' }
-                        .collect { n ->
-                            def node = (groovy.util.Node) n
-                            "${node.get('groupId')[0].text()}:${node.get('artifactId')[0].text()}"
-                        } as Set
+                // Remove anything Gradle/Shadow may have inserted (we're taking control)
+                depsNode.children().clear()
 
-                Set<String> shadedGA = (
-                        ['org.aspectj:aspectjrt'] +
-                                toWeave.collect { "${it.group}:${it.name}" }
+                // Coordinates you bundle/override -> must NOT be published as transitive deps
+                Set<String> bundledOrOverriddenGA = (
+                        ['org.aspectj:aspectjrt'] +                 // shaded via ajcRuntime
+                                ['io.cucumber:cucumber-bom'] +              // don't publish BOM as a normal dep
+                                toWeave.collect { "${it.group}:${it.name}" } // woven cucumber/messages/gherkin
                 ) as Set
 
-                def rtArtifacts = configurations.runtimeClasspath
-                        .resolvedConfiguration
-                        .resolvedArtifacts
-                        .findAll { ra ->
-                            def ga = "${ra.moduleVersion.id.group}:${ra.name}"
-                            !shadedGA.contains(ga) &&
-                                    !(ra.moduleVersion.id.group == project.group && ra.name == 'pickleball')
+                // Collect declared direct deps you want to publish transitively:
+                // - api deps (exposed to consumers)
+                // - implementation deps (turnkey runtime; also visible if you want)
+                def declared = []
+                declared.addAll(configurations.api.allDependencies)
+                declared.addAll(configurations.implementation.allDependencies)
+
+                // Helper: resolve a version ONLY when needed (and allowed)
+                def resolvedVersionFor = { String g, String a ->
+                    def ra = configurations.runtimeClasspath
+                            .resolvedConfiguration
+                            .resolvedArtifacts
+                            .find { it.moduleVersion.id.group == g && it.name == a }
+                    return ra?.moduleVersion?.id?.version
+                }
+
+                // De-dupe by GA
+                Set<String> added = new LinkedHashSet<>()
+
+                declared.each { dep ->
+                    // Skip non-module deps (files(...), project deps, etc.)
+                    if (!(dep instanceof org.gradle.api.artifacts.ModuleDependency)) return
+                    if (!dep.group || !dep.name) return
+
+                    String ga = "${dep.group}:${dep.name}"
+
+                    // Skip anything you bundle/override
+                    if (bundledOrOverriddenGA.contains(ga)) return
+
+                    if (added.contains(ga)) return
+                    added.add(ga)
+
+                    // Decide version string:
+                    String versionString
+
+                    // ✅ Selenium floats for consumers
+                    if (ga == "org.seleniumhq.selenium:selenium-java") {
+                        versionString = "[4.0,5.0)"
+                    } else {
+                        // Use declared version when present
+                        versionString = dep.version
+
+                        // If version is missing due to constraints/BOM, fall back to resolved version
+                        if (!versionString) {
+                            versionString = resolvedVersionFor(dep.group, dep.name)
                         }
+                    }
 
+                    if (!versionString) {
+                        throw new GradleException("Cannot determine version for published dependency: ${ga}")
+                    }
 
+                    def d = depsNode.appendNode('dependency')
+                    d.appendNode('groupId', dep.group)
+                    d.appendNode('artifactId', dep.name)
+                    d.appendNode('version', versionString)
+
+                    // For your "turnkey framework" goal, compile scope is fine
+                    d.appendNode('scope', 'compile')
+
+                    // ---- Exclusions handling (single shared <exclusions> node) ----
+                    def existingExcls = d.get('exclusions') as groovy.util.NodeList
+                    def exclsNode = (existingExcls && existingExcls.size() > 0)
+                            ? (groovy.util.Node) existingExcls[0]
+                            : null
+
+                    // ✅ Always exclude the woven cucumber internals from the engine dependency in the published POM
+                    if (ga == "io.cucumber:cucumber-junit-platform-engine") {
+                        if (exclsNode == null) exclsNode = d.appendNode('exclusions')
+
+                        [
+                                "io.cucumber:cucumber-core",
+                                "io.cucumber:cucumber-java",
+                                "io.cucumber:cucumber-plugin",
+                                "io.cucumber:messages",
+                                "io.cucumber:gherkin"
+                        ].each { gav ->
+                            def (eg, ea) = gav.split(':', 2)
+                            def ex = exclsNode.appendNode('exclusion')
+                            ex.appendNode('groupId', eg)
+                            ex.appendNode('artifactId', ea)
+                        }
+                    }
+
+                    // Carry excludes if you ever add them on deps
+                    if (dep.excludeRules && !dep.excludeRules.isEmpty()) {
+                        if (exclsNode == null) exclsNode = d.appendNode('exclusions')
+
+                        dep.excludeRules.each { er ->
+                            def ex = exclsNode.appendNode('exclusion')
+                            ex.appendNode('groupId', er.group ?: '*')
+                            ex.appendNode('artifactId', er.module ?: '*')
+                        }
+                    }
+                }
             }
+
+
         }
     }
 }
+
 
 
 
@@ -416,11 +511,15 @@ idea {
         // ▶ Add woven classes to IDE classpath for code insight
         scopes.COMPILE.plus += [configurations.wovenInsight]
         scopes.RUNTIME.plus += [configurations.wovenInsight]
+        scopes.TEST.plus    += [configurations.wovenInsight]   // ✅ add this
+
         // ▶ Remove the *unwoven* jars from IDE classpath (build remains unchanged)
         scopes.COMPILE.minus += [configurations.weaveLibs]
         scopes.RUNTIME.minus += [configurations.weaveLibs]
+        scopes.TEST.minus    += [configurations.weaveLibs]     // ✅ add this
     }
 }
+
 
 
 
@@ -541,10 +640,36 @@ tasks.register("centralBundleZip", Zip) {
 
 // Lifecycle
 tasks.assemble { dependsOn tasks.shadowJar }
-tasks.test { useJUnitPlatform() }
 
 
 // If we're only doing publishToMavenLocal, never run signing tasks
 tasks.withType(Sign).configureEach {
     onlyIf { !isMavenLocalPublish }
 }
+
+
+tasks.test {
+    useJUnitPlatform()
+    dependsOn("expandWoven") // expandWoven already dependsOn weaveTargets
+
+    // Put woven classes FIRST so they beat the unwoven dependency jars
+    classpath = files(wovenExpanded) + classpath
+}
+
+
+configurations.named("testRuntimeClasspath") {
+    exclude group: "io.cucumber", module: "cucumber-core"
+    exclude group: "io.cucumber", module: "cucumber-java"
+    exclude group: "io.cucumber", module: "cucumber-plugin"
+    exclude group: "io.cucumber", module: "messages"
+    exclude group: "io.cucumber", module: "gherkin"
+}
+
+//configurations.named("testCompileClasspath") {
+//    exclude group: "io.cucumber", module: "cucumber-core"
+//    exclude group: "io.cucumber", module: "cucumber-java"
+//    exclude group: "io.cucumber", module: "cucumber-plugin"
+//    exclude group: "io.cucumber", module: "messages"
+//    exclude group: "io.cucumber", module: "gherkin"
+//}
+
