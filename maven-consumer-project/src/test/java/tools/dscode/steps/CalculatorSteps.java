@@ -5,6 +5,7 @@ import com.xpathy.Attribute;
 import com.xpathy.Condition;
 import com.xpathy.Tag;
 import com.xpathy.XPathy;
+//import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.AfterAll;
@@ -55,7 +56,7 @@ import org.intellij.lang.annotations.Language;
 public class CalculatorSteps {
 
 
-    @Given("^capitalize:(.*)$")
+    @Given("^zcapitalize:(.*)$")
     public static String gettext(String text) {
 
         sjson(        """

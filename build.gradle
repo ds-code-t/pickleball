@@ -75,9 +75,11 @@ dependencies {
     }
 
 
-    api("org.junit.platform:junit-platform-suite-api:1.10.2")
-    api("org.junit.platform:junit-platform-suite-engine:1.10.2")
-    api("org.junit.jupiter:junit-jupiter-api:5.10.2")
+    // ✅ Change 2: update JUnit to what Cucumber 7.27.x expects
+    api("org.junit.platform:junit-platform-suite-api:1.13.4")
+    api("org.junit.platform:junit-platform-suite-engine:1.13.4")
+    api("org.junit.jupiter:junit-jupiter-api:5.13.4")
+
     api("com.google.guava:guava:33.5.0-jre")
     api("com.fasterxml.jackson.core:jackson-databind:2.20.0")
     api("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.20.0")
@@ -106,11 +108,12 @@ dependencies {
     ajcRuntime "org.aspectj:aspectjrt:${aspectjVersion}"
 //    implementation "org.aspectj:aspectjrt:${aspectjVersion}" // shaded into pickleball
 
-// Declare weave targets + compile visibility (but DO NOT publish as transitive deps)
+// Declare weave targets.
+// ✅ publish these modules so their transitives come in normally for consumers
 // The woven bytecode is bundled into the shadow jar via from(wovenExpanded).
     toWeave.each { gav ->
         weaveLibs  "${gav.group}:${gav.name}:${gav.version}"
-        compileOnly "${gav.group}:${gav.name}:${gav.version}"
+        api "${gav.group}:${gav.name}:${gav.version}"
         testImplementation "${gav.group}:${gav.name}:${gav.version}" // only if your tests need it
     }
 
@@ -382,18 +385,13 @@ publishing {
                 // Coordinates you bundle/override -> must NOT be published as transitive deps
                 Set<String> bundledOrOverriddenGA = (
                         ['org.aspectj:aspectjrt'] +                 // shaded via ajcRuntime
-                                ['io.cucumber:cucumber-bom'] +              // don't publish BOM as a normal dep
-                                toWeave.collect { "${it.group}:${it.name}" } // woven cucumber/messages/gherkin
+                                ['io.cucumber:cucumber-bom']         // don't publish BOM as a normal dep
                 ) as Set
 
-                // Collect declared direct deps you want to publish transitively:
-                // - api deps (exposed to consumers)
-                // - implementation deps (turnkey runtime; also visible if you want)
                 def declared = []
                 declared.addAll(configurations.api.allDependencies)
                 declared.addAll(configurations.implementation.allDependencies)
 
-                // Helper: resolve a version ONLY when needed (and allowed)
                 def resolvedVersionFor = { String g, String a ->
                     def ra = configurations.runtimeClasspath
                             .resolvedConfiguration
@@ -402,33 +400,25 @@ publishing {
                     return ra?.moduleVersion?.id?.version
                 }
 
-                // De-dupe by GA
                 Set<String> added = new LinkedHashSet<>()
 
                 declared.each { dep ->
-                    // Skip non-module deps (files(...), project deps, etc.)
                     if (!(dep instanceof org.gradle.api.artifacts.ModuleDependency)) return
                     if (!dep.group || !dep.name) return
 
                     String ga = "${dep.group}:${dep.name}"
 
-                    // Skip anything you bundle/override
                     if (bundledOrOverriddenGA.contains(ga)) return
 
                     if (added.contains(ga)) return
                     added.add(ga)
 
-                    // Decide version string:
                     String versionString
 
-                    // ✅ Selenium floats for consumers
                     if (ga == "org.seleniumhq.selenium:selenium-java") {
                         versionString = "[4.0,5.0)"
                     } else {
-                        // Use declared version when present
                         versionString = dep.version
-
-                        // If version is missing due to constraints/BOM, fall back to resolved version
                         if (!versionString) {
                             versionString = resolvedVersionFor(dep.group, dep.name)
                         }
@@ -442,17 +432,13 @@ publishing {
                     d.appendNode('groupId', dep.group)
                     d.appendNode('artifactId', dep.name)
                     d.appendNode('version', versionString)
-
-                    // For your "turnkey framework" goal, compile scope is fine
                     d.appendNode('scope', 'compile')
 
-                    // ---- Exclusions handling (single shared <exclusions> node) ----
                     def existingExcls = d.get('exclusions') as groovy.util.NodeList
                     def exclsNode = (existingExcls && existingExcls.size() > 0)
                             ? (groovy.util.Node) existingExcls[0]
                             : null
 
-                    // ✅ Always exclude the woven cucumber internals from the engine dependency in the published POM
                     if (ga == "io.cucumber:cucumber-junit-platform-engine") {
                         if (exclsNode == null) exclsNode = d.appendNode('exclusions')
 
@@ -470,7 +456,6 @@ publishing {
                         }
                     }
 
-                    // Carry excludes if you ever add them on deps
                     if (dep.excludeRules && !dep.excludeRules.isEmpty()) {
                         if (exclsNode == null) exclsNode = d.appendNode('exclusions')
 
@@ -487,9 +472,6 @@ publishing {
         }
     }
 }
-
-
-
 
 apply plugin: 'idea'
 
@@ -520,13 +502,9 @@ idea {
     }
 }
 
-
-
-
 nexusPublishing {
     repositories {
         sonatype {
-            // Most OSSRH accounts use s01; if your account is on the older host, change these to oss.sonatype.org
             nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
             snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
 
@@ -536,7 +514,6 @@ nexusPublishing {
     }
 }
 
-// Decide what kind of publish this build is doing (based on requested task names)
 def requested = gradle.startParameter.taskNames*.toLowerCase()
 
 def isMavenLocalPublish =
@@ -549,19 +526,14 @@ def isStagingPublish =
                 requested.any { it.contains("releasesonatype") } ||
                 requested.any { it.contains("publishsonatype") }
 
-// If you *only* want signing for staging, keep it this strict:
 def signingIsRequired = isStagingPublish && !isMavenLocalPublish
 
-
-
 signing {
-    // Only require signing for the staging / Central flow
     required { signingIsRequired }
 
     def key  = (findProperty("signingKey") ?: System.getenv("SIGNING_KEY"))?.toString()
     def pass = (findProperty("signingPassword") ?: System.getenv("SIGNING_PASSWORD"))?.toString()
 
-    // Only configure keys when we actually intend to sign
     if (signingIsRequired) {
         if (!key) {
             throw new GradleException(
@@ -572,8 +544,6 @@ signing {
         sign(publishing.publications.named("maven").get())
     }
 }
-
-
 
 import java.security.MessageDigest
 
@@ -607,7 +577,7 @@ tasks.register("generateCentralChecksums") {
         fileTree(root).matching {
             include "**/*"
             exclude "**/*.md5", "**/*.sha1", "**/*.sha256", "**/*.sha512"
-            exclude "**/*.asc"                 // .asc should NOT have checksums :contentReference[oaicite:1]{index=1}
+            exclude "**/*.asc"
             exclude "**/maven-metadata.xml*"
         }.files.findAll { it.isFile() }.each { f ->
             checksumFiles(f)
@@ -632,15 +602,8 @@ tasks.register("centralBundleZip", Zip) {
     }
 }
 
-
-
-
-
-
-
 // Lifecycle
 tasks.assemble { dependsOn tasks.shadowJar }
-
 
 // If we're only doing publishToMavenLocal, never run signing tasks
 tasks.withType(Sign).configureEach {
@@ -664,12 +627,3 @@ configurations.named("testRuntimeClasspath") {
     exclude group: "io.cucumber", module: "messages"
     exclude group: "io.cucumber", module: "gherkin"
 }
-
-//configurations.named("testCompileClasspath") {
-//    exclude group: "io.cucumber", module: "cucumber-core"
-//    exclude group: "io.cucumber", module: "cucumber-java"
-//    exclude group: "io.cucumber", module: "cucumber-plugin"
-//    exclude group: "io.cucumber", module: "messages"
-//    exclude group: "io.cucumber", module: "gherkin"
-//}
-

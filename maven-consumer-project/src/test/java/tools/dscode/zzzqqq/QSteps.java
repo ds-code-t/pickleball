@@ -1,11 +1,12 @@
 package tools.dscode.zzzqqq;
 
-import io.cucumber.core.runner.PickleStepTestStep;
+//import io.cucumber.core.runner.PickleStepTestStep;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.java.BeforeAll;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.ReturnStep;
+import io.cucumber.plugin.event.PickleStepTestStep;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chromium.ChromiumDriver;
 import org.openqa.selenium.edge.EdgeDriver;
@@ -107,16 +108,16 @@ public class QSteps {
 
     }
 
-    @Given("^zprint (.*)$")
-    public static void printVal(String message) {
-        System.out.println("PRINT: " + message);
-        PickleStepTestStep executingPickleStepTestStep = getRunningStep().executingPickleStepTestStep;
-        System.out.println("nestingLevel1-: " + getRunningStep().getNestingLevel());
-        System.out.println("nestingLevel2-: " + executingPickleStepTestStep.getPickleStep().nestingLevel);
-
-        System.out.println("zzz1: " + getRunningStep().executingPickleStepTestStep.getStepText());
-        System.out.println("zzz2: " + getRunningStep().executingPickleStepTestStep.getStep().getText());
-    }
+//    @Given("^zprint (.*)$")
+//    public static void printVal(String message) {
+//        System.out.println("PRINT: " + message);
+//        PickleStepTestStep executingPickleStepTestStep = getRunningStep().executingPickleStepTestStep;
+//        System.out.println("nestingLevel1-: " + getRunningStep().getNestingLevel());
+//        System.out.println("nestingLevel2-: " + executingPickleStepTestStep.getPickleStep().nestingLevel);
+//
+//        System.out.println("zzz1: " + getRunningStep().executingPickleStepTestStep.getStepText());
+//        System.out.println("zzz2: " + getRunningStep().executingPickleStepTestStep.getStep().getText());
+//    }
 
     public static void main(String[] args) {
         System.out.println("Hello World!");

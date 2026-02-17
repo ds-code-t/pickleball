@@ -1,11 +1,21 @@
 Feature: Additiontest
 
-
+  @test4
   Scenario: aaasdsave2
-  @[DEBUG]
-  * DateTime:now
-#    * capitalizeeee
+#  @[DEBUG]
+    * DateTime:now
+    * zcapitalize: ss
     * , save "<$DateTime:now>"  as "A"
+    * , save "<$now>"  as "A"
+    Given , save "<$DateTime:today>" as "A"
+    Given , save "<$DateTime:tomorrow>" as "A"
+    Given , save "<$DateTime:yesterday>" as "A"
+
+    Given , save "<$today>" as "A"
+    Given , save "<$tomorrow>" as "A"
+    Given , save "<$yesterday>" as "A"
+    Given , save "<$now>" as "A"
+
 #    * , save "<$capitalizeeee>"  as "A"
 #    * , save "{1+1}"  as "A"
 
@@ -21,8 +31,8 @@ Feature: Additiontest
   Scenario: ttt
   @[DEBUG,##]
     * , from the Top Panel:
-   : * , wait on Loading
-   : * , wait on Textbox
+  : * , wait on Loading
+  : * , wait on Textbox
   : * , wait on Loading
   : * , wait on Textbox
   : * , wait on Loading
@@ -38,7 +48,7 @@ Feature: Additiontest
   @[DEBUG,##]
     * navigate to: URL.textbox
     * , from the Top Panel:
-    : * IF: "aa" THEN: , click "Get your own website" Link
+  : * IF: "aa" THEN: , click "Get your own website" Link
 
 #    : * , click the "Run ❯" Button, and the "Get your website" Link, and wait 2 seconds
 #    * , switch Window
@@ -74,11 +84,11 @@ Feature: Additiontest
 #    Then , save "Q1" as "W"
 #  @[DEBUG,noBase,##Specificity,##xscore,##textXpath,##]
   @[DEBUG,nobase,##Specificity,##xscore,##textXpath,##pseudotags,##nosrmalizexpaths,##]
-     * , from the Top Panel:
-    : * , I verify  "Get your website" Link is displayed. I verify  "Get your website" Link is displayed
+    * , from the Top Panel:
+  : * , I verify  "Get your website" Link is displayed. I verify  "Get your website" Link is displayed
 #    : * , click the "Get your website" Link
-    : * IF: the "Get your website" Link is displayed:
-    :: * , click the "Get your website" Link
+  : * IF: the "Get your website" Link is displayed:
+  :: * , click the "Get your website" Link
 
 
 
@@ -413,7 +423,7 @@ Feature: Additiontest
 #    * navigate to: URL.select
 #    * , from the Top Panel:
 #  : * , enter "AA" in the "Choose a car:" Textbox
-   * , enter "AA" in the "Choose a car:" Textbox
+    * , enter "AA" in the "Choose a car:" Textbox
 
 
   Scenario: ssatesss
