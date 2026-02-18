@@ -263,6 +263,7 @@ public class StepExtension extends StepData {
     public String resolveStepFromString(String stepText) {
         StepExtension newStepExtension = createNewStepExtension(stepText);
         Object obj = newStepExtension.runAndGetReturnValue();
+        System.out.println("Return step '" + stepText + "' resolved to: " + obj + "");
         if(obj == null) return null;
         return obj.toString();
     }

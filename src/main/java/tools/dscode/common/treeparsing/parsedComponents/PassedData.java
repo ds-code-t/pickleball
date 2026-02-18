@@ -287,7 +287,6 @@ public abstract class PassedData {
         elementMatchesFollowingOperation = new ArrayList<>();
         elementMatchesProceedingOperation = new ArrayList<>();
         for (ElementMatch em : elementMatches) {
-            System.out.println("@@em:");
             if (em.elementTypes.contains(HTML_ELEMENT)) {
                 htmlElementMatches.add(em);
             } else if (em.elementTypes.contains(BROWSER)) {
