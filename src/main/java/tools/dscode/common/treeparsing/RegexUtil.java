@@ -56,8 +56,8 @@ public final class RegexUtil {
     public static final String M4 = "\u001F";
 
 
-    public static final String TOKEN_START = "_\u2060";
-    public static final String TOKEN_END   = "\u2063_";
+    public static final String TOKEN_START = " _\u2060";
+    public static final String TOKEN_END   = "\u2063_ ";
     // Escaped sentinels (safe to embed in regex)
     public static final String TOKEN_START_ESC = Pattern.quote(TOKEN_START);
     public static final String TOKEN_END_ESC   = Pattern.quote(TOKEN_END);

@@ -50,7 +50,7 @@ public abstract class PassedData {
             }
         }
 
-        if (elementCount >0) {
+        if (elementCount > 0) {
             if (phraseType == ELEMENT_ONLY || (!getAssertion().isBlank() && getAssertionType().isBlank())) {
                 if (lastOperationPhrase == null || lastOperationPhrase.equals(this)) {
                     if (hasTerminationConditional()) {
@@ -70,7 +70,7 @@ public abstract class PassedData {
             }
             if (phraseType == ELEMENT_ONLY) {
                 if (lastOperationPhrase == null || lastOperationPhrase.equals(this)) {
-                    PhraseData currentPhrase = getNextPhrase().getResolvedPhrase();
+                    PhraseData currentPhrase = getNextPhrase() == null ? null : getNextPhrase().getResolvedPhrase();
                     while (currentPhrase != null) {
                         if (currentPhrase.isOperationPhrase) {
                             if (!currentPhrase.getAction().isBlank()) {
@@ -83,8 +83,8 @@ public abstract class PassedData {
                                 setElementGroupings();
                             }
                         }
-                        currentPhrase = currentPhrase.getNextPhrase().getResolvedPhrase();
-                        if (currentPhrase.isSeparatorPhrase())
+                        currentPhrase = currentPhrase.getNextPhrase() == null ? null : currentPhrase.getNextPhrase().getResolvedPhrase();
+                        if (currentPhrase == null || currentPhrase.isSeparatorPhrase())
                             break;
                     }
                 } else {
@@ -118,7 +118,7 @@ public abstract class PassedData {
     private PhraseData previousPhrase;
     private PhraseData nextPhrase;
 
-     public ElementMatch browserElement;
+    public ElementMatch browserElement;
     protected List<ElementMatch> elementMatches = new ArrayList<>();
     private List<ElementMatch> elementMatchesProceedingOperation = new ArrayList<>();
     private List<ElementMatch> elementMatchesFollowingOperation = new ArrayList<>();
@@ -127,9 +127,8 @@ public abstract class PassedData {
     private final List<ElementMatch> valueTypeEntryElementMatches = new ArrayList<>();
 
     public List<ElementMatch> getValueTypeEntryElementMatches() {
-        if(valueTypeEntryElementMatches.isEmpty())
-        {
-            if(previousPhrase != null) {
+        if (valueTypeEntryElementMatches.isEmpty()) {
+            if (previousPhrase != null) {
                 valueTypeEntryElementMatches.addAll(previousPhrase.getValueTypeEntryElementMatches());
             }
         }
@@ -138,12 +137,11 @@ public abstract class PassedData {
 
 
     public final List<ElementMatch> webElementMatches = new ArrayList<>();
-    public final List<ElementMatch>htmlElementMatches = new ArrayList<>();
+    public final List<ElementMatch> htmlElementMatches = new ArrayList<>();
 
     public List<ElementMatch> getClosestWebElementMatches() {
-        if(webElementMatches.isEmpty())
-        {
-            if(previousPhrase != null) {
+        if (webElementMatches.isEmpty()) {
+            if (previousPhrase != null) {
                 webElementMatches.addAll(previousPhrase.webElementMatches);
             }
         }
@@ -226,7 +224,6 @@ public abstract class PassedData {
     public Integer operationIndex;
 
 
-
     public PhraseData getPreviousPhrase() {
         PhraseData prevPhrase = previousPhrase == null ? ((PhraseData) this).parsedLine.inheritedPhrase : previousPhrase;
         if (prevPhrase == null || prevPhrase.getResolvedPhrase() == null)
@@ -286,16 +283,14 @@ public abstract class PassedData {
         }
     }
 
-    public void setElementGroupings()
-    {
+    public void setElementGroupings() {
         elementMatchesFollowingOperation = new ArrayList<>();
         elementMatchesProceedingOperation = new ArrayList<>();
         for (ElementMatch em : elementMatches) {
             System.out.println("@@em:");
-            if(em.elementTypes.contains(HTML_ELEMENT)) {
+            if (em.elementTypes.contains(HTML_ELEMENT)) {
                 htmlElementMatches.add(em);
-            } else if(em.elementTypes.contains(BROWSER))
-            {
+            } else if (em.elementTypes.contains(BROWSER)) {
                 browserElement = em;
             }
             if (em.startIndex < operationIndex) {
@@ -306,29 +301,25 @@ public abstract class PassedData {
                 em.elementTypes.add(FOLLOWING_OPERATION);
             }
         }
-        if(elementMatchesProceedingOperation.isEmpty())
-        {
+        if (elementMatchesProceedingOperation.isEmpty()) {
             elementMatchesFollowingOperation.forEach(em -> {
-                if(  em.elementTypes.contains(VALUE_TYPE)){
+                if (em.elementTypes.contains(VALUE_TYPE)) {
                     valueTypeEntryElementMatches.add(em);
-                }
-               else if(em.elementTypes.contains(HTML_ELEMENT)){
+                } else if (em.elementTypes.contains(HTML_ELEMENT)) {
                     webElementMatches.add(em);
                 }
             });
         }
-        if(webElementMatches.isEmpty())
-        {
+        if (webElementMatches.isEmpty()) {
             elementMatchesProceedingOperation.forEach(em -> {
-                if(  em.elementTypes.contains(HTML_ELEMENT)){
+                if (em.elementTypes.contains(HTML_ELEMENT)) {
                     webElementMatches.add(em);
                 }
             });
         }
-        if(valueTypeEntryElementMatches.isEmpty())
-        {
+        if (valueTypeEntryElementMatches.isEmpty()) {
             elementMatchesProceedingOperation.forEach(em -> {
-                if(  em.elementTypes.contains(VALUE_TYPE)){
+                if (em.elementTypes.contains(VALUE_TYPE)) {
                     valueTypeEntryElementMatches.add(em);
                 }
             });
@@ -496,7 +487,7 @@ public abstract class PassedData {
 
     public WebDriver getDriver() {
 
-        if(driver == null)
+        if (driver == null)
             driver = getDefaultDriver();
         return driver;
     }
