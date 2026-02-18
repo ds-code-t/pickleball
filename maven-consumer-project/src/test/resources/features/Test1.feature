@@ -21,7 +21,8 @@ Feature: Additiontest
 
   Scenario: stttdfsdgf
   @[DEBUG,##MatchNode]
-    * , enter "123" in 1st "First name:" Textbox
+    * , then click the 3rd "Create" Link
+#    * , enter "123" in 1st "First name:" Textbox
 #    * , enter "456" in 2nd Textbox
 #    * , enter "123" in  "First  name:" Textbox, press "TAB" , and enter "456"
 #    * , enter "123" in  "First  name:" Textbox
