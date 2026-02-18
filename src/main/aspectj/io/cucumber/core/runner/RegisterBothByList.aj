@@ -6,10 +6,14 @@ public aspect RegisterBothByList {
 
     /* Include runner package so TestCase is captured */
     pointcut ctorInScope():
-            execution(io.cucumber.core.runtime..*.new(..))
-                    || execution(io.cucumber.core.feature..*.new(..))
-                    || execution(io.cucumber.core.runner..*.new(..))    // ← added
-                    || execution(io.cucumber.java..*.new(..));
+            execution(io.cucumber.core.runner.Runner+.new(..))
+                    || execution(io.cucumber.core.runtime.Runtime+.new(..))
+                    || execution(io.cucumber.core.feature.FeatureParser+.new(..))
+                    || execution(io.cucumber.core.runtime.FeaturePathFeatureSupplier+.new(..))
+                    || execution(io.cucumber.core.runner.TestCase+.new(..))
+                    || execution(io.cucumber.core.runner.TestCaseState+.new(..))
+                    || execution(io.cucumber.java.JavaBackend+.new(..));
+
 
     /* Allow-list by FQCN (loader-agnostic matching) */
     private static final String[] TARGET_FQCNS = new String[] {
