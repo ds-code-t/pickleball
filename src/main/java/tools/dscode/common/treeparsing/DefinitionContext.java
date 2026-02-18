@@ -418,7 +418,7 @@ public final class DefinitionContext {
 
 
             category("Menu").children("Menus", "Menu Item", "Menu Items")
-                    .addBase("//li[contains(@class, 'menu-item') and not(ancestor::li[contains(@class, 'menu-item')])]")
+                    .addBase("//li[contains(@class, 'menu-item')]")
                     .and(
                             (category, v, op) -> {
                                 if (v == null || v.isNull())
@@ -426,8 +426,7 @@ public final class DefinitionContext {
                                 String textXpath = "[" + XPathy.from("descendant-or-self::*")
                                         .byHaving(deepNormalizedText(v, op)).getXpath().replaceAll("^//\\*", "") + "]";
                                 printDebug("##textXpath Section: " + textXpath);
-                                String xpath1 = XPathy.from("//li[a[1]" + textXpath  + "]").getXpath();
-                                return XPathy.from(deepestOnlyXPath(xpath1));
+                                return XPathy.from("//li[a[1]" + textXpath  + "]");
                             }
                     );
 
