@@ -418,7 +418,7 @@ public final class DefinitionContext {
 
 
             category("Menu").children("Menus", "Menu Item", "Menu Items")
-                    .addBase("//li[contains(@class, 'menu-item')]")
+                    .addBase("//li[contains(@class, 'menu-item') and not(ancestor::li[contains(@class, 'menu-item')])]")
                     .and(
                             (category, v, op) -> {
                                 if (v == null || v.isNull())
