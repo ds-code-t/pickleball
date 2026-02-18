@@ -21,7 +21,10 @@ Feature: Additiontest
 
   Scenario: stttdfsdgf
   @[DEBUG,##MatchNode]
-    * , then click the Link
+    * , verify "The input element" Text is displayed
+    * , save "123" as "A"
+    * , save "The input element" Text as "A"
+#    * , then click the Link
 #    * , then click the 3rd "Create" Link
 #    * , enter "123" in 1st "First name:" Textbox
 #    * , enter "456" in 2nd Textbox

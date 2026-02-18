@@ -227,8 +227,8 @@ public class ParseNode {
 
                 // Substitute into parent's masked stream
                 String substitute = childDef.onSubstitute(childMatch);
-                if (substitute == null) substitute = "";
-                newMasked.append(substitute);
+                if (substitute == null) substitute = " ";
+                newMasked.append(" " + substitute + " ");
 
                 lastEnd = m.end();
             }
