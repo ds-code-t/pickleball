@@ -1,5 +1,13 @@
 Feature: Additiontest
 
+#  @[DEBUG,##MatchNode]
+  Scenario: test match1
+  @[DEBUG,##MatchNode]
+#    * , I verify  "Get your own website" Link matches "^Gxet.*$
+  * ,  verify "2343242" matches "\d+"
+  * ,  verify "\d+"  matches "2343242"
+  * ,  verify "a" equal "a"
+
   @test4
   Scenario: aaasdsave2
 #  @[DEBUG]

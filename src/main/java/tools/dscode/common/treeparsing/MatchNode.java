@@ -125,7 +125,7 @@ public final class MatchNode {
     }
 
     public String token() {
-        return token;
+        return " " + token + " ";
     }
 
     public String originalText() {
