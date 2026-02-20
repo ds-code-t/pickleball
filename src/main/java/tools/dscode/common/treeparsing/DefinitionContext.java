@@ -36,6 +36,7 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.KEY_N
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.customElementSuffixPredicate;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepestOnlyXPath;
 import static tools.dscode.common.util.debug.DebugUtils.disableBaseElement;
@@ -372,7 +373,7 @@ public final class DefinitionContext {
                     );
 
 
-            category("Icon").children("Icons").andAnyCategories("forLabel", "htmlNaming", CONTAINS_TEXT)
+            category("Icon").children("Icons").andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, CONTAINS_TEXT)
                     .or(
                             (category, v, op) -> XPathyBuilder.buildIfAllTrue(Tag.img, class_, ValueWrapper.createValueWrapper("'icon'"), Op.CONTAINS),
                             (category, v, op) -> XPathy.from(Tag.i),
@@ -385,7 +386,7 @@ public final class DefinitionContext {
                     );
 
 
-            category("Button").children("Buttons").andAnyCategories("forLabel", "htmlNaming", CONTAINS_TEXT)
+            category("Button").children("Buttons").andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, CONTAINS_TEXT)
                     .or(
                             (category, v, op) -> XPathy.from(Tag.button),
                             (category, v, op) -> XPathy.from(Tag.img).byAttribute(role).equals("button"),
@@ -433,7 +434,7 @@ public final class DefinitionContext {
 
 
 
-            category("Modal").children("Modals", "Dialog", "Dialogs").andAnyCategories(CONTAINS_TEXT, "forLabel", "htmlNaming")
+            category("Modal").children("Modals", "Dialog", "Dialogs").andAnyCategories(CONTAINS_TEXT, "forLabel", HTML_NAME_ATTRIBUTES)
                     .addBase("//div")
                     .and(
                             (category, v, op) ->
@@ -445,7 +446,7 @@ public final class DefinitionContext {
                             (category, v, op) -> XPathy.from("//div[.//text()]")
                     );
 
-            category("Expandable Section").children("Expandable Sections").andAnyCategories("htmlNaming", CONTAINS_TEXT)
+            category("Expandable Section").children("Expandable Sections").andAnyCategories(HTML_NAME_ATTRIBUTES, CONTAINS_TEXT)
                     .addBase("//div")
                     .and(
                             (category, v, op) ->
@@ -455,7 +456,7 @@ public final class DefinitionContext {
                                     )
                     );
 
-            category("Expandable Header").children("Expandable Headers").andAnyCategories("htmlNaming", CONTAINS_TEXT)
+            category("Expandable Header").children("Expandable Headers").andAnyCategories(HTML_NAME_ATTRIBUTES, CONTAINS_TEXT)
                     .addBase("//div")
                     .and(
                             (category, v, op) -> XPathy.from(div)
@@ -463,7 +464,7 @@ public final class DefinitionContext {
                                     .and().byHaving().parent().byAttribute(class_).withCase(LOWER).contains("collapsible")
                     );
 
-            category("Expandable Icon").children("Expandable Icons").andAnyCategories("htmlNaming", CONTAINS_TEXT)
+            category("Expandable Icon").children("Expandable Icons").andAnyCategories(HTML_NAME_ATTRIBUTES, CONTAINS_TEXT)
                     .and(
                             (category, v, op) -> any.byAttribute(role).equals("button").and().byAttribute(Attribute.custom("aria-expanded")).haveIt()
                     );
@@ -484,7 +485,7 @@ public final class DefinitionContext {
                     );
 
 
-            category("Dropdown").children("Dropdowns").andAnyCategories("forLabel", "htmlNaming", "genericLabel")
+            category("Dropdown").children("Dropdowns").andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, "genericLabel")
                     .addBase("//select");
 
 
@@ -515,7 +516,7 @@ public final class DefinitionContext {
             //
             // Textbox  (two registration blocks preserved exactly)
             //
-            category("Textbox").children("Textboxes").andAnyCategories("forLabel", "htmlNaming", "genericLabel", "placeholderLabel")
+            category("Textbox").children("Textboxes").andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, "genericLabel", "placeholderLabel")
                     .addBase("//input")
                     .or(
                             (category, v, op) -> input.byAttribute(type).equals("text"),
@@ -536,15 +537,15 @@ public final class DefinitionContext {
                             )
                     );
 
-            category("Textarea").children("Textareas").andAnyCategories("forLabel", "htmlNaming", "genericLabel", "placeholderLabel")
+            category("Textarea").children("Textareas").andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, "genericLabel", "placeholderLabel")
                     .addBase("//textarea");
 
 
-            category("Radio Button").children("Radio Buttons").andAnyCategories("forLabel", "htmlNaming", "genericLabel")
+            category("Radio Button").children("Radio Buttons").andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, "genericLabel")
                     .addBase("//input[@type='radio']");
 
 
-            category("Checkbox").children("Checkboxes").andAnyCategories("forLabel", "htmlNaming", "genericLabel")
+            category("Checkbox").children("Checkboxes").andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, "genericLabel")
                     .and((category, v, op) ->
                             combineOr(
                                     Tag.input.byAttribute(type).equals("checkbox"),
@@ -552,7 +553,7 @@ public final class DefinitionContext {
                             )
                     );
 
-            category("Toggle").children("Toggles").andAnyCategories("forLabel", "htmlNaming", "genericLabel")
+            category("Toggle").children("Toggles").andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, "genericLabel")
                     .and((category, v, op) ->
                             combineOr(
                                     Tag.input.byAttribute(checked).haveIt(),
@@ -564,10 +565,33 @@ public final class DefinitionContext {
             category("Option").children("Options").inheritsFrom(CONTAINS_TEXT)
                     .addBase("//option");
 
+
+
+            category("Table").children("Tables").inheritsFrom(CONTAINS_TEXT)
+                    .and((category, v, op) ->
+                            XPathy.from("//*[self::table or @role='table' or self::*" + customElementSuffixPredicate("table") + "][not(descendant::table)]")
+                    );
+
             category("Row").children("Rows").inheritsFrom(CONTAINS_TEXT)
                     .and((category, v, op) ->
-                            XPathy.from("//*[self::tr or @role='row'][not(descendant::*[self::tr or @role='row'])]")
+                            XPathy.from("//*[self::tr or @role='row' or self::*" +  customElementSuffixPredicate("row") +  " ][not(descendant::table)]")
                     );
+
+            category("Header Row").children("Headers").inheritsFrom(CONTAINS_TEXT)
+                    .and((category, v, op) ->
+                            XPathy.from("//*[self::thead or self::tr[th] or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)]")
+                    );
+
+            category("Header").children("Column Headers").inheritsFrom(CONTAINS_TEXT)
+                    .and((category, v, op) ->
+                            XPathy.from("//*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)]")
+                    );
+
+            category("Cell").children("Cells").inheritsFrom(CONTAINS_TEXT)
+                    .and((category, v, op) ->
+                            XPathy.from("//*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + " ][not(descendant::table)]")
+                    );
+
 
 
             category(BASE_CATEGORY).and(
@@ -660,12 +684,20 @@ public final class DefinitionContext {
                     );
 
 
-            category("htmlNaming")
+            category(HTML_NAME_ATTRIBUTES)
                     .or(
-                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(any, id, v, op, v != null),
-                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(any, title, v, op, v != null),
-                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(any, name, v, op, v != null),
-                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(any, aria_label, v, op, v != null)
+                            (category, v, op) -> {
+                                if (v == null)
+                                    return null;
+                                ValueWrapper strippedValueWrapper = v.stripAllNonLetters();
+                                return combineOr(
+                                        XPathyBuilder.build(any, id, strippedValueWrapper, op),
+                                        XPathyBuilder.build(any, title, strippedValueWrapper, op),
+                                        XPathyBuilder.build(any, name, strippedValueWrapper, op),
+                                        XPathyBuilder.build(any, Attribute.custom("node_name"), strippedValueWrapper, op),
+                                        XPathyBuilder.build(any, Attribute.custom("data-node-id"),strippedValueWrapper, op)
+                                );
+                            }
                     );
 
             //

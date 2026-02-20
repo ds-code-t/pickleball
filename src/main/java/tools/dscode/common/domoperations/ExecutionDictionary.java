@@ -51,6 +51,7 @@ public class ExecutionDictionary {
     // Default base category that *every* category implicitly inherits from
     public static final String DIRECT_TEXT = "DirectTextInternalUSE";
     public static final String CONTAINS_TEXT = "ContainsTextInternalUSE";
+    public static final String HTML_NAME_ATTRIBUTES = "htmlNaming";
     public static final String BASE_CATEGORY = "BaseCategoryInternalUSE";
     public static final String STARTING_CONTEXT = "DefaultStartingContextInternalUSE";
     public static final String VISIBILITY_FILTER = "VisibilityFilterInternalUSE";

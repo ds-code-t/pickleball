@@ -1,21 +1,27 @@
 Feature: Addition
 
 
+  Scenario: zzsStart Run component
+    Then print Arrrrrrrrr
+    * RUN SCENARIOS:
+      | Tags      |
+      | %wtest33c |
+
+
   @par1
   Scenario Outline: outlineTest <A>
-#    * , save "<A>" as "zzzzzzdd<C>"
-#    * navigate to: URL.select
-#    * error
-#    * , wait <B> seconds
-    * test2
-    * error
-#    * , save "<A>" as "<C>"
-#    * , wait 5 seconds
-
+    * print <A>
+    * print <B>
     Examples:
-      | A | B | C    |
-#      | 1 | 5 | qqqq |
-      | 2 | 5 |      |
+    Examples:
+      | Tags      | A | B | C |
+      | %wtest33c | 2 | 5 |   |
+
+
+  Scenario: trewtr
+
+    * RU
+
 #      | 3 | 5 | yyyy |
 #      | 4  | 5 |   |
 #      | 5  | 5 |   |
@@ -193,15 +199,10 @@ Feature: Addition
     Then print Arrrrrrrrr
     Given zargt1 333
 
-  Scenario: sStart Run component
-    Then print Arrrrrrrrr
-    * RUN SCENARIOS: %wtest33
 
-  @%wtest33
-  Scenario: aaa
-    Then print Awwwwwwwww
-    Given QQQ
-    Given QQQ2ss2
+
+#    Given QQQ
+#    Given QQQ2ss2
 
   @test1 @sc1 @smoke @%fg
   Scenario Outline: conditionals2
@@ -217,7 +218,7 @@ Feature: Addition
     @sc2
     Examples:
       | Scenario Tags | B  |
-      | @t1estz3q2    | 22 |
+      | #t1estz3q2    | 22 |
 
 
   @%t1est3q2

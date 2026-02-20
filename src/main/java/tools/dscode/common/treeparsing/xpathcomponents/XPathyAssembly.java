@@ -214,7 +214,7 @@ public final class XPathyAssembly {
 
     private static final Pattern SELF_WRAP =
             Pattern.compile(
-                    "^[^a-zA-Z]*self::[A-Za-z*]+\\[(\\d+)>-(\\d+)\\].*\\[\\1>-\\2\\][^a-zA-Z]*$",
+                    "^[^a-zA-Z]*self::(?:[A-Za-z_][A-Za-z0-9_.:-]*|\\*)\\[(\\d+)>-(\\d+)\\].*\\[\\1>-\\2\\][^a-zA-Z]*$",
                     Pattern.DOTALL
             );
 
@@ -252,7 +252,7 @@ public final class XPathyAssembly {
 
         int id = selfCounter.incrementAndGet();
         int nestingCount = countIdPairs(step);
-        step = step.replaceFirst("^([a-zA-Z*]+)", "self::$1[" + id + ">-" + nestingCount + "]") + "[" + id + ">-" + nestingCount + "]";
+        step = step.replaceFirst("^([A-Za-z_][A-Za-z0-9_.:-]*|\\*)", "self::$1[" + id + ">-" + nestingCount + "]") + "[" + id + ">-" + nestingCount + "]";
         return step;
     }
 
@@ -358,9 +358,9 @@ public final class XPathyAssembly {
         return prettyPrintXPath(xpathy.getXpath());
     }
 
-    // Boundary is either a full self-step with tag OR a bare tag
+// Boundary is either a full self-step with tag OR a bare tag
     private static final Pattern BOUNDARY =
-            Pattern.compile("self::[A-Za-z*]+\\[\\d+>-\\d+\\]|\\[\\d+>-\\d+\\]");
+            Pattern.compile("self::(?:[A-Za-z_][A-Za-z0-9_.:-]*|\\*)\\[\\d+>-\\d+\\]|\\[\\d+>-\\d+\\]");
 
     // Extract b from any tag [a>-b]
     private static final Pattern PSEUDO_TAG =

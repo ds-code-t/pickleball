@@ -178,8 +178,44 @@ public final class XPathyUtils {
     private static final String A2Z = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     private static final String a2z = "abcdefghijklmnopqrstuvwxyz";
 
+    /**
+     * Characters we will REMOVE for TILDE_QUOTED comparisons.
+     * - digits
+     * - common ASCII punctuation/symbols
+     * - space (we remove space separately too, but harmless here)
+     *
+     * IMPORTANT: This is ASCII-focused because XPath 1.0 has limited string tooling.
+     */
+    private static final String STRIP_NON_LETTERS_ASCII =
+            "0123456789" +
+                    " \t\r\n" +
+                    "!\"#$%&()*+,./:;<=>?@[\\]^`{|}" + // no apostrophe
+                    "_-";
+
+    private static String lettersOnlyCaseFoldExpr(String expr) {
+        String norm = normalizeWhitespaceExpr(expr);
+        norm = caseFoldExpr(norm);
+        // strip digits/punct/underscore/dash/space
+        return "translate(" + norm + ", " + toXPathLiteral(STRIP_NON_LETTERS_ASCII) + ", '')";
+    }
+
     private static String caseFoldExpr(String expr) {
         return "translate(" + expr + ", " + toXPathLiteral(A2Z) + ", " + toXPathLiteral(a2z) + ")";
+    }
+
+    private static String normalizeWhitespaceExpr(String expr) {
+        // Your existing whitespace normalization strategy
+        return "normalize-space(translate(" + expr + ", " + toXPathLiteral(from) + " , " + toXPathLiteral(to) + "))";
+    }
+
+
+    /** Java-side counterpart for expected values (TILDE_QUOTED). */
+    private static String normalizeLettersOnlyExpected(String s) {
+        if (s == null) return "";
+        String norm = normalizeText(s);
+        if (norm == null) return "";
+        // ASCII letters only, lower-case
+        return norm.toLowerCase().replaceAll("[^a-z]+", "");
     }
 
     private static String caseFoldValue(String s) {
@@ -194,22 +230,27 @@ public final class XPathyUtils {
     private static boolean isTextQuotedType(ValueWrapper.ValueTypes t) {
         return t == ValueWrapper.ValueTypes.DOUBLE_QUOTED
                 || t == ValueWrapper.ValueTypes.SINGLE_QUOTED
-                || t == ValueWrapper.ValueTypes.BACK_TICKED;
+                || t == ValueWrapper.ValueTypes.BACK_TICKED
+                || t == ValueWrapper.ValueTypes.TILDE_QUOTED;
     }
 
     private static String buildDeepTextPredicate(ValueWrapper value, ExecutionDictionary.Op op) {
         ValueWrapper.ValueTypes t = value.type;
 
-        boolean caseInsensitive = (t == ValueWrapper.ValueTypes.SINGLE_QUOTED);
+        boolean exact = (t == ValueWrapper.ValueTypes.BACK_TICKED);
+        boolean tilde = (t == ValueWrapper.ValueTypes.TILDE_QUOTED);
+        boolean caseInsensitive = (t == ValueWrapper.ValueTypes.SINGLE_QUOTED) || tilde;
 
         // Build the DOM-side expression evaluated per TEXT NODE (.)
         String textNodeExpr;
-        if (t == ValueWrapper.ValueTypes.BACK_TICKED) {
-            // exact: no normalization/casefold
+        if (exact) {
             textNodeExpr = "string(.)";
+        } else if (tilde) {
+            // fuzzy letters-only matching
+            textNodeExpr = lettersOnlyCaseFoldExpr("string(.)");
         } else {
-            // normalized-text matching (your existing normalization strategy)
-            textNodeExpr = "normalize-space(translate(string(.), " + toXPathLiteral(from) + " , " + toXPathLiteral(to) + "))";
+            // your existing normalized-text matching
+            textNodeExpr = normalizeWhitespaceExpr("string(.)");
             if (caseInsensitive) {
                 textNodeExpr = caseFoldExpr(textNodeExpr);
             }
@@ -218,54 +259,63 @@ public final class XPathyUtils {
         // Expected value
         String expected = rawValue(value);
         if (expected == null) expected = "";
-        if (t != ValueWrapper.ValueTypes.BACK_TICKED) {
+
+        if (exact) {
+            // no normalization
+        } else if (tilde) {
+            expected = normalizeLettersOnlyExpected(expected);
+        } else {
             expected = normalizeText(expected);
             if (expected == null) expected = "";
-        }
-        if (caseInsensitive) {
-            expected = caseFoldValue(expected);
+            if (caseInsensitive) expected = caseFoldValue(expected);
         }
 
         String needleLiteral = toXPathLiteral(expected);
-
-        // Build comparison op against the per-text-node expression
-        String textPredicate = buildStringPredicate(textNodeExpr, needleLiteral, op);
-
-        // Filter out text nodes that are inside field-accessibility descendants
-        return textPredicate;
-//        return " not(ancestor::*[position()<=5][contains(@class, 'field-accessibility')]) and " + textPredicate + " ";
+        return buildStringPredicate(textNodeExpr, needleLiteral, op);
     }
 
 
     private static String buildAttributePredicate(String attrExpr, ValueWrapper value, ExecutionDictionary.Op op) {
         ValueWrapper.ValueTypes t = value.type;
 
-        // NUMERIC: comparisons against number(@attr)
         if (t == ValueWrapper.ValueTypes.NUMERIC) {
             return buildNumericPredicate("number(" + attrExpr + ")", value, op);
         }
 
-        // BOOLEAN: presence semantics + explicit value strings some frameworks set
         if (t == ValueWrapper.ValueTypes.BOOLEAN) {
             return buildBooleanAttrPredicate(attrExpr, value, op);
         }
 
-        // BACK_TICKED: exact @attr compare (no normalization/casefold)
         if (t == ValueWrapper.ValueTypes.BACK_TICKED) {
             String expected = rawValue(value);
             if (expected == null) {
-                // Treat null as "attribute missing" on equals; otherwise invalid.
                 if (op == ExecutionDictionary.Op.EQUALS) return "not(" + attrExpr + ")";
                 throw new IllegalArgumentException("Cannot apply " + op + " to null BACK_TICKED attribute value");
             }
             return buildStringPredicate(attrExpr, toXPathLiteral(expected), op);
         }
 
-        // Text-ish attribute comparisons (normalized)
-        boolean caseInsensitive = (t == ValueWrapper.ValueTypes.SINGLE_QUOTED);
+        boolean tilde = (t == ValueWrapper.ValueTypes.TILDE_QUOTED);
+        boolean caseInsensitive = (t == ValueWrapper.ValueTypes.SINGLE_QUOTED) || tilde;
 
-        String domExpr = normalizedAttrExpr(attrExpr);
-        String expected = normalizeText(rawValue(value));
+        String domExpr;
+        String expectedRaw = rawValue(value);
+
+        if (expectedRaw == null) {
+            if (op == ExecutionDictionary.Op.EQUALS) return "not(" + attrExpr + ")";
+            throw new IllegalArgumentException("Cannot apply " + op + " to null attribute value");
+        }
+
+        if (tilde) {
+            domExpr = lettersOnlyCaseFoldExpr(attrExpr);
+            String expected = normalizeLettersOnlyExpected(expectedRaw);
+            return buildStringPredicate(domExpr, toXPathLiteral(expected), op);
+        }
+
+        // existing normalized attribute comparisons
+        domExpr = normalizedAttrExpr(attrExpr);
+        String expected = normalizeText(expectedRaw);
+
         if (expected == null) {
             if (op == ExecutionDictionary.Op.EQUALS) return "not(" + attrExpr + ")";
             throw new IllegalArgumentException("Cannot apply " + op + " to null attribute value");
@@ -421,6 +471,22 @@ public final class XPathyUtils {
         return x + "[not(" + inner + ")]";
     }
 
+    public static String customElementSuffixPredicate(String suffix) {
+        if (suffix == null || suffix.isBlank()) {
+            throw new IllegalArgumentException("Suffix must not be null or blank");
+        }
 
+        String clean = suffix.trim();
+
+        // XPath string literal safe quoting
+        String literal = toXPathLiteral("-" + clean);
+
+        int len = clean.length() + 1; // +1 for leading hyphen
+
+        return "[contains(local-name(), '-') and " +
+                "substring(local-name(), string-length(local-name()) - " + (len - 1) + ") = " +
+                literal +
+                "]";
+    }
 
 }

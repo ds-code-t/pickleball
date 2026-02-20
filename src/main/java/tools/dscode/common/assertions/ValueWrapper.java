@@ -24,7 +24,7 @@ public class ValueWrapper {
         if (value == null || o == null) return false;
         if(value.equals(o))
             return true;
-        if(isNumeric || o instanceof Number)
+        if (Boolean.TRUE.equals(isNumeric) || o instanceof Number)
         {
             return asBigInteger().equals(convertToInteger(normalizeText(o.toString())));
         }
@@ -38,7 +38,7 @@ public class ValueWrapper {
     }
 
     public enum ValueTypes {
-        DOUBLE_QUOTED, SINGLE_QUOTED, BACK_TICKED, NUMERIC, DEFAULT, BOOLEAN
+        DOUBLE_QUOTED, SINGLE_QUOTED, BACK_TICKED, TILDE_QUOTED, NUMERIC, DEFAULT, BOOLEAN
     }
 
 
@@ -52,8 +52,7 @@ public class ValueWrapper {
             if (node == null || node.isNull() || node.isMissingNode()) return new ValueWrapper(null);
 
             if (node.isTextual()) return new ValueWrapper(node.textValue());
-            if (node.isBoolean()) new ValueWrapper(node.booleanValue(), ValueTypes.BOOLEAN);
-
+            if (node.isBoolean()) return new ValueWrapper(node.booleanValue(), ValueTypes.BOOLEAN);
             if (node.isNumber()) {
                 return new ValueWrapper(node.bigIntegerValue(), ValueTypes.NUMERIC);
             }
@@ -78,8 +77,6 @@ public class ValueWrapper {
             return;
         }
 
-
-//        String s = raw.trim();
         if (raw.length() >= 2) {
             char f = raw.charAt(0);
             char l = raw.charAt(raw.length() - 1);
@@ -103,9 +100,16 @@ public class ValueWrapper {
                         this.normalizedText = normalizeText((String) value);
                         return;
                     }
+                    case '~' -> { // <-- NEW
+                        type = ValueTypes.TILDE_QUOTED;
+                        value = raw.substring(1, raw.length() - 1);
+                        this.normalizedText = normalizeText((String) value);
+                        return;
+                    }
                 }
             }
         }
+
         this.normalizedText = normalizeText(raw);
         if (isNumeric(normalizedText)) {
             type = ValueTypes.NUMERIC;
@@ -261,7 +265,8 @@ public class ValueWrapper {
         // Always strings if explicitly quoted
         if (type == ValueTypes.DOUBLE_QUOTED
                 || type == ValueTypes.SINGLE_QUOTED
-                || type == ValueTypes.BACK_TICKED) {
+                || type == ValueTypes.BACK_TICKED
+                || type == ValueTypes.TILDE_QUOTED) {
             return value.toString();
         }
 
@@ -345,6 +350,12 @@ public class ValueWrapper {
     {
         if(normalizedText == null) return null;
         return createValueWrapper("'" + normalizedText.toLowerCase().replaceAll("\\s+", "") + "'");
+    }
+
+    public ValueWrapper stripAllNonLetters()
+    {
+        if(normalizedText == null) return null;
+        return createValueWrapper("~" + normalizedText + "~");
     }
 
 }
