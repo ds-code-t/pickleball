@@ -509,7 +509,7 @@ public final class DefinitionContext {
                             (category, v, op) -> XPathy.from(Tag.any.byAttribute(role).equals("tab"))
                     );
 
-            category("Tab Panel").children("Tab Panels").inheritsFrom(CONTAINS_TEXT)
+            category("Tab Panel").children("Tab Panels").inheritsFrom("forLabel")
                     .or(
                             (category, v, op) -> XPathy.from(Tag.any.byAttribute(role).equals("tabpanel"))
                     );
