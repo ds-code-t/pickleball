@@ -10,6 +10,8 @@ import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.domoperations.elementstates.BinaryStateConditions;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathyBuilder;
 
+import java.util.List;
+
 import static com.xpathy.Attribute.aria_label;
 import static com.xpathy.Attribute.id;
 import static com.xpathy.Attribute.name;
@@ -22,8 +24,11 @@ import static com.xpathy.Tag.input;
 import static tools.dscode.common.domoperations.ExecutionDictionary.CONTAINS_TEXT;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.customElementSuffixPredicate;
 import static tools.dscode.common.util.debug.DebugUtils.onMatch;
 import static tools.dscode.common.util.debug.DebugUtils.printDebug;
+import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
+import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
 
 public class Registrations {
 
@@ -49,10 +54,8 @@ public class Registrations {
     }
 
 
-
     @LifecycleHook(Phase.BEFORE_CUCUMBER_RUN)
     public static void beforeRun() {
-
 
 
         ExecutionDictionary dict = getExecutionDictionary();
@@ -61,30 +64,11 @@ public class Registrations {
                 .addBase("//select");
 
 
-        dict.category("cellLabel")
-                .and(
-
-                        (category, v, op) -> {
-                            if (v == null || v.isNullOrBlank()) {
-                                return null; // no label text to match, skip this builder
-                            }
-                            String textXpath = dict.andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceAll("^//\\*", "");
-                            printDebug("##textXpath genericLabel: " + textXpath);
-
-                            XPathy xPathy =  new XPathy("//*[self::select or self::input or self::textarea]" +
-                                    "  [ancestor::tr[count(td)=2" +
-                                    "     and count(descendant::*[self::select or self::input or self::textarea])=1" +
-                                    "     and td[1]" + textXpath +
-                                    "     and td[2][descendant::*[self::select or self::input or self::textarea]]" +
-                                    "  ]]");
-
-                            return xPathy;
-                        }
-                );
 
         dict.category("idMatch")
                 .or(
-                        (category, v, op) ->{ XPathy x = XPathyBuilder.buildIfAllTrue(any, id, v, op, v != null);
+                        (category, v, op) -> {
+                            XPathy x = XPathyBuilder.buildIfAllTrue(any, id, v, op, v != null);
                             return x;
                         }
                 );
@@ -100,8 +84,8 @@ public class Registrations {
                             printDebug("##textXpath forLabel:1 " + textXpath);
 
                             XPathy ret = combineOr(
-                                    new XPathy("//select[@id = //label[normalize-space(.)='"+ v +"']/@for]"),
-                                    new XPathy("//*[preceding-sibling::*[1][self::label[normalize-space(.)='"+ v +"']]]")
+                                    new XPathy("//select[@id = //label[normalize-space(.)='" + v + "']/@for]"),
+                                    new XPathy("//*[preceding-sibling::*[1][self::label[normalize-space(.)='" + v + "']]]")
                             );
 
                             onMatch("##textXpath forLabel:2 ", (matchedString) ->
@@ -112,8 +96,17 @@ public class Registrations {
                 );
 
 
+        dict.category("Zell").or(
+                (category, v, op) ->
+                {
+                    XPathy t = new XPathy("//*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + "][ancestor::table and (count(preceding-sibling::*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + "]) + 1) = (count(((ancestor::table[1]//thead//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + dict.getDirectText(v, op) + ") | (ancestor::table[1]//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + dict.getDirectText(v, op) + "))[1]/preceding-sibling::*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + "]) + 1)]");
+                    System.out.println("@@@t: " + t.getXpath());
+                    System.out.println("\n\n----------- ");
 
-
+//                    List<WebElement> list = getDriver("BROWSER").findElements(t.getLocator());
+//                    System.out.println("@@@t: " + list.size());
+                    return t;
+                });
 
         dict.category("Submit Button").or(
                 (category, v, op) -> input.byAttribute(type).equals("submit")
@@ -133,13 +126,13 @@ public class Registrations {
                 webDriver.switchTo().defaultContent();
 
                 XPathy xpathy = dict.getCategoryXPathy("FrameResult");
-                WebElement frame = webDriver.findElement(xpathy.getLocator());
-
-                webDriver.switchTo().frame(frame);
+                List<WebElement> frames = webDriver.findElements(xpathy.getLocator());
+                if (frames.isEmpty())
+                    return webDriver;
+                webDriver.switchTo().frame(frames.getFirst());
 
                 return webDriver;
             } catch (Exception e) {
-
                 e.printStackTrace();
                 throw new RuntimeException(e);
             }

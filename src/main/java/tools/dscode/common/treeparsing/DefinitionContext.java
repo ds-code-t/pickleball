@@ -427,11 +427,9 @@ public final class DefinitionContext {
                                 String textXpath = "[" + XPathy.from("descendant-or-self::*")
                                         .byHaving(deepNormalizedText(v, op)).getXpath().replaceAll("^//\\*", "") + "]";
                                 printDebug("##textXpath Section: " + textXpath);
-                                return XPathy.from("//li[a[1]" + textXpath  + "]");
+                                return XPathy.from("//li[a[1]" + textXpath + "]");
                             }
                     );
-
-
 
 
             category("Modal").children("Modals", "Dialog", "Dialogs").andAnyCategories(CONTAINS_TEXT, "forLabel", HTML_NAME_ATTRIBUTES)
@@ -508,9 +506,12 @@ public final class DefinitionContext {
 
             category("Tab").children("Tabs").inheritsFrom(CONTAINS_TEXT)
                     .or(
-                            (category, v, op) -> XPathy.from(Tag.any.byAttribute(role).equals("tab")),
-                            (category, v, op) -> XPathy.from(Tag.img).byAttribute(tabindex).haveIt()
+                            (category, v, op) -> XPathy.from(Tag.any.byAttribute(role).equals("tab"))
+                    );
 
+            category("Tab Panel").children("Tab Panels").inheritsFrom(CONTAINS_TEXT)
+                    .or(
+                            (category, v, op) -> XPathy.from(Tag.any.byAttribute(role).equals("tabpanel"))
                     );
 
             //
@@ -566,15 +567,14 @@ public final class DefinitionContext {
                     .addBase("//option");
 
 
-
-            category("Table").children("Tables").inheritsFrom(CONTAINS_TEXT)
+            category("Table").children("Tables").inheritsFrom("forLabel")
                     .and((category, v, op) ->
                             XPathy.from("//*[self::table or @role='table' or self::*" + customElementSuffixPredicate("table") + "][not(descendant::table)]")
                     );
 
             category("Row").children("Rows").inheritsFrom(CONTAINS_TEXT)
                     .and((category, v, op) ->
-                            XPathy.from("//*[self::tr or @role='row' or self::*" +  customElementSuffixPredicate("row") +  " ][not(descendant::table)]")
+                            XPathy.from("//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + " ][not(descendant::table)]")
                     );
 
             category("Header Row").children("Headers").inheritsFrom(CONTAINS_TEXT)
@@ -587,11 +587,10 @@ public final class DefinitionContext {
                             XPathy.from("//*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)]")
                     );
 
-            category("Cell").children("Cells").inheritsFrom(CONTAINS_TEXT)
+            category("Cell").children("Cells").inheritsFrom("cellLabel")
                     .and((category, v, op) ->
                             XPathy.from("//*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + " ][not(descendant::table)]")
                     );
-
 
 
             category(BASE_CATEGORY).and(
@@ -660,6 +659,11 @@ public final class DefinitionContext {
                     );
 
 
+            category("cellLabel")
+                    .or(
+                            (category, v, op) -> cellsInColumnByHeaderText(v, op, customElementSuffixPredicate("row"), customElementSuffixPredicate("cell"), customElementSuffixPredicate("header"))
+                    );
+
             category("forLabel")
                     .and(
                             (category, v, op) -> {
@@ -668,7 +672,9 @@ public final class DefinitionContext {
                                 }
 
                                 XPathy returnXpath = combineOr(
-                                        new XPathy("//*[@id = (ancestor::div[3]//descendant::*" + getDirectText(v, op) + "[@for][1]/@for)]"),
+                                        new XPathy("//*[@id and string-length(normalize-space(@id)) > 0 and @id = (ancestor::div[3]//descendant::*" + getDirectText(v, op) + "[@for and string-length(normalize-space(@for)) > 0][1]/@for)]"),
+                                        new XPathy("//*[@aria-labelledby and string-length(normalize-space(@aria-labelledby)) > 0 and @aria-labelledby = (ancestor::div[3]//descendant::*" + getDirectText(v, op) + "[@id and string-length(normalize-space(@id)) > 0][1]/@id)]"),
+                                        new XPathy("//*[ @headers and string-length(normalize-space(@headers)) > 0 and contains(concat(' ', @headers, ' '), concat(' ', (ancestor::div[3]//descendant::*" + getDirectText(v, op) + "[@id and string-length(normalize-space(@id)) > 0][1]/@id), ' ')) ]"),
                                         new XPathy("//*[ancestor-or-self::*[position() <= 7]" +
                                                 "  [preceding-sibling::*[1]        " +
                                                 getContainsText(v, op) +
@@ -678,8 +684,6 @@ public final class DefinitionContext {
                                 );
                                 printDebug("##textXpath forLabel:2 " + returnXpath);
                                 return returnXpath;
-//                                        new XPathy("//*[ancestor-or-self::*[position() <= 5][preceding-sibling::*[1][not(descendant::*[self::button or self::input or self::textarea or self::select or self::a])][self::*" + textXpath + "]]")
-
                             }
                     );
 
@@ -695,7 +699,7 @@ public final class DefinitionContext {
                                         XPathyBuilder.build(any, title, strippedValueWrapper, op),
                                         XPathyBuilder.build(any, name, strippedValueWrapper, op),
                                         XPathyBuilder.build(any, Attribute.custom("node_name"), strippedValueWrapper, op),
-                                        XPathyBuilder.build(any, Attribute.custom("data-node-id"),strippedValueWrapper, op)
+                                        XPathyBuilder.build(any, Attribute.custom("data-node-id"), strippedValueWrapper, op)
                                 );
                             }
                     );

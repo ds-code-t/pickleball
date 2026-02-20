@@ -1,6 +1,14 @@
 Feature: Addition
 
 
+  Scenario: gdfgdf
+  @[DEBUG,nobase]
+    * test2
+    * , verify "Status" Cell equals "A"
+    * , verify 2nd "Status" Cell equals "A"
+    * , verify "Status" Text is displayed
+    * test2
+
   Scenario: zzsStart Run component
     Then print Arrrrrrrrr
     * RUN SCENARIOS:

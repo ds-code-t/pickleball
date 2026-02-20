@@ -20,6 +20,8 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.xpathy.Tag.any;
+import static tools.dscode.common.domoperations.TableColumnByHeaderXPath.matchCellsByHeader;
+import static tools.dscode.common.domoperations.TableColumnByHeaderXPath.requireBracketPredicate;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.xpathSpecificityScore;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
 
@@ -151,7 +153,28 @@ public class ExecutionDictionary {
         });
     }
 
+    public  XPathy cellsInColumnByHeaderText(
+            ValueWrapper v,
+            ExecutionDictionary.Op op,
+            String customRowSuffixPredicate,
+            String customCellSuffixPredicate,
+            String customHeaderSuffixPredicate
+    ) {
+        if (v == null) throw new IllegalArgumentException("ValueWrapper v must not be null");
+        if (op == null) throw new IllegalArgumentException("Op op must not be null");
 
+        // Assumes your framework returns a BRACKETED predicate like:
+        //   "[normalize-space(.)='Status']"
+        // or similar XPath 1.0-compatible predicate.
+        final String headerTextPred = requireBracketPredicate(getDirectText(v, op), "v.getDirectText(op)");
+
+        return matchCellsByHeader(
+                headerTextPred,
+                customRowSuffixPredicate,
+                customCellSuffixPredicate,
+                customHeaderSuffixPredicate
+        );
+    }
     //========================================================
     // Inheritance configuration
     //========================================================

@@ -12,10 +12,14 @@ import io.cucumber.java.AfterAll;
 import io.cucumber.java.Before;
 import io.cucumber.java.BeforeAll;
 import io.cucumber.java.en.*;
+import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import tools.dscode.common.annotations.LifecycleHook;
 import tools.dscode.common.annotations.Phase;
+import tools.dscode.common.assertions.ValueWrapper;
+import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Status;
 import tools.dscode.common.servicecalls.JacksonUtils;
@@ -47,54 +51,58 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.servicecalls.ToJsonNode.sjson;
 import static tools.dscode.common.treeparsing.DefinitionContext.DEFAULT_EXECUTION_DICTIONARY;
+import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.customElementSuffixPredicate;
 import static tools.dscode.common.util.datetime.CalendarRegistry.DEFAULT_CALENDAR;
 import static tools.dscode.common.util.datetime.CalendarRegistry.calendar;
 import static tools.dscode.common.util.datetime.CalendarRegistry.getCalendar;
 import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
+import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;
+
 import org.intellij.lang.annotations.Language;
+
 public class CalculatorSteps {
 
 
     @Given("^zcapitalize:(.*)$")
     public static String gettext(String text) {
 
-        sjson(        """
-                        {
-                        "A": "Some text"
-                        }
-                        """);
+        sjson("""
+                {
+                "A": "Some text"
+                }
+                """);
 
-        new ToJsonNode.JsonRecord( """
-                        {
-                        "A": "Some text"
-                        }
-                        """);
+        new ToJsonNode.JsonRecord("""
+                {
+                "A": "Some text"
+                }
+                """);
 
         ToJsonNode t = new ToJsonNode(
-        """
+                """
                         {
                         "A": "Some text"
                         }
                         """
         );
 
-        t.json2 =      """
-                        {
-                        "A": "Some text"
-                        }
-                        """;
+        t.json2 = """
+                {
+                "A": "Some text"
+                }
+                """;
 
-        t.json3 =      """
-                        {
-                        "A": "Some text"
-                        }
-                        """;
+        t.json3 = """
+                {
+                "A": "Some text"
+                }
+                """;
 
         System.out.println("capitalizing: " + text);
         return text.toUpperCase();
     }
-
 
 
     public static void main(String[] args) {
@@ -106,7 +114,7 @@ public class CalculatorSteps {
                 """);
 
 
-        JsonNode jsonNode = JacksonUtils.toJSON( """
+        JsonNode jsonNode = JacksonUtils.toJSON("""
                 {
                   "name": "John",
                   "age": 30
@@ -114,12 +122,11 @@ public class CalculatorSteps {
                 """);
 
 
-
-        JsonNode yamlNode =  JacksonUtils.toYAML("""
-
+        JsonNode yamlNode = JacksonUtils.toYAML("""
+                
                         name: John
-
-
+                
+                
                 age: 30""");
 
         JsonNode xmlNode = JacksonUtils.
@@ -132,7 +139,7 @@ public class CalculatorSteps {
                                 </person>""");
         String formattedJson = JacksonUtils.formatJSON(
                 """
-
+                        
                             {
                           "name": "John",
                           "age": 30
@@ -143,10 +150,10 @@ public class CalculatorSteps {
         String
                 formattedYaml = JacksonUtils
                 .formatYAML("""
-
+                        
                                 name: John
-
-
+                        
+                        
                         age: 30""");
         System.out.println(formattedYaml);
 
@@ -216,7 +223,65 @@ public class CalculatorSteps {
 
     @Given("test2")
     public static void test2() {
+        List<WebElement> list;
+        WebDriver driver = getDriver("BROWSER");
 
+        ValueWrapper v = ValueWrapper.createValueWrapper("Status");
+        ExecutionDictionary.Op op = ExecutionDictionary.Op.EQUALS;
+        ExecutionDictionary dict = getExecutionDictionary();
+//        XPathy t = new XPathy("//*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + "][ancestor::table and (count(preceding-sibling::*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + "]) + 1) = (count(((ancestor::table[1]//thead//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" +
+//                customElementSuffixPredicate("header") + dict.getDirectText(v, op) + ") | (ancestor::table[1]//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + dict.getDirectText(v, op) + "))[1]/preceding-sibling::*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + "]) + 1)]");
+        XPathy t = dict.cellsInColumnByHeaderText(v, op, customElementSuffixPredicate("row"), customElementSuffixPredicate("cell"), customElementSuffixPredicate("header"));
+        System.out.println("@@@t: " + t.getXpath());
+        System.out.println("\n\n----------- ");
+
+        list = driver.findElements(t.getLocator());
+        System.out.println("@@@list 1-: " + list.size());
+        System.out.println("@@@list 1: " + list);
+
+        for(WebElement e: list){
+            System.out.println("@@@e: " + e);
+            System.out.println("@@@e.getText: " + e.getText());
+        }
+        if(true)
+            return;
+
+        String xpath1 = "//*[(count(ancestor::table[1]//thead//*[self::tr or @role='row' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 3) = '-row']][1]//*[self::th or @role='columnheader' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 6) = '-header']][string(.) = 'Status']/preceding-sibling::*[self::th or @role='columnheader' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 6) = '-header']]) + 1) = 1]";
+        String xpath2 = "//*[(count(ancestor::table[1]//*[self::tr or @role='row' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 3) = '-row']][1]//*[self::th or @role='columnheader' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 6) = '-header']][string(.) = 'Status']/preceding-sibling::*[self::th or @role='columnheader' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 6) = '-header']]) + 1) = 1]";
+        try {
+            list = driver.findElements(By.xpath(xpath1));
+            System.out.println("@@@list 1-: " + list.size());
+            System.out.println("@@@list 1: " + list);
+        }
+        catch (Exception e){
+            System.out.println("@@xpath1 error");
+            e.printStackTrace();
+        }
+        try {
+            list = driver.findElements(By.xpath(xpath2));
+            System.out.println("@@@list 2-: " + list.size());
+            System.out.println("@@@list 2: " + list);
+        }
+        catch (Exception e){
+            System.out.println("@@xpath2 error");
+            e.printStackTrace();
+        }
+
+        String nxpath = "//*[(count((//thead//*[self::th])/preceding-sibling::*[self::th]) + 1) = 1]";
+
+        try {
+            System.out.println("@@@");
+            list = driver.findElements(By.xpath(nxpath));
+            System.out.println("@@@list nxpath-: " + list.size());
+            System.out.println("@@@list nxpath: " + list);
+        }
+        catch (Exception e){
+            System.out.println("@@xpathnxpath error");
+            e.printStackTrace();
+        }
+        list = driver.findElements(t.getLocator());
+        System.out.println("@@@list1: " + list.size());
+        System.out.println("@@@list2: " + list);
     }
 
     private int a, b, result;
