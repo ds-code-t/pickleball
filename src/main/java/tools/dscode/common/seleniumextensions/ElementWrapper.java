@@ -46,7 +46,7 @@ public class ElementWrapper {
         int index = 0;
         for (WebElement element : elements) {
             ElementWrapper ew = new ElementWrapper(element, elementMatch, ++index);
-            if (displayElement && ew.screenReaderOnlyCheck())
+            if (displayElement && !ew.isDisplayed())
                 continue;
             elementWrappers.add(ew);
             if (singleElement) break;
