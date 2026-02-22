@@ -42,7 +42,7 @@ public class ElementWrapper {
 
         boolean singleElement = elementMatch.selectionType.isBlank();
         boolean displayElement = !elementMatch.categoryFlags.contains(ExecutionDictionary.CategoryFlags.NON_DISPLAY_ELEMENT);
-
+        printDebug("##elements-getWrappedElements-elements: " + elements.size());
         int index = 0;
         for (WebElement element : elements) {
             ElementWrapper ew = new ElementWrapper(element, elementMatch, ++index);
@@ -51,7 +51,7 @@ public class ElementWrapper {
             elementWrappers.add(ew);
             if (singleElement) break;
         }
-
+        printDebug("##elements-getWrappedElements-elementWrappers: " + elementWrappers.size());
 
         return elementWrappers;
     }

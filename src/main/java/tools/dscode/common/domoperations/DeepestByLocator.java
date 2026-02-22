@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import static tools.dscode.common.util.debug.DebugUtils.printDebug;
+
 public final class DeepestByLocator {
 
     private DeepestByLocator() {}
@@ -54,7 +56,7 @@ public final class DeepestByLocator {
         Objects.requireNonNull(locator, "locator");
 
         List<WebElement> matches = context.findElements(locator);
-
+        printDebug("##elements-findDeepest-matches.size(): " + matches.size());
 
 
         if (matches.size() <= 1) return matches;
@@ -87,6 +89,7 @@ public final class DeepestByLocator {
                 out.add(el);
             }
         }
+        printDebug("##elements-findDeepest-out.size(): " + out.size());
 
         return out;
     }
