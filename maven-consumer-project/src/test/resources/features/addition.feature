@@ -2,12 +2,12 @@ Feature: Addition
 
 
   Scenario: gdfgdf
-  @[DEBUG,nobase]
+  @[DEBUG,nobasse]
     * test2
-    * , verify "Status" Cell equals "A"
-    * , verify 2nd "Status" Cell equals "A"
-    * , verify "Status" Text is displayed
-    * test2
+#    * , verify "Status" Dropdown equals "A"
+#    * , verify 2nd "Status" Cell equals "A"
+#    * , verify "Status" Text is displayed
+#    * test2
 
   Scenario: zzsStart Run component
     Then print Arrrrrrrrr

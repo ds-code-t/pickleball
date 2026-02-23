@@ -21,9 +21,9 @@ import java.util.stream.Stream;
 
 import static com.xpathy.Tag.any;
 import static tools.dscode.common.domoperations.TableColumnByHeaderXPath.matchCellsByHeader;
-import static tools.dscode.common.domoperations.TableColumnByHeaderXPath.requireBracketPredicate;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.xpathSpecificityScore;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedVisibleText;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.descendantDeepNormalizedVisibleText;
 
 public class ExecutionDictionary {
 
@@ -112,12 +112,13 @@ public class ExecutionDictionary {
     protected void register() {
     }
 
-    public String getContainsText(ValueWrapper v, Op op){
-        return  andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceFirst("^//\\*","");
-    }
-    public String getDirectText(ValueWrapper v, Op op){
-        return  andThenOr(DIRECT_TEXT, v, op).getXpath().replaceFirst("^//\\*","");
-    }
+//    public String getContainsText(ValueWrapper v, Op op) {
+//        return andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceFirst("^//\\*", "");
+//    }
+//
+//    public String getDirectText(ValueWrapper v, Op op) {
+//        return andThenOr(DIRECT_TEXT, v, op).getXpath().replaceFirst("^//\\*", "");
+//    }
 
     private void defaultRegistrations() {
 
@@ -139,21 +140,17 @@ public class ExecutionDictionary {
         category(CONTAINS_TEXT).and((category, v, op) -> {
             if (v == null || v.isNull())
                 return null;
-            return any.byHaving(
-                    XPathy.from("descendant-or-self::*")
-                            .byHaving(deepNormalizedText(v, op))
-            );
+            return XPathy.from("//*" + descendantDeepNormalizedVisibleText(v, op));
         });
 
         category(DIRECT_TEXT).and((category, v, op) -> {
             if (v == null || v.isNull())
                 return null;
-            return any.byHaving(deepNormalizedText(v, op)
-            );
+            return XPathy.from("//*" + descendantDeepNormalizedVisibleText(v, op));
         });
     }
 
-    public  XPathy cellsInColumnByHeaderText(
+    public XPathy cellsInColumnByHeaderText(
             ValueWrapper v,
             ExecutionDictionary.Op op,
             String customRowSuffixPredicate,
@@ -166,7 +163,7 @@ public class ExecutionDictionary {
         // Assumes your framework returns a BRACKETED predicate like:
         //   "[normalize-space(.)='Status']"
         // or similar XPath 1.0-compatible predicate.
-        final String headerTextPred = requireBracketPredicate(getDirectText(v, op), "v.getDirectText(op)");
+        final String headerTextPred = deepNormalizedVisibleText(v, op);
 
         return matchCellsByHeader(
                 headerTextPred,

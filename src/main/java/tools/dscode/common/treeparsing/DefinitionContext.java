@@ -30,6 +30,7 @@ import static com.xpathy.Tag.textarea;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.extractPredicate;
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.invisible;
+import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.noDisplay;
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.visible;
 import static tools.dscode.common.treeparsing.RegexUtil.betweenWithEscapes;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.KEY_NAME;
@@ -38,7 +39,9 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.customElementSuffixPredicate;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepestOnlyXPath;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.descendantDeepNormalizedVisibleText;
 import static tools.dscode.common.util.debug.DebugUtils.disableBaseElement;
 import static tools.dscode.common.util.debug.DebugUtils.onMatch;
 import static tools.dscode.common.util.debug.DebugUtils.printDebug;
@@ -399,10 +402,7 @@ public final class DefinitionContext {
                             (category, v, op) -> {
                                 if (v == null || v.isNull())
                                     return null;
-                                String textXpath = "[" + XPathy.from("descendant::*")
-                                        .byHaving(deepNormalizedText(v, op)).getXpath().replaceAll("^//\\*", "") + "]";
-                                printDebug("##textXpath Section: " + textXpath);
-                                String xpath1 = XPathy.from("//div" + textXpath +
+                                String xpath1 = XPathy.from("//div" + descendantDeepNormalizedVisibleText(v, op) +
                                         "[self::div[" +
                                         "    descendant::*[self::select or self::input or self::textarea or self::textarea]" +
                                         "    or" +
@@ -424,10 +424,7 @@ public final class DefinitionContext {
                             (category, v, op) -> {
                                 if (v == null || v.isNull())
                                     return null;
-                                String textXpath = "[" + XPathy.from("descendant-or-self::*")
-                                        .byHaving(deepNormalizedText(v, op)).getXpath().replaceAll("^//\\*", "") + "]";
-                                printDebug("##textXpath Section: " + textXpath);
-                                return XPathy.from("//li[a[1]" + textXpath + "]");
+                                return XPathy.from("//li[a[1]" + descendantDeepNormalizedVisibleText(v, op) + "]");
                             }
                     );
 
@@ -582,7 +579,7 @@ public final class DefinitionContext {
                             XPathy.from("//*[self::thead or self::tr[th] or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)]")
                     );
 
-            category("Header").children("Column Headers").inheritsFrom(CONTAINS_TEXT)
+            category("Header").children("Headers" ,"Column Header", "Column Headers").inheritsFrom(CONTAINS_TEXT)
                     .and((category, v, op) ->
                             XPathy.from("//*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)]")
                     );
@@ -634,7 +631,6 @@ public final class DefinitionContext {
                                 if (v == null || v.isNullOrBlank()) {
                                     return null; // no label text to match, skip this builder
                                 }
-
                                 XPathy returnXpathy = new XPathy(
                                         "//*[ancestor-or-self::*[position() <= 5]" +
                                                 singleControlElementContainer +
@@ -642,7 +638,7 @@ public final class DefinitionContext {
                                                 "           [" +
                                                 "               normalize-space(.)!='' or " +
                                                 "               descendant::*[self::input or self::textarea or self::select]" +
-                                                "           ][1]       " + getContainsText(v, op) + "          [not(descendant::*[self::input or self::textarea or self::select][@type='hidden'])]" +
+                                                "           ][1]       " + descendantDeepNormalizedVisibleText(v, op) + "          [not(descendant::*[self::input or self::textarea or self::select][@type='hidden'])]" +
                                                 "       ]" +
                                                 "]"
                                 );
@@ -671,13 +667,15 @@ public final class DefinitionContext {
                                     return null; // no label text to match, skip this builder
                                 }
 
+                                String deepNormalizedVisibleText = deepNormalizedVisibleText(v, op);
+
                                 XPathy returnXpath = combineOr(
-                                        new XPathy("//*[@id and string-length(normalize-space(@id)) > 0 and @id = (ancestor::div[3]//descendant::*" + getDirectText(v, op) + "[@for and string-length(normalize-space(@for)) > 0][1]/@for)]"),
-                                        new XPathy("//*[@aria-labelledby and string-length(normalize-space(@aria-labelledby)) > 0 and @aria-labelledby = (ancestor::div[3]//descendant::*" + getDirectText(v, op) + "[@id and string-length(normalize-space(@id)) > 0][1]/@id)]"),
-                                        new XPathy("//*[ @headers and string-length(normalize-space(@headers)) > 0 and contains(concat(' ', @headers, ' '), concat(' ', (ancestor::div[3]//descendant::*" + getDirectText(v, op) + "[@id and string-length(normalize-space(@id)) > 0][1]/@id), ' ')) ]"),
+                                        new XPathy("//*[@id and string-length(normalize-space(@id)) > 0 and @id = (ancestor::div[3]//descendant::*" + deepNormalizedVisibleText + "[@for and string-length(normalize-space(@for)) > 0][1]/@for)]"),
+                                        new XPathy("//*[@aria-labelledby and string-length(normalize-space(@aria-labelledby)) > 0 and @aria-labelledby = (ancestor::div[3]//descendant::*" + deepNormalizedVisibleText + "[@id and string-length(normalize-space(@id)) > 0][1]/@id)]"),
+                                        new XPathy("//*[ @headers and string-length(normalize-space(@headers)) > 0 and contains(concat(' ', @headers, ' '), concat(' ', (ancestor::div[3]//descendant::*" + deepNormalizedVisibleText + "[@id and string-length(normalize-space(@id)) > 0][1]/@id), ' ')) ]"),
                                         new XPathy("//*[ancestor-or-self::*[position() <= 7]" +
                                                 "  [preceding-sibling::*[1]        " +
-                                                getContainsText(v, op) +
+                                                descendantDeepNormalizedVisibleText(v, op) +
                                                 "         [not(descendant::button or descendant::input or descendant::textarea or descendant::select or descendant::a)]" +
                                                 "  ]" +
                                                 "]")

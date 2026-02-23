@@ -85,6 +85,20 @@ public final class VisibilityConditions {
         return xpathWithPredicate.substring(base.length() + 1, xpathWithPredicate.length() - 1);
     }
 
+
+
+    public static Condition noDisplay =  Condition.or(
+            Condition.style(display).equals("none"),
+            Condition.attribute(style).contains("display:none"),
+            Condition.attribute(style).contains("display: none"),
+            Condition.attribute(class_).contains("sr-only"),
+            Condition.attribute(style).contains("visually-hidden"),
+            Condition.attribute(style).contains("visuallyhidden"),
+            Condition.attribute(style).contains("screen-reader-"),
+            Condition.attribute(style).contains("screenreader-"),
+            Condition.attribute(style).contains("offscreen")
+    );
+
     /**
      * Visual "visible" condition for the element itself.
      *
@@ -101,16 +115,7 @@ public final class VisibilityConditions {
                 // display != none
                 // -------------------------------------------------------------
                 Condition.not(
-                        Condition.or(
-                                Condition.attribute(style).contains("screen-reader-text"),
-                                Condition.style(display).equals("none"),
-                                // allow missing semicolon / spaces a bit
-                                Condition.attribute(style).contains("display:none"),
-                                Condition.attribute(style).contains("display: none"),
-                                Condition.attribute(class_).contains("sr-only"),
-                                Condition.attribute(style).contains("visually-hidden"),
-                                Condition.attribute(style).contains("offscreen")
-                        )
+                        noDisplay
                 ),
 
                 // -------------------------------------------------------------
@@ -204,18 +209,13 @@ public final class VisibilityConditions {
      *    (these usually *do* hide descendants visually).
      */
     public static Condition ancestorInvisible() {
+
+
+
         return Condition.or(
 
                 // display:none
-                Condition.or(
-                        Condition.style(display).equals("none"),
-                        Condition.attribute(style).contains("display:none"),
-                        Condition.attribute(style).contains("display: none"),
-                        Condition.attribute(class_).contains("sr-only"),
-                        Condition.attribute(style).contains("visually-hidden"),
-                        Condition.attribute(style).contains("screen-reader-text"),
-                        Condition.attribute(style).contains("offscreen")
-                ),
+                noDisplay,
 
                 // visibility:hidden or collapse (mostly correct for ancestors; can be overridden)
                 Condition.or(

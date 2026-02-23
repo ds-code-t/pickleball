@@ -24,6 +24,7 @@ import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Status;
 import tools.dscode.common.servicecalls.JacksonUtils;
 import tools.dscode.common.servicecalls.ToJsonNode;
+import tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils;
 import tools.dscode.common.util.datetime.BusinessCalendar;
 import tools.dscode.common.util.datetime.CalendarRegistry;
 import tools.dscode.coredefinitions.NavigationSteps;
@@ -48,11 +49,13 @@ import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static org.assertj.core.api.Assertions.assertThat;
 
 
+import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.noDisplay;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.servicecalls.ToJsonNode.sjson;
 import static tools.dscode.common.treeparsing.DefinitionContext.DEFAULT_EXECUTION_DICTIONARY;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.customElementSuffixPredicate;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
 import static tools.dscode.common.util.datetime.CalendarRegistry.DEFAULT_CALENDAR;
 import static tools.dscode.common.util.datetime.CalendarRegistry.calendar;
 import static tools.dscode.common.util.datetime.CalendarRegistry.getCalendar;
@@ -223,12 +226,22 @@ public class CalculatorSteps {
 
     @Given("test2")
     public static void test2() {
+        ExecutionDictionary dict = getExecutionDictionary();
+        System.out.println("@@noDisplay: " + any.byCondition(noDisplay));
+        System.out.println("@@Menu: " + dict.andThenOr("Menu",ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
+        XPathy deeplyNormalized = XPathy.from(XPathyUtils.deepNormalizedText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
+        String noDisplayPredicate = any.byCondition(noDisplay).getXpath().replaceFirst("//\\*", "");
+        XPathy co = XPathy.from(deeplyNormalized.getXpath() + noDisplayPredicate);
+        System.out.println("@@deepNormalizedText(v, op): " + deeplyNormalized);
+        System.out.println("@@noDisplayPredicate: " + noDisplayPredicate);
+        System.out.println("@@co: " + co);
+        System.out.println("@@getContainsText(v, op): " + dict.getContainsText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
+        System.out.println("@@getDirectText(v, op): " + dict.getDirectText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
         List<WebElement> list;
         WebDriver driver = getDriver("BROWSER");
 
         ValueWrapper v = ValueWrapper.createValueWrapper("Status");
         ExecutionDictionary.Op op = ExecutionDictionary.Op.EQUALS;
-        ExecutionDictionary dict = getExecutionDictionary();
 //        XPathy t = new XPathy("//*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + "][ancestor::table and (count(preceding-sibling::*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + "]) + 1) = (count(((ancestor::table[1]//thead//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" +
 //                customElementSuffixPredicate("header") + dict.getDirectText(v, op) + ") | (ancestor::table[1]//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + dict.getDirectText(v, op) + "))[1]/preceding-sibling::*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + "]) + 1)]");
         XPathy t = dict.cellsInColumnByHeaderText(v, op, customElementSuffixPredicate("row"), customElementSuffixPredicate("cell"), customElementSuffixPredicate("header"));

@@ -335,7 +335,7 @@ public final class XPathyAssembly {
         }
         printDebug("##Xscore score5: " + score);
 
-        if (noSpace.contains("'screen-reader-text'")) {
+        if (noSpace.contains("'opacity:0'")) {
             score += 10_000_000;
         }
 

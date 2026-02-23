@@ -8,6 +8,9 @@ import tools.dscode.common.domoperations.ExecutionDictionary;
 import java.util.Objects;
 import java.util.Set;
 
+import static com.xpathy.Tag.any;
+import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.noDisplay;
+
 public final class XPathyUtils {
 
     private XPathyUtils() {
@@ -99,26 +102,25 @@ public final class XPathyUtils {
     //  PUBLIC MATCHING APIs (ValueWrapper-only)
     // =========================================================================
 
-    /**
-     * ValueWrapper-driven deep text predicate as an XPathy (standalone predicate expression wrapped).
-     *
-     * Type-driven behavior:
-     * - DOUBLE_QUOTED + DEFAULT + everything else => normalized, case-sensitive
-     * - SINGLE_QUOTED => normalized, case-insensitive
-     * - BACK_TICKED => exact (no normalization/trimming/casefold)
-     * - NUMERIC/BOOLEAN => treated like DOUBLE_QUOTED for text matching
-     */
-    public static XPathy deepNormalizedText(ValueWrapper value, ExecutionDictionary.Op mode) {
+    public static String noDisplayPredicate = any.byCondition(noDisplay).getXpath().replaceFirst("//*", "");
+
+
+    public static String deepNormalizedText(ValueWrapper value, ExecutionDictionary.Op mode) {
         Objects.requireNonNull(value, "value must not be null");
         ExecutionDictionary.Op op = normalizeOp(mode);
 
         String predicate = buildDeepTextPredicate(value, op);
-        return XPathy.from("(" + predicate + ")");
+        return "[" + predicate + "]";
     }
 
-    public static XPathy deepNormalizedText(ValueWrapper value) {
-        return deepNormalizedText(value, ExecutionDictionary.Op.EQUALS);
+    public static String deepNormalizedVisibleText(ValueWrapper value, ExecutionDictionary.Op mode) {
+        return deepNormalizedText(value, mode) + noDisplayPredicate;
     }
+
+    public static String descendantDeepNormalizedVisibleText(ValueWrapper value, ExecutionDictionary.Op mode) {
+        return  "[descendant-or-self::node()[" + deepNormalizedVisibleText(value, mode) + "]]";
+    }
+
 
     /**
      * Builds a predicate (WITHOUT surrounding brackets) that matches an attribute

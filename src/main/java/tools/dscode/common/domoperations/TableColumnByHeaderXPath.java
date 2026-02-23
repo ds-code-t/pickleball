@@ -69,18 +69,17 @@ public final class TableColumnByHeaderXPath {
          *
          * Inputs (requirements)
          * ---------------------
-         * @param getDirectTextPredicate a predicate string INCLUDING brackets that matches header text.
+         * @param headerTextPred a predicate string INCLUDING brackets that matches header text.
          * @param customRowSuffixPredicate caller-provided predicate INCLUDING brackets (null/empty = no custom)
          * @param customCellSuffixPredicate caller-provided predicate INCLUDING brackets (null/empty = no custom)
          * @param customHeaderSuffixPredicate caller-provided predicate INCLUDING brackets (null/empty = no custom)
          */
         public static XPathy matchCellsByHeader(
-                String getDirectTextPredicate,
+                String headerTextPred,
                 String customRowSuffixPredicate,
                 String customCellSuffixPredicate,
                 String customHeaderSuffixPredicate
         ) {
-            final String headerTextPred = requireBracketPredicate(getDirectTextPredicate, "getDirectTextPredicate");
 
             final String ROW = ROW_EXPR(customRowSuffixPredicate);
             final String CELL = CELL_EXPR(customCellSuffixPredicate);
@@ -127,16 +126,16 @@ public final class TableColumnByHeaderXPath {
             return s;
         }
 
-        static String requireBracketPredicate(String bracketPredicate, String name) {
-            if (bracketPredicate == null || bracketPredicate.trim().isEmpty()) {
-                throw new IllegalArgumentException(name + " must be a non-empty bracketed predicate like \"[... ]\"");
-            }
-            final String s = bracketPredicate.trim();
-            if (!s.startsWith("[") || !s.endsWith("]")) {
-                throw new IllegalArgumentException(name + " must include brackets, e.g. \"[... ]\": " + s);
-            }
-            return s;
-        }
+//        static String requireBracketPredicate(String bracketPredicate, String name) {
+//            if (bracketPredicate == null || bracketPredicate.trim().isEmpty()) {
+//                throw new IllegalArgumentException(name + " must be a non-empty bracketed predicate like \"[... ]\"");
+//            }
+//            final String s = bracketPredicate.trim();
+//            if (!s.startsWith("[") || !s.endsWith("]")) {
+//                throw new IllegalArgumentException(name + " must include brackets, e.g. \"[... ]\": " + s);
+//            }
+//            return s;
+//        }
 
         // ---------------------------------------------------------------------
 // Convenience overload: build header text predicate from ValueWrapper + Op
