@@ -96,17 +96,6 @@ public class Registrations {
                 );
 
 
-        dict.category("Zell").or(
-                (category, v, op) ->
-                {
-                    XPathy t = new XPathy("//*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + "][ancestor::table and (count(preceding-sibling::*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + "]) + 1) = (count(((ancestor::table[1]//thead//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + dict.getDirectText(v, op) + ") | (ancestor::table[1]//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + dict.getDirectText(v, op) + "))[1]/preceding-sibling::*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + "]) + 1)]");
-                    System.out.println("@@@t: " + t.getXpath());
-                    System.out.println("\n\n----------- ");
-
-//                    List<WebElement> list = getDriver("BROWSER").findElements(t.getLocator());
-//                    System.out.println("@@@t: " + list.size());
-                    return t;
-                });
 
         dict.category("Submit Button").or(
                 (category, v, op) -> input.byAttribute(type).equals("submit")

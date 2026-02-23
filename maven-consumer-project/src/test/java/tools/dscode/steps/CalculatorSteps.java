@@ -56,6 +56,8 @@ import static tools.dscode.common.treeparsing.DefinitionContext.DEFAULT_EXECUTIO
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.customElementSuffixPredicate;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedVisibleText;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.descendantDeepNormalizedVisibleText;
 import static tools.dscode.common.util.datetime.CalendarRegistry.DEFAULT_CALENDAR;
 import static tools.dscode.common.util.datetime.CalendarRegistry.calendar;
 import static tools.dscode.common.util.datetime.CalendarRegistry.getCalendar;
@@ -235,8 +237,8 @@ public class CalculatorSteps {
         System.out.println("@@deepNormalizedText(v, op): " + deeplyNormalized);
         System.out.println("@@noDisplayPredicate: " + noDisplayPredicate);
         System.out.println("@@co: " + co);
-        System.out.println("@@getContainsText(v, op): " + dict.getContainsText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
-        System.out.println("@@getDirectText(v, op): " + dict.getDirectText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
+        System.out.println("@@descendantDeepNormalizedVisibleText(v, op): " + descendantDeepNormalizedVisibleText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
+        System.out.println("@@deepNormalizedVisibleText(v, op): " +deepNormalizedVisibleText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
         List<WebElement> list;
         WebDriver driver = getDriver("BROWSER");
 

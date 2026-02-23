@@ -102,8 +102,7 @@ public final class XPathyUtils {
     //  PUBLIC MATCHING APIs (ValueWrapper-only)
     // =========================================================================
 
-    public static String noDisplayPredicate = any.byCondition(noDisplay).getXpath().replaceFirst("//*", "");
-
+    public static String noDisplayPredicate = any.byCondition(noDisplay).getXpath().replaceFirst("//\\*", "");
 
     public static String deepNormalizedText(ValueWrapper value, ExecutionDictionary.Op mode) {
         Objects.requireNonNull(value, "value must not be null");

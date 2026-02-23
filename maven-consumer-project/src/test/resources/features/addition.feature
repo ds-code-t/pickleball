@@ -2,9 +2,9 @@ Feature: Addition
 
 
   Scenario: gdfgdf
-  @[DEBUG,nobasse]
+  @[DEBUG,nobase]
     * test2
-#    * , verify "Status" Dropdown equals "A"
+    * , verify "Status" Dropdown equals "A"
 #    * , verify 2nd "Status" Cell equals "A"
 #    * , verify "Status" Text is displayed
 #    * test2
