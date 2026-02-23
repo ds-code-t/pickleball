@@ -65,7 +65,7 @@ public class ElementMatch {
     public Set<ElementType> elementTypes;
     public ElementMatcher elementMatcher;
     public ContextWrapper contextWrapper;
-    public List<String> defaultValueKeys = new ArrayList<>(List.of(ELEMENT_RETURN_VALUE, "value", "textContent"));
+    public List<String> defaultValueKeys = new ArrayList<>(List.of(ELEMENT_RETURN_VALUE, "attributes.value", "childValue", "textContent"));
     public ValueWrapper defaultText;
     public ExecutionDictionary.Op defaultTextOp;
 
@@ -380,7 +380,6 @@ public class ElementMatch {
     private List<ValueWrapper> previouslyReturnedValues = null;
 
     public List<ValueWrapper> getValues() {
-
         List<ValueWrapper> returnList = new ArrayList<>();
         if (elementTypes.contains(ElementType.HTML_TYPE)) {
             getElementWrappers().forEach(e -> returnList.add(e.getElementReturnValue()));

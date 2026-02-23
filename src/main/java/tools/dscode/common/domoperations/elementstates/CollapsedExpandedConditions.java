@@ -1,180 +1,133 @@
 package tools.dscode.common.domoperations.elementstates;
 
-import com.xpathy.Condition;
 import com.xpathy.XPathy;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
 
-import static com.xpathy.Attribute.*;
-import static com.xpathy.Condition.*;
+import java.util.List;
 
-/**
- * Reusable XPathy conditions related to "collapsed/expanded" UI state.
- *
- * Supports common signals:
- *  - ARIA:         aria-expanded="true|false"
- *  - HTML:         <details open>  (uses raw XPath: @open)
- *  - data-* :      data-expanded, data-collapsed, data-state=open/closed/expanded/collapsed
- *  - class tokens: expanded/collapsed/open/closed/show/etc.
- *
- * NOTE:
- *  - All references to aria-hidden, hide, hidden have been removed because they are not
- *    reliable indicators of collapsed/expanded state in many UIs (e.g., decorative icons).
- */
 public final class CollapsedExpandedConditions {
 
     private CollapsedExpandedConditions() {
         // utility class
     }
 
-    /* -------------------------------------------------------------------------
-     * Public Condition API (pure XPathy Condition)
-     * ------------------------------------------------------------------------- */
+    /**
+     * Broadest "this thing participates in expand/collapse" predicate.
+     *
+     * Intentionally matches BOTH:
+     *  - toggles (buttons/headers) that carry state via aria-expanded / classes
+     *  - sections/panels/details that carry state via data-state / open / classes
+     *
+     * Current state is irrelevant here; this is just "collapsible-capable".
+     */
+    public static final String COLLAPSIBLE_PREDICATE =
+            "(" +
+                    // native <details open>
+                    "@open or " +
 
-    public static Condition expanded() {
-        return expandedClassLike();
-    }
+                    // common ARIA/data hooks (present whether true/false)
+                    "@aria-expanded or " +
+                    "@data-expanded or " +
+                    "@data-collapsed or " +
+                    "@data-state or " +
 
-    public static Condition collapsed() {
-        return not(expanded());
-    }
+                    // broad class-token heuristics (includes both expanded-ish & collapsed-ish)
+                    "contains(concat(' ', normalize-space(@class), ' '), ' expanded ') or " +
+                    "contains(concat(' ', normalize-space(@class), ' '), ' is-expanded ') or " +
+                    "contains(concat(' ', normalize-space(@class), ' '), ' open ') or " +
+                    "contains(concat(' ', normalize-space(@class), ' '), ' is-open ') or " +
+                    "contains(concat(' ', normalize-space(@class), ' '), ' show ') or " +
+                    "contains(concat(' ', normalize-space(@class), ' '), ' collapsed ') or " +
+                    "contains(concat(' ', normalize-space(@class), ' '), ' is-collapsed ') or " +
+                    "contains(concat(' ', normalize-space(@class), ' '), ' closed ') or " +
+                    "contains(concat(' ', normalize-space(@class), ' '), ' is-closed ')" +
+                    ")";
 
-    /* -------------------------------------------------------------------------
-     * Public XPathy API (adds raw XPath fallbacks for aria-/data-* and @open)
-     * ------------------------------------------------------------------------- */
+    /**
+     * State predicate that can be used:
+     *  - alone (on any element), OR
+     *  - alongside COLLAPSIBLE_PREDICATE for "only collapsible things"
+     *
+     * Rules:
+     *  - TRUE  => treat as EXPANDED
+     *  - FALSE => treat as COLLAPSED
+     *  - Defaults to EXPANDED when there are no explicit collapsed indicators.
+     *
+     * In other words: Expanded unless explicitly marked collapsed,
+     * but explicit expanded markers win if both are present.
+     */
+    public static final String EXPANDED_STATE_PREDICATE =
+            "(" +
+                    // explicit expanded signals
+                    "@open or " +
+                    "@aria-expanded='true' or " +
+                    "@data-expanded='true' or " +
+                    "@data-state='open' or @data-state='opened' or @data-state='expanded' or " +
+                    "contains(concat(' ', normalize-space(@class), ' '), ' expanded ') or " +
+                    "contains(concat(' ', normalize-space(@class), ' '), ' is-expanded ') or " +
+                    "contains(concat(' ', normalize-space(@class), ' '), ' open ') or " +
+                    "contains(concat(' ', normalize-space(@class), ' '), ' is-open ') or " +
+                    "contains(concat(' ', normalize-space(@class), ' '), ' show ') or " +
 
-    public static XPathy expandedElement() {
-        XPathy any = new XPathy();
-        XPathy byCond = any.byCondition(expanded());
+                    // default-to-expanded when NOT explicitly collapsed
+                    "not(" + EXPLICIT_COLLAPSED_PREDICATE() + ")" +
+                    ")";
 
-        String base = any.getXpath();        // "//*"
-        String withPred = byCond.getXpath(); // "//*[<predicate>]"
-        String predicate = extractPredicate(base, withPred);
-
-        String rawExpanded =
-                "(" +
-                        "@open or " +
-                        "@aria-expanded='true' or " +
-                        "@data-expanded='true' or " +
-                        "@data-state='open' or @data-state='opened' or @data-state='expanded'" +
-                        ")";
-
-        String finalXpath = base + "[" + predicate + " or " + rawExpanded + "]";
-        return new XPathy(finalXpath);
-    }
-
-    public static XPathy collapsedElement() {
-        XPathy any = new XPathy();
-        String base = any.getXpath();
-
-        String expandedXpath = expandedElement().getXpath();
-        String expandedPred = extractPredicate(base, expandedXpath);
-
-        String candidatePred = buildCollapsibleCandidatePredicate(base);
-
-        // explicit collapsed signals (self) — aria-hidden removed
-        String rawCollapsed =
-                "(" +
-                        "@aria-expanded='false' or " +
-                        "@data-collapsed='true' or " +
-                        "@data-expanded='false' or " +
-                        "@data-state='closed' or @data-state='collapsed'" +
-                        ")";
-
-        String finalXpath =
-                base + "[" +
-                        rawCollapsed +
-                        " or (" + candidatePred + " and not(" + expandedPred + "))" +
-                        "]";
-
-        return new XPathy(finalXpath);
-    }
-
-    public static XPathy collapsedElementExplicit() {
-        XPathy any = new XPathy();
-        String base = any.getXpath();
-
-        XPathy byCondCollapsedMarkers = any.byCondition(collapsedClassLike());
-        String collapsedMarkersPred = extractPredicate(base, byCondCollapsedMarkers.getXpath());
-
-        // explicit collapsed signals — aria-hidden removed
-        String rawCollapsed =
-                "(" +
-                        "@aria-expanded='false' or " +
-                        "@data-collapsed='true' or " +
-                        "@data-expanded='false' or " +
-                        "@data-state='closed' or @data-state='collapsed'" +
-                        ")";
-
-        String finalXpath = base + "[" + collapsedMarkersPred + " or " + rawCollapsed + "]";
-        return new XPathy(finalXpath);
+    // Kept as a method so EXPANDED_STATE_PREDICATE can inline it without duplicating text manually.
+    // This method is private, but the collapsed logic is still fully expressed via EXPANDED_STATE_PREDICATE and not(...).
+    private static String EXPLICIT_COLLAPSED_PREDICATE() {
+        return "(" +
+                "@aria-expanded='false' or " +
+                "@data-collapsed='true' or " +
+                "@data-expanded='false' or " +
+                "@data-state='closed' or @data-state='collapsed' or " +
+                "contains(concat(' ', normalize-space(@class), ' '), ' collapsed ') or " +
+                "contains(concat(' ', normalize-space(@class), ' '), ' is-collapsed ') or " +
+                "contains(concat(' ', normalize-space(@class), ' '), ' closed ') or " +
+                "contains(concat(' ', normalize-space(@class), ' '), ' is-closed ')" +
+                ")";
     }
 
     /**
-     * "Expanded content element" heuristic without aria-hidden.
-     * Falls back to data-state / data-expanded and expanded-ish class tokens.
+     * Finds collapsible-capable elements that are treated as expanded
+     * (expanded by explicit markers, or by default if not explicitly collapsed).
      */
-    public static XPathy expandedContentElement() {
-        XPathy any = new XPathy();
-        String base = any.getXpath();
-
-        String rawExpandedContent =
-                "(" +
-                        "@data-state='open' or @data-state='opened' or " +
-                        "@data-expanded='true'" +
-                        ")";
-
-        XPathy byCondExpandedClass = any.byCondition(expandedClassLike());
-        String expandedClassPred = extractPredicate(base, byCondExpandedClass.getXpath());
-
-        String finalXpath = base + "[" + rawExpandedContent + " or " + expandedClassPred + "]";
-        return new XPathy(finalXpath);
+    public static XPathy expandedElement() {
+        String base = new XPathy().getXpath(); // "//*"
+        return new XPathy(base + "[" + COLLAPSIBLE_PREDICATE + " and " + EXPANDED_STATE_PREDICATE + "]");
     }
 
-    /* -------------------------------------------------------------------------
-     * Internals (Condition-only class token heuristics)
-     * ------------------------------------------------------------------------- */
-
-    private static Condition expandedClassLike() {
-        return or(
-                attribute(class_).contains("expanded"),
-                attribute(class_).contains("is-expanded"),
-                attribute(class_).contains("open"),
-                attribute(class_).contains("is-open"),
-                attribute(class_).contains("show")     // e.g. Bootstrap collapse "show"
-        );
+    /**
+     * Finds collapsible-capable elements that are treated as collapsed.
+     *
+     * Per your requirement: uses BOTH predicates and wraps the *second* predicate in not(...).
+     */
+    public static XPathy collapsedElement() {
+        String base = new XPathy().getXpath(); // "//*"
+        return new XPathy(base + "[" + COLLAPSIBLE_PREDICATE + " and not(" + EXPANDED_STATE_PREDICATE + ")]");
     }
 
-    private static Condition collapsedClassLike() {
-        return or(
-                attribute(class_).contains("collapsed"),
-                attribute(class_).contains("is-collapsed"),
-                attribute(class_).contains("closed"),
-                attribute(class_).contains("is-closed")
-        );
+    /**
+     * WebElement utility that applies ONLY the "state" predicate using self::*.
+     *
+     * This means it will return TRUE (expanded) by default if the element has no explicit
+     * collapsed indicators — even if the element isn't actually a collapsible widget.
+     * (That’s what you asked for.)
+     */
+    public static boolean isExpandedState(WebElement element) {
+        return matchesSelf(element, EXPANDED_STATE_PREDICATE);
     }
 
-    private static String buildCollapsibleCandidatePredicate(String base) {
-        XPathy any = new XPathy();
-
-        XPathy byCondAnyStateClass = any.byCondition(or(expandedClassLike(), collapsedClassLike()));
-        String classStatePred = extractPredicate(base, byCondAnyStateClass.getXpath());
-
-        // raw attribute presence checks — aria-hidden removed
-        String rawCandidate =
-                "(" +
-                        "@open or " +
-                        "@aria-expanded or " +
-                        "@data-expanded or " +
-                        "@data-collapsed or " +
-                        "@data-state" +
-                        ")";
-
-        return "(" + classStatePred + " or " + rawCandidate + ")";
+    public static boolean isCollapsedState(WebElement element) {
+        return !matchesSelf(element, EXPANDED_STATE_PREDICATE);
     }
 
-    public static String extractPredicate(String base, String xpathWithPredicate) {
-        if (!xpathWithPredicate.startsWith(base + "[") || !xpathWithPredicate.endsWith("]")) {
-            throw new IllegalArgumentException("Unexpected XPath format: " + xpathWithPredicate);
+    private static boolean matchesSelf(WebElement element, String predicate) {
+        if (element == null) {
+            return false;
         }
-        return xpathWithPredicate.substring(base.length() + 1, xpathWithPredicate.length() - 1);
+        List<WebElement> matches = element.findElements(By.xpath("self::*[" + predicate + "]"));
+        return !matches.isEmpty();
     }
 }

@@ -16,6 +16,10 @@ import static tools.dscode.common.domoperations.LeanWaits.safeWaitForElementRead
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.intersection;
 import static tools.dscode.common.domoperations.SeleniumUtils.union;
+import static tools.dscode.common.domoperations.elementstates.BinaryStateConditions.isCheckedSelectedOrOn;
+import static tools.dscode.common.domoperations.elementstates.CollapsedExpandedConditions.isCollapsedState;
+import static tools.dscode.common.domoperations.elementstates.CollapsedExpandedConditions.isExpandedState;
+import static tools.dscode.common.domoperations.elementstates.RequiredInputConditions.isElementRequired;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementMatch.ELEMENT_RETURN_VALUE;
 import static tools.dscode.common.util.debug.DebugUtils.printDebug;
@@ -73,7 +77,7 @@ public class ElementWrapper {
         // Build the persistent locating XPath (no JS).
         // Uses default attribute priority when varargs are omitted.
         this.xpath1 = buildXPathForElement(element, 10, 30, List.of("id", "data-user-id"), List.of("name", "title"), List.of("role", "aria-label", "class"));
-        this.xpath2 = buildXPathForElement(element, 10, 15,  List.of("href", "target", "src", "index"));
+        this.xpath2 = buildXPathForElement(element, 10, 15, List.of("href", "target", "src", "index"));
 
 
     }
@@ -93,6 +97,17 @@ public class ElementWrapper {
                 "return arguments[0].innerText;", element
         );
         attributeSnapshot.put("textContent", textContent == null ? "" : textContent);
+
+        List<WebElement> children = element.findElements(By.xpath("./*[@selected]"));
+        String childValue = "";
+        if (!children.isEmpty()) {
+            for (WebElement child : children) {
+                String temp = child.getAttribute("value");
+                childValue += temp == null ? child.getText() : temp;
+            }
+            attributeSnapshot.put("childValue", childValue);
+        }
+
 
         // all attributes as name:value
         Map<String, String> attrs = (Map<String, String>) js.executeScript(
@@ -168,8 +183,17 @@ public class ElementWrapper {
                 break;
         }
         for (String key : elementMatch.defaultValueKeys) {
-            if (attributeSnapshot.has(key)) {
-                String returnVal = attributeSnapshot.get(key).asText();
+            ObjectNode node;
+
+            if (key.startsWith("attributes")) {
+                node = (ObjectNode) attributeSnapshot.get("attributes");
+                key = key.substring("attributes".length() + 1);
+            }
+            else {
+                node = attributeSnapshot;
+            }
+            if (node.has(key)) {
+                String returnVal = node.get(key).asText();
                 attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
                 return createValueWrapper(returnVal);
             }
@@ -617,8 +641,24 @@ public class ElementWrapper {
         return getElement().isEnabled();
     }
 
-    public boolean isSelected() {
-        return getElement().isSelected();
+    public boolean isRequired() {
+        return isElementRequired(getElement());
+    }
+
+    public boolean isExpanded() {
+        return isExpandedState(getElement());
+    }
+
+    public boolean isCollapsed() {
+        return isCollapsedState(getElement());
+    }
+
+    public boolean isOn() {
+        return isCheckedSelectedOrOn(getElement());
+    }
+
+    public boolean isOff() {
+        return !isCheckedSelectedOrOn(getElement());
     }
 
     public boolean isBlank() {

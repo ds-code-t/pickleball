@@ -22,6 +22,7 @@ import java.util.stream.Stream;
 import static com.xpathy.Tag.any;
 import static tools.dscode.common.domoperations.TableColumnByHeaderXPath.matchCellsByHeader;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.xpathSpecificityScore;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.colocatedDeepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.descendantDeepNormalizedVisibleText;
 
@@ -53,6 +54,7 @@ public class ExecutionDictionary {
     // Default base category that *every* category implicitly inherits from
     public static final String DIRECT_TEXT = "DirectTextInternalUSE";
     public static final String CONTAINS_TEXT = "ContainsTextInternalUSE";
+    public static final String COLOCATED_TEXT = "ColocatedTextInternalUSE";
     public static final String HTML_NAME_ATTRIBUTES = "htmlNaming";
     public static final String BASE_CATEGORY = "BaseCategoryInternalUSE";
     public static final String STARTING_CONTEXT = "DefaultStartingContextInternalUSE";
@@ -137,6 +139,12 @@ public class ExecutionDictionary {
                         }
                 );
 
+        category(COLOCATED_TEXT).and((category, v, op) -> {
+            if (v == null || v.isNull())
+                return null;
+            return XPathy.from("//*" + colocatedDeepNormalizedVisibleText(v, op));
+        });
+
         category(CONTAINS_TEXT).and((category, v, op) -> {
             if (v == null || v.isNull())
                 return null;
@@ -146,7 +154,7 @@ public class ExecutionDictionary {
         category(DIRECT_TEXT).and((category, v, op) -> {
             if (v == null || v.isNull())
                 return null;
-            return XPathy.from("//*" + descendantDeepNormalizedVisibleText(v, op));
+            return XPathy.from("//*" + deepNormalizedVisibleText(v, op));
         });
     }
 

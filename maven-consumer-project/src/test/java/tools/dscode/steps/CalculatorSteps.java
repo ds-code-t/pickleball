@@ -54,6 +54,7 @@ import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.servicecalls.ToJsonNode.sjson;
 import static tools.dscode.common.treeparsing.DefinitionContext.DEFAULT_EXECUTION_DICTIONARY;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.colocatedDeepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.customElementSuffixPredicate;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedVisibleText;
@@ -229,7 +230,11 @@ public class CalculatorSteps {
     @Given("test2")
     public static void test2() {
         ExecutionDictionary dict = getExecutionDictionary();
-        System.out.println("@@noDisplay: " + any.byCondition(noDisplay));
+        System.out.println("\n@@colocatedDeepNormalizedVisibleText((v, op): " + colocatedDeepNormalizedVisibleText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
+        System.out.println("\n@@descendantDeepNormalizedVisibleText(v, op): " + descendantDeepNormalizedVisibleText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
+
+
+        System.out.println("\n@@noDisplay: " + any.byCondition(noDisplay));
         System.out.println("@@Menu: " + dict.andThenOr("Menu",ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
         XPathy deeplyNormalized = XPathy.from(XPathyUtils.deepNormalizedText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
         String noDisplayPredicate = any.byCondition(noDisplay).getXpath().replaceFirst("//\\*", "");
@@ -237,7 +242,6 @@ public class CalculatorSteps {
         System.out.println("@@deepNormalizedText(v, op): " + deeplyNormalized);
         System.out.println("@@noDisplayPredicate: " + noDisplayPredicate);
         System.out.println("@@co: " + co);
-        System.out.println("@@descendantDeepNormalizedVisibleText(v, op): " + descendantDeepNormalizedVisibleText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
         System.out.println("@@deepNormalizedVisibleText(v, op): " +deepNormalizedVisibleText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
         List<WebElement> list;
         WebDriver driver = getDriver("BROWSER");

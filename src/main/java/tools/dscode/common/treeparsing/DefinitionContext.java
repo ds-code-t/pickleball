@@ -37,6 +37,7 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.KEY_N
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.colocatedDeepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.customElementSuffixPredicate;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedVisibleText;
@@ -257,19 +258,20 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode assertion = new ParseNode("\\b(?:starts?\\s+with|ends?\\s+with|contains?|match(?:es)?|displayed|(?:un)?selected|(?:un)?checked|enabled|disabled|equals?|less\\s+than|greater\\s+than|has\\s+values?|(?:has|is)\\s+blank)\\b") {
+        ParseNode assertion = new ParseNode("\\b(?:starts?\\s+with|ends?\\s+with|contains?|match(?:es)?|required|(non-?)?required|displayed|collapsed|expanded|(?:un)?selected|(?:un)?checked|enabled|disabled|equals?|less\\s+than|greater\\s+than|has\\s+values?|(?:has|is)\\s+blank|is\\s+on|is\\s+off)\\b") {
             @Override
             public String onCapture(MatchNode self) {
                 String assertion = self.originalText().trim()
                         .replaceAll("(start|end|contain|match|equal|values)(?:es|s)", "$1")
-                        .replaceAll("^(?:is|has)", "")
+                        .replaceAll("(deselected|unselected|unchecked)", "off")
+                        .replaceAll("(selected|checked)", "on")
+                        .replaceAll("^(?:is|has|-)", "")
                         .replaceAll("\\s+", " ")
                         .trim();
+
                 self.parent().putToLocalState("assertion", assertion);
 
-
                 self.parent().putToLocalState("operationIndex", self.start);
-
                 return self.originalText();
             }
         };
@@ -678,7 +680,8 @@ public final class DefinitionContext {
                                                 descendantDeepNormalizedVisibleText(v, op) +
                                                 "         [not(descendant::button or descendant::input or descendant::textarea or descendant::select or descendant::a)]" +
                                                 "  ]" +
-                                                "]")
+                                                "]"),
+                                        XPathy.from("//*" + colocatedDeepNormalizedVisibleText(v, op))
                                 );
                                 printDebug("##textXpath forLabel:2 " + returnXpath);
                                 return returnXpath;

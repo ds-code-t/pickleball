@@ -1,10 +1,35 @@
 Feature: Addition
 
+  Scenario: gdfgdfss
+  @[DEBUG,nobase,##]
+    * , verify "Subscribe" Checkbox is on
+    * , verify "Subscribe" Checkbox is true
+    * , verify "Subscribe" Checkbox is selected
+    * , verify "Subscribe" Checkbox is checked
+    * , verify "Subscribe" Checkbox is not displayed
+    * , verify "Text Input:" Textbox is not blank
+    * , verify "Subscribe" Checkbox is not blank
+    * , verify "Subscribe" Dropdown is not blank
 
   Scenario: gdfgdf
-  @[DEBUG,nobase]
-    * test2
-    * , verify "Status" Dropdown equals "A"
+  @[DEBUG,nobase,##]
+    * , verify "Required text input" Textbox is blank
+    * , verify "Optional text input" Textbox is blank
+
+    * , verify "Required text input" Textbox is required
+    * , verify "Required text input" Textbox is non-required
+    * , verify "Optional text input" Textbox is required
+    * , verify "Optional text input" Textbox is non-required
+
+
+
+    * , verify "Enabled dropdown" Dropdown is enabled
+    * , verify "Enabled dropdown" Dropdown is disabled
+    * , verify "Disabled dropdown" Dropdown is enabled
+    * , verify "Disabled dropdown" Dropdown is disabled
+
+#    * test2
+#    * , verify "Status" Dropdown equals "A"
 #    * , verify 2nd "Status" Cell equals "A"
 #    * , verify "Status" Text is displayed
 #    * test2
@@ -12,8 +37,8 @@ Feature: Addition
   Scenario: zzsStart Run component
     Then print Arrrrrrrrr
     * RUN SCENARIOS:
-      | Tags      |
-      | %wtest33c |
+      | Tags  |
+      | %taga |
 
 
   @par1
@@ -22,8 +47,8 @@ Feature: Addition
     * print <B>
     Examples:
     Examples:
-      | Tags      | A | B | C |
-      | %wtest33c | 2 | 5 |   |
+      | Scenario Tags | A | B | C |
+      | %taga         | 2 | 5 |   |
 
 
   Scenario: trewtr

@@ -102,7 +102,7 @@ public final class XPathyUtils {
     //  PUBLIC MATCHING APIs (ValueWrapper-only)
     // =========================================================================
 
-    public static String noDisplayPredicate = any.byCondition(noDisplay).getXpath().replaceFirst("//\\*", "");
+    public static String noDisplayPredicate = "[not(ancestor-or-self::" + any.byCondition(noDisplay).getXpath().replaceFirst("//", "")+ ")]";
 
     public static String deepNormalizedText(ValueWrapper value, ExecutionDictionary.Op mode) {
         Objects.requireNonNull(value, "value must not be null");
@@ -117,9 +117,13 @@ public final class XPathyUtils {
     }
 
     public static String descendantDeepNormalizedVisibleText(ValueWrapper value, ExecutionDictionary.Op mode) {
-        return  "[descendant-or-self::node()[" + deepNormalizedVisibleText(value, mode) + "]]";
+        return  "[descendant-or-self::node()" + deepNormalizedVisibleText(value, mode) + "]";
     }
 
+    public static String colocatedDeepNormalizedVisibleText(ValueWrapper value, ExecutionDictionary.Op mode) {
+        return  "[ancestor-or-self::*[" +
+                "count(.//text()" + noDisplayPredicate + "[normalize-space() and not(ancestor::script|ancestor::style)]) = 1][1]" + deepNormalizedText(value, mode) + "]";
+    }
 
     /**
      * Builds a predicate (WITHOUT surrounding brackets) that matches an attribute

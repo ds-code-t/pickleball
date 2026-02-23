@@ -117,7 +117,7 @@ public enum AssertionOperations implements OperationsInterface {
         }
     },
 
-    HAS_VALUE {
+    VALUE {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing Assertion " + this.name());
@@ -136,7 +136,7 @@ public enum AssertionOperations implements OperationsInterface {
             });
         }
     },
-    IS_BLANK {
+    BLANK {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing Assertion " + this.name());
@@ -144,7 +144,6 @@ public enum AssertionOperations implements OperationsInterface {
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE)
             );
-
             ElementMatch firstElement = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
                 return ValueWrapperCompareReducer.evalValues(
@@ -169,10 +168,9 @@ public enum AssertionOperations implements OperationsInterface {
             ElementMatch firstElement = phraseData.resultElements.getFirst();
 
 
-
             if (firstElement.elementTypes.contains(ElementType.ALERT) || firstElement.elementTypes.contains(ElementType.BROWSER_WINDOW)) {
                 phraseData.result = Attempt.run(() ->
-                     (modeSet.contains(ValueWrapperCompareReducer.Mode.NOT) ^ !firstElement.getValues().isEmpty())
+                        (modeSet.contains(ValueWrapperCompareReducer.Mode.NOT) ^ !firstElement.getValues().isEmpty())
                 );
                 return;
             }
@@ -213,12 +211,11 @@ public enum AssertionOperations implements OperationsInterface {
             });
         }
     },
-
-    SELECTED {
+    EXPANDED {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing Assertion " + this.name());
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
@@ -226,7 +223,89 @@ public enum AssertionOperations implements OperationsInterface {
             ElementMatch firstElement = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
                 return ValueWrapperCompareReducer.evalElements(
-                        ElementWrapper::isSelected,
+                        ElementWrapper::isExpanded,
+                        firstElement.getElementWrappers(),
+                        getModeSet(phraseData)
+                );
+            });
+        }
+    },
+
+    COLLAPSED {
+        @Override
+        public void execute(PhraseData phraseData) {
+            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
+                    new ElementMatcher()
+                            .mustMatchAll(ElementType.HTML_ELEMENT)
+            );
+
+            ElementMatch firstElement = phraseData.resultElements.getFirst();
+            phraseData.result = Attempt.run(() -> {
+                return ValueWrapperCompareReducer.evalElements(
+                        ElementWrapper::isCollapsed,
+                        firstElement.getElementWrappers(),
+                        getModeSet(phraseData)
+                );
+            });
+        }
+    },
+
+    REQUIRED {
+        @Override
+        public void execute(PhraseData phraseData) {
+            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
+                    new ElementMatcher()
+                            .mustMatchAll(ElementType.HTML_ELEMENT)
+            );
+
+            ElementMatch firstElement = phraseData.resultElements.getFirst();
+            phraseData.result = Attempt.run(() -> {
+                return ValueWrapperCompareReducer.evalElements(
+                        ElementWrapper::isRequired,
+                        firstElement.getElementWrappers(),
+                        getModeSet(phraseData)
+                );
+            });
+        }
+    },
+
+
+    ON {
+        @Override
+        public void execute(PhraseData phraseData) {
+            System.out.println(phraseData + " : Executing Assertion " + this.name());
+
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatches(),
+                    new ElementMatcher()
+                            .mustMatchAll(ElementType.HTML_ELEMENT)
+            );
+
+            ElementMatch firstElement = phraseData.resultElements.getFirst();
+            phraseData.result = Attempt.run(() -> {
+                return ValueWrapperCompareReducer.evalElements(
+                        ElementWrapper::isOn,
+                        firstElement.getElementWrappers(),
+                        getModeSet(phraseData)
+                );
+            });
+        }
+    },
+
+    OFF {
+        @Override
+        public void execute(PhraseData phraseData) {
+            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatches(),
+                    new ElementMatcher()
+                            .mustMatchAll(ElementType.HTML_ELEMENT)
+            );
+
+            ElementMatch firstElement = phraseData.resultElements.getFirst();
+            phraseData.result = Attempt.run(() -> {
+                return ValueWrapperCompareReducer.evalElements(
+                        ElementWrapper::isOff,
                         firstElement.getElementWrappers(),
                         getModeSet(phraseData)
                 );
@@ -278,6 +357,7 @@ public enum AssertionOperations implements OperationsInterface {
     public static AssertionOperations
 
     fromString(String input) {
+        input = input.replaceFirst("un|non-?", "");
         return OperationsInterface.requireOperationEnum(AssertionOperations.class, input);
     }
 
@@ -290,7 +370,7 @@ public enum AssertionOperations implements OperationsInterface {
             modeSet.add(ValueWrapperCompareReducer.Mode.NONE);
         if (phraseData.hasNo)
             modeSet.add(ValueWrapperCompareReducer.Mode.NOT);
-        if (phraseData.getAssertion().startsWith("un") || phraseData.getAssertion().startsWith("disable"))
+        if (phraseData.getAssertion().startsWith("un") || phraseData.getAssertion().startsWith("disable") || phraseData.getAssertion().startsWith("non"))
             modeSet.add(ValueWrapperCompareReducer.Mode.UN);
         return modeSet;
     }

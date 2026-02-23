@@ -1,5 +1,11 @@
 Feature: Additiontest
 
+
+  Scenario: test dd match1
+  @[DEBUG]
+  * test2
+
+
 #  @[DEBUG,##MatchNode]
   Scenario: test match1
   @[DEBUG,##MatchNode]

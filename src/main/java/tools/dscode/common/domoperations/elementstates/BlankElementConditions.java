@@ -1,6 +1,10 @@
 package tools.dscode.common.domoperations.elementstates;
 
 import com.xpathy.XPathy;
+import org.openqa.selenium.By;
+import org.openqa.selenium.WebElement;
+
+import java.util.List;
 
 /**
  * XPath predicates for selecting elements that are "blank" vs "non-blank"
@@ -14,7 +18,7 @@ import com.xpathy.XPathy;
  *
  * Notes:
  *  - XPath cannot see JS properties like element.value unless it is reflected into @value.
- *  - We also treat "null" (case-insensitive) in @value as blank, because you asked for it.
+ *  - We also treat "null" (case-insensitive) in @value as blank.
  */
 public final class BlankElementConditions {
 
@@ -22,62 +26,45 @@ public final class BlankElementConditions {
         // utility class
     }
 
-    /**
-     * Matches elements whose self-or-descendants have:
-     *  - no non-whitespace text node, AND
-     *  - no non-blank @value (treating "", whitespace, and "null" as blank).
-     */
+    // Reusable sub-predicates (kept identical to preserve behavior)
+    private static final String HAS_ANY_NON_BLANK_TEXT =
+            "descendant-or-self::node()[self::text() and normalize-space(.) != '']";
+
+    private static final String HAS_ANY_NON_BLANK_VALUE_ATTR =
+            "descendant-or-self::*[@" +
+                    "value and " +
+                    "normalize-space(@value) != '' and " +
+                    "translate(normalize-space(@value), " +
+                    "  'ABCDEFGHIJKLMNOPQRSTUVWXYZ', " +
+                    "  'abcdefghijklmnopqrstuvwxyz'" +
+                    ") != 'null'" +
+                    "]";
+
+    // Derived predicates
+    private static final String BLANK_PRED =
+            "not(" + HAS_ANY_NON_BLANK_TEXT + ") and " +
+                    "not(" + HAS_ANY_NON_BLANK_VALUE_ATTR + ")";
+
+    private static final String NON_BLANK_PRED =
+            "(" + HAS_ANY_NON_BLANK_TEXT + ") or (" + HAS_ANY_NON_BLANK_VALUE_ATTR + ")";
+
     public static XPathy blankElement() {
         String base = new XPathy().getXpath(); // "//*"
-
-        // Any text node (self or descendants) that has non-whitespace content
-        // normalize-space(.) != ''  => contains something besides whitespace
-        String hasAnyNonBlankText =
-                "descendant-or-self::node()[self::text() and normalize-space(.) != '']";
-
-        // Any element (self or descendants) with a @value attribute that is non-blank
-        // and not the literal string "null" (any casing).
-        String hasAnyNonBlankValueAttr =
-                "descendant-or-self::*[@" +
-                        "value and " +
-                        "normalize-space(@value) != '' and " +
-                        "translate(normalize-space(@value), " +
-                        "  'ABCDEFGHIJKLMNOPQRSTUVWXYZ', " +
-                        "  'abcdefghijklmnopqrstuvwxyz'" +
-                        ") != 'null'" +
-                        "]";
-
-        String pred =
-                "not(" + hasAnyNonBlankText + ") and " +
-                        "not(" + hasAnyNonBlankValueAttr + ")";
-
-        return new XPathy(base + "[" + pred + "]");
+        return new XPathy(base + "[" + BLANK_PRED + "]");
     }
 
-    /**
-     * Matches elements whose self-or-descendants have either:
-     *  - a non-whitespace text node, OR
-     *  - a non-blank @value attribute (treating "", whitespace, and "null" as blank).
-     */
     public static XPathy nonBlankElement() {
         String base = new XPathy().getXpath(); // "//*"
-
-        String hasAnyNonBlankText =
-                "descendant-or-self::node()[self::text() and normalize-space(.) != '']";
-
-        String hasAnyNonBlankValueAttr =
-                "descendant-or-self::*[@" +
-                        "value and " +
-                        "normalize-space(@value) != '' and " +
-                        "translate(normalize-space(@value), " +
-                        "  'ABCDEFGHIJKLMNOPQRSTUVWXYZ', " +
-                        "  'abcdefghijklmnopqrstuvwxyz'" +
-                        ") != 'null'" +
-                        "]";
-
-        String pred =
-                "(" + hasAnyNonBlankText + ") or (" + hasAnyNonBlankValueAttr + ")";
-
-        return new XPathy(base + "[" + pred + "]");
+        return new XPathy(base + "[" + NON_BLANK_PRED + "]");
     }
+
+    public static boolean isBlank(WebElement element) {
+        if (element == null) {
+            return false;
+        }
+        List<WebElement> matches =
+                element.findElements(By.xpath("self::*[" + BLANK_PRED + "]"));
+        return !matches.isEmpty();
+    }
+
 }

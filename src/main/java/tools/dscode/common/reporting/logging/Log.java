@@ -37,9 +37,8 @@ public final class Log {
         for (WorkBook report : workBookMap.values()) {
             try {
                 report.write();
-            } catch (IOException e) {
-                e.printStackTrace();
-                throw new RuntimeException("Report '" + report.outputFile + "'failed", e);
+            } catch (Exception e) {
+                System.out.println("Report '" + report.outputFile + "' failed to write due to: " + e.getMessage());
             }
         }
     }
