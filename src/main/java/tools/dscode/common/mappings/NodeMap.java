@@ -61,6 +61,10 @@ public class NodeMap  extends ValueFormatting{
         MAPPER.registerModule(new GuavaModule());
     }
 
+    public NodeMap(String path) {
+        super((ObjectNode) FileAndDataParsing.buildJsonFromPath(path));
+    }
+
     public NodeMap(MapConfigurations.MapType mapType, MapConfigurations.DataSource... dataSources) {
         this(mapType);
         this.dataSources = Arrays.stream(dataSources).toList();

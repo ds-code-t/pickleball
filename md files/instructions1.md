@@ -17,7 +17,7 @@ Add Pickleball as a test dependency:
     <dependency>
         <groupId>tools.dscode</groupId>
         <artifactId>pickleball</artifactId>
-        <version>2.0.4</version>
+        <version>2.0.5</version>
         <scope>test</scope>
     </dependency>
 </dependencies>

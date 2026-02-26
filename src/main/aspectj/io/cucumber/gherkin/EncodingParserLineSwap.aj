@@ -10,7 +10,7 @@ public aspect EncodingParserLineSwap {
 
 
     private static final Pattern LINE_SWAP_PATTERN = Pattern.compile(
-            "^((?:(?:\\s*:)|(?:\\s*@\\[[^\\[\\]]*\\]))+)(\\s*[A-Z*].*$)?",
+            "^((?:(?:\\s*:)|(?:\\s*(?:@|\\*\\s+)\\[DEBUG[^\\[\\]]*\\]))+)(\\s*[A-Z*].*$)?",
             Pattern.MULTILINE
     );
 
@@ -37,18 +37,13 @@ public aspect EncodingParserLineSwap {
         while (matcher.find()) {
             String g1 = matcher.group(1);
             String g2 = matcher.group(2);
-
-
-
-
-
             // Hardcoded fallback for group 2
             String prefix = (g2 != null) ? g2 : replacementStep;
 
 
-            String replacement = prefix + PARSER_FLAG + g1.replace("\n"," ").strip();
-
-
+            String replacement = prefix + PARSER_FLAG +
+                    g1.replaceFirst("\\*\\s+\\[","@[")
+                            .replace("\n"," ").strip();
             matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
         }
         matcher.appendTail(sb);

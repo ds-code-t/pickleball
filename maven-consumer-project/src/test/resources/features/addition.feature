@@ -11,22 +11,7 @@ Feature: Addition
     * , verify "Subscribe" Checkbox is not blank
     * , verify "Subscribe" Dropdown is not blank
 
-  Scenario: gdfgdf
-  @[DEBUG,nobase,##]
-    * , verify "Required text input" Textbox is blank
-    * , verify "Optional text input" Textbox is blank
 
-    * , verify "Required text input" Textbox is required
-    * , verify "Required text input" Textbox is non-required
-    * , verify "Optional text input" Textbox is required
-    * , verify "Optional text input" Textbox is non-required
-
-
-
-    * , verify "Enabled dropdown" Dropdown is enabled
-    * , verify "Enabled dropdown" Dropdown is disabled
-    * , verify "Disabled dropdown" Dropdown is enabled
-    * , verify "Disabled dropdown" Dropdown is disabled
 
 #    * test2
 #    * , verify "Status" Dropdown equals "A"
@@ -35,6 +20,7 @@ Feature: Addition
 #    * test2
 
   Scenario: zzsStart Run component
+  @[DEBUG]
     Then print Arrrrrrrrr
     * RUN SCENARIOS:
       | Tags  |
