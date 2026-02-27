@@ -1,6 +1,7 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
 import org.openqa.selenium.Keys;
+import org.openqa.selenium.NoAlertPresentException;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.browseroperations.WindowSwitch;
@@ -373,9 +374,16 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             System.out.println(phraseData + " : Executing " + this.name());
-            phraseData.result = Attempt.runVoid(() ->
-                    accept(GeneralSteps.getDefaultDriver())
-            );
+            phraseData.result = Attempt.runVoid(() -> {
+                try {
+                    if(!phraseData.getFirstElement().category.startsWith("Alert"))
+                        throw new RuntimeException("Accept only works on Alerts");
+                    accept(GeneralSteps.getDefaultDriver());
+                } catch (NoAlertPresentException e) {
+                    if(!phraseData.getFirstElement().selectionType.equals("any"))
+                        throw e;
+                }
+            });
         }
     },
     DISMISS {

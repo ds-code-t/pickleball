@@ -123,7 +123,6 @@ public class ElementMatch {
 
 
     public ElementMatch(PhraseData phraseData, MatchNode elementNode) {
-
         this.fullText = elementNode.getStringFromLocalState("fullText");
 
         this.parentPhrase = phraseData;
@@ -140,7 +139,6 @@ public class ElementMatch {
 
         this.elementPosition = elementNode.getStringFromLocalState("elementPosition");
         this.selectionType = elementNode.getStringFromLocalState("selectionType");
-
         this.valueTypes = Arrays.stream(elementNode.getStringFromLocalState("valueTypes").split("\\s+")).sorted(Comparator.reverseOrder()).toList();
 
 

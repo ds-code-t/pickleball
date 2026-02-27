@@ -136,7 +136,9 @@ public class StepExtension extends StepData {
         }
         executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
         executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
-        stepEntry = getScenarioLogRoot().logInfo("STEP: " + executingPickleStepTestStep.getStepText()).start();
+        if(!definitionFlags.contains(DefinitionFlag.NO_LOGGING)) {
+            stepEntry = getScenarioLogRoot().logInfo("STEP: " + executingPickleStepTestStep.getStepText()).start();
+        }
         lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
         io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep, executionMode);
 
@@ -152,15 +154,18 @@ public class StepExtension extends StepData {
             safeWaitForPageReady(webDriverUsed, Duration.ofSeconds(5), 200);
         }
         lifecycle.fire(Phase.AFTER_SCENARIO_STEP);
-        if (webDriverUsed != null) {
-            if (isPresent(webDriverUsed)) {
-                stepEntry.info("Browser Alert is present, cannot take screenshot.");
-                stepEntry.stop();
+
+        if(!definitionFlags.contains(DefinitionFlag.NO_LOGGING)) {
+            if (webDriverUsed != null) {
+                if (isPresent(webDriverUsed)) {
+                    stepEntry.info("Browser Alert is present, cannot take screenshot.");
+                    stepEntry.stop();
+                } else {
+                    stepEntry.screenshot("After Step").stop();
+                }
             } else {
-                stepEntry.screenshot("After Step").stop();
+                stepEntry.stop();
             }
-        } else {
-            stepEntry.stop();
         }
 
 

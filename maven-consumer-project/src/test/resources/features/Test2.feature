@@ -4,9 +4,9 @@ Feature: aad 2
   Scenario: gdfgdf
     * [DEBUG,nobase]
 #    * ,  if "Text Input:" Textbox is blank?
-
-    * ,  in Dropdown, the "Bansana" Option is displayed? enter "123" in "Text Input:" Textbox
-    * ,  in Dropdown, if the "Bansana" Option is displayed. enter "123" in "Text Input:" Textbox
+    * , accept any Alerts
+#    * ,  in Dropdown, the "Bansana" Option is displayed? enter "123" in "Text Input:" Textbox
+#    * ,  in Dropdown, if the "Bansana" Option is displayed. enter "123" in "Text Input:" Textbox
 
 
 #    * ,  in Dropdown, if the "Bansana" Option is displayed?
