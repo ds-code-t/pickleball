@@ -10,21 +10,20 @@ import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly;
 
-import java.sql.SQLOutput;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static com.xpathy.Tag.any;
+
 import static tools.dscode.common.domoperations.TableColumnByHeaderXPath.matchCellsByHeader;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.xpathSpecificityScore;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.colocatedDeepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.descendantDeepNormalizedVisibleText;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.noDisplayPredicate;
 
 public class ExecutionDictionary {
 
@@ -81,7 +80,7 @@ public class ExecutionDictionary {
         }
     }
 
-    public enum CategoryFlags {PAGE_CONTEXT, PAGE_TOP_CONTEXT, ELEMENT_CONTEXT, SHADOW_HOST, IFRAME, NON_DISPLAY_ELEMENT}
+    public enum CategoryFlags {PAGE_CONTEXT, PAGE_TOP_CONTEXT, ELEMENT_CONTEXT, SHADOW_HOST, IFRAME, NON_DISPLAY_ELEMENT, NO_NESTING_FILTER, OUTER_NESTING_FILTER}
 
     //========================================================
     // Instance state

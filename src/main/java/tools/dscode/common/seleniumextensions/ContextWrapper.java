@@ -5,13 +5,14 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.domoperations.ExecutionDictionary;
+import tools.dscode.common.domoperations.NestedByLocator;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static tools.dscode.common.domoperations.DeepestByLocator.findDeepestWithRetry;
+import static tools.dscode.common.domoperations.NestedByLocator.findWithRetry;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.prettyPrintXPath;
@@ -117,7 +118,7 @@ public class ContextWrapper {
         }
 
         printDebug("##XPath: getElementListFromSearchContext\n" + prettyPrintXPath(xpath) +"\n----------------" );
-        return findDeepestWithRetry(searchContext, new By.ByXPath(xpath), !elementMatch.categoryFlags.contains(ExecutionDictionary.CategoryFlags.NON_DISPLAY_ELEMENT));
+        return findWithRetry(searchContext, new By.ByXPath(xpath), elementMatch);
 //        return searchContext.findElements(new By.ByXPath(xpath));
     }
 
