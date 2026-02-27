@@ -39,24 +39,17 @@ public class ElementWrapper {
 
 
     public static List<ElementWrapper> getWrappedElements(ElementMatch elementMatch) {
-
-
         List<ElementWrapper> elementWrappers = new ArrayList<>();
         List<WebElement> elements = elementMatch.contextWrapper.getElements();
-
         boolean singleElement = elementMatch.selectionType.isBlank();
-        boolean displayElement = !elementMatch.categoryFlags.contains(ExecutionDictionary.CategoryFlags.NON_DISPLAY_ELEMENT);
         printDebug("##elements-getWrappedElements-elements: " + elements.size());
         int index = 0;
         for (WebElement element : elements) {
             ElementWrapper ew = new ElementWrapper(element, elementMatch, ++index);
-            if (displayElement && !ew.isDisplayed())
-                continue;
             elementWrappers.add(ew);
             if (singleElement) break;
         }
         printDebug("##elements-getWrappedElements-elementWrappers: " + elementWrappers.size());
-
         return elementWrappers;
     }
 

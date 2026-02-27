@@ -17,11 +17,11 @@ public final class DeepestByLocator {
 
     private DeepestByLocator() {}
 
-    public static List<WebElement> findDeepestWithRetry(SearchContext context, By locator) {
-        return findDeepestWithRetry(context, locator, Duration.ofSeconds(10));
+    public static List<WebElement> findDeepestWithRetry(SearchContext context, By locator , boolean displayedElementsOnly) {
+        return findDeepestWithRetry(context, locator, Duration.ofSeconds(10), displayedElementsOnly);
     }
 
-    public static List<WebElement> findDeepestWithRetry(SearchContext context, By locator, Duration timeout) {
+    public static List<WebElement> findDeepestWithRetry(SearchContext context, By locator, Duration timeout, boolean displayedElementsOnly) {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(locator, "locator");
         Objects.requireNonNull(timeout, "timeout");
@@ -31,7 +31,7 @@ public final class DeepestByLocator {
 
         while (Instant.now().isBefore(deadline)) {
             try {
-                return findDeepest(context, locator);
+                return findDeepest(context, locator, displayedElementsOnly);
             } catch (StaleElementReferenceException e) {
                 last = e;
                 sleep(Duration.ofSeconds(3));
@@ -51,11 +51,16 @@ public final class DeepestByLocator {
      *     internal = el.findElements(withinElementLocator(locator))   // descendants (and maybe self)
      *     if internal contains any element equal to some "other" in matches (other != el), drop el
      */
-    public static List<WebElement> findDeepest(SearchContext context, By locator) {
+    public static List<WebElement> findDeepest(SearchContext context, By locator, boolean displayedElementsOnly) {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(locator, "locator");
 
         List<WebElement> matches = context.findElements(locator);
+
+        if (displayedElementsOnly) {
+            matches = matches.stream().filter(WebElement::isDisplayed).toList();
+        }
+
         printDebug("##elements-findDeepest-matches.size(): " + matches.size());
 
 

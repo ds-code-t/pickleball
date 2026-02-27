@@ -47,7 +47,7 @@ public class ContextWrapper {
         printDebug("####ContextWrapper-elementTerminalXPath ");
         prettyPrintXPath(elementTerminalXPath);
         printDebug("\n\n##ContextWrapper-end##");
-        return getElementListFromSearchContext(searchContext, elementTerminalXPath);
+        return getElementListFromSearchContext(searchContext, elementTerminalXPath, elementMatch);
 //        return searchContext.findElements(elementTerminalXPath.getLocator());
     }
 
@@ -84,7 +84,7 @@ public class ContextWrapper {
                 printDebug("##ContextWrapper-xPathyList:= " + xPathyList);
                 if (!xPathyList.isEmpty()) {
                     XPathy combinedXPathy = combineAnd(xPathyList);
-                    searchContext = getElementFromSearchContext(searchContext, combinedXPathy);
+                    searchContext = getElementFromSearchContext(searchContext, combinedXPathy, elementMatch);
 //                    searchContext = searchContext.findElement(combinedXPathy.getLocator());
                     xPathyList.clear();
                 }
@@ -108,7 +108,7 @@ public class ContextWrapper {
         return searchContext;
     }
 
-    public static List<WebElement> getElementListFromSearchContext(SearchContext searchContext, XPathy xPathy) {
+    public static List<WebElement> getElementListFromSearchContext(SearchContext searchContext, XPathy xPathy, ElementMatch elementMatch) {
         String xpath = xPathy.getXpath();
 
         if (searchContext instanceof WebElement) {
@@ -117,13 +117,12 @@ public class ContextWrapper {
         }
 
         printDebug("##XPath: getElementListFromSearchContext\n" + prettyPrintXPath(xpath) +"\n----------------" );
-
-        return findDeepestWithRetry(searchContext, new By.ByXPath(xpath));
+        return findDeepestWithRetry(searchContext, new By.ByXPath(xpath), !elementMatch.categoryFlags.contains(ExecutionDictionary.CategoryFlags.NON_DISPLAY_ELEMENT));
 //        return searchContext.findElements(new By.ByXPath(xpath));
     }
 
-    public static WebElement getElementFromSearchContext(SearchContext searchContext, XPathy xPathy) {
-        List<WebElement> list = getElementListFromSearchContext(searchContext, xPathy);
+    public static WebElement getElementFromSearchContext(SearchContext searchContext, XPathy xPathy, ElementMatch elementMatch) {
+        List<WebElement> list = getElementListFromSearchContext(searchContext, xPathy, elementMatch);
         if (list.isEmpty()) return null;
         return list.getFirst();
     }
