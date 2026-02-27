@@ -323,7 +323,6 @@ public class CalculatorSteps {
     public static void locationTest() {
         Pickle pickle = getCurrentScenarioState().pickle;
 
-
         if (pickle.getExamplesLocation() != null && pickle.getExamplesLocation().isPresent()) {
 
         }

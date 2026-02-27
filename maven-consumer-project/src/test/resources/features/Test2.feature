@@ -1,12 +1,17 @@
 Feature: aad 2
 
 
-
   Scenario: gdfgdf
     * [DEBUG,nobase]
 #    * ,  if "Text Input:" Textbox is blank?
-    * ,  in  Dropdown, "Banana" Option is displayed?
-    :  * ,  enter "123"  in "Text Input:" Textbox
+
+    * ,  in Dropdown, the "Bansana" Option is displayed? enter "123" in "Text Input:" Textbox
+    * ,  in Dropdown, if the "Bansana" Option is displayed. enter "123" in "Text Input:" Textbox
+
+
+#    * ,  in Dropdown, if the "Bansana" Option is displayed?
+#  : *  , enter "123" in "Text Input:" Textbox
+
 #    * , verify "Subscribe" Checkbox is on
 #    * , verify "Subscribe" Checkbox is true
 #    * , verify "Subscribe" Checkbox is selected

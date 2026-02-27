@@ -213,6 +213,24 @@ public class StepExtension extends StepData {
         return "SE: " + pickleStepTestStep.getStep().getText();
     }
 
+    public List<StepExtension> insertChildStepsByString(List<String> newStepStrings) {
+        List<StepExtension> newSteps = new ArrayList<>();
+        for(String newStepString : newStepStrings) {
+            newSteps.add(modifyStepExtension(newStepString));
+        }
+        insertChildSteps(newSteps);
+        return newSteps;
+    }
+
+    public void insertChildSteps(List<StepExtension> newSteps) {
+        if(newSteps == null || newSteps.isEmpty()) return;
+        StepExtension lastStep = newSteps.getLast();
+        lastStep.childSteps.addAll(childSteps);
+        lastStep.grandChildrenSteps.addAll(grandChildrenSteps);
+        childSteps.clear();
+        grandChildrenSteps.clear();
+        childSteps.addAll(newSteps);
+    }
 
     public List<StepExtension> insertStepsByString(List<String> newStepStrings) {
         List<StepExtension> newSteps = new ArrayList<>();
@@ -222,6 +240,7 @@ public class StepExtension extends StepData {
         insertSteps(newSteps);
         return newSteps;
     }
+
 
     public void insertSteps(List<StepExtension> newSteps) {
         if(newSteps == null || newSteps.isEmpty()) return;

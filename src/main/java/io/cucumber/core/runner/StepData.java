@@ -88,6 +88,7 @@ public abstract class StepData extends StepMapping {
             child.childSteps.addAll(grandChildrenSteps);
 
             child.parentStep = this;
+            child.nestingLevel = nestingLevel + 1;
 
             child.stepFlags.addAll(stepFlags);
 

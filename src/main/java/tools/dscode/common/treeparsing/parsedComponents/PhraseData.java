@@ -338,8 +338,7 @@ public abstract class PhraseData extends PassedData {
 //        }
 
 
-
-        switch (getAssertionType()) {
+        switch (getAssertionType().replace("Termination", "")) {
             case "ensure" -> {
                 if (!previouslyResolvedBoolean) {
                     throw new RuntimeException("FAILED  " + assertionMessage);
