@@ -7,6 +7,10 @@ import io.cucumber.plugin.event.PickleStepTestStep;
 import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.reporting.Report;
 import tools.dscode.common.reporting.WorkBook;
+import tools.dscode.common.reporting.logging.BaseConverter;
+
+import java.nio.file.Path;
+import java.util.Optional;
 
 
 import java.util.List;
@@ -23,6 +27,36 @@ import static tools.dscode.registry.GlobalRegistry.runners;
 public class GlobalState {
 
     public static WorkBook defaultReport;
+
+    // RowKey (scenario id) -> HTML report file
+    private static final ConcurrentHashMap<String, Path> scenarioHtmlByRowKey = new ConcurrentHashMap<>();
+
+    static {
+        BaseConverter.setRowDataProvider(rowKey ->
+                getReport()
+                        .snapshotRow(rowKey)
+                        .map(rs -> new BaseConverter.RowData(
+                                rs.sheetName(),
+                                rs.headers(),
+                                rs.valuesByHeader()
+                        ))
+        );
+    }
+
+    /** Called internally by HTML converters to register their output and auto-link it into the XLSX. */
+    public static void registerScenarioHtml(String rowKey, Path htmlFile) {
+        if (rowKey == null || rowKey.isBlank() || htmlFile == null) return;
+
+        scenarioHtmlByRowKey.put(rowKey, htmlFile);
+
+        // Auto-add a hyperlink column into the default workbook.
+        WorkBook wb = getReport();
+        wb.put(rowKey, "Scenario HTML", new WorkBook.Link(htmlFile, "Open"));
+    }
+
+    public static Optional<Path> getScenarioHtml(String rowKey) {
+        return Optional.ofNullable(scenarioHtmlByRowKey.get(rowKey));
+    }
 
     public static final LifecycleManager lifecycle = new LifecycleManager();
 

@@ -5,6 +5,7 @@ import tools.dscode.common.reporting.logging.Attachment;
 import tools.dscode.common.reporting.logging.BaseConverter;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Level;
+import io.cucumber.core.runner.GlobalState;
 import tools.dscode.common.reporting.logging.Status;
 
 import java.io.IOException;
@@ -56,6 +57,8 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         synchronized (lock) {
             try {
                 writeReport();
+                scopes.values().forEach(s -> {
+                    if (s.rowKey != null) GlobalState.registerScenarioHtml(s.rowKey, reportFile);                });
             } catch (IOException e) {
                 // last-resort fallback
                 System.err.println("[SimpleHtmlReportConverter] FAILED writing report: " + e);
@@ -117,8 +120,10 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
     private ScopeState initScope(Entry scope) {
         ScopeState s = new ScopeState();
-        HtmlNode root = new HtmlNode(scope.id, sanitizeNodeName(scope.text), null);
         s.rootId = scope.id;
+        s.rowKey = GlobalState.getCurrentScenarioState().id.toString(); // <-- CAPTURE REAL XLSX ROW KEY
+
+        HtmlNode root = new HtmlNode(scope.id, sanitizeNodeName(scope.text), null);
         s.nodes.put(scope.id, root);
         return s;
     }
@@ -314,6 +319,8 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             out.append("    <div class=\"scopeMeta\">Nodes: ").append(s.nodes.size()).append("</div>\n");
             out.append("  </div>\n");
 
+            renderScenarioSummary(out, s.rowKey);
+
             out.append("  <div class=\"tree\">\n");
             renderNode(out, root, 0);
             out.append("  </div>\n");
@@ -508,6 +515,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
     private static final class ScopeState {
         String rootId;
+        String rowKey; // <-- NEW
         final Map<String, HtmlNode> nodes = new HashMap<>();
         final Map<String, Meta> meta = new HashMap<>();
     }
@@ -698,6 +706,29 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             }
         }
         return out.toString();
+    }
+
+    private void renderScenarioSummary(StringBuilder out, String rowKey) {
+        rowData(rowKey).ifPresent(rd -> {
+            out.append("  <div class=\"scenarioSummary\">\n");
+            out.append("    <div class=\"scenarioSummaryTitle\">Scenario Summary</div>\n");
+            out.append("    <table class=\"summaryTable\">\n");
+            out.append("      <thead><tr>\n");
+            for (String h : rd.headers()) {
+                out.append("        <th>").append(escapeHtml(h)).append("</th>\n");
+            }
+            out.append("      </tr></thead>\n");
+            out.append("      <tbody><tr>\n");
+            for (String h : rd.headers()) {
+                Object v = rd.valuesByHeader().get(h);
+                out.append("        <td>")
+                        .append(escapeHtml(v == null ? "" : String.valueOf(v)))
+                        .append("</td>\n");
+            }
+            out.append("      </tr></tbody>\n");
+            out.append("    </table>\n");
+            out.append("  </div>\n");
+        });
     }
 
     // Clean, email-friendly CSS (no external fonts)
@@ -899,5 +930,36 @@ a { color: inherit; }
   color: var(--muted);
   font-size: 12px;
 }
+
+
+.scenarioSummary {
+  margin: 12px 0 16px 0;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fafafa;
+}
+.scenarioSummaryTitle {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.summaryTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.summaryTable th, .summaryTable td {
+  border: 1px solid #e0e0e0;
+  padding: 6px 8px;
+  vertical-align: top;
+}
+.summaryTable th {
+  background: #f2f2f2;
+  text-align: left;
+}
+
 """;
 }
+
+
+

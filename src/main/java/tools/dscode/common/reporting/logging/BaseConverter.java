@@ -7,9 +7,37 @@ import org.openqa.selenium.WebDriver;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
 public abstract class BaseConverter {
 
     private final AtomicBoolean closed = new AtomicBoolean(false);
+
+
+    /** Optional hook for converters that want to display XLSX row data in their output. */
+    @FunctionalInterface
+    public interface RowDataProvider {
+        Optional<RowData> get(String rowKey);
+    }
+
+    /** Immutable snapshot of one scenario's row (same headers/values that will be written to XLSX). */
+    public record RowData(String sheetName, List<String> headers, Map<String, Object> valuesByHeader) { }
+
+    private static volatile RowDataProvider rowDataProvider = null;
+
+    /** Framework-level registration; normal callers never need this. */
+    public static void setRowDataProvider(RowDataProvider provider) {
+        rowDataProvider = provider;
+    }
+
+    protected final Optional<RowData> rowData(String rowKey) {
+        RowDataProvider p = rowDataProvider;
+        if (p == null || rowKey == null || rowKey.isBlank()) return Optional.empty();
+        return p.get(rowKey);
+    }
+
 
     public void onStart(Entry scope, Entry entry) { }
     public void onTimestamp(Entry scope, Entry entry) { }

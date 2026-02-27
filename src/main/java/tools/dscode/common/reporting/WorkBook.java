@@ -1,5 +1,6 @@
 package tools.dscode.common.reporting;
 
+import org.apache.poi.common.usermodel.HyperlinkType;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
@@ -18,6 +19,25 @@ public final class WorkBook extends WorkSheet {
     public enum ColumnType { STRING, BOOLEAN, INTEGER, DECIMAL, DATE, DATETIME }
     public enum SortKind { ALPHABETIC, NUMERIC }
     public enum SortDirection { ASC, DESC }
+
+
+    /** Stored as a cell value to render an XLSX hyperlink. */
+    public static final class Link {
+        public final String address;
+        public final String label;
+
+        public Link(String address, String label) {
+            this.address = (address == null) ? "" : address;
+            this.label = (label == null || label.isBlank()) ? this.address : label;
+        }
+
+        public Link(Path file, String label) {
+            this((file == null) ? "" : file.toAbsolutePath().toUri().toString(), label);
+        }
+    }
+
+    public record RowSnapshot(String sheetName, List<String> headers, Map<String, Object> valuesByHeader) { }
+
 
     public final Path outputFile;
     private final String defaultSheetName;
@@ -524,6 +544,39 @@ public final class WorkBook extends WorkSheet {
         return out;
     }
 
+
+    /** Snapshot a single row's effective headers + values (same as will be written to XLSX). */
+    public synchronized Optional<RowSnapshot> snapshotRow(String rowKey) {
+        if (rowKey == null || rowKey.isBlank()) return Optional.empty();
+        if (sheets.isEmpty()) return Optional.empty();
+
+        for (SheetData s : sheets.values()) {
+            RowData rd = s.rowsByKey.get(rowKey);
+            if (rd == null) continue;
+
+            List<String> headers = getFinalHeaderOrder(s);
+
+            List<String> effectiveHeaders = headers;
+            if (s.includeRowKeyColumn) {
+                LinkedHashSet<String> tmp = new LinkedHashSet<>();
+                tmp.add(s.rowKeyHeaderName);
+                tmp.addAll(headers);
+                effectiveHeaders = List.copyOf(tmp);
+            }
+
+            LinkedHashMap<String, Object> out = new LinkedHashMap<>();
+            for (String h : effectiveHeaders) {
+                if (s.includeRowKeyColumn && h.equals(s.rowKeyHeaderName)) {
+                    out.put(h, rowKey);
+                } else {
+                    out.put(h, rd.values.get(h));
+                }
+            }
+            return Optional.of(new RowSnapshot(s.name, effectiveHeaders, Collections.unmodifiableMap(out)));
+        }
+        return Optional.empty();
+    }
+
     private void writeOneSheet(Workbook wb, SheetSnapshot snap) {
         DataFormat dataFormat = wb.createDataFormat();
         Sheet sheet = wb.createSheet(snap.sheetName);
@@ -545,6 +598,13 @@ public final class WorkBook extends WorkSheet {
 
         CellStyle dateTimeStyle = wb.createCellStyle();
         dateTimeStyle.setDataFormat(dataFormat.getFormat(snap.dateTimeFormat));
+
+
+        CellStyle hyperlinkStyle = wb.createCellStyle();
+        Font hyperlinkFont = wb.createFont();
+        hyperlinkFont.setUnderline(Font.U_SINGLE);
+        hyperlinkFont.setColor(IndexedColors.BLUE.getIndex());
+        hyperlinkStyle.setFont(hyperlinkFont);
 
         // Header row
         Row headerRow = sheet.createRow(0);
@@ -571,7 +631,7 @@ public final class WorkBook extends WorkSheet {
 
                 Object raw = rowData.values.get(header);
                 ColumnType type = snap.types.getOrDefault(header, ColumnType.STRING);
-                writeCellValue(cell, raw, type, dateStyle, dateTimeStyle);
+                writeCellValue(cell, raw, type, dateStyle, dateTimeStyle, hyperlinkStyle);
             }
         }
 
@@ -729,12 +789,24 @@ public final class WorkBook extends WorkSheet {
             Object raw,
             ColumnType type,
             CellStyle dateStyle,
-            CellStyle dateTimeStyle
+            CellStyle dateTimeStyle,
+            CellStyle hyperlinkStyle
     ) {
         if (raw == null) {
             cell.setBlank();
             return;
         }
+
+        if (raw instanceof Link link) {
+            cell.setCellType(CellType.STRING);
+            cell.setCellValue(link.label);
+            Hyperlink hl = cell.getSheet().getWorkbook().getCreationHelper().createHyperlink(HyperlinkType.URL);
+            hl.setAddress(link.address);
+            cell.setHyperlink(hl);
+            cell.setCellStyle(hyperlinkStyle);
+            return;
+        }
+
 
         if (type == ColumnType.STRING) {
             cell.setCellType(CellType.STRING);

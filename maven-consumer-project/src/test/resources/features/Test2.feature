@@ -1,13 +1,17 @@
 Feature: aad 2
 
 
-  Scenario: gdfgdf
+  Scenario Outline: gdfgdf <A>
     * [DEBUG,nobase]
 #    * ,  if "Text Input:" Textbox is blank?
     * , accept any Alerts
-#    * ,  in Dropdown, the "Bansana" Option is displayed? enter "123" in "Text Input:" Textbox
+    * ,  in Dropdown, the "Banana" Option is displayed? enter "123" in "Text Input:" Textbox
 #    * ,  in Dropdown, if the "Bansana" Option is displayed. enter "123" in "Text Input:" Textbox
 
+    Examples:
+      | A |
+      | c |
+      | d |
 
 #    * ,  in Dropdown, if the "Bansana" Option is displayed?
 #  : *  , enter "123" in "Text Input:" Textbox
