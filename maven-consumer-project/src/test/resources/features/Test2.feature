@@ -4,6 +4,8 @@ Feature: aad 2
   Scenario Outline: gdfgdf <A>
     * [DEBUG,nobase]
 #    * ,  if "Text Input:" Textbox is blank?
+    * , if "<A>" equals "c" :
+      : * , accept Alerts
     * , accept any Alerts
     * ,  in Dropdown, the "Banana" Option is displayed? enter "123" in "Text Input:" Textbox
 #    * ,  in Dropdown, if the "Bansana" Option is displayed. enter "123" in "Text Input:" Textbox

@@ -43,6 +43,16 @@ public abstract class BaseConverter {
     public void onTimestamp(Entry scope, Entry entry) { }
     public void onStop(Entry scope, Entry entry) { }
 
+    // BaseConverter.java
+
+    /** Optional hook: called when a scenario is complete and row data is available. Default no-op. */
+    protected void onScenarioSummary(Entry scope, String rowKey, RowData data) { }
+
+    /** Convenience: fetch row data and call onScenarioSummary(...) if present. */
+    protected final void renderScenarioSummary(Entry scope, String rowKey) {
+        rowData(rowKey).ifPresent(d -> onScenarioSummary(scope, rowKey, d));
+    }
+
     /** Override for flush / write / cleanup logic */
     protected void onClose() { }
 

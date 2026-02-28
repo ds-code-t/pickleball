@@ -137,7 +137,7 @@ public class StepExtension extends StepData {
         executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
         executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
         if(!definitionFlags.contains(DefinitionFlag.NO_LOGGING)) {
-            stepEntry = getScenarioLogRoot().logInfo("STEP: " + executingPickleStepTestStep.getStepText()).start();
+            stepEntry = getScenarioLogRoot().logWithType("STEP" , executingPickleStepTestStep.getStepText()).start();
         }
         lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
         io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep, executionMode);

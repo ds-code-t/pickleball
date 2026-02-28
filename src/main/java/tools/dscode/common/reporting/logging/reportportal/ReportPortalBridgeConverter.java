@@ -1,4 +1,3 @@
-// file: tools/dscode/common/reporting/logging/ReportPortalBridgeConverter.java
 package tools.dscode.common.reporting.logging.reportportal;
 
 import org.openqa.selenium.OutputType;
@@ -11,6 +10,7 @@ import java.util.Base64;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import io.cucumber.core.runner.GlobalState;
 import tools.dscode.common.reporting.logging.Attachment;
 import tools.dscode.common.reporting.logging.BaseConverter;
 import tools.dscode.common.reporting.logging.Entry;
@@ -25,7 +25,6 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     public void onStart(Entry scope, Entry entry) {
         ReportPortalBridge.startLaunchIfNeeded(null, null);
 
-        // root span = TEST, nested = STEP
         String type = (entry.parent == null) ? "TEST" : "STEP";
         ReportPortalBridge.startItem(entry.text, type, null);
     }
@@ -51,19 +50,36 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                     ? Path.of(a.path()).getFileName().toString()
                     : a.name();
 
-            ReportPortalBridge.logAttachment(
-                    level(entry.level),
-                    entry.text,
-                    bytes,
-                    filename
-            );
+            ReportPortalBridge.logAttachment(level(entry.level), entry.text, bytes, filename);
         }
     }
 
-
     @Override
     public void onStop(Entry scope, Entry entry) {
+        // Only inject scenario summary once: at the end of the scenario root item.
+        if (entry.parent == null) {
+            String rowKey = GlobalState.getCurrentScenarioState().id.toString();
+            renderScenarioSummary(scope, rowKey);
+        }
+
         ReportPortalBridge.finishCurrentItem(status(entry.status));
+    }
+
+    @Override
+    protected void onScenarioSummary(Entry scope, String rowKey, RowData data) {
+        // ReportPortal is happiest with readable text/markdown-ish logs.
+        // Keep it compact: one line per column.
+        StringBuilder sb = new StringBuilder(1024);
+        sb.append("Scenario Summary\n");
+
+        for (String h : data.headers()) {
+            Object v = data.valuesByHeader().get(h);
+            sb.append("- ").append(h).append(": ")
+                    .append(v == null ? "" : String.valueOf(v))
+                    .append('\n');
+        }
+
+        ReportPortalBridge.log("INFO", sb.toString());
     }
 
     @Override

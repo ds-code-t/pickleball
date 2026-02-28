@@ -1,11 +1,11 @@
 // file: tools/dscode/common/reporting/logging/simplehtml/SimpleHtmlReportConverter.java
 package tools.dscode.common.reporting.logging.simplehtml;
 
+import io.cucumber.core.runner.GlobalState;
 import tools.dscode.common.reporting.logging.Attachment;
 import tools.dscode.common.reporting.logging.BaseConverter;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Level;
-import io.cucumber.core.runner.GlobalState;
 import tools.dscode.common.reporting.logging.Status;
 
 import java.io.IOException;
@@ -19,12 +19,21 @@ import java.time.format.DateTimeFormatter;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A minimal, single-file HTML report generator:
  * - embeds CSS (no CDN)
  * - embeds screenshots (base64 -> data: URIs)
  * - escapes all user-provided text to avoid HTML breakage / injection
+ *
+ * Supports optional "single file mode" across parallel scenarios:
+ * - Default OFF (current behavior): one HTML per scenario
+ * - When ON: creates one HTML containing vertically-aligned left tabs (one per scenario)
+ *
+ * Toggle (no GlobalState changes required):
+ * - Enable:  -Dpickleball.simplehtml.singleFile=true
+ * - Optional output file: -Dpickleball.simplehtml.singleFile.path=/abs/or/rel/path/cucumber-report.html
  *
  * Mirrors the design pattern of ExtentReportConverter:
  * - scope state map
@@ -38,6 +47,18 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
     private final Map<String, ScopeState> scopes = new ConcurrentHashMap<>();
     private final Path reportFile;
+    private final boolean singleFileMode;
+
+    // ---------------- Single-file (multi-scenario) aggregation ----------------
+    private static final class SharedSingleFile {
+        static final Object LOCK = new Object();
+        static final AtomicInteger ACTIVE = new AtomicInteger(0);
+
+        // Key: scenario rowKey (preferred), else rootId
+        static final Map<String, ScopeState> ALL_SCOPES = new ConcurrentHashMap<>();
+
+        static volatile Path REPORT_FILE = null;
+    }
 
     // Guards to prevent giant/bloated emails
     private static final int MAX_TEXT_LEN = 20_000;
@@ -50,34 +71,142 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
     public SimpleHtmlReportConverter(Path reportFile) {
         this.reportFile = reportFile;
+
+        // Default OFF (keeps current behavior)
+        this.singleFileMode = isSingleFileEnabled();
+
+        if (singleFileMode) {
+            // Decide the shared output file once.
+            if (SharedSingleFile.REPORT_FILE == null) {
+                SharedSingleFile.REPORT_FILE = resolveSingleFileOutput(reportFile);
+            }
+            SharedSingleFile.ACTIVE.incrementAndGet();
+        }
+    }
+
+    private static boolean isSingleFileEnabled() {
+        // DEFAULT = TRUE (single file with tabs)
+
+        String v = System.getProperty("pickleball.simplehtml.singleFile");
+        if (v == null || v.isBlank()) v = System.getenv("PICKLEBALL_SIMPLEHTML_SINGLEFILE");
+
+        // If not specified, default to TRUE
+        if (v == null) return true;
+
+        v = v.trim().toLowerCase(Locale.ROOT);
+
+        // Allow turning it OFF explicitly
+        if (v.equals("false") || v.equals("0") || v.equals("no") || v.equals("n")) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static Path resolveSingleFileOutput(Path perScenarioReportFile) {
+        String p = System.getProperty("pickleball.simplehtml.singleFile.path");
+        if (p == null || p.isBlank()) p = System.getenv("PICKLEBALL_SIMPLEHTML_SINGLEFILE_PATH");
+        if (p != null && !p.isBlank()) {
+            try {
+                return Path.of(p.trim());
+            } catch (Throwable ignored) { }
+        }
+
+        // Fallback: stable file next to the first scenario report
+        Path dir = (perScenarioReportFile != null && perScenarioReportFile.getParent() != null)
+                ? perScenarioReportFile.getParent()
+                : Path.of(".");
+        return dir.resolve("cucumber-report.html");
     }
 
     @Override
     protected void onClose() {
         synchronized (lock) {
             try {
-                writeReport();
-                scopes.values().forEach(s -> {
-                    if (s.rowKey != null) GlobalState.registerScenarioHtml(s.rowKey, reportFile);                });
-            } catch (IOException e) {
+                if (!singleFileMode) {
+                    writeReport(reportFile);
+                    // Register per-scenario HTML for XLSX hyperlinking (existing behavior).
+                    for (ScopeState s : scopes.values()) {
+                        if (s.rowKey != null) GlobalState.registerScenarioHtml(s.rowKey, reportFile);
+                    }
+                    return;
+                }
+
+                // Single-file mode: merge this scenario's scope(s) into the shared report.
+                synchronized (SharedSingleFile.LOCK) {
+                    for (ScopeState s : scopes.values()) {
+                        String key = (s.rowKey != null && !s.rowKey.isBlank()) ? s.rowKey : s.rootId;
+                        if (key == null) continue;
+                        SharedSingleFile.ALL_SCOPES.put(key, deepCopyScopeState(s));
+                    }
+                }
+
+            } catch (Throwable e) {
                 // last-resort fallback
-                System.err.println("[SimpleHtmlReportConverter] FAILED writing report: " + e);
+                System.err.println("[SimpleHtmlReportConverter] FAILED onClose: " + e);
+            } finally {
+                if (singleFileMode) {
+                    int remaining = SharedSingleFile.ACTIVE.decrementAndGet();
+                    if (remaining == 0) {
+                        // last scenario closes -> write the combined report once.
+                        try {
+                            Path outFile = SharedSingleFile.REPORT_FILE;
+                            if (outFile == null) outFile = Path.of("cucumber-report.html");
+                            writeCombinedReport(outFile);
+                        } catch (Throwable ex) {
+                            System.err.println("[SimpleHtmlReportConverter] FAILED writing combined report: " + ex);
+                        }
+                    }
+                }
             }
         }
     }
 
+    private static ScopeState deepCopyScopeState(ScopeState src) {
+        ScopeState c = new ScopeState();
+        c.rootId = src.rootId;
+        c.rowKey = src.rowKey;
+        for (Map.Entry<String, HtmlNode> e : src.nodes.entrySet()) {
+            c.nodes.put(e.getKey(), e.getValue().deepCopy());
+        }
+        // meta is not needed for final rendering
+        return c;
+    }
 
-    private Status computeOverallStatus() {
-        for (ScopeState s : scopes.values()) {
-            for (HtmlNode n : s.nodes.values()) {
-                if (n.status == Status.FAIL) {
-                    return Status.FAIL;
-                }
-            }
+    private void writeCombinedReport(Path outFile) throws IOException {
+        Map<String, ScopeState> snapshot;
+        synchronized (SharedSingleFile.LOCK) {
+            snapshot = new LinkedHashMap<>(SharedSingleFile.ALL_SCOPES);
+        }
+
+        if (outFile.getParent() != null) Files.createDirectories(outFile.getParent());
+
+        String html = renderHtmlDocument(snapshot, outFile);
+        Files.writeString(outFile, html, StandardCharsets.UTF_8);
+
+        // Link each scenario's XLSX row to the same combined HTML.
+        for (ScopeState s : snapshot.values()) {
+            if (s.rowKey != null) GlobalState.registerScenarioHtml(s.rowKey, outFile);
+        }
+
+        System.out.println("[SimpleHtmlReportConverter] wrote combined: " + outFile.toAbsolutePath());
+    }
+
+    private Status computeOverallStatus(Map<String, ScopeState> scopesToRender) {
+        if (scopesToRender == null) return Status.PASS;
+        for (ScopeState s : scopesToRender.values()) {
+            if (computeOverallStatusForScope(s) == Status.FAIL) return Status.FAIL;
         }
         return Status.PASS;
     }
 
+    private Status computeOverallStatusForScope(ScopeState s) {
+        if (s == null) return Status.PASS;
+        for (HtmlNode n : s.nodes.values()) {
+            if (n.status == Status.FAIL) return Status.FAIL;
+        }
+        return Status.PASS;
+    }
 
     @Override
     public void onStart(Entry scope, Entry entry) {
@@ -102,7 +231,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             applyMetaOncePerChange(s, entry, node);
 
             if (phase == Phase.TIMESTAMP) {
-                // Similar to Extent: log a marker with status (or INFO).
                 Status st = (entry.status != null) ? entry.status : Status.INFO;
                 node.addLogLine(LogLine.of(now(), mapStatusCss(st), labelForStatus(st)));
             }
@@ -121,7 +249,13 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     private ScopeState initScope(Entry scope) {
         ScopeState s = new ScopeState();
         s.rootId = scope.id;
-        s.rowKey = GlobalState.getCurrentScenarioState().id.toString(); // <-- CAPTURE REAL XLSX ROW KEY
+
+        // Capture real scenario row key (used by XLSX hyperlinking)
+        try {
+            s.rowKey = GlobalState.getCurrentScenarioState().id.toString();
+        } catch (Throwable ignored) {
+            s.rowKey = null;
+        }
 
         HtmlNode root = new HtmlNode(scope.id, sanitizeNodeName(scope.text), null);
         s.nodes.put(scope.id, root);
@@ -189,7 +323,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                 InlineImage img = inlineImage(name, mime, data);
                 node.attachments.add(img);
             } else {
-                // For non-images, keep it as text
                 node.attachments.add(InlineImage.textOnly(name, sanitizeLogText(String.valueOf(data))));
             }
         }
@@ -198,13 +331,12 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
     private InlineImage inlineImage(String name, String mime, String data) {
         try {
-            // Case 1: already base64 in the "mime" (your BaseConverter uses "image/png;base64")
+            // Case 1: already base64 in the mime (e.g., "image/png;base64")
             if (mime.contains("base64")) {
                 String raw = rawBase64(data);
                 if (raw == null || raw.isBlank()) {
                     return InlineImage.textOnly(name, sanitizeLogText("<empty base64>"));
                 }
-                // Store a data URI
                 String mediaType = mime.substring(0, mime.indexOf(';') >= 0 ? mime.indexOf(';') : mime.length());
                 String src = "data:" + mediaType + ";base64," + raw;
                 return InlineImage.image(name, src);
@@ -223,8 +355,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
             Path p = Path.of(trimmed);
             if (!Files.exists(p)) {
-                // Sometimes callers pass relative to report directory; try that too
-                Path maybeRel = reportFile.getParent() == null ? p : reportFile.getParent().resolve(trimmed);
+                Path maybeRel = (reportFile == null || reportFile.getParent() == null) ? p : reportFile.getParent().resolve(trimmed);
                 if (Files.exists(maybeRel)) p = maybeRel;
             }
 
@@ -250,52 +381,130 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         }
     }
 
-    private void writeReport() throws IOException {
-        if (reportFile.getParent() != null) {
-            Files.createDirectories(reportFile.getParent());
+    private void writeReport(Path outFile) throws IOException {
+        if (outFile == null) return;
+        if (outFile.getParent() != null) {
+            Files.createDirectories(outFile.getParent());
         }
 
-        String html = renderHtmlDocument();
-        Files.writeString(reportFile, html, StandardCharsets.UTF_8);
+        String html = renderHtmlDocument(scopes, outFile);
+        Files.writeString(outFile, html, StandardCharsets.UTF_8);
 
-        System.out.println("[SimpleHtmlReportConverter] wrote: " + reportFile.toAbsolutePath());
+        System.out.println("[SimpleHtmlReportConverter] wrote: " + outFile.toAbsolutePath());
     }
 
-    private String renderHtmlDocument() {
+    private String renderHtmlDocument(Map<String, ScopeState> scopesToRender, Path outFile) {
         StringBuilder out = new StringBuilder(256_000);
-
         out.append("<!doctype html>\n");
         out.append("<html lang=\"en\">\n<head>\n");
         out.append("  <meta charset=\"utf-8\">\n");
         out.append("  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
-        out.append("  <title>").append(escapeHtml(reportFile.getFileName().toString())).append("</title>\n");
+        out.append("  <title>").append(escapeHtml(outFile.getFileName().toString())).append("</title>\n");
         out.append("  <style>\n").append(CSS).append("\n  </style>\n");
         out.append("</head>\n<body>\n");
 
-        Status overall = computeOverallStatus();
-        String overallCss = (overall == Status.FAIL) ? "fail" : "pass";
-        String overallLabel = (overall == Status.FAIL) ? "FAIL" : "PASS";
+        // Order scopes deterministically
+        List<ScopeState> scopeStates = new ArrayList<>(scopesToRender.values());
+        scopeStates.sort(Comparator.comparing(s -> {
+            String k = (s.rowKey == null) ? "" : s.rowKey;
+            return k.isBlank() ? (s.rootId == null ? "" : s.rootId) : k;
+        }));
 
-        out.append("<header class=\"top\">\n");
-        out.append("  <div class=\"headerRow\">\n");
-        out.append("    <div>\n");
-        out.append("      <div class=\"title\">Test Report</div>\n");
-        out.append("      <div class=\"subtitle\">Generated ")
-                .append(escapeHtml(TS_FMT.format(Instant.now())))
-                .append("</div>\n");
-        out.append("    </div>\n");
-        out.append("    <div class=\"overallBadge ").append(overallCss).append("\">")
-                .append(overallLabel)
-                .append("</div>\n");
-        out.append("  </div>\n");
-        out.append("</header>\n");
+        boolean useTabs = scopeStates.size() > 1;
 
+        // Compute run-level summary for bar graph
+        int total = scopeStates.size();
+        int passed = 0;
+        int failed = 0;
 
-        // Render each scope as its own section
-        List<ScopeState> scopeStates = new ArrayList<>(scopes.values());
-        scopeStates.sort(Comparator.comparing(s -> s.rootId == null ? "" : s.rootId));
-
+        // Also compute per-scope statuses for tab coloring
+        List<Status> perScopeStatus = new ArrayList<>(scopeStates.size());
         for (ScopeState s : scopeStates) {
+            Status st = computeOverallStatusForScope(s);
+            perScopeStatus.add(st);
+            if (st == Status.FAIL) failed++; else passed++;
+        }
+        int passPct = (total == 0) ? 0 : (int) Math.round((passed * 100.0) / total);
+        if (passPct < 0) passPct = 0;
+        if (passPct > 100) passPct = 100;
+
+        if (!useTabs) {
+            // Classic header for single scenario file (keeps your existing layout style)
+            Status overall = computeOverallStatus(scopesToRender);
+            String overallCss = (overall == Status.FAIL) ? "fail" : "pass";
+            String overallLabel = (overall == Status.FAIL) ? "FAIL" : "PASS";
+
+            out.append("<header class=\"top\">\n");
+            out.append("  <div class=\"headerRow\">\n");
+            out.append("    <div>\n");
+            out.append("      <div class=\"title\">Test Report</div>\n");
+            out.append("      <div class=\"subtitle\">Generated ")
+                    .append(escapeHtml(TS_FMT.format(Instant.now())))
+                    .append("</div>\n");
+            out.append("    </div>\n");
+            out.append("    <div class=\"overallBadge ").append(overallCss).append("\">")
+                    .append(overallLabel)
+                    .append("</div>\n");
+            out.append("  </div>\n");
+            out.append("</header>\n");
+
+        } else {
+            // New: left rail with summary + vertical tabs
+            out.append("<div class=\"page\">\n");
+            out.append("  <aside class=\"leftRail\">\n");
+            out.append("    <div class=\"railHeader\">\n");
+
+            out.append("      <div class=\"topSummary\">\n");
+            out.append("        <div class=\"summaryTitle\">Cucumber Run Summary</div>\n");
+            out.append("        <div class=\"summaryMeta\">Generated ")
+                    .append(escapeHtml(TS_FMT.format(Instant.now())))
+                    .append("</div>\n");
+
+            out.append("        <div class=\"summaryNumbers\">\n");
+            out.append("          <span class=\"pill passPill\">Passed: ").append(passed).append("/").append(total).append("</span>\n");
+            out.append("          <span class=\"pill failPill\">Failed: ").append(failed).append("/").append(total).append("</span>\n");
+            out.append("          <span class=\"pill pctPill\">").append(passPct).append("% pass</span>\n");
+            out.append("        </div>\n");
+
+            out.append("        <div class=\"barWrap\" aria-label=\"Pass/fail percentage bar\">\n");
+            out.append("          <div class=\"barFail\"></div>\n");
+            out.append("          <div class=\"barPass\" style=\"width: ").append(passPct).append("%;\"></div>\n");
+            out.append("        </div>\n");
+            out.append("      </div>\n");
+
+            out.append("    </div>\n"); // railHeader
+
+            out.append("    <nav class=\"railTabs\">\n");
+            out.append("      <div class=\"tabButtons\">\n");
+
+            for (int i = 0; i < scopeStates.size(); i++) {
+                ScopeState s = scopeStates.get(i);
+                HtmlNode root = s.nodes.get(s.rootId);
+                if (root == null) continue;
+
+                String label = root.title;
+                if (label == null || label.isBlank()) label = "Scenario " + (i + 1);
+
+                Status st = perScopeStatus.get(i);
+                String stClass = (st == Status.FAIL) ? "fail" : "pass";
+
+                out.append("        <button class=\"tabBtn ").append(stClass).append(i == 0 ? " active" : "")
+                        .append("\" data-tab=\"sc").append(i).append("\">");
+                out.append("<span class=\"statusDot ").append(stClass).append("\"></span>");
+                out.append(label);
+                out.append("</button>\n");
+            }
+
+            out.append("      </div>\n");
+            out.append("    </nav>\n");
+
+            out.append("  </aside>\n");
+            out.append("  <main class=\"main\">\n");
+        }
+
+        // Render each scope (scenario)
+        for (int i = 0; i < scopeStates.size(); i++) {
+            ScopeState s = scopeStates.get(i);
             HtmlNode root = s.nodes.get(s.rootId);
             if (root == null) continue;
 
@@ -310,16 +519,24 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                 }
             }
 
-            // Deterministic order: by creation/order-insensitive fallback on title+id
+            // Deterministic order: by title then id
             sortTree(root);
 
-            out.append("<section class=\"scope\">\n");
+            if (useTabs) {
+                out.append("<section class=\"scope tabPanel").append(i == 0 ? " active" : "")
+                        .append("\" id=\"sc").append(i).append("\">\n");
+            } else {
+                out.append("<section class=\"scope\" id=\"sc").append(i).append("\">\n");
+            }
+
             out.append("  <div class=\"scopeHeader\">\n");
             out.append("    <div class=\"scopeName\">").append(root.title).append("</div>\n");
-            out.append("    <div class=\"scopeMeta\">Nodes: ").append(s.nodes.size()).append("</div>\n");
             out.append("  </div>\n");
 
-            renderScenarioSummary(out, s.rowKey);
+            // Optional: scenario summary table (if RowDataProvider is configured)
+            if (s.rowKey != null) {
+                renderScenarioSummary(out, s.rowKey);
+            }
 
             out.append("  <div class=\"tree\">\n");
             renderNode(out, root, 0);
@@ -327,9 +544,27 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             out.append("</section>\n");
         }
 
-        out.append("<footer class=\"foot\">Single-file HTML • No external assets</footer>\n");
-        out.append("</body>\n</html>\n");
+        // Tabs JS (only when multi-scope)
+        if (useTabs) {
+            out.append("<script>\n");
+            out.append("(function(){\n");
+            out.append("  var btns = document.querySelectorAll('.tabBtn');\n");
+            out.append("  var panels = document.querySelectorAll('.tabPanel');\n");
+            out.append("  function show(id){\n");
+            out.append("    panels.forEach(function(p){ p.classList.toggle('active', p.id === id); });\n");
+            out.append("    btns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-tab') === id); });\n");
+            out.append("  }\n");
+            out.append("  btns.forEach(function(b){ b.addEventListener('click', function(){ show(b.getAttribute('data-tab')); }); });\n");
+            out.append("  if (btns.length > 0) { show(btns[0].getAttribute('data-tab')); }\n");
+            out.append("})();\n");
+            out.append("</script>\n");
 
+            // close layout wrappers
+            out.append("  </main>\n");
+            out.append("</div>\n");
+        }
+
+        out.append("</body>\n</html>\n");
         return out.toString();
     }
 
@@ -362,7 +597,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
         out.append("<div class=\"node ").append(indentClass).append("\">");
 
-        // Collapsible if it has children or details
         boolean hasDetails = !node.children.isEmpty()
                 || (node.tags != null && !node.tags.isEmpty())
                 || (node.fields != null && !node.fields.isEmpty())
@@ -372,7 +606,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         if (hasDetails) out.append("<details open>");
         out.append("<summary>");
 
-        // Status/level badge (prefer status; else level)
         String badge = badgeText(node);
         String badgeClass = badgeClass(node);
         out.append("<span class=\"badge ").append(badgeClass).append("\">")
@@ -385,7 +618,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         if (hasDetails) {
             out.append("<div class=\"details\">");
 
-            // Tags
             if (node.tags != null && !node.tags.isEmpty()) {
                 out.append("<div class=\"row\"><span class=\"k\">Tags</span><span class=\"v\">");
                 for (String t : node.tags) {
@@ -394,7 +626,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                 out.append("</span></div>");
             }
 
-            // Fields
             if (node.fields != null && !node.fields.isEmpty()) {
                 out.append("<div class=\"row\"><span class=\"k\">Fields</span><span class=\"v\">");
                 out.append("<table class=\"fields\"><tbody>");
@@ -407,7 +638,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                 out.append("</span></div>");
             }
 
-            // Attachments
             if (!node.attachments.isEmpty()) {
                 out.append("<div class=\"row\"><span class=\"k\">Attachments</span><span class=\"v\">");
                 out.append("<div class=\"attachments\">");
@@ -429,14 +659,12 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                     } else {
                         out.append("<div class=\"attText\">").append(a.text == null ? "" : a.text).append("</div>");
                     }
-
                     out.append("</div>");
                 }
                 out.append("</div>");
                 out.append("</span></div>");
             }
 
-            // Logs
             if (!node.logs.isEmpty()) {
                 out.append("<div class=\"row\"><span class=\"k\">Log</span><span class=\"v\">");
                 out.append("<div class=\"log\">");
@@ -450,7 +678,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                 out.append("</span></div>");
             }
 
-            // Children
             if (!node.children.isEmpty()) {
                 out.append("<div class=\"kids\">");
                 for (HtmlNode child : node.children) {
@@ -511,11 +738,11 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         return TS_FMT.format(Instant.now());
     }
 
-    private enum Phase { START, TIMESTAMP, STOP }
+    private enum Phase {START, TIMESTAMP, STOP}
 
     private static final class ScopeState {
         String rootId;
-        String rowKey; // <-- NEW
+        String rowKey; // scenario id string
         final Map<String, HtmlNode> nodes = new HashMap<>();
         final Map<String, Meta> meta = new HashMap<>();
     }
@@ -549,6 +776,18 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         void addLogLine(LogLine line) {
             if (logs.size() >= MAX_LOG_LINES_PER_NODE) return;
             logs.add(line);
+        }
+
+        HtmlNode deepCopy() {
+            HtmlNode c = new HtmlNode(this.id, this.title, this.parentId);
+            c.status = this.status;
+            c.level = this.level;
+            c.tags = (this.tags == null) ? List.of() : List.copyOf(this.tags);
+            c.fields = (this.fields == null) ? Map.of() : Map.copyOf(this.fields);
+            c.attachments.addAll(this.attachments); // InlineImage is immutable
+            c.logs.addAll(this.logs);               // LogLine is immutable
+            // children are rebuilt during render
+            return c;
         }
     }
 
@@ -586,7 +825,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         }
 
         static InlineImage image(String name, String dataUri) {
-            // dataUri must not be HTML-escaped; browsers need it raw
             return new InlineImage(escapeHtml(name), true, dataUri, null);
         }
 
@@ -612,7 +850,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
     private static Map<String, String> sanitizeFields(Map<String, ?> fields) {
         if (fields == null || fields.isEmpty()) return Map.of();
-        // stable order for deterministic HTML
         TreeMap<String, String> out = new TreeMap<>();
         for (Map.Entry<String, ?> e : fields.entrySet()) {
             String k = escapeHtml(sanitizeCommon(String.valueOf(e.getKey())).replaceAll("\\s+", " ").trim());
@@ -660,12 +897,10 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
         String x = s;
 
-        // Normalize some unicode separators to \n
-        x = x.replace('\u2028', '\n') // line separator
-                .replace('\u2029', '\n') // paragraph separator
-                .replace('\u0085', '\n'); // next line
+        x = x.replace('\u2028', '\n')
+                .replace('\u2029', '\n')
+                .replace('\u0085', '\n');
 
-        // Remove control chars except \t \n \r
         StringBuilder sb = new StringBuilder(x.length());
         for (int i = 0; i < x.length(); i++) {
             char c = x.charAt(i);
@@ -733,233 +968,274 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
     // Clean, email-friendly CSS (no external fonts)
     private static final String CSS = """
-.headerRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+            :root {
+              --bg: #ffffff;
+              --fg: #111827;
+              --muted: #6b7280;
+              --card: #f9fafb;
+              --line: #e5e7eb;
+              --pill: #eef2ff;
+              --pass: #065f46;
+              --fail: #991b1b;
+              --warn: #92400e;
+              --info: #1f2937;
+              --skip: #374151;
+            }
+
+            * { box-sizing: border-box; }
+            html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: Arial, Helvetica, sans-serif; }
+            a { color: inherit; }
+
+            /* Classic single-scope header */
+            .headerRow {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 12px;
+            }
+            .top {
+              padding: 16px 18px;
+              border-bottom: 1px solid var(--line);
+              background: #fff;
+            }
+            .title { font-size: 18px; font-weight: 700; }
+            .subtitle { margin-top: 4px; font-size: 12px; color: var(--muted); }
+
+            .overallBadge {
+              font-size: 16px;
+              font-weight: 800;
+              padding: 8px 18px;
+              border-radius: 999px;
+              border: 2px solid var(--line);
+              letter-spacing: 0.5px;
+            }
+            .overallBadge.pass {
+              color: var(--pass);
+              background: #ecfdf5;
+              border-color: #34d399;
+            }
+            .overallBadge.fail {
+              color: var(--fail);
+              background: #fef2f2;
+              border-color: #f87171;
+            }
+
+            /* Multi-scope layout: left rail + main content */
+            .page { display: flex; height: 100vh; overflow: hidden; }
+            .leftRail {
+              width: 320px;
+              min-width: 240px;
+              max-width: 420px;
+              border-right: 1px solid var(--line);
+              background: #fafafa;
+              display: flex;
+              flex-direction: column;
+            }
+            .railHeader {
+              padding: 14px 14px 12px 14px;
+              border-bottom: 1px solid var(--line);
+              background: #fff;
+            }
+
+            .topSummary .summaryTitle { font-weight: 800; font-size: 14px; margin-bottom: 6px; }
+            .topSummary .summaryMeta { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+
+            .summaryNumbers { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+            .pill {
+              display: inline-block;
+              padding: 2px 10px;
+              border-radius: 999px;
+              background: var(--pill);
+              border: 1px solid #e0e7ff;
+              font-size: 12px;
+            }
+            .passPill { border-color: #bbf7d0; background: #ecfdf5; color: var(--pass); }
+            .failPill { border-color: #fecaca; background: #fef2f2; color: var(--fail); }
+            .pctPill  { border-color: #e5e7eb; background: #fff; color: var(--info); }
+
+            .barWrap {
+              position: relative;
+              height: 14px;
+              border-radius: 999px;
+              overflow: hidden;
+              border: 1px solid var(--line);
+              background: #fff;
+            }
+            .barFail { position: absolute; inset: 0; background: #d63a3a; }
+            .barPass { position: absolute; inset: 0; background: #1f9d4c; }
+
+            .railTabs { padding: 10px; overflow: auto; flex: 1; }
+            .tabButtons { display: flex; flex-direction: column; gap: 8px; }
+
+            .tabBtn {
+              cursor: pointer;
+              border: 1px solid var(--line);
+              background: #fff;
+              color: var(--fg);
+              border-radius: 10px;
+              padding: 10px 10px;
+              font-size: 13px;
+              line-height: 1.2;
+              text-align: left;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            }
+            .tabBtn.active {
+              outline: 2px solid #111827;
+              border-color: #111827;
+            }
+            .tabBtn.pass { border-left: 10px solid #1f9d4c; }
+            .tabBtn.fail { border-left: 10px solid #d63a3a; }
+
+            .statusDot {
+              width: 10px;
+              height: 10px;
+              border-radius: 50%;
+              flex: 0 0 10px;
+              border: 1px solid var(--line);
+              background: #fff;
+            }
+            .statusDot.pass { background: #1f9d4c; border-color: #1f9d4c; }
+            .statusDot.fail { background: #d63a3a; border-color: #d63a3a; }
+
+            .main { flex: 1; overflow: auto; background: #fff; }
+
+            .tabPanel { display: none; }
+            .tabPanel.active { display: block; }
+
+            /* Scope / tree styles */
+            .scope {
+              margin: 14px;
+              border: 1px solid var(--line);
+              border-radius: 10px;
+              overflow: hidden;
+              background: #fff;
+            }
+            .scopeHeader {
+              display: flex;
+              gap: 10px;
+              justify-content: space-between;
+              align-items: baseline;
+              padding: 12px 12px;
+              border-bottom: 1px solid var(--line);
+              background: var(--card);
+            }
+            .scopeName { font-weight: 700; }
+
+            .tree { padding: 10px; }
+
+            .node { margin: 6px 0; }
+            .node details { border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+            .node summary {
+              list-style: none;
+              cursor: pointer;
+              padding: 10px 10px;
+              display: flex;
+              align-items: center;
+              gap: 10px;
+            }
+            .node summary::-webkit-details-marker { display: none; }
+            .nodeTitle { font-weight: 600; word-break: break-word; }
+
+            .details { padding: 8px 10px 12px 10px; border-top: 1px solid var(--line); background: #fff; }
+
+            .badge {
+              font-size: 11px;
+              padding: 2px 8px;
+              border-radius: 999px;
+              border: 1px solid var(--line);
+              background: #fff;
+              color: var(--info);
+              white-space: nowrap;
+            }
+            .badge.pass { color: var(--pass); border-color: #bbf7d0; background: #ecfdf5; }
+            .badge.fail { color: var(--fail); border-color: #fecaca; background: #fef2f2; }
+            .badge.warn { color: var(--warn); border-color: #fde68a; background: #fffbeb; }
+            .badge.skip { color: var(--skip); border-color: #e5e7eb; background: #f9fafb; }
+            .badge.info { color: var(--info); border-color: #e5e7eb; background: #f9fafb; }
+            .badge.muted { color: var(--muted); border-color: #e5e7eb; background: #fff; }
+
+            .row { display: flex; gap: 10px; margin-top: 8px; }
+            .k { width: 90px; flex: 0 0 90px; font-size: 12px; color: var(--muted); padding-top: 2px; }
+            .v { flex: 1; min-width: 0; }
+
+            .fields { width: 100%; border-collapse: collapse; }
+            .fields td { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; }
+            .fk { width: 220px; color: var(--muted); font-size: 12px; }
+            .fv { font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+
+            .attachments { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+            .att { border: 1px solid var(--line); border-radius: 10px; background: var(--card); overflow: hidden; }
+            .attName { padding: 8px 10px; font-size: 12px; font-weight: 700; border-bottom: 1px solid var(--line); background: #fff; }
+            .imgDetails { border-top: 1px solid var(--line); background: #fff; }
+            .imgSummary {
+              list-style: none;
+              cursor: pointer;
+              padding: 8px 10px;
+              display: grid;
+              gap: 6px;
+              align-items: start;
+            }
+            .imgSummary::-webkit-details-marker { display: none; }
+
+            .imgThumb {
+              width: 100%;
+              max-height: 140px;
+              object-fit: contain;
+              border-radius: 8px;
+              border: 1px solid var(--line);
+              background: #fff;
+            }
+
+            .imgHint { font-size: 12px; color: var(--muted); }
+
+            .imgFullWrap { padding: 10px; border-top: 1px solid var(--line); background: var(--card); }
+
+            .imgFull {
+              width: 100%;
+              height: auto;
+              border-radius: 10px;
+              border: 1px solid var(--line);
+              background: #fff;
+            }
+
+            .attText { padding: 8px 10px; font-size: 12px; white-space: pre-wrap; word-break: break-word; color: var(--fg); }
+
+            .log { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+            .logLine { display: flex; gap: 10px; padding: 6px 10px; border-top: 1px solid var(--line); font-size: 12px; }
+            .logLine:first-child { border-top: none; }
+            .ts { color: var(--muted); white-space: nowrap; }
+            .msg { white-space: pre-wrap; word-break: break-word; }
+            .logLine.pass .msg { color: var(--pass); }
+            .logLine.fail .msg { color: var(--fail); }
+            .logLine.warn .msg { color: var(--warn); }
+            .logLine.skip .msg { color: var(--skip); }
+
+            .kids { margin-top: 10px; padding-top: 6px; border-top: 1px dashed var(--line); }
+
+            .d0 { margin-left: 0px; }
+            .d1 { margin-left: 12px; }
+            .d2 { margin-left: 24px; }
+            .d3 { margin-left: 36px; }
+            .d4 { margin-left: 48px; }
+            .d5 { margin-left: 60px; }
+            .d6 { margin-left: 72px; }
+
+            .scenarioSummary {
+              margin: 12px 0 16px 0;
+              padding: 10px 12px;
+              border: 1px solid #ddd;
+              border-radius: 8px;
+              background: #fafafa;
+            }
+            .scenarioSummaryTitle { font-weight: 700; margin-bottom: 8px; }
+            .summaryTable { width: 100%; border-collapse: collapse; font-size: 13px; }
+            .summaryTable th, .summaryTable td {
+              border: 1px solid #e0e0e0;
+              padding: 6px 8px;
+              vertical-align: top;
+            }
+            .summaryTable th { background: #f2f2f2; text-align: left; }
+            """;
 }
-
-.overallBadge {
-  font-size: 16px;
-  font-weight: 800;
-  padding: 8px 18px;
-  border-radius: 999px;
-  border: 2px solid var(--line);
-  letter-spacing: 0.5px;
-}
-
-.overallBadge.pass {
-  color: var(--pass);
-  background: #ecfdf5;
-  border-color: #34d399;
-}
-
-.overallBadge.fail {
-  color: var(--fail);
-  background: #fef2f2;
-  border-color: #f87171;
-}
-
-
-
-
-:root {
-  --bg: #ffffff;
-  --fg: #111827;
-  --muted: #6b7280;
-  --card: #f9fafb;
-  --line: #e5e7eb;
-  --pill: #eef2ff;
-  --pass: #065f46;
-  --fail: #991b1b;
-  --warn: #92400e;
-  --info: #1f2937;
-  --skip: #374151;
-}
-
-* { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); font-family: Arial, Helvetica, sans-serif; }
-a { color: inherit; }
-
-.top {
-  padding: 16px 18px;
-  border-bottom: 1px solid var(--line);
-  background: #fff;
-}
-.title { font-size: 18px; font-weight: 700; }
-.subtitle { margin-top: 4px; font-size: 12px; color: var(--muted); }
-
-.scope {
-  margin: 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  overflow: hidden;
-  background: #fff;
-}
-.scopeHeader {
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 12px 12px;
-  border-bottom: 1px solid var(--line);
-  background: var(--card);
-}
-.scopeName { font-weight: 700; }
-.scopeMeta { font-size: 12px; color: var(--muted); }
-
-.tree { padding: 10px; }
-
-.node { margin: 6px 0; }
-.node details { border: 1px solid var(--line); border-radius: 10px; background: #fff; }
-.node summary {
-  list-style: none;
-  cursor: pointer;
-  padding: 10px 10px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.node summary::-webkit-details-marker { display: none; }
-.nodeTitle { font-weight: 600; word-break: break-word; }
-
-.details { padding: 8px 10px 12px 10px; border-top: 1px solid var(--line); background: #fff; }
-
-.badge {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: #fff;
-  color: var(--info);
-  white-space: nowrap;
-}
-.badge.pass { color: var(--pass); border-color: #bbf7d0; background: #ecfdf5; }
-.badge.fail { color: var(--fail); border-color: #fecaca; background: #fef2f2; }
-.badge.warn { color: var(--warn); border-color: #fde68a; background: #fffbeb; }
-.badge.skip { color: var(--skip); border-color: #e5e7eb; background: #f9fafb; }
-.badge.info { color: var(--info); border-color: #e5e7eb; background: #f9fafb; }
-.badge.muted { color: var(--muted); border-color: #e5e7eb; background: #fff; }
-
-.row { display: flex; gap: 10px; margin-top: 8px; }
-.k { width: 90px; flex: 0 0 90px; font-size: 12px; color: var(--muted); padding-top: 2px; }
-.v { flex: 1; min-width: 0; }
-
-.pill {
-  display: inline-block;
-  padding: 2px 8px;
-  margin: 0 6px 6px 0;
-  border-radius: 999px;
-  background: var(--pill);
-  border: 1px solid #e0e7ff;
-  font-size: 12px;
-}
-
-.fields { width: 100%; border-collapse: collapse; }
-.fields td { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; }
-.fk { width: 220px; color: var(--muted); font-size: 12px; }
-.fv { font-size: 12px; white-space: pre-wrap; word-break: break-word; }
-
-.attachments { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
-.att { border: 1px solid var(--line); border-radius: 10px; background: var(--card); overflow: hidden; }
-.attName { padding: 8px 10px; font-size: 12px; font-weight: 700; border-bottom: 1px solid var(--line); background: #fff; }
-.imgDetails { border-top: 1px solid var(--line); background: #fff; }
-.imgSummary {
-  list-style: none;
-  cursor: pointer;
-  padding: 8px 10px;
-  display: grid;
-  gap: 6px;
-  align-items: start;
-}
-.imgSummary::-webkit-details-marker { display: none; }
-
-.imgThumb {
-  width: 100%;
-  max-height: 140px;
-  object-fit: contain;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: #fff;
-}
-
-.imgHint {
-  font-size: 12px;
-  color: var(--muted);
-}
-
-.imgFullWrap {
-  padding: 10px;
-  border-top: 1px solid var(--line);
-  background: var(--card);
-}
-
-.imgFull {
-  width: 100%;
-  height: auto;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: #fff;
-}
-
-.attText { padding: 8px 10px; font-size: 12px; white-space: pre-wrap; word-break: break-word; color: var(--fg); }
-
-.log { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
-.logLine { display: flex; gap: 10px; padding: 6px 10px; border-top: 1px solid var(--line); font-size: 12px; }
-.logLine:first-child { border-top: none; }
-.ts { color: var(--muted); white-space: nowrap; }
-.msg { white-space: pre-wrap; word-break: break-word; }
-.logLine.pass .msg { color: var(--pass); }
-.logLine.fail .msg { color: var(--fail); }
-.logLine.warn .msg { color: var(--warn); }
-.logLine.skip .msg { color: var(--skip); }
-
-.kids { margin-top: 10px; padding-top: 6px; border-top: 1px dashed var(--line); }
-
-.d0 { margin-left: 0px; }
-.d1 { margin-left: 12px; }
-.d2 { margin-left: 24px; }
-.d3 { margin-left: 36px; }
-.d4 { margin-left: 48px; }
-.d5 { margin-left: 60px; }
-.d6 { margin-left: 72px; }
-
-.foot {
-  padding: 14px 18px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-
-.scenarioSummary {
-  margin: 12px 0 16px 0;
-  padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background: #fafafa;
-}
-.scenarioSummaryTitle {
-  font-weight: 700;
-  margin-bottom: 8px;
-}
-.summaryTable {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-.summaryTable th, .summaryTable td {
-  border: 1px solid #e0e0e0;
-  padding: 6px 8px;
-  vertical-align: top;
-}
-.summaryTable th {
-  background: #f2f2f2;
-  text-align: left;
-}
-
-""";
-}
-
-
-

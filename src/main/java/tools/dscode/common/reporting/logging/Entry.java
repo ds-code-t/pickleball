@@ -6,11 +6,18 @@ import org.openqa.selenium.WebDriver;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Map;
 
 public class Entry {
+
+    // Track counts per type for THIS Entry instance
+    private final Map<String, AtomicInteger> typeCounts = new ConcurrentHashMap<>();
+
 
     public final String id = UUID.randomUUID().toString();
     public final Entry parent;
@@ -61,6 +68,32 @@ public class Entry {
     }
 
     // ---- hierarchy ----
+
+
+    public Entry logWithType(String type, String message) {
+        if (type == null || type.isBlank()) {
+            throw new IllegalArgumentException("type must not be null or blank");
+        }
+
+        if (message == null) {
+            message = "";
+        }
+
+        // Normalize type if desired (optional)
+        String normalizedType = type.trim();
+
+        // Get or create counter for this type
+        AtomicInteger counter = typeCounts.computeIfAbsent(
+                normalizedType,
+                t -> new AtomicInteger(0)
+        );
+
+        int count = counter.incrementAndGet();
+
+        String formatted = normalizedType + " " + count + ": " + message;
+
+        return logInfo(formatted);
+    }
 
     private Entry logEntry(String text) {
         Entry e = new Entry(text, this, seqGen);

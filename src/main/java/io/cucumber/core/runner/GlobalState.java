@@ -20,7 +20,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import static io.cucumber.core.runner.CurrentScenarioState.currentScenarioState;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.util.Reflect.getProperty;
-import static tools.dscode.registry.GlobalRegistry.localOf;
 import static tools.dscode.registry.GlobalRegistry.localOrGlobalOf;
 import static tools.dscode.registry.GlobalRegistry.runners;
 
@@ -31,7 +30,45 @@ public class GlobalState {
     // RowKey (scenario id) -> HTML report file
     private static final ConcurrentHashMap<String, Path> scenarioHtmlByRowKey = new ConcurrentHashMap<>();
 
+    // ------------------------------------------------------------
+    // HTML reporting mode toggle
+    // ------------------------------------------------------------
+    // Default FALSE keeps existing behavior (one HTML file per scenario).
+    private static volatile boolean singleHtmlReportEnabled = false;
+
+    /**
+     * Optional target for the combined report when singleHtmlReportEnabled is true.
+     * If empty, SimpleHtmlReportConverter will fall back to creating "cucumber-report.html"
+     * next to the first per-scenario report file it sees.
+     */
+    private static volatile Path singleHtmlReportFile = null;
+
+    public static boolean isSingleHtmlReportEnabled() {
+        return singleHtmlReportEnabled;
+    }
+
+    public static Optional<Path> getSingleHtmlReportFile() {
+        return Optional.ofNullable(singleHtmlReportFile);
+    }
+
+    /** Enable combined single-file HTML output for the whole run. */
+    public static void enableSingleHtmlReport(Path outputFile) {
+        singleHtmlReportEnabled = true;
+        singleHtmlReportFile = outputFile;
+    }
+
+    /** Disable combined single-file HTML output (back to one HTML per scenario). */
+    public static void disableSingleHtmlReport() {
+        singleHtmlReportEnabled = false;
+        singleHtmlReportFile = null;
+    }
+
+
     static {
+        GlobalState.enableSingleHtmlReport(
+                Path.of("reports/cucumber-report.html")
+        );
+
         BaseConverter.setRowDataProvider(rowKey ->
                 getReport()
                         .snapshotRow(rowKey)
