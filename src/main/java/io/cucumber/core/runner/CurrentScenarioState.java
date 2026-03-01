@@ -99,7 +99,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public static Entry logToScenario(String message, DataTable dataTable) {
-        Entry entry = getCurrentScenarioState().scenarioLog.logInfo(message);
+        Entry entry = getCurrentScenarioState().scenarioLog.info(message);
         if (dataTable == null) return entry.timestamp();
         List<List<String>> lists = dataTable.asLists();
         if (lists.isEmpty()) return entry.timestamp();

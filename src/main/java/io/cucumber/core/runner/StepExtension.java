@@ -143,7 +143,7 @@ public class StepExtension extends StepData {
         io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep, executionMode);
 
         if (result.getError() != null) {
-            stepEntry.logError("Exception: " + result.getError().getClass().getName())
+            stepEntry.error("Exception: " + result.getError().getClass().getName())
                     .field("message", result.getError().getMessage())
                     .field("trace", Arrays.stream(result.getError().getStackTrace())
                             .map(StackTraceElement::toString)
