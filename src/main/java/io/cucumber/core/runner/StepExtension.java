@@ -98,7 +98,6 @@ public class StepExtension extends StepData {
         }
 
     }
-
     public Object runAndGetReturnValue() {
         Object instanceOrNull = null;
         try {

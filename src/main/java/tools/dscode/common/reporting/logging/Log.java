@@ -2,8 +2,10 @@
 package tools.dscode.common.reporting.logging;
 
 import tools.dscode.common.reporting.WorkBook;
+import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -41,6 +43,9 @@ public final class Log {
                 System.out.println("Report '" + report.outputFile + "' failed to write due to: " + e.getMessage());
             }
         }
+
+        SimpleHtmlReportConverter.writeFinalReport(Path.of("reports/cucumber-report.html"));
+
     }
 
 }

@@ -1,16 +1,21 @@
 package tools.dscode.common.variables;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.NullNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import java.util.Arrays;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Properties;
 
 public final class SysEnv {
 
     private SysEnv() {
     }
 
-
-    public static final String pickleBallVarPrefix = "pickleball.";
+    public static final String pickleBallVarPrefix = "pkb.";
     public static final String bambooVarPrefix     = "bamboo_";
     public static final String githubVarPrefix     = "GITHUB_";
 
@@ -128,4 +133,8 @@ public final class SysEnv {
     private static boolean isPresent(String v) {
         return v != null && !v.isBlank();
     }
+
+
+
+
 }

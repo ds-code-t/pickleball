@@ -1,6 +1,7 @@
 package tools.dscode.coredefinitions;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.cucumber.core.gherkin.Step;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.core.stepexpression.DocStringArgument;
 import io.cucumber.java.AfterAll;
@@ -22,6 +23,7 @@ import tools.dscode.common.reporting.logging.Log;
 import tools.dscode.common.status.SoftRuntimeException;
 
 import java.time.Duration;
+import java.util.Calendar;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -41,6 +43,8 @@ import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
+import static tools.dscode.common.mappings.BracketLiteralMasker.getAndResolveKeyWithMasking;
+import static tools.dscode.common.variables.RunVars.resolveVarOrDefault;
 
 
 public class GeneralSteps extends CoreSteps {
@@ -58,11 +62,12 @@ public class GeneralSteps extends CoreSteps {
     }
 
     public static JavascriptExecutor getJavascriptExecutor() {
-        return getDriver("BROWSER");
+        return getDefaultDriver();
     }
 
     public static ChromiumDriver getDefaultDriver() {
-        return getDriver("BROWSER");
+        String browserName = resolveVarOrDefault("BROWSER", "BROWSER").toString();
+        return getDriver(browserName);
     }
 
     public static ChromiumDriver getDriver(String browserName) {
@@ -96,7 +101,7 @@ public class GeneralSteps extends CoreSteps {
         Object existingObject = getScenarioObject(stepText);
         if (key == null || key.isBlank()) {
             if (existingObject != null) return existingObject;
-            StepExtension modifiedStep = currentStep.modifyStepExtension("$" + stepText);
+            StepExtension modifiedStep = currentStep.modifyStepExtension("&" + stepText);
             modifiedStep.argument = currentStep.argument;
             Object returnValue = modifiedStep.runAndGetReturnValue();
             registerScenarioObject(stepText, returnValue);
@@ -104,7 +109,7 @@ public class GeneralSteps extends CoreSteps {
         } else {
             Object existingObjectFromKey = getScenarioObject(key);
             if (existingObjectFromKey != null) return existingObjectFromKey;
-            StepExtension modifiedStep = currentStep.modifyStepExtension("$" + stepText);
+            StepExtension modifiedStep = currentStep.modifyStepExtension("&" + stepText);
             modifiedStep.argument = currentStep.argument;
             Object returnValue = modifiedStep.runAndGetReturnValue();
             registerScenarioObject(key, returnValue);
@@ -113,14 +118,13 @@ public class GeneralSteps extends CoreSteps {
     }
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-
     //    @Given("(?i)^@chrome$")
-    @Given("$BROWSER")
-    @Given("$CHROME")
+    @Given("(?i)^&BROWSER$")
+    @Given("(?i)^&CHROME$")
     public ChromeDriver getChrome() throws Exception {
 
         StepExtension currentStep = getRunningStep();
-        String json = !(currentStep.argument instanceof DocStringArgument) ? (String) currentStep.getStepParsingMap().getAndResolve("configs.chrome") : currentStep.argument.getValue().toString();
+        String json = !(currentStep.argument instanceof DocStringArgument) ? getAndResolveKeyWithMasking("configs.chrome") : currentStep.argument.getValue().toString();
         if (Objects.isNull(json)) throw new RuntimeException("Chrome Driver Configuration not found");
         Map<String, Object> map = MAPPER.readValue(json, Map.class);
         ChromeOptions options = new ChromeOptions();
@@ -133,7 +137,7 @@ public class GeneralSteps extends CoreSteps {
         return chromeDriver;
     }
 
-    @Given("$EDGE")
+    @Given("(?i)^&EDGE$")
     public EdgeDriver getEdge() throws Exception {
         StepExtension currentStep = getRunningStep();
         String json = !(currentStep.argument instanceof DocStringArgument) ? (String) currentStep.getStepParsingMap().getAndResolve("configs.edge") : currentStep.argument.getValue().toString();
@@ -165,8 +169,6 @@ public class GeneralSteps extends CoreSteps {
     @Given(ROOT_STEP)
     public static void rootStep() {
 //        System.out.println("Starting Scenario Run");
-
-
 
 
 //        Map<String, ?> localStepDefinitionsByPattern = (Map<String, ?>) getProperty(getLocalCachingGlue(), "stepDefinitionsByPattern");

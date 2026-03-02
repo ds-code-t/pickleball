@@ -269,14 +269,24 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return null;
     }
 
-
     public Object getAndResolve(Object key) {
         if (key == null)
             throw new RuntimeException("key cannot be null");
         Object returnObj = get(key);
         return resolveWholeText(getStringValue(returnObj));
+    }
 
-
+    public Object getCaseInsensitive(String key) {
+        Tokenized tokenized = new Tokenized(key);
+        for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
+            if (map == null)
+                continue;
+            Object replacement = map.getByNormalizedPath(key);
+            if (replacement != null) {
+                return replacement;
+            }
+        }
+        return null;
     }
 
     public Object get(String key) {

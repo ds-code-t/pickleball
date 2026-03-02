@@ -5,6 +5,7 @@ import io.cucumber.gherkin.GherkinDialect;
 import io.cucumber.gherkin.GherkinDialects;
 import io.cucumber.plugin.event.PickleStepTestStep;
 import tools.dscode.common.annotations.LifecycleManager;
+import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.reporting.Report;
 import tools.dscode.common.reporting.WorkBook;
 import tools.dscode.common.reporting.logging.BaseConverter;
@@ -30,45 +31,9 @@ public class GlobalState {
     // RowKey (scenario id) -> HTML report file
     private static final ConcurrentHashMap<String, Path> scenarioHtmlByRowKey = new ConcurrentHashMap<>();
 
-    // ------------------------------------------------------------
-    // HTML reporting mode toggle
-    // ------------------------------------------------------------
-    // Default FALSE keeps existing behavior (one HTML file per scenario).
-    private static volatile boolean singleHtmlReportEnabled = false;
-
-    /**
-     * Optional target for the combined report when singleHtmlReportEnabled is true.
-     * If empty, SimpleHtmlReportConverter will fall back to creating "cucumber-report.html"
-     * next to the first per-scenario report file it sees.
-     */
-    private static volatile Path singleHtmlReportFile = null;
-
-    public static boolean isSingleHtmlReportEnabled() {
-        return singleHtmlReportEnabled;
-    }
-
-    public static Optional<Path> getSingleHtmlReportFile() {
-        return Optional.ofNullable(singleHtmlReportFile);
-    }
-
-    /** Enable combined single-file HTML output for the whole run. */
-    public static void enableSingleHtmlReport(Path outputFile) {
-        singleHtmlReportEnabled = true;
-        singleHtmlReportFile = outputFile;
-    }
-
-    /** Disable combined single-file HTML output (back to one HTML per scenario). */
-    public static void disableSingleHtmlReport() {
-        singleHtmlReportEnabled = false;
-        singleHtmlReportFile = null;
-    }
 
 
     static {
-        GlobalState.enableSingleHtmlReport(
-                Path.of("reports/cucumber-report.html")
-        );
-
         BaseConverter.setRowDataProvider(rowKey ->
                 getReport()
                         .snapshotRow(rowKey)
@@ -80,16 +45,6 @@ public class GlobalState {
         );
     }
 
-    /** Called internally by HTML converters to register their output and auto-link it into the XLSX. */
-    public static void registerScenarioHtml(String rowKey, Path htmlFile) {
-        if (rowKey == null || rowKey.isBlank() || htmlFile == null) return;
-
-        scenarioHtmlByRowKey.put(rowKey, htmlFile);
-
-        // Auto-add a hyperlink column into the default workbook.
-        WorkBook wb = getReport();
-        wb.put(rowKey, "Scenario HTML", new WorkBook.Link(htmlFile, "Open"));
-    }
 
     public static Optional<Path> getScenarioHtml(String rowKey) {
         return Optional.ofNullable(scenarioHtmlByRowKey.get(rowKey));
@@ -222,6 +177,26 @@ public class GlobalState {
     public static StepExtension getRunningStep() {
         return getCurrentScenarioState().getCurrentStep();
     }
+    public static ParsingMap getRunningParsingMap() {
+        try {
+            return getCurrentScenarioState().getCurrentStep().getStepParsingMap();
+        } catch (Throwable e) {
+            return getCurrentScenarioState().getParsingMap();
+        }
+    }
+
+    public static String resolveToStringWithRunningParsingMap(String input) {
+        return getRunningParsingMap().resolveWholeText(input);
+    }
+
+    public static Object getFromRunningParsingMapCaseInsensitive(String input) {
+        return getRunningParsingMap().getCaseInsensitive(input);
+    }
+
+    public static Object getFromRunningParsingMap(String key) {
+        return getCurrentScenarioState().getParsingMap().get(key);
+    }
+
 
     public static void enterInDefaultReport(String columnName, Object value) {
         enterInReport(null, null, null, columnName, value);

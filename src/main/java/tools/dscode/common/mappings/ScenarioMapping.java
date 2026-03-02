@@ -8,8 +8,6 @@ public class ScenarioMapping {
     private final NodeMap runMap = parsingMap.getPrimaryRunMap();
 
     public ParsingMap getParsingMap() {
-
-
         return parsingMap;
     }
 

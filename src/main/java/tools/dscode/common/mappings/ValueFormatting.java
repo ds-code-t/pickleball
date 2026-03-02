@@ -1,5 +1,6 @@
 package tools.dscode.common.mappings;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -12,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+
+import static tools.dscode.common.mappings.ValueFormatting.fromSafeJsonNode;
 
 public abstract class ValueFormatting {
     public static final String NON_SERIALIZABLE_FIELD = "_NonSerializableReferenceID";
@@ -27,7 +30,8 @@ public abstract class ValueFormatting {
      * Lightweight placeholder type that gets serialized instead of the real object.
      * JSON will look like: { "id": "some-uuid" }
      */
-    public record NonSerializableRef(String _NonSerializableReferenceID) {}
+    public record NonSerializableRef(String _NonSerializableReferenceID) {
+    }
 
     protected ValueFormatting(ObjectNode root) {
         this.root = root;
@@ -35,8 +39,8 @@ public abstract class ValueFormatting {
 
     /**
      * Forward conversion:
-     *  - For safe packages → MAPPER.valueToTree(obj)
-     *  - For others → store obj in nonSerializable and return JSON for NonSerializableRef
+     * - For safe packages → MAPPER.valueToTree(obj)
+     * - For others → store obj in nonSerializable and return JSON for NonSerializableRef
      */
     public static JsonNode toSafeJsonNode(Object obj) {
         if (obj == null) {
@@ -68,12 +72,18 @@ public abstract class ValueFormatting {
                 NonSerializableRef ref = MAPPER.convertValue(objectNode, NonSerializableRef.class);
                 return nonSerializable.get(ref._NonSerializableReferenceID());
             }
+            return objectNode;
+        }
+        if (node instanceof JsonNode jsonNode) {
+            try {
+                return MAPPER.treeToValue(jsonNode, Object.class);
+            } catch (JsonProcessingException e) {
+                return node;
+            }
         }
         // Not a placeholder → just return as-is
         return node;
     }
-
-
 
 
     // ───────── safe package detection ─────────
@@ -100,18 +110,18 @@ public abstract class ValueFormatting {
     }
 
 
+    public String getStringValue(String periodSeparatedPath) {
+        Object obj = getByNormalizedPath(periodSeparatedPath);
+        if (obj == null) return null;
+        return String.valueOf(obj);
+    }
 
-    public JsonNode getByNormalizedPath(String periodSeparatedPath) {
-        if (root == null || periodSeparatedPath == null) {
-            return JsonNodeFactory.instance.missingNode();
-        }
+    public Object getByNormalizedPath(String periodSeparatedPath) {
+        if (root == null || periodSeparatedPath == null) return null;
 
         String path = periodSeparatedPath.trim();
-        if (path.isEmpty()) {
-            return JsonNodeFactory.instance.missingNode();
-        }
+        if (path.isEmpty()) return null;
 
-        // Per-call cache: ObjectNode identity -> (normalizedFieldName -> actualFieldName)
         IdentityHashMap<JsonNode, Map<String, String>> fieldLookupCache = new IdentityHashMap<>();
 
         JsonNode current = root;
@@ -119,34 +129,29 @@ public abstract class ValueFormatting {
             if (segment.isBlank()) continue;
 
             ParsedSegment ps = parseSegment(segment);
+            if (ps == null) return null;
 
-            // Optional property name (e.g., "customers[0]" => name="customers", indexes=[0])
             if (!ps.name.isEmpty()) {
-                if (current == null || !current.isObject()) {
-                    return JsonNodeFactory.instance.missingNode();
-                }
+                if (current == null || !current.isObject()) return null;
                 current = getFieldIgnoreCaseSpaceNormalized(current, ps.name, fieldLookupCache);
-                if (current == null || current.isMissingNode()) {
-                    return JsonNodeFactory.instance.missingNode();
-                }
+                if (current == null || current.isMissingNode()) return null;
             }
 
-            // Any number of array indexes in the segment (e.g., "matrix[0][1]")
             for (int idx : ps.indexes) {
-                if (current == null || !current.isArray()) {
-                    return JsonNodeFactory.instance.missingNode();
-                }
-                if (idx < 0 || idx >= current.size()) {
-                    return JsonNodeFactory.instance.missingNode();
-                }
+                if (current == null || !current.isArray()) return null;
+                if (idx < 0 || idx >= current.size()) return null;
                 current = current.get(idx);
             }
         }
 
-        return current == null ? JsonNodeFactory.instance.missingNode() : current;
+        return fromSafeJsonNode(current); // handles null/missing/null-node conversions
     }
 
-    /** Split on '.' with basic trimming (indexes are in [n], so '.' is safe to split on). */
+
+
+    /**
+     * Split on '.' with basic trimming (indexes are in [n], so '.' is safe to split on).
+     */
     private static List<String> splitByDot(String path) {
         List<String> parts = new ArrayList<>();
         int start = 0;
@@ -160,13 +165,26 @@ public abstract class ValueFormatting {
         return parts;
     }
 
+    public static JsonNode getFieldIgnoreCaseSpaceNormalized(ObjectNode objectNode, String rawName) {
+        if (objectNode == null || rawName == null) {
+            return JsonNodeFactory.instance.missingNode();
+        }
+        // One-off lookup: per-call cache
+        IdentityHashMap<JsonNode, Map<String, String>> cache = new IdentityHashMap<>();
+        return getFieldIgnoreCaseSpaceNormalized(objectNode, rawName, cache);
+    }
+
     private static JsonNode getFieldIgnoreCaseSpaceNormalized(
             JsonNode objectNode,
             String rawName,
             IdentityHashMap<JsonNode, Map<String, String>> cache
     ) {
-        String normalizedTarget = normalizeKey(rawName);
+        JsonNode direct = objectNode.get(rawName);
+        if (direct != null) {
+            return direct;
+        }
 
+        String normalizedTarget = normalizeKey(rawName);
         Map<String, String> lookup = cache.get(objectNode);
         if (lookup == null) {
             lookup = new HashMap<>();
@@ -182,61 +200,43 @@ public abstract class ValueFormatting {
         return actualField == null ? JsonNodeFactory.instance.missingNode() : objectNode.get(actualField);
     }
 
+
     private static ParsedSegment parseSegment(String segment) {
-        // Examples:
-        //  "customers[0]" -> name="customers", indexes=[0]
-        //  "[0]"          -> name="",         indexes=[0]
-        //  "a[0][1]"      -> name="a",        indexes=[0,1]
         String s = segment.trim();
 
         StringBuilder name = new StringBuilder();
         List<Integer> indexes = new ArrayList<>();
 
         int i = 0;
-        // Read name until first '[' (or end)
+
         while (i < s.length() && s.charAt(i) != '[') {
             name.append(s.charAt(i));
             i++;
         }
 
-        // Read one or more [number] parts
         while (i < s.length()) {
-            if (s.charAt(i) != '[') {
-                // Unexpected character (e.g., stray text after indexes) -> treat as invalid segment
-                // Returning empty name + no indexes here would silently succeed; better to fail fast.
-                return new ParsedSegment("__INVALID__", List.of(Integer.MIN_VALUE));
-            }
+            if (s.charAt(i) != '[') return null;
+
             int close = s.indexOf(']', i + 1);
-            if (close < 0) {
-                return new ParsedSegment("__INVALID__", List.of(Integer.MIN_VALUE));
-            }
+            if (close < 0) return null;
 
             String inside = s.substring(i + 1, close).trim();
-            if (inside.isEmpty()) {
-                return new ParsedSegment("__INVALID__", List.of(Integer.MIN_VALUE));
-            }
+            if (inside.isEmpty()) return null;
 
-            // Parse integer index (allow whitespace; disallow non-digits except leading '-')
-            int idx;
             try {
-                idx = Integer.parseInt(inside);
+                indexes.add(Integer.parseInt(inside));
             } catch (NumberFormatException e) {
-                return new ParsedSegment("__INVALID__", List.of(Integer.MIN_VALUE));
+                return null;
             }
-            indexes.add(idx);
 
             i = close + 1;
-        }
-
-        // Validate invalid sentinel
-        if (name.toString().equals("__INVALID__") || indexes.contains(Integer.MIN_VALUE)) {
-            return new ParsedSegment("__INVALID__", List.of(Integer.MIN_VALUE));
         }
 
         return new ParsedSegment(name.toString(), indexes);
     }
 
-    private record ParsedSegment(String name, List<Integer> indexes) {}
+    private record ParsedSegment(String name, List<Integer> indexes) {
+    }
 
     private static String normalizeKey(String key) {
         if (key == null) return "";

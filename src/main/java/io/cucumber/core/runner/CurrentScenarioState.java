@@ -160,6 +160,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 //        rootScenarioStep.addDefinitionFlag(DefinitionFlag.NO_LOGGING);
         testCaseState = getTestCaseState();
 //        rootScenarioStep.runMethodDirectly = true;
+        Throwable throwable = null;
         try {
 
             runStep(rootScenarioStep);
@@ -170,9 +171,8 @@ public class CurrentScenarioState extends ScenarioMapping {
                 lifecycle.fire(Phase.AFTER_SCENARIO_PASS);
 
         } catch (Throwable t) {
-
             lifecycle.fire(Phase.AFTER_SCENARIO_FAIL);
-            throw t;
+            throwable = t;
         }
         getScenarioLogRoot().stop().close();
 
@@ -185,13 +185,16 @@ public class CurrentScenarioState extends ScenarioMapping {
                 .distinct()
                 .collect(Collectors.joining(", "));
 
+
         ReportingSteps.setRow(null, null, List.of(
                 List.of("STATUS", "INFO"),
                 List.of((isScenarioFailed() ? "FAILED" : "PASSED"), infoMessage)));
 
         scenarioRunCleanUp();
-
         lifecycle.fire(Phase.AFTER_SCENARIO_CLEANUP);
+
+        if (throwable != null)
+            throw new RuntimeException(throwable);
     }
 
     public void scenarioRunCleanUp() {
@@ -273,20 +276,18 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
         if (!stepExtension.definitionFlags.contains(IGNORE_CHILDREN)) {
-            if(stepExtension.lineData.inheritancePhrase != null && stepExtension.lineData.inheritancePhrase.repeatRootPhrase)
-            {
-                while(true) {
+            if (stepExtension.lineData.inheritancePhrase != null && stepExtension.lineData.inheritancePhrase.repeatRootPhrase) {
+                while (true) {
                     PhraseData clonedChainStart = stepExtension.lineData.inheritancePhrase.cloneRepeatedChain();
                     clonedChainStart.parsedLine.runPhraseFromLine(clonedChainStart);
-                    if(clonedChainStart.phraseConditionalMode < 1) break;
+                    if (clonedChainStart.phraseConditionalMode < 1) break;
 
                     StepExtension firstChild = (StepExtension) ((StepExtension) stepExtension.clone()).initializeChildSteps();
                     if (firstChild != null) {
                         runStep(firstChild);
                     }
                 }
-            }
-            else {
+            } else {
 
                 List<StepExtension> clonedSteps = stepCloner(stepExtension);
                 for (StepExtension repeatStep : clonedSteps) {
@@ -302,9 +303,6 @@ public class CurrentScenarioState extends ScenarioMapping {
             runStep((StepExtension) stepExtension.nextSibling);
         }
     }
-
-
-
 
 
     private boolean isScenarioHardFail = false;

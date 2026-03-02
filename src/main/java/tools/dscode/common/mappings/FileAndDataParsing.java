@@ -114,11 +114,13 @@ public final class FileAndDataParsing {
         } else {
             try {
                 return JSON_MAPPER.readTree(content);
-            } catch (IOException ignored) { }
+            } catch (IOException ignored) {
+            }
 
             try {
                 return YAML_MAPPER.readTree(content);
-            } catch (IOException ignored) { }
+            } catch (IOException ignored) {
+            }
         }
 
         // As-is text fallback
@@ -204,39 +206,46 @@ public final class FileAndDataParsing {
 
         ObjectNode dir = JSON_MAPPER.createObjectNode();
         try (Stream<Path> walk = Files.walk(root)) {
-            walk.forEach(p -> {
-                try {
-                    if (Files.isDirectory(p)) {
-                        if (p.equals(root))
-                            return;
-                        String key = p.getFileName().toString();
-                        JsonNode child = buildFromRoot(p);
-                        // key derived from directory name
-                        dir.set(key, child);
+            walk.sorted((a, b) -> {
+                        // Primary: alphabetical ignoring case
+                        int ci = String.CASE_INSENSITIVE_ORDER.compare(a.toString(), b.toString());
+                        if (ci != 0) return ci;
+                        // Secondary: stable tie-breaker (case / exact path)
+                        return a.toString().compareTo(b.toString());
+                    })
+                    .forEach(p -> {
+                        try {
+                            if (Files.isDirectory(p)) {
+                                if (p.equals(root))
+                                    return;
+                                String key = p.getFileName().toString();
+                                JsonNode child = buildFromRoot(p);
+                                // key derived from directory name
+                                dir.set(key, child);
 //                        setWithLowercaseAlias(dir, key, child);
-                    } else {
-                        String fileName = p.getFileName().toString();
-                        String ext = getExtensionLower(fileName);
-                        if (!ALLOWED_EXTENSIONS.contains(ext))
-                            return;
+                            } else {
+                                String fileName = p.getFileName().toString();
+                                String ext = getExtensionLower(fileName);
+                                if (!ALLOWED_EXTENSIONS.contains(ext))
+                                    return;
 
-                        long size = Files.size(p);
-                        if (size > MAX_CONFIG_FILE_SIZE_BYTES) {
-                            System.out.println("Skipping file (too large): " + p + " (" + size + " bytes)");
-                            return;
-                        }
+                                long size = Files.size(p);
+                                if (size > MAX_CONFIG_FILE_SIZE_BYTES) {
+                                    System.out.println("Skipping file (too large): " + p + " (" + size + " bytes)");
+                                    return;
+                                }
 
-                        String base = getBaseFileName(fileName);
-                        String content = Files.readString(p, StandardCharsets.UTF_8);
-                        JsonNode parsed = parseSingleFile(content, fileName);
-                        // base derived from file name (without extension)
-                        dir.set(base, parsed);
+                                String base = getBaseFileName(fileName);
+                                String content = Files.readString(p, StandardCharsets.UTF_8);
+                                JsonNode parsed = parseSingleFile(content, fileName);
+                                // base derived from file name (without extension)
+                                dir.set(base, parsed);
 //                        setWithLowercaseAlias(dir, base, parsed); // base-name collisions will overwrite
-                    }
-                } catch (IOException ioe) {
-                    System.out.println("Failed to read file: " + p + " (" + ioe.getMessage() + ")");
-                }
-            });
+                            }
+                        } catch (IOException ioe) {
+                            System.out.println("Failed to read file: " + p + " (" + ioe.getMessage() + ")");
+                        }
+                    });
         }
         return dir;
     }

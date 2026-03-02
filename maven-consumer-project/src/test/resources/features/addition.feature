@@ -1,5 +1,8 @@
 Feature: Addition
 
+  Scenario: nav tes6
+    * navigate to: URL.select
+
   Scenario: gdfgdfss
   @[DEBUG,nobase,##]
     * , verify "Subscribe" Checkbox is on

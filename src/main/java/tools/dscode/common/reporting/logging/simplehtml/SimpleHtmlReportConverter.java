@@ -20,7 +20,6 @@ import java.time.format.DateTimeFormatter;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Always generates a single, tabbed HTML report for the entire Cucumber run (parallel-safe):
@@ -37,7 +36,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     // ---------------- Single-file (multi-scenario) aggregation ----------------
     private static final class SharedSingleFile {
         static final Object LOCK = new Object();
-        static final AtomicInteger ACTIVE = new AtomicInteger(0);
 
         // Key: scenario rowKey (preferred), else rootId
         static final Map<String, ScopeState> ALL_SCOPES = new ConcurrentHashMap<>();
@@ -60,7 +58,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         if (SharedSingleFile.REPORT_FILE == null) {
             SharedSingleFile.REPORT_FILE = resolveSingleFileOutput(reportFile);
         }
-        SharedSingleFile.ACTIVE.incrementAndGet();
     }
 
     private static Path resolveSingleFileOutput(Path perScenarioReportFile) {
@@ -80,6 +77,8 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
     @Override
     protected void onClose() {
+        // IMPORTANT: We do NOT auto-generate the final HTML here.
+        // close() only contributes this converter's in-memory scenario data to the shared run snapshot.
         synchronized (lock) {
             try {
                 synchronized (SharedSingleFile.LOCK) {
@@ -89,20 +88,8 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                         SharedSingleFile.ALL_SCOPES.put(key, deepCopyScopeState(s));
                     }
                 }
-
             } catch (Throwable e) {
                 System.err.println("[SimpleHtmlReportConverter] FAILED onClose: " + e);
-            } finally {
-                int remaining = SharedSingleFile.ACTIVE.decrementAndGet();
-                if (remaining == 0) {
-                    try {
-                        Path outFile = SharedSingleFile.REPORT_FILE;
-                        if (outFile == null) outFile = Path.of("cucumber-report.html");
-                        writeCombinedReport(outFile);
-                    } catch (Throwable ex) {
-                        System.err.println("[SimpleHtmlReportConverter] FAILED writing combined report: " + ex);
-                    }
-                }
             }
         }
     }
@@ -117,6 +104,59 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         return c;
     }
 
+    // ---------------------------------------------------------------------------------
+    // Explicit finalization API (caller-controlled)
+    // ---------------------------------------------------------------------------------
+
+    /**
+     * Clears all accumulated scenario data for the current JVM. Call this once before a new Cucumber run
+     * if you reuse the same JVM (e.g., from Gradle daemon, Surefire reuseForks, IDE, etc.).
+     */
+    public static void resetRun() {
+        synchronized (SharedSingleFile.LOCK) {
+            SharedSingleFile.ALL_SCOPES.clear();
+            SharedSingleFile.REPORT_FILE = null;
+        }
+    }
+
+    /** Returns the resolved default output file for the single combined report. */
+    public static Path defaultReportFile(Path anyPerScenarioPath) {
+        return resolveSingleFileOutput(anyPerScenarioPath);
+    }
+
+    /**
+     * Writes the combined, tabbed HTML report to the default single-file output location.
+     * This must be called explicitly by external code once the entire Cucumber run is complete.
+     */
+    public static void writeFinalReport() {
+        Path out;
+        synchronized (SharedSingleFile.LOCK) {
+            out = SharedSingleFile.REPORT_FILE;
+        }
+        if (out == null) out = Path.of("cucumber-report.html");
+        writeFinalReport(out);
+    }
+
+    /**
+     * Writes the combined, tabbed HTML report to {@code outFile}.
+     * This must be called explicitly by external code once the entire Cucumber run is complete.
+     */
+    public static void writeFinalReport(Path outFile) {
+        if (outFile == null) outFile = Path.of("cucumber-report.html");
+
+        synchronized (SharedSingleFile.LOCK) {
+            SharedSingleFile.REPORT_FILE = outFile;
+        }
+
+        try {
+            // Use a lightweight instance to reuse the existing (instance) rendering code that depends on BaseConverter.rowData(...).
+            new SimpleHtmlReportConverter(outFile).writeCombinedReport(outFile);
+        } catch (Throwable ex) {
+            System.err.println("[SimpleHtmlReportConverter] FAILED writing combined report: " + ex);
+        }
+    }
+
+
     private void writeCombinedReport(Path outFile) throws IOException {
         Map<String, ScopeState> snapshot;
         synchronized (SharedSingleFile.LOCK) {
@@ -128,9 +168,9 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         String html = renderHtmlDocument(snapshot, outFile);
         Files.writeString(outFile, html, StandardCharsets.UTF_8);
 
-        for (ScopeState s : snapshot.values()) {
-            if (s.rowKey != null) GlobalState.registerScenarioHtml(s.rowKey, outFile);
-        }
+//        for (ScopeState s : snapshot.values()) {
+//            if (s.rowKey != null) GlobalState.registerScenarioHtml(s.rowKey, outFile);
+//        }
 
         System.out.println("[SimpleHtmlReportConverter] wrote combined: " + outFile.toAbsolutePath());
     }
@@ -454,9 +494,115 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("    panels.forEach(function(p){ p.classList.toggle('active', p.id === id); });\n");
         out.append("    btns.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-tab') === id); });\n");
         out.append("  }\n");
+        out.append("  window.__showTab = show;\n");
         out.append("  btns.forEach(function(b){ b.addEventListener('click', function(){ show(b.getAttribute('data-tab')); }); });\n");
         out.append("  var first = document.querySelector('.tabBtn[data-tab=\"main\"]');\n");
         out.append("  if (first) show('main');\n");
+        out.append("\n");
+        out.append("  // ---------- Spreadsheet-like MAIN table (sort + filters + status radio) ----------\n");
+        out.append("  var table = document.getElementById('mainSummaryTable');\n");
+        out.append("  if (!table) return;\n");
+        out.append("  var tbody = table.querySelector('tbody');\n");
+        out.append("  var hdrCells = table.querySelectorAll('thead tr.hdrRow th');\n");
+        out.append("  var filterInputs = table.querySelectorAll('input.colFilter');\n");
+        out.append("  var statusRadios = document.querySelectorAll('input[name=\"ovStatus\"]');\n");
+        out.append("\n");
+        out.append("  function getStatusBucket(tr){\n");
+        out.append("    if (tr.classList.contains('rowPass')) return 'pass';\n");
+        out.append("    if (tr.classList.contains('rowFail')) return 'fail';\n");
+        out.append("    return 'all';\n");
+        out.append("  }\n");
+        out.append("\n");
+        out.append("  function applyFilters(){\n");
+        out.append("    var wanted = 'all';\n");
+        out.append("    statusRadios.forEach(function(r){ if (r.checked) wanted = r.value; });\n");
+        out.append("\n");
+        out.append("    // build per-column filter map by column index\n");
+        out.append("    var colFilters = {};\n");
+        out.append("    filterInputs.forEach(function(inp){\n");
+        out.append("      var th = inp.closest('th');\n");
+        out.append("      var idx = Array.prototype.indexOf.call(th.parentNode.children, th);\n");
+        out.append("      var val = (inp.value || '').trim().toLowerCase();\n");
+        out.append("      if (val) colFilters[idx] = val;\n");
+        out.append("    });\n");
+        out.append("\n");
+        out.append("    var rows = tbody.querySelectorAll('tr');\n");
+        out.append("    rows.forEach(function(tr){\n");
+        out.append("      var ok = true;\n");
+        out.append("\n");
+        out.append("      // status radio\n");
+        out.append("      if (wanted !== 'all') {\n");
+        out.append("        var bucket = getStatusBucket(tr);\n");
+        out.append("        if (bucket !== wanted) ok = false;\n");
+        out.append("      }\n");
+        out.append("\n");
+        out.append("      // column text filters\n");
+        out.append("      if (ok) {\n");
+        out.append("        for (var idx in colFilters) {\n");
+        out.append("          var i = parseInt(idx, 10);\n");
+        out.append("          var td = tr.children[i];\n");
+        out.append("          var txt = (td ? (td.textContent || '') : '').toLowerCase();\n");
+        out.append("          if (txt.indexOf(colFilters[idx]) === -1) { ok = false; break; }\n");
+        out.append("        }\n");
+        out.append("      }\n");
+        out.append("\n");
+        out.append("      tr.style.display = ok ? '' : 'none';\n");
+        out.append("    });\n");
+        out.append("  }\n");
+        out.append("\n");
+        out.append("  filterInputs.forEach(function(inp){ inp.addEventListener('input', applyFilters); });\n");
+        out.append("  statusRadios.forEach(function(r){ r.addEventListener('change', applyFilters); });\n");
+        out.append("\n");
+        out.append("  // jump buttons\n");
+        out.append("  table.addEventListener('click', function(e){\n");
+        out.append("    var btn = e.target.closest('.jumpBtn');\n");
+        out.append("    if (!btn) return;\n");
+        out.append("    var id = btn.getAttribute('data-tab');\n");
+        out.append("    if (id) show(id);\n");
+        out.append("  });\n");
+        out.append("\n");
+        out.append("  // sorting (click header). column 0 is link column => ignore.\n");
+        out.append("  function normalize(s){ return (s||'').trim(); }\n");
+        out.append("  function isNumeric(s){ return /^-?\\d+(\\.\\d+)?$/.test(s); }\n");
+        out.append("\n");
+        out.append("  function sortByCol(colIdx){\n");
+        out.append("    if (colIdx === 0) return;\n");
+        out.append("    var th = hdrCells[colIdx];\n");
+        out.append("    var cur = th.getAttribute('data-sort') || 'none';\n");
+        out.append("    var dir = (cur === 'asc') ? 'desc' : 'asc';\n");
+        out.append("\n");
+        out.append("    // reset other headers\n");
+        out.append("    hdrCells.forEach(function(h, i){ if (i !== colIdx) h.setAttribute('data-sort','none'); });\n");
+        out.append("    th.setAttribute('data-sort', dir);\n");
+        out.append("\n");
+        out.append("    var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));\n");
+        out.append("    rows.sort(function(a,b){\n");
+        out.append("      var av = normalize(a.children[colIdx] ? a.children[colIdx].textContent : '');\n");
+        out.append("      var bv = normalize(b.children[colIdx] ? b.children[colIdx].textContent : '');\n");
+        out.append("\n");
+        out.append("      // numeric compare if both numeric\n");
+        out.append("      if (isNumeric(av) && isNumeric(bv)) {\n");
+        out.append("        var an = parseFloat(av), bn = parseFloat(bv);\n");
+        out.append("        return (dir === 'asc') ? (an - bn) : (bn - an);\n");
+        out.append("      }\n");
+        out.append("\n");
+        out.append("      // string compare\n");
+        out.append("      var cmp = av.localeCompare(bv);\n");
+        out.append("      return (dir === 'asc') ? cmp : -cmp;\n");
+        out.append("    });\n");
+        out.append("\n");
+        out.append("    // re-append\n");
+        out.append("    rows.forEach(function(r){ tbody.appendChild(r); });\n");
+        out.append("    applyFilters();\n");
+        out.append("  }\n");
+        out.append("\n");
+        out.append("  // attach sort handlers to header cells (except col 0)\n");
+        out.append("  hdrCells.forEach(function(th, idx){\n");
+        out.append("    if (idx === 0) return;\n");
+        out.append("    th.addEventListener('click', function(){ sortByCol(idx); });\n");
+        out.append("  });\n");
+        out.append("\n");
+        out.append("  applyFilters();\n");
         out.append("})();\n");
         out.append("</script>\n");
 
@@ -468,52 +614,113 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     }
 
     private void renderOverviewSpreadsheet(StringBuilder out, List<ScopeState> scopeStates, List<Status> perScopeStatus) {
-        List<String> summaryHeaders = new ArrayList<>();
+        // Determine the one true header set (order preserved) from the first scenario that provides it.
+        List<String> summaryHeaders = List.of();
         for (ScopeState s : scopeStates) {
             if (s.rowKey == null) continue;
             Optional<RowData> od = rowData(s.rowKey);
             if (od.isPresent()) {
-                summaryHeaders = new ArrayList<>(od.get().headers());
+                summaryHeaders = List.copyOf(od.get().headers());
                 break;
             }
         }
 
-        out.append("  <div class=\"overview\">\n");
-        out.append("    <div class=\"overviewHint\">Same headers as each scenario summary.</div>\n");
-
-        out.append("    <div class=\"overviewTableWrap\">\n");
-        out.append("      <table class=\"overviewTable\">\n");
-        out.append("        <thead><tr>\n");
-        out.append("          <th>Scenario</th>\n");
-        out.append("          <th>Result</th>\n");
-        for (String h : summaryHeaders) {
-            out.append("          <th>").append(escapeHtml(h)).append("</th>\n");
+        // Build rows: one per scenario tab, preserving same column shape.
+        // Also capture the tab id (sc{i}) so the link icon can jump to the scenario.
+        final class Row {
+            final String tabId;
+            final Map<String, Object> values;
+            Row(String tabId, Map<String, Object> values) { this.tabId = tabId; this.values = values; }
         }
-        out.append("        </tr></thead>\n");
-        out.append("        <tbody>\n");
 
+        List<Row> rows = new ArrayList<>();
         for (int i = 0; i < scopeStates.size(); i++) {
             ScopeState s = scopeStates.get(i);
-            HtmlNode root = (s.rootId == null) ? null : s.nodes.get(s.rootId);
-            String scenarioName = (root == null || root.title == null || root.title.isBlank()) ? ("Scenario " + (i + 1)) : root.title;
+            if (s.rowKey == null) continue;
 
-            Status st = (i < perScopeStatus.size()) ? perScopeStatus.get(i) : Status.PASS;
-            String stCss = (st == Status.FAIL) ? "fail" : "pass";
-            String stLabel = (st == Status.FAIL) ? "FAIL" : "PASS";
+            Optional<RowData> od = rowData(s.rowKey);
+            if (od.isEmpty()) continue;
 
-            Map<String, Object> valuesByHeader = Map.of();
-            if (s.rowKey != null) {
-                Optional<RowData> od = rowData(s.rowKey);
-                if (od.isPresent()) valuesByHeader = od.get().valuesByHeader();
-            }
+            rows.add(new Row("sc" + i, od.get().valuesByHeader()));
+        }
 
-            out.append("          <tr>\n");
-            out.append("            <td class=\"ovScenario\">").append(scenarioName).append("</td>\n");
-            out.append("            <td class=\"ovResult\"><span class=\"pill ovPill ").append(stCss).append("\">").append(stLabel).append("</span></td>\n");
+        out.append("  <div class=\"overview\">\n");
 
+        // Radio filter
+        out.append("    <div class=\"overviewControls\">\n");
+        out.append("      <div class=\"statusRadios\" role=\"radiogroup\" aria-label=\"Scenario status filter\">\n");
+        out.append("        <label><input type=\"radio\" name=\"ovStatus\" value=\"all\" checked> All</label>\n");
+        out.append("        <label><input type=\"radio\" name=\"ovStatus\" value=\"pass\"> Passed</label>\n");
+        out.append("        <label><input type=\"radio\" name=\"ovStatus\" value=\"fail\"> Failed</label>\n");
+        out.append("      </div>\n");
+        out.append("      <div class=\"overviewHint\">Click headers to sort. Use filters under headers.</div>\n");
+        out.append("    </div>\n");
+
+        out.append("    <div class=\"overviewTableWrap\">\n");
+        out.append("      <table class=\"summaryTable summaryTable--multi\" id=\"mainSummaryTable\">\n");
+
+        // THEAD: header row + filter row
+        out.append("        <thead>\n");
+
+        // Header row (includes a leading link column)
+        out.append("          <tr class=\"hdrRow\">\n");
+        out.append("            <th class=\"linkCol\" data-sort=\"none\" title=\"Open scenario tab\">🔗</th>\n");
+        for (String h : summaryHeaders) {
+            out.append("            <th class=\"sortable\" data-sort=\"none\">").append(escapeHtml(h)).append("</th>\n");
+        }
+        out.append("          </tr>\n");
+
+        // Filter inputs row (also includes a blank cell for link column)
+        out.append("          <tr class=\"filterRow\">\n");
+        out.append("            <th class=\"linkCol\"></th>\n");
+        for (String h : summaryHeaders) {
+            out.append("            <th>")
+                    .append("<input class=\"colFilter\" type=\"text\" placeholder=\"Filter\" ")
+                    .append("data-col=\"").append(escapeHtml(h)).append("\" aria-label=\"Filter ").append(escapeHtml(h)).append("\">")
+                    .append("</th>\n");
+        }
+        out.append("          </tr>\n");
+
+        out.append("        </thead>\n");
+
+        // TBODY
+        out.append("        <tbody>\n");
+
+        for (Row r : rows) {
+            // Determine row pass/fail class from STATUS column if present
+            String rowStatusClass = "";
+            Object stVal = null;
             for (String h : summaryHeaders) {
-                Object v = valuesByHeader.get(h);
-                out.append("            <td>").append(escapeHtml(v == null ? "" : String.valueOf(v))).append("</td>\n");
+                if ("STATUS".equalsIgnoreCase(h.trim())) {
+                    stVal = r.values.get(h);
+                    break;
+                }
+            }
+            String st = (stVal == null) ? "" : String.valueOf(stVal).trim();
+            String stUpper = st.toUpperCase(Locale.ROOT);
+            if (stUpper.startsWith("PASS")) rowStatusClass = "rowPass";
+            else if (stUpper.startsWith("FAIL")) rowStatusClass = "rowFail";
+
+            out.append("          <tr class=\"").append(rowStatusClass).append("\" data-tab=\"")
+                    .append(escapeHtml(r.tabId)).append("\">\n");
+
+            // Link icon cell
+            out.append("            <td class=\"linkCol\">")
+                    .append("<button class=\"jumpBtn\" type=\"button\" data-tab=\"")
+                    .append(escapeHtml(r.tabId))
+                    .append("\" title=\"Open scenario\">↪</button>")
+                    .append("</td>\n");
+
+            // Data cells in header order, with STATUS cell styling
+            for (String h : summaryHeaders) {
+                Object v = r.values.get(h);
+                String cellText = (v == null) ? "" : String.valueOf(v);
+
+                String tdClass = summaryCellClass(h, cellText); // your PASS/FAIL startsWith() logic
+                if (!tdClass.isBlank()) out.append("            <td class=\"").append(tdClass).append("\">");
+                else out.append("            <td>");
+
+                out.append(escapeHtml(cellText)).append("</td>\n");
             }
 
             out.append("          </tr>\n");
@@ -524,7 +731,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("    </div>\n");
         out.append("  </div>\n");
     }
-
 
     private static String stripTagsForSort(String escaped) {
         return escaped == null ? "" : escaped.replace("&quot;", "\"")
@@ -915,24 +1121,61 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         rowData(rowKey).ifPresent(rd -> {
             out.append("  <div class=\"scenarioSummary\">\n");
             out.append("    <div class=\"scenarioSummaryTitle\">Scenario Summary</div>\n");
-            out.append("    <table class=\"summaryTable\">\n");
-            out.append("      <thead><tr>\n");
-            for (String h : rd.headers()) {
-                out.append("        <th>").append(escapeHtml(h)).append("</th>\n");
-            }
-            out.append("      </tr></thead>\n");
-            out.append("      <tbody><tr>\n");
-            for (String h : rd.headers()) {
-                Object v = rd.valuesByHeader().get(h);
-                out.append("        <td>")
-                        .append(escapeHtml(v == null ? "" : String.valueOf(v)))
-                        .append("</td>\n");
-            }
-            out.append("      </tr></tbody>\n");
+            out.append("    <table class=\"summaryTable summaryTable--single\">\n");
+
+            // single scenario => single row
+            renderSummaryTable(out, rd.headers(), List.of(rd.valuesByHeader()));
+
             out.append("    </table>\n");
             out.append("  </div>\n");
         });
     }
+    private static void renderSummaryTable(
+            StringBuilder out,
+            List<String> summaryHeaders,
+            List<Map<String, Object>> rows
+    ) {
+        // Headers (sole source of truth; order preserved)
+        out.append("      <thead><tr>\n");
+        for (String h : summaryHeaders) {
+            out.append("        <th>").append(escapeHtml(h)).append("</th>\n");
+        }
+        out.append("      </tr></thead>\n");
+
+        // Rows
+        out.append("      <tbody>\n");
+        for (Map<String, Object> row : rows) {
+            out.append("        <tr>\n");
+            for (String h : summaryHeaders) {
+                Object v = (row == null) ? null : row.get(h);
+                String cellText = (v == null) ? "" : String.valueOf(v);
+
+                String tdClass = summaryCellClass(h, cellText);
+                if (!tdClass.isBlank()) {
+                    out.append("          <td class=\"").append(tdClass).append("\">");
+                } else {
+                    out.append("          <td>");
+                }
+
+                out.append(escapeHtml(cellText));
+                out.append("</td>\n");
+            }
+            out.append("        </tr>\n");
+        }
+        out.append("      </tbody>\n");
+    }
+
+    private static String summaryCellClass(String header, String value) {
+        if (header == null) return "";
+        if (!"STATUS".equalsIgnoreCase(header.trim())) return "";
+
+        String v = (value == null) ? "" : value.trim().toUpperCase(Locale.ROOT);
+
+        if (v.startsWith("PASS")) return "statusCell pass";
+        if (v.startsWith("FAIL")) return "statusCell fail";
+        return "statusCell";
+    }
+
 
     private static final String CSS = """
 :root {
@@ -1254,6 +1497,36 @@ a { color: inherit; }
 }
 .summaryTable th { background: #f2f2f2; text-align: left; }
 
+
+/* Summary tables (shared by main + scenario tabs) */
+.summaryTable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.summaryTable th, .summaryTable td {
+  border: 1px solid #e0e0e0;
+  padding: 6px 8px;
+  vertical-align: top;
+}
+.summaryTable th { background: #f2f2f2; text-align: left; }
+
+/* STATUS cell indicators */
+.statusCell {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.statusCell.pass {
+  color: var(--pass);
+  background: #ecfdf5;
+}
+.statusCell.fail {
+  color: var(--fail);
+  background: #fef2f2;
+}
+.statusCell.pass::before {
+  content: "✓ ";
+}
+.statusCell.fail::before {
+  content: "✕ ";
+}
+
 /* ---------------- Overview table ---------------- */
 .overview { padding: 12px; }
 .overviewHint { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
@@ -1265,5 +1538,79 @@ a { color: inherit; }
 .ovResult { white-space: nowrap; }
 .ovPill.pass { color: var(--pass); border-color: #bbf7d0; background: #ecfdf5; }
 .ovPill.fail { color: var(--fail); border-color: #fecaca; background: #fef2f2; }
+
+/* MAIN tab controls */
+.overviewControls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 0 12px;
+}
+.statusRadios {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--fg);
+}
+.statusRadios label { display: inline-flex; gap: 6px; align-items: center; }
+
+/* Make header row look clickable for sorting */
+.summaryTable--multi thead tr.hdrRow th.sortable {
+  cursor: pointer;
+  user-select: none;
+  position: sticky;
+  top: 0;
+  z-index: 6;
+}
+.summaryTable--multi thead tr.hdrRow th.sortable:hover {
+  filter: brightness(0.98);
+}
+
+/* Visual sort indicator using data-sort */
+.summaryTable--multi thead tr.hdrRow th[data-sort="asc"]::after  { content: " ▲"; color: var(--muted); }
+.summaryTable--multi thead tr.hdrRow th[data-sort="desc"]::after { content: " ▼"; color: var(--muted); }
+
+/* Filter row sticks below header row */
+.summaryTable--multi thead tr.filterRow th {
+  position: sticky;
+  top: 34px;          /* approx height of header row; adjust if needed */
+  z-index: 5;
+  background: #fff;
+}
+.colFilter {
+  width: 100%;
+  font-size: 12px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+/* Link column */
+.linkCol { width: 42px; min-width: 42px; max-width: 42px; text-align: center; }
+.jumpBtn {
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 10px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+.jumpBtn:hover { filter: brightness(0.98); }
+
+/* Optional subtle row tint for quick scan */
+.summaryTable--multi tbody tr.rowPass td { background: #fcfffd; }
+.summaryTable--multi tbody tr.rowFail td { background: #fffdfd; }
+
+/* STATUS cell indicators (you already have these, keep/merge) */
+.statusCell { font-weight: 700; white-space: nowrap; }
+.statusCell.pass { color: var(--pass); background: #ecfdf5; }
+.statusCell.fail { color: var(--fail); background: #fef2f2; }
+.statusCell.pass::before { content: "✓ "; }
+.statusCell.fail::before { content: "✕ "; }
+
+
 """;
 }
