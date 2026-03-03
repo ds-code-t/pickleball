@@ -21,6 +21,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static io.cucumber.core.runner.CurrentScenarioState.currentScenarioState;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
+import static tools.dscode.common.reporting.WorkBookConsolePrinter.error;
+import static tools.dscode.common.reporting.WorkBookConsolePrinter.errorBlock;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.registry.GlobalRegistry.localOrGlobalOf;
 import static tools.dscode.registry.GlobalRegistry.runners;
@@ -175,24 +177,56 @@ public class GlobalState {
 //        return (CurrentScenarioState) getProperty(localOrGlobalOf(TestCase.class), "currentScenarioState");
     }
 
+
     public static Entry getStepEntry() {
         return getCurrentScenarioState().getCurrentStep().stepEntry;
     }
 
+    public static Entry stepFail(String message) {
+        return getCurrentScenarioState().getCurrentStep().stepEntry.fail(message);
+    }
+
+
     public static Entry stepInfo(String message) {
-        Entry entry = getCurrentScenarioState().getCurrentStep().stepEntry;
-        return entry.info(message);
+        return getCurrentScenarioState().getCurrentStep().stepEntry.info(message);
     }
 
     public static Entry stepError(String message) {
-        Entry entry = getCurrentScenarioState().getCurrentStep().stepEntry;
-        return entry.error(message);
+        return getCurrentScenarioState().getCurrentStep().stepEntry.error(message);
     }
 
-    public static Entry stepFail(String message) {
-        Entry entry = getCurrentScenarioState().getCurrentStep().stepEntry;
-        return entry.fail(message);
+    public static Entry stepWarn(String message) {
+        return getCurrentScenarioState().getCurrentStep().stepEntry.warn(message);
     }
+
+    public static Entry stepTrace(String message) {
+        return getCurrentScenarioState().getCurrentStep().stepEntry.trace(message);
+    }
+
+    public static Entry stepDebug(String message) {
+        return getCurrentScenarioState().getCurrentStep().stepEntry.debug(message);
+    }
+
+    public static Entry scenarioInfo(String message) {
+        return getCurrentScenarioState().scenarioLog.info(message);
+    }
+
+    public static Entry scenarioError(String message) {
+        return getCurrentScenarioState().scenarioLog.error(message);
+    }
+
+    public static Entry scenarioWarn(String message) {
+        return getCurrentScenarioState().scenarioLog.warn(message);
+    }
+
+    public static Entry scenarioTrace(String message) {
+        return getCurrentScenarioState().scenarioLog.trace(message);
+    }
+
+    public static Entry scenarioDebug(String message) {
+        return getCurrentScenarioState().scenarioLog.debug(message);
+    }
+
 
     public static StepExtension getRunningStep() {
         return getCurrentScenarioState().getCurrentStep();

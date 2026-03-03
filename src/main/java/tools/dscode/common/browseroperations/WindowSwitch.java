@@ -22,6 +22,8 @@ import java.util.stream.Collectors;
 import org.openqa.selenium.interactions.Actions;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch.TextOp;
 
+import static io.cucumber.core.runner.GlobalState.stepInfo;
+
 /**
  * Window/tab utilities (filtering + switching are decoupled).
  * <p>
@@ -132,7 +134,7 @@ public final class WindowSwitch {
      * @throws NoSuchWindowException with a descriptive message if handle is not present.
      */
     public static String switchToHandleOrThrow(WebDriver driver, String handle) {
-        System.out.println("Attempting to switch to Window/Tab: " + handle);
+        stepInfo("Attempting to switch to Window/Tab: " + handle);
         Objects.requireNonNull(driver, "driver");
         if (handle == null || handle.isBlank()) {
             throw new NoSuchWindowException("Cannot switch window: handle was null/blank.");
@@ -181,7 +183,7 @@ public final class WindowSwitch {
 
         String original = safeCurrentHandle(driver);
         List<String> matches = new ArrayList<>();
-        System.out.println("Checking open Windows for a matching " + textOps);
+        stepInfo("Checking open Windows for a matching " + textOps);
         try {
             for (String h : handles) {
                 driver.switchTo().window(h);
@@ -195,10 +197,10 @@ public final class WindowSwitch {
                     continue;
                 }
 
-                System.out.println("Window " + property + ": " + actual);
+                stepInfo("Window " + property + ": " + actual);
 
                 if (matchesAll(actual, textOps)) {
-                    System.out.println("Matched");
+                    stepInfo("Matched");
                     matches.add(h);
                 }
             }

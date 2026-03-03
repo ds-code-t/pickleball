@@ -16,6 +16,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.function.Function;
 
+import static io.cucumber.core.runner.GlobalState.stepError;
+import static io.cucumber.core.runner.GlobalState.stepWarn;
 import static tools.dscode.common.domoperations.HumanInteractions.blur;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 
@@ -50,9 +52,7 @@ public final class LeanWaits {
             waitForElementPresent(driver, element, timeout);
 
         } catch (Exception e) {
-            System.out.println("[WARN] Element did NOT become present: " + element);
-            System.out.println("Cause: " + e);
-            e.printStackTrace(System.out);
+            stepWarn("[WARN] Element did NOT become present: " + element +" , Cause: " + e);
         }
     }
 
@@ -68,8 +68,7 @@ public final class LeanWaits {
         try {
             waitForPageReady(driver, timeout);
         } catch (Exception e) {
-            System.out.println("[WARN] Page did NOT reach ready state in time: " + e);
-            e.printStackTrace(System.out);
+            stepWarn("[WARN] Page did NOT reach ready state in time: " + e);
         }
     }
 

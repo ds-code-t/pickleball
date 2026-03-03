@@ -18,6 +18,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 
+import static io.cucumber.core.runner.GlobalState.stepError;
 import static tools.dscode.common.domoperations.TableColumnByHeaderXPath.matchCellsByHeader;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.xpathSpecificityScore;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.colocatedDeepNormalizedVisibleText;
@@ -825,7 +826,7 @@ public class ExecutionDictionary {
         try {
             return cb.build(category, value, op, webDriver, context);
         } catch (Throwable t) {
-            System.out.println("Could not return SearchContext for '" + category + "'");
+            stepError("Could not return SearchContext for '" + category + "'");
             throw new RuntimeException("Could not return SearchContext for '" + category + "'", t);
         }
     }

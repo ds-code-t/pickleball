@@ -8,29 +8,31 @@ import java.util.List;
 import static io.cucumber.core.runner.CurrentScenarioState.endScenario;
 import static io.cucumber.core.runner.CurrentScenarioState.failScenario;
 import static io.cucumber.core.runner.CurrentScenarioState.softFailScenario;
+import static io.cucumber.core.runner.GlobalState.stepFail;
+import static io.cucumber.core.runner.GlobalState.stepInfo;
 
 
 public class MessageAndLoggingSteps {
 
     @Given("^END SCENARIO$")
     public void endScenarioStep() {
-        System.out.println("Manually ending Scenario");
+        stepInfo("Manually ending Scenario");
         endScenario();
     }
 
     @Given("^SOFT FAIL SCENARIO( \".*\")$")
     public void softFailScenarioStep(String failMessage) {
-        System.out.println("Manually soft failing Scenario");
+        stepFail("Manually soft failing Scenario");
         if(failMessage != null)
-            System.out.println(failMessage);
+            stepFail(failMessage);
         softFailScenario(failMessage);
     }
 
     @Given("^FAIL SCENARIO( \".*\")$")
     public void failScenarioStep(String failMessage) {
-        System.out.println("Manually hard failing Scenario");
+        stepFail("Manually hard failing Scenario");
         if(failMessage != null)
-            System.out.println(failMessage);
+            stepFail(failMessage);
         failScenario(failMessage);
     }
 

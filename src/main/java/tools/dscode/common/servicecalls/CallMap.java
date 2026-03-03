@@ -11,6 +11,9 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import static io.cucumber.core.runner.GlobalState.stepError;
+import static io.cucumber.core.runner.GlobalState.stepInfo;
+import static io.cucumber.core.runner.GlobalState.stepWarn;
 import static tools.dscode.common.mappings.ValueFormatting.toSafeJsonNode;
 import static tools.dscode.common.servicecalls.RestAssuredUtil.buildRequest;
 import static tools.dscode.common.servicecalls.RestAssuredUtil.execute;
@@ -123,7 +126,7 @@ public class CallMap extends NodeMap {
 
             if (logEnabled) {
                 System.out.println("\n============================================================");
-                System.out.println("SERVICE CALL: attempt " + attempt + " of " + (retryMax + 1));
+                stepInfo("SERVICE CALL: attempt " + attempt + " of " + (retryMax + 1));
                 System.out.println("============================================================");
             }
 
@@ -136,7 +139,7 @@ public class CallMap extends NodeMap {
                 } catch (Exception e) {
                     // predicate failed; treat as no-retry but report
                     if (logEnabled) {
-                        System.out.println("[RETRY predicate ERROR] " + e.getClass().getSimpleName() + ": " + safeMsg(e));
+                        stepWarn("[RETRY predicate ERROR] " + e.getClass().getSimpleName() + ": " + safeMsg(e));
                     }
                     shouldRetry = false;
                 }
@@ -146,7 +149,7 @@ public class CallMap extends NodeMap {
 
             if (shouldRetry && hasMoreAttempts) {
                 if (logEnabled) {
-                    System.out.println("[RETRY] Condition matched -> retrying after " + retryWait.toMillis() + " ms"
+                    stepInfo("[RETRY] Condition matched -> retrying after " + retryWait.toMillis() + " ms"
                             + " (remaining retries: " + (retryMax - attempt + 1) + ")");
                 }
                 sleepQuietly(retryWait);
@@ -154,7 +157,7 @@ public class CallMap extends NodeMap {
             }
 
             if (shouldRetry && !hasMoreAttempts && logEnabled) {
-                System.out.println("[RETRY] Condition matched but no retries left -> stopping.");
+                stepError("[RETRY] Condition matched but no retries left -> stopping.");
             }
 
             break;
@@ -170,7 +173,7 @@ public class CallMap extends NodeMap {
         ObjectNode reqNode = getRequestNode();
 
         if (logEnabled) {
-            System.out.println(prettyRequest(reqNode));
+            stepInfo(prettyRequest(reqNode));
         }
 
         try {
@@ -178,7 +181,7 @@ public class CallMap extends NodeMap {
             root.set("response", RestAssuredUtil.extractResponse(response));
 
             if (logEnabled) {
-                System.out.println(prettyResponse(root.get("response")));
+                stepInfo(prettyResponse(root.get("response")));
             }
 
             return response;
@@ -194,9 +197,8 @@ public class CallMap extends NodeMap {
             root.set("response", err);
 
             if (logEnabled) {
-                System.out.println("[FAILURE] No response (exception thrown).");
-                System.out.println("[FAILURE] " + e.getClass().getSimpleName() + ": " + safeMsg(e));
-                System.out.println(prettyResponse(err));
+                stepError("[FAILURE] No response (exception thrown)." + e.getClass().getSimpleName() + ": " + safeMsg(e));
+                stepError(prettyResponse(err));
             }
 
             return null;

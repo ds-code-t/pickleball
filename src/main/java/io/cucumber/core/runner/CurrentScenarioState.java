@@ -32,6 +32,7 @@ import java.util.stream.Stream;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
+import static io.cucumber.core.runner.GlobalState.stepInfo;
 import static io.cucumber.core.runner.StepLogic.stepCloner;
 import static org.junit.jupiter.api.Assertions.fail;
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
@@ -88,7 +89,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         return getCurrentScenarioState().scenarioRunner;
     }
 
-    private Entry scenarioLog;
+    protected Entry scenarioLog;
 
     public static Entry getScenarioLogRoot() {
         return getCurrentScenarioState().scenarioLog;
@@ -113,7 +114,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     public void startScenarioRun() {
         String scenarioName = pickle.getName() + " , Line " + pickle.getLocation().getLine();
-        System.out.println("Starting scenario: '" + scenarioName + "'");
+        stepInfo("Starting scenario: '" + scenarioName + "'");
         scenarioLog =
                 Entry.of(scenarioName)
                         .tag("SCENARIO")
@@ -218,7 +219,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
     public void runningStep(StepExtension stepExtension) {
-        System.out.println("Running " + stepExtension);
+        stepInfo("Running " + stepExtension);
         if (!shouldRun(stepExtension)) {
             stepExtension.skipped = true;
             if (stepExtension.nextSibling != null) {
@@ -315,7 +316,6 @@ public class CurrentScenarioState extends ScenarioMapping {
     public static void failScenario(String failMessage) {
         if (failMessage == null || failMessage.isBlank())
             failMessage = "Manually Hard Failed Scenario";
-
         fail(failMessage.trim());
 
 //        throw new AssertionFailedError(failMessage.trim());

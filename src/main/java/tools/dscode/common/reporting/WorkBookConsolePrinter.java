@@ -20,6 +20,7 @@ public final class WorkBookConsolePrinter {
     private static final String RESET  = "\u001B[0m";
     private static final String RED    = "\u001B[31m";
     private static final String GREEN  = "\u001B[32m";
+    private static final String YELLOW = "\u001B[33m";
     private static final String BLUE   = "\u001B[34m";
     private static final String BOLD   = "\u001B[1m";
     private static final String BLINK  = "\u001B[5m";
@@ -251,4 +252,133 @@ public final class WorkBookConsolePrinter {
                     "Unable to read field '" + fieldName + "' from " + target.getClass(), e);
         }
     }
+
+
+
+
+    // ---------------- level printing (simple "log-like" helpers) ----------------
+
+    /**
+     * Convenience: INFO-styled line.
+     */
+    public static void printInfo(String msg) {
+        printlnStyled("INFO", msg, BLUE, false);
+    }
+
+    /**
+     * Convenience: WARN-styled line.
+     */
+    public static void printWarn(String msg) {
+            printlnStyled("WARN", msg, YELLOW, true);
+    }
+
+    /**
+     * Convenience: ERROR-styled line.
+     */
+    public static void printError(String msg) {
+        printlnStyled("ERROR", msg, RED, true);
+    }
+
+    /**
+     * Convenience: DEBUG-styled line.
+     */
+    public static void printDebug(String msg) {
+        printlnStyled("DEBUG", msg, BLUE, true);
+    }
+
+    /**
+     * Convenience: TRACE-styled line.
+     */
+    public static void printTrace(String msg) {
+        printlnStyled("TRACE", msg, BLUE, false);
+    }
+
+    /**
+     * Same helpers, but caller can decide whether ANSI is enabled.
+     */
+    public static void info(String msg, boolean useAnsiColors)  { printlnStyled("INFO",  msg, BLUE,  false, useAnsiColors); }
+    public static void warn(String msg, boolean useAnsiColors)  { printlnStyled("WARN",  msg, RED,   true,  useAnsiColors); }
+    public static void error(String msg, boolean useAnsiColors) { printlnStyled("ERROR", msg, RED,   true,  useAnsiColors); }
+    public static void debug(String msg, boolean useAnsiColors) { printlnStyled("DEBUG", msg, BLUE,  true,  useAnsiColors); }
+    public static void trace(String msg, boolean useAnsiColors) { printlnStyled("TRACE", msg, BLUE,  false, useAnsiColors); }
+
+    /**
+     * Optional block style if you want a framed message using the existing FRAME_LINE.
+     */
+    public static void errorBlock(String title, String msg, boolean useAnsiColors) {
+        printBlock("ERROR", title, msg, RED, true, useAnsiColors);
+    }
+
+    public static void warnBlock(String title, String msg, boolean useAnsiColors) {
+        printBlock("WARN", title, msg, RED, true, useAnsiColors);
+    }
+
+    public static void infoBlock(String title, String msg, boolean useAnsiColors) {
+        printBlock("INFO", title, msg, BLUE, false, useAnsiColors);
+    }
+
+    public static void debugBlock(String title, String msg, boolean useAnsiColors) {
+        printBlock("DEBUG", title, msg, BLUE, true, useAnsiColors);
+    }
+
+    public static void traceBlock(String title, String msg, boolean useAnsiColors) {
+        printBlock("TRACE", title, msg, BLUE, false, useAnsiColors);
+    }
+
+    // ---------------- internals ----------------
+
+    private static void printlnStyled(String level, String msg, String color, boolean bold) {
+        printlnStyled(level, msg, color, bold, true);
+    }
+
+    private static void printlnStyled(String level, String msg, String color, boolean bold, boolean useAnsiColors) {
+        String text = formatLevelLine(level, msg);
+        if (!useAnsiColors) {
+            System.out.println(text);
+            return;
+        }
+        String style = bold ? (color + BOLD) : color;
+        System.out.println(style + text + RESET);
+    }
+
+    private static void printBlock(
+            String level,
+            String title,
+            String msg,
+            String color,
+            boolean bold,
+            boolean useAnsiColors
+    ) {
+        String header = (title == null || title.isBlank()) ? level : (level + ": " + title);
+
+        System.out.println();
+        if (!useAnsiColors) {
+            System.out.println(FRAME_LINE);
+            System.out.println(header);
+            System.out.println(FRAME_LINE);
+            if (msg != null && !msg.isBlank()) System.out.println(msg);
+            System.out.println();
+            return;
+        }
+
+        String style = bold ? (color + BOLD) : color;
+        System.out.println(style + FRAME_LINE + RESET);
+        System.out.println(style + header + RESET);
+        System.out.println(style + FRAME_LINE + RESET);
+        if (msg != null && !msg.isBlank()) System.out.println(style + msg + RESET);
+        System.out.println();
+    }
+
+    private static String formatLevelLine(String level, String msg) {
+        String m = (msg == null) ? "" : msg;
+        return "[" + level + "] " + m;
+    }
+
+
+
+
+
+
+
+
 }

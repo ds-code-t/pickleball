@@ -28,6 +28,8 @@ import static io.cucumber.core.runner.GlobalState.getGlobalEventBus;
 import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
+import static io.cucumber.core.runner.GlobalState.stepDebug;
+import static io.cucumber.core.runner.GlobalState.stepInfo;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleStepTestStep;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
@@ -286,7 +288,7 @@ public class StepExtension extends StepData {
     public String resolveStepFromString(String stepText) {
         StepExtension newStepExtension = createNewStepExtension(stepText);
         Object obj = newStepExtension.runAndGetReturnValue();
-        System.out.println("Return step '" + stepText + "' resolved to: " + obj + "");
+        stepDebug("Return step '" + stepText + "' resolved to: " + obj + "");
         if(obj == null) return null;
         return obj.toString();
     }

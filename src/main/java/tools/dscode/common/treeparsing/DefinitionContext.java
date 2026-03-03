@@ -87,7 +87,6 @@ public final class DefinitionContext {
         ParseNode quoteMask = new ParseNode(betweenWithEscapes(BOOK_END, BOOK_END)) {
             @Override
             public String onCapture(String s) {
-                System.out.println("##onCaputre quoteMask: " + s);
                 return s.substring(1, s.length() - 1);
             }
         };
@@ -105,7 +104,6 @@ public final class DefinitionContext {
             public String onSubstitute(MatchNode self) {
                 String value = " " + self.groups().get("value") + " ";
                 String unit = " " + VALUE_TYPE_MATCH + self.groups().getOrDefault("unit", "").trim().replaceAll("\\s$", "") + " ";
-
                 return value + unit;
             }
         };
@@ -119,10 +117,6 @@ public final class DefinitionContext {
                 String separator = self.resolvedGroupText("separatorA");
                 if (separator.isEmpty())
                     separator = self.resolvedGroupText("separatorB");
-
-                onMatch("##parsing-phrase: '" + separator + "'", (matchString) -> {
-                    System.out.println(matchString + "  , for : " + self.originalText());
-                });
 
                 if (!separator.isEmpty()) {
                     self.putToLocalState("separator", "true");
@@ -240,7 +234,6 @@ public final class DefinitionContext {
         ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite|clear|save|creates? and attach|attach|switch|close|accept|dismiss)(?:s|ed|ing|es)?\\b") {
             @Override
             public String onCapture(MatchNode self) {
-                System.out.println("##onCaputre action: " + self.originalText() + "");
                 self.parent().putToLocalState("action", self.resolvedGroupText("base"));
                 self.parent().putToLocalState("operationIndex", self.start);
 

@@ -26,6 +26,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static io.cucumber.core.runner.GlobalState.stepWarn;
+
 public final class FileAndDataParsing {
 
     private FileAndDataParsing() {
@@ -86,7 +88,7 @@ public final class FileAndDataParsing {
                 return buildFromRoot(root);
             }
         } catch (Exception e) {
-            System.out.println("Failed to process resource: " + resourcePath + " (" +
+            stepWarn("Failed to process resource: " + resourcePath + " (" +
                     e.getMessage() + ")");
             return JSON_MAPPER.createObjectNode();
         }

@@ -11,6 +11,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static tools.dscode.common.reporting.WorkBookConsolePrinter.printDebug;
+import static tools.dscode.common.reporting.WorkBookConsolePrinter.printError;
+import static tools.dscode.common.reporting.WorkBookConsolePrinter.printInfo;
+import static tools.dscode.common.reporting.WorkBookConsolePrinter.printTrace;
+import static tools.dscode.common.reporting.WorkBookConsolePrinter.printWarn;
 import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
 
 public class Entry {
@@ -114,22 +119,27 @@ public class Entry {
     }
 
     public Entry trace(String message) {
+        printTrace(message);
         return log(Level.TRACE, Status.INFO, message);
     }
 
     public Entry debug(String message) {
+        printDebug(message);
         return log(Level.DEBUG, Status.INFO, message);
     }
 
     public Entry info(String message) {
+        printInfo(message);
         return log(Level.INFO, Status.INFO, message);
     }
 
     public Entry warn(String message) {
+        printWarn(message);
         return log(Level.WARN, Status.WARN, message);
     }
 
     public Entry error(String message) {
+        printError(message);
         return log(Level.ERROR, Status.FAIL, message);
     }
 
@@ -159,6 +169,7 @@ public class Entry {
      * - Returns THIS entry (fluent).
      */
     public Entry fail(String message) {
+        printError("FAIL");
         if (message != null && !message.isBlank()) {
             error(message); // creates child ERROR event with FAIL + timestamp + emission
         }
@@ -214,6 +225,7 @@ public class Entry {
     public Entry screenshot(WebDriver driver, String name) {
         try {
             emit((scope, converter) -> converter.screenshot(this, driver, name));
+            printInfo("Screenshot attached");
         } catch (Throwable t) {
             // keep it safe: log an error event and continue
             error("Failed to take Screenshot due to '" + t.getMessage() + "'");
@@ -226,12 +238,14 @@ public class Entry {
     // ---------------------------------------------------------
 
     public Entry start() {
+        printInfo("STARTED: " + text);
         startedAt = Instant.now();
         emit((s, c) -> c.onStart(s, this));
         return this;
     }
 
     public Entry start(Instant at) {
+        printInfo("STARTED: " + text);
         startedAt = at;
         emit((s, c) -> c.onStart(s, this));
         return this;
@@ -250,12 +264,14 @@ public class Entry {
     }
 
     public Entry stop() {
+        printInfo("STOPPED: " + text);
         stoppedAt = Instant.now();
         emit((s, c) -> c.onStop(s, this));
         return this;
     }
 
     public Entry stop(Status status) {
+        printInfo("STOPPED: " + text);
         this.status = status;
         stoppedAt = Instant.now();
         emit((s, c) -> c.onStop(s, this));
@@ -263,6 +279,7 @@ public class Entry {
     }
 
     public Entry stop(Status status, String extraText) {
+        printInfo("STOPPED: " + text);
         this.status = status;
         stoppedAt = Instant.now();
         emit((s, c) -> c.onStop(s, this));

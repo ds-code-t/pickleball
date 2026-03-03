@@ -8,6 +8,7 @@ import tools.dscode.common.treeparsing.preparsing.LineData;
 
 import java.util.ArrayList;
 
+import static io.cucumber.core.runner.GlobalState.stepInfo;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.treeparsing.DefinitionContext.FILE_INPUT;
 
@@ -112,9 +113,9 @@ public final class Phrase extends PhraseData {
         parsedLine.executedPhrases.add(this);
 
         if (shouldRun()) {
-            System.out.println("Running Phrase: " + this + (isClone ? " (clone)" : ""));
+            stepInfo("Running Phrase: " + this + (isClone ? " (clone)" : ""));
         } else {
-            System.out.println("Skipping Phrase: " + this + (isClone ? " (clone)" : ""));
+            stepInfo("Skipping Phrase: " + this + (isClone ? " (clone)" : ""));
             return;
         }
 

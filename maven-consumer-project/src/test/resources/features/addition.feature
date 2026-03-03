@@ -3,6 +3,7 @@ Feature: Addition
   @DDD
   Scenario: nav tes6
     * navigate to: URL.select
+    * , verify "Subscribe" Checkbox is on, and "Subscribe" Checkbox is true
 
   Scenario: gdfgdfss
   @[DEBUG,nobase,##]

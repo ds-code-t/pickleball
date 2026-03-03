@@ -24,7 +24,7 @@ public class CustomParameters {
 
 //    @Given("^,(.*)$")
 //    public void dynamicStep(String stepText) {
-//        System.out.println("dynamicStep: " + stepText);
+//        stepInfo("dynamicStep: " + stepText);
 //        DictionaryA dict = new DictionaryA();
 //        LineExecution lineData = dict.getLineExecutionData(stepText);
 //        lineData.execute(BrowserSteps.getDriver());

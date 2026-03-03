@@ -9,6 +9,8 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static io.cucumber.core.runner.GlobalState.stepInfo;
+
 public class UtilitySteps {
 
     public class CommonTransforms {
@@ -19,19 +21,19 @@ public class UtilitySteps {
 
         @Given("^uppercase:(.*)$")
         public static String uppercase(String text) {
-            System.out.println("uppercasing: " + text);
+            stepInfo("uppercasing: " + text);
             return text.toUpperCase(Locale.ROOT);
         }
 
         @Given("^lowercase:(.*)$")
         public static String lowercase(String text) {
-            System.out.println("lowercasing: " + text);
+            stepInfo("lowercasing: " + text);
             return text.toLowerCase(Locale.ROOT);
         }
 
         @Given("^capitalize:(.*)$")
         public static String capitalize(String text) {
-            System.out.println("capitalizing: " + text);
+            stepInfo("capitalizing: " + text);
             if (text == null || text.isEmpty()) return "";
             String s = text;
             // keep exactly as-is beyond first char
@@ -40,7 +42,7 @@ public class UtilitySteps {
 
         @Given("^titlecase:(.*)$")
         public static String titlecase(String text) {
-            System.out.println("titlecasing: " + text);
+            stepInfo("titlecasing: " + text);
             if (text == null || text.isBlank()) return "";
             String[] parts = text.trim().split("\\s+");
             StringBuilder sb = new StringBuilder();
@@ -57,26 +59,26 @@ public class UtilitySteps {
 
         @Given("^trim:(.*)$")
         public static String trim(String text) {
-            System.out.println("trimming: " + text);
+            stepInfo("trimming: " + text);
             return text == null ? "" : text.trim();
         }
 
         @Given("^strip:(.*)$")
         public static String strip(String text) {
-            System.out.println("stripping (unicode): " + text);
+            stepInfo("stripping (unicode): " + text);
             return text == null ? "" : text.strip();
         }
 
         @Given("^collapseSpaces:(.*)$")
         public static String collapseSpaces(String text) {
-            System.out.println("collapsing spaces: " + text);
+            stepInfo("collapsing spaces: " + text);
             if (text == null) return "";
             return text.trim().replaceAll("\\s+", " ");
         }
 
         @Given("^removeWhitespace:(.*)$")
         public static String removeWhitespace(String text) {
-            System.out.println("removing whitespace: " + text);
+            stepInfo("removing whitespace: " + text);
             if (text == null) return "";
             return text.replaceAll("\\s+", "");
         }
@@ -87,21 +89,21 @@ public class UtilitySteps {
 
         @Given("^normalizeNFC:(.*)$")
         public static String normalizeNFC(String text) {
-            System.out.println("normalizing NFC: " + text);
+            stepInfo("normalizing NFC: " + text);
             if (text == null) return "";
             return Normalizer.normalize(text, Normalizer.Form.NFC);
         }
 
         @Given("^normalizeNFKC:(.*)$")
         public static String normalizeNFKC(String text) {
-            System.out.println("normalizing NFKC: " + text);
+            stepInfo("normalizing NFKC: " + text);
             if (text == null) return "";
             return Normalizer.normalize(text, Normalizer.Form.NFKC);
         }
 
         @Given("^removeDiacritics:(.*)$")
         public static String removeDiacritics(String text) {
-            System.out.println("removing diacritics: " + text);
+            stepInfo("removing diacritics: " + text);
             if (text == null) return "";
             String decomposed = Normalizer.normalize(text, Normalizer.Form.NFD);
             return decomposed.replaceAll("\\p{M}+", "");
@@ -109,28 +111,28 @@ public class UtilitySteps {
 
         @Given("^digitsOnly:(.*)$")
         public static String digitsOnly(String text) {
-            System.out.println("keeping digits only: " + text);
+            stepInfo("keeping digits only: " + text);
             if (text == null) return "";
             return text.replaceAll("\\D+", "");
         }
 
         @Given("^alnumOnly:(.*)$")
         public static String alnumOnly(String text) {
-            System.out.println("keeping alnum only: " + text);
+            stepInfo("keeping alnum only: " + text);
             if (text == null) return "";
             return text.replaceAll("[^\\p{Alnum}]+", "");
         }
 
         @Given("^lettersOnly:(.*)$")
         public static String lettersOnly(String text) {
-            System.out.println("keeping letters only: " + text);
+            stepInfo("keeping letters only: " + text);
             if (text == null) return "";
             return text.replaceAll("[^\\p{L}]+", "");
         }
 
         @Given("^keepByRegex:(.*?);(.*)$")
         public static String keepByRegex(String pattern, String text) {
-            System.out.println("keepByRegex pattern=" + pattern + " text=" + text);
+            stepInfo("keepByRegex pattern=" + pattern + " text=" + text);
             if (text == null) return "";
             Pattern p = Pattern.compile(pattern);
             Matcher m = p.matcher(text);
@@ -149,21 +151,21 @@ public class UtilitySteps {
 
         @Given("^replace:(.*?);(.*?);(.*)$")
         public static String replace(String target, String replacement, String text) {
-            System.out.println("replacing '" + target + "'->'" + replacement + "' in: " + text);
+            stepInfo("replacing '" + target + "'->'" + replacement + "' in: " + text);
             if (text == null) return "";
             return text.replace(target, replacement);
         }
 
         @Given("^replaceRegex:(.*?);(.*?);(.*)$")
         public static String replaceRegex(String regex, String replacement, String text) {
-            System.out.println("replaceRegex /" + regex + "/ -> '" + replacement + "' in: " + text);
+            stepInfo("replaceRegex /" + regex + "/ -> '" + replacement + "' in: " + text);
             if (text == null) return "";
             return text.replaceAll(regex, replacement);
         }
 
         @Given("^extractRegex:(.*?);(\\d+);(.*)$")
         public static String extractRegexGroup(String regex, String groupIndexStr, String text) {
-            System.out.println("extractRegex regex=" + regex + " group=" + groupIndexStr + " text=" + text);
+            stepInfo("extractRegex regex=" + regex + " group=" + groupIndexStr + " text=" + text);
             if (text == null) return "";
             int groupIndex = parseIntSafe(groupIndexStr, 0);
             Matcher m = Pattern.compile(regex).matcher(text);
@@ -174,7 +176,7 @@ public class UtilitySteps {
 
         @Given("^extractAllRegex:(.*?);(\\d+);(.*)$")
         public static String extractAllRegexGroup(String regex, String groupIndexStr, String text) {
-            System.out.println("extractAllRegex regex=" + regex + " group=" + groupIndexStr + " text=" + text);
+            stepInfo("extractAllRegex regex=" + regex + " group=" + groupIndexStr + " text=" + text);
             if (text == null) return "";
             int groupIndex = parseIntSafe(groupIndexStr, 0);
             Matcher m = Pattern.compile(regex).matcher(text);
@@ -220,25 +222,25 @@ public class UtilitySteps {
 
         @Given("^add:(.*?);(.*)$")
         public static String add(String a, String b) {
-            System.out.println("add: " + a + " + " + b);
+            stepInfo("add: " + a + " + " + b);
             return parseDecimal(a).add(parseDecimal(b)).stripTrailingZeros().toPlainString();
         }
 
         @Given("^subtract:(.*?);(.*)$")
         public static String subtract(String a, String b) {
-            System.out.println("subtract: " + a + " - " + b);
+            stepInfo("subtract: " + a + " - " + b);
             return parseDecimal(a).subtract(parseDecimal(b)).stripTrailingZeros().toPlainString();
         }
 
         @Given("^multiply:(.*?);(.*)$")
         public static String multiply(String a, String b) {
-            System.out.println("multiply: " + a + " * " + b);
+            stepInfo("multiply: " + a + " * " + b);
             return parseDecimal(a).multiply(parseDecimal(b)).stripTrailingZeros().toPlainString();
         }
 
         @Given("^divide:(.*?);(.*?);(\\d+)$")
         public static String divide(String a, String b, String scaleStr) {
-            System.out.println("divide: " + a + " / " + b + " scale=" + scaleStr);
+            stepInfo("divide: " + a + " / " + b + " scale=" + scaleStr);
             int scale = parseIntSafe(scaleStr, 2);
             BigDecimal divisor = parseDecimal(b);
             if (divisor.compareTo(BigDecimal.ZERO) == 0) return "NaN";
@@ -247,35 +249,35 @@ public class UtilitySteps {
 
         @Given("^floor:(.*)$")
         public static String floor(String a) {
-            System.out.println("floor: " + a);
+            stepInfo("floor: " + a);
             BigDecimal d = parseDecimal(a);
             return d.setScale(0, RoundingMode.FLOOR).toPlainString();
         }
 
         @Given("^ceil:(.*)$")
         public static String ceil(String a) {
-            System.out.println("ceil: " + a);
+            stepInfo("ceil: " + a);
             BigDecimal d = parseDecimal(a);
             return d.setScale(0, RoundingMode.CEILING).toPlainString();
         }
 
         @Given("^truncate:(.*?);(\\d+)$")
         public static String truncate(String a, String placesStr) {
-            System.out.println("truncate: " + a + " places=" + placesStr);
+            stepInfo("truncate: " + a + " places=" + placesStr);
             int places = parseIntSafe(placesStr, 0);
             return parseDecimal(a).setScale(places, RoundingMode.DOWN).toPlainString();
         }
 
         @Given("^roundHalfUp:(.*?);(\\d+)$")
         public static String roundHalfUp(String a, String placesStr) {
-            System.out.println("roundHalfUp: " + a + " places=" + placesStr);
+            stepInfo("roundHalfUp: " + a + " places=" + placesStr);
             int places = parseIntSafe(placesStr, 0);
             return parseDecimal(a).setScale(places, RoundingMode.HALF_UP).toPlainString();
         }
 
         @Given("^min:(.*?);(.*)$")
         public static String min(String a, String b) {
-            System.out.println("min: " + a + ", " + b);
+            stepInfo("min: " + a + ", " + b);
             BigDecimal da = parseDecimal(a);
             BigDecimal db = parseDecimal(b);
             return (da.compareTo(db) <= 0 ? da : db).stripTrailingZeros().toPlainString();
@@ -283,7 +285,7 @@ public class UtilitySteps {
 
         @Given("^max:(.*?);(.*)$")
         public static String max(String a, String b) {
-            System.out.println("max: " + a + ", " + b);
+            stepInfo("max: " + a + ", " + b);
             BigDecimal da = parseDecimal(a);
             BigDecimal db = parseDecimal(b);
             return (da.compareTo(db) >= 0 ? da : db).stripTrailingZeros().toPlainString();
@@ -296,7 +298,7 @@ public class UtilitySteps {
 
         @Given("^padLeftZeros:(.*?);(\\d+)$")
         public static String padLeftZeros(String text, String widthStr) {
-            System.out.println("padLeftZeros: " + text + " width=" + widthStr);
+            stepInfo("padLeftZeros: " + text + " width=" + widthStr);
             int width = parseIntSafe(widthStr, 0);
             String s = nullToEmpty(text);
             if (s.length() >= width) return s;
@@ -305,7 +307,7 @@ public class UtilitySteps {
 
         @Given("^padRightZeros:(.*?);(\\d+)$")
         public static String padRightZeros(String text, String widthStr) {
-            System.out.println("padRightZeros: " + text + " width=" + widthStr);
+            stepInfo("padRightZeros: " + text + " width=" + widthStr);
             int width = parseIntSafe(widthStr, 0);
             String s = nullToEmpty(text);
             if (s.length() >= width) return s;
@@ -314,7 +316,7 @@ public class UtilitySteps {
 
         @Given("^trimLeadingZeros:(.*)$")
         public static String trimLeadingZeros(String text) {
-            System.out.println("trimLeadingZeros: " + text);
+            stepInfo("trimLeadingZeros: " + text);
             String s = nullToEmpty(text);
             // keep a single zero if the string is all zeros
             String t = s.replaceFirst("^0+(?!$)", "");
@@ -323,7 +325,7 @@ public class UtilitySteps {
 
         @Given("^trimTrailingZerosDecimal:(.*)$")
         public static String trimTrailingZerosDecimal(String text) {
-            System.out.println("trimTrailingZerosDecimal: " + text);
+            stepInfo("trimTrailingZerosDecimal: " + text);
             // For decimals like "12.3400" -> "12.34", "12.000" -> "12"
             BigDecimal d = parseDecimal(text);
             return d.stripTrailingZeros().toPlainString();
@@ -335,13 +337,13 @@ public class UtilitySteps {
 
         @Given("^abs:(.*)$")
         public static String abs(String a) {
-            System.out.println("abs: " + a);
+            stepInfo("abs: " + a);
             return parseDecimal(a).abs().stripTrailingZeros().toPlainString();
         }
 
         @Given("^clamp:(.*?);(.*?);(.*)$")
         public static String clamp(String value, String min, String max) {
-            System.out.println("clamp value=" + value + " min=" + min + " max=" + max);
+            stepInfo("clamp value=" + value + " min=" + min + " max=" + max);
             BigDecimal v = parseDecimal(value);
             BigDecimal lo = parseDecimal(min);
             BigDecimal hi = parseDecimal(max);

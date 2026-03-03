@@ -18,6 +18,7 @@ import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static io.cucumber.core.runner.GlobalState.stepInfo;
 import static io.cucumber.core.runner.util.TableUtils.toFlatMultimap;
 import static io.cucumber.core.runner.util.TableUtils.toRowsMultimap;
 import static tools.dscode.common.GlobalConstants.MATCH_START;
@@ -114,8 +115,8 @@ public class MappingSteps extends CoreSteps {
 
     @Given("^(:?\"(.*)\"\\s+)?DATA TABLE$")
     public static void dataTable(String tableName, DataTable dataTable) {
-        System.out.println("Datatable Step tableName: " + tableName);
-        System.out.println("Datatable Step dataTable: " + dataTable);
+        stepInfo("Datatable Step tableName: " + tableName);
+        stepInfo("Datatable Step dataTable: " + dataTable);
         // tableName = tableName == null || tableName.isBlank() ? "" :
         // tableName.trim();
         // getCurrentStep().putToTemplateStep(tableName, dataTable);
@@ -173,7 +174,7 @@ public class MappingSteps extends CoreSteps {
 
     @Given("^save \"(.*)\" as \"(.*)\"$")
     public static void saveValues(String value, String key) {
-        System.out.println("SAve values");
+        stepInfo("SAve values");
         try {
             Thread.sleep(100L);
         } catch (InterruptedException e) {

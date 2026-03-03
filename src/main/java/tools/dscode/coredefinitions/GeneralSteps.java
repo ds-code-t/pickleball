@@ -33,6 +33,7 @@ import static io.cucumber.core.runner.CurrentScenarioState.registerScenarioObjec
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
+import static io.cucumber.core.runner.GlobalState.stepInfo;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.GlobalConstants.INFO_STEP;
 import static tools.dscode.common.GlobalConstants.NEXT_SIBLING_STEP;
@@ -156,31 +157,19 @@ public class GeneralSteps extends CoreSteps {
 
     @Given("^" + SCENARIO_STEP + "\\s*(?:.*)$")
     public static void scenarioStep() {
-        waitMilliseconds(300);
-        StepExtension currentStep = getRunningStep();
-        System.out.println("currentStep: " + currentStep);
-        System.out.println("currentStep.getUnmodifiedText(): " + currentStep.getUnmodifiedText());
-        System.out.println("currentStep.pickleStepTestStep: " + currentStep.pickleStepTestStep);
-        System.out.println("currentStep: " + currentStep);
-        System.out.println("currentStep.childSteps.size(): " + currentStep.childSteps.size());
+
     }
 
     @DefinitionFlags(DefinitionFlag.RUN_METHOD_DIRECTLY)
     @Given(ROOT_STEP)
     public static void rootStep() {
-//        System.out.println("Starting Scenario Run");
-
-
-//        Map<String, ?> localStepDefinitionsByPattern = (Map<String, ?>) getProperty(getLocalCachingGlue(), "stepDefinitionsByPattern");
-//        Map<String, ?> globalStepDefinitionsByPattern = (Map<String, ?>) getProperty(getCachingGlue(), "stepDefinitionsByPattern");
-
 
         getCurrentScenarioState().startScenarioRun();
     }
 
     @Given(INFO_STEP)
     public static void infoStep(String message) {
-        System.out.println(message);
+        stepInfo(message);
     }
 
     @Given(HARD_ERROR_STEP)
@@ -195,20 +184,20 @@ public class GeneralSteps extends CoreSteps {
 
     @Given("^SKIPPING: (.*)$")
     public static void skippedStep(String message) {
-        System.out.println("Skipping step: " + message);
+        stepInfo("Skipping step: " + message);
     }
 
 
     @Given("^print (.*)$")
     public static void printVal(String message) {
-        System.out.println("PRINT: " + message);
+        stepInfo("PRINT: " + message);
     }
 
 
     @DefinitionFlags(_NO_LOGGING)
     @Given(NEXT_SIBLING_STEP)
     public static void NEXT_SIBLING_STEP() {
-        System.out.println("NEXT_SIBLING_STEP: ");
+
     }
 
 }

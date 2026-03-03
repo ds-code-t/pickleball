@@ -8,6 +8,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 
+import static io.cucumber.core.runner.GlobalState.stepError;
+import static io.cucumber.core.runner.GlobalState.stepInfo;
 import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 import static tools.dscode.pickleruntime.CucumberOptionResolver.glueDistinct;
 
@@ -37,7 +39,6 @@ public aspect JavaBackend_LoadGlue_Mutator {
                 throw new RuntimeException(e);
             }
             String text = uri.toString();
-            printDebug("##Glue path: " + text);
             if (text.startsWith("classpath:/tools/dscode/coredefinitions")) continue;
             if (text.equals("classpath:") || text.equals("classpath:/")) continue;
 
@@ -59,9 +60,7 @@ public aspect JavaBackend_LoadGlue_Mutator {
             throw new RuntimeException(e);
         }
 
-        DebugUtils.onMatch("##Glue final-URI: ", msg -> {
-            for(URI uri : modified) System.out.println(msg + uri );;
-        });
+        stepInfo("Glue paths set: " + modified.stream().map(URI::toString).collect(java.util.stream.Collectors.joining(",")));
 
         proceed(glue, modified);
     }
