@@ -1,5 +1,6 @@
 Feature: Addition
 
+  @DDD
   Scenario: nav tes6
     * navigate to: URL.select
 

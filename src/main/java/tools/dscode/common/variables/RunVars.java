@@ -4,13 +4,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import tools.dscode.common.mappings.FileAndDataParsing;
-import tools.dscode.common.mappings.GlobalMappings;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -44,10 +42,10 @@ public class RunVars extends NodeMap {
         for (Map.Entry<String, JsonNode> entry : runConfigNode.properties()) {
             String key = entry.getKey();
             JsonNode value = entry.getValue();
+            if(value.isMissingNode() || value.isNull())
+                continue;
             evaluate(value, RUN_VARS.root);
         }
-
-
         String profileName = RUN_VARS.getStringValue(PROFILEProp);
 
         if (profileName != null && !profileName.isBlank()) {

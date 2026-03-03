@@ -276,6 +276,12 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return resolveWholeText(getStringValue(returnObj));
     }
 
+    public String getCaseInsensitiveAndResolve(String key) {
+        Object returnObj = getCaseInsensitive(resolveWholeText(key));
+        if (returnObj == null) return null;
+        return resolveWholeText(String.valueOf(returnObj));
+    }
+
     public Object getCaseInsensitive(String key) {
         Tokenized tokenized = new Tokenized(key);
         for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
