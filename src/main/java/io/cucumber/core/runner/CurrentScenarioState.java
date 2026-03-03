@@ -239,7 +239,6 @@ public class CurrentScenarioState extends ScenarioMapping {
         io.cucumber.plugin.event.Status status = result.getStatus();
         Throwable throwable = result.getError();
 
-
         if (!result.getStatus().equals(Status.PASSED) && !result.getStatus().equals(Status.SKIPPED) && throwable == null) {
 
             if (status.equals(io.cucumber.plugin.event.Status.UNDEFINED))

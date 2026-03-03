@@ -21,6 +21,8 @@ import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
+import static io.cucumber.core.runner.GlobalState.stepError;
+import static io.cucumber.core.runner.GlobalState.stepInfo;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
@@ -327,7 +329,7 @@ public abstract class PhraseData extends PassedData {
         previouslyResolvedBoolean = getBooleanResult();
 
         String assertionMessage = "Assertion phrase '" + resolvedText + "' evaluates to: " + previouslyResolvedBoolean;
-        System.out.println(assertionMessage);
+        stepInfo(assertionMessage);
         if (!resultElements.isEmpty())
             assertionMessage += " , elements:" + resultElements.stream()
                     .map(Object::toString)
@@ -341,11 +343,13 @@ public abstract class PhraseData extends PassedData {
         switch (getAssertionType().replace("Termination", "")) {
             case "ensure" -> {
                 if (!previouslyResolvedBoolean) {
+                    stepError("Failed hard assertion in Phrase '" + resolvedText + "'");
                     throw new RuntimeException("FAILED  " + assertionMessage);
                 }
             }
             case "verify" -> {
                 if (!previouslyResolvedBoolean) {
+                    stepError("Failed soft assertion in Phrase '" + resolvedText + "'");
                     throw new SoftRuntimeException("FAILED  " + assertionMessage);
                 }
             }

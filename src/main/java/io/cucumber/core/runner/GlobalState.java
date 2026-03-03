@@ -9,6 +9,7 @@ import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.reporting.Report;
 import tools.dscode.common.reporting.WorkBook;
 import tools.dscode.common.reporting.logging.BaseConverter;
+import tools.dscode.common.reporting.logging.Entry;
 
 import java.nio.file.Path;
 import java.util.Optional;
@@ -174,9 +175,29 @@ public class GlobalState {
 //        return (CurrentScenarioState) getProperty(localOrGlobalOf(TestCase.class), "currentScenarioState");
     }
 
+    public static Entry getStepEntry() {
+        return getCurrentScenarioState().getCurrentStep().stepEntry;
+    }
+
+    public static Entry stepInfo(String message) {
+        Entry entry = getCurrentScenarioState().getCurrentStep().stepEntry;
+        return entry.info(message);
+    }
+
+    public static Entry stepError(String message) {
+        Entry entry = getCurrentScenarioState().getCurrentStep().stepEntry;
+        return entry.error(message);
+    }
+
+    public static Entry stepFail(String message) {
+        Entry entry = getCurrentScenarioState().getCurrentStep().stepEntry;
+        return entry.fail(message);
+    }
+
     public static StepExtension getRunningStep() {
         return getCurrentScenarioState().getCurrentStep();
     }
+
     public static ParsingMap getRunningParsingMap() {
         try {
             return getCurrentScenarioState().getCurrentStep().getStepParsingMap();
