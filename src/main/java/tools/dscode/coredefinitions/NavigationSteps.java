@@ -1,12 +1,10 @@
 package tools.dscode.coredefinitions;
 
-import io.cucumber.core.runner.StepExtension;
 import io.cucumber.java.en.When;
 import org.openqa.selenium.WebDriver;
 
 import static io.cucumber.core.runner.GlobalState.getRunningParsingMap;
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static io.cucumber.core.runner.GlobalState.stepInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 
 public class NavigationSteps {
 

@@ -583,9 +583,10 @@ public final class DefinitionContext {
 
             category("Cell").children("Cells").inheritsFrom("cellLabel")
                     .and((category, v, op) ->
-                            XPathy.from("//*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + " ][not(descendant::table)]")
+                            XPathy.from("//*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + " ][not(descendant::table)][not(self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + ")]")
                     );
 
+            category("Column").children("Columns").inheritsFrom("cellLabel");
 
             category(BASE_CATEGORY).and(
                     (category, v, op) -> {
@@ -654,7 +655,12 @@ public final class DefinitionContext {
 
             category("cellLabel")
                     .or(
-                            (category, v, op) -> cellsInColumnByHeaderText(v, op, customElementSuffixPredicate("row"), customElementSuffixPredicate("cell"), customElementSuffixPredicate("header"))
+                            (category, v, op) -> {
+                                if (v == null || v.isNullOrBlank()) {
+                                    return null; // no label text to match, skip this builder
+                                }
+                                return cellsInColumnByHeaderText(v, op, customElementSuffixPredicate("row"), customElementSuffixPredicate("cell"), customElementSuffixPredicate("header"));
+                            }
                     );
 
             category("forLabel")

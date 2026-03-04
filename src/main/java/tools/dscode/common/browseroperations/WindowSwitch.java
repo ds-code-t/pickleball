@@ -19,10 +19,9 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.openqa.selenium.interactions.Actions;
-import tools.dscode.common.treeparsing.parsedComponents.ElementMatch.TextOp;
 
-import static io.cucumber.core.runner.GlobalState.stepInfo;
+import tools.dscode.common.treeparsing.parsedComponents.ElementMatch.TextOp;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 
 /**
  * Window/tab utilities (filtering + switching are decoupled).

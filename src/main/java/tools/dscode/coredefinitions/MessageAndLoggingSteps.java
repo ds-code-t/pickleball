@@ -8,8 +8,8 @@ import java.util.List;
 import static io.cucumber.core.runner.CurrentScenarioState.endScenario;
 import static io.cucumber.core.runner.CurrentScenarioState.failScenario;
 import static io.cucumber.core.runner.CurrentScenarioState.softFailScenario;
-import static io.cucumber.core.runner.GlobalState.stepFail;
-import static io.cucumber.core.runner.GlobalState.stepInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepFail;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 
 
 public class MessageAndLoggingSteps {

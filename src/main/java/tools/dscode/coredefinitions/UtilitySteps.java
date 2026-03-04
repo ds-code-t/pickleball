@@ -9,7 +9,7 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static io.cucumber.core.runner.GlobalState.stepInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 
 public class UtilitySteps {
 

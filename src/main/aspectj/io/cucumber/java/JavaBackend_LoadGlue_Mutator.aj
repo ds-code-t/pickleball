@@ -8,9 +8,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
 
-import static io.cucumber.core.runner.GlobalState.stepError;
-import static io.cucumber.core.runner.GlobalState.stepInfo;
-import static tools.dscode.common.util.debug.DebugUtils.printDebug;
+
+import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 import static tools.dscode.pickleruntime.CucumberOptionResolver.glueDistinct;
 
 public aspect JavaBackend_LoadGlue_Mutator {

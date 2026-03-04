@@ -8,8 +8,8 @@ import tools.dscode.common.treeparsing.preparsing.LineData;
 
 import java.util.ArrayList;
 
-import static io.cucumber.core.runner.GlobalState.stepInfo;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 import static tools.dscode.common.treeparsing.DefinitionContext.FILE_INPUT;
 
 

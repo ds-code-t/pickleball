@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
-import static io.cucumber.core.runner.GlobalState.stepInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 import static tools.dscode.common.treeparsing.parsedComponents.Phrase.updateChainAndInheritances;
 
 public final class ParsedLine extends LineData {

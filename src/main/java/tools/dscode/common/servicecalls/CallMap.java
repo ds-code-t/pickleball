@@ -11,10 +11,10 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import static io.cucumber.core.runner.GlobalState.stepError;
-import static io.cucumber.core.runner.GlobalState.stepInfo;
-import static io.cucumber.core.runner.GlobalState.stepWarn;
-import static tools.dscode.common.mappings.ValueFormatting.toSafeJsonNode;
+
+import static tools.dscode.common.reporting.logging.LogForwarder.stepError;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepWarn;
 import static tools.dscode.common.servicecalls.RestAssuredUtil.buildRequest;
 import static tools.dscode.common.servicecalls.RestAssuredUtil.execute;
 import static tools.dscode.common.servicecalls.RestAssuredUtil.extractResponse;

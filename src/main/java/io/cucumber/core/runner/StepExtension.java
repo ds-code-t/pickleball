@@ -28,12 +28,11 @@ import static io.cucumber.core.runner.GlobalState.getGlobalEventBus;
 import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
-import static io.cucumber.core.runner.GlobalState.stepDebug;
-import static io.cucumber.core.runner.GlobalState.stepInfo;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleStepTestStep;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepDebug;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
 import static tools.dscode.common.util.debug.DebugUtils.parseDebugString;
 

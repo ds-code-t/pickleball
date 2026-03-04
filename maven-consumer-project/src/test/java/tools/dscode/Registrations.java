@@ -60,40 +60,9 @@ public class Registrations {
 
         ExecutionDictionary dict = getExecutionDictionary();
 
-        dict.category("Menu").andAnyCategories("idMatch", "cellLabel")
-                .addBase("//select");
 
 
 
-        dict.category("idMatch")
-                .or(
-                        (category, v, op) -> {
-                            XPathy x = XPathyBuilder.buildIfAllTrue(any, id, v, op, v != null);
-                            return x;
-                        }
-                );
-
-
-        dict.category("label")
-                .and(
-                        (category, v, op) -> {
-                            if (v == null || v.isNullOrBlank()) {
-                                return null; // no label text to match, skip this builder
-                            }
-                            String textXpath = v.asNormalizedText();
-                            printDebug("##textXpath forLabel:1 " + textXpath);
-
-                            XPathy ret = combineOr(
-                                    new XPathy("//select[@id = //label[normalize-space(.)='" + v + "']/@for]"),
-                                    new XPathy("//*[preceding-sibling::*[1][self::label[normalize-space(.)='" + v + "']]]")
-                            );
-
-                            onMatch("##textXpath forLabel:2 ", (matchedString) ->
-                                    System.out.println(matchedString + ret)
-                            );
-                            return ret;
-                        }
-                );
 
 
 

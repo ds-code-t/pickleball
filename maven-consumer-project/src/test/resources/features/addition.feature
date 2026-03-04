@@ -1,9 +1,23 @@
 Feature: Addition
 
+
+  Scenario: Scenario test cell
+  @[DEBUG,nobase,##]
+    * navigate to: URL.SELEct
+#    * , verify "Name" Column equals "1"
+#    * , verify 2nd "Name" Column equals "1"
+
   @DDD
-  Scenario: nav tes6
+  Scenario Outline: nav tes6 <A>
     * navigate to: URL.select
     * , verify "Subscribe" Checkbox is on, and "Subscribe" Checkbox is true
+    Examples:
+      | Scenario Tags | A | B | C |
+      | %taga         | 1 | 5 |   |
+      | %taga         | 2 | 5 |   |
+      | %taga         | 3 | 5 |   |
+      | %taga         | 4 | 5 |   |
+
 
   Scenario: gdfgdfss
   @[DEBUG,nobase,##]

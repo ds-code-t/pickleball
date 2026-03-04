@@ -16,10 +16,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.function.Function;
 
-import static io.cucumber.core.runner.GlobalState.stepError;
-import static io.cucumber.core.runner.GlobalState.stepWarn;
+
 import static tools.dscode.common.domoperations.HumanInteractions.blur;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepWarn;
 
 public final class LeanWaits {
 

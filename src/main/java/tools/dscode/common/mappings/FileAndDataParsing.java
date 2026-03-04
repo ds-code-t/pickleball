@@ -26,7 +26,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import static io.cucumber.core.runner.GlobalState.stepWarn;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepWarn;
 
 public final class FileAndDataParsing {
 

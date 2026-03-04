@@ -10,6 +10,7 @@ import tools.dscode.common.reporting.Report;
 import tools.dscode.common.reporting.WorkBook;
 import tools.dscode.common.reporting.logging.BaseConverter;
 import tools.dscode.common.reporting.logging.Entry;
+import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
 
 import java.nio.file.Path;
 import java.util.Optional;
@@ -24,6 +25,8 @@ import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.reporting.WorkBookConsolePrinter.error;
 import static tools.dscode.common.reporting.WorkBookConsolePrinter.errorBlock;
 import static tools.dscode.common.util.Reflect.getProperty;
+import static tools.dscode.common.util.StringUtilities.safeFileName;
+import static tools.dscode.pickleruntime.CucumberOptionResolver.tags;
 import static tools.dscode.registry.GlobalRegistry.localOrGlobalOf;
 import static tools.dscode.registry.GlobalRegistry.runners;
 
@@ -35,8 +38,19 @@ public class GlobalState {
     private static final ConcurrentHashMap<String, Path> scenarioHtmlByRowKey = new ConcurrentHashMap<>();
 
 
+    public static Entry pickleballLog;
+
 
     static {
+        String entryName = "Pickleball Run " + (tags().isEmpty() ? "" : tags());
+        pickleballLog =
+                Entry.of(entryName).excludeFromSummary()
+                        .tag("RUNLOG")
+                        .on(new SimpleHtmlReportConverter(
+                                Path.of("reports/tests", safeFileName(entryName + ".html"))
+                        )).threadSafe().start();
+
+
         BaseConverter.setRowDataProvider(rowKey ->
                 getReport()
                         .snapshotRow(rowKey)
@@ -64,11 +78,10 @@ public class GlobalState {
     public static Runner getGlobalRunner() {
         int counter = 0;
         while (globalRunner == null && counter++ < 10) {
-            for(Runner runner : runners) {
+            for (Runner runner : runners) {
                 CachingGlue glue = (CachingGlue) getProperty(runner, "glue");
                 Map stepDefinitionsByPattern = (Map) getProperty(glue, "stepDefinitionsByPattern");
-                if(!stepDefinitionsByPattern.isEmpty())
-                {
+                if (!stepDefinitionsByPattern.isEmpty()) {
                     globalRunner = runner;
                     globalCachingGlue = glue;
                     break;
@@ -123,8 +136,6 @@ public class GlobalState {
 //    }
 
 
-
-
 //    public static Locale locale;
 //
 //    public static Locale getLocal() {
@@ -175,56 +186,6 @@ public class GlobalState {
     public static io.cucumber.core.runner.CurrentScenarioState getCurrentScenarioState() {
         return currentScenarioState.get();
 //        return (CurrentScenarioState) getProperty(localOrGlobalOf(TestCase.class), "currentScenarioState");
-    }
-
-
-    public static Entry getStepEntry() {
-        return getCurrentScenarioState().getCurrentStep().stepEntry;
-    }
-
-    public static Entry stepFail(String message) {
-        return getCurrentScenarioState().getCurrentStep().stepEntry.fail(message);
-    }
-
-
-    public static Entry stepInfo(String message) {
-        return getCurrentScenarioState().getCurrentStep().stepEntry.info(message);
-    }
-
-    public static Entry stepError(String message) {
-        return getCurrentScenarioState().getCurrentStep().stepEntry.error(message);
-    }
-
-    public static Entry stepWarn(String message) {
-        return getCurrentScenarioState().getCurrentStep().stepEntry.warn(message);
-    }
-
-    public static Entry stepTrace(String message) {
-        return getCurrentScenarioState().getCurrentStep().stepEntry.trace(message);
-    }
-
-    public static Entry stepDebug(String message) {
-        return getCurrentScenarioState().getCurrentStep().stepEntry.debug(message);
-    }
-
-    public static Entry scenarioInfo(String message) {
-        return getCurrentScenarioState().scenarioLog.info(message);
-    }
-
-    public static Entry scenarioError(String message) {
-        return getCurrentScenarioState().scenarioLog.error(message);
-    }
-
-    public static Entry scenarioWarn(String message) {
-        return getCurrentScenarioState().scenarioLog.warn(message);
-    }
-
-    public static Entry scenarioTrace(String message) {
-        return getCurrentScenarioState().scenarioLog.trace(message);
-    }
-
-    public static Entry scenarioDebug(String message) {
-        return getCurrentScenarioState().scenarioLog.debug(message);
     }
 
 

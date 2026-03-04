@@ -84,6 +84,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                 synchronized (SharedSingleFile.LOCK) {
                     for (ScopeState s : scopes.values()) {
                         String key = (s.rowKey != null && !s.rowKey.isBlank()) ? s.rowKey : s.rootId;
+
                         if (key == null) continue;
                         SharedSingleFile.ALL_SCOPES.put(key, deepCopyScopeState(s));
                     }
@@ -98,6 +99,10 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         ScopeState c = new ScopeState();
         c.rootId = src.rootId;
         c.rowKey = src.rowKey;
+
+        // NEW
+        c.includeInSummary = src.includeInSummary;
+
         for (Map.Entry<String, HtmlNode> e : src.nodes.entrySet()) {
             c.nodes.put(e.getKey(), e.getValue().deepCopy());
         }
@@ -224,6 +229,9 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         ScopeState s = new ScopeState();
         s.rootId = scope.id;
 
+        // NEW: read the flag from the root scope entry
+        s.includeInSummary = scope.isIncludedInSummary();
+
         try {
             s.rowKey = GlobalState.getCurrentScenarioState().id.toString();
         } catch (Throwable ignored) {
@@ -231,7 +239,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         }
 
         HtmlNode root = new HtmlNode(scope.id, sanitizeNodeName(scope.text), null);
-        // Root is a span-like container; try to carry start/stop too if present
         root.startedAt = scope.startedAt;
         root.stoppedAt = scope.stoppedAt;
         root.timestampedAt = scope.timestampedAt;
@@ -379,23 +386,36 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("  <style>\n").append(CSS).append("\n  </style>\n");
         out.append("</head>\n<body>\n");
 
-        List<ScopeState> scopeStates = new ArrayList<>(scopesToRender.values());
-        scopeStates.sort(Comparator.comparing(s -> {
+        List<ScopeState> all = new ArrayList<>(scopesToRender.values());
+        all.sort(Comparator.comparing(s -> {
             String k = (s.rowKey == null) ? "" : s.rowKey;
             return k.isBlank() ? (s.rootId == null ? "" : s.rootId) : k;
         }));
 
-        int total = scopeStates.size();
-        int passed = 0;
-        int failed = 0;
+        // Split: included scopes get tabs; excluded scopes render under MAIN tab.
+        List<ScopeState> included = new ArrayList<>();
+        List<ScopeState> excluded = new ArrayList<>();
 
-        List<Status> perScopeStatus = new ArrayList<>(scopeStates.size());
-        for (ScopeState s : scopeStates) {
-            Status st = computeOverallStatusForScope(s);
-            perScopeStatus.add(st);
-            if (st == Status.FAIL) failed++; else passed++;
+        for (ScopeState s : all) {
+            if (s == null) continue;
+            if (s.includeInSummary) included.add(s);
+            else excluded.add(s);
         }
-        int passPct = (total == 0) ? 0 : (int) Math.round((passed * 100.0) / total);
+
+        // Compute statuses (for included scopes only, since those become scenario tabs)
+        List<Status> includedStatus = new ArrayList<>(included.size());
+        for (ScopeState s : included) includedStatus.add(computeOverallStatusForScope(s));
+
+        // Summary counts should still be based on "includeInSummary" scopes
+        int totalCounted = included.size();
+        int passedCounted = 0;
+        int failedCounted = 0;
+        for (Status st : includedStatus) {
+            if (st == Status.FAIL) failedCounted++;
+            else passedCounted++;
+        }
+
+        int passPct = (totalCounted == 0) ? 0 : (int) Math.round((passedCounted * 100.0) / totalCounted);
         passPct = Math.max(0, Math.min(100, passPct));
 
         out.append("<div class=\"page\">\n");
@@ -409,8 +429,10 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                 .append("</div>\n");
 
         out.append("        <div class=\"summaryNumbers\">\n");
-        out.append("          <span class=\"pill passPill\">Passed: ").append(passed).append("/").append(total).append("</span>\n");
-        out.append("          <span class=\"pill failPill\">Failed: ").append(failed).append("/").append(total).append("</span>\n");
+        out.append("          <span class=\"pill passPill\">Passed: ")
+                .append(passedCounted).append("/").append(totalCounted).append("</span>\n");
+        out.append("          <span class=\"pill failPill\">Failed: ")
+                .append(failedCounted).append("/").append(totalCounted).append("</span>\n");
         out.append("          <span class=\"pill pctPill\">").append(passPct).append("% pass</span>\n");
         out.append("        </div>\n");
 
@@ -425,20 +447,21 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("    <nav class=\"railTabs\">\n");
         out.append("      <div class=\"tabButtons\">\n");
 
-        // MAIN tab label: "Scenarios (N)" (no dot)
+        // MAIN tab label
         out.append("        <button class=\"tabBtn main active\" data-tab=\"main\">");
-        out.append("Scenarios (").append(total).append(")");
+        out.append("Scenarios (").append(totalCounted).append(")");
         out.append("</button>\n");
 
-        for (int i = 0; i < scopeStates.size(); i++) {
-            ScopeState s = scopeStates.get(i);
+        // Scenario tabs (included only)
+        for (int i = 0; i < included.size(); i++) {
+            ScopeState s = included.get(i);
             HtmlNode root = s.nodes.get(s.rootId);
             if (root == null) continue;
 
             String label = root.title;
             if (label == null || label.isBlank()) label = "Scenario " + (i + 1);
 
-            Status st = perScopeStatus.get(i);
+            Status st = includedStatus.get(i);
             String stClass = (st == Status.FAIL) ? "fail" : "pass";
 
             out.append("        <button class=\"tabBtn ").append(stClass).append("\" data-tab=\"sc").append(i).append("\">");
@@ -453,30 +476,29 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("  </aside>\n");
         out.append("  <main class=\"main\">\n");
 
+        // MAIN panel
         out.append("<section class=\"scope tabPanel active\" id=\"main\">\n");
         out.append("  <div class=\"scopeHeader\">\n");
         out.append("    <div class=\"scopeName\">All Scenarios</div>\n");
         out.append("  </div>\n");
-        renderOverviewSpreadsheet(out, scopeStates, perScopeStatus);
+
+        // Overview table (included scopes only)
+        renderOverviewSpreadsheet(out, included, includedStatus);
+
+        // NEW: excluded scopes appear under the overview table
+        renderExcludedScopesUnderMain(out, excluded);
+
         out.append("</section>\n");
 
-        for (int i = 0; i < scopeStates.size(); i++) {
-            ScopeState s = scopeStates.get(i);
+        // Scenario panels (included only)
+        for (int i = 0; i < included.size(); i++) {
+            ScopeState s = included.get(i);
             HtmlNode root = s.nodes.get(s.rootId);
             if (root == null) continue;
 
-            for (HtmlNode n : s.nodes.values()) n.children.clear();
-            for (HtmlNode n : s.nodes.values()) {
-                if (n.parentId != null) {
-                    HtmlNode parent = s.nodes.get(n.parentId);
-                    if (parent != null) parent.children.add(n);
-                }
-            }
+            rebuildChildrenLinks(s);
 
             out.append("<section class=\"scope tabPanel\" id=\"sc").append(i).append("\">\n");
-//            out.append("  <div class=\"scopeHeader\">\n");
-//            out.append("    <div class=\"scopeName\">").append(root.title).append("</div>\n");
-//            out.append("  </div>\n");
 
             if (s.rowKey != null) renderScenarioSummary(out, s.rowKey);
 
@@ -486,6 +508,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             out.append("</section>\n");
         }
 
+        // JS unchanged (still targets mainSummaryTable, and jumps to sc{i})
         out.append("<script>\n");
         out.append("(function(){\n");
         out.append("  var btns = document.querySelectorAll('.tabBtn');\n");
@@ -499,7 +522,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("  var first = document.querySelector('.tabBtn[data-tab=\"main\"]');\n");
         out.append("  if (first) show('main');\n");
         out.append("\n");
-        out.append("  // ---------- Spreadsheet-like MAIN table (sort + filters + status radio) ----------\n");
         out.append("  var table = document.getElementById('mainSummaryTable');\n");
         out.append("  if (!table) return;\n");
         out.append("  var tbody = table.querySelector('tbody');\n");
@@ -517,7 +539,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("    var wanted = 'all';\n");
         out.append("    statusRadios.forEach(function(r){ if (r.checked) wanted = r.value; });\n");
         out.append("\n");
-        out.append("    // build per-column filter map by column index\n");
         out.append("    var colFilters = {};\n");
         out.append("    filterInputs.forEach(function(inp){\n");
         out.append("      var th = inp.closest('th');\n");
@@ -529,14 +550,10 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("    var rows = tbody.querySelectorAll('tr');\n");
         out.append("    rows.forEach(function(tr){\n");
         out.append("      var ok = true;\n");
-        out.append("\n");
-        out.append("      // status radio\n");
         out.append("      if (wanted !== 'all') {\n");
         out.append("        var bucket = getStatusBucket(tr);\n");
         out.append("        if (bucket !== wanted) ok = false;\n");
         out.append("      }\n");
-        out.append("\n");
-        out.append("      // column text filters\n");
         out.append("      if (ok) {\n");
         out.append("        for (var idx in colFilters) {\n");
         out.append("          var i = parseInt(idx, 10);\n");
@@ -545,7 +562,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("          if (txt.indexOf(colFilters[idx]) === -1) { ok = false; break; }\n");
         out.append("        }\n");
         out.append("      }\n");
-        out.append("\n");
         out.append("      tr.style.display = ok ? '' : 'none';\n");
         out.append("    });\n");
         out.append("  }\n");
@@ -553,7 +569,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("  filterInputs.forEach(function(inp){ inp.addEventListener('input', applyFilters); });\n");
         out.append("  statusRadios.forEach(function(r){ r.addEventListener('change', applyFilters); });\n");
         out.append("\n");
-        out.append("  // jump buttons\n");
         out.append("  table.addEventListener('click', function(e){\n");
         out.append("    var btn = e.target.closest('.jumpBtn');\n");
         out.append("    if (!btn) return;\n");
@@ -561,7 +576,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("    if (id) show(id);\n");
         out.append("  });\n");
         out.append("\n");
-        out.append("  // sorting (click header). column 0 is link column => ignore.\n");
         out.append("  function normalize(s){ return (s||'').trim(); }\n");
         out.append("  function isNumeric(s){ return /^-?\\d+(\\.\\d+)?$/.test(s); }\n");
         out.append("\n");
@@ -570,33 +584,23 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("    var th = hdrCells[colIdx];\n");
         out.append("    var cur = th.getAttribute('data-sort') || 'none';\n");
         out.append("    var dir = (cur === 'asc') ? 'desc' : 'asc';\n");
-        out.append("\n");
-        out.append("    // reset other headers\n");
         out.append("    hdrCells.forEach(function(h, i){ if (i !== colIdx) h.setAttribute('data-sort','none'); });\n");
         out.append("    th.setAttribute('data-sort', dir);\n");
-        out.append("\n");
         out.append("    var rows = Array.prototype.slice.call(tbody.querySelectorAll('tr'));\n");
         out.append("    rows.sort(function(a,b){\n");
         out.append("      var av = normalize(a.children[colIdx] ? a.children[colIdx].textContent : '');\n");
         out.append("      var bv = normalize(b.children[colIdx] ? b.children[colIdx].textContent : '');\n");
-        out.append("\n");
-        out.append("      // numeric compare if both numeric\n");
         out.append("      if (isNumeric(av) && isNumeric(bv)) {\n");
         out.append("        var an = parseFloat(av), bn = parseFloat(bv);\n");
         out.append("        return (dir === 'asc') ? (an - bn) : (bn - an);\n");
         out.append("      }\n");
-        out.append("\n");
-        out.append("      // string compare\n");
         out.append("      var cmp = av.localeCompare(bv);\n");
         out.append("      return (dir === 'asc') ? cmp : -cmp;\n");
         out.append("    });\n");
-        out.append("\n");
-        out.append("    // re-append\n");
         out.append("    rows.forEach(function(r){ tbody.appendChild(r); });\n");
         out.append("    applyFilters();\n");
         out.append("  }\n");
         out.append("\n");
-        out.append("  // attach sort handlers to header cells (except col 0)\n");
         out.append("  hdrCells.forEach(function(th, idx){\n");
         out.append("    if (idx === 0) return;\n");
         out.append("    th.addEventListener('click', function(){ sortByCol(idx); });\n");
@@ -613,10 +617,10 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         return out.toString();
     }
 
-    private void renderOverviewSpreadsheet(StringBuilder out, List<ScopeState> scopeStates, List<Status> perScopeStatus) {
+    private void renderOverviewSpreadsheet(StringBuilder out, List<ScopeState> includedScopes, List<Status> includedStatus) {
         // Determine the one true header set (order preserved) from the first scenario that provides it.
         List<String> summaryHeaders = List.of();
-        for (ScopeState s : scopeStates) {
+        for (ScopeState s : includedScopes) {
             if (s.rowKey == null) continue;
             Optional<RowData> od = rowData(s.rowKey);
             if (od.isPresent()) {
@@ -634,8 +638,8 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         }
 
         List<Row> rows = new ArrayList<>();
-        for (int i = 0; i < scopeStates.size(); i++) {
-            ScopeState s = scopeStates.get(i);
+        for (int i = 0; i < includedScopes.size(); i++) {
+            ScopeState s = includedScopes.get(i);
             if (s.rowKey == null) continue;
 
             Optional<RowData> od = rowData(s.rowKey);
@@ -920,6 +924,10 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     private static final class ScopeState {
         String rootId;
         String rowKey;
+
+        // NEW: whether this top-level scope counts in run summary metrics
+        boolean includeInSummary = true;
+
         final Map<String, HtmlNode> nodes = new LinkedHashMap<>();
         final Map<String, Meta> meta = new HashMap<>();
     }
@@ -1174,6 +1182,50 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         if (v.startsWith("PASS")) return "statusCell pass";
         if (v.startsWith("FAIL")) return "statusCell fail";
         return "statusCell";
+    }
+
+
+    private static void rebuildChildrenLinks(ScopeState s) {
+        if (s == null) return;
+        for (HtmlNode n : s.nodes.values()) n.children.clear();
+        for (HtmlNode n : s.nodes.values()) {
+            if (n.parentId != null) {
+                HtmlNode parent = s.nodes.get(n.parentId);
+                if (parent != null) parent.children.add(n);
+            }
+        }
+    }
+
+    private static void renderExcludedScopesUnderMain(StringBuilder out, List<ScopeState> excluded) {
+        if (excluded == null || excluded.isEmpty()) return;
+
+        out.append("  <div class=\"excludedSection\">\n");
+        out.append("    <div class=\"excludedHeader\">\n");
+        out.append("      <div class=\"excludedTitle\">General Logs</div>\n");
+        out.append("      <div class=\"excludedHint\">Logs not associated with a scenario (excluded scopes).</div>\n");
+        out.append("    </div>\n");
+        out.append("    <div class=\"tree\">\n");
+
+        int idx = 0;
+        for (ScopeState s : excluded) {
+            if (s == null) continue;
+            HtmlNode root = s.nodes.get(s.rootId);
+            if (root == null) continue;
+
+            // Ensure tree relationships exist
+            rebuildChildrenLinks(s);
+
+            // Optional: wrap each excluded scope in a container so it’s visually separated
+            out.append("      <div class=\"excludedBlock\">\n");
+            out.append("        <div class=\"excludedBlockTitle\">")
+                    .append(escapeHtml(root.title == null || root.title.isBlank() ? ("General Log " + (++idx)) : root.title))
+                    .append("</div>\n");
+            renderNode(out, root, 0);
+            out.append("      </div>\n");
+        }
+
+        out.append("    </div>\n");
+        out.append("  </div>\n");
     }
 
 
@@ -1610,7 +1662,33 @@ a { color: inherit; }
 .statusCell.fail { color: var(--fail); background: #fef2f2; }
 .statusCell.pass::before { content: "✓ "; }
 .statusCell.fail::before { content: "✕ "; }
-
+/* ---------------- Excluded / General logs under MAIN ---------------- */
+.excludedSection {
+  margin-top: 14px;
+  border-top: 1px dashed var(--line);
+  padding-top: 12px;
+}
+.excludedHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 12px 8px 12px;
+}
+.excludedTitle { font-weight: 800; }
+.excludedHint { color: var(--muted); font-size: 12px; }
+.excludedBlock {
+  margin: 10px 12px 14px 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+.excludedBlockTitle {
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--info);
+}
 
 """;
 }

@@ -18,10 +18,10 @@ import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static io.cucumber.core.runner.GlobalState.stepInfo;
 import static io.cucumber.core.runner.util.TableUtils.toFlatMultimap;
 import static io.cucumber.core.runner.util.TableUtils.toRowsMultimap;
 import static tools.dscode.common.GlobalConstants.MATCH_START;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 
 
 public class MappingSteps extends CoreSteps {

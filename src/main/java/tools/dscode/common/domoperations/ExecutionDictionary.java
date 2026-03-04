@@ -17,14 +17,12 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-
-import static io.cucumber.core.runner.GlobalState.stepError;
 import static tools.dscode.common.domoperations.TableColumnByHeaderXPath.matchCellsByHeader;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepError;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.xpathSpecificityScore;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.colocatedDeepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.descendantDeepNormalizedVisibleText;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.noDisplayPredicate;
 
 public class ExecutionDictionary {
 

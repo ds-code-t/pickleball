@@ -21,10 +21,10 @@ import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
-import static io.cucumber.core.runner.GlobalState.stepError;
-import static io.cucumber.core.runner.GlobalState.stepInfo;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepError;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;

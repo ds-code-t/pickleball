@@ -33,7 +33,7 @@ import static io.cucumber.core.runner.CurrentScenarioState.registerScenarioObjec
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
-import static io.cucumber.core.runner.GlobalState.stepInfo;
+import static io.cucumber.core.runner.GlobalState.pickleballLog;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.GlobalConstants.INFO_STEP;
 import static tools.dscode.common.GlobalConstants.NEXT_SIBLING_STEP;
@@ -45,6 +45,7 @@ import static tools.dscode.common.domoperations.LeanWaits.waitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.BracketLiteralMasker.getAndResolveKeyWithMasking;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 import static tools.dscode.common.variables.RunVars.resolveVarOrDefault;
 
 
@@ -60,6 +61,7 @@ public class GeneralSteps extends CoreSteps {
     public static void afterAll() {
         Log.global().closeAll();
         lifecycle.fire(Phase.AFTER_CUCUMBER_RUN);
+        pickleballLog.stop();
     }
 
     public static JavascriptExecutor getJavascriptExecutor() {
