@@ -1,11 +1,26 @@
 Feature: Addition
 
+  Scenario: Scenario test cell2
+  @[DEBUG,nobase,##]
+    * , verify "Product" Cell equals "z1"
 
   Scenario: Scenario test cell
   @[DEBUG,nobase,##]
-    * navigate to: URL.SELEct
-#    * , verify "Name" Column equals "1"
-#    * , verify 2nd "Name" Column equals "1"
+    * , verify 2nd "Id" Cell equals "z1"
+    * , verify 3rd "Id" Cell equals "z1"
+    * , verify 2nd "Product" Cell equals "z1"
+    * , verify 3rd "Product" Cell equals "z1"
+    * , verify 2nd "Outer Id" Cell equals "z1"
+    * , verify 3rd "Outer Id" Cell equals "z1"
+    * , verify 5th "Name" Cell equals "z1"
+    * , verify last "Name" Cell equals "z1"
+    * , verify 3rd "Notes" Cell equals "z1"
+    * , verify 2nd "Notes" Cell equals "z1"
+
+#    * , verify "Name" Cell equals "1"
+#    * , verify 1st "Name" Cell equals "1"
+#    * , verify 2nd "Name" Cell equals "1"
+
 
   @DDD
   Scenario Outline: nav tes6 <A>
