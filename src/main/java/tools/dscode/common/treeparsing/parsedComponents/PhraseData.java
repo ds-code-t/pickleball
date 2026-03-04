@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
+import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepError;
@@ -90,7 +91,7 @@ public abstract class PhraseData extends PassedData {
     //    public XPathChainResult contextMatch;
     @Override
     public String toString() {
-        return resolvedText + termination;
+        return resolvedText.replaceAll(BOOK_END, "") + termination;
     }
 
     public static final Set<String> DATA_ELEMENTS =

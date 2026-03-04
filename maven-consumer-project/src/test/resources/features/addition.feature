@@ -26,12 +26,17 @@ Feature: Addition
   Scenario Outline: nav tes6 <A>
     * navigate to: URL.select
     * , verify "Subscribe" Checkbox is on, and "Subscribe" Checkbox is true
+#    * , wait 30 seconds
     Examples:
       | Scenario Tags | A | B | C |
       | %taga         | 1 | 5 |   |
       | %taga         | 2 | 5 |   |
       | %taga         | 3 | 5 |   |
       | %taga         | 4 | 5 |   |
+#      | %taga         | 6 | 5 |   |
+#      | %taga         | 7 | 5 |   |
+#      | %taga         | 8 | 5 |   |
+#      | %taga         | 9 | 5 |   |
 
 
   Scenario: gdfgdfss

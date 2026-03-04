@@ -112,10 +112,15 @@ public final class Phrase extends PhraseData {
 
         parsedLine.executedPhrases.add(this);
 
+        if(!text.equals(resolvedText))
+        {
+            stepInfo("Resolving `" + text + "` to `" + resolvedText + "`" );
+        }
+
         if (shouldRun()) {
-            stepInfo("Running Phrase: " + this + (isClone ? " (clone)" : ""));
+            stepInfo("Running Phrase: " + this );
         } else {
-            stepInfo("Skipping Phrase: " + this + (isClone ? " (clone)" : ""));
+            stepInfo("Skipping Phrase: " + this );
             return;
         }
 
