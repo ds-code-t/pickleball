@@ -10,9 +10,10 @@ import io.restassured.specification.RequestSpecification;
 
 import java.util.Map;
 
+import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+
 public class RestAssuredUtil {
 
-    private static final ObjectMapper mapper = new ObjectMapper();
 
     public static RequestSpecification buildRequest(JsonNode config) {
         RequestSpecification spec = RestAssured.given();
@@ -27,27 +28,27 @@ public class RestAssuredUtil {
             spec.port(config.get("port").asInt());
         }
         if (config.has("headers")) {
-            Map<String, Object> headers = mapper.convertValue(config.get("headers"), new TypeReference<>() {});
+            Map<String, Object> headers = MAPPER.convertValue(config.get("headers"), new TypeReference<>() {});
             spec.headers(headers);
         }
         if (config.has("cookies")) {
-            Map<String, Object> cookies = mapper.convertValue(config.get("cookies"), new TypeReference<>() {});
+            Map<String, Object> cookies = MAPPER.convertValue(config.get("cookies"), new TypeReference<>() {});
             spec.cookies(cookies);
         }
         if (config.has("params")) {
-            Map<String, Object> params = mapper.convertValue(config.get("params"), new TypeReference<>() {});
+            Map<String, Object> params = MAPPER.convertValue(config.get("params"), new TypeReference<>() {});
             spec.params(params);
         }
         if (config.has("queryParams")) {
-            Map<String, Object> queryParams = mapper.convertValue(config.get("queryParams"), new TypeReference<>() {});
+            Map<String, Object> queryParams = MAPPER.convertValue(config.get("queryParams"), new TypeReference<>() {});
             spec.queryParams(queryParams);
         }
         if (config.has("formParams")) {
-            Map<String, Object> formParams = mapper.convertValue(config.get("formParams"), new TypeReference<>() {});
+            Map<String, Object> formParams = MAPPER.convertValue(config.get("formParams"), new TypeReference<>() {});
             spec.formParams(formParams);
         }
         if (config.has("pathParams")) {
-            Map<String, Object> pathParams = mapper.convertValue(config.get("pathParams"), new TypeReference<>() {});
+            Map<String, Object> pathParams = MAPPER.convertValue(config.get("pathParams"), new TypeReference<>() {});
             spec.pathParams(pathParams);
         }
         if (config.has("body")) {
@@ -120,12 +121,12 @@ public class RestAssuredUtil {
 
 
     public static JsonNode extractResponse(Response response) {
-        ObjectNode root = mapper.createObjectNode();
+        ObjectNode root = MAPPER.createObjectNode();
 
         root.put("statusCode", response.getStatusCode());
         root.put("statusLine", response.getStatusLine());
 
-        ObjectNode headers = mapper.createObjectNode();
+        ObjectNode headers = MAPPER.createObjectNode();
         response.getHeaders().forEach(h ->
                 headers.put(h.getName(), h.getValue()));
         root.set("headers", headers);
@@ -133,7 +134,7 @@ public class RestAssuredUtil {
         String contentType = response.getContentType();
         if (contentType != null && contentType.contains("json")) {
             try {
-                JsonNode body = mapper.readTree(response.asString());
+                JsonNode body = MAPPER.readTree(response.asString());
                 root.set("body", body);
             } catch (Exception e) {
                 root.put("body", response.asString());

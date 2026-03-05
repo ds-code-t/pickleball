@@ -55,11 +55,6 @@ public class NodeMap  extends ValueFormatting{
 
     private MapConfigurations.MapType mapType = MapConfigurations.MapType.DEFAULT;
 
-    public static final ObjectMapper MAPPER = new ObjectMapper();
-
-    static {
-        MAPPER.registerModule(new GuavaModule());
-    }
 
     public NodeMap(String path) {
         super((ObjectNode) FileAndDataParsing.buildJsonFromPath(path));

@@ -64,28 +64,7 @@ public class GeneralSteps extends CoreSteps {
         pickleballLog.stop();
     }
 
-    public static JavascriptExecutor getJavascriptExecutor() {
-        return getDefaultDriver();
-    }
 
-    public static ChromiumDriver getDefaultDriver() {
-        String browserName = resolveVarOrDefault("BROWSER", "BROWSER").toString();
-        return getDriver(browserName);
-    }
-
-    public static ChromiumDriver getDriver(String browserName) {
-        WebDriver webDriver = getChromiumDriver(browserName);
-        getRunningStep().webDriverUsed = webDriver;
-        return (ChromiumDriver) webDriver;
-    }
-
-    private static ChromiumDriver getChromiumDriver(String browserName) {
-        Object returnObject = getScenarioObject(browserName);
-        if (returnObject != null) return (ChromiumDriver) returnObject;
-        returnObject = returnStepParameter(browserName);
-        if (returnObject != null) return (ChromiumDriver) returnObject;
-        return (ChromiumDriver) returnStepParameter("CHROME");
-    }
 
     @Given("navigate {returnStepParameter}")
     public void navigateBrowser(ChromiumDriver driver, List<String> list) {
@@ -93,68 +72,8 @@ public class GeneralSteps extends CoreSteps {
         waitForPageReady(driver, Duration.ofSeconds(60));
     }
 
-    public static Object returnStepParameter(String stepText) {
-        return returnStepParameter(stepText, null);
-    }
 
-    //    @ParameterType("\\$\\(([^()]+)\\)")
-    @ParameterType("([A-Za-z0-9_-]+)(:([A-Za-z0-9_-]+))?")
-    public static Object returnStepParameter(String stepText, String key) {
-        StepExtension currentStep = getRunningStep();
-        Object existingObject = getScenarioObject(stepText);
-        if (key == null || key.isBlank()) {
-            if (existingObject != null) return existingObject;
-            StepExtension modifiedStep = currentStep.modifyStepExtension("&" + stepText);
-            modifiedStep.argument = currentStep.argument;
-            Object returnValue = modifiedStep.runAndGetReturnValue();
-            registerScenarioObject(stepText, returnValue);
-            return returnValue;
-        } else {
-            Object existingObjectFromKey = getScenarioObject(key);
-            if (existingObjectFromKey != null) return existingObjectFromKey;
-            StepExtension modifiedStep = currentStep.modifyStepExtension("&" + stepText);
-            modifiedStep.argument = currentStep.argument;
-            Object returnValue = modifiedStep.runAndGetReturnValue();
-            registerScenarioObject(key, returnValue);
-            return returnValue;
-        }
-    }
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-    //    @Given("(?i)^@chrome$")
-    @Given("(?i)^&BROWSER$")
-    @Given("(?i)^&CHROME$")
-    public ChromeDriver getChrome() throws Exception {
-
-        StepExtension currentStep = getRunningStep();
-        String json = !(currentStep.argument instanceof DocStringArgument) ? getAndResolveKeyWithMasking("configs.chrome") : currentStep.argument.getValue().toString();
-        if (Objects.isNull(json)) throw new RuntimeException("Chrome Driver Configuration not found");
-        Map<String, Object> map = MAPPER.readValue(json, Map.class);
-        ChromeOptions options = new ChromeOptions();
-        map.forEach(options::setCapability);
-        if (getCurrentScenarioState().debugBrowser) {
-            ensureDevToolsPort(options, "chrome");
-        }
-        ChromeDriver chromeDriver = new ChromeDriver(options);
-        registerScenarioObject("browser", chromeDriver);
-        return chromeDriver;
-    }
-
-    @Given("(?i)^&EDGE$")
-    public EdgeDriver getEdge() throws Exception {
-        StepExtension currentStep = getRunningStep();
-        String json = !(currentStep.argument instanceof DocStringArgument) ? (String) currentStep.getStepParsingMap().getAndResolve("configs.edge") : currentStep.argument.getValue().toString();
-        if (Objects.isNull(json)) throw new RuntimeException("Edge Driver Configuration not found");
-        Map<String, Object> map = MAPPER.readValue(json, Map.class);
-        EdgeOptions options = new EdgeOptions();
-        map.forEach(options::setCapability);
-        if (getCurrentScenarioState().debugBrowser) {
-            ensureDevToolsPort(options, "edge");
-        }
-        EdgeDriver edgeDriver = new EdgeDriver(options);
-        registerScenarioObject("browser", edgeDriver);
-        return edgeDriver;
-    }
 
 
     @Given("^" + SCENARIO_STEP + "\\s*(?:.*)$")

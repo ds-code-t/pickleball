@@ -22,7 +22,8 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.NO_OP
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PRECEDING_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
-import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
+import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getDefaultDriver;
+
 
 public abstract class PassedData {
 

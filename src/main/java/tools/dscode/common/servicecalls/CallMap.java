@@ -25,9 +25,7 @@ import static tools.dscode.common.servicecalls.RestAssuredUtil.extractResponse;
 public class CallMap extends NodeMap {
     // --- logging ---
     private boolean logEnabled = true;
-
-    public static final com.fasterxml.jackson.databind.ObjectMapper MAPPER = NodeMap.MAPPER;
-
+    
     // --- immutable provenance ---
     private final ServiceCallTemplate template;
     private final ObjectNode originalRequest; // deep copy snapshot of template request

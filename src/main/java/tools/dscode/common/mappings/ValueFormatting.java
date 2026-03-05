@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.datatype.guava.GuavaModule;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -14,14 +15,19 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static tools.dscode.common.mappings.ValueFormatting.fromSafeJsonNode;
 
 public abstract class ValueFormatting {
+
+
+    public static final ObjectMapper MAPPER = new ObjectMapper();
+
+    static {
+        MAPPER.registerModule(new GuavaModule());
+    }
+
     public static final String NON_SERIALIZABLE_FIELD = "_NonSerializableReferenceID";
     protected final ObjectNode root;
 
-    // Global mapper (or reuse your existing one if you prefer)
-    public static final ObjectMapper MAPPER = new ObjectMapper();
 
     // Registry for non-serializable / “unsafe” objects
     public static final Map<String, Object> nonSerializable = new ConcurrentHashMap<>();

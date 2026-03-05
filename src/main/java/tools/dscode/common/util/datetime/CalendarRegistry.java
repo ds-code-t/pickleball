@@ -10,9 +10,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.mappings.GlobalMappings.rootDirectory;
+import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 
 public final class CalendarRegistry {
-    private static final ObjectMapper OM = new ObjectMapper();
+
     private static final ConcurrentHashMap<String, BusinessCalendar> REGISTRY = new ConcurrentHashMap<>();
 
     // ---- one-time init gate ----
@@ -58,7 +59,7 @@ public final class CalendarRegistry {
 
     public static void registerJson(String json) {
         try {
-            JsonNode root = OM.readTree(json);
+            JsonNode root = MAPPER.readTree(json);
             Iterator<Map.Entry<String, JsonNode>> it = root.fields();
             while (it.hasNext()) {
                 Map.Entry<String, JsonNode> e = it.next();

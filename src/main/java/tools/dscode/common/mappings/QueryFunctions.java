@@ -13,7 +13,6 @@ public class QueryFunctions {
     private static final Pattern INDEX_PATTERN = Pattern.compile("#[\\d:,]+");
     private static final Pattern INT_PATTERN = Pattern.compile("\\d+");
 
-    public static final ObjectMapper MAPPER = new ObjectMapper();
 
     // public List<JsonNode> getValues(JsonNode root, String input) {
     // String query = input.strip();

@@ -10,13 +10,14 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 
+import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+
 public class JsonataParentDemo {
 
     public static String getParentPath(String path) {
         return path.trim() + ".{ 'p': % }.p";
     }
 
-    private static final ObjectMapper M = new ObjectMapper();
 
     private static void run(JsonNode root, String q) {
         try {
@@ -50,7 +51,7 @@ public class JsonataParentDemo {
 
     public static void main(String[] args) {
         // Build a simple nested JSON tree
-        ObjectNode root = M.createObjectNode();
+        ObjectNode root = MAPPER.createObjectNode();
         ObjectNode a = root.putObject("a");
         ObjectNode b = a.putObject("b");
         b.put("c", 123);

@@ -17,7 +17,7 @@ import static tools.dscode.common.reporting.WorkBookConsolePrinter.printError;
 import static tools.dscode.common.reporting.WorkBookConsolePrinter.printInfo;
 import static tools.dscode.common.reporting.WorkBookConsolePrinter.printTrace;
 import static tools.dscode.common.reporting.WorkBookConsolePrinter.printWarn;
-import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
+import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getDefaultDriver;
 
 /**
  * Entry is NOT inherently thread-safe by default.

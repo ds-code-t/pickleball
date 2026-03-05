@@ -20,14 +20,13 @@ import static tools.dscode.common.domoperations.elementstates.BinaryStateConditi
 import static tools.dscode.common.domoperations.elementstates.CollapsedExpandedConditions.isCollapsedState;
 import static tools.dscode.common.domoperations.elementstates.CollapsedExpandedConditions.isExpandedState;
 import static tools.dscode.common.domoperations.elementstates.RequiredInputConditions.isElementRequired;
+import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementMatch.ELEMENT_RETURN_VALUE;
 import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 
 
 public class ElementWrapper {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final WebDriver driver;
     public WebElement element;
