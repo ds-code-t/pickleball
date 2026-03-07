@@ -10,9 +10,11 @@ import tools.dscode.common.mappings.queries.Tokenized;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -31,7 +33,7 @@ public class NodeMap  extends ValueFormatting{
         return "Type: " + mapType + " Source: " + dataSources + "\nroot:" + root.toString();
     }
 
-    public List<MapConfigurations.DataSource> getDataSources() {
+    public Set<MapConfigurations.DataSource> getDataSources() {
         return dataSources;
     }
 
@@ -39,7 +41,7 @@ public class NodeMap  extends ValueFormatting{
         this.dataSources.addAll(List.of(dataSources));
     }
 
-    private List<MapConfigurations.DataSource> dataSources = new ArrayList<>();
+    private Set<MapConfigurations.DataSource> dataSources = new HashSet<>();
 
     public MapConfigurations.MapType getMapType() {
         return mapType;
@@ -55,15 +57,20 @@ public class NodeMap  extends ValueFormatting{
 
     private MapConfigurations.MapType mapType = MapConfigurations.MapType.DEFAULT;
 
-
     public NodeMap(String path) {
         super((ObjectNode) FileAndDataParsing.buildJsonFromPath(path));
     }
 
+    public NodeMap(MapConfigurations.MapType mapType, ObjectNode objectNode) {
+        super(objectNode);
+        setMapType(mapType);
+    }
+
     public NodeMap(MapConfigurations.MapType mapType, MapConfigurations.DataSource... dataSources) {
         this(mapType);
-        this.dataSources = Arrays.stream(dataSources).toList();
+        this.dataSources = Arrays.stream(dataSources).collect(Collectors.toSet());
     }
+
 
     public NodeMap(MapConfigurations.MapType mapType) {
         super(MAPPER.createObjectNode());

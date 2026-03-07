@@ -88,13 +88,6 @@ public class QSteps {
 
 
 
-    @Given("get browser {returnStepParameter}")
-    public void chrometest1(Object param, DocString docString) {
-
-
-
-    }
-
     @Given("^xQQQ2(.*)$")
     public void qqq2(String arg0 ) {
 

@@ -17,30 +17,25 @@ public abstract class StepMapping extends StepBase {
         return stepParsingMap;
     }
 
-    public NodeMap getStepNodeMap() {
-        return stepNodeMap;
+    public NodeMap getDefaultStepNodeMap() {
+        return defaultStepNodeMap;
     }
 
     public void mergeToStepNodeMap(LinkedListMultimap<?, ?> obj) {
-        stepNodeMap.merge(obj);
+        defaultStepNodeMap.merge(obj);
     }
 
     public void put(Object key, Object value) {
         if (key == null || (key instanceof String && ((String) key).isBlank()))
             throw new RuntimeException("key cannot be null or blank");
-        stepNodeMap.put(String.valueOf(key), value);
+        defaultStepNodeMap.put(String.valueOf(key), value);
     }
 
     public void setStepParsingMap(ParsingMap stepParsingMap) {
-
         copyParsingMap(stepParsingMap);
-
-
-
-
-        this.stepParsingMap.addMaps(stepNodeMap);
-
-
+        if (dataContextStepNodeMap != null)
+            this.stepParsingMap.addMaps(dataContextStepNodeMap);
+        this.stepParsingMap.addMaps(defaultStepNodeMap);
     }
 
     public void addToStepParsingMap(NodeMap... nodes) {
@@ -63,5 +58,14 @@ public abstract class StepMapping extends StepBase {
             this.stepParsingMap.maps.putAll(parsingMap.getMaps());
             this.stepParsingMap.keyOrder.addAll(parsingMap.keyOrder());
         }
+    }
+
+    public static ParsingMap copytoNewParsingMap( ParsingMap parsingMap) {
+        ParsingMap newParsingMap = new ParsingMap();
+        newParsingMap.clear();
+        newParsingMap.keyOrder.clear();
+        newParsingMap.maps.putAll(parsingMap.getMaps());
+        newParsingMap.keyOrder.addAll(parsingMap.keyOrder());
+        return newParsingMap;
     }
 }

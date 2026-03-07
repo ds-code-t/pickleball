@@ -7,8 +7,9 @@ import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.Phase;
+import tools.dscode.common.mappings.MapConfigurations;
+import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
-import tools.dscode.common.util.debug.DebugUtils;
 
 import java.lang.reflect.InvocationTargetException;
 import java.time.Duration;
@@ -30,6 +31,9 @@ import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleStepTestStep;
+import static io.cucumber.core.runner.util.TableUtils.DOCSTRING_KEY;
+import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
+import static io.cucumber.core.runner.util.TableUtils.toRowsMultimap;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepDebug;
@@ -83,22 +87,29 @@ public class StepExtension extends StepData {
 
 
         if (isCoreStep && methodName.equals("docString")) {
-//            List<Argument> args = pickleStepTestStep.getDefinitionMatch().getArguments();
+            dataArgumentStep = true;
             String docStringName = (String) arguments.getFirst().getValue();
             docString = (DocString) arguments.getLast().getValue();
             if (docStringName != null && !docStringName.isBlank()) {
-                getCurrentScenarioState().getParsingMap().getRootSingletonMap().put("DOCSTRING." + docStringName.trim(), docString);
+                getCurrentScenarioState().getParsingMap().getRootSingletonMap().put(DOCSTRING_KEY + "_" + docStringName.trim(), docString);
             }
+            dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.STEP_MAP);
+            dataContextStepNodeMap.put("DOCSTRING", docString);
         } else if (isCoreStep && methodName.equals("dataTable")) {
-//            List<Argument> args = pickleStepTestStep.getDefinitionMatch().getArguments();
+            dataArgumentStep = true;
             String tableName = (String) arguments.getFirst().getValue();
             dataTable = (DataTable) arguments.getLast().getValue();
             if (tableName != null && !tableName.isBlank()) {
-                getCurrentScenarioState().getParsingMap().getRootSingletonMap().put("DATATABLE." + tableName.trim(), dataTable);
+                getCurrentScenarioState().getParsingMap().getRootSingletonMap().put(TABLE_KEY +"_" + tableName.trim(), toRowsMultimap(dataTable));
             }
+            dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.STEP_MAP);
+            System.out.println("@@step: " + this);
+            System.out.println("@@dataContextStepNodeMap: " + dataContextStepNodeMap);
+            System.out.println("@@dataContextStepNodeMap.getMapType(): " + dataContextStepNodeMap.getMapType());
+            dataContextStepNodeMap.put(TABLE_KEY, toRowsMultimap(dataTable));
         }
-
     }
+
     public Object runAndGetReturnValue() {
         Object instanceOrNull = null;
         try {

@@ -62,6 +62,14 @@ public abstract class MappingProcessor implements Map<String, Object> {
         removeMaps(Arrays.stream(nodes).toList());
     }
 
+    public void removeMaps(MapConfigurations.DataSource... dataSources) {
+        List<NodeMap> nodeMapList = new ArrayList<>();
+        for (MapConfigurations.DataSource dataSource : dataSources) {
+            nodeMapList.addAll(maps.values().stream().filter(nodeMap -> nodeMap.getDataSources().contains(dataSource)).toList());
+        }
+        removeMaps(nodeMapList);
+    }
+
     public void removeMaps(List<NodeMap> nodes) {
         for (NodeMap node : nodes) {
             List<NodeMap> nodeList = maps.get(node.getMapType());

@@ -8,10 +8,6 @@ import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 
 public class NavigationSteps {
 
-    @When("set {returnStepParameter}")
-    public void setObject(Object object, String config) {
-
-    }
 
     @When("^navigate to: (.*)$")
     public void i_navigate_to(String text) {

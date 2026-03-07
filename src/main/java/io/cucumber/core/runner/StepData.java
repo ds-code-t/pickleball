@@ -33,31 +33,14 @@ public abstract class StepData extends StepMapping {
 
 
     public DocString getDocString() {
-        if (docString == null && nextSibling != null)
-            docString = nextSibling.getDocString();
-        if (docString == null)
-            docString = getDocStringFromParent();
+        if(docString == null && parentStep != null)
+            return parentStep.getDocString();
         return docString;
     }
-
-    public DocString getDocStringFromParent() {
-        if (docString == null && parentStep != null)
-            docString = parentStep.getDocStringFromParent();
-        return docString;
-    }
-
 
     public DataTable getDataTable() {
-        if (dataTable == null && nextSibling != null)
-            dataTable = nextSibling.getDataTable();
-        if (dataTable == null)
-            dataTable = getDataTableFromParent();
-        return dataTable;
-    }
-
-    public DataTable getDataTableFromParent() {
-        if (dataTable == null && parentStep != null)
-            dataTable = parentStep.getDataTableFromParent();
+        if(dataTable == null && parentStep != null)
+            return parentStep.getDataTable();
         return dataTable;
     }
 

@@ -1,14 +1,23 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.LinkedListMultimap;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 
+import static io.cucumber.core.runner.util.TableUtils.ENTRY_KEY;
+import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
+import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 import static tools.dscode.common.treeparsing.DefinitionContext.FILE_INPUT;
 
@@ -112,20 +121,19 @@ public final class Phrase extends PhraseData {
 
         parsedLine.executedPhrases.add(this);
 
-        if(!text.equals(resolvedText))
-        {
-            stepInfo("Resolving `" + text + "` to `" + resolvedText + "`" );
+        if (!text.equals(resolvedText)) {
+            stepInfo("Resolving `" + text + "` to `" + resolvedText + "`");
         }
 
         if (shouldRun()) {
-            stepInfo("Running Phrase: " + this );
+            stepInfo("Running Phrase: " + this);
         } else {
-            stepInfo("Skipping Phrase: " + this );
+            stepInfo("Skipping Phrase: " + this);
             return;
         }
 
-        if (contextElement != null) {
-//            contextPhrases.add(this);
+        if (contextElement != null || phraseNodeMap != null)
+        {
             return;
         }
 
@@ -152,14 +160,41 @@ public final class Phrase extends PhraseData {
 
 
     void processContextPhrase() {
-        if (!getFirstElement().selectionType.isEmpty()) {
-
-//            syncWithDOM();
-            if (getFirstElement().getElementWrappers().isEmpty()) {
-                if (!getFirstElement().selectionType.equals("any")) {
-                    throw new RuntimeException("Failed to find WebElements for " + getFirstElement());
+        ElementMatch firstElement = getFirstElement();
+        if (firstElement.elementTypes.contains(ElementType.DATA_TYPE)) {
+            String categoryName = firstElement.category.replaceFirst("(?i:s)$", "");
+            String keyLabel = firstElement.defaultText == null || firstElement.defaultText.isNullOrBlank() ? "" : "_" + firstElement.defaultText.asNormalizedText();
+            String key = categoryName + keyLabel;
+            if (firstElement.selectionType.isEmpty()) {
+                Object obj = getPhraseParsingMap().get(key);
+                System.out.println("@@obj: " + obj);
+                branchedPhrases.add(cloneWithDataElement(null, obj));
+            }
+            else {
+                JsonNode obj = (JsonNode) getPhraseParsingMap().get(key + " as-LIST");
+                if (obj instanceof ArrayNode arrayNode) {
+                    if (arrayNode.isEmpty()) {
+                        if (!firstElement.selectionType.equals("any")) {
+                            throw new RuntimeException("Failed to find Data elements for " + firstElement);
+                        }
+                        System.out.println("No Data elements match for " + firstElement + ", skipping subsequent phrases");
+                    } else {
+                        for (Object item : arrayNode) {
+                            System.out.println("@@arrayNode: " + arrayNode);
+                            branchedPhrases.add(cloneWithDataElement(null, item));
+                        }
+                    }
                 }
-                System.out.println("No elements match for " + getFirstElement() + ", skipping subsequent phrases");
+                else {
+                    branchedPhrases.add(cloneWithDataElement(null, obj));
+                }
+            }
+        } else if (!firstElement.selectionType.isEmpty()) {
+            if (firstElement.getElementWrappers().isEmpty()) {
+                if (!firstElement.selectionType.equals("any")) {
+                    throw new RuntimeException("Failed to find WebElements for " + firstElement);
+                }
+                System.out.println("No elements match for " + firstElement + ", skipping subsequent phrases");
             }
             for (ElementWrapper elementWrapper : getWrappedElements()) {
                 branchedPhrases.add(cloneWithElementContext(elementWrapper));
@@ -169,11 +204,29 @@ public final class Phrase extends PhraseData {
 
 
     public PhraseData cloneWithElementContext(ElementWrapper elementWrapper) {
-//        char c = termination == ':' ? ',' : termination;
         PhraseData clone = clonePhrase(getPreviousPhrase());
-//        PhraseData clone = clonePhrase(getPreviousPhrase(), c);
         clone.contextElement = elementWrapper;
         clone.categoryFlags.add(ExecutionDictionary.CategoryFlags.ELEMENT_CONTEXT);
+        return clone;
+    }
+
+    public PhraseData cloneWithDataElement(String key, Object object) {
+        PhraseData clone = clonePhrase(getPreviousPhrase());
+        clone.categoryFlags.add(ExecutionDictionary.CategoryFlags.DATA_CONTEXT);
+        if(key == null){
+            if(object instanceof ObjectNode objectNode) {
+                clone.setPhraseParsingMap(objectNode);
+            }
+            else {
+                clone.setPhraseParsingMap(MAPPER.createObjectNode()
+                        .set(ENTRY_KEY, MAPPER.valueToTree(object)));
+            }
+        }
+        else
+        {
+            clone.setPhraseParsingMap(MAPPER.createObjectNode()
+                    .set(key, MAPPER.valueToTree(object)));
+        }
         return clone;
     }
 
@@ -197,24 +250,22 @@ public final class Phrase extends PhraseData {
 
         PhraseData chainStartClone = null;
         PhraseData lastClone = chainStartPhrase.getPreviousPhrase();
-       for (int p = 0; p< chainStartPhrase.repeatedChain.size(); p++) {
-           PhraseData currentPhrase = chainStartPhrase.repeatedChain.get(p);
-           PhraseData currentClone = currentPhrase.clonePhrase(lastClone, null);
-           if(p ==0)
-           {
-               chainStartClone = currentClone;
-               currentClone.isChainStart = true;
-               branchedPhrases.add(currentPhrase);
-           }
-           else {
-               lastClone.setNextPhrase(currentClone);
-           }
-           currentClone.chainStartPhrase = chainStartClone;
-           currentClone.shouldRepeatPhrase = true;
-           currentClone.repeatRootPhrase = false;
-           chainStartClone.repeatedChain.add(currentClone);
-           lastClone = currentClone;
-       }
+        for (int p = 0; p < chainStartPhrase.repeatedChain.size(); p++) {
+            PhraseData currentPhrase = chainStartPhrase.repeatedChain.get(p);
+            PhraseData currentClone = currentPhrase.clonePhrase(lastClone, null);
+            if (p == 0) {
+                chainStartClone = currentClone;
+                currentClone.isChainStart = true;
+                branchedPhrases.add(currentPhrase);
+            } else {
+                lastClone.setNextPhrase(currentClone);
+            }
+            currentClone.chainStartPhrase = chainStartClone;
+            currentClone.shouldRepeatPhrase = true;
+            currentClone.repeatRootPhrase = false;
+            chainStartClone.repeatedChain.add(currentClone);
+            lastClone = currentClone;
+        }
         return chainStartClone;
     }
 

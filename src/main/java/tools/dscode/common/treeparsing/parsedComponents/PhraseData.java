@@ -1,11 +1,17 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.LinkedListMultimap;
 import com.xpathy.XPathy;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 
+import tools.dscode.common.mappings.MapConfigurations;
+import tools.dscode.common.mappings.NodeMap;
+import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.status.SoftRuntimeException;
 import tools.dscode.common.treeparsing.MatchNode;
@@ -16,7 +22,6 @@ import tools.dscode.common.treeparsing.preparsing.LineData;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
@@ -24,6 +29,7 @@ import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
+import static tools.dscode.common.mappings.StepMapping.copytoNewParsingMap;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepError;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
@@ -57,7 +63,6 @@ public abstract class PhraseData extends PassedData {
 
 
     public SearchContext getSearchContext() {
-
 
         if (contextElement != null) {
             WebElement element = contextElement.getElement();
@@ -94,21 +99,38 @@ public abstract class PhraseData extends PassedData {
         return resolvedText.replaceAll(BOOK_END, "") + termination;
     }
 
-    public static final Set<String> DATA_ELEMENTS =
-            Set.of("Data Table", "Data Row");
-
-    public static final Set<String> BROWSER_ELEMENTS =
-            Set.of("Alert", "Window", "BROWSER", "Browser Tab", "Address Bar");
-
 
     public boolean hasResolvedText = false;
     public boolean hasTextToResolve = false;
+
+    ParsingMap phraseParsingMap;
+    NodeMap phraseNodeMap;
+
+    public ParsingMap getPhraseParsingMap() {
+        if(phraseParsingMap != null)
+            return phraseParsingMap;
+//        if(getPreviousPhrase() != null  && getPreviousPhrase().getPhraseParsingMap() != null)
+//            return getPreviousPhrase().getPhraseParsingMap();
+        return getRunningStep().getStepParsingMap();
+    }
+
+    public String resolveText(String inputText) {
+        return getPhraseParsingMap().resolveWholeText(inputText);
+    };
+
+    public void setPhraseParsingMap(ObjectNode data) {
+        phraseParsingMap = copytoNewParsingMap(getPhraseParsingMap());
+        phraseParsingMap.removeMaps(MapConfigurations.DataSource.PHRASE_NODE);
+        phraseNodeMap = new NodeMap(MapConfigurations.MapType.STEP_MAP, data);
+        phraseNodeMap.setDataSource(MapConfigurations.DataSource.PHRASE_NODE);
+        phraseParsingMap.addMapsToStart(phraseNodeMap);
+    }
 
 
     public PhraseData(String inputText, Character delimiter, LineData lineData) {
         parsedLine = lineData;
         text = inputText;
-        resolvedText = getRunningStep().getStepParsingMap().resolveWholeText(text);
+        resolvedText = resolveText(text);
         hasResolvedText = !text.trim().equalsIgnoreCase(resolvedText.trim());
         hasTextToResolve = hasResolvedText || text.matches(".*<.*>.*");
         termination = delimiter;

@@ -32,11 +32,6 @@ public class ContextWrapper {
     }
 
 
-//    public List<WebElement> refreshElement(WebDriver driver, XPathy XPathyWithID) {
-//        getFinalSearchContext(driver);
-//        XPathy refreshXpath = combineAnd(XPathyWithID, elementPath);
-//        return driver.findElements(refreshXpath.getLocator());
-//    }
 
 
     public List<WebElement> getElements() {

@@ -51,8 +51,8 @@ public class GlobalConstants {
 
     public static final String defaultMatchFlag = "\u207A-DEFAULT_DEFINITION_";
 
-    public static final String TABLE_KEY = "\u206A_TABLE_KEY";
-    public static final String DocString_KEY = "\u206A_DOCSTRING_KEY";
+//    public static final String TABLE_KEY = "\u206A_TABLE_KEY";
+//    public static final String DocString_KEY = "\u206A_DOCSTRING_KEY";
 
     public static final String SCENARIO_TAGS = "SCENARIO TAGS";
     public static final String COMPONENT_TAGS = "COMPONENT TAGS";

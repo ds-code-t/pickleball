@@ -6,7 +6,7 @@ package tools.dscode.common.mappings;
 public class MapConfigurations {
 
     public enum DataSource {
-        CONFIGURATION_FILE, PASSED_TABLE, EXAMPLE_TABLE, STEP_TABLE, TABLE_ROW
+        CONFIGURATION_FILE, PASSED_TABLE, EXAMPLE_TABLE, STEP_TABLE, TABLE_ROW, PHRASE_NODE
     }
     public enum MapType {
         OVERRIDE_MAP,  PASSED_MAP, EXAMPLE_MAP, STEP_MAP, RUN_MAP, GLOBAL_NODE, DEFAULT, SINGLETON

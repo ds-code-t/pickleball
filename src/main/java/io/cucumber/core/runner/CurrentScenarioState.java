@@ -13,7 +13,6 @@ import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
 import tools.dscode.common.status.SoftExceptionInterface;
 import tools.dscode.common.status.SoftRuntimeException;
-import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 import tools.dscode.coredefinitions.ReportingSteps;
@@ -364,7 +363,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     //Singleton registration of object in both step nodes, and local register.
     public static void registerScenarioObject(String key, Object value) {
         key = normalizeRegistryKey(key);
-        GlobalState.getRunningStep().getStepNodeMap().put(key, value);
+        GlobalState.getRunningStep().getDefaultStepNodeMap().put(key, value);
         GlobalRegistry.putLocal(key, value);
     }
 

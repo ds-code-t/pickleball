@@ -208,6 +208,8 @@ public class ElementMatch {
                 else if (category.matches("Dropdowns?"))
                     elementTypes.add(HTML_DROPDOWN);
             }
+        } else if (elementTypes.contains(ElementType.DATA_TYPE)) {
+
         } else if (elementTypes.contains(ElementType.VALUE_TYPE)) {
             nonHTMLValues.add(defaultText);
             elementTypes.add(RETURNS_VALUE);

@@ -17,7 +17,7 @@ public enum ElementType {
     HTML_TYPE, HTML_ELEMENT, HTML_IFRAME, HTML_SHADOW_ROOT,
     HTML_OPTION, HTML_DROPDOWN, HTML_LOADING,
     BROWSER_TYPE, ALERT, BROWSER, BROWSER_WINDOW, BROWSER_TAB, URL,
-    DATA_TYPE, DATA_ROW, DATA_TABLE,
+    DATA_TYPE,
     VALUE_TYPE, TIME_VALUE, NUMERIC_VALUE, INTEGER_VALUE, DECIMAL_VALUE, TEXT_VALUE, KEY_VALUE,
     RETURNS_VALUE;
 
@@ -58,15 +58,33 @@ public enum ElementType {
     public static final String KEY_NAME = "KEYNAME";
 
 
+    public static final Set<String> DATA_ELEMENTS =
+            Set.of("Data Table", "Data Row", "Data Entry");
+
+    public static final Set<String> BROWSER_ELEMENTS =
+            Set.of("Alert", "Window", "BROWSER", "Browser Tab", "Address Bar");
+
     public static Set<ElementType> fromString(String raw) {
         Set<ElementType> returnSet = new java.util.HashSet<>();
-        if (raw.equals("Loading")) {
+        String singular = raw.replaceAll("s$", "");
+
+        if (singular.equals("Loading")) {
             returnSet.add(HTML_LOADING);
             returnSet.add(HTML_TYPE);
             return returnSet;
         }
 
-        if (raw.equals("Browser")) {
+        if(DATA_ELEMENTS.contains(singular)) {
+            returnSet.add(DATA_TYPE);
+            returnSet.add(RETURNS_VALUE);
+            return returnSet;
+        }
+
+        if(BROWSER_ELEMENTS.contains(singular)) {
+            returnSet.add(BROWSER_TYPE);
+        }
+
+        if (singular.equals("Browser")) {
             returnSet.add(BROWSER_TYPE);
             returnSet.add(BROWSER_WINDOW);
             return returnSet;
@@ -89,10 +107,14 @@ public enum ElementType {
         }
 
 
-        if (raw.matches("Alerts?")) {
+        if (singular.equals("Alerts")) {
             returnSet.add(BROWSER_TYPE);
             returnSet.add(ALERT);
             returnSet.add(RETURNS_VALUE);
+            return returnSet;
+        }
+
+        if(returnSet.contains(BROWSER_TYPE)) {
             return returnSet;
         }
 

@@ -3,6 +3,7 @@ package tools.dscode.common.treeparsing.parsedComponents;
 import com.xpathy.XPathy;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.domoperations.ExecutionDictionary;
+import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ActionOperations;
@@ -12,6 +13,7 @@ import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHo
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
 
@@ -26,6 +28,7 @@ import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getDefaultDri
 
 
 public abstract class PassedData {
+//    protected NodeMap phraseNodeMap;
 
     public PhraseData chainStartPhrase;
     int chainStart;
@@ -188,9 +191,9 @@ public abstract class PassedData {
 
     private WebDriver driver = null;
     public List<PhraseData> branchedPhrases = new ArrayList<>();
-    public List<PhraseData> repeatedPhrases = new ArrayList<>();
 
     public ElementWrapper contextElement;
+
 
     public boolean contextTermination;
 

@@ -1,9 +1,13 @@
 package tools.dscode.common.assertions;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.LinkedListMultimap;
+import com.google.common.collect.ListMultimap;
 
 import java.math.BigInteger;
 import java.time.Duration;
+import java.util.*;
 
 import static tools.dscode.common.evaluations.AviatorUtil.isStringTruthy;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.normalizeText;
@@ -22,15 +26,13 @@ public class ValueWrapper {
                 return true;
         }
         if (value == null || o == null) return false;
-        if(value.equals(o))
+        if (value.equals(o))
             return true;
-        if (Boolean.TRUE.equals(isNumeric) || o instanceof Number)
-        {
+        if (Boolean.TRUE.equals(isNumeric) || o instanceof Number) {
             return asBigInteger().equals(convertToInteger(normalizeText(o.toString())));
         }
         String normalizedInput = normalizeText(o.toString());
         return (value.equals(o) || normalizedText.equals(normalizedInput));
-
     }
 
     public Object getValue() {
@@ -38,16 +40,57 @@ public class ValueWrapper {
     }
 
     public enum ValueTypes {
-        DOUBLE_QUOTED, SINGLE_QUOTED, BACK_TICKED, TILDE_QUOTED, NUMERIC, DEFAULT, BOOLEAN
+        DOUBLE_QUOTED, SINGLE_QUOTED, BACK_TICKED, TILDE_QUOTED,
+        NUMERIC, DEFAULT, BOOLEAN,
+        LIST, SET, MAP, MULTIMAP
     }
 
-
-
     public static ValueWrapper createValueWrapper(Object obj) {
+        // Keep existing scalar behavior first
         if (obj == null || obj instanceof String)
             return new ValueWrapper((String) obj);
         if (obj instanceof Number)
             return new ValueWrapper(obj, ValueTypes.NUMERIC);
+
+        // NEW: containers (wrap inner values)
+        if (obj instanceof List<?> list) {
+            List<ValueWrapper> wrapped = new ArrayList<>(list.size());
+            for (Object el : list) wrapped.add(createValueWrapper(el));
+            return new ValueWrapper(wrapped, ValueTypes.LIST);
+        }
+
+        if (obj instanceof Set<?> set) {
+            // preserve order when possible (LinkedHashSet for most sets, TreeSet if SortedSet)
+            Set<ValueWrapper> wrapped;
+            if (set instanceof SortedSet<?>) wrapped = new TreeSet<>(Comparator.comparing(ValueWrapper::toNonNullString));
+            else wrapped = new LinkedHashSet<>(Math.max(16, set.size() * 2));
+
+            for (Object el : set) wrapped.add(createValueWrapper(el));
+            return new ValueWrapper(wrapped, ValueTypes.SET);
+        }
+
+        if (obj instanceof Map<?, ?> map) {
+            Map<Object, ValueWrapper> wrapped =
+                    (map instanceof LinkedHashMap<?, ?>) ? new LinkedHashMap<>(Math.max(16, map.size() * 2))
+                            : (map instanceof SortedMap<?, ?>) ? new TreeMap<>()
+                            : new LinkedHashMap<>(Math.max(16, map.size() * 2));
+
+            for (Map.Entry<?, ?> e : map.entrySet()) {
+                // keys NOT wrapped, per your requirement
+                wrapped.put(e.getKey(), createValueWrapper(e.getValue()));
+            }
+            return new ValueWrapper(wrapped, ValueTypes.MAP);
+        }
+
+        if (obj instanceof ListMultimap<?, ?> mm) {
+            LinkedListMultimap<Object, ValueWrapper> wrapped = LinkedListMultimap.create();
+            for (Map.Entry<?, ?> e : mm.entries()) {
+                wrapped.put(e.getKey(), createValueWrapper(e.getValue()));
+            }
+            return new ValueWrapper(wrapped, ValueTypes.MULTIMAP);
+        }
+
+        // Existing JsonNode behavior unchanged
         if (obj instanceof JsonNode node) {
             if (node == null || node.isNull() || node.isMissingNode()) return new ValueWrapper(null);
 
@@ -58,16 +101,15 @@ public class ValueWrapper {
             }
             return new ValueWrapper(node.textValue());
         }
+
         return new ValueWrapper(obj.toString());
     }
-
 
     private ValueWrapper(Object raw, ValueTypes type) {
         this.type = type;
         this.value = raw;
         this.normalizedText = raw == null ? null : normalizeText(raw.toString());
     }
-
 
     private ValueWrapper(String raw) {
         if (raw == null) {
@@ -100,7 +142,7 @@ public class ValueWrapper {
                         this.normalizedText = normalizeText((String) value);
                         return;
                     }
-                    case '~' -> { // <-- NEW
+                    case '~' -> {
                         type = ValueTypes.TILDE_QUOTED;
                         value = raw.substring(1, raw.length() - 1);
                         this.normalizedText = normalizeText((String) value);
@@ -135,7 +177,6 @@ public class ValueWrapper {
         return bigIntegerValue;
     }
 
-
     public static BigInteger convertToInteger(String inputString) {
         String s = inputString
                 .replaceAll("[^0-9.\\-]", " ")
@@ -153,15 +194,11 @@ public class ValueWrapper {
         return asBigInteger().intValueExact();
     }
 
-
     public String asNormalizedText() {
         return normalizedText;
     }
 
     private Boolean isNumeric;
-
-
-
 
     public Duration asDuration(String unit) {
         if (unit == null || unit.isBlank()) {
@@ -172,32 +209,20 @@ public class ValueWrapper {
         String u = unit.trim().toLowerCase();
 
         return switch (u) {
-            // seconds
             case "s", "sec", "secs", "second", "seconds" -> Duration.ofSeconds(value.longValueExact());
-
-            // minutes
             case "m", "min", "mins", "minute", "minutes" -> Duration.ofMinutes(value.longValueExact());
-
-            // hours
             case "h", "hr", "hrs", "hour", "hours" -> Duration.ofHours(value.longValueExact());
-
-            // days (often useful)
             case "d", "day", "days" -> Duration.ofDays(value.longValueExact());
-
-            // milliseconds
             case "ms", "millis", "millisecond", "milliseconds" -> Duration.ofMillis(value.longValueExact());
-
             default -> throw new IllegalArgumentException("Unsupported time unit: " + unit);
         };
     }
-
 
     @Override
     public String toString() {
         if (value == null) return null;
         return value.toString();
     }
-
 
     public String toNonNullString() {
         if (value == null) return "";
@@ -217,7 +242,6 @@ public class ValueWrapper {
         return isNumeric;
     }
 
-
     public boolean isNumeric() {
         return isNumeric(normalizedText);
     }
@@ -227,7 +251,7 @@ public class ValueWrapper {
     }
 
     public boolean isTruthy() {
-        if(type.toString().endsWith("QUOTED"))
+        if (type.toString().endsWith("QUOTED"))
             return isStringTruthy(asNormalizedText());
         if (isNumeric()) {
             return asBigInteger().signum() != 0;
@@ -238,6 +262,7 @@ public class ValueWrapper {
     public boolean isBlank() {
         return (value == null || asNormalizedText().isBlank());
     }
+
     public boolean hasValue() {
         return !(value == null || asNormalizedText().isBlank());
     }

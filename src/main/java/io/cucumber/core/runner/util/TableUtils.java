@@ -17,11 +17,16 @@ import static io.cucumber.core.runner.util.CucumberQueryUtil.messagePickle;
 
 public class TableUtils {
 
+    public static final String DOCSTRING_KEY = "Doc String";
+    public static final String TABLE_KEY = "Data Table";
+    public static final String ROW_KEY = "Data Row";
+    public static final String ENTRY_KEY = "Data Entry";
+
     public static <K, V> LinkedListMultimap<String, LinkedListMultimap<K, V>> toRowsMultimap(DataTable dataTable) {
         List<LinkedListMultimap<K, V>> rowList = toListOfMultimap(dataTable);
         LinkedListMultimap<String, LinkedListMultimap<K, V>> returnMap = LinkedListMultimap.create();
         assert rowList != null;
-        rowList.forEach(r -> returnMap.put("ROWS", r));
+        rowList.forEach(r -> returnMap.put(ROW_KEY, r));
         return returnMap;
     }
 

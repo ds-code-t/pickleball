@@ -1,5 +1,15 @@
 Feature: Addition
 
+
+  Scenario: data test
+    * , in the Data Table, for every Data Row, save "<A>" as "Z"
+
+    * DATA TABLE
+      | A  | B  | C  |
+      | a1 | a2 | a3 |
+      | b1 | b2 | b3 |
+      | c1 | c2 | c3 |
+
   Scenario: Scenario test cell2
   @[DEBUG,nobase,##]
     * , verify "Product" Cell equals "z1"

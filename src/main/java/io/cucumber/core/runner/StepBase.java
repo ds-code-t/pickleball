@@ -6,7 +6,6 @@ import io.cucumber.docstring.DocString;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
-import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 import tools.dscode.coredefinitions.GeneralSteps;
 
@@ -19,6 +18,7 @@ import static tools.dscode.common.mappings.MapConfigurations.MapType.STEP_MAP;
 
 
 public abstract class StepBase implements Cloneable {
+    public boolean dataArgumentStep = false;
     public boolean isDynamicStep;
     public boolean isCoreConditionalStep;
     public boolean logAndIgnore = false;
@@ -44,9 +44,8 @@ public abstract class StepBase implements Cloneable {
     public Argument argument;
 
     protected final ParsingMap stepParsingMap = new ParsingMap();
-    protected final NodeMap stepNodeMap = new NodeMap(STEP_MAP);
-
-
+    protected final NodeMap defaultStepNodeMap = new NodeMap(STEP_MAP);
+    public NodeMap dataContextStepNodeMap;
     protected int nestingLevel = 0;
     public String codeLocation;
     public boolean isCoreStep;
@@ -78,11 +77,9 @@ public abstract class StepBase implements Cloneable {
 
     protected abstract DocString getDocString();
 
-    protected abstract DocString getDocStringFromParent();
 
     protected abstract DataTable getDataTable();
 
-    protected abstract DataTable getDataTableFromParent();
 
     public abstract Collection<ConditionalStates> getConditionalStates();
 
@@ -123,8 +120,10 @@ public abstract class StepBase implements Cloneable {
                 copy.nextSibling = nextSibling.clone();
                 copy.nextSibling.previousSibling = copy;
             }
-
-
+            System.out.println("@@=dataArgumentStep: " + dataArgumentStep);
+            System.out.println("@@=dataContextStepNodeMap: " + dataContextStepNodeMap);
+            System.out.println("@@=copy.dataArgumentStep: " + copy.dataArgumentStep);
+            System.out.println("@@=copy.dataContextStepNodeMap: " + copy.dataContextStepNodeMap);
             return copy;
         } catch (CloneNotSupportedException e) {
             throw new AssertionError("StepBase should be cloneable", e);
