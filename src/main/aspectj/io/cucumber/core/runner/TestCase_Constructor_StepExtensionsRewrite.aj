@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import static io.cucumber.core.runner.CurrentScenarioState.currentScenarioState;
 import static io.cucumber.core.runner.PredefinedSteps.getRootStep;
+import static tools.dscode.common.mappings.MappingProcessor.resetRunAndSingletonNodeMaps;
 
 /**
  * Rewrites TestCase construction so that:
@@ -50,6 +51,7 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
             boolean dryRun
     ) : ctorCall(id, testSteps, beforeHooks, afterHooks, pickle, dryRun) {
         GlobalState.language = pickle.getLanguage();
+        resetRunAndSingletonNodeMaps();
         List original = testSteps;
 
 

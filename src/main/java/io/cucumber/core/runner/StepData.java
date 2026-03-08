@@ -55,8 +55,6 @@ public abstract class StepData extends StepMapping {
 
 
     public StepBase initializeChildSteps() {
-
-
         if (childSteps.isEmpty()) {
             if (grandChildrenSteps.isEmpty())
                 return null;
@@ -82,7 +80,6 @@ public abstract class StepData extends StepMapping {
             }
 
             child.setStepParsingMap(getStepParsingMap());
-
             lastChild = child;
 
         }

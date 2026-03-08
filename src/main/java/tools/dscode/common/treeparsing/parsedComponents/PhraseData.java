@@ -42,7 +42,7 @@ import static tools.dscode.common.util.debug.DebugUtils.onMatch;
 
 
 public abstract class PhraseData extends PassedData {
-//    boolean isStartingContext;
+    //    boolean isStartingContext;
     public final String text;
     public final String resolvedText;
     public final Character termination; // nullable
@@ -52,7 +52,7 @@ public abstract class PhraseData extends PassedData {
     public boolean shouldRepeatPhrase = false;
     public boolean repeatRootPhrase = false;
     public List<PhraseData> repeatedChain = new ArrayList<>();
-//    public boolean evaluateResults = true;
+    //    public boolean evaluateResults = true;
 //    boolean invertConditional = false;
     List<Object> repetitionContext = new ArrayList<>();
 
@@ -96,38 +96,49 @@ public abstract class PhraseData extends PassedData {
     //    public XPathChainResult contextMatch;
     @Override
     public String toString() {
-        return resolvedText.replaceAll(BOOK_END, "") + termination;
+        return (resolvedText == null ? text: resolvedText ).replaceAll(BOOK_END, "") + termination;
     }
 
 
     public boolean hasResolvedText = false;
     public boolean hasTextToResolve = false;
 
-    ParsingMap phraseParsingMap;
-    NodeMap phraseNodeMap;
 
     public ParsingMap getPhraseParsingMap() {
-        if(phraseParsingMap != null)
-            return phraseParsingMap;
-//        if(getPreviousPhrase() != null  && getPreviousPhrase().getPhraseParsingMap() != null)
-//            return getPreviousPhrase().getPhraseParsingMap();
-        return getRunningStep().getStepParsingMap();
+        if (phraseParsingMap == null) {
+            PhraseData previousPhrase = getPreviousPhrase();
+            if (previousPhrase == null || previousPhrase.termination == '.' || previousPhrase.termination == '?') {
+                phraseParsingMap = getRunningStep().getStepParsingMap();
+            } else {
+                phraseParsingMap = previousPhrase.getPhraseParsingMap();
+            }
+
+        }
+
+        return phraseParsingMap;
     }
 
     public String resolveText(String inputText) {
         return getPhraseParsingMap().resolveWholeText(inputText);
-    };
+    }
+
+
 
     public void setPhraseParsingMap(ObjectNode data) {
         phraseParsingMap = copytoNewParsingMap(getPhraseParsingMap());
         phraseParsingMap.removeMaps(MapConfigurations.DataSource.PHRASE_NODE);
-        phraseNodeMap = new NodeMap(MapConfigurations.MapType.STEP_MAP, data);
+        NodeMap phraseNodeMap = new NodeMap(MapConfigurations.MapType.STEP_MAP, data);
         phraseNodeMap.setDataSource(MapConfigurations.DataSource.PHRASE_NODE);
         phraseParsingMap.addMapsToStart(phraseNodeMap);
     }
 
 
     public PhraseData(String inputText, Character delimiter, LineData lineData) {
+        this(inputText, delimiter, lineData, null);
+    }
+
+    public PhraseData(String inputText, Character delimiter, LineData lineData, PhraseData previousPhrase) {
+        setPreviousPhrase(previousPhrase);
         parsedLine = lineData;
         text = inputText;
         resolvedText = resolveText(text);
@@ -214,12 +225,10 @@ public abstract class PhraseData extends PassedData {
     }
 
 
-
-
     public List<PhraseData> getPhraseContextList() {
         List<PhraseData> contextList = getContextListFromInheritedPhrases();
 
-        if(contextList.isEmpty() || (!contextList.getFirst().isTopContext && contextList.getFirst().contextElement == null))
+        if (contextList.isEmpty() || (!contextList.getFirst().isTopContext && contextList.getFirst().contextElement == null))
             contextList.addFirst(new Phrase(parsedLine));
 
         return contextList;
@@ -242,8 +251,7 @@ public abstract class PhraseData extends PassedData {
                 }
             }
 
-            if (currentPhrase.isTopContext || currentPhrase.isNewContext() || currentPhrase.contextElement != null)
-            {
+            if (currentPhrase.isTopContext || currentPhrase.isNewContext() || currentPhrase.contextElement != null) {
                 return contextList;
             }
 
@@ -252,7 +260,6 @@ public abstract class PhraseData extends PassedData {
 
         return contextList;
     }
-
 
 
     public static XPathy getXPathyContext(String context, List<ElementMatch> elements) {
@@ -278,6 +285,7 @@ public abstract class PhraseData extends PassedData {
     public abstract PhraseData cloneRepeatedChain();
 
     public abstract PhraseData clonePhrase(PhraseData previous, Character newTermination);
+
     public abstract PhraseData clonePhrase(PhraseData previous);
 
     public abstract PhraseData resolvePhrase();
@@ -378,12 +386,10 @@ public abstract class PhraseData extends PassedData {
             }
             case "conditional" -> {
                 phraseConditionalMode = previouslyResolvedBoolean ? 1 : -1;
-                if(shouldRepeatPhrase) {
-                    if(phraseConditionalMode <= 0) {
+                if (shouldRepeatPhrase) {
+                    if (phraseConditionalMode <= 0) {
                         phraseConditionalMode = 1;
-                    }
-                    else
-                    {
+                    } else {
                         phraseConditionalMode = 0;
                     }
                 }

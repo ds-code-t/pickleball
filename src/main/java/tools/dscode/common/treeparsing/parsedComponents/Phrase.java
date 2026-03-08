@@ -31,7 +31,11 @@ public final class Phrase extends PhraseData {
     }
 
     public Phrase(String inputText, Character delimiter, LineData parsedLine) {
-        super(inputText, delimiter, parsedLine);
+        super(inputText, delimiter, parsedLine, null);
+    }
+
+    public Phrase(String inputText, Character delimiter, LineData parsedLine, PhraseData previousPhrase) {
+        super(inputText, delimiter, parsedLine, previousPhrase);
         if (!isOperationPhrase) {
             elementMatches = new ArrayList<>(elementMatches.stream().filter(e -> !e.isPlaceHolder()).toList());
         }
@@ -132,8 +136,8 @@ public final class Phrase extends PhraseData {
             return;
         }
 
-        if (contextElement != null || phraseNodeMap != null)
-        {
+        if (noExecution) {
+            stepInfo("Context branch set");
             return;
         }
 
@@ -165,28 +169,30 @@ public final class Phrase extends PhraseData {
             String categoryName = firstElement.category.replaceFirst("(?i:s)$", "");
             String keyLabel = firstElement.defaultText == null || firstElement.defaultText.isNullOrBlank() ? "" : "_" + firstElement.defaultText.asNormalizedText();
             String key = categoryName + keyLabel;
+
+
+
+            System.out.println("\n-------------\n");
+
             if (firstElement.selectionType.isEmpty()) {
                 Object obj = getPhraseParsingMap().get(key);
-                System.out.println("@@obj: " + obj);
+                if (obj == null)
+                    return;
                 branchedPhrases.add(cloneWithDataElement(null, obj));
-            }
-            else {
-                JsonNode obj = (JsonNode) getPhraseParsingMap().get(key + " as-LIST");
-                if (obj instanceof ArrayNode arrayNode) {
-                    if (arrayNode.isEmpty()) {
-                        if (!firstElement.selectionType.equals("any")) {
-                            throw new RuntimeException("Failed to find Data elements for " + firstElement);
-                        }
-                        System.out.println("No Data elements match for " + firstElement + ", skipping subsequent phrases");
-                    } else {
-                        for (Object item : arrayNode) {
-                            System.out.println("@@arrayNode: " + arrayNode);
-                            branchedPhrases.add(cloneWithDataElement(null, item));
-                        }
+            } else {
+                List obj = (List) getPhraseParsingMap().get(key + " as-LIST");
+                if (obj == null)
+                    return;
+
+                if (obj.isEmpty()) {
+                    if (!firstElement.selectionType.equals("any")) {
+                        throw new RuntimeException("Failed to find Data elements for " + firstElement);
                     }
-                }
-                else {
-                    branchedPhrases.add(cloneWithDataElement(null, obj));
+                    System.out.println("No Data elements match for " + firstElement + ", skipping subsequent phrases");
+                } else {
+                    for (Object item : obj) {
+                        branchedPhrases.add(cloneWithDataElement(null, item));
+                    }
                 }
             }
         } else if (!firstElement.selectionType.isEmpty()) {
@@ -207,23 +213,22 @@ public final class Phrase extends PhraseData {
         PhraseData clone = clonePhrase(getPreviousPhrase());
         clone.contextElement = elementWrapper;
         clone.categoryFlags.add(ExecutionDictionary.CategoryFlags.ELEMENT_CONTEXT);
+        clone.noExecution = true;
         return clone;
     }
 
     public PhraseData cloneWithDataElement(String key, Object object) {
         PhraseData clone = clonePhrase(getPreviousPhrase());
         clone.categoryFlags.add(ExecutionDictionary.CategoryFlags.DATA_CONTEXT);
-        if(key == null){
-            if(object instanceof ObjectNode objectNode) {
+        clone.noExecution = true;
+        if (key == null) {
+            if (object instanceof ObjectNode objectNode) {
                 clone.setPhraseParsingMap(objectNode);
-            }
-            else {
+            } else {
                 clone.setPhraseParsingMap(MAPPER.createObjectNode()
                         .set(ENTRY_KEY, MAPPER.valueToTree(object)));
             }
-        }
-        else
-        {
+        } else {
             clone.setPhraseParsingMap(MAPPER.createObjectNode()
                     .set(key, MAPPER.valueToTree(object)));
         }
@@ -271,36 +276,26 @@ public final class Phrase extends PhraseData {
 
     @Override
     public PhraseData clonePhrase(PhraseData previous, Character newTermination) {
-        Phrase clone = new Phrase(text, (newTermination == null ? termination : newTermination), parsedLine);
+        Phrase clone = new Phrase(text, (newTermination == null ? termination : newTermination), parsedLine, previous);
         clone.phraseConditionalMode = phraseConditionalMode;
         clone.result = null;
         clone.isClone = true;
         clone.position = position;
-//        clones.add(clone);
-        clone.setPreviousPhrase(previous);
         if (getNextPhrase() != null) {
             clone.setNextPhrase(getNextPhrase().clonePhrase(clone));
             clone.getNextPhrase().setPreviousPhrase(clone);
         }
+        clone.phraseParsingMap = null;
         return clone;
     }
 
     public PhraseData resolvePhrase() {
-        PhraseData resolvedPhrase = new Phrase(text, termination, parsedLine);
+        PhraseData resolvedPhrase = new Phrase(text, termination, parsedLine, getPreviousPhrase());
         if (resolvedPhrase.getAction().endsWith("attach") && !resolvedPhrase.getElementMatches().stream().anyMatch(e -> e.elementTypes.contains(ElementType.HTML_TYPE))) {
             resolvedPhrase = new Phrase(resolvedPhrase.resolvedText.replaceFirst("\\battach(?:es|ed)?\\b", "attach " + FILE_INPUT + " "), termination, parsedLine);
         }
         setResolvedPhrase(resolvedPhrase);
         getResolvedPhrase().position = position;
-        getResolvedPhrase().setPreviousPhrase(getPreviousPhrase());
-
-//        List<ElementMatch> nextElementMatches = new ArrayList<>();
-//        PhraseData nextPhrase = getNextPhrase();
-//        while(nextPhrase != null)
-//        {
-//            nextPhrase = nextPhrase.getNextPhrase();
-//        }
-
 
         getResolvedPhrase().setNextPhrase(getNextPhrase());
         return getResolvedPhrase();

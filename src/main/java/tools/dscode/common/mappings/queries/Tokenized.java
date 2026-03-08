@@ -137,8 +137,10 @@ public final class Tokenized {
                 return null;
             return fromSafeJsonNode(list.getLast());
         }
-        if (suffix.equals("as-LIST"))
-            return list.stream().map(ValueFormatting::fromSafeJsonNode).toList();
+        if (suffix.equals("as-LIST")) {
+            return fromSafeJsonNode(list);
+//            return list.stream().map(ValueFormatting::fromSafeJsonNode).toList();
+        }
         return null;
     }
 

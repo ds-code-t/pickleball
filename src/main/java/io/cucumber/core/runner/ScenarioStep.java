@@ -55,16 +55,12 @@ public class ScenarioStep extends StepExtension {
             int currentNesting = currentStep.getNestingLevel();
             StepExtension parentStep = nestingMap.get(currentNesting - 1);
             StepExtension previousSibling = currentNesting > lastNestingLevel ? null : nestingMap.get(currentNesting);
-            System.out.println("@@currentStep.dataArgumentStep--: " + currentStep.dataArgumentStep);
             if(currentStep.dataArgumentStep) {
-                System.out.println("@@currentStep--: " + currentStep);
                 if(previousSibling != null) {
                     previousSibling.dataTable = currentStep.dataTable;
                     previousSibling.docString = currentStep.docString;
-                    System.out.println("@@currentStep.dataContextStepNodeMap--: " + currentStep.dataContextStepNodeMap);
-                    System.out.println("@@currentStep.dataContextStepNodeMap.getMapType()--: " + currentStep.dataContextStepNodeMap.getMapType());
                     previousSibling.dataContextStepNodeMap = currentStep.dataContextStepNodeMap;
-                    getStepParsingMap().addMapsToStart(currentStep.dataContextStepNodeMap);
+//                    previousSibling.getStepParsingMap().addMaps(currentStep.dataContextStepNodeMap);
                 }
                 continue;
             }

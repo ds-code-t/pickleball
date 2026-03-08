@@ -13,10 +13,6 @@ import static tools.dscode.common.evaluations.AviatorUtil.eval;
 
 public abstract class StepMapping extends StepBase {
 
-    public ParsingMap getStepParsingMap() {
-        return stepParsingMap;
-    }
-
     public NodeMap getDefaultStepNodeMap() {
         return defaultStepNodeMap;
     }
@@ -34,8 +30,8 @@ public abstract class StepMapping extends StepBase {
     public void setStepParsingMap(ParsingMap stepParsingMap) {
         copyParsingMap(stepParsingMap);
         if (dataContextStepNodeMap != null)
-            this.stepParsingMap.addMaps(dataContextStepNodeMap);
-        this.stepParsingMap.addMaps(defaultStepNodeMap);
+            this.stepParsingMap.addMapsToStart(dataContextStepNodeMap);
+        this.stepParsingMap.addMapsToStart(defaultStepNodeMap);
     }
 
     public void addToStepParsingMap(NodeMap... nodes) {

@@ -30,11 +30,26 @@ public abstract class MappingProcessor implements Map<String, Object> {
     protected final List<MapConfigurations.MapType> keyOrder = new ArrayList<>();
     protected final List<MapConfigurations.MapType> singletonOrder = new ArrayList<>();
 
+    public static ThreadLocal<NodeMap> runMap = new ThreadLocal<>();
+    public static ThreadLocal<NodeMap> singletonMap = new ThreadLocal<>();
+
+    public static void resetRunAndSingletonNodeMaps() {
+        runMap.set(new NodeMap(MapConfigurations.MapType.RUN_MAP));
+        singletonMap.set(new NodeMap(MapConfigurations.MapType.SINGLETON));
+    }
+
+    public static NodeMap getRunMap() {
+        return runMap.get();
+    }
+
+    public static NodeMap getSingletonMap() {
+        return singletonMap.get();
+    }
+
 
     public MappingProcessor() {
         // Defensive copy to make key order immutable
-        addMaps(new NodeMap(MapConfigurations.MapType.RUN_MAP));
-        addMaps(new NodeMap(MapConfigurations.MapType.SINGLETON));
+        addMaps(runMap.get(), singletonMap.get());
         addMaps(GLOBALS);
         this.keyOrder.addAll(Arrays.asList(MapConfigurations.MapType.OVERRIDE_MAP,
                 MapConfigurations.MapType.PASSED_MAP, MapConfigurations.MapType.EXAMPLE_MAP, MapConfigurations.MapType.STEP_MAP,
@@ -97,6 +112,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     public void addMaps(List<NodeMap> nodes) {
+        boolean log = (nodes.stream().anyMatch(m -> m.getMapType() == MapConfigurations.MapType.STEP_MAP));
+        if(log) {
+        }
         if (nodes != null) {
             for (NodeMap node : nodes) {
                 maps.put(node.getMapType(), node);
@@ -109,12 +127,15 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     public void addMapsToStart(List<NodeMap> nodes) {
+        boolean log = (nodes.stream().anyMatch(m -> m.getMapType() == MapConfigurations.MapType.STEP_MAP));
+        if(log) {
+        }
         List<List<NodeMap>> grouped = groupByMapType(nodes);
         for (List<NodeMap> list : grouped) {
             if (list.isEmpty())
                 continue;
             List<NodeMap> existingNodes = maps.get(list.getFirst().getMapType());
-            existingNodes.addAll(list);
+            existingNodes.addAll(0, list);
         }
     }
 
@@ -423,6 +444,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
     public String toString() {
         return "\n====\n" + getMapsForResolution()
                 .stream()
+//                .filter(m -> m.getMapType() == MapConfigurations.MapType.STEP_MAP)
                 .map(String::valueOf) // safely converts each element to its
                 // string form
                 .collect(Collectors.joining(System.lineSeparator())) + "\n---\n";

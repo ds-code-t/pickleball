@@ -104,6 +104,9 @@ public abstract class ValueFormatting {
     };
 
     private static boolean isFromSafePackage(Object obj) {
+        if (obj instanceof Enum<?>) {
+            return true;
+        }
         Package p = obj.getClass().getPackage();
         if (p == null) return false;
         String pkg = p.getName();

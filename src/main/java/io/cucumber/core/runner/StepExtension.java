@@ -36,6 +36,7 @@ import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static io.cucumber.core.runner.util.TableUtils.toRowsMultimap;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
+import static tools.dscode.common.mappings.MappingProcessor.getSingletonMap;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepDebug;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
 import static tools.dscode.common.util.debug.DebugUtils.parseDebugString;
@@ -91,7 +92,7 @@ public class StepExtension extends StepData {
             String docStringName = (String) arguments.getFirst().getValue();
             docString = (DocString) arguments.getLast().getValue();
             if (docStringName != null && !docStringName.isBlank()) {
-                getCurrentScenarioState().getParsingMap().getRootSingletonMap().put(DOCSTRING_KEY + "_" + docStringName.trim(), docString);
+                getSingletonMap().put(DOCSTRING_KEY + "_" + docStringName.trim(), docString);
             }
             dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.STEP_MAP);
             dataContextStepNodeMap.put("DOCSTRING", docString);
@@ -100,12 +101,9 @@ public class StepExtension extends StepData {
             String tableName = (String) arguments.getFirst().getValue();
             dataTable = (DataTable) arguments.getLast().getValue();
             if (tableName != null && !tableName.isBlank()) {
-                getCurrentScenarioState().getParsingMap().getRootSingletonMap().put(TABLE_KEY +"_" + tableName.trim(), toRowsMultimap(dataTable));
+                getSingletonMap().put(TABLE_KEY +"_" + tableName.trim(), toRowsMultimap(dataTable));
             }
             dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.STEP_MAP);
-            System.out.println("@@step: " + this);
-            System.out.println("@@dataContextStepNodeMap: " + dataContextStepNodeMap);
-            System.out.println("@@dataContextStepNodeMap.getMapType(): " + dataContextStepNodeMap.getMapType());
             dataContextStepNodeMap.put(TABLE_KEY, toRowsMultimap(dataTable));
         }
     }

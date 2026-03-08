@@ -4,6 +4,7 @@ import com.xpathy.XPathy;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.mappings.NodeMap;
+import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ActionOperations;
@@ -29,6 +30,9 @@ import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getDefaultDri
 
 public abstract class PassedData {
 //    protected NodeMap phraseNodeMap;
+
+    ParsingMap phraseParsingMap;
+//    NodeMap phraseNodeMap;
 
     public PhraseData chainStartPhrase;
     int chainStart;
@@ -193,6 +197,8 @@ public abstract class PassedData {
     public List<PhraseData> branchedPhrases = new ArrayList<>();
 
     public ElementWrapper contextElement;
+
+    public boolean noExecution = false;
 
 
     public boolean contextTermination;
@@ -391,6 +397,8 @@ public abstract class PassedData {
 
     public void setResolvedPhrase(PhraseData resolvedPhrase) {
         this.resolvedPhrase = resolvedPhrase;
+        this.resolvedPhrase.phraseParsingMap = phraseParsingMap;
+        this.resolvedPhrase.phraseNode = phraseNode;
         resolvedPhrase.templatePhrase = (PhraseData) this;
     }
 

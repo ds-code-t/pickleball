@@ -67,6 +67,9 @@ public abstract class StepBase implements Cloneable {
     public DocString docString;
     public DataTable dataTable;
 
+    public ParsingMap getStepParsingMap() {
+        return stepParsingMap;
+    }
 
     public enum ConditionalStates {
         SKIP, FALSE, TRUE
@@ -120,10 +123,7 @@ public abstract class StepBase implements Cloneable {
                 copy.nextSibling = nextSibling.clone();
                 copy.nextSibling.previousSibling = copy;
             }
-            System.out.println("@@=dataArgumentStep: " + dataArgumentStep);
-            System.out.println("@@=dataContextStepNodeMap: " + dataContextStepNodeMap);
-            System.out.println("@@=copy.dataArgumentStep: " + copy.dataArgumentStep);
-            System.out.println("@@=copy.dataContextStepNodeMap: " + copy.dataContextStepNodeMap);
+
             return copy;
         } catch (CloneNotSupportedException e) {
             throw new AssertionError("StepBase should be cloneable", e);

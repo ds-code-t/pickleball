@@ -1,14 +1,40 @@
 Feature: Addition
 
-
-  Scenario: data test
-    * , in the Data Table, for every Data Row, save "<A>" as "Z"
-
-    * DATA TABLE
+  Scenario: dfsdf
+    * "B" DATA TABLE
       | A  | B  | C  |
       | a1 | a2 | a3 |
       | b1 | b2 | b3 |
-      | c1 | c2 | c3 |
+
+  Scenario: table test a
+  @[DEBUG,nobase,##]
+    * , save "" as "A"
+#    * , for every Table , save "<A>1" as "A"
+    * , for every Table:
+    : * , save "<A>1" as "A"
+
+
+  Scenario: data test
+#    * , save "123" as "Data Table"
+    * , save "111" as "1", in the Data Table, for every Data Row:
+  :  * , save "222" as "2",  in Data Table, for every Data Row:
+#  :: * , save "<A>" as "WW"
+  :: * , save "<Data Table>" as "dt"
+  :: * , save "<Data Table #1>" as "dt1"
+  :: * , save "<Data Table #2>" as "dt2"
+  :: * , save "<Data Table_A>" as "dta"
+  :: * , save "<Data Table_B>" as "dtb"
+
+  :  * "A" DATA TABLE
+    | A          |
+    | rrrrrrrrrr |
+    | yyyyyyyyyy |
+
+    * "B" DATA TABLE
+      | A  | B  | C  |
+      | a1 | a2 | a3 |
+      | b1 | b2 | b3 |
+#      | c1 | c2 | c3 |
 
   Scenario: Scenario test cell2
   @[DEBUG,nobase,##]

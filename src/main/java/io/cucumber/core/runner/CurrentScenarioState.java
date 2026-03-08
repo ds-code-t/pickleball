@@ -274,21 +274,18 @@ public class CurrentScenarioState extends ScenarioMapping {
             return;
         }
 
-
         if (!stepExtension.definitionFlags.contains(IGNORE_CHILDREN)) {
             if (stepExtension.lineData.inheritancePhrase != null && stepExtension.lineData.inheritancePhrase.repeatRootPhrase) {
                 while (true) {
                     PhraseData clonedChainStart = stepExtension.lineData.inheritancePhrase.cloneRepeatedChain();
                     clonedChainStart.parsedLine.runPhraseFromLine(clonedChainStart);
                     if (clonedChainStart.phraseConditionalMode < 1) break;
-
                     StepExtension firstChild = (StepExtension) ((StepExtension) stepExtension.clone()).initializeChildSteps();
                     if (firstChild != null) {
                         runStep(firstChild);
                     }
                 }
             } else {
-
                 List<StepExtension> clonedSteps = stepCloner(stepExtension);
                 for (StepExtension repeatStep : clonedSteps) {
                     StepExtension firstChild = (StepExtension) repeatStep.initializeChildSteps();
