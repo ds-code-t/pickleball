@@ -27,8 +27,6 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.com
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.customElementSuffixPredicate;
 import static tools.dscode.common.util.debug.DebugUtils.onMatch;
 import static tools.dscode.common.util.debug.DebugUtils.printDebug;
-import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
-import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
 
 public class Registrations {
 

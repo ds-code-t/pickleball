@@ -7,6 +7,7 @@ import io.cucumber.docstring.DocString;
 import io.cucumber.plugin.event.Result;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.annotations.DefinitionFlag;
+import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.mappings.StepMapping;
 import tools.dscode.common.reporting.logging.Entry;
 
@@ -55,6 +56,8 @@ public abstract class StepData extends StepMapping {
 
 
     public StepBase initializeChildSteps() {
+        ParsingMap stepParsingMap = lineData.inheritancePhrase == null ? getStepParsingMap() : lineData.inheritancePhrase.getPhraseParsingMap();
+
         if (childSteps.isEmpty()) {
             if (grandChildrenSteps.isEmpty())
                 return null;
@@ -79,7 +82,8 @@ public abstract class StepData extends StepMapping {
                 child.previousSibling = lastChild;
             }
 
-            child.setStepParsingMap(getStepParsingMap());
+
+            child.setStepParsingMap(stepParsingMap);
             lastChild = child;
 
         }

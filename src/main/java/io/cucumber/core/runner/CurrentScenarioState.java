@@ -13,6 +13,7 @@ import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
 import tools.dscode.common.status.SoftExceptionInterface;
 import tools.dscode.common.status.SoftRuntimeException;
+import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 import tools.dscode.coredefinitions.ReportingSteps;
@@ -67,6 +68,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     private StepExtension currentStep;
+    public Phrase currentPhrase;
 
     public boolean debugBrowser = false;
 
@@ -214,6 +216,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         currentStep = stepExtension;
         stepExtension.lineData = new ParsedLine(stepExtension.getUnmodifiedText());
         stepExtension.lineData.setInheritance(stepExtension);
+        currentPhrase = (Phrase) stepExtension.lineData.inheritedPhrase;
         runningStep(stepExtension);
     }
 

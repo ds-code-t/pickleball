@@ -10,6 +10,7 @@ import java.util.List;
 
 
 import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepDebug;
 import static tools.dscode.pickleruntime.CucumberOptionResolver.glueDistinct;
 
 public aspect JavaBackend_LoadGlue_Mutator {
@@ -59,7 +60,7 @@ public aspect JavaBackend_LoadGlue_Mutator {
             throw new RuntimeException(e);
         }
 
-        stepInfo("Glue paths set: " + modified.stream().map(URI::toString).collect(java.util.stream.Collectors.joining(",")));
+        stepDebug("Glue paths set: " + modified.stream().map(URI::toString).collect(java.util.stream.Collectors.joining(",")));
 
         proceed(glue, modified);
     }

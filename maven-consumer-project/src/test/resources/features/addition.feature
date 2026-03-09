@@ -1,5 +1,8 @@
 Feature: Addition
 
+  Scenario: fffdgf
+    * , save "" as "A"
+
   Scenario: dfsdf
     * "B" DATA TABLE
       | A  | B  | C  |

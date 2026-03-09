@@ -194,10 +194,13 @@ public class GlobalState {
     }
 
     public static ParsingMap getRunningParsingMap() {
+        CurrentScenarioState scenarioState = getCurrentScenarioState();
+        if(scenarioState.currentPhrase != null)
+            return scenarioState.currentPhrase.getPhraseParsingMap();
         try {
-            return getCurrentScenarioState().getCurrentStep().getStepParsingMap();
+            return scenarioState.getCurrentStep().getStepParsingMap();
         } catch (Throwable e) {
-            return getCurrentScenarioState().getParsingMap();
+            return scenarioState.getParsingMap();
         }
     }
 

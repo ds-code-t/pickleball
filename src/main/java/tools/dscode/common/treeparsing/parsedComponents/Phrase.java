@@ -14,10 +14,12 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 
+import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.util.TableUtils.ENTRY_KEY;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepDebug;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 import static tools.dscode.common.treeparsing.DefinitionContext.FILE_INPUT;
 
@@ -126,7 +128,7 @@ public final class Phrase extends PhraseData {
         parsedLine.executedPhrases.add(this);
 
         if (!text.equals(resolvedText)) {
-            stepInfo("Resolving `" + text + "` to `" + resolvedText + "`");
+            stepDebug("Resolving `" + text + "` to `" + resolvedText + "`");
         }
 
         if (shouldRun()) {
@@ -136,8 +138,10 @@ public final class Phrase extends PhraseData {
             return;
         }
 
+        getCurrentScenarioState().currentPhrase = this;
+
         if (noExecution) {
-            stepInfo("Context branch set");
+            stepDebug("Context branch set");
             return;
         }
 
@@ -180,7 +184,7 @@ public final class Phrase extends PhraseData {
                     return;
                 branchedPhrases.add(cloneWithDataElement(null, obj));
             } else {
-                List obj = (List) getPhraseParsingMap().get(key + " as-LIST");
+                List<Object> obj =  getPhraseParsingMap().getList(key);
                 if (obj == null)
                     return;
 

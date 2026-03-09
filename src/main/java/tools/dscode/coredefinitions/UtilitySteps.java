@@ -13,31 +13,125 @@ import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 
 public class UtilitySteps {
 
-    public class CommonTransforms {
+    public static class CommonTransforms {
 
         // -----------------------------
         // Casing / basic string ops
         // -----------------------------
 
+        @Given("^unquote:(.*)$")
+        public static String unquote(String text) {
+            stepInfo("unquoting: " + text);
+            if (text == null) {
+                return null;
+            }
+
+            String trimmed = text.trim();
+            if (trimmed.length() < 2) {
+                return text;
+            }
+
+            char first = trimmed.charAt(0);
+            char last = trimmed.charAt(trimmed.length() - 1);
+
+            boolean supportedQuote = first == '\'' || first == '"' || first == '`';
+            if (supportedQuote && first == last) {
+                return trimmed.substring(1, trimmed.length() - 1);
+            }
+
+            return text;
+        }
+
+        @Given("^safeQuote:(.*)$")
+        public static String safeQuote(String text) {
+            stepInfo("safe-quoting: " + text);
+            if (text == null) {
+                return null;
+            }
+
+            String trimmed = text.trim();
+            if (trimmed.length() < 4) {
+                return text;
+            }
+
+            char outerFirst = trimmed.charAt(0);
+            char outerLast = trimmed.charAt(trimmed.length() - 1);
+
+            if (!isQuoteChar(outerFirst) || outerFirst != outerLast) {
+                return text;
+            }
+
+            String inner = trimmed.substring(1, trimmed.length() - 1).trim();
+            if (inner.length() < 2) {
+                return text;
+            }
+
+            char innerFirst = inner.charAt(0);
+            char innerLast = inner.charAt(inner.length() - 1);
+
+            if (!isQuoteChar(innerFirst) || innerFirst != innerLast) {
+                return text;
+            }
+
+            String unwrappedInner = inner.substring(1, inner.length() - 1);
+            return outerFirst + unwrappedInner + String.valueOf(outerLast);
+        }
+
+        @Given("^defaultSafeQuote:(.*)$")
+        public static String defaultSafeQuote(String text) {
+            stepInfo("default-safe-quoting: " + text);
+            if (text == null) {
+                return null;
+            }
+
+            String trimmed = text.trim();
+            if (trimmed.length() < 4) {
+                return text;
+            }
+
+            char outerFirst = trimmed.charAt(0);
+            char outerLast = trimmed.charAt(trimmed.length() - 1);
+
+            if (!isQuoteChar(outerFirst) || outerFirst != outerLast) {
+                return text;
+            }
+
+            String inner = trimmed.substring(1, trimmed.length() - 1).trim();
+            if (inner.length() < 2) {
+                return text;
+            }
+
+            char innerFirst = inner.charAt(0);
+            char innerLast = inner.charAt(inner.length() - 1);
+
+            if (!isQuoteChar(innerFirst) || innerFirst != innerLast) {
+                return text;
+            }
+
+            return inner;
+        }
+
+        private static boolean isQuoteChar(char c) {
+            return c == '\'' || c == '"' || c == '`';
+        }
+
         @Given("^uppercase:(.*)$")
         public static String uppercase(String text) {
             stepInfo("uppercasing: " + text);
-            return text.toUpperCase(Locale.ROOT);
+            return text == null ? "" : text.toUpperCase(Locale.ROOT);
         }
 
         @Given("^lowercase:(.*)$")
         public static String lowercase(String text) {
             stepInfo("lowercasing: " + text);
-            return text.toLowerCase(Locale.ROOT);
+            return text == null ? "" : text.toLowerCase(Locale.ROOT);
         }
 
         @Given("^capitalize:(.*)$")
         public static String capitalize(String text) {
             stepInfo("capitalizing: " + text);
             if (text == null || text.isEmpty()) return "";
-            String s = text;
-            // keep exactly as-is beyond first char
-            return s.substring(0, 1).toUpperCase(Locale.ROOT) + s.substring(1);
+            return text.substring(0, 1).toUpperCase(Locale.ROOT) + text.substring(1);
         }
 
         @Given("^titlecase:(.*)$")
@@ -130,41 +224,62 @@ public class UtilitySteps {
             return text.replaceAll("[^\\p{L}]+", "");
         }
 
-        @Given("^keepByRegex:(.*?);(.*)$")
-        public static String keepByRegex(String pattern, String text) {
-            stepInfo("keepByRegex pattern=" + pattern + " text=" + text);
+        @Given("^keepByRegex\\s*(\\S)(.*)$")
+        public static String keepByRegex(String delimiter, String values) {
+            String[] parts = splitArgs(delimiter, values, 2);
+            String pattern = parts[0];
+            String text = parts[1];
+
+            stepInfo("keepByRegex delimiter=" + delimiter + " pattern=" + pattern + " text=" + text);
             if (text == null) return "";
             Pattern p = Pattern.compile(pattern);
             Matcher m = p.matcher(text);
             StringBuilder sb = new StringBuilder();
             while (m.find()) {
-                // if there are groups, prefer group(1), else whole match
-                sb.append(m.groupCount() >= 1 ? m.group(1) : m.group());
+                sb.append(m.groupCount() >= 1 ? nullToEmpty(m.group(1)) : nullToEmpty(m.group()));
             }
             return sb.toString();
         }
 
         // -----------------------------
         // Replace / regex replace / regex extract
-        // Note: using ; as a delimiter for multiple args.
+        // Uses caller-chosen single-character non-whitespace delimiter.
+        // Example:
+        // replace ;old;new;some text
+        // replace |old|new|some text
         // -----------------------------
 
-        @Given("^replace:(.*?);(.*?);(.*)$")
-        public static String replace(String target, String replacement, String text) {
+        @Given("^replace\\s*(\\S)(.*)$")
+        public static String replace(String delimiter, String values) {
+            String[] parts = splitArgs(delimiter, values, 3);
+            String target = parts[0];
+            String replacement = parts[1];
+            String text = parts[2];
+
             stepInfo("replacing '" + target + "'->'" + replacement + "' in: " + text);
             if (text == null) return "";
             return text.replace(target, replacement);
         }
 
-        @Given("^replaceRegex:(.*?);(.*?);(.*)$")
-        public static String replaceRegex(String regex, String replacement, String text) {
+        @Given("^replaceRegex\\s*(\\S)(.*)$")
+        public static String replaceRegex(String delimiter, String values) {
+            String[] parts = splitArgs(delimiter, values, 3);
+            String regex = parts[0];
+            String replacement = parts[1];
+            String text = parts[2];
+
             stepInfo("replaceRegex /" + regex + "/ -> '" + replacement + "' in: " + text);
             if (text == null) return "";
             return text.replaceAll(regex, replacement);
         }
 
-        @Given("^extractRegex:(.*?);(\\d+);(.*)$")
-        public static String extractRegexGroup(String regex, String groupIndexStr, String text) {
+        @Given("^extractRegex\\s*(\\S)(.*)$")
+        public static String extractRegexGroup(String delimiter, String values) {
+            String[] parts = splitArgs(delimiter, values, 3);
+            String regex = parts[0];
+            String groupIndexStr = parts[1];
+            String text = parts[2];
+
             stepInfo("extractRegex regex=" + regex + " group=" + groupIndexStr + " text=" + text);
             if (text == null) return "";
             int groupIndex = parseIntSafe(groupIndexStr, 0);
@@ -174,8 +289,13 @@ public class UtilitySteps {
             return "";
         }
 
-        @Given("^extractAllRegex:(.*?);(\\d+);(.*)$")
-        public static String extractAllRegexGroup(String regex, String groupIndexStr, String text) {
+        @Given("^extractAllRegex\\s*(\\S)(.*)$")
+        public static String extractAllRegexGroup(String delimiter, String values) {
+            String[] parts = splitArgs(delimiter, values, 3);
+            String regex = parts[0];
+            String groupIndexStr = parts[1];
+            String text = parts[2];
+
             stepInfo("extractAllRegex regex=" + regex + " group=" + groupIndexStr + " text=" + text);
             if (text == null) return "";
             int groupIndex = parseIntSafe(groupIndexStr, 0);
@@ -196,7 +316,6 @@ public class UtilitySteps {
             if (s == null) return BigDecimal.ZERO;
             String t = s.trim();
             if (t.isEmpty()) return BigDecimal.ZERO;
-            // allow commas in inputs like "1,234.50"
             t = t.replace(",", "");
             return new BigDecimal(t);
         }
@@ -216,30 +335,83 @@ public class UtilitySteps {
             return s == null ? "" : s;
         }
 
+        public static String[] splitValues(String delimiter, String values) {
+            if (values == null) {
+                return new String[0];
+            }
+            return values.split(Pattern.quote(delimiter), -1);
+        }
+
+        private static String[] splitArgs(String delimiter, String values, int expectedParts) {
+            String[] raw = splitValues(delimiter, values);
+            String[] parts = new String[expectedParts];
+
+            int copyCount = Math.min(expectedParts - 1, raw.length);
+            System.arraycopy(raw, 0, parts, 0, copyCount);
+
+            if (raw.length >= expectedParts) {
+                StringBuilder tail = new StringBuilder();
+                for (int i = expectedParts - 1; i < raw.length; i++) {
+                    if (i > expectedParts - 1) {
+                        tail.append(delimiter);
+                    }
+                    tail.append(raw[i]);
+                }
+                parts[expectedParts - 1] = tail.toString();
+            } else if (raw.length == expectedParts - 1) {
+                parts[expectedParts - 1] = "";
+            }
+
+            for (int i = 0; i < expectedParts; i++) {
+                if (parts[i] == null) {
+                    parts[i] = "";
+                }
+            }
+
+            return parts;
+        }
+
         // -----------------------------
         // Numeric transforms (String args -> String output)
         // -----------------------------
 
-        @Given("^add:(.*?);(.*)$")
-        public static String add(String a, String b) {
+        @Given("^add\\s*(\\S)(.*)$")
+        public static String add(String delimiter, String values) {
+            String[] parts = splitArgs(delimiter, values, 2);
+            String a = parts[0];
+            String b = parts[1];
+
             stepInfo("add: " + a + " + " + b);
             return parseDecimal(a).add(parseDecimal(b)).stripTrailingZeros().toPlainString();
         }
 
-        @Given("^subtract:(.*?);(.*)$")
-        public static String subtract(String a, String b) {
+        @Given("^subtract\\s*(\\S)(.*)$")
+        public static String subtract(String delimiter, String values) {
+            String[] parts = splitArgs(delimiter, values, 2);
+            String a = parts[0];
+            String b = parts[1];
+
             stepInfo("subtract: " + a + " - " + b);
             return parseDecimal(a).subtract(parseDecimal(b)).stripTrailingZeros().toPlainString();
         }
 
-        @Given("^multiply:(.*?);(.*)$")
-        public static String multiply(String a, String b) {
+        @Given("^multiply\\s*(\\S)(.*)$")
+        public static String multiply(String delimiter, String values) {
+            String[] parts = splitArgs(delimiter, values, 2);
+            String a = parts[0];
+            String b = parts[1];
+
             stepInfo("multiply: " + a + " * " + b);
             return parseDecimal(a).multiply(parseDecimal(b)).stripTrailingZeros().toPlainString();
         }
 
-        @Given("^divide:(.*?);(.*?);(\\d+)$")
-        public static String divide(String a, String b, String scaleStr) {
+        @Given("^divide\\s*(\\S)(.*)$")
+        public static String divide(String delimiter, String values) {
+            String[] parts = splitArgs(delimiter, values, 3);
+            String a = parts[0];
+            String b = parts[1];
+            String scaleStr = parts[2];
+
             stepInfo("divide: " + a + " / " + b + " scale=" + scaleStr);
             int scale = parseIntSafe(scaleStr, 2);
             BigDecimal divisor = parseDecimal(b);
@@ -261,30 +433,46 @@ public class UtilitySteps {
             return d.setScale(0, RoundingMode.CEILING).toPlainString();
         }
 
-        @Given("^truncate:(.*?);(\\d+)$")
-        public static String truncate(String a, String placesStr) {
+        @Given("^truncate\\s*(\\S)(.*)$")
+        public static String truncate(String delimiter, String values) {
+            String[] parts = splitArgs(delimiter, values, 2);
+            String a = parts[0];
+            String placesStr = parts[1];
+
             stepInfo("truncate: " + a + " places=" + placesStr);
             int places = parseIntSafe(placesStr, 0);
             return parseDecimal(a).setScale(places, RoundingMode.DOWN).toPlainString();
         }
 
-        @Given("^roundHalfUp:(.*?);(\\d+)$")
-        public static String roundHalfUp(String a, String placesStr) {
+        @Given("^roundHalfUp\\s*(\\S)(.*)$")
+        public static String roundHalfUp(String delimiter, String values) {
+            String[] parts = splitArgs(delimiter, values, 2);
+            String a = parts[0];
+            String placesStr = parts[1];
+
             stepInfo("roundHalfUp: " + a + " places=" + placesStr);
             int places = parseIntSafe(placesStr, 0);
             return parseDecimal(a).setScale(places, RoundingMode.HALF_UP).toPlainString();
         }
 
-        @Given("^min:(.*?);(.*)$")
-        public static String min(String a, String b) {
+        @Given("^min\\s*(\\S)(.*)$")
+        public static String min(String delimiter, String values) {
+            String[] parts = splitArgs(delimiter, values, 2);
+            String a = parts[0];
+            String b = parts[1];
+
             stepInfo("min: " + a + ", " + b);
             BigDecimal da = parseDecimal(a);
             BigDecimal db = parseDecimal(b);
             return (da.compareTo(db) <= 0 ? da : db).stripTrailingZeros().toPlainString();
         }
 
-        @Given("^max:(.*?);(.*)$")
-        public static String max(String a, String b) {
+        @Given("^max\\s*(\\S)(.*)$")
+        public static String max(String delimiter, String values) {
+            String[] parts = splitArgs(delimiter, values, 2);
+            String a = parts[0];
+            String b = parts[1];
+
             stepInfo("max: " + a + ", " + b);
             BigDecimal da = parseDecimal(a);
             BigDecimal db = parseDecimal(b);
@@ -293,11 +481,14 @@ public class UtilitySteps {
 
         // -----------------------------
         // Zero stuffing / trimming
-        // (useful for IDs, fixed-width numbers, etc.)
         // -----------------------------
 
-        @Given("^padLeftZeros:(.*?);(\\d+)$")
-        public static String padLeftZeros(String text, String widthStr) {
+        @Given("^padLeftZeros\\s*(\\S)(.*)$")
+        public static String padLeftZeros(String delimiter, String values) {
+            String[] parts = splitArgs(delimiter, values, 2);
+            String text = parts[0];
+            String widthStr = parts[1];
+
             stepInfo("padLeftZeros: " + text + " width=" + widthStr);
             int width = parseIntSafe(widthStr, 0);
             String s = nullToEmpty(text);
@@ -305,8 +496,12 @@ public class UtilitySteps {
             return "0".repeat(width - s.length()) + s;
         }
 
-        @Given("^padRightZeros:(.*?);(\\d+)$")
-        public static String padRightZeros(String text, String widthStr) {
+        @Given("^padRightZeros\\s*(\\S)(.*)$")
+        public static String padRightZeros(String delimiter, String values) {
+            String[] parts = splitArgs(delimiter, values, 2);
+            String text = parts[0];
+            String widthStr = parts[1];
+
             stepInfo("padRightZeros: " + text + " width=" + widthStr);
             int width = parseIntSafe(widthStr, 0);
             String s = nullToEmpty(text);
@@ -318,15 +513,12 @@ public class UtilitySteps {
         public static String trimLeadingZeros(String text) {
             stepInfo("trimLeadingZeros: " + text);
             String s = nullToEmpty(text);
-            // keep a single zero if the string is all zeros
-            String t = s.replaceFirst("^0+(?!$)", "");
-            return t;
+            return s.replaceFirst("^0+(?!$)", "");
         }
 
         @Given("^trimTrailingZerosDecimal:(.*)$")
         public static String trimTrailingZerosDecimal(String text) {
             stepInfo("trimTrailingZerosDecimal: " + text);
-            // For decimals like "12.3400" -> "12.34", "12.000" -> "12"
             BigDecimal d = parseDecimal(text);
             return d.stripTrailingZeros().toPlainString();
         }
@@ -341,8 +533,13 @@ public class UtilitySteps {
             return parseDecimal(a).abs().stripTrailingZeros().toPlainString();
         }
 
-        @Given("^clamp:(.*?);(.*?);(.*)$")
-        public static String clamp(String value, String min, String max) {
+        @Given("^clamp\\s*(\\S)(.*)$")
+        public static String clamp(String delimiter, String values) {
+            String[] parts = splitArgs(delimiter, values, 3);
+            String value = parts[0];
+            String min = parts[1];
+            String max = parts[2];
+
             stepInfo("clamp value=" + value + " min=" + min + " max=" + max);
             BigDecimal v = parseDecimal(value);
             BigDecimal lo = parseDecimal(min);
@@ -352,6 +549,4 @@ public class UtilitySteps {
             return v.stripTrailingZeros().toPlainString();
         }
     }
-
-
 }

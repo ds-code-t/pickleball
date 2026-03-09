@@ -124,6 +124,10 @@ public abstract class PhraseData extends PassedData {
 
 
 
+    public void setPhraseParsingMap(ParsingMap newParsingMap) {
+        this.phraseParsingMap = newParsingMap;
+    }
+
     public void setPhraseParsingMap(ObjectNode data) {
         phraseParsingMap = copytoNewParsingMap(getPhraseParsingMap());
         phraseParsingMap.removeMaps(MapConfigurations.DataSource.PHRASE_NODE);

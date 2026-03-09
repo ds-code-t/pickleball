@@ -62,8 +62,8 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.descen
 import static tools.dscode.common.util.datetime.CalendarRegistry.DEFAULT_CALENDAR;
 import static tools.dscode.common.util.datetime.CalendarRegistry.calendar;
 import static tools.dscode.common.util.datetime.CalendarRegistry.getCalendar;
-import static tools.dscode.coredefinitions.GeneralSteps.getDefaultDriver;
-import static tools.dscode.coredefinitions.GeneralSteps.getDriver;
+import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getDefaultDriver;
+import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getDriver;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;
 
 import org.intellij.lang.annotations.Language;
