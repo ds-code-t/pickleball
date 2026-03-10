@@ -6,6 +6,7 @@ import io.cucumber.docstring.DocString;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
+import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 import tools.dscode.coredefinitions.GeneralSteps;
 
@@ -18,6 +19,7 @@ import static tools.dscode.common.mappings.MapConfigurations.MapType.STEP_MAP;
 
 
 public abstract class StepBase implements Cloneable {
+    public PhraseData inheritancePhrase;
     public boolean dataArgumentStep = false;
     public boolean isDynamicStep;
     public boolean isCoreConditionalStep;
@@ -27,7 +29,7 @@ public abstract class StepBase implements Cloneable {
 
     protected boolean runMethodDirectly = false;
     public boolean debugStartStep = false;
-//    public LineData inheritedLineData;
+    //    public LineData inheritedLineData;
     public LineData lineData;
     public io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep;
     public io.cucumber.core.runner.PickleStepTestStep executingPickleStepTestStep;
@@ -86,10 +88,16 @@ public abstract class StepBase implements Cloneable {
 
     public abstract Collection<ConditionalStates> getConditionalStates();
 
-//    public StepBase clone(PhraseData) {
-//
-//
-//    }
+    public static PhraseData getInheritancePhrase(StepBase stepBase) {
+        if (stepBase == null) return null;
+        return stepBase.inheritancePhrase;
+    }
+
+    public StepBase clone(PhraseData inheritancePhrase) {
+        StepBase clone = clone();
+        clone.inheritancePhrase = inheritancePhrase;
+        return clone;
+    }
 
     @Override
     public StepBase clone() {

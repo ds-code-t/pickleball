@@ -184,7 +184,8 @@ Feature: Addition
 #      | 5  | 3 |   |
 
   Scenario: sssst5ff55
-  @[DEBUG]
+  @[DEBUG,##]
+#    * navigate to: URL.select
     * , from the Top Panel:
   : * , I click "Get your own website" Link
 

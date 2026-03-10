@@ -20,7 +20,6 @@ import static tools.dscode.common.util.Reflect.getProperty;
 
 
 public abstract class StepData extends StepMapping {
-
     public Entry stepEntry;
 
     public WebDriver webDriverUsed = null;
@@ -57,7 +56,6 @@ public abstract class StepData extends StepMapping {
 
 
     public StepBase initializeChildSteps() {
-        PhraseData inheritancePhrase = lineData.inheritancePhrases.isEmpty() ? null : lineData.inheritancePhrases.getFirst();
         ParsingMap stepParsingMap = inheritancePhrase == null ? getStepParsingMap() : inheritancePhrase.getPhraseParsingMap();
         if (childSteps.isEmpty()) {
             if (grandChildrenSteps.isEmpty())

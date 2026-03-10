@@ -233,10 +233,8 @@ public abstract class PhraseData extends PassedData {
 
     public List<PhraseData> getPhraseContextList() {
         List<PhraseData> contextList = getContextListFromInheritedPhrases();
-
         if (contextList.isEmpty() || (!contextList.getFirst().isTopContext && contextList.getFirst().contextElement == null))
             contextList.addFirst(new Phrase(parsedLine));
-
         return contextList;
     }
 
@@ -246,7 +244,6 @@ public abstract class PhraseData extends PassedData {
         int counter = 0;
         while (currentPhrase != null) {
             counter++;
-
             if (counter > 1) {
                 if (currentPhrase.termination != ',' && currentPhrase.termination != ':') {
                     return contextList;

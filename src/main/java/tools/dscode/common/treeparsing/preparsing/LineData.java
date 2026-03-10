@@ -14,6 +14,7 @@ import java.util.Objects;
 import java.util.Set;
 
 
+import static io.cucumber.core.runner.StepBase.getInheritancePhrase;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
@@ -43,18 +44,19 @@ public abstract class LineData implements Cloneable {
     public void setInheritance(StepBase currentStep) {
         stepExtension = currentStep;
 
-        PhraseData previousSiblingInheritancePhrase = currentStep.previousSibling == null  || currentStep.previousSibling.lineData == null || currentStep.previousSibling.lineData.inheritancePhrases.isEmpty() ? null : currentStep.previousSibling.lineData.inheritancePhrases.getFirst();
+        PhraseData previousSiblingInheritancePhrase = getInheritancePhrase(currentStep.previousSibling);
         previousSiblingConditionalState = previousSiblingInheritancePhrase == null ? 1 : previousSiblingInheritancePhrase.phraseConditionalMode;
 
         StepBase parentStep = currentStep.parentStep;
-        inheritedPhrase = parentStep == null || parentStep.lineData == null || parentStep.lineData.inheritancePhrases.isEmpty() ? null : parentStep.lineData.inheritancePhrases.getFirst();
+        inheritedPhrase = getInheritancePhrase(parentStep);
         inheritedConditionalState = inheritedPhrase == null ? 1 : inheritedPhrase.phraseConditionalMode;
         currentStep.logAndIgnore =
                 inheritedConditionalState < 1
                         || (parentStep != null && parentStep.logAndIgnore);
 
-        if(inheritedPhrase != null)
+        if(inheritedPhrase != null) {
             inheritedPhrase.setPhraseParsingMap(currentStep.getStepParsingMap());
+        }
     }
 
     public List<String> lineComponents = new ArrayList<>();

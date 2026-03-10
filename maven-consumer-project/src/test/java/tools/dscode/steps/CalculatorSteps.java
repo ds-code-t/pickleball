@@ -230,19 +230,11 @@ public class CalculatorSteps {
     @Given("test2")
     public static void test2() {
         ExecutionDictionary dict = getExecutionDictionary();
-        System.out.println("\n@@colocatedDeepNormalizedVisibleText((v, op): " + colocatedDeepNormalizedVisibleText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
-        System.out.println("\n@@descendantDeepNormalizedVisibleText(v, op): " + descendantDeepNormalizedVisibleText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
 
 
-        System.out.println("\n@@noDisplay: " + any.byCondition(noDisplay));
-        System.out.println("@@Menu: " + dict.andThenOr("Menu",ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
         XPathy deeplyNormalized = XPathy.from(XPathyUtils.deepNormalizedText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
         String noDisplayPredicate = any.byCondition(noDisplay).getXpath().replaceFirst("//\\*", "");
         XPathy co = XPathy.from(deeplyNormalized.getXpath() + noDisplayPredicate);
-        System.out.println("@@deepNormalizedText(v, op): " + deeplyNormalized);
-        System.out.println("@@noDisplayPredicate: " + noDisplayPredicate);
-        System.out.println("@@co: " + co);
-        System.out.println("@@deepNormalizedVisibleText(v, op): " +deepNormalizedVisibleText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
         List<WebElement> list;
         WebDriver driver = getDriver("BROWSER");
 
@@ -251,16 +243,11 @@ public class CalculatorSteps {
 //        XPathy t = new XPathy("//*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + "][ancestor::table and (count(preceding-sibling::*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + "]) + 1) = (count(((ancestor::table[1]//thead//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" +
 //                customElementSuffixPredicate("header") + dict.getDirectText(v, op) + ") | (ancestor::table[1]//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + dict.getDirectText(v, op) + "))[1]/preceding-sibling::*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + "]) + 1)]");
         XPathy t = dict.cellsInColumnByHeaderText(v, op, customElementSuffixPredicate("row"), customElementSuffixPredicate("cell"), customElementSuffixPredicate("header"));
-        System.out.println("@@@t: " + t.getXpath());
         System.out.println("\n\n----------- ");
 
         list = driver.findElements(t.getLocator());
-        System.out.println("@@@list 1-: " + list.size());
-        System.out.println("@@@list 1: " + list);
 
         for(WebElement e: list){
-            System.out.println("@@@e: " + e);
-            System.out.println("@@@e.getText: " + e.getText());
         }
         if(true)
             return;
@@ -269,38 +256,26 @@ public class CalculatorSteps {
         String xpath2 = "//*[(count(ancestor::table[1]//*[self::tr or @role='row' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 3) = '-row']][1]//*[self::th or @role='columnheader' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 6) = '-header']][string(.) = 'Status']/preceding-sibling::*[self::th or @role='columnheader' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 6) = '-header']]) + 1) = 1]";
         try {
             list = driver.findElements(By.xpath(xpath1));
-            System.out.println("@@@list 1-: " + list.size());
-            System.out.println("@@@list 1: " + list);
         }
         catch (Exception e){
-            System.out.println("@@xpath1 error");
             e.printStackTrace();
         }
         try {
             list = driver.findElements(By.xpath(xpath2));
-            System.out.println("@@@list 2-: " + list.size());
-            System.out.println("@@@list 2: " + list);
         }
         catch (Exception e){
-            System.out.println("@@xpath2 error");
             e.printStackTrace();
         }
 
         String nxpath = "//*[(count((//thead//*[self::th])/preceding-sibling::*[self::th]) + 1) = 1]";
 
         try {
-            System.out.println("@@@");
             list = driver.findElements(By.xpath(nxpath));
-            System.out.println("@@@list nxpath-: " + list.size());
-            System.out.println("@@@list nxpath: " + list);
         }
         catch (Exception e){
-            System.out.println("@@xpathnxpath error");
             e.printStackTrace();
         }
         list = driver.findElements(t.getLocator());
-        System.out.println("@@@list1: " + list.size());
-        System.out.println("@@@list2: " + list);
     }
 
     private int a, b, result;
