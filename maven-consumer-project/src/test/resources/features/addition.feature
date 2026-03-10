@@ -1,5 +1,18 @@
 Feature: Addition
 
+  @logTest
+  Scenario Outline: loggingTest <A>
+    * , wait 1 second, save "<A>" as "B", wait 1 second, save "<A>" as "C"
+    * IF: 1 equals 1 :
+    : * , wait 1 second, save "<A>" as "B", wait 1 second, save "<A>" as "C"
+    : * , verify <A> equals 2
+
+    Examples:
+      | A |
+      | 1 |
+      | 2 |
+      | 3 |
+
   Scenario: data test C
 
 #    * , in "YYY" Data Table,  for every "B" Data Cell:
@@ -7,14 +20,14 @@ Feature: Addition
 #    : * print "cellhere"
   :   * , save "<A>-<B>" as "WW"
     * "YYY" DATA TABLE
-      | A  | B  | C  |
-      | y1 | a2 | a3 |
+      | A  | B    | C  |
+      | y1 | a2   | a3 |
       | y2 | b2-1 | b3 |
       | y2 | b2-2 | b3 |
       | y2 | b2-3 | b3 |
       | y2 | b2-4 | b3 |
-      | y1 | b2 | b3 |
-      | y3 | b2 | b3 |
+      | y1 | b2   | b3 |
+      | y3 | b2   | b3 |
 
   Scenario: data test B
     * "XXX" DATA TABLE
