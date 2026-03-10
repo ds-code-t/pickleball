@@ -222,7 +222,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
     public void runningStep(StepExtension stepExtension) {
-        scenarioInfo("Running " + stepExtension);
+//        scenarioInfo("Running " + stepExtension);
         if (!shouldRun(stepExtension)) {
             stepExtension.skipped = true;
             if (stepExtension.nextSibling != null) {
