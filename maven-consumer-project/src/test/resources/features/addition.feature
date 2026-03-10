@@ -1,7 +1,56 @@
 Feature: Addition
 
-  Scenario: fffdgf
-    * , save "" as "A"
+  Scenario: data test C
+
+#    * , in "YYY" Data Table,  for every "B" Data Cell:
+    * , in "YYY" Data Table, for every "y2" Data Row, for every Data Cell:
+#    : * print "cellhere"
+  :   * , save "<A>-<B>" as "WW"
+    * "YYY" DATA TABLE
+      | A  | B  | C  |
+      | y1 | a2 | a3 |
+      | y2 | b2-1 | b3 |
+      | y2 | b2-2 | b3 |
+      | y2 | b2-3 | b3 |
+      | y2 | b2-4 | b3 |
+      | y1 | b2 | b3 |
+      | y3 | b2 | b3 |
+
+  Scenario: data test B
+    * "XXX" DATA TABLE
+      | A  | B  | C  |
+      | x1 | a2 | a3 |
+      | x2 | b2 | b3 |
+      | x3 | b2 | b3 |
+
+    * "YYY" DATA TABLE
+      | A  | B  | C  |
+      | y1 | a2 | a3 |
+      | y2 | b2 | b3 |
+
+    * , save "123" as "z"
+    * , in the Data Table, for any Data Row:
+  : * , save "123" as "z"
+
+#   * FOR EVERY DATA ROW IN THE "ZZ" DATA TABLE:
+  : * , in "YYY" Data Table, for every Data Row:
+  :: * , save "<A>" as "WW"
+
+  :  * "AAA" DATA TABLE
+    | A          |
+    | rrrrrrrrrr |
+    | yyyyyyyyyy |
+
+    * "BBB" DATA TABLE
+      | A  | B  | C  |
+      | a1 | a2 | a3 |
+      | b1 | b2 | b3 |
+
+
+    * "ZZZ" DATA TABLE
+      | A  | B  | C  |
+      | z1 | a2 | a3 |
+      | z2 | b2 | b3 |
 
   Scenario: dfsdf
     * "B" DATA TABLE
@@ -13,8 +62,9 @@ Feature: Addition
   @[DEBUG,nobase,##]
     * , save "" as "A"
 #    * , for every Table , save "<A>1" as "A"
-    * , for every Table:
-    : * , save "<A>1" as "A"
+    * , for any Dropdown , save "<A>1" as "A"
+    * , for any Dropdown:
+  : * , save "<A>1" as "A"
 
 
   Scenario: data test

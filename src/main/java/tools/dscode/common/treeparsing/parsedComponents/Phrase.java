@@ -1,22 +1,17 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.common.collect.LinkedListMultimap;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
-import static io.cucumber.core.runner.util.TableUtils.ENTRY_KEY;
-import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
+import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepDebug;
@@ -74,7 +69,7 @@ public final class Phrase extends PhraseData {
         if (contextTermination) {
             if (termination.equals(':') || termination.equals('?')) {
                 parsedLine.lineConditionalMode = phraseConditionalMode;
-                parsedLine.inheritancePhrase = this;
+                parsedLine.inheritancePhrases.add(this);
             }
         }
 //            if (phraseType.equals(PhraseType.CONDITIONAL)) {
@@ -170,37 +165,32 @@ public final class Phrase extends PhraseData {
     void processContextPhrase() {
         ElementMatch firstElement = getFirstElement();
         if (firstElement.elementTypes.contains(ElementType.DATA_TYPE)) {
+            categoryFlags.add(ExecutionDictionary.CategoryFlags.DATA_CONTEXT);
             String categoryName = firstElement.category.replaceFirst("(?i:s)$", "");
-            String keyLabel = firstElement.defaultText == null || firstElement.defaultText.isNullOrBlank() ? "" : "_" + firstElement.defaultText.asNormalizedText();
-            String key = categoryName + keyLabel;
-
-
-
-            System.out.println("\n-------------\n");
-
+//            String key = categoryName.equals(CELL_KEY) ? CELL_KEY : null;
+            String key = null;
             if (firstElement.selectionType.isEmpty()) {
-                Object obj = getPhraseParsingMap().get(key);
-                if (obj == null)
-                    return;
-                branchedPhrases.add(cloneWithDataElement(null, obj));
+                List<?> obj = getPhraseParsingMap().get(firstElement);
+                if (obj == null || obj.isEmpty())
+                    phraseConditionalMode = 0;
+                saveToPhraseParsingMap(key, obj.getLast());
             } else {
-                List<Object> obj =  getPhraseParsingMap().getList(key);
-                if (obj == null)
-                    return;
-
-                if (obj.isEmpty()) {
+                List<?> obj = getPhraseParsingMap().get(firstElement);
+                if (obj == null || obj.isEmpty()) {
+                    phraseConditionalMode = 0;
                     if (!firstElement.selectionType.equals("any")) {
                         throw new RuntimeException("Failed to find Data elements for " + firstElement);
                     }
                     System.out.println("No Data elements match for " + firstElement + ", skipping subsequent phrases");
                 } else {
                     for (Object item : obj) {
-                        branchedPhrases.add(cloneWithDataElement(null, item));
+                        branchedPhrases.add(cloneWithDataElement(key, item));
                     }
                 }
             }
         } else if (!firstElement.selectionType.isEmpty()) {
             if (firstElement.getElementWrappers().isEmpty()) {
+                phraseConditionalMode = 0;
                 if (!firstElement.selectionType.equals("any")) {
                     throw new RuntimeException("Failed to find WebElements for " + firstElement);
                 }
@@ -225,18 +215,27 @@ public final class Phrase extends PhraseData {
         PhraseData clone = clonePhrase(getPreviousPhrase());
         clone.categoryFlags.add(ExecutionDictionary.CategoryFlags.DATA_CONTEXT);
         clone.noExecution = true;
+        saveToPhraseParsingMap(clone, key, object);
+        return clone;
+    }
+
+
+    public void saveToPhraseParsingMap(String key, Object object) {
+        saveToPhraseParsingMap(this, key, object);
+    }
+
+    public void saveToPhraseParsingMap(PhraseData phraseData, String key, Object object) {
+
         if (key == null) {
             if (object instanceof ObjectNode objectNode) {
-                clone.setPhraseParsingMap(objectNode);
+                phraseData.setPhraseParsingMap(objectNode);
             } else {
-                clone.setPhraseParsingMap(MAPPER.createObjectNode()
-                        .set(ENTRY_KEY, MAPPER.valueToTree(object)));
+                phraseData.setPhraseParsingMap(MAPPER.valueToTree(object));
             }
         } else {
-            clone.setPhraseParsingMap(MAPPER.createObjectNode()
+            phraseData.setPhraseParsingMap(MAPPER.createObjectNode()
                     .set(key, MAPPER.valueToTree(object)));
         }
-        return clone;
     }
 
 
@@ -244,7 +243,6 @@ public final class Phrase extends PhraseData {
     public PhraseData cloneInheritedPhrase() {
         PhraseData clonedPhrase = clonePhrase(getPreviousPhrase());
         clonedPhrase.branchedPhrases.addAll(branchedPhrases);
-//        clonedPhrase.repeatRootPhrase = repeatRootPhrase;
         clonedPhrase.setResolvedPhrase(clonedPhrase);
         return clonedPhrase;
     }

@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -38,7 +39,16 @@ public class NodeMap  extends ValueFormatting{
     }
 
     public void setDataSource(MapConfigurations.DataSource... dataSources) {
-        this.dataSources.addAll(List.of(dataSources));
+        this.dataSources.addAll(Arrays.stream(dataSources)
+                .filter(Objects::nonNull)
+                .toList());
+    }
+
+    public void setDataSource(String... dataSources) {
+        this.dataSources.addAll(Arrays.stream(dataSources)
+                .filter(Objects::nonNull)
+                .map(MapConfigurations.DataSource::fromString)
+                .toList());
     }
 
     private Set<MapConfigurations.DataSource> dataSources = new HashSet<>();

@@ -47,7 +47,6 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyA
 
 
 public class ElementMatch {
-
     public final String fullText;
     public final int startIndex;
     public final int position;

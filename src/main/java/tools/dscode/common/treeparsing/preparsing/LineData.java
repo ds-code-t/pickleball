@@ -33,7 +33,7 @@ public abstract class LineData implements Cloneable {
     public final List<PhraseData> executedPhrases = new ArrayList<>();
     private final Set<Character> delimiters; // characters that cause a split
     //    public final List<PhraseData> contextPhrases = new ArrayList<>();
-    public PhraseData inheritancePhrase;
+    public List<PhraseData> inheritancePhrases = new ArrayList<>();
     public PhraseData inheritedPhrase;
     public int inheritedConditionalState;
     public int previousSiblingConditionalState = 1;
@@ -43,11 +43,11 @@ public abstract class LineData implements Cloneable {
     public void setInheritance(StepBase currentStep) {
         stepExtension = currentStep;
 
-        PhraseData previousSiblingInheritancePhrase = currentStep.previousSibling == null  || currentStep.previousSibling.lineData == null ? null : currentStep.previousSibling.lineData.inheritancePhrase;
+        PhraseData previousSiblingInheritancePhrase = currentStep.previousSibling == null  || currentStep.previousSibling.lineData == null || currentStep.previousSibling.lineData.inheritancePhrases.isEmpty() ? null : currentStep.previousSibling.lineData.inheritancePhrases.getFirst();
         previousSiblingConditionalState = previousSiblingInheritancePhrase == null ? 1 : previousSiblingInheritancePhrase.phraseConditionalMode;
 
         StepBase parentStep = currentStep.parentStep;
-        inheritedPhrase = parentStep == null || parentStep.lineData == null ? null : parentStep.lineData.inheritancePhrase;
+        inheritedPhrase = parentStep == null || parentStep.lineData == null || parentStep.lineData.inheritancePhrases.isEmpty() ? null : parentStep.lineData.inheritancePhrases.getFirst();
         inheritedConditionalState = inheritedPhrase == null ? 1 : inheritedPhrase.phraseConditionalMode;
         currentStep.logAndIgnore =
                 inheritedConditionalState < 1
@@ -200,6 +200,7 @@ public abstract class LineData implements Cloneable {
     public LineData clone() {
         try {
             LineData copy = (LineData) super.clone();
+            copy.inheritancePhrases = new ArrayList<>();
             if (this.inheritedPhrase != null) {
                 copy.inheritedPhrase = this.inheritedPhrase.cloneInheritedPhrase();
             }

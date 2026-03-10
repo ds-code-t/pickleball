@@ -107,7 +107,7 @@ public abstract class PhraseData extends PassedData {
     public ParsingMap getPhraseParsingMap() {
         if (phraseParsingMap == null) {
             PhraseData previousPhrase = getPreviousPhrase();
-            if (previousPhrase == null || previousPhrase.termination == '.' || previousPhrase.termination == '?') {
+            if (isNewContext() || previousPhrase == null || previousPhrase.termination == '.' || previousPhrase.termination == '?') {
                 phraseParsingMap = getRunningStep().getStepParsingMap();
             } else {
                 phraseParsingMap = previousPhrase.getPhraseParsingMap();
@@ -130,10 +130,12 @@ public abstract class PhraseData extends PassedData {
 
     public void setPhraseParsingMap(ObjectNode data) {
         phraseParsingMap = copytoNewParsingMap(getPhraseParsingMap());
-        phraseParsingMap.removeMaps(MapConfigurations.DataSource.PHRASE_NODE);
-        NodeMap phraseNodeMap = new NodeMap(MapConfigurations.MapType.STEP_MAP, data);
-        phraseNodeMap.setDataSource(MapConfigurations.DataSource.PHRASE_NODE);
+        phraseParsingMap.removeMaps(MapConfigurations.MapType.PHRASE_MAP);
+        NodeMap phraseNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP, data);
         phraseParsingMap.addMapsToStart(phraseNodeMap);
+        ElementMatch dataElement = getDataElement();
+        String categoryName = dataElement == null ? null : dataElement.category.replaceFirst("(?i:s)$", "");
+        phraseNodeMap.setDataSource(categoryName);
     }
 
 

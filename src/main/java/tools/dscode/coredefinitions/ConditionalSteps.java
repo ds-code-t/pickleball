@@ -64,18 +64,12 @@ public class ConditionalSteps extends CoreSteps {
     @Given("^(?:IF:|ELSE:|ELSE-IF:).*$")
     public static void runConditional() {
         StepExtension currentStep = getRunningStep();
-//        StepExtension parentStep = (StepExtension) currentStep.parentStep;
-
-//        currentStep.grandChildrenSteps.addAll(currentStep.childSteps);
-//        currentStep.childSteps.clear();
-
         String inputString = getProperty(getRunningStep().pickleStepTestStep, "unresolvedText").toString();
 
         List<TokenPart> parts = splitByTokens(inputString);
         StepExtension lastNonThenStep = null;
         String stepString = "";
         for (int i = 0; i < parts.size(); i++) {
-            boolean last = i == parts.size() - 1;
             TokenPart part = parts.get(i);
 
             switch (part.token()) {
@@ -108,8 +102,6 @@ public class ConditionalSteps extends CoreSteps {
 
             } else {
                 StepExtension modifiedStep = currentStep.modifyStepExtension(stepString);
-
-
                 currentStep.insertReplacement(modifiedStep);
                 modifiedStep.addDefinitionFlag(NO_LOGGING);
                 modifiedStep.addDefinitionFlag(IGNORE_CHILDREN_IF_FALSE);

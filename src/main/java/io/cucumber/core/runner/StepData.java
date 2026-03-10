@@ -10,6 +10,7 @@ import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.mappings.StepMapping;
 import tools.dscode.common.reporting.logging.Entry;
+import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -56,8 +57,8 @@ public abstract class StepData extends StepMapping {
 
 
     public StepBase initializeChildSteps() {
-        ParsingMap stepParsingMap = lineData.inheritancePhrase == null ? getStepParsingMap() : lineData.inheritancePhrase.getPhraseParsingMap();
-
+        PhraseData inheritancePhrase = lineData.inheritancePhrases.isEmpty() ? null : lineData.inheritancePhrases.getFirst();
+        ParsingMap stepParsingMap = inheritancePhrase == null ? getStepParsingMap() : inheritancePhrase.getPhraseParsingMap();
         if (childSteps.isEmpty()) {
             if (grandChildrenSteps.isEmpty())
                 return null;
@@ -81,7 +82,6 @@ public abstract class StepData extends StepMapping {
 
                 child.previousSibling = lastChild;
             }
-
 
             child.setStepParsingMap(stepParsingMap);
             lastChild = child;

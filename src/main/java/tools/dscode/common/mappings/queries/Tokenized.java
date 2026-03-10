@@ -127,6 +127,8 @@ public final class Tokenized {
         });
     }
 
+    public static final String AS_LIST_SUFFIX = "as-LIST";
+
     public Object get(JsonNode root) {
 
         List<JsonNode> list = getList(root, getQuery);
@@ -137,7 +139,7 @@ public final class Tokenized {
                 return null;
             return fromSafeJsonNode(list.getLast());
         }
-        if (suffix.equals("as-LIST")) {
+        if (suffix.equals(AS_LIST_SUFFIX)) {
             return fromSafeJsonNode(list);
 //            return list.stream().map(ValueFormatting::fromSafeJsonNode).toList();
         }

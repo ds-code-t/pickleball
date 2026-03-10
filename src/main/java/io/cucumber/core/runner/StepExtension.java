@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -36,6 +37,8 @@ import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static io.cucumber.core.runner.util.TableUtils.toRowsMultimap;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
+import static tools.dscode.common.mappings.MappingProcessor.getDataTableMap;
+import static tools.dscode.common.mappings.MappingProcessor.getDocStringMap;
 import static tools.dscode.common.mappings.MappingProcessor.getSingletonMap;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepDebug;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
@@ -92,18 +95,20 @@ public class StepExtension extends StepData {
             String docStringName = (String) arguments.getFirst().getValue();
             docString = (DocString) arguments.getLast().getValue();
             if (docStringName != null && !docStringName.isBlank()) {
-                getSingletonMap().put(DOCSTRING_KEY + "_" + docStringName.trim(), docString);
+               getDocStringMap().put(DOCSTRING_KEY,   Map.of( docStringName.trim(), docString));
             }
-            dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.STEP_MAP);
+            dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP);
+            dataContextStepNodeMap.setDataSource(MapConfigurations.DataSource.DOC_STRING);
             dataContextStepNodeMap.put("DOCSTRING", docString);
         } else if (isCoreStep && methodName.equals("dataTable")) {
             dataArgumentStep = true;
             String tableName = (String) arguments.getFirst().getValue();
             dataTable = (DataTable) arguments.getLast().getValue();
             if (tableName != null && !tableName.isBlank()) {
-                getSingletonMap().put(TABLE_KEY +"_" + tableName.trim(), toRowsMultimap(dataTable));
+                getDataTableMap().put(TABLE_KEY , Map.of( tableName.trim(), toRowsMultimap(dataTable)));
             }
-            dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.STEP_MAP);
+            dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP);
+            dataContextStepNodeMap.setDataSource(MapConfigurations.DataSource.DATA_TABLE);
             dataContextStepNodeMap.put(TABLE_KEY, toRowsMultimap(dataTable));
         }
     }

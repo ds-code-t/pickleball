@@ -2,12 +2,18 @@ package tools.dscode.common.mappings;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.LinkedListMultimap;
+import com.google.common.collect.Multimaps;
+import io.cucumber.java.mk_latn.No;
+import org.apache.poi.ss.formula.functions.T;
 import tools.dscode.common.mappings.queries.Tokenized;
+import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -17,10 +23,26 @@ import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
+import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
+import static io.cucumber.core.runner.util.TableUtils.DOCSTRING_KEY;
+import static io.cucumber.core.runner.util.TableUtils.HEADER_KEY;
+import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
+import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
+import static io.cucumber.core.runner.util.TableUtils.VALUE_KEY;
+import static tools.dscode.common.dataoperations.DataComparisons.filterFlatValues;
+import static tools.dscode.common.dataoperations.DataComparisons.filterGroupedValues;
+import static tools.dscode.common.dataoperations.DataComparisons.getHeaders;
+import static tools.dscode.common.dataoperations.TableQueries.findCellValues;
+
+import static tools.dscode.common.dataoperations.TableQueries.findCells;
+import static tools.dscode.common.dataoperations.TableQueries.findHeaders;
+import static tools.dscode.common.dataoperations.TableQueries.findRows;
+
 import static tools.dscode.common.evaluations.AviatorUtil.eval;
 import static tools.dscode.common.evaluations.AviatorUtil.evalToBoolean;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.mappings.NodeMap.MAPPER;
+import static tools.dscode.common.mappings.queries.Tokenized.AS_LIST_SUFFIX;
 import static tools.dscode.common.util.StringUtilities.decodeBackToText;
 import static tools.dscode.common.util.StringUtilities.encodeToPlaceHolders;
 
@@ -34,12 +56,16 @@ public abstract class MappingProcessor implements Map<String, Object> {
     public static ThreadLocal<NodeMap> singletonMap = new ThreadLocal<>();
     public static ThreadLocal<NodeMap> overridesMap = new ThreadLocal<>();
     public static ThreadLocal<NodeMap> defaultsMap = new ThreadLocal<>();
+    public static ThreadLocal<NodeMap> dataTableMap = new ThreadLocal<>();
+    public static ThreadLocal<NodeMap> docStringMap = new ThreadLocal<>();
 
     public static void resetCommonMaps() {
         runMap.set(new NodeMap(MapConfigurations.MapType.RUN_MAP));
         singletonMap.set(new NodeMap(MapConfigurations.MapType.SINGLETON));
         overridesMap.set(new NodeMap(MapConfigurations.MapType.OVERRIDE_MAP));
         defaultsMap.set(new NodeMap(MapConfigurations.MapType.DEFAULT));
+        dataTableMap.set(new NodeMap(MapConfigurations.MapType.DATATABLE));
+        docStringMap.set(new NodeMap(MapConfigurations.MapType.DOCSTRING));
     }
 
     public static NodeMap getRunMap() {
@@ -58,19 +84,47 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return defaultsMap.get();
     }
 
+    public static NodeMap getDataTableMap() {
+        return dataTableMap.get();
+    }
+
+    public static NodeMap getDocStringMap() {
+        return docStringMap.get();
+    }
+
 
     public MappingProcessor() {
         // Defensive copy to make key order immutable
-        addMaps(runMap.get(), singletonMap.get(), overridesMap.get(), defaultsMap.get());
-        addMaps(GLOBALS);
-        this.keyOrder.addAll(Arrays.asList(MapConfigurations.MapType.OVERRIDE_MAP,
-                MapConfigurations.MapType.PASSED_MAP, MapConfigurations.MapType.EXAMPLE_MAP, MapConfigurations.MapType.STEP_MAP,
-                MapConfigurations.MapType.RUN_MAP, MapConfigurations.MapType.SINGLETON,
-                MapConfigurations.MapType.GLOBAL_NODE, MapConfigurations.MapType.DEFAULT));
-        this.singletonOrder.addAll(Arrays.asList(MapConfigurations.MapType.OVERRIDE_MAP,
-                MapConfigurations.MapType.SINGLETON, MapConfigurations.MapType.GLOBAL_NODE, MapConfigurations.MapType.PASSED_MAP,
-                MapConfigurations.MapType.EXAMPLE_MAP, MapConfigurations.MapType.STEP_MAP, MapConfigurations.MapType.RUN_MAP,
+        addMaps(GLOBALS, runMap.get(), singletonMap.get(), overridesMap.get(), defaultsMap.get(), dataTableMap.get(), docStringMap.get());
+
+        this.keyOrder.addAll(Arrays.asList(
+                MapConfigurations.MapType.OVERRIDE_MAP,
+                MapConfigurations.MapType.PHRASE_MAP,
+                MapConfigurations.MapType.STEP_MAP,
+                MapConfigurations.MapType.DATATABLE,
+                MapConfigurations.MapType.DOCSTRING,
+                MapConfigurations.MapType.PASSED_MAP,
+                MapConfigurations.MapType.EXAMPLE_MAP,
+                MapConfigurations.MapType.RUN_MAP,
+                MapConfigurations.MapType.SINGLETON,
+                MapConfigurations.MapType.GLOBAL_NODE,
                 MapConfigurations.MapType.DEFAULT));
+        this.singletonOrder.addAll(Arrays.asList(
+                MapConfigurations.MapType.OVERRIDE_MAP,
+                MapConfigurations.MapType.SINGLETON,
+                MapConfigurations.MapType.PHRASE_MAP,
+                MapConfigurations.MapType.STEP_MAP,
+                MapConfigurations.MapType.DATATABLE,
+                MapConfigurations.MapType.DOCSTRING,
+                MapConfigurations.MapType.PASSED_MAP,
+                MapConfigurations.MapType.EXAMPLE_MAP,
+                MapConfigurations.MapType.RUN_MAP,
+                MapConfigurations.MapType.GLOBAL_NODE,
+                MapConfigurations.MapType.DEFAULT));
+    }
+
+    public NodeMap getPhraseMap() {
+        return maps.get(MapConfigurations.MapType.PHRASE_MAP).getFirst();
     }
 
     public NodeMap getPrimaryRunMap() {
@@ -89,10 +143,25 @@ public abstract class MappingProcessor implements Map<String, Object> {
         removeMaps(Arrays.stream(nodes).toList());
     }
 
+    public void clearDataSourceMaps(MapConfigurations.DataSource... dataSources) {
+
+        for (MapConfigurations.DataSource dataSource : dataSources) {
+            maps.values().forEach(m -> m.getDataSources());
+        }
+    }
+
     public void removeMaps(MapConfigurations.DataSource... dataSources) {
         List<NodeMap> nodeMapList = new ArrayList<>();
         for (MapConfigurations.DataSource dataSource : dataSources) {
             nodeMapList.addAll(maps.values().stream().filter(nodeMap -> nodeMap.getDataSources().contains(dataSource)).toList());
+        }
+        removeMaps(nodeMapList);
+    }
+
+    public void removeMaps(MapConfigurations.MapType... mapTypes) {
+        List<NodeMap> nodeMapList = new ArrayList<>();
+        for (MapConfigurations.MapType mapType : mapTypes) {
+            nodeMapList.addAll(maps.values().stream().filter(nodeMap -> nodeMap.getMapType() == mapType).toList());
         }
         removeMaps(nodeMapList);
     }
@@ -337,16 +406,96 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     public List<Object> getList(String key) {
-        return (List<Object>) get(key + " as-LIST");
+        return (List<Object>) get(addSuffix(key, AS_LIST_SUFFIX));
+    }
+
+    public static String addSuffix(String key, String suffix) {
+        return key.endsWith(suffix) ? key : key + " " + suffix;
+    }
+
+
+//    public Object get(ElementMatch element) {
+//        List<?>  list = getAsList(element);
+//        if(list == null || list.isEmpty()) return null;
+//        return list.getLast();
+//    }
+
+    public  List<?> get(ElementMatch element) {
+        String categoryName = element.category.replaceFirst("(?i:s)$", "");
+                boolean noQuotedText = element.defaultText == null || element.defaultText.isNullOrBlank();
+        if (categoryName.equals(TABLE_KEY)) {
+                                    if (noQuotedText) {
+                return element.parentPhrase.getPhraseParsingMap().getPhraseMap().getAsList(TABLE_KEY);
+            } else {
+                ObjectNode objectNode = (ObjectNode) getDataTableMap().get(TABLE_KEY);
+                                List<String> tableNames = new ArrayList<>();
+                List<JsonNode> tableNodes = new ArrayList<>();
+                for (Map.Entry<String, JsonNode> entry : objectNode.properties()) {
+                    tableNames.add(entry.getKey());
+                    tableNodes.add(entry.getValue());
+                }
+                                                return filterGroupedValues( tableNames, tableNodes, element, false);
+            }
+        }
+
+
+        NodeMap map = getPhraseMap();
+        if (map == null)
+            return null;
+
+
+
+
+
+        switch (categoryName) {
+            case ROW_KEY:
+                List<JsonNode> rowsArray = findRows(map.getRoot());
+                                List<String> keyList = new ArrayList<>();
+                rowsArray.forEach(row -> keyList.add(row.values().next().get(0).asText()));
+                                                return filterGroupedValues(keyList, rowsArray, element, false);
+            case CELL_KEY:
+                                
+                List<JsonNode> cellsArray = findCells(map.getRoot());
+                
+                List<String> cellKeys = new ArrayList<>();
+                List<String> cellValues = new ArrayList<>();
+
+                for (JsonNode cell : cellsArray) {
+                    if (cell.isObject() && cell.size() == 1) {
+                        cellKeys.add(cell.fieldNames().next());
+                        JsonNode value = cell.elements().next();
+                        cellValues.add(value == null || value.isNull() || value.isMissingNode() ? "" : value.asText(""));
+                    } else {
+                        cellKeys.add("");
+                        cellValues.add(cell == null || cell.isNull() || cell.isMissingNode() ? "" : cell.asText(""));
+                    }
+                }
+
+                List<Map<String, String>> keyedCellValues = new ArrayList<>(cellKeys.size());
+                for (int i = 0; i < cellKeys.size(); i++) {
+                    keyedCellValues.add(Map.of(cellKeys.get(i), cellValues.get(i)));
+                }
+
+                return filterGroupedValues(cellKeys, keyedCellValues, element, false);
+            case HEADER_KEY:
+                List<String> headers = findHeaders(map.root);
+                return filterGroupedValues(headers, headers, element, false);
+            case VALUE_KEY:
+                List<String> values = findCellValues(map.root);
+                return filterGroupedValues(values, values, element, false);
+            default:
+                return null;
+        }
+
     }
 
 
     public Object get(String key) {
-        Tokenized tokenized = new Tokenized(key);
+                Tokenized tokenized = new Tokenized(key);
         for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
             if (map == null)
                 continue;
-            Object replacement = map.get(tokenized);
+                        Object replacement = map.get(tokenized);
             if (replacement != null) {
                 return replacement;
             }

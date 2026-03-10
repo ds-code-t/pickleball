@@ -7,9 +7,8 @@ import java.util.List;
 
 public class StepLogic {
 
-    public static List<StepExtension> stepCloner(StepExtension stepExtension) {
-        PhraseData inheritancePhrase = stepExtension.lineData.inheritancePhrase;
-        if (inheritancePhrase == null || inheritancePhrase.branchedPhrases.isEmpty())
+    public static List<StepExtension> stepCloner( PhraseData inheritancePhrase , StepExtension stepExtension) {
+        if (inheritancePhrase  == null || inheritancePhrase.branchedPhrases.isEmpty())
         {
             return new ArrayList<>(List.of((StepExtension) stepExtension.clone()));
         }
@@ -19,7 +18,7 @@ public class StepLogic {
         for(PhraseData branchPhrase: inheritancePhrase.branchedPhrases)
         {
             StepExtension branchStep = (StepExtension) stepExtension.clone();
-            branchStep.lineData.inheritancePhrase = branchPhrase;
+            branchStep.lineData.inheritancePhrases.add(branchPhrase);
             returnList.add(branchStep);
         }
         return returnList;

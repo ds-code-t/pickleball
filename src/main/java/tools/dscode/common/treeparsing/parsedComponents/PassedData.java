@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Set;
 
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.BROWSER;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.DATA_TYPE;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.FOLLOWING_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.HTML_ELEMENT;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.NO_OPERATION;
@@ -402,6 +403,9 @@ public abstract class PassedData {
         resolvedPhrase.templatePhrase = (PhraseData) this;
     }
 
+    public ElementMatch getDataElement() {
+        return elementMatches.stream().filter(e -> e.elementTypes.contains(DATA_TYPE)).findFirst().orElse(null);
+    }
 
     public ElementMatch getFirstElement() {
 //        if(firstElement == null || firstElement.elementTypes.contains(ElementType.PLACE_HOLDER))
