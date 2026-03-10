@@ -21,7 +21,8 @@ import java.util.stream.Collectors;
 
 
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch.TextOp;
-import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
+
+import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
 
 /**
  * Window/tab utilities (filtering + switching are decoupled).
@@ -133,7 +134,7 @@ public final class WindowSwitch {
      * @throws NoSuchWindowException with a descriptive message if handle is not present.
      */
     public static String switchToHandleOrThrow(WebDriver driver, String handle) {
-        stepInfo("Attempting to switch to Window/Tab: " + handle);
+        phraseInfo("Attempting to switch to Window/Tab: " + handle);
         Objects.requireNonNull(driver, "driver");
         if (handle == null || handle.isBlank()) {
             throw new NoSuchWindowException("Cannot switch window: handle was null/blank.");
@@ -182,7 +183,7 @@ public final class WindowSwitch {
 
         String original = safeCurrentHandle(driver);
         List<String> matches = new ArrayList<>();
-        stepInfo("Checking open Windows for a matching " + textOps);
+        phraseInfo("Checking open Windows for a matching " + textOps);
         try {
             for (String h : handles) {
                 driver.switchTo().window(h);
@@ -196,10 +197,10 @@ public final class WindowSwitch {
                     continue;
                 }
 
-                stepInfo("Window " + property + ": " + actual);
+                phraseInfo("Window " + property + ": " + actual);
 
                 if (matchesAll(actual, textOps)) {
-                    stepInfo("Matched");
+                    phraseInfo("Matched");
                     matches.add(h);
                 }
             }

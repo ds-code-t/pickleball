@@ -12,9 +12,10 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 
-import static tools.dscode.common.reporting.logging.LogForwarder.stepError;
-import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
-import static tools.dscode.common.reporting.logging.LogForwarder.stepWarn;
+
+import static tools.dscode.common.reporting.logging.LogForwarder.phraseError;
+import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.phraseWarn;
 import static tools.dscode.common.servicecalls.RestAssuredUtil.buildRequest;
 import static tools.dscode.common.servicecalls.RestAssuredUtil.execute;
 import static tools.dscode.common.servicecalls.RestAssuredUtil.extractResponse;
@@ -25,7 +26,7 @@ import static tools.dscode.common.servicecalls.RestAssuredUtil.extractResponse;
 public class CallMap extends NodeMap {
     // --- logging ---
     private boolean logEnabled = true;
-    
+
     // --- immutable provenance ---
     private final ServiceCallTemplate template;
     private final ObjectNode originalRequest; // deep copy snapshot of template request
@@ -124,7 +125,7 @@ public class CallMap extends NodeMap {
 
             if (logEnabled) {
                 System.out.println("\n============================================================");
-                stepInfo("SERVICE CALL: attempt " + attempt + " of " + (retryMax + 1));
+                phraseInfo("SERVICE CALL: attempt " + attempt + " of " + (retryMax + 1));
                 System.out.println("============================================================");
             }
 
@@ -137,7 +138,7 @@ public class CallMap extends NodeMap {
                 } catch (Exception e) {
                     // predicate failed; treat as no-retry but report
                     if (logEnabled) {
-                        stepWarn("[RETRY predicate ERROR] " + e.getClass().getSimpleName() + ": " + safeMsg(e));
+                        phraseWarn("[RETRY predicate ERROR] " + e.getClass().getSimpleName() + ": " + safeMsg(e));
                     }
                     shouldRetry = false;
                 }
@@ -147,7 +148,7 @@ public class CallMap extends NodeMap {
 
             if (shouldRetry && hasMoreAttempts) {
                 if (logEnabled) {
-                    stepInfo("[RETRY] Condition matched -> retrying after " + retryWait.toMillis() + " ms"
+                    phraseInfo("[RETRY] Condition matched -> retrying after " + retryWait.toMillis() + " ms"
                             + " (remaining retries: " + (retryMax - attempt + 1) + ")");
                 }
                 sleepQuietly(retryWait);
@@ -155,7 +156,7 @@ public class CallMap extends NodeMap {
             }
 
             if (shouldRetry && !hasMoreAttempts && logEnabled) {
-                stepError("[RETRY] Condition matched but no retries left -> stopping.");
+                phraseError("[RETRY] Condition matched but no retries left -> stopping.");
             }
 
             break;
@@ -171,7 +172,7 @@ public class CallMap extends NodeMap {
         ObjectNode reqNode = getRequestNode();
 
         if (logEnabled) {
-            stepInfo(prettyRequest(reqNode));
+            phraseInfo(prettyRequest(reqNode));
         }
 
         try {
@@ -179,7 +180,7 @@ public class CallMap extends NodeMap {
             root.set("response", RestAssuredUtil.extractResponse(response));
 
             if (logEnabled) {
-                stepInfo(prettyResponse(root.get("response")));
+                phraseInfo(prettyResponse(root.get("response")));
             }
 
             return response;
@@ -195,8 +196,8 @@ public class CallMap extends NodeMap {
             root.set("response", err);
 
             if (logEnabled) {
-                stepError("[FAILURE] No response (exception thrown)." + e.getClass().getSimpleName() + ": " + safeMsg(e));
-                stepError(prettyResponse(err));
+                phraseError("[FAILURE] No response (exception thrown)." + e.getClass().getSimpleName() + ": " + safeMsg(e));
+                phraseError(prettyResponse(err));
             }
 
             return null;

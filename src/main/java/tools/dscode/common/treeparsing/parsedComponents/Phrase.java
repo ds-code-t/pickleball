@@ -14,8 +14,8 @@ import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
-import static tools.dscode.common.reporting.logging.LogForwarder.stepDebug;
-import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.phraseDebug;
+import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
 import static tools.dscode.common.treeparsing.DefinitionContext.FILE_INPUT;
 
 
@@ -72,21 +72,6 @@ public final class Phrase extends PhraseData {
                 parsedLine.inheritancePhrases.add(this);
             }
         }
-//            if (phraseType.equals(PhraseType.CONDITIONAL)) {
-//                parsedLine.lineConditionalMode = phraseConditionalMode;
-//            } else if (termination.equals(':')) {
-//                parsedLine.inheritedContextPhrases.add(contextPhrases);
-//                parsedLine.lineConditionalMode = phraseConditionalMode;
-//            }
-////            else {
-////                parsedLine.inheritedContextPhrases.removeLast();
-////            }
-//        }
-//
-//        if(contextTermination  && !termination.equals('.'))
-//        {
-//            parsedLine.passedPhrase = this;
-//        }
 
         return nextResolvedPhrase;
     }
@@ -123,20 +108,20 @@ public final class Phrase extends PhraseData {
         parsedLine.executedPhrases.add(this);
 
         if (!text.equals(resolvedText)) {
-            stepDebug("Resolving `" + text + "` to `" + resolvedText + "`");
+            phraseDebug("Resolving `" + text + "` to `" + resolvedText + "`");
         }
 
         if (shouldRun()) {
-            stepInfo("Running Phrase: " + this);
+            phraseInfo("Running Phrase: " + this);
         } else {
-            stepInfo("Skipping Phrase: " + this);
+            phraseInfo("Skipping Phrase: " + this);
             return;
         }
 
-        getCurrentScenarioState().currentPhrase = this;
+//        getCurrentScenarioState().currentPhrase = this;
 
         if (noExecution) {
-            stepDebug("Context branch set");
+            phraseDebug("Context branch set");
             return;
         }
 

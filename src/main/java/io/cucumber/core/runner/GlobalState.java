@@ -11,6 +11,7 @@ import tools.dscode.common.reporting.WorkBook;
 import tools.dscode.common.reporting.logging.BaseConverter;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
+import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 
 import java.nio.file.Path;
 import java.util.Optional;
@@ -191,6 +192,9 @@ public class GlobalState {
 
     public static StepExtension getRunningStep() {
         return getCurrentScenarioState().getCurrentStep();
+    }
+    public static Phrase getRunningPhrase() {
+        return getCurrentScenarioState().currentPhrase;
     }
 
     public static ParsingMap getRunningParsingMap() {

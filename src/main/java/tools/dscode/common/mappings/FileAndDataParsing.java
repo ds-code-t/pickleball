@@ -26,7 +26,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import static tools.dscode.common.reporting.logging.LogForwarder.stepWarn;
+import static tools.dscode.common.reporting.logging.LogForwarder.phraseWarn;
+
 
 public final class FileAndDataParsing {
 
@@ -88,7 +89,7 @@ public final class FileAndDataParsing {
                 return buildFromRoot(root);
             }
         } catch (Exception e) {
-            stepWarn("Failed to process resource: " + resourcePath + " (" +
+            phraseWarn("Failed to process resource: " + resourcePath + " (" +
                     e.getMessage() + ")");
             return JSON_MAPPER.createObjectNode();
         }

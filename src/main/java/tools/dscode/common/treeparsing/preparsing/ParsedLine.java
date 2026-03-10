@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 import static tools.dscode.common.treeparsing.parsedComponents.Phrase.updateChainAndInheritances;
 
@@ -32,7 +34,10 @@ public final class ParsedLine extends LineData {
 
     @Override
     public PhraseData runPhraseFromLine(PhraseData phrase) {
+        getCurrentScenarioState().currentPhrase = (tools.dscode.common.treeparsing.parsedComponents.Phrase) phrase;
+        phrase.phraseEntry = getRunningStep().stepEntry.logWithType("PHRASE" , phrase.toString()).start();
         PhraseData nextResolvedPhrase = phrase.runPhrase();
+        getCurrentScenarioState().currentPhrase = null;
 
         if (phrase.repeatRootPhrase) {
             phrase.chainStartPhrase.repeatedChain.add(phrase);

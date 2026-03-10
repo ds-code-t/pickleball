@@ -12,6 +12,7 @@ import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
+import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.status.SoftRuntimeException;
 import tools.dscode.common.treeparsing.MatchNode;
@@ -30,8 +31,8 @@ import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.StepMapping.copytoNewParsingMap;
-import static tools.dscode.common.reporting.logging.LogForwarder.stepError;
-import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.phraseError;
+import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
@@ -42,6 +43,7 @@ import static tools.dscode.common.util.debug.DebugUtils.onMatch;
 
 
 public abstract class PhraseData extends PassedData {
+    public Entry phraseEntry;
     //    boolean isStartingContext;
     public final String text;
     public final String resolvedText;
@@ -363,7 +365,7 @@ public abstract class PhraseData extends PassedData {
         previouslyResolvedBoolean = getBooleanResult();
 
         String assertionMessage = "Assertion phrase '" + resolvedText + "' evaluates to: " + previouslyResolvedBoolean;
-        stepInfo(assertionMessage);
+        phraseInfo(assertionMessage);
         if (!resultElements.isEmpty())
             assertionMessage += " , elements:" + resultElements.stream()
                     .map(Object::toString)
@@ -377,13 +379,13 @@ public abstract class PhraseData extends PassedData {
         switch (getAssertionType().replace("Termination", "")) {
             case "ensure" -> {
                 if (!previouslyResolvedBoolean) {
-                    stepError("Failed hard assertion in Phrase '" + resolvedText + "'");
+                    phraseError("Failed hard assertion in Phrase '" + resolvedText + "'");
                     throw new RuntimeException("FAILED  " + assertionMessage);
                 }
             }
             case "verify" -> {
                 if (!previouslyResolvedBoolean) {
-                    stepError("Failed soft assertion in Phrase '" + resolvedText + "'");
+                    phraseError("Failed soft assertion in Phrase '" + resolvedText + "'");
                     throw new SoftRuntimeException("FAILED  " + assertionMessage);
                 }
             }
