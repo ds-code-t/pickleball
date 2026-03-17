@@ -50,6 +50,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.noDisplay;
+import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
+import static tools.dscode.common.mappings.FileAndDataParsing.readResourceFile;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.servicecalls.ToJsonNode.sjson;
 import static tools.dscode.common.treeparsing.DefinitionContext.DEFAULT_EXECUTION_DICTIONARY;
@@ -63,13 +65,18 @@ import static tools.dscode.common.util.datetime.CalendarRegistry.DEFAULT_CALENDA
 import static tools.dscode.common.util.datetime.CalendarRegistry.calendar;
 import static tools.dscode.common.util.datetime.CalendarRegistry.getCalendar;
 import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getDefaultDriver;
-import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getDriver;
+//import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getDriver;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;
 
 import org.intellij.lang.annotations.Language;
 
 public class CalculatorSteps {
 
+    @Given("test2")
+    public static void test2() throws Exception {
+        JsonNode j = readResourceFile("objects/URL.yaml");
+        System.out.println("@@j: " + j);
+    }
 
     @Given("^zcapitalize:(.*)$")
     public static String gettext(String text) {
@@ -227,56 +234,56 @@ public class CalculatorSteps {
 //        ThreadDumps.dumpStacksAsync("cucumber @AfterAll");
 //    }
 
-    @Given("test2")
-    public static void test2() {
-        ExecutionDictionary dict = getExecutionDictionary();
-
-
-        XPathy deeplyNormalized = XPathy.from(XPathyUtils.deepNormalizedText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
-        String noDisplayPredicate = any.byCondition(noDisplay).getXpath().replaceFirst("//\\*", "");
-        XPathy co = XPathy.from(deeplyNormalized.getXpath() + noDisplayPredicate);
-        List<WebElement> list;
-        WebDriver driver = getDriver("BROWSER");
-
-        ValueWrapper v = ValueWrapper.createValueWrapper("Status");
-        ExecutionDictionary.Op op = ExecutionDictionary.Op.EQUALS;
-//        XPathy t = new XPathy("//*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + "][ancestor::table and (count(preceding-sibling::*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + "]) + 1) = (count(((ancestor::table[1]//thead//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" +
-//                customElementSuffixPredicate("header") + dict.getDirectText(v, op) + ") | (ancestor::table[1]//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + dict.getDirectText(v, op) + "))[1]/preceding-sibling::*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + "]) + 1)]");
-        XPathy t = dict.cellsInColumnByHeaderText(v, op, customElementSuffixPredicate("row"), customElementSuffixPredicate("cell"), customElementSuffixPredicate("header"));
-        System.out.println("\n\n----------- ");
-
-        list = driver.findElements(t.getLocator());
-
-        for(WebElement e: list){
-        }
-        if(true)
-            return;
-
-        String xpath1 = "//*[(count(ancestor::table[1]//thead//*[self::tr or @role='row' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 3) = '-row']][1]//*[self::th or @role='columnheader' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 6) = '-header']][string(.) = 'Status']/preceding-sibling::*[self::th or @role='columnheader' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 6) = '-header']]) + 1) = 1]";
-        String xpath2 = "//*[(count(ancestor::table[1]//*[self::tr or @role='row' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 3) = '-row']][1]//*[self::th or @role='columnheader' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 6) = '-header']][string(.) = 'Status']/preceding-sibling::*[self::th or @role='columnheader' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 6) = '-header']]) + 1) = 1]";
-        try {
-            list = driver.findElements(By.xpath(xpath1));
-        }
-        catch (Exception e){
-            e.printStackTrace();
-        }
-        try {
-            list = driver.findElements(By.xpath(xpath2));
-        }
-        catch (Exception e){
-            e.printStackTrace();
-        }
-
-        String nxpath = "//*[(count((//thead//*[self::th])/preceding-sibling::*[self::th]) + 1) = 1]";
-
-        try {
-            list = driver.findElements(By.xpath(nxpath));
-        }
-        catch (Exception e){
-            e.printStackTrace();
-        }
-        list = driver.findElements(t.getLocator());
-    }
+//    @Given("test2")
+//    public static void test2() {
+//        ExecutionDictionary dict = getExecutionDictionary();
+//
+//
+//        XPathy deeplyNormalized = XPathy.from(XPathyUtils.deepNormalizedText(ValueWrapper.createValueWrapper("aaa"), ExecutionDictionary.Op.EQUALS));
+//        String noDisplayPredicate = any.byCondition(noDisplay).getXpath().replaceFirst("//\\*", "");
+//        XPathy co = XPathy.from(deeplyNormalized.getXpath() + noDisplayPredicate);
+//        List<WebElement> list;
+//        WebDriver driver = getDefaultDriver("BROWSER");
+//
+//        ValueWrapper v = ValueWrapper.createValueWrapper("Status");
+//        ExecutionDictionary.Op op = ExecutionDictionary.Op.EQUALS;
+////        XPathy t = new XPathy("//*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + "][ancestor::table and (count(preceding-sibling::*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + "]) + 1) = (count(((ancestor::table[1]//thead//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" +
+////                customElementSuffixPredicate("header") + dict.getDirectText(v, op) + ") | (ancestor::table[1]//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + dict.getDirectText(v, op) + "))[1]/preceding-sibling::*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + "]) + 1)]");
+//        XPathy t = dict.cellsInColumnByHeaderText(v, op, customElementSuffixPredicate("row"), customElementSuffixPredicate("cell"), customElementSuffixPredicate("header"));
+//        System.out.println("\n\n----------- ");
+//
+//        list = driver.findElements(t.getLocator());
+//
+//        for(WebElement e: list){
+//        }
+//        if(true)
+//            return;
+//
+//        String xpath1 = "//*[(count(ancestor::table[1]//thead//*[self::tr or @role='row' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 3) = '-row']][1]//*[self::th or @role='columnheader' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 6) = '-header']][string(.) = 'Status']/preceding-sibling::*[self::th or @role='columnheader' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 6) = '-header']]) + 1) = 1]";
+//        String xpath2 = "//*[(count(ancestor::table[1]//*[self::tr or @role='row' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 3) = '-row']][1]//*[self::th or @role='columnheader' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 6) = '-header']][string(.) = 'Status']/preceding-sibling::*[self::th or @role='columnheader' or self::*[contains(local-name(), '-') and substring(local-name(), string-length(local-name()) - 6) = '-header']]) + 1) = 1]";
+//        try {
+//            list = driver.findElements(By.xpath(xpath1));
+//        }
+//        catch (Exception e){
+//            e.printStackTrace();
+//        }
+//        try {
+//            list = driver.findElements(By.xpath(xpath2));
+//        }
+//        catch (Exception e){
+//            e.printStackTrace();
+//        }
+//
+//        String nxpath = "//*[(count((//thead//*[self::th])/preceding-sibling::*[self::th]) + 1) = 1]";
+//
+//        try {
+//            list = driver.findElements(By.xpath(nxpath));
+//        }
+//        catch (Exception e){
+//            e.printStackTrace();
+//        }
+//        list = driver.findElements(t.getLocator());
+//    }
 
     private int a, b, result;
 
@@ -305,7 +312,7 @@ public class CalculatorSteps {
 
     @Given("logTest")
     public static void logTest() {
-        WebDriver driver = getDefaultDriver();
+//        WebDriver driver = getDefaultDriver();
         Entry entry = logToScenario("logTest");
         entry.info("child1").status(Status.FAIL).screenshot("Test").start().info("gradnchaild1").status(Status.PASS).timestamp().parent.stop();
         entry.info("child2").status(Status.INFO).timestamp().info("gradnchaild2").screenshot("Test").status(Status.FAIL).timestamp();

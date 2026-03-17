@@ -1,11 +1,32 @@
 Feature: Addition
 
+  Scenario: j test1
+    * test2
+
+  Scenario: data test C
+
+#    * , in "YYY" Data Table,  for every "B" Data Cell:
+#    * , in Data Table, for every Data Row:
+    * FOR EVERY DATA ROW IN THE DATA TABLE:
+#    : * print "cellhere"
+  :   * , save "<A>-<B>" as "WW"
+    * DATA TABLE
+      | A  | B    | C  |
+      | y1 | a2   | a3 |
+      | y2 | b2-1 | b3 |
+      | y2 | b2-2 | b3 |
+      | y2 | b2-3 | b3 |
+      | y2 | b2-4 | b3 |
+      | y1 | b2   | b3 |
+      | y3 | b2   | b3 |
+
+
   @logTest
   Scenario Outline: loggingTest <A>
     * , wait 1 second, save "<A>" as "B", wait 1 second, save "<A>" as "C"
     * IF: 1 equals 1 :
-    : * , wait 1 second, save "<A>" as "B", wait 1 second, save "<A>" as "C"
-    : * , verify <A> equals 2
+  : * , wait 1 second, save "<A>" as "B", wait 1 second, save "<A>" as "C"
+  : * , verify <A> equals 2
 
     Examples:
       | A |
@@ -333,7 +354,7 @@ Feature: Addition
       | A | bqqw  |
       | 1 | qqqw1 |
       | 2 | qqqw2 |
-    Then For every ROW in DATA TABLE
+    Then FOR EVERY ".*" DATA ROW IN THE ".*" DATA TABLE:
   : * print printing== <A>
 #     * print printing== <B>
     * DATA TABLE
