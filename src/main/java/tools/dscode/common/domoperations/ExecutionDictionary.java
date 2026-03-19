@@ -325,6 +325,9 @@ public class ExecutionDictionary {
         }
 
         if (allBuilders.isEmpty()) {
+            if (category.equals(BASE_CATEGORY)) {
+                return List.of();
+            }
             if (!hasAnyRegisteredBuilders(lineage) && !hasResolvedBase(lineage)) {
                 var starList = map.get("*");
                 if (starList == null || starList.isEmpty()) return List.of();
@@ -544,6 +547,7 @@ public class ExecutionDictionary {
 
 
         // --- builders ---
+// --- builders ---
         public CategorySpec or(Builder... builders) {
             dict.registerOrForCategories(categories, builders);
             return this;
@@ -553,6 +557,23 @@ public class ExecutionDictionary {
             dict.registerAndForCategories(categories, builders);
             return this;
         }
+
+        public CategorySpec or(Object... args) {
+            Builder[] builders = dict.adaptToBuilders(args);
+            if (builders.length > 0) {
+                dict.registerOrForCategories(categories, builders);
+            }
+            return this;
+        }
+
+        public CategorySpec and(Object... args) {
+            Builder[] builders = dict.adaptToBuilders(args);
+            if (builders.length > 0) {
+                dict.registerAndForCategories(categories, builders);
+            }
+            return this;
+        }
+
 
         /**
          * Register the resolved XPathy of one or more other categories as OR-components
@@ -886,5 +907,36 @@ public class ExecutionDictionary {
                     WebElement host = context.findElement(By.xpath(xpathy.getXpath()));
                     return host.getShadowRoot();
                 });
+    }
+
+    //builder helpers
+
+    private Builder adaptToBuilder(Object arg) {
+        if (arg == null) {
+            return null;
+        }
+
+        if (arg instanceof Builder builder) {
+            return builder;
+        }
+
+        XPathy constantXPath = tryConvertToXPathy(arg);
+        return (category, value, op) -> constantXPath;
+    }
+
+    private Builder[] adaptToBuilders(Object... args) {
+        if (args == null || args.length == 0) {
+            return new Builder[0];
+        }
+
+        List<Builder> result = new ArrayList<>();
+        for (Object arg : args) {
+            Builder builder = adaptToBuilder(arg);
+            if (builder != null) {
+                result.add(builder);
+            }
+        }
+
+        return result.toArray(new Builder[0]);
     }
 }
