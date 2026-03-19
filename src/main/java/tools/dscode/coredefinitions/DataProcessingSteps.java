@@ -67,7 +67,7 @@ public class DataProcessingSteps {
         }
 
         if (position.startsWith("#")) {
-            int index = Integer.parseInt(position.substring(1));
+            int index = Integer.parseInt(position.substring(1)) -1;
             return index >= 0 && index < matches.size() ? matches.get(index) : key;
         }
 
