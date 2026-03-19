@@ -1,6 +1,7 @@
 Feature: Addition
 
   Scenario: j test1
+    * , click the Rrr
     * test2
 
   Scenario: data test C

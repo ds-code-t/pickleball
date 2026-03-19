@@ -62,6 +62,10 @@ public class Registrations {
 
 
 
+        dict.category("Rrr").addBase("//div");
+
+
+
 
 
         dict.category("Submit Button").or(

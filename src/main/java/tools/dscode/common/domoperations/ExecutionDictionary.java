@@ -23,6 +23,7 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.xpa
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.colocatedDeepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.descendantDeepNormalizedVisibleText;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.tryConvertToXPathy;
 
 public class ExecutionDictionary {
 
@@ -41,7 +42,7 @@ public class ExecutionDictionary {
 
     @FunctionalInterface
     public interface Builder {
-        XPathy build(String category, ValueWrapper value, Op op);
+        Object build(String category, ValueWrapper value, Op op);
     }
 
     @FunctionalInterface
@@ -112,19 +113,10 @@ public class ExecutionDictionary {
     protected void register() {
     }
 
-//    public String getContainsText(ValueWrapper v, Op op) {
-//        return andThenOr(CONTAINS_TEXT, v, op).getXpath().replaceFirst("^//\\*", "");
-//    }
-//
-//    public String getDirectText(ValueWrapper v, Op op) {
-//        return andThenOr(DIRECT_TEXT, v, op).getXpath().replaceFirst("^//\\*", "");
-//    }
 
     private void defaultRegistrations() {
 
-//        category("Text").children("Texts").context((category, v, op, webDriver, ctx) ->
-//                ctx
-//        );
+
 
         category("Text").children("Texts").inheritsFrom(CONTAINS_TEXT).
                 and(
@@ -333,7 +325,7 @@ public class ExecutionDictionary {
         }
 
         if (allBuilders.isEmpty()) {
-            if (!hasAnyRegisteredBuilders(lineage)) {
+            if (!hasAnyRegisteredBuilders(lineage) && !hasResolvedBase(lineage)) {
                 var starList = map.get("*");
                 if (starList == null || starList.isEmpty()) return List.of();
                 allBuilders.addAll(starList);
@@ -343,7 +335,7 @@ public class ExecutionDictionary {
         }
 
         return allBuilders.stream()
-                .map(b -> b.build(category, value, op))
+                .map(b -> tryConvertToXPathy(b.build(category, value, op)))
                 .filter(Objects::nonNull)
                 .toList();
     }
@@ -481,6 +473,14 @@ public class ExecutionDictionary {
             if (orBuilders != null && !orBuilders.isEmpty()) return true;
             var andBuilders = andReg.get(catKey);
             if (andBuilders != null && !andBuilders.isEmpty()) return true;
+        }
+        return false;
+    }
+
+    private boolean hasResolvedBase(List<String> lineage) {
+        for (String catKey : lineage) {
+            XPathy base = baseReg.get(catKey);
+            if (base != null) return true;
         }
         return false;
     }
@@ -733,7 +733,7 @@ public class ExecutionDictionary {
                 System.out.println("Category: " + cat);
                 for (int i = 0; i < builders.size(); i++) {
                     Builder b = builders.get(i);
-                    XPathy result = safeInvoke(b, category, value, op);
+                    XPathy result = tryConvertToXPathy(b.build(category, value, op));
                     System.out.println("  OR[" + i + "] -> " + safeXpath(result));
                 }
             });
@@ -747,7 +747,7 @@ public class ExecutionDictionary {
                 System.out.println("Category: " + cat);
                 for (int i = 0; i < builders.size(); i++) {
                     Builder b = builders.get(i);
-                    XPathy result = safeInvoke(b, category, value, op);
+                    XPathy result = tryConvertToXPathy(b.build(category, value, op));
                     System.out.println("  AND[" + i + "] -> " + safeXpath(result));
                 }
             });
@@ -765,13 +765,6 @@ public class ExecutionDictionary {
         System.out.println("\n======================================");
     }
 
-    private XPathy safeInvoke(Builder builder, String category, ValueWrapper value, Op op) {
-        try {
-            return builder.build(category, value, op);
-        } catch (Exception e) {
-            return XPathy.from("//ERROR[" + e.getClass().getSimpleName() + "]");
-        }
-    }
 
     // ========================================================
     // Category flags registration / resolution

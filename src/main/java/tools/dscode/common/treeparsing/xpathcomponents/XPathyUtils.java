@@ -2,6 +2,7 @@ package tools.dscode.common.treeparsing.xpathcomponents;
 
 
 import com.xpathy.XPathy;
+import org.openqa.selenium.By;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 
@@ -492,6 +493,74 @@ public final class XPathyUtils {
                 "substring(local-name(), string-length(local-name()) - " + (len - 1) + ") = " +
                 literal +
                 "]";
+    }
+
+
+    public static XPathy tryConvertToXPathy(Object value) {
+        if (value == null) {
+            return null;
+        }
+
+        try {
+            XPathy converted = tryDirectXPathyConversions(value);
+            if (converted != null) {
+                return converted;
+            }
+
+            return tryStringFallbackConversion(value);
+        } catch (RuntimeException e) {
+            String className;
+            try {
+                className = value.getClass().getName();
+            } catch (Exception ignored) {
+                className = "<unknown-class>";
+            }
+
+            String valuePreview;
+            try {
+                valuePreview = String.valueOf(value);
+            } catch (Exception ignored) {
+                valuePreview = "<String.valueOf failed>";
+            }
+
+            throw new RuntimeException(
+                    "Failed to convert object to XPathy. " +
+                            "Actual type: " + className + ", " +
+                            "value: " + valuePreview,
+                    e
+            );
+        }
+    }
+
+    private static XPathy tryDirectXPathyConversions(Object value) {
+        if (value instanceof XPathy xpathy) {
+            return XPathy.from(xpathy);
+        }
+
+        if (value instanceof By by) {
+            return XPathy.from(by);
+        }
+
+        if (value instanceof com.xpathy.Tag tag) {
+            return XPathy.from(tag);
+        }
+
+        if (value instanceof String s) {
+            if (s.isBlank()) {
+                return null;
+            }
+            return XPathy.from(s);
+        }
+
+        return null;
+    }
+
+    private static XPathy tryStringFallbackConversion(Object value) {
+        String asString = String.valueOf(value);
+        if (asString == null || asString.isBlank()) {
+            return null;
+        }
+        return XPathy.from(asString);
     }
 
 }
