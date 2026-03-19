@@ -1,10 +1,8 @@
 package tools.dscode.common.seleniumextensions;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.openqa.selenium.*;
 import org.openqa.selenium.NoSuchElementException;
-import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.assertions.ValueWrapper;
 

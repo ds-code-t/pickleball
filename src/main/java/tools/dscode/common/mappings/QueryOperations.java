@@ -12,8 +12,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static tools.dscode.common.mappings.NodeMap.MAPPER;
 import static tools.dscode.common.mappings.NodeMap.toSafeJsonNode;
+import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 
 public class QueryOperations {
 

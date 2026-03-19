@@ -12,7 +12,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 
-
+import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseError;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseWarn;
@@ -362,7 +362,7 @@ public class CallMap extends NodeMap {
 
     private static JsonNode tryParseJson(String s) {
         try {
-            return MAPPER.readTree(s);
+            return tildeReader.readTree(s);
         } catch (Exception ignored) {
             return null;
         }
@@ -370,7 +370,7 @@ public class CallMap extends NodeMap {
 
     private static String prettyJson(JsonNode n) {
         try {
-            return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(n);
+            return tildeReader.writeValueAsPrettyString(n);
         } catch (Exception e) {
             return String.valueOf(n);
         }

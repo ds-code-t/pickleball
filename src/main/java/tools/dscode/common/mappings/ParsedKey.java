@@ -13,8 +13,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.Arrays.asList;
-import static tools.dscode.common.mappings.NodeMap.MAPPER;
 import static tools.dscode.common.mappings.NodeMap.toSafeJsonNode;
+import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 
 public class ParsedKey {
 

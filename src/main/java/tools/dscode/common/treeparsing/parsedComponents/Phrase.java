@@ -10,10 +10,9 @@ import tools.dscode.common.treeparsing.preparsing.LineData;
 import java.util.ArrayList;
 import java.util.List;
 
-import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
-import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseDebug;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
 import static tools.dscode.common.treeparsing.DefinitionContext.FILE_INPUT;
@@ -215,11 +214,11 @@ public final class Phrase extends PhraseData {
             if (object instanceof ObjectNode objectNode) {
                 phraseData.setPhraseParsingMap(objectNode);
             } else {
-                phraseData.setPhraseParsingMap(MAPPER.valueToTree(object));
+                phraseData.setPhraseParsingMap((ObjectNode) tildeReader.valueToTree(object));
             }
         } else {
             phraseData.setPhraseParsingMap(MAPPER.createObjectNode()
-                    .set(key, MAPPER.valueToTree(object)));
+                    .set(key, tildeReader.valueToTree(object)));
         }
     }
 

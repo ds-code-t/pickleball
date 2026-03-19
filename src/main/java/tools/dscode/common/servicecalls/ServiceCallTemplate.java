@@ -9,6 +9,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 import static tools.dscode.common.mappings.ValueFormatting.toSafeJsonNode;
+import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 
 /**
  * Immutable template for producing CallMap instances.
@@ -69,7 +70,7 @@ public final class ServiceCallTemplate {
     }
 
     private ObjectNode buildRequestNode() {
-        ObjectNode n = CallMap.MAPPER.createObjectNode();
+        ObjectNode n = MAPPER.createObjectNode();
 
         if (baseUri != null) n.put("baseUri", baseUri);
         if (basePath != null) n.put("basePath", basePath);

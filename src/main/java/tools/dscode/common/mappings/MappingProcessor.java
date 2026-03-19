@@ -4,16 +4,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.LinkedListMultimap;
-import com.google.common.collect.Multimaps;
-import io.cucumber.java.mk_latn.No;
-import org.apache.poi.ss.formula.functions.T;
 import tools.dscode.common.mappings.queries.Tokenized;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,14 +20,11 @@ import java.util.stream.Collectors;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
-import static io.cucumber.core.runner.util.TableUtils.DOCSTRING_KEY;
 import static io.cucumber.core.runner.util.TableUtils.HEADER_KEY;
 import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static io.cucumber.core.runner.util.TableUtils.VALUE_KEY;
-import static tools.dscode.common.dataoperations.DataComparisons.filterFlatValues;
 import static tools.dscode.common.dataoperations.DataComparisons.filterGroupedValues;
-import static tools.dscode.common.dataoperations.DataComparisons.getHeaders;
 import static tools.dscode.common.dataoperations.TableQueries.findCellValues;
 
 import static tools.dscode.common.dataoperations.TableQueries.findCells;
@@ -41,7 +34,8 @@ import static tools.dscode.common.dataoperations.TableQueries.findRows;
 import static tools.dscode.common.evaluations.AviatorUtil.eval;
 import static tools.dscode.common.evaluations.AviatorUtil.evalToBoolean;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
-import static tools.dscode.common.mappings.NodeMap.MAPPER;
+import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
 import static tools.dscode.common.mappings.queries.Tokenized.AS_LIST_SUFFIX;
 import static tools.dscode.common.util.StringUtilities.decodeBackToText;
 import static tools.dscode.common.util.StringUtilities.encodeToPlaceHolders;
@@ -594,7 +588,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
             }
             try {
                 // arrays / objects → canonical JSON
-                String otherNode = MAPPER.writeValueAsString(jsonNode);
+                String otherNode = tildeReader.writeValueAsString(jsonNode);
                 return encodeToPlaceHolders(otherNode);
             } catch (JsonProcessingException e) {
                 // fallback to best-effort text

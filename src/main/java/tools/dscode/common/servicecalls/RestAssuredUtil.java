@@ -2,7 +2,6 @@ package tools.dscode.common.servicecalls;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
@@ -11,6 +10,7 @@ import io.restassured.specification.RequestSpecification;
 import java.util.Map;
 
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
 
 public class RestAssuredUtil {
 
@@ -28,27 +28,27 @@ public class RestAssuredUtil {
             spec.port(config.get("port").asInt());
         }
         if (config.has("headers")) {
-            Map<String, Object> headers = MAPPER.convertValue(config.get("headers"), new TypeReference<>() {});
+            Map<String, Object> headers = tildeReader.convertValue(config.get("headers"), new TypeReference<>() {});
             spec.headers(headers);
         }
         if (config.has("cookies")) {
-            Map<String, Object> cookies = MAPPER.convertValue(config.get("cookies"), new TypeReference<>() {});
+            Map<String, Object> cookies = tildeReader.convertValue(config.get("cookies"), new TypeReference<>() {});
             spec.cookies(cookies);
         }
         if (config.has("params")) {
-            Map<String, Object> params = MAPPER.convertValue(config.get("params"), new TypeReference<>() {});
+            Map<String, Object> params = tildeReader.convertValue(config.get("params"), new TypeReference<>() {});
             spec.params(params);
         }
         if (config.has("queryParams")) {
-            Map<String, Object> queryParams = MAPPER.convertValue(config.get("queryParams"), new TypeReference<>() {});
+            Map<String, Object> queryParams = tildeReader.convertValue(config.get("queryParams"), new TypeReference<>() {});
             spec.queryParams(queryParams);
         }
         if (config.has("formParams")) {
-            Map<String, Object> formParams = MAPPER.convertValue(config.get("formParams"), new TypeReference<>() {});
+            Map<String, Object> formParams = tildeReader.convertValue(config.get("formParams"), new TypeReference<>() {});
             spec.formParams(formParams);
         }
         if (config.has("pathParams")) {
-            Map<String, Object> pathParams = MAPPER.convertValue(config.get("pathParams"), new TypeReference<>() {});
+            Map<String, Object> pathParams = tildeReader.convertValue(config.get("pathParams"), new TypeReference<>() {});
             spec.pathParams(pathParams);
         }
         if (config.has("body")) {
@@ -134,7 +134,7 @@ public class RestAssuredUtil {
         String contentType = response.getContentType();
         if (contentType != null && contentType.contains("json")) {
             try {
-                JsonNode body = MAPPER.readTree(response.asString());
+                JsonNode body = tildeReader.readTree(response.asString());
                 root.set("body", body);
             } catch (Exception e) {
                 root.put("body", response.asString());

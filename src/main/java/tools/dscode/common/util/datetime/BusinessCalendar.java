@@ -28,7 +28,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static tools.dscode.common.mappings.NodeMap.MAPPER;
+import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
 
 /**
  * Immutable + thread-safe (read-only after construction).
@@ -92,7 +92,7 @@ public final class BusinessCalendar {
 
     public static BusinessCalendar fromJson(String json) {
         try {
-            JsonNode n = MAPPER.readTree(json);
+            JsonNode n = tildeReader.readTree(json);
             return fromJson(n);
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid calendar JSON", e);

@@ -15,6 +15,8 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
+
 
 public abstract class ValueFormatting {
 
@@ -60,7 +62,7 @@ public abstract class ValueFormatting {
 
         // Safe packages → normal Jackson tree serialization
         if (isFromSafePackage(obj)) {
-            return MAPPER.valueToTree(obj);
+            return tildeReader.valueToTree(obj);
         }
 
         // Unsafe / non-serializable: put in registry, return placeholder ref as JSON
@@ -68,24 +70,20 @@ public abstract class ValueFormatting {
         nonSerializable.put(id, obj);
 
         NonSerializableRef ref = new NonSerializableRef(id);
-        return MAPPER.valueToTree(ref);
+        return tildeReader.valueToTree(ref);
     }
 
     public static Object fromSafeJsonNode(Object node) {
         if (node instanceof ObjectNode objectNode) {
             // Only treat as a NonSerializableRef placeholder if our special field is present
             if (objectNode.has(NON_SERIALIZABLE_FIELD)) {
-                NonSerializableRef ref = MAPPER.convertValue(objectNode, NonSerializableRef.class);
+                NonSerializableRef ref = tildeReader.convertValue(objectNode, NonSerializableRef.class);
                 return nonSerializable.get(ref._NonSerializableReferenceID());
             }
             return objectNode;
         }
         if (node instanceof JsonNode jsonNode) {
-            try {
-                return MAPPER.treeToValue(jsonNode, Object.class);
-            } catch (JsonProcessingException e) {
-                return node;
-            }
+            return tildeReader.treeToValue(jsonNode, Object.class);
         }
         // Not a placeholder → just return as-is
         return node;

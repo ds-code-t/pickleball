@@ -164,7 +164,7 @@ public class ServiceCallFluentDemo {
     private static ObjectNode requestNode(CallMap c) {
         JsonNode req = (JsonNode) c.get("request");
         if (req == null || !req.isObject()) {
-            ObjectNode fresh = CallMap.MAPPER.createObjectNode();
+            ObjectNode fresh = zAPPER.createObjectNode();
             c.put("request", fresh);
             return fresh;
         }

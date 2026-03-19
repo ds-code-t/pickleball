@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import tools.dscode.common.mappings.MapConfigurations;
-import tools.dscode.common.mappings.ValueFormatting;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -20,10 +19,10 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static tools.dscode.common.GlobalConstants.META_FLAG;
-import static tools.dscode.common.mappings.NodeMap.MAPPER;
 import static tools.dscode.common.mappings.NodeMap.MapTypeKey;
 import static tools.dscode.common.mappings.NodeMap.toSafeJsonNode;
 import static tools.dscode.common.mappings.ValueFormatting.fromSafeJsonNode;
+import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 
 public final class Tokenized {
 
