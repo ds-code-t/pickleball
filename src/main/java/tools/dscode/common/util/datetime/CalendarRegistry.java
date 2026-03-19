@@ -1,7 +1,6 @@
 package tools.dscode.common.util.datetime;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cucumber.core.runner.StepExtension;
 
 import java.util.Iterator;
@@ -9,7 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static tools.dscode.common.mappings.GlobalMappings.rootDirectory;
+import static tools.dscode.common.mappings.GlobalMappings.configsRoot;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 
 public final class CalendarRegistry {
@@ -44,7 +43,7 @@ public final class CalendarRegistry {
     private static void initOnce() {
         System.out.println("Initializing calendar registry...");
         StepExtension currentStep = getRunningStep();
-        String json = (String) currentStep.getStepParsingMap().getAndResolve(rootDirectory+ ".CALENDARS");
+        String json = (String) currentStep.getStepParsingMap().getAndResolve(configsRoot + ".CALENDARS");
         registerJson(json);
     }
 

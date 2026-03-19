@@ -1,9 +1,15 @@
 package tools.dscode.common.mappings;
 
+import io.cucumber.core.runner.GlobalState;
+import io.cucumber.core.runner.StepExtension;
+import io.cucumber.core.stepexpression.DocStringArgument;
+
 import java.util.Map;
 
 import static io.cucumber.core.runner.GlobalState.getFromRunningParsingMap;
+import static io.cucumber.core.runner.GlobalState.getFromRunningParsingMapCaseInsensitive;
 import static io.cucumber.core.runner.GlobalState.resolveToStringWithRunningParsingMap;
+import static tools.dscode.common.mappings.GlobalMappings.configsRoot;
 
 public final class BracketLiteralMasker {
     private BracketLiteralMasker() {
@@ -20,8 +26,20 @@ public final class BracketLiteralMasker {
         return unmaskAndEscape(resolveToStringWithRunningParsingMap(maskBrackets(s)));
     }
 
+
+    public static String resolveFromDocStringOrConfig(String key) {
+        StepExtension currentStep = GlobalState.getRunningStep();
+        if(currentStep.argument instanceof DocStringArgument)
+            return resolveWithMasking(currentStep.argument.getValue().toString());
+       return getAndResolveKeyWithMasking(configsRoot + "." + key);
+    }
+
+    public static String resolveConfig(String key) {
+        return getAndResolveKeyWithMasking(configsRoot + "." + key);
+    }
+
     public static String getAndResolveKeyWithMasking(String key) {
-        Object value = getFromRunningParsingMap(key);
+        Object value = getFromRunningParsingMapCaseInsensitive(key);
         if (value == null) return null;
         return resolveWithMasking(String.valueOf(value));
     }

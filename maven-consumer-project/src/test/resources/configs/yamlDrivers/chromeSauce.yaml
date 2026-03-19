@@ -1,0 +1,63 @@
+connection:
+  remoteUrl: https://ondemand.us-west-1.saucelabs.com/wd/hub
+  enableTracing: false
+  clientConfig:
+    baseUrl: https://ondemand.us-west-1.saucelabs.com/wd/hub
+    connectionTimeoutMs: 30000
+    readTimeoutMs: 120000
+    wsTimeoutMs: 120000
+    version: HTTP_1_1
+    withRetries: true
+
+capabilities:
+  browserName: chrome
+  browserVersion: latest
+  platformName: Windows 11
+  acceptInsecureCerts: true
+  pageLoadStrategy: normal
+  unhandledPromptBehavior: dismiss and notify
+  strictFileInteractability: false
+  timeouts:
+    implicit: 0
+    pageLoad: 300000
+    script: 30000
+  goog:chromeOptions:
+    args:
+      - --disable-print-preview
+      - --test-type
+      - --ignore-certificate-errors
+      - --ignore-certificate-errors-spki-list=
+      - --allow-insecure-localhost
+  sauce:options:
+    username: ${SAUCE_USERNAME}
+    accessKey: ${SAUCE_ACCESS_KEY}
+    name: Chrome Sauce Test
+    build: local-dev-build
+    tags:
+      - chrome
+      - sauce
+      - template
+
+postStart:
+  window: maximize
+  clearCookies: true
+  implicitWaitMs: 0
+  pageLoadTimeoutMs: 300000
+  scriptTimeoutMs: 30000
+  localFileDetector: true
+  initialUrl: about:blank
+
+metadata:
+  profileName: chrome-sauce
+  displayName: Chrome Sauce Example
+  description: Example remote Chrome profile for Sauce Labs.
+  owner: qa
+  tags:
+    - sauce
+    - chrome
+    - remote
+    - template
+
+framework:
+  defaultAlias: SAUCE_CHROME
+  executionMode: remote-sauce

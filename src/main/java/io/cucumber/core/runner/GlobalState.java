@@ -210,8 +210,8 @@ public class GlobalState {
         return getRunningParsingMap().resolveWholeText(input);
     }
 
-    public static Object getFromRunningParsingMapCaseInsensitive(String input) {
-        return getRunningParsingMap().getCaseInsensitive(input);
+    public static Object getFromRunningParsingMapCaseInsensitive(String key) {
+        return getRunningParsingMap().getCaseInsensitive(key);
     }
 
     public static Object getFromRunningParsingMap(String key) {

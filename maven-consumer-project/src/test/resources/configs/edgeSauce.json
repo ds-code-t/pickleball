@@ -1,25 +1,70 @@
 {
-  "remoteUrl": "https://ondemand.us-west-1.saucelabs.com/wd/hub",
-  "browserName": "MicrosoftEdge",
-  "browserVersion": "latest",
-  "platformName": "Windows 11",
-  "acceptInsecureCerts": true,
-  "pageLoadStrategy": "normal",
-  "timeouts": {
-    "implicit": 0,
-    "pageLoad": 300000,
-    "script": 30000
+  "connection": {
+    "remoteUrl": "https://ondemand.us-west-1.saucelabs.com/wd/hub",
+    "enableTracing": false,
+    "clientConfig": {
+      "baseUrl": "https://ondemand.us-west-1.saucelabs.com/wd/hub",
+      "connectionTimeoutMs": 30000,
+      "readTimeoutMs": 120000,
+      "wsTimeoutMs": 120000,
+      "version": "HTTP_1_1",
+      "withRetries": true
+    }
   },
-  "ms:edgeOptions": {
-    "args": [
-      "--ignore-certificate-errors",
-      "--allow-insecure-localhost"
+  "capabilities": {
+    "browserName": "MicrosoftEdge",
+    "browserVersion": "latest",
+    "platformName": "Windows 11",
+    "acceptInsecureCerts": true,
+    "pageLoadStrategy": "normal",
+    "unhandledPromptBehavior": "dismiss and notify",
+    "strictFileInteractability": false,
+    "timeouts": {
+      "implicit": 0,
+      "pageLoad": 300000,
+      "script": 30000
+    },
+    "ms:edgeOptions": {
+      "args": [
+        "--ignore-certificate-errors",
+        "--allow-insecure-localhost"
+      ]
+    },
+    "sauce:options": {
+      "username": "${SAUCE_USERNAME}",
+      "accessKey": "${SAUCE_ACCESS_KEY}",
+      "name": "Edge Sauce Test",
+      "build": "local-dev-build",
+      "tags": [
+        "edge",
+        "sauce",
+        "template"
+      ]
+    }
+  },
+  "postStart": {
+    "window": "maximize",
+    "clearCookies": true,
+    "implicitWaitMs": 0,
+    "pageLoadTimeoutMs": 300000,
+    "scriptTimeoutMs": 30000,
+    "localFileDetector": true,
+    "initialUrl": "about:blank"
+  },
+  "metadata": {
+    "profileName": "edge-sauce",
+    "displayName": "Edge Sauce Example",
+    "description": "Example remote Edge profile for Sauce Labs.",
+    "owner": "qa",
+    "tags": [
+      "sauce",
+      "edge",
+      "remote",
+      "template"
     ]
   },
-  "sauce:options": {
-    "username": "${SAUCE_USERNAME}",
-    "accessKey": "${SAUCE_ACCESS_KEY}",
-    "name": "Edge Sauce Test",
-    "build": "local-dev-build"
+  "framework": {
+    "defaultAlias": "SAUCE_EDGE",
+    "executionMode": "remote-sauce"
   }
 }

@@ -14,13 +14,13 @@ import static tools.dscode.common.variables.SysEnv.getPickleBallProperty;
  */
 public class GlobalMappings extends NodeMap {
 
-    public static final String rootDirectory = "configs";
+    public static final String configsRoot = "configs";
 
     public final static GlobalMappings GLOBALS = new GlobalMappings();
 
     private GlobalMappings() {
         super(MapConfigurations.MapType.GLOBAL_NODE);
-        root.set(rootDirectory, FileAndDataParsing.buildJsonFromPath(rootDirectory));
+        root.set(configsRoot, FileAndDataParsing.buildJsonFromPath(configsRoot));
     }
 
     private final ReadWriteLock rw = new ReentrantReadWriteLock();

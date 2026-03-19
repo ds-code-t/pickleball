@@ -20,8 +20,8 @@
     ]
   },
   "sauce:options": {
-    "username": "${SAUCE_USERNAME}",
-    "accessKey": "${SAUCE_ACCESS_KEY}",
+    "username": "{~SAUCE_USERNAME~}",
+    "accessKey": "{~SAUCE_ACCESS_KEY~}",
     "name": "Chrome Sauce Test",
     "build": "local-dev-build"
   }

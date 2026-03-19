@@ -1,23 +1,79 @@
 {
-  "browserName": "chrome",
-  "acceptInsecureCerts": true,
-  "pageLoadStrategy": "normal",
-  "timeouts": {
-    "implicit": 0,
-    "pageLoad": 300000,
-    "script": 30000
-  },
-
-  "goog:chromeOptions": {
-    "args": [
-      "--disable-print-preview",
-      "--test-type",
-      "--ignore-certificate-errors",
-      "--ignore-certificate-errors-spki-list=",
-      "--allow-insecure-localhost"
-    ],
-    "prefs": {
-      "download.default_directory": "/tmp/downloads"
+  "connection": {
+    "clientConfig": {
+      "connectionTimeoutMs": 30000,
+      "readTimeoutMs": 120000,
+      "wsTimeoutMs": 120000,
+      "version": "HTTP_1_1",
+      "withRetries": true
     }
+  },
+  "capabilities": {
+    "browserName": "chrome",
+    "acceptInsecureCerts": true,
+    "pageLoadStrategy": "normal",
+    "unhandledPromptBehavior": "dismiss and notify",
+    "strictFileInteractability": false,
+    "timeouts": {
+      "implicit": 0,
+      "pageLoad": 300000,
+      "script": 30000
+    },
+    "goog:chromeOptions": {
+      "args": [
+        "--disable-print-preview",
+        "--test-type",
+        "--ignore-certificate-errors",
+        "--ignore-certificate-errors-spki-list=",
+        "--allow-insecure-localhost"
+      ],
+      "prefs": {
+        "download.default_directory": "/tmp/downloads"
+      }
+    }
+  },
+  "service": {
+    "driverExecutable": "/path/to/chromedriver",
+    "port": 0,
+    "timeoutMs": 20000,
+    "logFile": "/tmp/chromedriver.log",
+    "logOutput": "stdout",
+    "environment": {
+      "TMPDIR": "/tmp"
+    },
+    "appendLog": true,
+    "buildCheckDisabled": false,
+    "verbose": false,
+    "silent": false,
+    "readableTimestamp": true,
+    "logLevel": "INFO"
+  },
+  "postStart": {
+    "window": "maximize",
+    "clearCookies": true,
+    "implicitWaitMs": 0,
+    "pageLoadTimeoutMs": 300000,
+    "scriptTimeoutMs": 30000,
+    "localFileDetector": false,
+    "initialUrl": "about:blank"
+  },
+  "metadata": {
+    "profileName": "chrome-local",
+    "displayName": "Chrome Local Example",
+    "description": "Example local Chrome profile using the structured BrowserSteps config format.",
+    "owner": "qa",
+    "tags": [
+      "local",
+      "chrome",
+      "template"
+    ]
+  },
+  "framework": {
+    "defaultAlias": "CHROME",
+    "executionMode": "local",
+    "notes": [
+      "All sections are optional except the file itself.",
+      "Remove any fields you do not need."
+    ]
   }
 }

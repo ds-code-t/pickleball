@@ -1,37 +1,16 @@
 package tools.dscode.coredefinitions;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import io.cucumber.core.gherkin.Step;
-import io.cucumber.core.runner.StepExtension;
-import io.cucumber.core.stepexpression.DocStringArgument;
+
 import io.cucumber.java.AfterAll;
 import io.cucumber.java.BeforeAll;
-import io.cucumber.java.ParameterType;
 import io.cucumber.java.en.Given;
-import org.openqa.selenium.JavascriptExecutor;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeOptions;
-import org.openqa.selenium.chromium.ChromiumDriver;
-import org.openqa.selenium.edge.EdgeDriver;
-import org.openqa.selenium.edge.EdgeOptions;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.DefinitionFlags;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.reporting.logging.Log;
 import tools.dscode.common.status.SoftRuntimeException;
-
-import java.time.Duration;
-import java.util.Calendar;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-
-import static io.cucumber.core.runner.CurrentScenarioState.getScenarioObject;
-import static io.cucumber.core.runner.CurrentScenarioState.registerScenarioObject;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.GlobalState.pickleballLog;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
@@ -41,12 +20,7 @@ import static tools.dscode.common.GlobalConstants.ROOT_STEP;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.GlobalConstants.SOFT_ERROR_STEP;
 import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
-import static tools.dscode.common.domoperations.LeanWaits.waitForPageReady;
-import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort;
-import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
-import static tools.dscode.common.mappings.BracketLiteralMasker.getAndResolveKeyWithMasking;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
-import static tools.dscode.common.variables.RunVars.resolveVarOrDefault;
 
 
 public class GeneralSteps extends CoreSteps {
