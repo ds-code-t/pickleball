@@ -1,0 +1,17 @@
+{
+  "remoteUrl": "http://localhost:4444",
+  "browserName": "MicrosoftEdge",
+  "acceptInsecureCerts": true,
+  "pageLoadStrategy": "normal",
+  "timeouts": {
+    "implicit": 0,
+    "pageLoad": 300000,
+    "script": 30000
+  },
+  "ms:edgeOptions": {
+    "args": [
+      "--ignore-certificate-errors",
+      "--allow-insecure-localhost"
+    ]
+  }
+}

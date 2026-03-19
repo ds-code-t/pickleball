@@ -1,0 +1,25 @@
+{
+  "remoteUrl": "https://ondemand.us-west-1.saucelabs.com/wd/hub",
+  "browserName": "MicrosoftEdge",
+  "browserVersion": "latest",
+  "platformName": "Windows 11",
+  "acceptInsecureCerts": true,
+  "pageLoadStrategy": "normal",
+  "timeouts": {
+    "implicit": 0,
+    "pageLoad": 300000,
+    "script": 30000
+  },
+  "ms:edgeOptions": {
+    "args": [
+      "--ignore-certificate-errors",
+      "--allow-insecure-localhost"
+    ]
+  },
+  "sauce:options": {
+    "username": "${SAUCE_USERNAME}",
+    "accessKey": "${SAUCE_ACCESS_KEY}",
+    "name": "Edge Sauce Test",
+    "build": "local-dev-build"
+  }
+}

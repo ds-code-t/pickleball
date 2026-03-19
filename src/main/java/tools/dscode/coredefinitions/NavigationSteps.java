@@ -13,7 +13,7 @@ public class NavigationSteps {
     public void i_navigate_to(String text) {
         text = getRunningParsingMap().getCaseInsensitiveAndResolve("configs." + text);
         stepInfo("Attempting to navigate to: " + text + "");
-        WebDriver driver = ObjectRegistrationSteps.getDefaultDriver();
+        WebDriver driver = BrowserSteps.getDefaultDriver();
         driver.get(text);
     }
 }

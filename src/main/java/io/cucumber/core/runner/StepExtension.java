@@ -27,6 +27,8 @@ import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgume
 import static io.cucumber.core.runner.CurrentScenarioState.getScenarioLogRoot;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getGlobalEventBus;
+import static io.cucumber.core.runner.GlobalState.getRunningParsingMap;
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
@@ -335,5 +337,19 @@ public class StepExtension extends StepData {
         modifiedStep.setStepParsingMap(getStepParsingMap());
         return modifiedStep;
     }
+
+    public static Object runStepFromTest(String stepText) {
+        return runStepFromTest(stepText, "");
+    }
+
+    public static Object runStepFromTest(String stepText, String argumentText) {
+        argumentText = argumentText == null || argumentText.isBlank() ? "" : argumentText;
+        StepExtension currentStep = getRunningStep();
+        StepExtension modifiedStep = new StepExtension(currentStep.testCase, getPickleStepTestStepFromStrings(currentStep.pickleStepTestStep.getStep().getKeyword(), stepText, argumentText));
+        modifiedStep.setStepParsingMap(getRunningParsingMap());
+        return modifiedStep.runAndGetReturnValue();
+    }
+
+
 
 }

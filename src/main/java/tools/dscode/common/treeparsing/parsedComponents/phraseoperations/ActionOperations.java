@@ -10,19 +10,14 @@ import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.util.FileUploadUtil;
-import tools.dscode.coredefinitions.GeneralSteps;
-import tools.dscode.coredefinitions.ObjectRegistrationSteps;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.browseroperations.BrowserAlerts.accept;
 import static tools.dscode.common.browseroperations.BrowserAlerts.dismiss;
-import static tools.dscode.common.domoperations.HumanInteractions.blur;
 import static tools.dscode.common.domoperations.HumanInteractions.clear;
-import static tools.dscode.common.domoperations.HumanInteractions.clearAndType;
 import static tools.dscode.common.domoperations.HumanInteractions.click;
 import static tools.dscode.common.domoperations.HumanInteractions.contextClick;
 import static tools.dscode.common.domoperations.HumanInteractions.doubleClick;
@@ -37,7 +32,7 @@ import static tools.dscode.common.domoperations.SeleniumUtils.waitForDuration;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
-import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getDefaultDriver;
+import static tools.dscode.coredefinitions.BrowserSteps.getDefaultDriver;
 
 
 public enum ActionOperations implements OperationsInterface {

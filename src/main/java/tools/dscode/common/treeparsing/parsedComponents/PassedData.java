@@ -3,7 +3,6 @@ package tools.dscode.common.treeparsing.parsedComponents;
 import com.xpathy.XPathy;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.domoperations.ExecutionDictionary;
-import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
@@ -14,7 +13,6 @@ import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHo
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Set;
 
@@ -26,7 +24,7 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.NO_OP
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PRECEDING_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
-import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getDefaultDriver;
+import static tools.dscode.coredefinitions.BrowserSteps.getDefaultDriver;
 
 
 public abstract class PassedData {

@@ -28,6 +28,17 @@ public class GeneralUtils {
         }
     }
 
+    public static boolean isUsableValue(Object value) {
+        if (value == null) return false;
+        if (!(value instanceof String s)) return true;
 
+        int len = s.length();
+        int i = 0;
+        while (i < len && s.charAt(i) <= ' ') {
+            i++;
+        }
+
+        return i < len && s.charAt(i) != '<';
+    }
 
 }

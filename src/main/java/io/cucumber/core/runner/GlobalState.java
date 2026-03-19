@@ -23,8 +23,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static io.cucumber.core.runner.CurrentScenarioState.currentScenarioState;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
-import static tools.dscode.common.reporting.WorkBookConsolePrinter.error;
-import static tools.dscode.common.reporting.WorkBookConsolePrinter.errorBlock;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
 import static tools.dscode.pickleruntime.CucumberOptionResolver.tags;
