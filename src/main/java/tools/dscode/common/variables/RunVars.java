@@ -15,7 +15,9 @@ import java.util.Objects;
 import java.util.Properties;
 
 import static io.cucumber.core.runner.GlobalState.getFromRunningParsingMapCaseInsensitive;
-import static tools.dscode.common.variables.YamlBooleanRulesDsl.evaluate;
+import static io.cucumber.core.runner.GlobalState.getRunningParsingMap;
+import static tools.dscode.common.mappings.ParsingMap.GLOBALS_PARSINGMAP;
+
 
 public class RunVars extends NodeMap {
 
@@ -42,22 +44,23 @@ public class RunVars extends NodeMap {
         for (Map.Entry<String, JsonNode> entry : runConfigNode.properties()) {
             String key = entry.getKey();
             JsonNode value = entry.getValue();
-            if(value.isMissingNode() || value.isNull())
+            if (value.isMissingNode() || value.isNull())
                 continue;
-            evaluate(value, RUN_VARS.root);
+//            evaluate(value, RUN_VARS.root);
         }
         String profileName = RUN_VARS.getStringValue(PROFILEProp);
 
         if (profileName != null && !profileName.isBlank()) {
             JsonNode profilesNode = FileAndDataParsing.buildJsonFromPath(PROFILES);
             JsonNode profileNode = getFieldIgnoreCaseSpaceNormalized((ObjectNode) profilesNode, profileName.trim());
-            evaluate(profileNode, RUN_VARS.root);
+//            evaluate(profileNode, RUN_VARS.root);
         }
 
     }
 
     public static final String PickleballVarPrefix = "pkb_";
     public static final String RunVarPrefix = "run_";
+    public static final String overridePrefix = "ovr_";
 
     public static Object resolveVarOrDefault(String varName, Object defaultValue) {
         System.out.println("@@resolveVarOrDefault: " + varName + ", default: " + defaultValue + "");
@@ -68,16 +71,21 @@ public class RunVars extends NodeMap {
     }
 
     public static Object resolveVar(String varName) {
+        System.out.println("@@resolveVar: " + varName);
         varName = varName.trim();
-        if (varName.startsWith(RunVarPrefix))
+        Object returnObj = null;
+        if (varName.startsWith(PickleballVarPrefix)) {
+            returnObj = resolveVarWithParsingMap(varName);
+            if (returnObj == null)
+                return resolveSetupVars(varName);
+            return returnObj;
+        }
+        returnObj = resolveSetupVars(varName);
+        if (returnObj == null)
             return resolveVarWithParsingMap(varName);
-        if (varName.startsWith(PickleballVarPrefix))
-            return resolveSetupVars(varName);
-        Object returnObj = resolveVarWithParsingMap(RunVarPrefix + varName);
-        if (returnObj == null || (returnObj instanceof String returnString && returnString.isBlank()))
-            returnObj = resolveSetupVars(PickleballVarPrefix + varName);
         return returnObj;
     }
+
 
     public static Object resolveVarWithParsingMap(String varName) {
         return getFromRunningParsingMapCaseInsensitive(varName);

@@ -12,7 +12,6 @@ import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.edge.EdgeDriverService;
 import org.openqa.selenium.edge.EdgeOptions;
 import org.openqa.selenium.remote.LocalFileDetector;
-
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.remote.http.ClientConfig;
 import org.openqa.selenium.remote.service.DriverService;
@@ -27,7 +26,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-import static io.cucumber.core.runner.CurrentScenarioState.registerScenarioObject;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort;
@@ -53,15 +51,15 @@ public class BrowserSteps {
     }
 
     public static WebDriver getDefaultDriver() {
-        System.out.println("@@getDefaultDriver");
-        String browserName = resolveVarOrDefault("BROWSER", "BROWSER").toString();
+        String browserName = String.valueOf(resolveVarOrDefault("pkb_BROWSER", "BROWSER"));
+        System.out.println("@@resolved-browserName: " + browserName + "");
         return getDriver(browserName);
     }
 
     public static WebDriver getDriver(String browserName) {
         WebDriver webDriver = getBrowserOrDefaultToChrome(browserName);
         getRunningStep().webDriverUsed = webDriver;
-        return (WebDriver) webDriver;
+        return webDriver;
     }
 
     private static WebDriver getBrowserOrDefaultToChrome(String browserName) {
@@ -70,139 +68,103 @@ public class BrowserSteps {
 
     @Given(objRegistration + "BROWSER$")
     public WebDriver getBrowser() throws Exception {
+        System.out.println("@@browser!");
         return getLocalBrowser("chrome", "");
     }
 
     @Given(objRegistration + "(CHROME|EDGE)(.*)?$")
     public WebDriver getLocalBrowser(String browserName, String configFileSuffix) throws Exception {
+        System.out.println("@@1 browserName: " + browserName + " configFileSuffix: " + configFileSuffix);
         String normalizedBrowserName = normalizeBrowserName(browserName);
-        DriverProfile profile = loadDriverProfile(
+        BrowserConfig config = loadBrowserConfig(
                 normalizedBrowserName + safeSuffix(configFileSuffix),
                 browserName + " Driver Configuration not found"
         );
-
-        WebDriver driver = createLocalDriver(normalizedBrowserName, profile);
-        registerDriverAndProfile(driver, profile);
-        return driver;
+        return createLocalDriver(normalizedBrowserName, config);
     }
 
-    @Given(objRegistration + "SAUCE_(chrome|edge)(.*)?$")
-    public WebDriver getSauceLabs(String browserName, String configFileSuffix) throws Exception {
+    @Given(objRegistration + "(SAUCE_)(chrome|edge)(.*)?$")
+    public WebDriver getSauceLabs(String saucePrefix, String browserName, String configFileSuffix) throws Exception {
+        System.out.println("@@2 browserName: " + browserName + " configFileSuffix: " + configFileSuffix);
         String normalizedBrowserName = normalizeBrowserName(browserName);
-        DriverProfile profile = loadDriverProfile(
-                normalizedBrowserName + safeSuffix(configFileSuffix),
+        BrowserConfig config = loadBrowserConfig(
+                saucePrefix + normalizedBrowserName + safeSuffix(configFileSuffix),
                 "Sauce Labs Driver Configuration not found"
         );
-
-        WebDriver driver = createRemoteDriver(normalizedBrowserName, profile, "Sauce Labs remoteUrl not found");
-        registerDriverAndProfile(driver, profile);
-        return driver;
+        return createRemoteDriver(normalizedBrowserName, config, "Sauce Labs remoteUrl not found");
     }
 
-    @Given(objRegistration + "GRID_(chrome|edge)(.*)?$")
-    @Given(objRegistration + "SELENIUM_GRID_(chrome|edge)(.*)?$")
-    public WebDriver getSeleniumGrid(String browserName, String configFileSuffix) throws Exception {
+    @Given(objRegistration + "(GRID_)(chrome|edge)(.*)?$")
+    @Given(objRegistration + "(SELENIUM_GRID_)(chrome|edge)(.*)?$")
+    public WebDriver getSeleniumGrid(String gridPrefix , String browserName, String configFileSuffix) throws Exception {
         String normalizedBrowserName = normalizeBrowserName(browserName);
-        DriverProfile profile = loadDriverProfile(
-                normalizedBrowserName + safeSuffix(configFileSuffix),
+        BrowserConfig config = loadBrowserConfig(
+                gridPrefix + normalizedBrowserName + safeSuffix(configFileSuffix),
                 "Selenium Grid Driver Configuration not found"
         );
-
-        WebDriver driver = createRemoteDriver(normalizedBrowserName, profile, "Selenium Grid remoteUrl not found");
-        registerDriverAndProfile(driver, profile);
-        return driver;
+        return createRemoteDriver(normalizedBrowserName, config, "Selenium Grid remoteUrl not found");
     }
 
-    private static void registerDriverAndProfile(WebDriver driver, DriverProfile profile) {
-        registerScenarioObject("browser", driver);
-        registerScenarioObject("browserConfig", profile.raw());
-        registerScenarioObject("browserConfigMetadata", profile.metadata());
-        registerScenarioObject("browserConfigPostStart", profile.postStart());
-    }
+    private static WebDriver createLocalDriver(String browserName, BrowserConfig config) throws Exception {
+        ClientConfig clientConfig = buildClientConfig(config.connection());
 
-    private static WebDriver createLocalDriver(String browserName, DriverProfile profile) throws Exception {
-        ClientConfig clientConfig = buildClientConfig(profile.connection());
+        return switch (browserName) {
+            case "chrome" -> {
+                ChromeOptions options = buildChromeOptions(config.capabilities());
+                ChromeDriverService service = buildChromeService(config.service());
 
-        switch (browserName) {
-            case "chrome": {
-                ChromeOptions options = buildChromeOptions(profile.capabilities());
-                ChromeDriverService service = buildChromeService(profile.service());
+                ChromeDriver driver =
+                        service != null && clientConfig != null ? new ChromeDriver(service, options, clientConfig)
+                                : service != null ? new ChromeDriver(service, options)
+                                : clientConfig != null ? new ChromeDriver(options, clientConfig)
+                                : new ChromeDriver(options);
 
-                ChromeDriver driver;
-                if (service != null && clientConfig != null) {
-                    driver = new ChromeDriver(service, options, clientConfig);
-                } else if (service != null) {
-                    driver = new ChromeDriver(service, options);
-                } else if (clientConfig != null) {
-                    driver = new ChromeDriver(options, clientConfig);
-                } else {
-                    driver = new ChromeDriver(options);
-                }
-
-                applyPostStart(driver, profile.postStart());
-                return driver;
+                applyPostStart(driver, config.postStart());
+                yield driver;
             }
+            case "edge" -> {
+                EdgeOptions options = buildEdgeOptions(config.capabilities());
+                EdgeDriverService service = buildEdgeService(config.service());
 
-            case "edge": {
-                EdgeOptions options = buildEdgeOptions(profile.capabilities());
-                EdgeDriverService service = buildEdgeService(profile.service());
+                EdgeDriver driver =
+                        service != null && clientConfig != null ? new EdgeDriver(service, options, clientConfig)
+                                : service != null ? new EdgeDriver(service, options)
+                                : clientConfig != null ? new EdgeDriver(options, clientConfig)
+                                : new EdgeDriver(options);
 
-                EdgeDriver driver;
-                if (service != null && clientConfig != null) {
-                    driver = new EdgeDriver(service, options, clientConfig);
-                } else if (service != null) {
-                    driver = new EdgeDriver(service, options);
-                } else if (clientConfig != null) {
-                    driver = new EdgeDriver(options, clientConfig);
-                } else {
-                    driver = new EdgeDriver(options);
-                }
-
-                applyPostStart(driver, profile.postStart());
-                return driver;
+                applyPostStart(driver, config.postStart());
+                yield driver;
             }
-
-            default:
-                throw new RuntimeException("Unsupported local browser: " + browserName);
-        }
+            default -> throw new RuntimeException("Unsupported local browser: " + browserName);
+        };
     }
 
-    private static WebDriver createRemoteDriver(String browserName, DriverProfile profile, String missingRemoteUrlMessage) throws Exception {
-        String remoteUrl = trimToNull(profile.connection().get("remoteUrl"));
+    private static WebDriver createRemoteDriver(String browserName, BrowserConfig config, String missingRemoteUrlMessage) throws Exception {
+        String remoteUrl = trimToNull(config.connection().get("remoteUrl"));
         if (remoteUrl == null) {
             throw new RuntimeException(missingRemoteUrlMessage);
         }
 
-        MutableCapabilities options = buildRemoteOptions(browserName, profile.capabilities());
-        ClientConfig clientConfig = buildClientConfig(profile.connection());
-        Boolean enableTracing = toBoolean(profile.connection().get("enableTracing"));
+        MutableCapabilities capabilities = buildRemoteCapabilities(browserName, config.capabilities());
+        ClientConfig clientConfig = buildClientConfig(config.connection());
+        Boolean enableTracing = toBoolean(config.connection().get("enableTracing"));
 
-        WebDriver driver;
-        URL url = new URL(remoteUrl);
+        RemoteWebDriver driver =
+                clientConfig != null && enableTracing != null ? new RemoteWebDriver(new URL(remoteUrl), capabilities, clientConfig, enableTracing)
+                        : clientConfig != null ? new RemoteWebDriver(new URL(remoteUrl), capabilities, clientConfig)
+                        : enableTracing != null ? new RemoteWebDriver(new URL(remoteUrl), capabilities, enableTracing)
+                        : new RemoteWebDriver(new URL(remoteUrl), capabilities);
 
-        if (clientConfig != null && enableTracing != null) {
-            driver = new RemoteWebDriver(url, options, clientConfig, enableTracing);
-        } else if (clientConfig != null) {
-            driver = new RemoteWebDriver(url, options, clientConfig);
-        } else if (enableTracing != null) {
-            driver = new RemoteWebDriver(url, options, enableTracing);
-        } else {
-            driver = new RemoteWebDriver(url, options);
-        }
-
-        applyPostStart(driver, profile.postStart());
+        applyPostStart(driver, config.postStart());
         return driver;
     }
 
-    private static MutableCapabilities buildRemoteOptions(String browserName, Map<String, Object> capabilities) {
-        switch (browserName) {
-            case "chrome":
-                return buildChromeOptions(capabilities);
-            case "edge":
-                return buildEdgeOptions(capabilities);
-            default:
-                throw new RuntimeException("Unsupported remote browser: " + browserName);
-        }
+    private static MutableCapabilities buildRemoteCapabilities(String browserName, Map<String, Object> capabilities) {
+        return switch (browserName) {
+            case "chrome" -> buildChromeOptions(capabilities);
+            case "edge" -> buildEdgeOptions(capabilities);
+            default -> throw new RuntimeException("Unsupported remote browser: " + browserName);
+        };
     }
 
     private static ChromeOptions buildChromeOptions(Map<String, Object> capabilities) {
@@ -223,10 +185,10 @@ public class BrowserSteps {
         return options;
     }
 
-    private static void applyCapabilities(MutableCapabilities options, Map<String, Object> capabilities) {
+    private static void applyCapabilities(MutableCapabilities target, Map<String, Object> capabilities) {
         safeMap(capabilities).forEach((key, value) -> {
             if (key != null && value != null) {
-                options.setCapability(key, value);
+                target.setCapability(key, value);
             }
         });
     }
@@ -256,7 +218,10 @@ public class BrowserSteps {
             builder.withAllowedListIps(trimToNull(service.get("allowedListIps")));
         }
         if (service.containsKey("readableTimestamp")) {
-            builder.withReadableTimestamp(toBoolean(service.get("readableTimestamp")));
+            Boolean readableTimestamp = toBoolean(service.get("readableTimestamp"));
+            if (readableTimestamp != null) {
+                builder.withReadableTimestamp(readableTimestamp);
+            }
         }
         if (service.containsKey("logLevel")) {
             ChromiumDriverLogLevel logLevel = parseChromiumLogLevel(service.get("logLevel"));
@@ -293,7 +258,10 @@ public class BrowserSteps {
             builder.withAllowedListIps(trimToNull(service.get("allowedListIps")));
         }
         if (service.containsKey("readableTimestamp")) {
-            builder.withReadableTimestamp(toBoolean(service.get("readableTimestamp")));
+            Boolean readableTimestamp = toBoolean(service.get("readableTimestamp"));
+            if (readableTimestamp != null) {
+                builder.withReadableTimestamp(readableTimestamp);
+            }
         }
         if (service.containsKey("logLevel")) {
             ChromiumDriverLogLevel logLevel = parseChromiumLogLevel(service.get("logLevel"));
@@ -342,8 +310,7 @@ public class BrowserSteps {
     }
 
     private static ClientConfig buildClientConfig(Map<String, Object> connectionSection) throws Exception {
-        Map<String, Object> connection = safeMap(connectionSection);
-        Map<String, Object> client = safeMap(connection.get("clientConfig"));
+        Map<String, Object> client = safeMap(safeMap(connectionSection).get("clientConfig"));
         if (client.isEmpty()) {
             return null;
         }
@@ -391,18 +358,11 @@ public class BrowserSteps {
         String window = trimToNull(postStart.get("window"));
         if (window != null) {
             switch (window.toLowerCase(Locale.ROOT)) {
-                case "maximize":
-                    driver.manage().window().maximize();
-                    break;
-                case "minimize":
-                    driver.manage().window().minimize();
-                    break;
-                case "fullscreen":
-                    driver.manage().window().fullscreen();
-                    break;
-                default:
-                    // ignore unknown window directives
-                    break;
+                case "maximize" -> driver.manage().window().maximize();
+                case "minimize" -> driver.manage().window().minimize();
+                case "fullscreen" -> driver.manage().window().fullscreen();
+                default -> {
+                }
             }
         }
 
@@ -425,8 +385,8 @@ public class BrowserSteps {
             driver.manage().timeouts().scriptTimeout(Duration.ofMillis(scriptTimeoutMs));
         }
 
-        if (booleanOrDefault(postStart.get("localFileDetector"), false)) {
-            ((RemoteWebDriver)driver).setFileDetector(new LocalFileDetector());
+        if (booleanOrDefault(postStart.get("localFileDetector"), false) && driver instanceof RemoteWebDriver remote) {
+            remote.setFileDetector(new LocalFileDetector());
         }
 
         String initialUrl = trimToNull(postStart.get("initialUrl"));
@@ -435,14 +395,16 @@ public class BrowserSteps {
         }
     }
 
-    private static DriverProfile loadDriverProfile(String configKey, String missingMessage) throws Exception {
+    private static BrowserConfig loadBrowserConfig(String configKey, String missingMessage) throws Exception {
+        System.out.println("@@loadBrowserConfig: configKey: " + configKey + " , missingMessage: " + missingMessage + "");
         String json = resolveFromDocStringOrConfig(configKey);
+        System.out.println("@@json: " + json + "");
         if (Objects.isNull(json)) {
             throw new RuntimeException(missingMessage);
         }
 
         Map<String, Object> raw = tildeReader.read(json, Map.class);
-        return DriverProfile.from(raw);
+        return BrowserConfig.from(raw);
     }
 
     private static String normalizeBrowserName(String browserName) {
@@ -458,7 +420,6 @@ public class BrowserSteps {
         if (token == null) {
             return null;
         }
-
         if ("stdout".equalsIgnoreCase(token)) {
             return System.out;
         }
@@ -563,15 +524,13 @@ public class BrowserSteps {
         return result;
     }
 
-    private record DriverProfile(
-            Map<String, Object> raw,
+    private record BrowserConfig(
             Map<String, Object> connection,
             Map<String, Object> capabilities,
             Map<String, Object> service,
-            Map<String, Object> postStart,
-            Map<String, Object> metadata
+            Map<String, Object> postStart
     ) {
-        static DriverProfile from(Map<String, Object> rawMap) {
+        static BrowserConfig from(Map<String, Object> rawMap) {
             Map<String, Object> raw = rawMap == null ? new LinkedHashMap<>() : new LinkedHashMap<>(rawMap);
 
             boolean structured = raw.keySet().stream().anyMatch(RESERVED_ROOT_KEYS::contains);
@@ -582,14 +541,6 @@ public class BrowserSteps {
                 Map<String, Object> service = safeMap(raw.get("service"));
                 Map<String, Object> postStart = safeMap(raw.get("postStart"));
 
-                Map<String, Object> metadata = safeMap(raw.get("metadata"));
-                Map<String, Object> framework = safeMap(raw.get("framework"));
-                if (!framework.isEmpty()) {
-                    metadata.putIfAbsent("framework", framework);
-                }
-
-                // Allow partial migration:
-                // if "capabilities" is omitted, treat all non-reserved top-level keys as capabilities.
                 if (capabilities.isEmpty()) {
                     raw.forEach((k, v) -> {
                         if (!RESERVED_ROOT_KEYS.contains(k) && !"remoteUrl".equals(k)) {
@@ -598,16 +549,13 @@ public class BrowserSteps {
                     });
                 }
 
-                // Allow top-level remoteUrl during migration.
                 if (!connection.containsKey("remoteUrl") && raw.containsKey("remoteUrl")) {
                     connection.put("remoteUrl", raw.get("remoteUrl"));
                 }
 
-                return new DriverProfile(raw, connection, capabilities, service, postStart, metadata);
+                return new BrowserConfig(connection, capabilities, service, postStart);
             }
 
-            // Legacy flat structure:
-            // everything except remoteUrl is treated as capabilities.
             Map<String, Object> connection = new LinkedHashMap<>();
             Map<String, Object> capabilities = new LinkedHashMap<>(raw);
 
@@ -615,11 +563,9 @@ public class BrowserSteps {
                 connection.put("remoteUrl", capabilities.remove("remoteUrl"));
             }
 
-            return new DriverProfile(
-                    raw,
+            return new BrowserConfig(
                     connection,
                     capabilities,
-                    new LinkedHashMap<>(),
                     new LinkedHashMap<>(),
                     new LinkedHashMap<>()
             );

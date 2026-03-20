@@ -1,33 +1,17 @@
 package tools.dscode.coredefinitions;
 
-import com.google.common.collect.LinkedListMultimap;
-import io.cucumber.core.runner.CurrentScenarioState;
-import io.cucumber.core.runner.StepBase;
+
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.java.en.Given;
-import org.apache.poi.ss.usermodel.Row;
 import tools.dscode.common.CoreSteps;
-import tools.dscode.common.annotations.DefinitionFlags;
-import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.mappings.NodeMap;
-import tools.dscode.common.mappings.ParsingMap;
-import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
-
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-
 import static io.cucumber.core.runner.GlobalState.*;
-import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
-import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static io.cucumber.core.runner.util.TableUtils.toFlatMultimap;
-import static io.cucumber.core.runner.util.TableUtils.toRowsMultimap;
-import static tools.dscode.common.GlobalConstants.MATCH_START;
-import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
+import static tools.dscode.common.variables.RunVars.resolveVar;
 
 
 public class MappingSteps extends CoreSteps {
@@ -78,5 +62,12 @@ public class MappingSteps extends CoreSteps {
         }
         getCurrentScenarioState().put(key, value);
     }
+
+    @Given("(?i)^resolveVar:(.+)$")
+    public static Object resolveToVarStepDef(String varName) {
+        System.out.println("@@resolveToVarStepDef: " + varName);
+        return resolveVar(varName);
+    }
+
 
 }

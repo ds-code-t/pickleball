@@ -378,12 +378,15 @@ public class CurrentScenarioState extends ScenarioMapping {
         return returnObject == null ? GlobalRegistry.getLocal(key) : returnObject;
     }
 
+    public static final String normalizationPrefix = "_obj_";
+
     public static String normalizeRegistryKey(String s) {
         if (s == null) return null;
-        return s.strip()                       // remove leading/trailing whitespace
+        String returnString = s.strip()                       // remove leading/trailing whitespace
                 .replaceAll("\\s+", " ")       // collapse consecutive whitespace
                 .toLowerCase()                 // lowercase
                 .replaceAll("[^a-z0-9._ ]", ""); // remove non-allowed chars
+        return returnString.startsWith(normalizationPrefix) ? returnString : normalizationPrefix + returnString;
     }
 
 }

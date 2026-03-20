@@ -15,6 +15,7 @@ public class ObjectRegistrationSteps {
 
     public static Object getObjectFromRegistryOrDefault(String objectName, String defaultObjectName) {
         String keyString = isUsableValue(objectName) ?  objectName: defaultObjectName;
+        System.out.println("@@keyString: " + keyString);
         return returnStepParameter(keyString);
     }
 
@@ -27,6 +28,7 @@ public class ObjectRegistrationSteps {
         StepExtension currentStep = getRunningStep();
         int suffixIndex = keyString.indexOf("::");
         String stepText = suffixIndex >= 0 ? keyString.substring(0, suffixIndex) : keyString;
+        System.out.println("@@stepText-=: " + stepText);
         StepExtension modifiedStep = currentStep.modifyStepExtension("_" + stepText);
         modifiedStep.argument = currentStep.argument;
         Object returnValue = modifiedStep.runAndGetReturnValue();

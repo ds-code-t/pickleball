@@ -117,6 +117,12 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 MapConfigurations.MapType.DEFAULT));
     }
 
+    protected MappingProcessor(NodeMap nodeMap) {
+        addMaps(nodeMap);
+        this.keyOrder.add(nodeMap.getMapType());
+        this.singletonOrder.add(nodeMap.getMapType());
+    }
+
     public NodeMap getPhraseMap() {
         return maps.get(MapConfigurations.MapType.PHRASE_MAP).getFirst();
     }
@@ -182,9 +188,11 @@ public abstract class MappingProcessor implements Map<String, Object> {
         }
     }
 
+
     public void addMaps(NodeMap... nodes) {
         addMaps(Arrays.stream(nodes).toList());
     }
+
 
     public void addMaps(List<NodeMap> nodes) {
         boolean log = (nodes.stream().anyMatch(m -> m.getMapType() == MapConfigurations.MapType.STEP_MAP));
@@ -414,21 +422,21 @@ public abstract class MappingProcessor implements Map<String, Object> {
 //        return list.getLast();
 //    }
 
-    public  List<?> get(ElementMatch element) {
+    public List<?> get(ElementMatch element) {
         String categoryName = element.category.replaceFirst("(?i:s)$", "");
-                boolean noQuotedText = element.defaultText == null || element.defaultText.isNullOrBlank();
+        boolean noQuotedText = element.defaultText == null || element.defaultText.isNullOrBlank();
         if (categoryName.equals(TABLE_KEY)) {
-                                    if (noQuotedText) {
+            if (noQuotedText) {
                 return element.parentPhrase.getPhraseParsingMap().getPhraseMap().getAsList(TABLE_KEY);
             } else {
                 ObjectNode objectNode = (ObjectNode) getDataTableMap().get(TABLE_KEY);
-                                List<String> tableNames = new ArrayList<>();
+                List<String> tableNames = new ArrayList<>();
                 List<JsonNode> tableNodes = new ArrayList<>();
                 for (Map.Entry<String, JsonNode> entry : objectNode.properties()) {
                     tableNames.add(entry.getKey());
                     tableNodes.add(entry.getValue());
                 }
-                                                return filterGroupedValues( tableNames, tableNodes, element, false);
+                return filterGroupedValues(tableNames, tableNodes, element, false);
             }
         }
 
@@ -438,19 +446,16 @@ public abstract class MappingProcessor implements Map<String, Object> {
             return null;
 
 
-
-
-
         switch (categoryName) {
             case ROW_KEY:
                 List<JsonNode> rowsArray = findRows(map.getRoot());
-                                List<String> keyList = new ArrayList<>();
+                List<String> keyList = new ArrayList<>();
                 rowsArray.forEach(row -> keyList.add(row.values().next().get(0).asText()));
-                                                return filterGroupedValues(keyList, rowsArray, element, false);
+                return filterGroupedValues(keyList, rowsArray, element, false);
             case CELL_KEY:
-                                
+
                 List<JsonNode> cellsArray = findCells(map.getRoot());
-                
+
                 List<String> cellKeys = new ArrayList<>();
                 List<String> cellValues = new ArrayList<>();
 
@@ -485,11 +490,11 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
 
     public Object get(String key) {
-                Tokenized tokenized = new Tokenized(key);
+        Tokenized tokenized = new Tokenized(key);
         for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
             if (map == null)
                 continue;
-                        Object replacement = map.get(tokenized);
+            Object replacement = map.get(tokenized);
             if (replacement != null) {
                 return replacement;
             }

@@ -23,6 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static io.cucumber.core.runner.CurrentScenarioState.currentScenarioState;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
+import static tools.dscode.common.mappings.ParsingMap.GLOBALS_PARSINGMAP;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
 import static tools.dscode.pickleruntime.CucumberOptionResolver.tags;
@@ -197,6 +198,8 @@ public class GlobalState {
 
     public static ParsingMap getRunningParsingMap() {
         CurrentScenarioState scenarioState = getCurrentScenarioState();
+        if(scenarioState == null)
+            return GLOBALS_PARSINGMAP;
         if(scenarioState.currentPhrase != null)
             return scenarioState.currentPhrase.getPhraseParsingMap();
         try {

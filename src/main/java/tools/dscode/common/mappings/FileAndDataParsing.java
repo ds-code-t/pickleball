@@ -26,6 +26,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
+import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToStep;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseWarn;
 
 
@@ -96,6 +98,17 @@ public final class FileAndDataParsing {
     }
 
     // ---- Parsing ----------------------------------------------------------------
+
+//    public static JsonNode parseSingleFile(String content, String fileName) {
+//        JsonNode jsonNode = parseSingleFileToValue(content, fileName);
+//        try {
+//            System.out.println("@@reading: " + fileName);
+//            return (JsonNode) tildeReader.read(jsonNode);
+//        } catch (IOException e) {
+//            closestEntryToStep().warn("Failed to resolve '" + fileName + "' due to '" + e.getMessage() + "' using unresolved parsed data");
+//            return jsonNode;
+//        }
+//    }
 
     public static JsonNode parseSingleFile(String content, String fileName) {
         if (content == null || fileName == null)

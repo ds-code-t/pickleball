@@ -21,7 +21,7 @@
   },
   "sauce:options": {
     "username": "~<$resolveVar:SAUCE_USERNAME>~",
-    "accessKey": "~<$resolveVar:SAUCE_ACCESS_KEY>~",
+    "accessKey": "~<$resolveVar:pkb_SAUCE_ACCESS_KEY>~",
     "name": "Chrome Sauce Test",
     "build": "local-dev-build"
   }
