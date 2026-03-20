@@ -139,7 +139,7 @@ public class BrowserSteps {
         };
     }
 
-    private static WebDriver createRemoteDriver(String browserName, BrowserConfig config, String missingRemoteUrlMessage) throws Exception {
+    public static WebDriver createRemoteDriver(String browserName, BrowserConfig config, String missingRemoteUrlMessage) throws Exception {
         String remoteUrl = trimToNull(config.connection().get("remoteUrl"));
         if (remoteUrl == null) {
             throw new RuntimeException(missingRemoteUrlMessage);
@@ -159,7 +159,7 @@ public class BrowserSteps {
         return driver;
     }
 
-    private static MutableCapabilities buildRemoteCapabilities(String browserName, Map<String, Object> capabilities) {
+    public static MutableCapabilities buildRemoteCapabilities(String browserName, Map<String, Object> capabilities) {
         return switch (browserName) {
             case "chrome" -> buildChromeOptions(capabilities);
             case "edge" -> buildEdgeOptions(capabilities);
@@ -167,7 +167,7 @@ public class BrowserSteps {
         };
     }
 
-    private static ChromeOptions buildChromeOptions(Map<String, Object> capabilities) {
+    public static ChromeOptions buildChromeOptions(Map<String, Object> capabilities) {
         ChromeOptions options = new ChromeOptions();
         applyCapabilities(options, capabilities);
         if (getCurrentScenarioState().debugBrowser) {
@@ -176,7 +176,7 @@ public class BrowserSteps {
         return options;
     }
 
-    private static EdgeOptions buildEdgeOptions(Map<String, Object> capabilities) {
+    public static EdgeOptions buildEdgeOptions(Map<String, Object> capabilities) {
         EdgeOptions options = new EdgeOptions();
         applyCapabilities(options, capabilities);
         if (getCurrentScenarioState().debugBrowser) {
@@ -185,7 +185,7 @@ public class BrowserSteps {
         return options;
     }
 
-    private static void applyCapabilities(MutableCapabilities target, Map<String, Object> capabilities) {
+    public static void applyCapabilities(MutableCapabilities target, Map<String, Object> capabilities) {
         safeMap(capabilities).forEach((key, value) -> {
             if (key != null && value != null) {
                 target.setCapability(key, value);
@@ -193,7 +193,7 @@ public class BrowserSteps {
         });
     }
 
-    private static ChromeDriverService buildChromeService(Map<String, Object> serviceMap) {
+    public static ChromeDriverService buildChromeService(Map<String, Object> serviceMap) {
         Map<String, Object> service = safeMap(serviceMap);
         if (service.isEmpty()) {
             return null;
@@ -233,7 +233,7 @@ public class BrowserSteps {
         return builder.build();
     }
 
-    private static EdgeDriverService buildEdgeService(Map<String, Object> serviceMap) {
+    public static EdgeDriverService buildEdgeService(Map<String, Object> serviceMap) {
         Map<String, Object> service = safeMap(serviceMap);
         if (service.isEmpty()) {
             return null;
@@ -273,7 +273,7 @@ public class BrowserSteps {
         return builder.build();
     }
 
-    private static <DS extends DriverService, B extends DriverService.Builder<DS, B>> void applyCommonServiceSettings(B builder, Map<String, Object> service) {
+    public static <DS extends DriverService, B extends DriverService.Builder<DS, B>> void applyCommonServiceSettings(B builder, Map<String, Object> service) {
         String executable = trimToNull(service.get("driverExecutable"));
         if (executable != null) {
             builder.usingDriverExecutable(new File(executable));
@@ -309,7 +309,7 @@ public class BrowserSteps {
         }
     }
 
-    private static ClientConfig buildClientConfig(Map<String, Object> connectionSection) throws Exception {
+    public static ClientConfig buildClientConfig(Map<String, Object> connectionSection) throws Exception {
         Map<String, Object> client = safeMap(safeMap(connectionSection).get("clientConfig"));
         if (client.isEmpty()) {
             return null;
@@ -349,7 +349,7 @@ public class BrowserSteps {
         return config;
     }
 
-    private static void applyPostStart(WebDriver driver, Map<String, Object> postStartSection) {
+    public static void applyPostStart(WebDriver driver, Map<String, Object> postStartSection) {
         Map<String, Object> postStart = safeMap(postStartSection);
         if (postStart.isEmpty()) {
             return;
@@ -395,7 +395,7 @@ public class BrowserSteps {
         }
     }
 
-    private static BrowserConfig loadBrowserConfig(String configKey, String missingMessage) throws Exception {
+    public static BrowserConfig loadBrowserConfig(String configKey, String missingMessage) throws Exception {
         System.out.println("@@loadBrowserConfig: configKey: " + configKey + " , missingMessage: " + missingMessage + "");
         String json = resolveFromDocStringOrConfig(configKey);
         System.out.println("@@json: " + json + "");
@@ -407,15 +407,15 @@ public class BrowserSteps {
         return BrowserConfig.from(raw);
     }
 
-    private static String normalizeBrowserName(String browserName) {
+    public static String normalizeBrowserName(String browserName) {
         return browserName == null ? "chrome" : browserName.trim().toLowerCase(Locale.ROOT);
     }
 
-    private static String safeSuffix(String configFileSuffix) {
+    public static String safeSuffix(String configFileSuffix) {
         return configFileSuffix == null ? "" : configFileSuffix.trim().toLowerCase(Locale.ROOT);
     }
 
-    private static OutputStream resolveLogOutput(Object value) {
+    public static OutputStream resolveLogOutput(Object value) {
         String token = trimToNull(value);
         if (token == null) {
             return null;
@@ -429,7 +429,7 @@ public class BrowserSteps {
         return null;
     }
 
-    private static ChromiumDriverLogLevel parseChromiumLogLevel(Object value) {
+    public static ChromiumDriverLogLevel parseChromiumLogLevel(Object value) {
         String text = trimToNull(value);
         if (text == null) {
             return null;
@@ -442,7 +442,7 @@ public class BrowserSteps {
         }
     }
 
-    private static String trimToNull(Object value) {
+    public static String trimToNull(Object value) {
         if (value == null) {
             return null;
         }
@@ -450,7 +450,7 @@ public class BrowserSteps {
         return text.isEmpty() ? null : text;
     }
 
-    private static Integer toInteger(Object value) {
+    public static Integer toInteger(Object value) {
         if (value instanceof Number n) {
             return n.intValue();
         }
@@ -465,7 +465,7 @@ public class BrowserSteps {
         }
     }
 
-    private static Long toLong(Object value) {
+    public static Long toLong(Object value) {
         if (value instanceof Number n) {
             return n.longValue();
         }
@@ -480,7 +480,7 @@ public class BrowserSteps {
         }
     }
 
-    private static Boolean toBoolean(Object value) {
+    public static Boolean toBoolean(Object value) {
         if (value instanceof Boolean b) {
             return b;
         }
@@ -497,13 +497,13 @@ public class BrowserSteps {
         return null;
     }
 
-    private static boolean booleanOrDefault(Object value, boolean defaultValue) {
+    public static boolean booleanOrDefault(Object value, boolean defaultValue) {
         Boolean parsed = toBoolean(value);
         return parsed == null ? defaultValue : parsed;
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> safeMap(Object value) {
+    public static Map<String, Object> safeMap(Object value) {
         if (!(value instanceof Map<?, ?> map)) {
             return new LinkedHashMap<>();
         }
@@ -513,7 +513,7 @@ public class BrowserSteps {
         return result;
     }
 
-    private static Map<String, String> toStringMap(Object value) {
+    public static Map<String, String> toStringMap(Object value) {
         Map<String, Object> raw = safeMap(value);
         Map<String, String> result = new LinkedHashMap<>();
         raw.forEach((k, v) -> {
@@ -524,7 +524,7 @@ public class BrowserSteps {
         return result;
     }
 
-    private record BrowserConfig(
+    public record BrowserConfig(
             Map<String, Object> connection,
             Map<String, Object> capabilities,
             Map<String, Object> service,

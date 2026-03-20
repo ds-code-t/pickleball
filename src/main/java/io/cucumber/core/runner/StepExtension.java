@@ -7,9 +7,11 @@ import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.Phase;
+import tools.dscode.common.exceptions.StepCreationException;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
+import tools.dscode.common.exceptions.SoftRuntimeException;
 
 import java.lang.reflect.InvocationTargetException;
 import java.time.Duration;
@@ -25,7 +27,6 @@ import java.util.stream.Collectors;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
 import static io.cucumber.core.runner.CurrentScenarioState.getScenarioLogRoot;
-import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getGlobalEventBus;
 import static io.cucumber.core.runner.GlobalState.getRunningParsingMap;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
@@ -41,7 +42,6 @@ import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.mappings.MappingProcessor.getDataTableMap;
 import static tools.dscode.common.mappings.MappingProcessor.getDocStringMap;
-import static tools.dscode.common.mappings.MappingProcessor.getSingletonMap;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepDebug;
 import static tools.dscode.common.util.GeneralUtils.stackTraceToString;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
@@ -298,7 +298,6 @@ public class StepExtension extends StepData {
         modifiedStep.setStepParsingMap(getStepParsingMap());
         modifiedStep.parentStep = parentStep;
         modifiedStep.nestingLevel = nestingLevel;
-//        modifiedStep.lineData = lineData.clone();
         return modifiedStep;
     }
 
@@ -312,8 +311,6 @@ public class StepExtension extends StepData {
 
 
     public PickleStepTestStep resolveAndClone(ParsingMap parsingMap) {
-
-
         PickleStepTestStep clonePickleStepTestStep = resolvePickleStepTestStep(pickleStepTestStep, parsingMap);
         if (definitionFlags.contains(DefinitionFlag.NO_LOGGING))
             clonePickleStepTestStep.setNoLogging(true);
@@ -340,16 +337,32 @@ public class StepExtension extends StepData {
         return modifiedStep;
     }
 
-    public static Object runStepFromTest(String stepText) {
-        return runStepFromTest(stepText, "");
+    public static Object runDynamicStep(String stepText) {
+        return runDynamicStep(stepText, "");
     }
 
-    public static Object runStepFromTest(String stepText, String argumentText) {
+    public static Object runDynamicStep(String stepText, String argumentText) {
         argumentText = argumentText == null || argumentText.isBlank() ? "" : argumentText;
         StepExtension currentStep = getRunningStep();
-        StepExtension modifiedStep = new StepExtension(currentStep.testCase, getPickleStepTestStepFromStrings(currentStep.pickleStepTestStep.getStep().getKeyword(), stepText, argumentText));
-        modifiedStep.setStepParsingMap(getRunningParsingMap());
-        return modifiedStep.runAndGetReturnValue();
+        try {
+            StepExtension modifiedStep = new StepExtension(currentStep.testCase, getPickleStepTestStepFromStrings(currentStep.pickleStepTestStep.getStep().getKeyword(), stepText, argumentText));
+            modifiedStep.setStepParsingMap(getRunningParsingMap());
+            return modifiedStep.runAndGetReturnValue();
+        } catch (Throwable t) {
+            throw new StepCreationException("Failed to create Step '" + stepText + "'" + (argumentText.isBlank() ? " with argument '" + argumentText + "'": "") + t.getMessage(), t );
+        }
+    }
+
+    public static Object tryToRunDynamicStep(String stepText, String argumentText) {
+        argumentText = argumentText == null || argumentText.isBlank() ? "" : argumentText;
+        StepExtension currentStep = getRunningStep();
+        try {
+            StepExtension modifiedStep = new StepExtension(currentStep.testCase, getPickleStepTestStepFromStrings(currentStep.pickleStepTestStep.getStep().getKeyword(), stepText, argumentText));
+            modifiedStep.setStepParsingMap(getRunningParsingMap());
+            return modifiedStep.runAndGetReturnValue();
+        } catch (Throwable t) {
+            return new StepCreationException("Failed to create Step '" + stepText + "'" + (argumentText.isBlank() ? " with argument '" + argumentText + "'": "") + t.getMessage(), t );
+        }
     }
 
 

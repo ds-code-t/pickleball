@@ -3,7 +3,6 @@ package tools.dscode.common.mappings.custommappings;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -13,9 +12,11 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 public abstract class CustomReader {
     protected final ObjectMapper mapper;
@@ -41,33 +42,32 @@ public abstract class CustomReader {
     }
 
     public <T> T read(Object input, Class<T> targetType) throws IOException {
-        T root = materializeForRead(input, targetType);
-        @SuppressWarnings("unchecked")
-        T modified = (T) walk(root, null);
-        return modified;
+        Object generic = readAsGenericGraph(input);
+        Object modified = walk(generic, null);
+        return convertGenericToType(modified, targetType);
     }
 
     public <T> T read(Object input, TypeReference<T> targetType) throws IOException {
-        T root = materializeForRead(input, targetType);
-        @SuppressWarnings("unchecked")
-        T modified = (T) walk(root, null);
-        return modified;
+        Object generic = readAsGenericGraph(input);
+        Object modified = walk(generic, null);
+        return convertGenericToType(modified, targetType);
     }
 
     public Object convertValue(Object input) {
-        return convertValue(input, Object.class);
+        Object generic = toGenericGraph(input);
+        return walk(generic, null);
     }
 
     public <T> T convertValue(Object input, Class<T> targetType) {
         Object generic = toGenericGraph(input);
         Object modified = walk(generic, null);
-        return mapper.convertValue(modified, targetType);
+        return convertGenericToType(modified, targetType);
     }
 
     public <T> T convertValue(Object input, TypeReference<T> targetType) {
         Object generic = toGenericGraph(input);
         Object modified = walk(generic, null);
-        return mapper.convertValue(modified, targetType);
+        return convertGenericToType(modified, targetType);
     }
 
     public JsonNode valueToTree(Object input) {
@@ -125,9 +125,13 @@ public abstract class CustomReader {
     }
 
     public <T> T modifyValue(T value) {
+        if (value == null) {
+            return null;
+        }
+
         @SuppressWarnings("unchecked")
-        T modified = (T) walk(value, null);
-        return modified;
+        Class<T> runtimeType = (Class<T>) value.getClass();
+        return convertValue(value, runtimeType);
     }
 
     protected abstract Object modify(Object value, Object parent);
@@ -136,82 +140,6 @@ public abstract class CustomReader {
         Object generic = readAsGenericGraph(input);
         Object modified = walk(generic, null);
         return mapper.valueToTree(modified);
-    }
-
-    private <T> T materializeForRead(Object input, Class<T> targetType) throws IOException {
-        if (input == null) {
-            return null;
-        }
-
-        if (targetType.isInstance(input) && !isJsonSource(input)) {
-            return targetType.cast(input);
-        }
-
-        if (input instanceof JsonNode node) {
-            return mapper.treeToValue(node, targetType);
-        }
-        if (input instanceof String s) {
-            return mapper.readValue(s, targetType);
-        }
-        if (input instanceof byte[] bytes) {
-            return mapper.readValue(bytes, targetType);
-        }
-        if (input instanceof File file) {
-            return mapper.readValue(file, targetType);
-        }
-        if (input instanceof URL url) {
-            return mapper.readValue(url, targetType);
-        }
-        if (input instanceof InputStream in) {
-            return mapper.readValue(in, targetType);
-        }
-        if (input instanceof Reader reader) {
-            return mapper.readValue(reader, targetType);
-        }
-        if (input instanceof JsonParser parser) {
-            return mapper.readValue(parser, targetType);
-        }
-
-        return mapper.convertValue(input, targetType);
-    }
-
-    private <T> T materializeForRead(Object input, TypeReference<T> targetType) throws IOException {
-        if (input == null) {
-            return null;
-        }
-
-        if (matchesRawTargetType(input, targetType) && !isJsonSource(input)) {
-            @SuppressWarnings("unchecked")
-            T same = (T) input;
-            return same;
-        }
-
-        if (input instanceof JsonNode node) {
-            return mapper.convertValue(node, targetType);
-        }
-        if (input instanceof String s) {
-            return mapper.readValue(s, targetType);
-        }
-        if (input instanceof byte[] bytes) {
-            return mapper.readValue(bytes, targetType);
-        }
-        if (input instanceof File file) {
-            return mapper.readValue(file, targetType);
-        }
-        if (input instanceof URL url) {
-            return mapper.readValue(url, targetType);
-        }
-        if (input instanceof InputStream in) {
-            return mapper.readValue(in, targetType);
-        }
-        if (input instanceof Reader reader) {
-            return mapper.readValue(reader, targetType);
-        }
-        if (input instanceof JsonParser parser) {
-            return mapper.readValue(parser, targetType);
-        }
-
-        return mapper.convertValue(input, targetType);
     }
 
     private Object readAsGenericGraph(Object input) throws IOException {
@@ -255,42 +183,59 @@ public abstract class CustomReader {
         if (input instanceof JsonNode node) {
             return mapper.convertValue(node, Object.class);
         }
-        if (input instanceof Map<?, ?> || input instanceof List<?> || input instanceof Object[]) {
-            return input;
+
+        return mapper.convertValue(mapper.valueToTree(input), Object.class);
+    }
+
+    private <T> T convertGenericToType(Object value, Class<T> targetType) {
+        if (value == null) {
+            return null;
         }
 
-        return mapper.convertValue(input, Object.class);
+        if (targetType == Object.class) {
+            return targetType.cast(value);
+        }
+
+        return mapper.convertValue(value, targetType);
     }
 
-    private boolean matchesRawTargetType(Object input, TypeReference<?> targetType) {
-        JavaType javaType = mapper.getTypeFactory().constructType(targetType.getType());
-        Class<?> rawClass = javaType.getRawClass();
-        return rawClass != null && rawClass.isInstance(input);
+    private <T> T convertGenericToType(Object value, TypeReference<T> targetType) {
+        if (value == null) {
+            return null;
+        }
+
+        return mapper.convertValue(value, targetType);
     }
 
-    private boolean isJsonSource(Object input) {
-        return input instanceof String
-                || input instanceof byte[]
-                || input instanceof File
-                || input instanceof URL
-                || input instanceof InputStream
-                || input instanceof Reader
-                || input instanceof JsonParser;
-    }
-
-    @SuppressWarnings({ "rawtypes", "unchecked" })
+    @SuppressWarnings({"rawtypes", "unchecked"})
     private Object walk(Object value, Object parent) {
         if (value instanceof Map<?, ?> rawMap) {
             Map map = (Map) rawMap;
             for (Object rawEntry : new ArrayList<>(map.entrySet())) {
                 Map.Entry entry = (Map.Entry) rawEntry;
-                entry.setValue(walk(entry.getValue(), map));
+                map.put(entry.getKey(), walk(entry.getValue(), map));
             }
         } else if (value instanceof List<?> rawList) {
             List list = (List) rawList;
             for (int i = 0; i < list.size(); i++) {
                 list.set(i, walk(list.get(i), list));
             }
+        } else if (value instanceof Set<?> rawSet) {
+            Set set = (Set) rawSet;
+            List<Object> updated = new ArrayList<>(set.size());
+            for (Object item : set) {
+                updated.add(walk(item, set));
+            }
+            set.clear();
+            set.addAll(updated);
+        } else if (value instanceof Collection<?> rawCollection) {
+            Collection collection = (Collection) rawCollection;
+            List<Object> updated = new ArrayList<>(collection.size());
+            for (Object item : collection) {
+                updated.add(walk(item, collection));
+            }
+            collection.clear();
+            collection.addAll(updated);
         } else if (value instanceof Object[] array) {
             for (int i = 0; i < array.length; i++) {
                 array[i] = walk(array[i], array);

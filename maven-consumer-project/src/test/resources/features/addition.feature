@@ -2,8 +2,9 @@ Feature: Addition
 
   @T1
   Scenario: j test1
-    * , verify Button is not displayed, and wait 10 seconds
-    * test2
+#    * , verify Button is not displayed, and wait 10 seconds
+    * test2 Q
+    * test2 ~INT~:3
 
   Scenario: data test C
 

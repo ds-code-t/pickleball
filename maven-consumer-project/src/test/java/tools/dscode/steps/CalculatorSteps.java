@@ -53,6 +53,7 @@ import static tools.dscode.common.domoperations.elementstates.VisibilityConditio
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
 import static tools.dscode.common.mappings.FileAndDataParsing.readResourceFile;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
+import static tools.dscode.common.mappings.custommappings.TildeReader.attemptConversion;
 import static tools.dscode.common.servicecalls.ToJsonNode.sjson;
 import static tools.dscode.common.treeparsing.DefinitionContext.DEFAULT_EXECUTION_DICTIONARY;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
@@ -72,10 +73,17 @@ import org.intellij.lang.annotations.Language;
 
 public class CalculatorSteps {
 
-    @Given("test2")
-    public static void test2() throws Exception {
-        JsonNode j = readResourceFile("objects/URL.yaml");
-        System.out.println("@@j: " + j);
+    @Given("^test2(?: (.*))?$")
+    public static void test2(String value) throws Exception {
+        if (value == null) {
+            System.out.println("@@value: " + value);
+            return;
+        }
+        Object obj = attemptConversion(value);
+        System.out.println("@@obj: " + obj);
+        System.out.println("@@obj.getClass(): " + obj.getClass());
+//        JsonNode j = readResourceFile("objects/URL.yaml");
+//        System.out.println("@@j: " + j);
     }
 
     @Given("^zcapitalize:(.*)$")

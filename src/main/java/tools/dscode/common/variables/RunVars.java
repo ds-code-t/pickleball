@@ -1,5 +1,6 @@
 package tools.dscode.common.variables;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -13,54 +14,128 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
+import java.util.regex.Pattern;
 
 import static io.cucumber.core.runner.GlobalState.getFromRunningParsingMapCaseInsensitive;
-import static io.cucumber.core.runner.GlobalState.getRunningParsingMap;
-import static tools.dscode.common.mappings.ParsingMap.GLOBALS_PARSINGMAP;
+import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
+import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
 
 
 public class RunVars extends NodeMap {
 
+    private static final Pattern prefixed = Pattern.compile("(?i)^[a-z]{3}_.*");
 
     private static final String ENV_PREFIX = "env_";
     private static final String SYS_PREFIX = "sys_";
-
+    public static final String PKB_PREFIX = "pkb_";
+    public static final String RUN_PREFIX = "run_";
 
     private static final String RUN_CONFIGS = "run-configs";
-    private static final String PROFILES = RUN_CONFIGS + ".profiles";
-    private static final String PROFILEProp = "pkb_profile";
-
-    private static ObjectNode startingGlobalConfig = MAPPER.createObjectNode();
+    private static final String PROFILES_DIR = "profiles";
+    private static final String PROFILEProp = "profile";
 
     public final static RunVars RUN_VARS = new RunVars();
 
     private RunVars() {
         super(MapConfigurations.MapType.GLOBAL_NODE);
-        merge(new HashMap<>(getPkbVariables()));
+        merge(new HashMap<>(collectPrefixedAndUnprefixedVars()));
     }
 
-    static {
-        JsonNode runConfigNode = FileAndDataParsing.buildJsonFromPath(RUN_CONFIGS);
-        for (Map.Entry<String, JsonNode> entry : runConfigNode.properties()) {
-            String key = entry.getKey();
-            JsonNode value = entry.getValue();
-            if (value.isMissingNode() || value.isNull())
-                continue;
-//            evaluate(value, RUN_VARS.root);
-        }
-        String profileName = RUN_VARS.getStringValue(PROFILEProp);
-
-        if (profileName != null && !profileName.isBlank()) {
-            JsonNode profilesNode = FileAndDataParsing.buildJsonFromPath(PROFILES);
-            JsonNode profileNode = getFieldIgnoreCaseSpaceNormalized((ObjectNode) profilesNode, profileName.trim());
-//            evaluate(profileNode, RUN_VARS.root);
-        }
-
+    public static String getProfile() {
+        Object profile = getFromRunningParsingMapCaseInsensitive(RUN_PREFIX + PROFILEProp);
+        if (profile == null)
+            profile = RUN_VARS.getByNormalizedPath(PROFILEProp);
+        if (profile == null || profile.toString().isBlank())
+            return null;
+        return profile.toString().trim();
     }
 
-    public static final String PickleballVarPrefix = "pkb_";
-    public static final String RunVarPrefix = "run_";
-    public static final String overridePrefix = "ovr_";
+
+    public static Map<String, Object> collectPrefixedAndUnprefixedVars() {
+        Map<String, Object> result = new HashMap<>();
+
+        System.getenv().forEach((k, v) ->
+                result.put(prefixed.matcher(k).matches() ? k : ENV_PREFIX + k, v));
+
+        Properties props = System.getProperties();
+        props.forEach((k, v) -> {
+            String key = String.valueOf(k);
+            result.put(prefixed.matcher(key).matches() ? key : SYS_PREFIX + key, v);
+        });
+
+        Map<String, Object> snapshot = new HashMap<>(result);
+
+        snapshot.forEach((k, v) -> {
+            if (k.startsWith(ENV_PREFIX)) {
+                result.put(k.substring(4), v);
+            }
+        });
+
+        snapshot.forEach((k, v) -> {
+            if (k.startsWith(SYS_PREFIX)) {
+                result.put(k.substring(4), v);
+            }
+        });
+
+        snapshot.forEach((k, v) -> {
+            if (k.startsWith(PKB_PREFIX)) {
+                result.put(k.substring(4), v);
+            }
+        });
+
+
+//        JsonNode jsonNode =  buildJsonFromPath(profilePath);
+
+        JsonNode runConfigs = buildJsonFromPath(RUN_CONFIGS);
+        if (runConfigs == null || runConfigs.isNull() || runConfigs.isMissingNode() || runConfigs.isEmpty())
+            return result;
+        if (runConfigs instanceof ObjectNode runConfigsNode) {
+            if (runConfigsNode.isEmpty())
+                return result;
+
+            runConfigsNode.fields().forEachRemaining(entry -> {
+                String key = entry.getKey();
+                JsonNode value = entry.getValue();
+                if (key.regionMatches(true, 0, "runconfig", 0, "runconfig".length())) {
+                    System.out.println("@@value: " + value);
+                    System.out.println("@@value.getClass(): " + value.getClass());
+                    if (value instanceof ObjectNode objectNode) {
+                        HashMap<String, Object> map = tildeReader.convertValue(objectNode, new TypeReference<>() {
+                        });
+                        result.putAll(map);
+                    } else {
+                        if (!(value.isNull() || value.isMissingNode() || value.isEmpty()))
+                            throw new RuntimeException("RunConfig '" + key + "' is not a valid ObjectNode");
+                    }
+                }
+            });
+            String profileName = getProfile();
+            if (profileName == null)
+                return result;
+            JsonNode jsonNode = runConfigs.get(PROFILES_DIR);
+
+            if (jsonNode instanceof ObjectNode profilesNode) {
+                JsonNode profile = profilesNode.get(profileName);
+                if (profile == null || profile.isNull() || profile.isMissingNode() || profile.isEmpty())
+                    return result;
+                if (profile instanceof ObjectNode profileNode) {
+                    HashMap<String, Object> map = tildeReader.convertValue(profileNode, new TypeReference<>() {
+                    });
+                    result.putAll(map);
+                } else {
+                    throw new RuntimeException(profileName + " is not a valid ObjectNode");
+                }
+            } else {
+                throw new RuntimeException("PROFILES_DIR is not a valid ObjectNode");
+            }
+        } else {
+            throw new RuntimeException(RUN_CONFIGS + "  is not a valid ObjectNode");
+        }
+
+
+        return result;
+    }
+
 
     public static Object resolveVarOrDefault(String varName, Object defaultValue) {
         System.out.println("@@resolveVarOrDefault: " + varName + ", default: " + defaultValue + "");
@@ -72,113 +147,12 @@ public class RunVars extends NodeMap {
 
     public static Object resolveVar(String varName) {
         System.out.println("@@resolveVar: " + varName);
-        varName = varName.trim();
-        Object returnObj = null;
-        if (varName.startsWith(PickleballVarPrefix)) {
-            returnObj = resolveVarWithParsingMap(varName);
-            if (returnObj == null)
-                return resolveSetupVars(varName);
-            return returnObj;
-        }
-        returnObj = resolveSetupVars(varName);
+        String prefixedVarName = prefixed.matcher(varName).matches() ? varName : RUN_PREFIX + varName;
+        Object returnObj = getFromRunningParsingMapCaseInsensitive(prefixedVarName);
+        ;
         if (returnObj == null)
-            return resolveVarWithParsingMap(varName);
+            return RUN_VARS.getByNormalizedPath(varName);
         return returnObj;
-    }
-
-
-    public static Object resolveVarWithParsingMap(String varName) {
-        return getFromRunningParsingMapCaseInsensitive(varName);
-    }
-
-    public static Object resolveSetupVars(String varName) {
-        return RUN_VARS.getByNormalizedPath(varName);
-    }
-
-    public static Map<String, Object> getPkbVariables() {
-
-        Map<String, Object> result = new HashMap<>();
-
-        // Env (lower priority)
-        System.getenv().forEach((k, v) -> {
-            String key = k.toLowerCase(Locale.ROOT);
-            if (key.startsWith(PickleballVarPrefix)) {
-                result.put(key, v);
-            }
-        });
-
-        // System properties (override env)
-        System.getProperties().forEach((k, v) -> {
-            String key = k.toString().toLowerCase(Locale.ROOT);
-            if (key.startsWith(PickleballVarPrefix)) {
-                result.put(key, v);
-            }
-        });
-        return Map.copyOf(result);
-    }
-
-    /**
-     * Adds all environment variables and JVM system properties to the given object node.
-     * Values are stored as JSON strings; nulls become JSON nulls.
-     */
-    public static void putEnvAndSysInto(ObjectNode target) {
-        Objects.requireNonNull(target, "target");
-
-        // Environment variables
-        for (Map.Entry<String, String> e : System.getenv().entrySet()) {
-            String key = ENV_PREFIX + e.getKey();
-            String val = e.getValue();
-            if (val == null) target.set(key, NullNode.getInstance());
-            else target.put(key, val);
-        }
-
-        // System properties
-        Properties props = System.getProperties();
-        for (String name : props.stringPropertyNames()) {
-            String key = SYS_PREFIX + name;
-            String val = props.getProperty(name); // may be null
-            if (val == null) target.set(key, NullNode.getInstance());
-            else target.put(key, val);
-        }
-    }
-
-    public static void applySysFromObjectNode(ObjectNode source) {
-        applySysFromObjectNode(source, true);
-    }
-
-    public static void applySysFromObjectNode(ObjectNode source, boolean alwaysSet) {
-        Objects.requireNonNull(source, "source");
-
-        Iterator<Map.Entry<String, JsonNode>> it = source.fields();
-        while (it.hasNext()) {
-            Map.Entry<String, JsonNode> field = it.next();
-
-            String jsonKey = field.getKey();
-            if (!jsonKey.startsWith(SYS_PREFIX) || jsonKey.length() == SYS_PREFIX.length()) {
-                continue;
-            }
-
-            String sysKey = jsonKey.substring(SYS_PREFIX.length());
-            JsonNode valueNode = field.getValue();
-
-            String current = System.getProperty(sysKey);
-            boolean currentUnsetOrBlank = (current == null) || current.isBlank();
-
-            if (!alwaysSet && !currentUnsetOrBlank) {
-                continue; // leave existing value alone
-            }
-            if (isNullOrBlank(valueNode)) {
-                System.clearProperty(sysKey);
-            } else {
-                System.setProperty(sysKey, valueNode.asText());
-            }
-        }
-    }
-
-    private static boolean isNullOrBlank(JsonNode n) {
-        if (n == null || n.isMissingNode() || n.isNull()) return true;
-        // treat blank strings as "blank"; other types become text via asText()
-        return n.isTextual() && n.asText().isBlank();
     }
 
 

@@ -1,8 +1,7 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
 
-import tools.dscode.common.status.SoftRuntimeException;
-import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
+import tools.dscode.common.exceptions.SoftRuntimeException;
 
 public final class Attempt {
 

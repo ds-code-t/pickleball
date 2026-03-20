@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
+import tools.dscode.common.mappings.custommappings.CustomReader;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,8 +27,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static tools.dscode.common.mappings.BracketLiteralMasker.resolveWithMasking;
 import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
-import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToStep;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseWarn;
 
 
@@ -99,33 +100,36 @@ public final class FileAndDataParsing {
 
     // ---- Parsing ----------------------------------------------------------------
 
-//    public static JsonNode parseSingleFile(String content, String fileName) {
-//        JsonNode jsonNode = parseSingleFileToValue(content, fileName);
-//        try {
-//            System.out.println("@@reading: " + fileName);
-//            return (JsonNode) tildeReader.read(jsonNode);
-//        } catch (IOException e) {
-//            closestEntryToStep().warn("Failed to resolve '" + fileName + "' due to '" + e.getMessage() + "' using unresolved parsed data");
-//            return jsonNode;
-//        }
-//    }
+
 
     public static JsonNode parseSingleFile(String content, String fileName) {
         if (content == null || fileName == null)
             return JSON_MAPPER.createObjectNode();
+        return parseDataStringCustomReader(content, fileName, tildeReader);
+    }
 
-        String lower = fileName.toLowerCase();
+    public static JsonNode parseDataStringCustomReader(String content, String name, CustomReader customReader) {
+        JsonNode jsonNode =   parseDataString(content, name);
+        try {
+            return (JsonNode) customReader.read(jsonNode);
+        } catch (IOException e) {
+            return jsonNode;
+        }
+    }
+    public static JsonNode parseDataString(String content, String name) {
+        String type = name.substring(name.lastIndexOf('.') + 1).toLowerCase().trim();
+        content = resolveWithMasking(content);
 
-        if (lower.endsWith(".csv")) {
+        if (type.equals("csv")) {
             return parseCsv(content);
         }
 
-        if (lower.endsWith(".xml")) {
+        if (type.equals("xml")) {
             try {
                 Object value = XML_MAPPER.readValue(content.strip(), Object.class);
                 return JSON_MAPPER.valueToTree(value);
             } catch (IOException e) {
-                System.out.println("XML parsing failed for " + fileName + ": " + e.getMessage());
+                System.out.println("XML parsing failed for " + name + ": " + e.getMessage());
             }
         } else {
             try {
@@ -141,6 +145,7 @@ public final class FileAndDataParsing {
 
         // As-is text fallback
         return JSON_MAPPER.valueToTree(content);
+
     }
 
 

@@ -185,27 +185,30 @@ public class GlobalState {
 
     public static io.cucumber.core.runner.CurrentScenarioState getCurrentScenarioState() {
         return currentScenarioState.get();
-//        return (CurrentScenarioState) getProperty(localOrGlobalOf(TestCase.class), "currentScenarioState");
     }
 
 
     public static StepExtension getRunningStep() {
-        return getCurrentScenarioState().getCurrentStep();
+        CurrentScenarioState currentScenarioState =  getCurrentScenarioState();
+        if(currentScenarioState == null) return null;
+        return currentScenarioState.getCurrentStep();
     }
     public static Phrase getRunningPhrase() {
-        return getCurrentScenarioState().currentPhrase;
+        CurrentScenarioState currentScenarioState =  getCurrentScenarioState();
+        if(currentScenarioState == null) return null;
+        return currentScenarioState.currentPhrase;
     }
 
     public static ParsingMap getRunningParsingMap() {
-        CurrentScenarioState scenarioState = getCurrentScenarioState();
-        if(scenarioState == null)
+        CurrentScenarioState currentScenarioState = getCurrentScenarioState();
+        if(currentScenarioState == null)
             return GLOBALS_PARSINGMAP;
-        if(scenarioState.currentPhrase != null)
-            return scenarioState.currentPhrase.getPhraseParsingMap();
+        if(currentScenarioState.currentPhrase != null)
+            return currentScenarioState.currentPhrase.getPhraseParsingMap();
         try {
-            return scenarioState.getCurrentStep().getStepParsingMap();
+            return currentScenarioState.getCurrentStep().getStepParsingMap();
         } catch (Throwable e) {
-            return scenarioState.getParsingMap();
+            return currentScenarioState.getParsingMap();
         }
     }
 

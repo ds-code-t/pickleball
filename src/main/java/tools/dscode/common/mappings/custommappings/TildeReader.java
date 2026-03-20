@@ -21,6 +21,18 @@ public class TildeReader extends CustomReader {
 
     public static final CustomReader tildeReader = new TildeReader(MAPPER);
 
+    public static Object attemptConversion(Object value) {
+        System.out.println("@@attemptConversion: " + value + "");
+        System.out.println("@@value instanceof String: " + (value instanceof String) + "");
+        System.out.println("@@value.toString().trim(): " + (value.toString().trim()) + "");
+        System.out.println("@@s.trim().startsWith(\"~\"): " + (value.toString().trim().startsWith("~")) + "");
+        System.out.println("@@s.trim().contains(\":\"): " + (value.toString().trim().contains(":")) + "");
+        if (value instanceof String s && s.trim().startsWith("~") && s.contains(":"))
+            return tildeReader.convertValue(value);
+        System.out.println("@@attemptConversion-return: " + value + "");
+        return value;
+    }
+
     @Override
     protected Object modify(Object value, Object parent) {
         if (value instanceof String s) {
