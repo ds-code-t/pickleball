@@ -208,7 +208,7 @@ public final class FileAndDataParsing {
         }
 
         ObjectNode dir = JSON_MAPPER.createObjectNode();
-        try (Stream<Path> walk = Files.walk(root)) {
+        try (Stream<Path> walk = Files.list(root)) {
             walk.sorted((a, b) -> {
                         // Primary: alphabetical ignoring case
                         int ci = String.CASE_INSENSITIVE_ORDER.compare(a.toString(), b.toString());

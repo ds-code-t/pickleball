@@ -43,6 +43,7 @@ import static tools.dscode.common.mappings.MappingProcessor.getDataTableMap;
 import static tools.dscode.common.mappings.MappingProcessor.getDocStringMap;
 import static tools.dscode.common.mappings.MappingProcessor.getSingletonMap;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepDebug;
+import static tools.dscode.common.util.GeneralUtils.stackTraceToString;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
 import static tools.dscode.common.util.debug.DebugUtils.parseDebugString;
 
@@ -159,7 +160,8 @@ public class StepExtension extends StepData {
         io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep, executionMode);
 
         if (result.getError() != null) {
-            stepEntry.error("Exception: " + result.getError().getClass().getName())
+//            stepEntry.error("Exception: " + result.getError().getClass().getName())
+            stepEntry.error(stackTraceToString(result.getError()))
                     .field("message", result.getError().getMessage())
                     .field("trace", Arrays.stream(result.getError().getStackTrace())
                             .map(StackTraceElement::toString)

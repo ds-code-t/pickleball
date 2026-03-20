@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Properties;
 
 import static io.cucumber.core.runner.GlobalState.getFromRunningParsingMapCaseInsensitive;
-import static tools.dscode.common.variables.YamlBooleanRulesDsl.evaluate;
+
 
 public class RunVars extends NodeMap {
 
@@ -44,14 +44,14 @@ public class RunVars extends NodeMap {
             JsonNode value = entry.getValue();
             if(value.isMissingNode() || value.isNull())
                 continue;
-            evaluate(value, RUN_VARS.root);
+//            evaluate(value, RUN_VARS.root);
         }
         String profileName = RUN_VARS.getStringValue(PROFILEProp);
 
         if (profileName != null && !profileName.isBlank()) {
             JsonNode profilesNode = FileAndDataParsing.buildJsonFromPath(PROFILES);
             JsonNode profileNode = getFieldIgnoreCaseSpaceNormalized((ObjectNode) profilesNode, profileName.trim());
-            evaluate(profileNode, RUN_VARS.root);
+//            evaluate(profileNode, RUN_VARS.root);
         }
 
     }

@@ -1,5 +1,7 @@
 package tools.dscode.common.util;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.concurrent.Callable;
 
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
@@ -39,6 +41,17 @@ public class GeneralUtils {
         }
 
         return i < len && s.charAt(i) != '<';
+    }
+
+    public static String stackTraceToString(Throwable t) {
+        if (t == null) {
+            return "";
+        }
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        t.printStackTrace(pw);
+        pw.flush();
+        return sw.toString();
     }
 
 }

@@ -53,6 +53,7 @@ public class BrowserSteps {
     }
 
     public static WebDriver getDefaultDriver() {
+        System.out.println("@@getDefaultDriver");
         String browserName = resolveVarOrDefault("BROWSER", "BROWSER").toString();
         return getDriver(browserName);
     }
@@ -449,7 +450,7 @@ public class BrowserSteps {
     }
 
     private static String safeSuffix(String configFileSuffix) {
-        return configFileSuffix == null ? "" : configFileSuffix;
+        return configFileSuffix == null ? "" : configFileSuffix.trim().toLowerCase(Locale.ROOT);
     }
 
     private static OutputStream resolveLogOutput(Object value) {

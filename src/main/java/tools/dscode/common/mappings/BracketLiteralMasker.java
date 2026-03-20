@@ -28,6 +28,7 @@ public final class BracketLiteralMasker {
 
 
     public static String resolveFromDocStringOrConfig(String key) {
+        System.out.println("@@resolveFromDocStringOrConfig: " + key);
         StepExtension currentStep = GlobalState.getRunningStep();
         if(currentStep.argument instanceof DocStringArgument)
             return resolveWithMasking(currentStep.argument.getValue().toString());
@@ -39,7 +40,9 @@ public final class BracketLiteralMasker {
     }
 
     public static String getAndResolveKeyWithMasking(String key) {
+        System.out.println("@@getAndResolveKeyWithMasking: " + key);
         Object value = getFromRunningParsingMapCaseInsensitive(key);
+        System.out.println("@@value: " + value + "");
         if (value == null) return null;
         return resolveWithMasking(String.valueOf(value));
     }

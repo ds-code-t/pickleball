@@ -31,45 +31,5 @@
         "download.default_directory": "/tmp/downloads"
       }
     }
-  },
-  "service": {
-    "driverExecutable": "/path/to/msedgedriver",
-    "port": 0,
-    "timeoutMs": 20000,
-    "logFile": "/tmp/msedgedriver.log",
-    "logOutput": "stdout",
-    "environment": {
-      "TMPDIR": "/tmp"
-    },
-    "appendLog": true,
-    "buildCheckDisabled": false,
-    "verbose": false,
-    "silent": false,
-    "readableTimestamp": true,
-    "logLevel": "INFO"
-  },
-  "postStart": {
-    "window": "maximize",
-    "clearCookies": true,
-    "implicitWaitMs": 0,
-    "pageLoadTimeoutMs": 300000,
-    "scriptTimeoutMs": 30000,
-    "localFileDetector": false,
-    "initialUrl": "about:blank"
-  },
-  "metadata": {
-    "profileName": "edge-local",
-    "displayName": "Edge Local Example",
-    "description": "Example local Edge profile using the structured BrowserSteps config format.",
-    "owner": "qa",
-    "tags": [
-      "local",
-      "edge",
-      "template"
-    ]
-  },
-  "framework": {
-    "defaultAlias": "EDGE",
-    "executionMode": "local"
   }
 }

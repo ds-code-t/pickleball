@@ -1,0 +1,66 @@
+{
+  "connection": {
+    "remoteUrl": "http://localhost:4444",
+    "enableTracing": false,
+    "clientConfig": {
+      "baseUrl": "http://localhost:4444",
+      "connectionTimeoutMs": 30000,
+      "readTimeoutMs": 120000,
+      "wsTimeoutMs": 120000,
+      "version": "HTTP_1_1",
+      "withRetries": true
+    }
+  },
+  "capabilities": {
+    "browserName": "chrome",
+    "acceptInsecureCerts": true,
+    "pageLoadStrategy": "normal",
+    "unhandledPromptBehavior": "dismiss and notify",
+    "strictFileInteractability": false,
+    "timeouts": {
+      "implicit": 0,
+      "pageLoad": 300000,
+      "script": 30000
+    },
+    "goog:chromeOptions": {
+      "args": [
+        "--disable-print-preview",
+        "--test-type",
+        "--ignore-certificate-errors",
+        "--ignore-certificate-errors-spki-list=",
+        "--allow-insecure-localhost"
+      ],
+      "prefs": {
+        "download.default_directory": "/tmp/downloads"
+      }
+    }
+  },
+  "postStart": {
+    "window": "maximize",
+    "clearCookies": true,
+    "implicitWaitMs": 0,
+    "pageLoadTimeoutMs": 300000,
+    "scriptTimeoutMs": 30000,
+    "localFileDetector": true,
+    "initialUrl": "about:blank"
+  },
+  "metadata": {
+    "profileName": "chrome-grid",
+    "displayName": "Chrome Grid Example",
+    "description": "Example remote Chrome profile for Selenium Grid.",
+    "owner": "qa",
+    "tags": [
+      "grid",
+      "chrome",
+      "remote",
+      "template"
+    ]
+  },
+  "framework": {
+    "defaultAlias": "GRID_CHROME",
+    "executionMode": "remote-grid",
+    "notes": [
+      "service is intentionally omitted because the current BrowserSteps only uses service for local drivers."
+    ]
+  }
+}

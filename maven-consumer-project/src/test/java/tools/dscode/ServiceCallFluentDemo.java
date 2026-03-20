@@ -8,6 +8,8 @@ import tools.dscode.common.servicecalls.ServiceCallTemplate;
 import java.time.Duration;
 import java.util.Map;
 
+import static tools.dscode.common.mappings.NodeMap.MAPPER;
+
 public class ServiceCallFluentDemo {
 
     public static void main(String[] args) {
@@ -164,7 +166,7 @@ public class ServiceCallFluentDemo {
     private static ObjectNode requestNode(CallMap c) {
         JsonNode req = (JsonNode) c.get("request");
         if (req == null || !req.isObject()) {
-            ObjectNode fresh = zAPPER.createObjectNode();
+            ObjectNode fresh = MAPPER.createObjectNode();
             c.put("request", fresh);
             return fresh;
         }

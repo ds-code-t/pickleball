@@ -14,7 +14,7 @@ capabilities:
   strictFileInteractability: false
   timeouts:
     implicit: 0
-    pageLoad: 300000
+    pageLoad: 220000
     script: 30000
   goog:chromeOptions:
     args:
@@ -27,7 +27,7 @@ capabilities:
       download.default_directory: /tmp/downloads
 
 service:
-  driverExecutable: /path/to/chromedriver
+  driverExecutable: /path/zz2/to/chromedriver
   port: 0
   timeoutMs: 20000
   logFile: /tmp/chromedriver.log

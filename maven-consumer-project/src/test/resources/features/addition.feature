@@ -1,7 +1,8 @@
 Feature: Addition
 
+  @T1
   Scenario: j test1
-    * , click the Rrr
+    * , verify Button is not displayed, and wait 10 seconds
     * test2
 
   Scenario: data test C
