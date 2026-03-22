@@ -28,7 +28,6 @@ import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherki
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
 import static io.cucumber.core.runner.CurrentScenarioState.getScenarioLogRoot;
 import static io.cucumber.core.runner.GlobalState.getGlobalEventBus;
-import static io.cucumber.core.runner.GlobalState.getRunningParsingMap;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
@@ -42,6 +41,7 @@ import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.mappings.MappingProcessor.getDataTableMap;
 import static tools.dscode.common.mappings.MappingProcessor.getDocStringMap;
+import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepDebug;
 import static tools.dscode.common.util.GeneralUtils.stackTraceToString;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;

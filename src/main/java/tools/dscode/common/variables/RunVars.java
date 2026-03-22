@@ -2,22 +2,19 @@ package tools.dscode.common.variables;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import tools.dscode.common.mappings.FileAndDataParsing;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
-import static io.cucumber.core.runner.GlobalState.getFromRunningParsingMapCaseInsensitive;
+
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
+import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
+import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
 import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
 
 
@@ -36,18 +33,36 @@ public class RunVars extends NodeMap {
 
     public final static RunVars RUN_VARS = new RunVars();
 
-    private RunVars() {
-        super(MapConfigurations.MapType.GLOBAL_NODE);
-        merge(new HashMap<>(collectPrefixedAndUnprefixedVars()));
+    static {
+        System.out.println(GLOBALS);
+        JsonNode runConfigs = buildJsonFromPath(RUN_CONFIGS);
+        if (runConfigs instanceof ObjectNode runConfigsNode)
+            RUN_VARS.merge(runConfigsNode);
+        RUN_VARS.merge(new HashMap<>(collectPrefixedAndUnprefixedVars()));
     }
 
-    public static String getProfile() {
+    private RunVars() {
+        super(MapConfigurations.MapType.GLOBAL_NODE);
+    }
+
+    public static String getProfileName() {
         Object profile = getFromRunningParsingMapCaseInsensitive(RUN_PREFIX + PROFILEProp);
         if (profile == null)
             profile = RUN_VARS.getByNormalizedPath(PROFILEProp);
         if (profile == null || profile.toString().isBlank())
             return null;
         return profile.toString().trim();
+    }
+
+    public static ObjectNode getProfile() {
+        String profileName = getProfileName();
+        if (profileName == null || profileName.isBlank()) return null;
+        Object profile = RUN_VARS.getByNormalizedPath(PROFILES_DIR + "." + profileName);
+        if (profile == null)
+            throw new RuntimeException("Profile '" + profileName + "' not found");
+        if (profile instanceof ObjectNode profileNode)
+            return profileNode;
+        return null;
     }
 
 
@@ -84,69 +99,36 @@ public class RunVars extends NodeMap {
         });
 
 
-//        JsonNode jsonNode =  buildJsonFromPath(profilePath);
+        ObjectNode profileNode = getProfile();
 
         JsonNode runConfigs = buildJsonFromPath(RUN_CONFIGS);
-        if (runConfigs == null || runConfigs.isNull() || runConfigs.isMissingNode() || runConfigs.isEmpty())
-            return result;
         if (runConfigs instanceof ObjectNode runConfigsNode) {
-            if (runConfigsNode.isEmpty())
-                return result;
-
             runConfigsNode.fields().forEachRemaining(entry -> {
                 String key = entry.getKey();
                 JsonNode value = entry.getValue();
                 if (key.regionMatches(true, 0, "runconfig", 0, "runconfig".length())) {
-                    System.out.println("@@value: " + value);
-                    System.out.println("@@value.getClass(): " + value.getClass());
                     if (value instanceof ObjectNode objectNode) {
-                        HashMap<String, Object> map = tildeReader.convertValue(objectNode, new TypeReference<>() {
+                        HashMap<String, Object> map = MAPPER.convertValue(objectNode, new TypeReference<>() {
                         });
                         result.putAll(map);
-                    } else {
-                        if (!(value.isNull() || value.isMissingNode() || value.isEmpty()))
-                            throw new RuntimeException("RunConfig '" + key + "' is not a valid ObjectNode");
                     }
                 }
             });
-            String profileName = getProfile();
-            if (profileName == null)
-                return result;
-            JsonNode jsonNode = runConfigs.get(PROFILES_DIR);
-
-            if (jsonNode instanceof ObjectNode profilesNode) {
-                JsonNode profile = profilesNode.get(profileName);
-                if (profile == null || profile.isNull() || profile.isMissingNode() || profile.isEmpty())
-                    return result;
-                if (profile instanceof ObjectNode profileNode) {
-                    HashMap<String, Object> map = tildeReader.convertValue(profileNode, new TypeReference<>() {
-                    });
-                    result.putAll(map);
-                } else {
-                    throw new RuntimeException(profileName + " is not a valid ObjectNode");
-                }
-            } else {
-                throw new RuntimeException("PROFILES_DIR is not a valid ObjectNode");
-            }
-        } else {
-            throw new RuntimeException(RUN_CONFIGS + "  is not a valid ObjectNode");
         }
-
-
+        if (profileNode != null)
+            result.putAll(MAPPER.convertValue(profileNode, new TypeReference<>() {
+            }));
         return result;
     }
 
 
     public static Object resolveVarOrDefault(String varName, Object defaultValue) {
-        System.out.println("@@resolveVarOrDefault: " + varName + ", default: " + defaultValue + "");
         Object obj = resolveVar(varName);
-        System.out.println("@@obj: " + obj + "");
         if (obj == null) return defaultValue;
         return obj;
     }
 
     public static Object resolveVar(String varName) {
-        System.out.println("@@resolveVar: " + varName);
         String prefixedVarName = prefixed.matcher(varName).matches() ? varName : RUN_PREFIX + varName;
         Object returnObj = getFromRunningParsingMapCaseInsensitive(prefixedVarName);
         ;

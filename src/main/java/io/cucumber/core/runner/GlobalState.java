@@ -23,7 +23,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static io.cucumber.core.runner.CurrentScenarioState.currentScenarioState;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
-import static tools.dscode.common.mappings.ParsingMap.GLOBALS_PARSINGMAP;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
 import static tools.dscode.pickleruntime.CucumberOptionResolver.tags;
@@ -199,30 +198,7 @@ public class GlobalState {
         return currentScenarioState.currentPhrase;
     }
 
-    public static ParsingMap getRunningParsingMap() {
-        CurrentScenarioState currentScenarioState = getCurrentScenarioState();
-        if(currentScenarioState == null)
-            return GLOBALS_PARSINGMAP;
-        if(currentScenarioState.currentPhrase != null)
-            return currentScenarioState.currentPhrase.getPhraseParsingMap();
-        try {
-            return currentScenarioState.getCurrentStep().getStepParsingMap();
-        } catch (Throwable e) {
-            return currentScenarioState.getParsingMap();
-        }
-    }
 
-    public static String resolveToStringWithRunningParsingMap(String input) {
-        return getRunningParsingMap().resolveWholeText(input);
-    }
-
-    public static Object getFromRunningParsingMapCaseInsensitive(String key) {
-        return getRunningParsingMap().getCaseInsensitive(key);
-    }
-
-    public static Object getFromRunningParsingMap(String key) {
-        return getCurrentScenarioState().getParsingMap().get(key);
-    }
 
 
     public static void enterInDefaultReport(String columnName, Object value) {

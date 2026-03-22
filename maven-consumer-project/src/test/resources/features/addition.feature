@@ -2,9 +2,11 @@ Feature: Addition
 
   @T1
   Scenario: j test1
+    * navigate to: URL.select
+    * , verify "Subscribe" Checkbox is on, and "Subscribe" Checkbox is true
 #    * , verify Button is not displayed, and wait 10 seconds
-    * test2 Q
-    * test2 ~INT~:3
+#    * test2 Q
+#    * test2 ~INT~:3
 
   Scenario: data test C
 

@@ -52,7 +52,6 @@ public class BrowserSteps {
 
     public static WebDriver getDefaultDriver() {
         String browserName = String.valueOf(resolveVarOrDefault("pkb_BROWSER", "BROWSER"));
-        System.out.println("@@resolved-browserName: " + browserName + "");
         return getDriver(browserName);
     }
 
@@ -68,13 +67,11 @@ public class BrowserSteps {
 
     @Given(objRegistration + "BROWSER$")
     public WebDriver getBrowser() throws Exception {
-        System.out.println("@@browser!");
         return getLocalBrowser("chrome", "");
     }
 
     @Given(objRegistration + "(CHROME|EDGE)(.*)?$")
     public WebDriver getLocalBrowser(String browserName, String configFileSuffix) throws Exception {
-        System.out.println("@@1 browserName: " + browserName + " configFileSuffix: " + configFileSuffix);
         String normalizedBrowserName = normalizeBrowserName(browserName);
         BrowserConfig config = loadBrowserConfig(
                 normalizedBrowserName + safeSuffix(configFileSuffix),
@@ -85,7 +82,6 @@ public class BrowserSteps {
 
     @Given(objRegistration + "(SAUCE_)(chrome|edge)(.*)?$")
     public WebDriver getSauceLabs(String saucePrefix, String browserName, String configFileSuffix) throws Exception {
-        System.out.println("@@2 browserName: " + browserName + " configFileSuffix: " + configFileSuffix);
         String normalizedBrowserName = normalizeBrowserName(browserName);
         BrowserConfig config = loadBrowserConfig(
                 saucePrefix + normalizedBrowserName + safeSuffix(configFileSuffix),
@@ -396,9 +392,7 @@ public class BrowserSteps {
     }
 
     public static BrowserConfig loadBrowserConfig(String configKey, String missingMessage) throws Exception {
-        System.out.println("@@loadBrowserConfig: configKey: " + configKey + " , missingMessage: " + missingMessage + "");
         String json = resolveFromDocStringOrConfig(configKey);
-        System.out.println("@@json: " + json + "");
         if (Objects.isNull(json)) {
             throw new RuntimeException(missingMessage);
         }

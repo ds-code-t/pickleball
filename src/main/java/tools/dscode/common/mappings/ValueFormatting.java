@@ -131,13 +131,10 @@ public abstract class ValueFormatting {
 
         IdentityHashMap<JsonNode, Map<String, String>> fieldLookupCache = new IdentityHashMap<>();
 
-        System.out.println("\n\n\n=======\n================\n@@root: " + root);
-
 
         JsonNode current = root;
         for (String segment : splitByDot(path)) {
 
-            System.out.println("\n----\n@@segment: " + segment);
             if (segment.isBlank()) continue;
 
             ParsedSegment ps = parseSegment(segment);
@@ -154,9 +151,7 @@ public abstract class ValueFormatting {
                 if (idx < 0 || idx >= current.size()) return null;
                 current = current.get(idx);
             }
-            System.out.println("@@current: " + current);
         }
-        System.out.println("\n\nRETURN: " + current + "\n----------------------\n");
         return fromSafeJsonNode(current); // handles null/missing/null-node conversions
     }
 

@@ -6,10 +6,10 @@ import io.cucumber.core.stepexpression.DocStringArgument;
 
 import java.util.Map;
 
-import static io.cucumber.core.runner.GlobalState.getFromRunningParsingMap;
-import static io.cucumber.core.runner.GlobalState.getFromRunningParsingMapCaseInsensitive;
-import static io.cucumber.core.runner.GlobalState.resolveToStringWithRunningParsingMap;
-import static tools.dscode.common.mappings.GlobalMappings.configsRoot;
+
+import static tools.dscode.common.mappings.ParsingMap.configsRoot;
+import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
+import static tools.dscode.common.mappings.ParsingMap.resolveToStringWithRunningParsingMap;
 
 public final class BracketLiteralMasker {
     private BracketLiteralMasker() {
@@ -28,7 +28,6 @@ public final class BracketLiteralMasker {
 
 
     public static String resolveFromDocStringOrConfig(String key) {
-        System.out.println("@@resolveFromDocStringOrConfig: " + key);
         StepExtension currentStep = GlobalState.getRunningStep();
         if(currentStep.argument instanceof DocStringArgument)
             return resolveWithMasking(currentStep.argument.getValue().toString());
@@ -40,9 +39,7 @@ public final class BracketLiteralMasker {
     }
 
     public static String getAndResolveKeyWithMasking(String key) {
-        System.out.println("@@getAndResolveKeyWithMasking: " + key);
         Object value = getFromRunningParsingMapCaseInsensitive(key);
-        System.out.println("@@value: " + value + "");
         if (value == null) return null;
         return resolveWithMasking(String.valueOf(value));
     }

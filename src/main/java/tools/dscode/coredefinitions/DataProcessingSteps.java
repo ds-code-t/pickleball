@@ -9,7 +9,8 @@ import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
-import static io.cucumber.core.runner.GlobalState.getRunningParsingMap;
+import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
+
 
 public class DataProcessingSteps {
 

@@ -28,9 +28,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import static tools.dscode.common.mappings.BracketLiteralMasker.resolveWithMasking;
-import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
-import static tools.dscode.common.reporting.logging.LogForwarder.phraseWarn;
-
+import java.io.UncheckedIOException;
 
 public final class FileAndDataParsing {
 
@@ -69,17 +67,16 @@ public final class FileAndDataParsing {
             String content = new String(in.readAllBytes(), StandardCharsets.UTF_8);
             return parseSingleFile(content, path);
         } catch (Exception e) {
+//            e.printStackTrace();
             throw new Exception("Failed to read resource: " + path, e);
         }
     }
 
-    /**
-     * Builds a nested Json structure from a classpath resource folder or file.
-     */
     public static JsonNode buildJsonFromPath(String resourcePath) {
         URL url = getResourceUrl(resourcePath);
-        if (url == null)
-            return JSON_MAPPER.createObjectNode();
+        if (url == null) {
+            throw new IllegalArgumentException("Resource not found: " + resourcePath);
+        }
 
         try {
             if ("jar".equals(url.getProtocol())) {
@@ -91,10 +88,12 @@ public final class FileAndDataParsing {
                 Path root = Paths.get(url.toURI());
                 return buildFromRoot(root);
             }
+        } catch (RuntimeException e) {
+//            e.printStackTrace();
+            throw e;
         } catch (Exception e) {
-            phraseWarn("Failed to process resource: " + resourcePath + " (" +
-                    e.getMessage() + ")");
-            return JSON_MAPPER.createObjectNode();
+//            e.printStackTrace();
+            throw new RuntimeException("Failed to process resource: " + resourcePath, e);
         }
     }
 
@@ -105,15 +104,17 @@ public final class FileAndDataParsing {
     public static JsonNode parseSingleFile(String content, String fileName) {
         if (content == null || fileName == null)
             return JSON_MAPPER.createObjectNode();
-        return parseDataStringCustomReader(content, fileName, tildeReader);
+        return parseDataString(content, fileName);
+//        return parseDataStringCustomReader(content, fileName, tildeReader);
     }
 
     public static JsonNode parseDataStringCustomReader(String content, String name, CustomReader customReader) {
-        JsonNode jsonNode =   parseDataString(content, name);
+        JsonNode jsonNode = parseDataString(content, name);
         try {
             return (JsonNode) customReader.read(jsonNode);
         } catch (IOException e) {
-            return jsonNode;
+//            e.printStackTrace();
+            throw new UncheckedIOException("Failed during customReader.read for: " + name, e);
         }
     }
     public static JsonNode parseDataString(String content, String name) {
@@ -129,17 +130,20 @@ public final class FileAndDataParsing {
                 Object value = XML_MAPPER.readValue(content.strip(), Object.class);
                 return JSON_MAPPER.valueToTree(value);
             } catch (IOException e) {
+//                e.printStackTrace();
                 System.out.println("XML parsing failed for " + name + ": " + e.getMessage());
             }
         } else {
             try {
                 return JSON_MAPPER.readTree(content);
             } catch (IOException ignored) {
+//                ignored.printStackTrace();
             }
 
             try {
                 return YAML_MAPPER.readTree(content);
             } catch (IOException ignored) {
+//                ignored.printStackTrace();
             }
         }
 
@@ -264,7 +268,8 @@ public final class FileAndDataParsing {
 //                        setWithLowercaseAlias(dir, base, parsed); // base-name collisions will overwrite
                             }
                         } catch (IOException ioe) {
-                            System.out.println("Failed to read file: " + p + " (" + ioe.getMessage() + ")");
+//                            ioe.printStackTrace();
+                            throw new UncheckedIOException("Failed to read file: " + p, ioe);
                         }
                     });
         }

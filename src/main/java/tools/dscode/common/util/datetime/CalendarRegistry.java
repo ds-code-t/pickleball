@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static tools.dscode.common.mappings.GlobalMappings.configsRoot;
+import static tools.dscode.common.mappings.ParsingMap.configsRoot;
 import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
 
 public final class CalendarRegistry {

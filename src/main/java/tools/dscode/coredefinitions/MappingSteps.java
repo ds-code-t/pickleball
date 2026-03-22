@@ -65,7 +65,6 @@ public class MappingSteps extends CoreSteps {
 
     @Given("(?i)^resolveVar:(.+)$")
     public static Object resolveToVarStepDef(String varName) {
-        System.out.println("@@resolveToVarStepDef: " + varName);
         return resolveVar(varName);
     }
 

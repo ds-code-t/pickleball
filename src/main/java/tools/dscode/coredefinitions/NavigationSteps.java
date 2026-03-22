@@ -3,8 +3,8 @@ package tools.dscode.coredefinitions;
 import io.cucumber.java.en.When;
 import org.openqa.selenium.WebDriver;
 
-import static io.cucumber.core.runner.GlobalState.getRunningParsingMap;
-import static tools.dscode.common.mappings.GlobalMappings.configsRoot;
+import static tools.dscode.common.mappings.ParsingMap.configsRoot;
+import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 
 public class NavigationSteps {

@@ -11,7 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static io.cucumber.core.runner.GlobalState.getRunningParsingMap;
+
+import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 
 public class TildeReader extends CustomReader {
@@ -22,14 +23,8 @@ public class TildeReader extends CustomReader {
     public static final CustomReader tildeReader = new TildeReader(MAPPER);
 
     public static Object attemptConversion(Object value) {
-        System.out.println("@@attemptConversion: " + value + "");
-        System.out.println("@@value instanceof String: " + (value instanceof String) + "");
-        System.out.println("@@value.toString().trim(): " + (value.toString().trim()) + "");
-        System.out.println("@@s.trim().startsWith(\"~\"): " + (value.toString().trim().startsWith("~")) + "");
-        System.out.println("@@s.trim().contains(\":\"): " + (value.toString().trim().contains(":")) + "");
         if (value instanceof String s && s.trim().startsWith("~") && s.contains(":"))
             return tildeReader.convertValue(value);
-        System.out.println("@@attemptConversion-return: " + value + "");
         return value;
     }
 

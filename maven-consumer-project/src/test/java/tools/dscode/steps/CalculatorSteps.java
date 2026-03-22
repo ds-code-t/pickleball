@@ -76,14 +76,10 @@ public class CalculatorSteps {
     @Given("^test2(?: (.*))?$")
     public static void test2(String value) throws Exception {
         if (value == null) {
-            System.out.println("@@value: " + value);
             return;
         }
         Object obj = attemptConversion(value);
-        System.out.println("@@obj: " + obj);
-        System.out.println("@@obj.getClass(): " + obj.getClass());
 //        JsonNode j = readResourceFile("objects/URL.yaml");
-//        System.out.println("@@j: " + j);
     }
 
     @Given("^zcapitalize:(.*)$")
