@@ -12,7 +12,6 @@ import java.util.List;
 
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
-import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseDebug;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
 import static tools.dscode.common.treeparsing.DefinitionContext.FILE_INPUT;
@@ -214,11 +213,11 @@ public final class Phrase extends PhraseData {
             if (object instanceof ObjectNode objectNode) {
                 phraseData.setPhraseParsingMap(objectNode);
             } else {
-                phraseData.setPhraseParsingMap((ObjectNode) tildeReader.valueToTree(object));
+                phraseData.setPhraseParsingMap((ObjectNode) MAPPER.valueToTree(object));
             }
         } else {
             phraseData.setPhraseParsingMap(MAPPER.createObjectNode()
-                    .set(key, tildeReader.valueToTree(object)));
+                    .set(key, MAPPER.valueToTree(object)));
         }
     }
 

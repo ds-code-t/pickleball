@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.mappings.ParsingMap.configsRoot;
-import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
+import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 
 public final class CalendarRegistry {
 
@@ -58,7 +58,7 @@ public final class CalendarRegistry {
 
     public static void registerJson(String json) {
         try {
-            JsonNode root = tildeReader.readTree(json);
+            JsonNode root = MAPPER.readTree(json);
             Iterator<Map.Entry<String, JsonNode>> it = root.fields();
             while (it.hasNext()) {
                 Map.Entry<String, JsonNode> e = it.next();

@@ -11,7 +11,7 @@ import tools.dscode.common.mappings.NodeMap;
 import static io.cucumber.core.runner.GlobalState.*;
 import static io.cucumber.core.runner.util.TableUtils.toFlatMultimap;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
-import static tools.dscode.common.variables.RunVars.resolveVar;
+import static tools.dscode.common.variables.RunVars.resolveFromVars;
 
 
 public class MappingSteps extends CoreSteps {
@@ -65,7 +65,7 @@ public class MappingSteps extends CoreSteps {
 
     @Given("(?i)^resolveVar:(.+)$")
     public static Object resolveToVarStepDef(String varName) {
-        return resolveVar(varName);
+        return resolveFromVars(varName);
     }
 
 

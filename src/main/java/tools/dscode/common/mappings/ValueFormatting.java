@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.guava.GuavaModule;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
@@ -15,7 +14,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
 
 
 public abstract class ValueFormatting {
@@ -62,7 +60,7 @@ public abstract class ValueFormatting {
 
         // Safe packages → normal Jackson tree serialization
         if (isFromSafePackage(obj)) {
-            return tildeReader.valueToTree(obj);
+            return MAPPER.valueToTree(obj);
         }
 
         // Unsafe / non-serializable: put in registry, return placeholder ref as JSON
@@ -70,20 +68,24 @@ public abstract class ValueFormatting {
         nonSerializable.put(id, obj);
 
         NonSerializableRef ref = new NonSerializableRef(id);
-        return tildeReader.valueToTree(ref);
+        return MAPPER.valueToTree(ref);
     }
 
     public static Object fromSafeJsonNode(Object node) {
         if (node instanceof ObjectNode objectNode) {
             // Only treat as a NonSerializableRef placeholder if our special field is present
             if (objectNode.has(NON_SERIALIZABLE_FIELD)) {
-                NonSerializableRef ref = tildeReader.convertValue(objectNode, NonSerializableRef.class);
+                NonSerializableRef ref = MAPPER.convertValue(objectNode, NonSerializableRef.class);
                 return nonSerializable.get(ref._NonSerializableReferenceID());
             }
             return objectNode;
         }
         if (node instanceof JsonNode jsonNode) {
-            return tildeReader.treeToValue(jsonNode, Object.class);
+            try {
+                return MAPPER.treeToValue(jsonNode, Object.class);
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
+            }
         }
         // Not a placeholder → just return as-is
         return node;

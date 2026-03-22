@@ -34,10 +34,6 @@ public class ParsingMap extends MappingProcessor {
         super(nodeMap);
     }
 
-
-
-
-
     public static ParsingMap getRunningParsingMap() {
         CurrentScenarioState currentScenarioState = getCurrentScenarioState();
         if(currentScenarioState == null)
@@ -52,16 +48,35 @@ public class ParsingMap extends MappingProcessor {
     }
 
     public static String resolveToStringWithRunningParsingMap(String input) {
+        if(input == null) return null;
         return getRunningParsingMap().resolveWholeText(input);
     }
 
     public static Object getFromRunningParsingMapCaseInsensitive(String key) {
+        if(key == null) return null;
         return getRunningParsingMap().getCaseInsensitive(key);
     }
 
     public static Object getFromRunningParsingMap(String key) {
-        return getCurrentScenarioState().getParsingMap().get(key);
+        if(key == null) return null;
+        return getRunningParsingMap().get(key);
     }
+
+
+    public static Object getFromRunningParsingMapCaseInsensitiveOrDefault(String key, String defaultValue) {
+        if(key == null) return defaultValue;
+        Object returnVal =  getRunningParsingMap().getCaseInsensitive(key);
+        if(returnVal == null) return defaultValue;
+        return returnVal;
+    }
+
+    public static Object getFromRunningParsingMapOrDefault(String key, String defaultValue) {
+        if(key == null) return defaultValue;
+        Object returnVal =  getRunningParsingMap().get(key);
+        if(returnVal == null) return defaultValue;
+        return returnVal;
+    }
+
 
 
 

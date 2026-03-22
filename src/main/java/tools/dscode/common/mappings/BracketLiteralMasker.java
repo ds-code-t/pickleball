@@ -26,7 +26,6 @@ public final class BracketLiteralMasker {
         return unmaskAndEscape(resolveToStringWithRunningParsingMap(maskBrackets(s)));
     }
 
-
     public static String resolveFromDocStringOrConfig(String key) {
         StepExtension currentStep = GlobalState.getRunningStep();
         if(currentStep.argument instanceof DocStringArgument)
@@ -43,7 +42,6 @@ public final class BracketLiteralMasker {
         if (value == null) return null;
         return resolveWithMasking(String.valueOf(value));
     }
-
 
     public static String maskBrackets(String s) {
         if (s == null || s.isEmpty()) return s;

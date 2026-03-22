@@ -12,30 +12,32 @@ import java.util.Map;
 import java.util.Set;
 
 
+import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMap;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
+import static tools.dscode.common.mappings.ParsingMap.resolveToStringWithRunningParsingMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 
-public class TildeReader extends CustomReader {
-    public TildeReader(ObjectMapper mapper) {
+public class ValConverter extends CustomReader {
+    public ValConverter(ObjectMapper mapper) {
         super(mapper);
     }
 
-    public static final CustomReader tildeReader = new TildeReader(MAPPER);
+    public static final CustomReader valConverter = new ValConverter(MAPPER);
 
-    public static Object attemptConversion(Object value) {
-        if (value instanceof String s && s.trim().startsWith("~") && s.contains(":"))
-            return tildeReader.convertValue(value);
-        return value;
-    }
+//    public static Object attemptConversion(Object value) {
+//        if (value instanceof String s && s.trim().startsWith("~") && s.contains(":"))
+//            return valConverter.convertValue(value);
+//        return value;
+//    }
 
     @Override
     protected Object modify(Object value, Object parent) {
-        if (value instanceof String s) {
+        if (value instanceof String s && s.trim().startsWith("~") && s.contains(":")) {
             int colonIndex = s.indexOf(':');
             if (colonIndex > 0) {
                 String key = s.substring(0, colonIndex);
                 String innerValue = s.substring(colonIndex + 1);
-                Object converted = convertMarkedValue(key, innerValue, s);
+                Object converted = convertMarkedValue(key, innerValue, s, parent);
                 if (converted != s) {
                     return converted;
                 }
@@ -55,10 +57,12 @@ public class TildeReader extends CustomReader {
             return value;
         }
 
-        return convertMarkedValue(key, entry.getValue(), value);
+        return convertMarkedValue(key, entry.getValue(), value, parent);
     }
 
-    private Object convertMarkedValue(String key, Object innerValue, Object originalValue) {
+    private Object convertMarkedValue(String key, Object innerValue, Object originalValue, Object parent) {
+        if (innerValue == null) return null;
+
         if (key == null
                 || key.length() < 3
                 || key.charAt(0) != '~'
@@ -67,10 +71,18 @@ public class TildeReader extends CustomReader {
         }
 
         if ("~PARSE~".equals(key)) {
-            return getRunningParsingMap().resolveWholeText("{" + innerValue + "}");
+            return resolveToStringWithRunningParsingMap("{" + modify(innerValue, parent) + "}");
         }
 
-        Object structured = convertStructuredType(key, innerValue, originalValue);
+        if ("~RESOLVE~".equals(key)) {
+            return getFromRunningParsingMap(String.valueOf(modify(innerValue, parent)));
+        }
+
+        if ("~RESOLVE-CASE-INSENSITIVE~".equals(key)) {
+            return resolveToStringWithRunningParsingMap(String.valueOf(modify(innerValue, parent)));
+        }
+
+        Object structured = convertStructuredType(key, modify(innerValue, parent), originalValue);
         if (structured != originalValue) {
             return structured;
         }
@@ -81,10 +93,10 @@ public class TildeReader extends CustomReader {
         }
 
         if (targetType == String.class) {
-            return innerValue == null ? null : String.valueOf(innerValue);
+            return String.valueOf(modify(innerValue, parent));
         }
 
-        return mapper.convertValue(innerValue, targetType);
+        return mapper.convertValue(modify(innerValue, parent), targetType);
     }
 
     private Object convertStructuredType(String key, Object innerValue, Object originalValue) {
@@ -98,7 +110,7 @@ public class TildeReader extends CustomReader {
                 default -> originalValue;
             };
         } catch (Exception e) {
-            return originalValue;
+            throw new RuntimeException("Failed to convert value: " + originalValue, e);
         }
     }
 

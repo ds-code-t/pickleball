@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
+import tools.dscode.common.mappings.ParsingMap;
 
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Pattern;
@@ -17,10 +19,9 @@ import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
 
 
-
 public class RunVars extends NodeMap {
 
-    private static final Pattern prefixed = Pattern.compile("(?i)^[a-z]{3}_.*");
+    public static final Pattern prefixed = Pattern.compile("(?i)^[a-z]{3}_\\S+$");
 
     private static final String ENV_PREFIX = "env_";
     private static final String SYS_PREFIX = "sys_";
@@ -101,8 +102,7 @@ public class RunVars extends NodeMap {
         JsonNode runConfigs = null;
         try {
             runConfigs = buildJsonFromPath(RUN_CONFIGS);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             return result;
         }
 
@@ -127,19 +127,23 @@ public class RunVars extends NodeMap {
     }
 
 
-    public static Object resolveVarOrDefault(String varName, Object defaultValue) {
-        Object obj = resolveVar(varName);
-        if (obj == null) return defaultValue;
-        return obj;
-    }
+//    public static Object resolveVarOrDefault(String varName, Object defaultValue) {
+//        Object obj = resolveVar(varName);
+//        if (obj == null) return defaultValue;
+//        return obj;
+//    }
+//
+//    public static Object resolveVar(String varName) {
+//        String prefixedVarName = prefixed.matcher(varName).matches() ? varName : RUN_PREFIX + varName;
+//        Object returnObj = getFromRunningParsingMapCaseInsensitive(prefixedVarName);
+//        if (returnObj == null)
+//            return RUN_VARS.getByNormalizedPath(varName);
+//        return returnObj;
+//    }
 
-    public static Object resolveVar(String varName) {
-        String prefixedVarName = prefixed.matcher(varName).matches() ? varName : RUN_PREFIX + varName;
-        Object returnObj = getFromRunningParsingMapCaseInsensitive(prefixedVarName);
-        ;
-        if (returnObj == null)
-            return RUN_VARS.getByNormalizedPath(varName);
-        return returnObj;
+    public static Object resolveFromVars(String varName) {
+        varName = varName.toLowerCase().startsWith(RUN_PREFIX) ? varName.substring(RUN_PREFIX.length()) : varName;
+        return RUN_VARS.getByNormalizedPath(varName);
     }
 
 

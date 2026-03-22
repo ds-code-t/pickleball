@@ -104,7 +104,7 @@ public final class FileAndDataParsing {
         if (content == null || fileName == null)
             return JSON_MAPPER.createObjectNode();
         return parseDataString(content, fileName);
-//        return parseDataStringCustomReader(content, fileName, tildeReader);
+//        return parseDataStringCustomReader(content, fileName, MAPPER);
     }
 
     public static JsonNode parseDataStringCustomReader(String content, String name, CustomReader customReader) {

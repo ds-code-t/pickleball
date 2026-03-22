@@ -29,9 +29,10 @@ import java.util.Set;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort;
-//import static tools.dscode.common.mappings.BracketLiteralMasker.resolveFromDocStringOrConfig;
-//import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
-import static tools.dscode.common.variables.RunVars.resolveVarOrDefault;
+import static tools.dscode.common.mappings.BracketLiteralMasker.resolveFromDocStringOrConfig;
+import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
+import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitiveOrDefault;
+import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getObjectFromRegistryOrDefault;
 import static tools.dscode.coredefinitions.ObjectRegistrationSteps.objRegistration;
 
@@ -51,7 +52,7 @@ public class BrowserSteps {
     }
 
     public static WebDriver getDefaultDriver() {
-        String browserName = String.valueOf(resolveVarOrDefault("pkb_BROWSER", "BROWSER"));
+        String browserName = String.valueOf(getFromRunningParsingMapCaseInsensitiveOrDefault("run_BROWSER", "BROWSER"));
         return getDriver(browserName);
     }
 
@@ -397,7 +398,7 @@ public class BrowserSteps {
             throw new RuntimeException(missingMessage);
         }
 
-        Map<String, Object> raw = tildeReader.read(json, Map.class);
+        Map<String, Object> raw = MAPPER.readValue(json, Map.class);
         return BrowserConfig.from(raw);
     }
 

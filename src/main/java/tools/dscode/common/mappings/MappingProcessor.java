@@ -35,10 +35,11 @@ import static tools.dscode.common.evaluations.AviatorUtil.eval;
 import static tools.dscode.common.evaluations.AviatorUtil.evalToBoolean;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
-import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
 import static tools.dscode.common.mappings.queries.Tokenized.AS_LIST_SUFFIX;
 import static tools.dscode.common.util.StringUtilities.decodeBackToText;
 import static tools.dscode.common.util.StringUtilities.encodeToPlaceHolders;
+import static tools.dscode.common.variables.RunVars.prefixed;
+import static tools.dscode.common.variables.RunVars.resolveFromVars;
 
 public abstract class MappingProcessor implements Map<String, Object> {
 
@@ -144,7 +145,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     public void clearDataSourceMaps(MapConfigurations.DataSource... dataSources) {
-
         for (MapConfigurations.DataSource dataSource : dataSources) {
             maps.values().forEach(m -> m.getDataSources());
         }
@@ -367,6 +367,47 @@ public abstract class MappingProcessor implements Map<String, Object> {
         }
     }
 
+
+    public Object getAndResolve(Object key) {
+        if (key == null)
+            throw new RuntimeException("key cannot be null");
+        Object returnObj = get(key);
+        if(returnObj  instanceof String returnString)  return resolveWholeText(returnString);
+        return returnObj;
+    }
+
+//    public Object getCaseInsensitiveAndResolve(String key) {
+//        Object returnObj = getCaseInsensitive(resolveWholeText(key));
+//        if (returnObj == null) return null;
+//        if(returnObj  instanceof String returnString)  return resolveWholeText(returnString);
+//        return returnObj;
+//    }
+
+    public Object getCaseInsensitive(String key) {
+        Tokenized tokenized = new Tokenized(key);
+        for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
+            if (map == null)
+                continue;
+            Object replacement = map.getByNormalizedPath(key);
+            if (replacement != null) {
+                return replacement;
+            }
+        }
+        if(prefixed.matcher(key).matches()) {
+            return resolveFromVars(key);
+        }
+        return null;
+    }
+
+    public List<Object> getList(String key) {
+        return (List<Object>) get(addSuffix(key, AS_LIST_SUFFIX));
+    }
+
+    public static String addSuffix(String key, String suffix) {
+        return key.endsWith(suffix) ? key : key + " " + suffix;
+    }
+
+
     @Override
     public Object get(Object key) {
         if (key == null)
@@ -381,46 +422,23 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return null;
     }
 
-    public Object getAndResolve(Object key) {
-        if (key == null)
-            throw new RuntimeException("key cannot be null");
-        Object returnObj = get(key);
-        return resolveWholeText(getStringValue(returnObj));
-    }
 
-    public String getCaseInsensitiveAndResolve(String key) {
-        Object returnObj = getCaseInsensitive(resolveWholeText(key));
-        if (returnObj == null) return null;
-        return resolveWholeText(String.valueOf(returnObj));
-    }
+    public Object get(String key) {
+        if(prefixed.matcher(key).matches()){
+            return getCaseInsensitive(key);
+        }
 
-    public Object getCaseInsensitive(String key) {
         Tokenized tokenized = new Tokenized(key);
         for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
             if (map == null)
                 continue;
-            Object replacement = map.getByNormalizedPath(key);
+            Object replacement = map.get(tokenized);
             if (replacement != null) {
                 return replacement;
             }
         }
         return null;
     }
-
-    public List<Object> getList(String key) {
-        return (List<Object>) get(addSuffix(key, AS_LIST_SUFFIX));
-    }
-
-    public static String addSuffix(String key, String suffix) {
-        return key.endsWith(suffix) ? key : key + " " + suffix;
-    }
-
-
-//    public Object get(ElementMatch element) {
-//        List<?>  list = getAsList(element);
-//        if(list == null || list.isEmpty()) return null;
-//        return list.getLast();
-//    }
 
     public List<?> get(ElementMatch element) {
         String categoryName = element.category.replaceFirst("(?i:s)$", "");
@@ -488,19 +506,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     }
 
-
-    public Object get(String key) {
-        Tokenized tokenized = new Tokenized(key);
-        for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
-            if (map == null)
-                continue;
-            Object replacement = map.get(tokenized);
-            if (replacement != null) {
-                return replacement;
-            }
-        }
-        return null;
-    }
 
     @Override
     public Object put(String key, Object value) {
@@ -593,7 +598,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
             }
             try {
                 // arrays / objects → canonical JSON
-                String otherNode = tildeReader.writeValueAsString(jsonNode);
+                String otherNode = MAPPER.writeValueAsString(jsonNode);
                 return encodeToPlaceHolders(otherNode);
             } catch (JsonProcessingException e) {
                 // fallback to best-effort text
