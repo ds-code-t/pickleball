@@ -15,7 +15,7 @@ import java.util.regex.Pattern;
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
-import static tools.dscode.common.mappings.custommappings.TildeReader.tildeReader;
+
 
 
 public class RunVars extends NodeMap {
@@ -97,11 +97,16 @@ public class RunVars extends NodeMap {
                 result.put(k.substring(4), v);
             }
         });
-
-
         ObjectNode profileNode = getProfile();
+        JsonNode runConfigs = null;
+        try {
+            runConfigs = buildJsonFromPath(RUN_CONFIGS);
+        }
+        catch (Exception e) {
+            return result;
+        }
 
-        JsonNode runConfigs = buildJsonFromPath(RUN_CONFIGS);
+
         if (runConfigs instanceof ObjectNode runConfigsNode) {
             runConfigsNode.fields().forEachRemaining(entry -> {
                 String key = entry.getKey();

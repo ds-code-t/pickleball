@@ -27,7 +27,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import static tools.dscode.common.mappings.BracketLiteralMasker.resolveWithMasking;
 import java.io.UncheckedIOException;
 
 public final class FileAndDataParsing {
@@ -119,7 +118,7 @@ public final class FileAndDataParsing {
     }
     public static JsonNode parseDataString(String content, String name) {
         String type = name.substring(name.lastIndexOf('.') + 1).toLowerCase().trim();
-        content = resolveWithMasking(content);
+//        content = resolveWithMasking(content);
 
         if (type.equals("csv")) {
             return parseCsv(content);
