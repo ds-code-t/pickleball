@@ -1,5 +1,8 @@
 package tools.dscode.coredefinitions;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.cucumber.java.en.Given;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.MutableCapabilities;
@@ -29,10 +32,10 @@ import java.util.Set;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort;
-import static tools.dscode.common.mappings.BracketLiteralMasker.resolveFromDocStringOrConfig;
-import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitiveOrDefault;
+import static tools.dscode.common.mappings.ParsingMap.resolveFromDocStringOrConfig;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+import static tools.dscode.common.variables.RunVars.VAR_PREFIX;
 import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getObjectFromRegistryOrDefault;
 import static tools.dscode.coredefinitions.ObjectRegistrationSteps.objRegistration;
 
@@ -52,7 +55,7 @@ public class BrowserSteps {
     }
 
     public static WebDriver getDefaultDriver() {
-        String browserName = String.valueOf(getFromRunningParsingMapCaseInsensitiveOrDefault("run_BROWSER", "BROWSER"));
+        String browserName = String.valueOf(getFromRunningParsingMapCaseInsensitiveOrDefault(VAR_PREFIX + "BROWSER", "BROWSER"));
         return getDriver(browserName);
     }
 
@@ -93,7 +96,7 @@ public class BrowserSteps {
 
     @Given(objRegistration + "(GRID_)(chrome|edge)(.*)?$")
     @Given(objRegistration + "(SELENIUM_GRID_)(chrome|edge)(.*)?$")
-    public WebDriver getSeleniumGrid(String gridPrefix , String browserName, String configFileSuffix) throws Exception {
+    public WebDriver getSeleniumGrid(String gridPrefix, String browserName, String configFileSuffix) throws Exception {
         String normalizedBrowserName = normalizeBrowserName(browserName);
         BrowserConfig config = loadBrowserConfig(
                 gridPrefix + normalizedBrowserName + safeSuffix(configFileSuffix),
@@ -393,12 +396,25 @@ public class BrowserSteps {
     }
 
     public static BrowserConfig loadBrowserConfig(String configKey, String missingMessage) throws Exception {
-        String json = resolveFromDocStringOrConfig(configKey);
+        Object json = resolveFromDocStringOrConfig(configKey);
         if (Objects.isNull(json)) {
             throw new RuntimeException(missingMessage);
         }
 
-        Map<String, Object> raw = MAPPER.readValue(json, Map.class);
+        Map<String, Object> raw;
+        if (json instanceof JsonNode node) {
+            raw = MAPPER.convertValue(node, new TypeReference<>() {
+            });
+        } else if (json instanceof String str) {
+            raw = MAPPER.readValue(str, new TypeReference<>() {
+            });
+        } else if (json instanceof Map<?, ?> map) {
+            raw = MAPPER.convertValue(map, new TypeReference<>() {
+            });
+        } else {
+            raw = MAPPER.convertValue(json, new TypeReference<>() {
+            });
+        }
         return BrowserConfig.from(raw);
     }
 

@@ -1,0 +1,3 @@
+#- set:
+#    pkb_browser: edge
+browser: edge

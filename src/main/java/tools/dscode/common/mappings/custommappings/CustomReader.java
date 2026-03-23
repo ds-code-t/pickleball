@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.apache.poi.ss.formula.functions.T;
 
 import java.io.File;
 import java.io.IOException;
@@ -23,6 +24,14 @@ public abstract class CustomReader {
 
     protected CustomReader(ObjectMapper mapper) {
         this.mapper = Objects.requireNonNull(mapper, "mapper");
+    }
+
+    public Object convert(Object input)  {
+        try {
+            return read(input);
+        } catch (Exception e) {
+            return input;
+        }
     }
 
     public Object read(String input) throws IOException {

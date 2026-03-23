@@ -13,9 +13,11 @@ import java.util.Set;
 
 
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMap;
-import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
+import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
 import static tools.dscode.common.mappings.ParsingMap.resolveToStringWithRunningParsingMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+import static tools.dscode.common.variables.RunVars.VAR_PREFIX;
+import static tools.dscode.common.variables.RunVars.prefixed;
 
 public class ValConverter extends CustomReader {
     public ValConverter(ObjectMapper mapper) {
@@ -23,12 +25,6 @@ public class ValConverter extends CustomReader {
     }
 
     public static final CustomReader valConverter = new ValConverter(MAPPER);
-
-//    public static Object attemptConversion(Object value) {
-//        if (value instanceof String s && s.trim().startsWith("~") && s.contains(":"))
-//            return valConverter.convertValue(value);
-//        return value;
-//    }
 
     @Override
     protected Object modify(Object value, Object parent) {
@@ -63,6 +59,7 @@ public class ValConverter extends CustomReader {
     private Object convertMarkedValue(String key, Object innerValue, Object originalValue, Object parent) {
         if (innerValue == null) return null;
 
+
         if (key == null
                 || key.length() < 3
                 || key.charAt(0) != '~'
@@ -74,12 +71,19 @@ public class ValConverter extends CustomReader {
             return resolveToStringWithRunningParsingMap("{" + modify(innerValue, parent) + "}");
         }
 
-        if ("~RESOLVE~".equals(key)) {
-            return getFromRunningParsingMap(String.valueOf(modify(innerValue, parent)));
+        if ("~VAR~".equals(key)) {
+            String val = String.valueOf(modify(innerValue, parent));
+            String var_key = prefixed.matcher(val).matches() ? key : VAR_PREFIX + val;
+            return getFromRunningParsingMapCaseInsensitive(var_key);
         }
 
-        if ("~RESOLVE-CASE-INSENSITIVE~".equals(key)) {
-            return resolveToStringWithRunningParsingMap(String.valueOf(modify(innerValue, parent)));
+        if(key.startsWith("~RESOLVE")) {
+            if ("~RESOLVE~".equals(key)) {
+                return getFromRunningParsingMap(String.valueOf(modify(innerValue, parent)));
+            }
+            if ("~RESOLVE-CASE-INSENSITIVE~".equals(key)) {
+                return getFromRunningParsingMapCaseInsensitive(String.valueOf(modify(innerValue, parent)));
+            }
         }
 
         Object structured = convertStructuredType(key, modify(innerValue, parent), originalValue);

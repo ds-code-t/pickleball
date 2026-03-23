@@ -5,10 +5,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
-import tools.dscode.common.mappings.ParsingMap;
+import tools.dscode.common.mappings.queries.Tokenized;
 
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Pattern;
@@ -26,20 +25,38 @@ public class RunVars extends NodeMap {
     private static final String ENV_PREFIX = "env_";
     private static final String SYS_PREFIX = "sys_";
     public static final String PKB_PREFIX = "pkb_";
-    public static final String RUN_PREFIX = "run_";
+    public static final String VAR_PREFIX = "var_";
 
-    private static final String RUN_CONFIGS = "run-configs";
+    private static final String RUN_CONFIGS = "runconfigs";
     private static final String PROFILES_DIR = "profiles";
     private static final String PROFILEProp = "profile";
 
     public final static RunVars RUN_VARS = new RunVars();
 
+    @Override
+    public void put(String key, Object value) {
+        root.set(key, MAPPER.valueToTree(value));
+    }
+
+    public void putAll(Object value) {
+        if (value == null) {
+            return;
+        }
+        root.setAll((ObjectNode) MAPPER.valueToTree(value));
+    }
+
+    public Object directGet(String key) {
+        return root.get(key);
+    }
+
     static {
         System.out.println(GLOBALS);
-        JsonNode runConfigs = buildJsonFromPath(RUN_CONFIGS);
-        if (runConfigs instanceof ObjectNode runConfigsNode)
-            RUN_VARS.merge(runConfigsNode);
         RUN_VARS.merge(new HashMap<>(collectPrefixedAndUnprefixedVars()));
+        JsonNode runConfigs = buildJsonFromPath(RUN_CONFIGS);
+        if (runConfigs instanceof ObjectNode runConfigsNode) {
+            RUN_VARS.put(RUN_CONFIGS, runConfigsNode);
+            parseRunConfigs();
+        }
     }
 
     private RunVars() {
@@ -47,7 +64,7 @@ public class RunVars extends NodeMap {
     }
 
     public static String getProfileName() {
-        Object profile = getFromRunningParsingMapCaseInsensitive(RUN_PREFIX + PROFILEProp);
+        Object profile = getFromRunningParsingMapCaseInsensitive(VAR_PREFIX + PROFILEProp);
         if (profile == null)
             profile = RUN_VARS.getByNormalizedPath(PROFILEProp);
         if (profile == null || profile.toString().isBlank())
@@ -58,10 +75,8 @@ public class RunVars extends NodeMap {
     public static ObjectNode getProfile() {
         String profileName = getProfileName();
         if (profileName == null || profileName.isBlank()) return null;
-        Object profile = RUN_VARS.getByNormalizedPath(PROFILES_DIR + "." + profileName);
-        if (profile == null)
-            throw new RuntimeException("Profile '" + profileName + "' not found");
-        if (profile instanceof ObjectNode profileNode)
+        Object returnObj = MAPPER.valueToTree(RUN_VARS.getByNormalizedPath(RUN_CONFIGS + "." + PROFILES_DIR + "." + profileName));
+        if (returnObj instanceof ObjectNode profileNode)
             return profileNode;
         return null;
     }
@@ -69,7 +84,6 @@ public class RunVars extends NodeMap {
 
     public static Map<String, Object> collectPrefixedAndUnprefixedVars() {
         Map<String, Object> result = new HashMap<>();
-
         System.getenv().forEach((k, v) ->
                 result.put(prefixed.matcher(k).matches() ? k : ENV_PREFIX + k, v));
 
@@ -78,7 +92,7 @@ public class RunVars extends NodeMap {
             String key = String.valueOf(k);
             result.put(prefixed.matcher(key).matches() ? key : SYS_PREFIX + key, v);
         });
-
+//
         Map<String, Object> snapshot = new HashMap<>(result);
 
         snapshot.forEach((k, v) -> {
@@ -98,51 +112,35 @@ public class RunVars extends NodeMap {
                 result.put(k.substring(4), v);
             }
         });
-        ObjectNode profileNode = getProfile();
-        JsonNode runConfigs = null;
-        try {
-            runConfigs = buildJsonFromPath(RUN_CONFIGS);
-        } catch (Exception e) {
-            return result;
-        }
+        return result;
+    }
 
+    public static void parseRunConfigs() {
+        Object runConfigs = RUN_VARS.directGet(RUN_CONFIGS);
 
         if (runConfigs instanceof ObjectNode runConfigsNode) {
+            if (runConfigsNode.isEmpty())
+                return;
             runConfigsNode.fields().forEachRemaining(entry -> {
                 String key = entry.getKey();
                 JsonNode value = entry.getValue();
                 if (key.regionMatches(true, 0, "runconfig", 0, "runconfig".length())) {
                     if (value instanceof ObjectNode objectNode) {
-                        HashMap<String, Object> map = MAPPER.convertValue(objectNode, new TypeReference<>() {
-                        });
-                        result.putAll(map);
+                        RUN_VARS.putAll(objectNode);
                     }
                 }
             });
+        } else {
+            return;
         }
+
+        ObjectNode profileNode = getProfile();
         if (profileNode != null)
-            result.putAll(MAPPER.convertValue(profileNode, new TypeReference<>() {
-            }));
-        return result;
+            RUN_VARS.putAll(profileNode);
     }
 
-
-//    public static Object resolveVarOrDefault(String varName, Object defaultValue) {
-//        Object obj = resolveVar(varName);
-//        if (obj == null) return defaultValue;
-//        return obj;
-//    }
-//
-//    public static Object resolveVar(String varName) {
-//        String prefixedVarName = prefixed.matcher(varName).matches() ? varName : RUN_PREFIX + varName;
-//        Object returnObj = getFromRunningParsingMapCaseInsensitive(prefixedVarName);
-//        if (returnObj == null)
-//            return RUN_VARS.getByNormalizedPath(varName);
-//        return returnObj;
-//    }
-
     public static Object resolveFromVars(String varName) {
-        varName = varName.toLowerCase().startsWith(RUN_PREFIX) ? varName.substring(RUN_PREFIX.length()) : varName;
+        varName = varName.toLowerCase().startsWith(VAR_PREFIX) ? varName.substring(VAR_PREFIX.length()) : varName;
         return RUN_VARS.getByNormalizedPath(varName);
     }
 

@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static tools.dscode.common.mappings.custommappings.ValConverter.valConverter;
 
 
 public abstract class ValueFormatting {
@@ -78,17 +79,9 @@ public abstract class ValueFormatting {
                 NonSerializableRef ref = MAPPER.convertValue(objectNode, NonSerializableRef.class);
                 return nonSerializable.get(ref._NonSerializableReferenceID());
             }
-            return objectNode;
+            return valConverter.convert(objectNode);
         }
-        if (node instanceof JsonNode jsonNode) {
-            try {
-                return MAPPER.treeToValue(jsonNode, Object.class);
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
-            }
-        }
-        // Not a placeholder → just return as-is
-        return node;
+        return valConverter.convert(node);
     }
 
 
@@ -141,13 +134,11 @@ public abstract class ValueFormatting {
 
             ParsedSegment ps = parseSegment(segment);
             if (ps == null) return null;
-
             if (!ps.name.isEmpty()) {
                 if (current == null || !current.isObject()) return null;
                 current = getFieldIgnoreCaseSpaceNormalized(current, ps.name, fieldLookupCache);
                 if (current == null || current.isMissingNode()) return null;
             }
-
             for (int idx : ps.indexes) {
                 if (current == null || !current.isArray()) return null;
                 if (idx < 0 || idx >= current.size()) return null;

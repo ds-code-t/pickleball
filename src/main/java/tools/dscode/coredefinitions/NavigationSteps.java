@@ -19,6 +19,8 @@ public class NavigationSteps {
             WebDriver driver = BrowserSteps.getDefaultDriver();
             driver.get(address);
         }
-      throw new RuntimeException("failed to navigate to: '" + text + "' , URL resolved to '" +  obj + "'"   );
+        else {
+            throw new RuntimeException("failed to navigate to: '" + text + "' , URL resolved to '" +  obj + "'"   );
+        }
     }
 }
