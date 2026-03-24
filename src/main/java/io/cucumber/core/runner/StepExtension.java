@@ -42,6 +42,7 @@ import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.mappings.MappingProcessor.getDataTableMap;
 import static tools.dscode.common.mappings.MappingProcessor.getDocStringMap;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
+import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToScenario;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepDebug;
 import static tools.dscode.common.util.GeneralUtils.stackTraceToString;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
@@ -139,7 +140,10 @@ public class StepExtension extends StepData {
     }
 
     public Result run() {
-
+        if(stepEntry == null)
+        {
+            stepEntry = closestEntryToScenario();
+        }
         ExecutionMode executionMode = ExecutionMode.RUN;
 
         if (logAndIgnore) {
