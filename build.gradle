@@ -92,7 +92,9 @@ dependencies {
     api 'org.jetbrains:annotations:26.0.2-1'
 
     // service calls
-    api('com.salesforce.revoman:revoman:0.81.0')
+    implementation ('com.salesforce.revoman:revoman:0.81.0') {
+        exclude group: "org.apache.logging.log4j", module: "log4j-slf4j2-impl"
+    }
     api('io.rest-assured:rest-assured:6.0.0')
 
     // logging and reports
