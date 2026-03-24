@@ -324,11 +324,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
             while (m.find()) {
                 key = m.group(1);
-                if (key.startsWith("$")) {
-                    replacement = getRunningStep().resolveStepFromString(key.substring(1));
-                } else {
-                    replacement = get(key);
-                }
+                replacement = get(key);
                 if (replacement != null)
                     break;
             }
@@ -372,7 +368,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
         if (key == null)
             throw new RuntimeException("key cannot be null");
         Object returnObj = get(key);
-        if(returnObj  instanceof String returnString)  return resolveWholeText(returnString);
+        if (returnObj instanceof String returnString) return resolveWholeText(returnString);
         return returnObj;
     }
 
@@ -393,7 +389,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 return replacement;
             }
         }
-        if(prefixed.matcher(key).matches()) {
+        if (prefixed.matcher(key).matches()) {
             return resolveFromVars(key);
         }
         return null;
@@ -424,7 +420,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
 
     public Object get(String key) {
-        if(prefixed.matcher(key).matches()){
+        if (key.startsWith("$"))
+            return getRunningStep().resolveStepFromString(key.substring(1));
+
+        if (prefixed.matcher(key).matches()) {
             return getCaseInsensitive(key);
         }
 
