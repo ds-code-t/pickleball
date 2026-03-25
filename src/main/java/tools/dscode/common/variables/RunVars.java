@@ -20,7 +20,7 @@ import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCa
 
 public class RunVars extends NodeMap {
 
-    public static final Pattern prefixed = Pattern.compile("(?i)^[a-z]{3}_\\S+$");
+    public static final Pattern prefixed = Pattern.compile("(?i)^[a-z]{3}_[^\\s\\.]+$");
 
     private static final String ENV_PREFIX = "env_";
     private static final String SYS_PREFIX = "sys_";

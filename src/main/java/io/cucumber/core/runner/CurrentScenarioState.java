@@ -1,7 +1,10 @@
 package io.cucumber.core.runner;
 
 import io.cucumber.core.gherkin.Pickle;
+import io.cucumber.core.stepexpression.StepExpressionFactory;
 import io.cucumber.datatable.DataTable;
+import io.cucumber.datatable.DataTableTypeRegistryTableConverter;
+import io.cucumber.docstring.DocStringTypeRegistryDocStringConverter;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import org.openqa.selenium.WebDriver;
@@ -84,6 +87,16 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     public static CachingGlue getGlue() {
         return getCurrentScenarioState().cachingGlue;
+    }
+
+    public static StepExpressionFactory getStepExpressionFactory() {
+        return (StepExpressionFactory) getProperty(getCurrentScenarioState().cachingGlue, "stepExpressionFactory");
+    }
+    public static DocStringTypeRegistryDocStringConverter getDocStringTypeRegistryDocStringConverter() {
+        return (DocStringTypeRegistryDocStringConverter) getProperty(getStepExpressionFactory(), "docStringConverter");
+    }
+    public static DataTableTypeRegistryTableConverter getDataTableTypeRegistryTableConverter() {
+        return (DataTableTypeRegistryTableConverter) getProperty(getStepExpressionFactory(), "tableConverter");
     }
 
     public static Runner getRunner() {

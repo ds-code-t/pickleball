@@ -1,0 +1,15 @@
+{
+  "constructor": "CREATE_DRIVER",
+  "browser": "chrome",
+  "connection": {
+    "remoteUrl": "http://localhost:4444/wd/hub",
+    "enableTracing": true
+  },
+  "capabilities": {
+    "acceptInsecureCerts": true
+  },
+  "postStart": {
+    "window": "maximize",
+    "initialUrl": "https://example.com"
+  }
+}

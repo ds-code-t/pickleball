@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import io.cucumber.java.DocStringType;
@@ -25,6 +26,34 @@ public class DocStringDefinitions {
 
     private static final TypeReference<LinkedHashMap<String, Object>> MAP_TYPE = new TypeReference<>() {};
     private static final TypeReference<ArrayList<Object>> LIST_TYPE = new TypeReference<>() {};
+
+
+
+    @DocStringType(contentType = "json")
+    public ObjectNode jsonObjectNode(String docString) throws JsonProcessingException {
+        return toObjectNode(JSON_MAPPER.readTree(docString), "json");
+    }
+
+    @DocStringType(contentType = "yaml")
+    public ObjectNode yamlObjectNode(String docString) throws JsonProcessingException {
+        return toObjectNode(YAML_MAPPER.readTree(docString), "yaml");
+    }
+
+    @DocStringType(contentType = "xml")
+    public ObjectNode xmlObjectNode(String docString) throws JsonProcessingException {
+        return toObjectNode(XML_MAPPER.readTree(docString), "xml");
+    }
+
+    private static ObjectNode toObjectNode(JsonNode node, String contentType) {
+        if (!(node instanceof ObjectNode objectNode)) {
+            throw new IllegalArgumentException(
+                    "DocString contentType '" + contentType
+                            + "' must parse to an object node to be converted to ObjectNode, but got: "
+                            + describeNode(node)
+            );
+        }
+        return objectNode;
+    }
 
     // =========================================================
     // JSON

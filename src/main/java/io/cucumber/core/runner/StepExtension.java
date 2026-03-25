@@ -1,5 +1,8 @@
 package io.cucumber.core.runner;
 
+import io.cucumber.core.stepexpression.Argument;
+import io.cucumber.core.stepexpression.DataTableArgument;
+import io.cucumber.core.stepexpression.DocStringArgument;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.messages.types.PickleStepArgument;
@@ -45,6 +48,7 @@ import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToScenario;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepDebug;
 import static tools.dscode.common.util.GeneralUtils.stackTraceToString;
+import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
 import static tools.dscode.common.util.debug.DebugUtils.parseDebugString;
 
@@ -99,7 +103,7 @@ public class StepExtension extends StepData {
             String docStringName = (String) arguments.getFirst().getValue();
             docString = (DocString) arguments.getLast().getValue();
             if (docStringName != null && !docStringName.isBlank()) {
-               getDocStringMap().put(DOCSTRING_KEY,   Map.of( docStringName.trim(), docString));
+                getDocStringMap().put(DOCSTRING_KEY, Map.of(docStringName.trim(), docString));
             }
             dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP);
             dataContextStepNodeMap.setDataSource(MapConfigurations.DataSource.DOC_STRING);
@@ -109,7 +113,7 @@ public class StepExtension extends StepData {
             String tableName = (String) arguments.getFirst().getValue();
             dataTable = (DataTable) arguments.getLast().getValue();
             if (tableName != null && !tableName.isBlank()) {
-                getDataTableMap().put(TABLE_KEY , Map.of( tableName.trim(), toRowsMultimap(dataTable)));
+                getDataTableMap().put(TABLE_KEY, Map.of(tableName.trim(), toRowsMultimap(dataTable)));
             }
             dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP);
             dataContextStepNodeMap.setDataSource(MapConfigurations.DataSource.DATA_TABLE);
@@ -130,6 +134,7 @@ public class StepExtension extends StepData {
                 ? null
                 : instanceOrNull;
 
+
         try {
             return method.invoke(target, arguments.stream().map(arg -> arg.getValue()).toArray());
         } catch (Throwable t) {
@@ -139,9 +144,17 @@ public class StepExtension extends StepData {
         }
     }
 
+    public void addArg(Argument arg) {
+        if (arg instanceof DocStringArgument) {
+            arguments.removeIf(a -> a instanceof DocStringArgument);
+        } else if (arg instanceof DataTableArgument) {
+            arguments.removeIf(a -> a instanceof DataTableArgument);
+        }
+        arguments.add(arg);
+    }
+
     public Result run() {
-        if(stepEntry == null)
-        {
+        if (stepEntry == null) {
             stepEntry = closestEntryToScenario();
         }
         ExecutionMode executionMode = ExecutionMode.RUN;
@@ -157,8 +170,8 @@ public class StepExtension extends StepData {
         }
         executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
         executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
-        if(!definitionFlags.contains(DefinitionFlag.NO_LOGGING)) {
-            stepEntry = getScenarioLogRoot().logWithType("STEP" , executingPickleStepTestStep.getStepText()).start();
+        if (!definitionFlags.contains(DefinitionFlag.NO_LOGGING)) {
+            stepEntry = getScenarioLogRoot().logWithType("STEP", executingPickleStepTestStep.getStepText()).start();
         }
         lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
         io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep, executionMode);
@@ -177,7 +190,7 @@ public class StepExtension extends StepData {
         }
         lifecycle.fire(Phase.AFTER_SCENARIO_STEP);
 
-        if(!definitionFlags.contains(DefinitionFlag.NO_LOGGING)) {
+        if (!definitionFlags.contains(DefinitionFlag.NO_LOGGING)) {
             if (webDriverUsed != null) {
                 if (isPresent(webDriverUsed)) {
                     stepEntry.info("Browser Alert is present, cannot take screenshot.");
@@ -242,7 +255,7 @@ public class StepExtension extends StepData {
 
     public List<StepExtension> insertChildStepsByString(List<String> newStepStrings) {
         List<StepExtension> newSteps = new ArrayList<>();
-        for(String newStepString : newStepStrings) {
+        for (String newStepString : newStepStrings) {
             newSteps.add(modifyStepExtension(newStepString));
         }
         insertChildSteps(newSteps);
@@ -250,7 +263,7 @@ public class StepExtension extends StepData {
     }
 
     public void insertChildSteps(List<StepExtension> newSteps) {
-        if(newSteps == null || newSteps.isEmpty()) return;
+        if (newSteps == null || newSteps.isEmpty()) return;
         StepExtension lastStep = newSteps.getLast();
         lastStep.childSteps.addAll(childSteps);
         lastStep.grandChildrenSteps.addAll(grandChildrenSteps);
@@ -261,7 +274,7 @@ public class StepExtension extends StepData {
 
     public List<StepExtension> insertStepsByString(List<String> newStepStrings) {
         List<StepExtension> newSteps = new ArrayList<>();
-        for(String newStepString : newStepStrings) {
+        for (String newStepString : newStepStrings) {
             newSteps.add(modifyStepExtension(newStepString));
         }
         insertSteps(newSteps);
@@ -270,14 +283,14 @@ public class StepExtension extends StepData {
 
 
     public void insertSteps(List<StepExtension> newSteps) {
-        if(newSteps == null || newSteps.isEmpty()) return;
+        if (newSteps == null || newSteps.isEmpty()) return;
         StepBase nextStep = this.nextSibling;
         StepExtension lastStep = this;
-        for(StepExtension newStep : newSteps) {
+        for (StepExtension newStep : newSteps) {
             lastStep.nextSibling = newStep;
             newStep.previousSibling = lastStep;
         }
-        if(nextStep != null) {
+        if (nextStep != null) {
             nextStep.previousSibling = lastStep;
             lastStep.nextSibling = nextStep;
         }
@@ -297,7 +310,7 @@ public class StepExtension extends StepData {
     }
 
     public StepExtension createNewStepExtension(String stepText) {
-        PickleStepTestStep  newPickleStepTestStep = getPickleStepTestStepFromStrings(pickleStepTestStep.getStep().getKeyword(), stepText, "");
+        PickleStepTestStep newPickleStepTestStep = getPickleStepTestStepFromStrings(pickleStepTestStep.getStep().getKeyword(), stepText, "");
         StepExtension modifiedStep = new StepExtension(testCase, newPickleStepTestStep);
         modifiedStep.setStepParsingMap(getStepParsingMap());
         modifiedStep.parentStep = parentStep;
@@ -309,7 +322,7 @@ public class StepExtension extends StepData {
         StepExtension newStepExtension = createNewStepExtension(stepText);
         Object obj = newStepExtension.runAndGetReturnValue();
         stepDebug("Return step '" + stepText + "' resolved to: " + obj + "");
-        if(obj == null) return null;
+        if (obj == null) return null;
         return obj.toString();
     }
 
@@ -353,7 +366,7 @@ public class StepExtension extends StepData {
             modifiedStep.setStepParsingMap(getRunningParsingMap());
             return modifiedStep.runAndGetReturnValue();
         } catch (Throwable t) {
-            throw new StepCreationException("Failed to create Step '" + stepText + "'" + (argumentText.isBlank() ? " with argument '" + argumentText + "'": "") + t.getMessage(), t );
+            throw new StepCreationException("Failed to create Step '" + stepText + "'" + (argumentText.isBlank() ? " with argument '" + argumentText + "'" : "") + t.getMessage(), t);
         }
     }
 
@@ -365,10 +378,9 @@ public class StepExtension extends StepData {
             modifiedStep.setStepParsingMap(getRunningParsingMap());
             return modifiedStep.runAndGetReturnValue();
         } catch (Throwable t) {
-            return new StepCreationException("Failed to create Step '" + stepText + "'" + (argumentText.isBlank() ? " with argument '" + argumentText + "'": "") + t.getMessage(), t );
+            return new StepCreationException("Failed to create Step '" + stepText + "'" + (argumentText.isBlank() ? " with argument '" + argumentText + "'" : "") + t.getMessage(), t);
         }
     }
-
 
 
 }

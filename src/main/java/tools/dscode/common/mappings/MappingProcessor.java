@@ -38,6 +38,8 @@ import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.mappings.queries.Tokenized.AS_LIST_SUFFIX;
 import static tools.dscode.common.util.StringUtilities.decodeBackToText;
 import static tools.dscode.common.util.StringUtilities.encodeToPlaceHolders;
+import static tools.dscode.common.variables.RunVars.RUN_VARS;
+import static tools.dscode.common.variables.RunVars.VAR_PREFIX;
 import static tools.dscode.common.variables.RunVars.prefixed;
 import static tools.dscode.common.variables.RunVars.resolveFromVars;
 
@@ -380,6 +382,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
 //    }
 
     public Object getCaseInsensitive(String key) {
+        if (prefixed.matcher(key).matches()) {
+            return getVar(key);
+        }
         Tokenized tokenized = new Tokenized(key);
         for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
             if (map == null)
@@ -389,10 +394,18 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 return replacement;
             }
         }
-        if (prefixed.matcher(key).matches()) {
-            return resolveFromVars(key);
-        }
         return null;
+    }
+
+    private Object getVar(String key) {
+        Object returnObj = singletonMap.get().getByNormalizedPath(key);
+        if (returnObj == null) return RUN_VARS.getByNormalizedPath(key);
+        return returnObj;
+    }
+
+    private void putVar(String key, Object value) {
+        singletonMap.get().root.remove(key);
+        singletonMap.get().root.set(key, MAPPER.valueToTree(value));
     }
 
     public List<Object> getList(String key) {
@@ -424,7 +437,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
             return getRunningStep().resolveStepFromString(key.substring(1));
 
         if (prefixed.matcher(key).matches()) {
-            return getCaseInsensitive(key);
+            return getVar(key);
         }
 
         Tokenized tokenized = new Tokenized(key);
@@ -510,6 +523,11 @@ public abstract class MappingProcessor implements Map<String, Object> {
     public Object put(String key, Object value) {
         if (key == null || key.isBlank())
             throw new RuntimeException("key cannot be null or blank");
+        if (prefixed.matcher(key).matches()) {
+            Object oldValue = getVar(key);
+            putVar(key, value);
+            return oldValue;
+        }
         Tokenized tokenized = new Tokenized(key);
         if (tokenized.isSingletonKey) {
             Object oldValue = getRootSingletonMap().get(tokenized);
