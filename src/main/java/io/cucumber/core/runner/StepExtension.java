@@ -146,9 +146,11 @@ public class StepExtension extends StepData {
 
     public void addArg(Argument arg) {
         if (arg instanceof DocStringArgument) {
+            argument = arg;
             arguments.removeIf(a -> a instanceof DocStringArgument);
         } else if (arg instanceof DataTableArgument) {
             arguments.removeIf(a -> a instanceof DataTableArgument);
+            argument = arg;
         }
         arguments.add(arg);
     }

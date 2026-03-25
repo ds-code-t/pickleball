@@ -17,8 +17,10 @@ public final class RegexUtil {
     public static String betweenWithEscapes(String start, String end) {
         String s = Pattern.quote(start);
         String e = Pattern.quote(end);
-        // (?s) dotall; (?:\\.|(?!end).)*? matches any escaped char or any char not starting the end delimiter
-        return "(?s)" + s + "(?:\\\\.|(?!"+e+").)*" + e;
+//        return "(?s)" + s + "(?:\\\\.|(?!"+e+").)*" + e;
+        return "(?s)" + s + "(?:\\\\.|(?!"+ e +").)*+" + e;
+//        return "(?s)" + s + "(?:\\\\.|(?!"+ e +").)++" + e;
+//        return "(?s)" + s + "[^"+ e +"]*" + e;
     }
 
 
