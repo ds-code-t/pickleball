@@ -18,7 +18,7 @@ public class BrowserSteps {
         return (JavascriptExecutor) getDefaultDriver();
     }
 
-    public static WebDriver getDefaultDriver() {
+    public static RemoteWebDriver getDefaultDriver() {
         String browserName = String.valueOf(getFromRunningParsingMapCaseInsensitiveOrDefault(VAR_PREFIX + "BROWSER", "BROWSER"));
         return getDriver(browserName);
     }
@@ -28,9 +28,9 @@ public class BrowserSteps {
         return getDriverWrapper(browserName);
     }
 
-    public static WebDriver getDriver(String browserName) {
+    public static RemoteWebDriver getDriver(String browserName) {
         Object created = getObjectFromRegistryOrDefault(browserName, "CHROME");
-        WebDriver webDriver = unwrapWebDriver(created);
+        RemoteWebDriver webDriver = unwrapWebDriver(created);
         getRunningStep().webDriverUsed = webDriver;
         return webDriver;
     }
@@ -49,11 +49,11 @@ public class BrowserSteps {
         );
     }
 
-    public static WebDriver unwrapWebDriver(Object value) {
+    public static RemoteWebDriver unwrapWebDriver(Object value) {
         if (value instanceof DriverWrapper wrapper) {
             return wrapper.getDriver();
         }
-        if (value instanceof WebDriver webDriver) {
+        if (value instanceof RemoteWebDriver webDriver) {
             return webDriver;
         }
         throw new RuntimeException(
