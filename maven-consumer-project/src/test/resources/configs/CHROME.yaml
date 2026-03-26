@@ -9,16 +9,16 @@ capabilities:
       - "--disable-notifications"
       - "--disable-popup-blocking"
       - "--remote-allow-origins=*"
-service:
-  port: 0
-  verbose: false
-postActions:
-  - "NAVIGATE: about:blank"
-  - "MAXIMIZE"
-  - "CLEAR_COOKIES"
-  - "IMPLICIT_WAIT: 5000"
-  - "PAGE_LOAD_TIMEOUT: 30000"
-  - "SCRIPT_TIMEOUT: 30000"
-
-cleanup:
-  - QUIT_LOCAL_DRIVER
+#service:
+#  port: 0
+#  verbose: false
+#postActions:
+#  - "NAVIGATE: about:blank"
+#  - "MAXIMIZE"
+#  - "CLEAR_COOKIES"
+#  - "IMPLICIT_WAIT: 5000"
+#  - "PAGE_LOAD_TIMEOUT: 30000"
+#  - "SCRIPT_TIMEOUT: 30000"
+#
+#cleanup:
+#  - QUIT_LOCAL_DRIVER

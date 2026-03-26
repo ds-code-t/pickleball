@@ -95,7 +95,7 @@ public class SeleniumUtils {
 
 
 
-    private static boolean isDevToolsListening(String host, int port) {
+    public static boolean isDevToolsListening(String host, int port) {
         HttpClient client = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(300))
                 .build();

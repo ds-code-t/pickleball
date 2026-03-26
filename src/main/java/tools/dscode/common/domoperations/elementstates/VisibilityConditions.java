@@ -1,12 +1,17 @@
 package tools.dscode.common.domoperations.elementstates;
 
 import com.xpathy.Condition;
+import com.xpathy.Style;
 import com.xpathy.XPathy;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static com.xpathy.Attribute.*;
-import static com.xpathy.Attribute.style;
-import static com.xpathy.Style.*;
+import static com.xpathy.Style.display;
 import static com.xpathy.Style.height;
+import static com.xpathy.Style.opacity;
+import static com.xpathy.Style.visibility;
 import static com.xpathy.Style.width;
 
 /**
@@ -59,7 +64,7 @@ public final class VisibilityConditions {
         // Ancestor predicate (reduced, safer checks)
         XPathy ancestorInv = any.byCondition(ancestorInvisible());
 
-        String base = any.getXpath();                   // "//*"
+        String base = any.getXpath(); // "//*"
         String selfVisibleXpath = selfVisible.getXpath();
         String ancestorInvXpath = ancestorInv.getXpath();
 
@@ -85,13 +90,16 @@ public final class VisibilityConditions {
         return xpathWithPredicate.substring(base.length() + 1, xpathWithPredicate.length() - 1);
     }
 
-
-
-    public static Condition noDisplay =  Condition.or(
-            Condition.style(display).equals("none"),
-            Condition.attribute(style).contains("display:none"),
-            Condition.attribute(style).contains("display: none"),
-            Condition.attribute(class_).contains("sr-only"),
+    /**
+     * NOTE:
+     * Keeping these non-style name checks as-is for behavior stability, except
+     * "sr-only" which is tightened to a whole class token match.
+     *
+     * The display:none check is now boundary-aware and whitespace-normalized.
+     */
+    public static Condition noDisplay = Condition.or(
+            styleOrInlineEqualsAny(display, "display", "none"),
+            hasClassToken("sr-only"),
             Condition.attribute(style).contains("visually-hidden"),
             Condition.attribute(style).contains("visuallyhidden"),
             Condition.attribute(style).contains("screen-reader-"),
@@ -101,95 +109,33 @@ public final class VisibilityConditions {
 
     /**
      * Visual "visible" condition for the element itself.
-     *
-     * Fixes applied:
-     *  - Removed aria-hidden from visual visibility.
-     *  - Made raw @style substring fallbacks for opacity/width/height less error-prone
-     *    (avoid matching 0.2, 0.5rem, etc).
      */
     public static Condition visible() {
 
         return Condition.and(
 
-                // -------------------------------------------------------------
                 // display != none
-                // -------------------------------------------------------------
-                Condition.not(
-                        noDisplay
-                ),
+                Condition.not(noDisplay),
 
-                // -------------------------------------------------------------
                 // visibility != hidden
-                // -------------------------------------------------------------
-                Condition.not(
-                        Condition.or(
-                                Condition.style(visibility).equals("hidden"),
-                                Condition.attribute(style).contains("visibility:hidden"),
-                                Condition.attribute(style).contains("visibility: hidden")
-                        )
-                ),
+                Condition.not(styleOrInlineEqualsAny(visibility, "visibility", "hidden")),
 
-                // -------------------------------------------------------------
                 // visibility != collapse
-                // -------------------------------------------------------------
-                Condition.not(
-                        Condition.or(
-                                Condition.style(visibility).equals("collapse"),
-                                Condition.attribute(style).contains("visibility:collapse"),
-                                Condition.attribute(style).contains("visibility: collapse")
-                        )
-                ),
+                Condition.not(styleOrInlineEqualsAny(visibility, "visibility", "collapse")),
 
-                // -------------------------------------------------------------
-                // opacity != 0  (make substring fallback safer: don't match 0.2)
-                // -------------------------------------------------------------
-                Condition.not(
-                        Condition.or(
-                                Condition.style(opacity).equals("0"),
-                                isInlineStyleExactlyZero("opacity")
-                        )
-                ),
+                // opacity != 0
+                Condition.not(styleOrInlineEqualsAny(opacity, "opacity", "0")),
 
-                // -------------------------------------------------------------
-                // width not in {0, 0px, 0%}  (safer substring fallback)
-                // -------------------------------------------------------------
-                Condition.not(
-                        Condition.or(
-                                Condition.style(width).equals("0"),
-                                Condition.style(width).equals("0px"),
-                                Condition.style(width).equals("0%"),
-                                isInlineStyleExactlyZero("width"),
-                                Condition.attribute(style).contains("width:0px"),
-                                Condition.attribute(style).contains("width: 0px"),
-                                Condition.attribute(style).contains("width:0%") ,
-                                Condition.attribute(style).contains("width: 0%")
-                        )
-                ),
+                // width not in {0, 0px, 0%}
+                Condition.not(styleOrInlineEqualsAny(width, "width", "0", "0px", "0%")),
 
-                // -------------------------------------------------------------
-                // height not in {0, 0px, 0%} (safer substring fallback)
-                // -------------------------------------------------------------
-                Condition.not(
-                        Condition.or(
-                                Condition.style(height).equals("0"),
-                                Condition.style(height).equals("0px"),
-                                Condition.style(height).equals("0%"),
-                                isInlineStyleExactlyZero("height"),
-                                Condition.attribute(style).contains("height:0px"),
-                                Condition.attribute(style).contains("height: 0px"),
-                                Condition.attribute(style).contains("height:0%"),
-                                Condition.attribute(style).contains("height: 0%")
-                        )
-                ),
+                // height not in {0, 0px, 0%}
+                Condition.not(styleOrInlineEqualsAny(height, "height", "0", "0px", "0%")),
 
-                // -------------------------------------------------------------
                 // no @hidden attribute
-                // -------------------------------------------------------------
                 Condition.not(Condition.attribute(hidden).haveIt()),
 
-                // -------------------------------------------------------------
                 // type != "hidden" (mostly for <input>, kept for backwards behavior)
-                // -------------------------------------------------------------
                 Condition.not(Condition.attribute(type).equals("hidden"))
 
                 // NOTE: aria-hidden intentionally removed from visual visibility.
@@ -199,66 +145,118 @@ public final class VisibilityConditions {
     /**
      * Reduced invisibility checks that are safer to apply to ancestors.
      *
-     * Fixes applied:
-     *  - Does NOT use aria-hidden (a11y-only).
-     *  - Does NOT use width/height (unsafe on ancestors).
-     *  - Does NOT use type=hidden (not meaningful for ancestors).
-     *
      * Kept:
      *  - display:none, hidden attribute, visibility hidden/collapse, opacity:0
      *    (these usually *do* hide descendants visually).
      */
     public static Condition ancestorInvisible() {
 
-
-
         return Condition.or(
 
                 // display:none
                 noDisplay,
 
-                // visibility:hidden or collapse (mostly correct for ancestors; can be overridden)
-                Condition.or(
-                        Condition.style(visibility).equals("hidden"),
-                        Condition.attribute(style).contains("visibility:hidden"),
-                        Condition.attribute(style).contains("visibility: hidden"),
-                        Condition.style(visibility).equals("collapse"),
-                        Condition.attribute(style).contains("visibility:collapse"),
-                        Condition.attribute(style).contains("visibility: collapse")
-                ),
+                // visibility:hidden or collapse
+                styleOrInlineEqualsAny(visibility, "visibility", "hidden", "collapse"),
 
-                // opacity:0 (safer substring fallback)
-                Condition.or(
-                        Condition.style(opacity).equals("0"),
-                        isInlineStyleExactlyZero("opacity")
-                ),
+                // opacity:0
+                styleOrInlineEqualsAny(opacity, "opacity", "0"),
 
-                // @hidden attribute (HTML boolean attribute)
+                // @hidden attribute
                 Condition.attribute(hidden).haveIt()
         );
     }
 
     /**
-     * Safer-ish "prop:0" matcher for raw @style.
+     * Combines:
+     *  1) XPathy's direct style(...) equals(...) checks
+     *  2) a boundary-aware raw @style declaration matcher
      *
-     * Goal: match opacity:0 / width:0 / height:0 but NOT opacity:0.2 or width:0.5rem.
-     * We can't do perfect tokenization with only "contains", so we:
-     *  - require "prop:0" or "prop: 0"
-     *  - and reject the common decimal forms "prop:0." / "prop: 0."
+     * The raw @style matcher normalizes whitespace and matches whole CSS declarations,
+     * so width:0 no longer matches border-width:0.
      */
-    private static Condition isInlineStyleExactlyZero(String prop) {
-        Condition has0 =
-                Condition.or(
-                        Condition.attribute(style).contains(prop + ":0"),
-                        Condition.attribute(style).contains(prop + ": 0")
-                );
+    private static Condition styleOrInlineEqualsAny(Style styleName, String property, String... values) {
+        List<Condition> conditions = new ArrayList<>(values.length + 1);
 
-        Condition hasDecimal =
-                Condition.or(
-                        Condition.attribute(style).contains(prop + ":0."),
-                        Condition.attribute(style).contains(prop + ": 0.")
-                );
+        for (String value : values) {
+            conditions.add(Condition.style(styleName).equals(value));
+        }
 
-        return Condition.and(has0, Condition.not(hasDecimal));
+        conditions.add(inlineStylePropertyEqualsAny(property, values));
+
+        return Condition.or(conditions.toArray(new Condition[0]));
+    }
+
+    /**
+     * Matches a whole inline CSS declaration after normalizing whitespace:
+     *
+     *   style=" color : red ; width : 0px "
+     *
+     * becomes effectively:
+     *
+     *   ;color:red;width:0px;
+     *
+     * Then we search for:
+     *
+     *   ;width:0px;
+     *
+     * This avoids false positives on:
+     *   border-width:0px
+     *   min-width:0px
+     *   width:0.5rem
+     */
+    private static Condition inlineStylePropertyEqualsAny(String property, String... values) {
+        List<Condition> conditions = new ArrayList<>(values.length);
+
+        for (String value : values) {
+            String compactValue = value.replace(" ", "");
+            conditions.add(rawPredicate(
+                    "contains(" + normalizedInlineStyleExpression() + ", ';" + property + ":" + compactValue + ";')"
+            ));
+        }
+
+        return Condition.or(conditions.toArray(new Condition[0]));
+    }
+
+    /**
+     * Whole-token class match:
+     *   class="foo sr-only bar" -> matches sr-only
+     *   class="not-sr-only-ish" -> does not match sr-only
+     */
+    private static Condition hasClassToken(String token) {
+        return rawPredicate(
+                "contains(concat(' ', normalize-space(@class), ' '), ' " + token + " ')"
+        );
+    }
+
+    /**
+     * Builds a normalized inline-style string expression:
+     *
+     *   concat(';', translate(normalize-space(@style), ' ', ''), ';')
+     *
+`     * Examples:
+     *   "width: 0px; color: red"
+     *   -> ";width:0px;color:red;"
+     */
+    private static String normalizedInlineStyleExpression() {
+        return "concat(';', translate(normalize-space(@style), ' ', ''), ';')";
+    }
+
+    /**
+     * Creates a raw XPath predicate Condition.
+     */
+    private static Condition rawPredicate(String predicate) {
+        return new RawCondition(predicate);
+    }
+
+    /**
+     * Minimal Condition subclass so we can safely inject a raw predicate string
+     * without changing the public API of this utility class.
+     */
+    private static final class RawCondition extends Condition {
+        private RawCondition(String predicate) {
+            super(ConditionType.ATTRIBUTE);
+            this.condition = predicate;
+        }
     }
 }

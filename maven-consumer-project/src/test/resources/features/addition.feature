@@ -1,5 +1,12 @@
 Feature: Addition
 
+
+  Scenario: debug tEst2
+#    @[DEBUG]
+#    * navigate to: URL.select
+  @[DEBUG]
+    * , select the last Option "Choose a car:" Dropdown
+
   @T1
   Scenario: j test1
 #    * test2 JAVA_HOME

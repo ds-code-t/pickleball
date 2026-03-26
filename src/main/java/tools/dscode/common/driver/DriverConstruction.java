@@ -1,6 +1,7 @@
 package tools.dscode.common.driver;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.openqa.selenium.MutableCapabilities;
 import org.openqa.selenium.WebDriver;
@@ -8,6 +9,7 @@ import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeDriverService;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.chromium.ChromiumDriverLogLevel;
+import org.openqa.selenium.chromium.ChromiumOptions;
 import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.edge.EdgeDriverService;
 import org.openqa.selenium.edge.EdgeOptions;
@@ -27,7 +29,9 @@ import java.util.Set;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort;
+import static tools.dscode.common.domoperations.SeleniumUtils.isDevToolsListening;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
 
 public final class DriverConstruction {
 
@@ -392,29 +396,22 @@ public final class DriverConstruction {
         return trimToNull(config.connection().get("remoteUrl")) != null;
     }
 
-    public static void applyDebugPort(ChromeOptions options, String browserName, ObjectNode fullConfiguration) {
+
+    public static void applyDebugPort(ChromiumOptions options, String browserName, ObjectNode fullConfiguration) {
         if (!getCurrentScenarioState().debugBrowser) {
             return;
         }
 
         Integer debugPort = resolveDebugPort(fullConfiguration);
-        if (debugPort != null) {
-            options.addArguments("--remote-debugging-port=" + debugPort);
-        } else {
-            ensureDevToolsPort(options, browserName);
-        }
-    }
 
-    public static void applyDebugPort(EdgeOptions options, String browserName, ObjectNode fullConfiguration) {
-        if (!getCurrentScenarioState().debugBrowser) {
-            return;
-        }
-
-        Integer debugPort = resolveDebugPort(fullConfiguration);
-        if (debugPort != null) {
-            options.addArguments("--remote-debugging-port=" + debugPort);
+        if ( isDevToolsListening("127.0.0.1", debugPort)) {
+            // Attach to existing browser
+            closestEntryToPhrase().info("Attaching to existing browser on debugging port: " + debugPort);
+            options.setExperimentalOption("debuggerAddress", "127.0.0.1" + ":" + debugPort);
         } else {
-            ensureDevToolsPort(options, browserName);
+            // Start new browser with that DevTools port
+            closestEntryToPhrase().info("Starting new browser on debugging port: " + debugPort);
+            options.addArguments("--remote-debugging-port=" + debugPort);
         }
     }
 
@@ -423,12 +420,17 @@ public final class DriverConstruction {
             return null;
         }
 
-        String pathKey = trimToNull(fullConfiguration.path("_pathKey").asText(null));
-        if (pathKey == null) {
-            return null;
-        }
+        JsonNode portNode = fullConfiguration.path("debuggingPort");
+        if(portNode.isMissingNode())
+            portNode = fullConfiguration.path("_pathKey");
+        if(portNode.isMissingNode())
+            portNode = fullConfiguration.path("browser");
+        if(portNode.isMissingNode())
+            throw new RuntimeException("Failed to set debugging port. Cannot find properties: debuggingPort, _pathKey, or browser in configuration. ");
 
-        return 20000 + Math.floorMod(pathKey.toLowerCase(Locale.ROOT).hashCode(), 20000);
+        String pathKey = trimToNull(portNode.asText());
+        return 9000 + (Math.abs(pathKey.toLowerCase(Locale.ROOT).hashCode()) % 1000);
+//        return 20000 + Math.floorMod(pathKey.toLowerCase(Locale.ROOT).hashCode(), 20000);
     }
 
     public static ObjectNode requireConfiguration(ObjectNode configuration) {
