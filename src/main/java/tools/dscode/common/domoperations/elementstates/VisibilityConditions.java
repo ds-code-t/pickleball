@@ -1,18 +1,12 @@
 package tools.dscode.common.domoperations.elementstates;
 
 import com.xpathy.Condition;
-import com.xpathy.Style;
 import com.xpathy.XPathy;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static com.xpathy.Attribute.*;
-import static com.xpathy.Style.display;
-import static com.xpathy.Style.height;
-import static com.xpathy.Style.opacity;
-import static com.xpathy.Style.visibility;
-import static com.xpathy.Style.width;
 
 /**
  * Reusable XPathy conditions related to "visibility".
@@ -21,14 +15,11 @@ import static com.xpathy.Style.width;
  * (inline styles / attributes). It intentionally does not try to look at
  * computed styles or layout.
  *
- * NOTE on aria-hidden:
- *  - aria-hidden is an accessibility-tree hint, not a visual rendering hint.
- *    So it is NOT used in visible() anymore.
- *
- * NOTE on ancestor checks:
- *  - Some properties (notably width/height) are unsafe to apply to ancestors
- *    because descendants can still be visually present (overflow, abs/fixed, etc).
- *  - visibleElement() now uses a reduced "ancestorInvisible()" predicate.
+ * Important:
+ * - This class intentionally does NOT use Condition.style(...).equals(...)
+ *   because XPathy expands that into substring-style checks like:
+ *     contains(translate(@style, ' ', ''), 'width:0px;')
+ *   which can false-match "border-width:0px;".
  */
 public final class VisibilityConditions {
 
@@ -42,7 +33,7 @@ public final class VisibilityConditions {
     }
 
     /**
-     * Optional helper if you ever want to exclude aria-hidden content explicitly
+     * Optional helper if you want to exclude aria-hidden content explicitly
      * (accessibility visibility, not visual visibility).
      */
     public static Condition accessible() {
@@ -58,10 +49,7 @@ public final class VisibilityConditions {
 
         XPathy any = new XPathy(); // "//*"
 
-        // Self predicate (full visible() checks)
         XPathy selfVisible = any.byCondition(visible());
-
-        // Ancestor predicate (reduced, safer checks)
         XPathy ancestorInv = any.byCondition(ancestorInvisible());
 
         String base = any.getXpath(); // "//*"
@@ -71,7 +59,6 @@ public final class VisibilityConditions {
         String visiblePredicate = extractPredicate(base, selfVisibleXpath);
         String ancestorInvisiblePredicate = extractPredicate(base, ancestorInvXpath);
 
-        // //*[ <visiblePredicate> and not(ancestor::*[ <ancestorInvisiblePredicate> ]) ]
         String finalXpath =
                 base + "[" +
                         visiblePredicate +
@@ -91,22 +78,23 @@ public final class VisibilityConditions {
     }
 
     /**
-     * NOTE:
-     *  - Actual CSS-property checks are boundary-aware and whitespace-normalized.
-     *  - The hidden-marker checks below are class-based heuristics, tightened to
-     *    whole class tokens or token prefixes instead of raw substring matching.
+     * Heuristics for elements commonly made non-visible.
+     *
+     * Notes:
+     * - CSS property checks are boundary-safe and whitespace-normalized.
+     * - Utility-class checks are done against @class tokens, not @style substrings.
      */
     public static Condition noDisplay = Condition.or(
-            styleOrInlineEqualsAny(display, "display", "none"),
+            cssPropertyEqualsAny("display", "none"),
 
-            // Common utility classes
+            // common utility classes / markers
             hasClassToken("sr-only"),
             hasClassToken("visually-hidden"),
             hasClassToken("visuallyhidden"),
             hasClassToken("offscreen"),
             hasClassToken("off-screen"),
 
-            // Common class prefixes
+            // common prefixed utility classes
             hasClassTokenStartingWith("screen-reader-"),
             hasClassTokenStartingWith("screenreader-"),
             hasClassTokenStartingWith("offscreen-"),
@@ -117,26 +105,25 @@ public final class VisibilityConditions {
      * Visual "visible" condition for the element itself.
      */
     public static Condition visible() {
-
         return Condition.and(
 
                 // display != none
                 Condition.not(noDisplay),
 
                 // visibility != hidden
-                Condition.not(styleOrInlineEqualsAny(visibility, "visibility", "hidden")),
+                Condition.not(cssPropertyEqualsAny("visibility", "hidden")),
 
                 // visibility != collapse
-                Condition.not(styleOrInlineEqualsAny(visibility, "visibility", "collapse")),
+                Condition.not(cssPropertyEqualsAny("visibility", "collapse")),
 
                 // opacity != 0
-                Condition.not(styleOrInlineEqualsAny(opacity, "opacity", "0")),
+                Condition.not(cssPropertyEqualsAny("opacity", "0")),
 
                 // width not in {0, 0px, 0%}
-                Condition.not(styleOrInlineEqualsAny(width, "width", "0", "0px", "0%")),
+                Condition.not(cssPropertyEqualsAny("width", "0", "0px", "0%")),
 
                 // height not in {0, 0px, 0%}
-                Condition.not(styleOrInlineEqualsAny(height, "height", "0", "0px", "0%")),
+                Condition.not(cssPropertyEqualsAny("height", "0", "0px", "0%")),
 
                 // no @hidden attribute
                 Condition.not(Condition.attribute(hidden).haveIt()),
@@ -144,7 +131,7 @@ public final class VisibilityConditions {
                 // type != "hidden" (mostly for <input>, kept for backwards behavior)
                 Condition.not(Condition.attribute(type).equals("hidden"))
 
-                // NOTE: aria-hidden intentionally removed from visual visibility.
+                // NOTE: aria-hidden intentionally not used for visual visibility.
         );
     }
 
@@ -152,21 +139,27 @@ public final class VisibilityConditions {
      * Reduced invisibility checks that are safer to apply to ancestors.
      *
      * Kept:
-     *  - display:none, hidden attribute, visibility hidden/collapse, opacity:0
-     *    (these usually *do* hide descendants visually).
+     * - display:none
+     * - visibility:hidden / collapse
+     * - opacity:0
+     * - @hidden
+     *
+     * Excluded:
+     * - width/height
+     * - type=hidden
+     * - aria-hidden
      */
     public static Condition ancestorInvisible() {
-
         return Condition.or(
 
                 // display:none
                 noDisplay,
 
                 // visibility:hidden or collapse
-                styleOrInlineEqualsAny(visibility, "visibility", "hidden", "collapse"),
+                cssPropertyEqualsAny("visibility", "hidden", "collapse"),
 
                 // opacity:0
-                styleOrInlineEqualsAny(opacity, "opacity", "0"),
+                cssPropertyEqualsAny("opacity", "0"),
 
                 // @hidden attribute
                 Condition.attribute(hidden).haveIt()
@@ -174,36 +167,16 @@ public final class VisibilityConditions {
     }
 
     /**
-     * Combines:
-     *  1) XPathy's direct style(...) equals(...) checks
-     *  2) a boundary-aware raw @style declaration matcher
+     * Matches one or more exact CSS declarations in inline @style
+     * using normalized declaration boundaries.
      *
-     * The raw @style matcher normalizes whitespace and matches whole CSS declarations,
-     * so width:0 no longer matches border-width:0.
-     */
-    private static Condition styleOrInlineEqualsAny(Style styleName, String property, String... values) {
-        List<Condition> conditions = new ArrayList<>(values.length + 1);
-
-        for (String value : values) {
-            conditions.add(Condition.style(styleName).equals(value));
-        }
-
-        conditions.add(inlineStylePropertyEqualsAny(property, values));
-
-        return Condition.or(conditions.toArray(new Condition[0]));
-    }
-
-    /**
-     * Matches a whole inline CSS declaration after normalizing whitespace:
-     *
+     * Example:
      *   style=" color : red ; width : 0px "
      *
-     * becomes effectively:
-     *
+     * normalized to:
      *   ;color:red;width:0px;
      *
-     * Then we search for:
-     *
+     * then matched against:
      *   ;width:0px;
      *
      * This avoids false positives on:
@@ -211,7 +184,7 @@ public final class VisibilityConditions {
      *   min-width:0px
      *   width:0.5rem
      */
-    private static Condition inlineStylePropertyEqualsAny(String property, String... values) {
+    private static Condition cssPropertyEqualsAny(String property, String... values) {
         List<Condition> conditions = new ArrayList<>(values.length);
 
         for (String value : values) {
@@ -225,9 +198,13 @@ public final class VisibilityConditions {
     }
 
     /**
-     * Whole-token class match:
-     *   class="foo sr-only bar" -> matches sr-only
-     *   class="not-sr-only-ish" -> does not match sr-only
+     * Whole-token class match.
+     *
+     * Matches:
+     *   class="foo sr-only bar"
+     *
+     * Does not match:
+     *   class="not-sr-only-ish"
      */
     private static Condition hasClassToken(String token) {
         return rawPredicate(
@@ -236,9 +213,13 @@ public final class VisibilityConditions {
     }
 
     /**
-     * Whole-token-prefix class match:
-     *   class="foo screen-reader-text bar" -> matches "screen-reader-"
-     *   class="foo myscreen-reader-text bar" -> does not match "screen-reader-"
+     * Whole-token-prefix class match.
+     *
+     * Matches:
+     *   class="foo screen-reader-text bar"
+     *
+     * Does not match:
+     *   class="foo myscreen-reader-text bar"
      */
     private static Condition hasClassTokenStartingWith(String tokenPrefix) {
         return rawPredicate(
@@ -251,9 +232,10 @@ public final class VisibilityConditions {
      *
      *   concat(';', translate(normalize-space(@style), ' ', ''), ';')
      *
-     * Examples:
+     * Example:
      *   "width: 0px; color: red"
-     *   -> ";width:0px;color:red;"
+     * becomes:
+     *   ";width:0px;color:red;"
      */
     private static String normalizedInlineStyleExpression() {
         return "concat(';', translate(normalize-space(@style), ' ', ''), ';')";
@@ -267,7 +249,7 @@ public final class VisibilityConditions {
     }
 
     /**
-     * Minimal Condition subclass so we can safely inject a raw predicate string
+     * Minimal Condition subclass so we can inject a raw predicate string
      * without changing the public API of this utility class.
      */
     private static final class RawCondition extends Condition {
