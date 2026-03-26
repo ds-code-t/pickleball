@@ -15,22 +15,16 @@ import static com.xpathy.Attribute.id;
 import static com.xpathy.Attribute.name;
 import static com.xpathy.Attribute.placeholder;
 import static com.xpathy.Attribute.role;
-import static com.xpathy.Attribute.src;
-import static com.xpathy.Attribute.tabindex;
 import static com.xpathy.Attribute.title;
 import static com.xpathy.Attribute.type;
 import static com.xpathy.Case.LOWER;
 import static com.xpathy.Tag.any;
 import static com.xpathy.Tag.div;
-import static com.xpathy.Tag.i;
 import static com.xpathy.Tag.input;
-import static com.xpathy.Tag.select;
-import static com.xpathy.Tag.textarea;
 
 import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.extractPredicate;
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.invisible;
-import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.noDisplay;
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.visible;
 import static tools.dscode.common.treeparsing.RegexUtil.betweenWithEscapes;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.KEY_NAME;
@@ -39,7 +33,6 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.colocatedDeepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.customElementSuffixPredicate;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepestOnlyXPath;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.descendantDeepNormalizedVisibleText;
@@ -373,17 +366,8 @@ public final class DefinitionContext {
                     );
 
 
-            category("Icon").children("Icons").andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, CONTAINS_TEXT)
-                    .or(
-                            (category, v, op) -> XPathyBuilder.buildIfAllTrue(Tag.img, class_, ValueWrapper.createValueWrapper("'icon'"), Op.CONTAINS),
-                            (category, v, op) -> XPathy.from(Tag.i),
-                            (category, v, op) -> XPathy.from(Tag.any).byAttribute(role).withCase(LOWER).equals("icon")
-                    ).and(
-                            (category, v, op) -> {
-                                ValueWrapper strippedValue = v == null ? null : v.normalizeLowerCaseAndStripAllWhiteSpace();
-                                return XPathyBuilder.buildIfAllTrue(any, src, strippedValue, op, strippedValue != null);
-                            }
-                    );
+            category("Icon").children("Icons", "Image", "Images").andAnyCategories("forLabel", TEXT_CONTENT_OR_ATTRIBUTE, SrcHrfMatchBuilder)
+                    .addBase("//*[self::img or self::i or local-name()='svg' or @role='icon' or  self::a[normalize-space(.) = '']]");
 
 
             category("Button").children("Buttons").andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, CONTAINS_TEXT)
@@ -692,18 +676,7 @@ public final class DefinitionContext {
 
             category(HTML_NAME_ATTRIBUTES)
                     .or(
-                            (category, v, op) -> {
-                                if (v == null)
-                                    return null;
-                                ValueWrapper strippedValueWrapper = v.stripAllNonLetters();
-                                return combineOr(
-                                        XPathyBuilder.build(any, id, strippedValueWrapper, op),
-                                        XPathyBuilder.build(any, title, strippedValueWrapper, op),
-                                        XPathyBuilder.build(any, name, strippedValueWrapper, op),
-                                        XPathyBuilder.build(any, Attribute.custom("node_name"), strippedValueWrapper, op),
-                                        XPathyBuilder.build(any, Attribute.custom("data-node-id"), strippedValueWrapper, op)
-                                );
-                            }
+                            htmlMatchBuilder
                     );
 
             //

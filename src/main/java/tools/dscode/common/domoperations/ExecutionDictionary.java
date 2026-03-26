@@ -2,6 +2,7 @@ package tools.dscode.common.domoperations;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.xpathy.Attribute;
 import com.xpathy.XPathy;
 import org.openqa.selenium.By;
 import org.openqa.selenium.SearchContext;
@@ -9,6 +10,7 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly;
+import tools.dscode.common.treeparsing.xpathcomponents.XPathyBuilder;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -17,10 +19,18 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.xpathy.Attribute.href;
+import static com.xpathy.Attribute.id;
+import static com.xpathy.Attribute.name;
+import static com.xpathy.Attribute.src;
+import static com.xpathy.Attribute.title;
+import static com.xpathy.Tag.any;
 import static tools.dscode.common.domoperations.TableColumnByHeaderXPath.matchCellsByHeader;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepError;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.xpathSpecificityScore;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.colocatedDeepNormalizedVisibleText;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.combineXPathParts;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.descendantDeepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.tryConvertToXPathy;
@@ -53,11 +63,33 @@ public class ExecutionDictionary {
     // Default base category that *every* category implicitly inherits from
     public static final String DIRECT_TEXT = "DirectTextInternalUSE";
     public static final String CONTAINS_TEXT = "ContainsTextInternalUSE";
+    public static final String TEXT_CONTENT_OR_ATTRIBUTE = "MatchesTextOrAttributeInternalUSE";
     public static final String COLOCATED_TEXT = "ColocatedTextInternalUSE";
     public static final String HTML_NAME_ATTRIBUTES = "htmlNaming";
     public static final String BASE_CATEGORY = "BaseCategoryInternalUSE";
     public static final String STARTING_CONTEXT = "DefaultStartingContextInternalUSE";
     public static final String VISIBILITY_FILTER = "VisibilityFilterInternalUSE";
+
+
+    public static final Builder htmlMatchBuilder  =  (category, v, op) -> {
+        if (v == null)
+            return null;
+        ValueWrapper strippedValueWrapper = v.stripAllNonLetters();
+        return combineOr(
+                XPathyBuilder.build(any, id, strippedValueWrapper, op),
+                XPathyBuilder.build(any, title, strippedValueWrapper, op),
+                XPathyBuilder.build(any, name, strippedValueWrapper, op),
+                XPathyBuilder.build(any, Attribute.custom("node_name"), strippedValueWrapper, op),
+                XPathyBuilder.build(any, Attribute.custom("data-node-id"), strippedValueWrapper, op)
+        );
+    };
+
+    public static final Builder SrcHrfMatchBuilder =  (category, v, op) -> {
+        ValueWrapper strippedValue = v == null ? null : v.normalizeLowerCaseAndStripAllWhiteSpace();
+        if (strippedValue == null)
+            return null;
+        return combineXPathParts(XPathyBuilder.build(any, src, strippedValue, op) , XPathyBuilder.build(any, href, strippedValue, op));
+    };
 
 
     //TODO  HAS , HAS_NOT, and negative versions of all operations
@@ -140,6 +172,19 @@ public class ExecutionDictionary {
                 return null;
             return XPathy.from("//*" + descendantDeepNormalizedVisibleText(v, op));
         });
+
+        category(TEXT_CONTENT_OR_ATTRIBUTE).or(
+                (category, v, op) -> {
+            if (v == null || v.isNull())
+                return null;
+            return XPathy.from("//*" + descendantDeepNormalizedVisibleText(v, op));
+        },
+                (category, v, op) -> {
+                    if (v == null || v.isNull())
+                        return null;
+                    return  getXPathFromBuilder(htmlMatchBuilder, category, v, op) + "[normalize-space(.) = '']";
+                }
+        );
 
         category(DIRECT_TEXT).and((category, v, op) -> {
             if (v == null || v.isNull())
@@ -575,117 +620,107 @@ public class ExecutionDictionary {
         }
 
 
-        /**
-         * Register the resolved XPathy of one or more other categories as OR-components
-         * for the category(ies) this spec is defining.
-         * <p>
-         * Example:
-         * category("newcategory").orCategories("CatA", "CatB");
-         * <p>
-         * At runtime, resolving "newcategory" will include the OR parts from:
-         * andThenOr("CatA", v, op) and andThenOr("CatB", v, op)
-         */
-        public CategorySpec orCategories(String... categoryNames) {
-            Objects.requireNonNull(categoryNames, "categoryNames must not be null");
+        public CategorySpec orCategories(Object... categoryNames) {
             if (categoryNames.length == 0) return this;
 
             for (String host : categories) {
                 if (host == null || host.isBlank()) continue;
 
-                for (String ref : categoryNames) {
-                    if (ref == null || ref.isBlank()) continue;
-                    if (ref.equals(host)) continue; // avoid trivial self recursion
+                for (Object ref : categoryNames) {
+                    if (ref instanceof String s) {
+                        if (s.isBlank()) continue;
+                        if (s.equals(host)) continue;
 
-                    dict.registerOrBuilder(host, (ignoredCategory, v, op) -> dict.andThenOr(ref, v, op));
+                        dict.registerOrBuilder(host, (ignoredCategory, v, op) -> dict.andThenOr(s, v, op));
+                    } else if (ref instanceof Builder b) {
+                        dict.registerOrBuilder(host, b);
+                    }
                 }
             }
             return this;
         }
 
-        /**
-         * Register the resolved XPathy of one or more other categories as AND-components
-         * for the category(ies) this spec is defining.
-         * <p>
-         * Example:
-         * category("newcategory").andCategories("CatA", "CatB");
-         * <p>
-         * At runtime, resolving "newcategory" will include the AND parts from:
-         * andThenOr("CatA", v, op) and andThenOr("CatB", v, op)
-         */
-        public CategorySpec andCategories(String... categoryNames) {
-            Objects.requireNonNull(categoryNames, "categoryNames must not be null");
+        public CategorySpec andCategories(Object... categoryNames) {
             if (categoryNames.length == 0) return this;
 
             for (String host : categories) {
                 if (host == null || host.isBlank()) continue;
 
-                for (String ref : categoryNames) {
-                    if (ref == null || ref.isBlank()) continue;
-                    if (ref.equals(host)) continue; // avoid trivial self recursion
+                for (Object ref : categoryNames) {
+                    if (ref instanceof String s) {
+                        if (s.isBlank()) continue;
+                        if (s.equals(host)) continue;
 
-                    dict.registerAndBuilder(host, (ignoredCategory, v, op) -> dict.andThenOr(ref, v, op));
+                        dict.registerAndBuilder(host, (ignoredCategory, v, op) -> dict.andThenOr(s, v, op));
+                    } else if (ref instanceof Builder b) {
+                        dict.registerAndBuilder(host, b);
+                    }
                 }
             }
             return this;
         }
 
-
-        // Add these two methods inside ExecutionDictionary.CategorySpec
-// (no other changes required)
-
-        public CategorySpec orAllCategories(String... categoryNames) {
-            Objects.requireNonNull(categoryNames, "categoryNames must not be null");
+        public CategorySpec orAllCategories(Object... categoryNames) {
             if (categoryNames.length == 0) return this;
 
-            // Register ONE OR builder per host category that, at runtime,
-            // resolves referenced categories and AND-combines them into a single XPathy.
             for (String host : categories) {
                 if (host == null || host.isBlank()) continue;
 
                 dict.registerOrBuilder(host, (ignoredCategory, v, op) -> {
-                    // Collect resolved XPathy from each referenced category
                     List<XPathy> parts = new ArrayList<>();
-                    for (String ref : categoryNames) {
-                        if (ref == null || ref.isBlank()) continue;
-                        if (ref.equals(host)) continue; // avoid trivial self recursion
 
-                        XPathy x = dict.andThenOr(ref, v, op);
-                        if (x != null) parts.add(x);
+                    for (Object ref : categoryNames) {
+                        if (ref instanceof String s) {
+                            if (s.isBlank()) continue;
+                            if (s.equals(host)) continue;
+
+                            XPathy x = dict.andThenOr(s, v, op);
+                            if (x != null) parts.add(x);
+                        } else if (ref instanceof Builder b) {
+                            XPathy x = tryConvertToXPathy(b.build(ignoredCategory, v, op));
+                            if (x != null) parts.add(x);
+                        }
                     }
 
-                    // Combine them into ONE "and" XPathy, return it as a single OR component
                     return dict.combine(parts, "and").orElse(null);
                 });
             }
             return this;
         }
 
-        public CategorySpec andAnyCategories(String... categoryNames) {
-            Objects.requireNonNull(categoryNames, "categoryNames must not be null");
+        public CategorySpec andAnyCategories(Object... categoryNames) {
             if (categoryNames.length == 0) return this;
 
-            // Register ONE AND builder per host category that, at runtime,
-            // resolves referenced categories and OR-combines them into a single XPathy.
             for (String host : categories) {
                 if (host == null || host.isBlank()) continue;
 
                 dict.registerAndBuilder(host, (ignoredCategory, v, op) -> {
-                    // Collect resolved XPathy from each referenced category
                     List<XPathy> parts = new ArrayList<>();
-                    for (String ref : categoryNames) {
-                        if (ref == null || ref.isBlank()) continue;
-                        if (ref.equals(host)) continue; // avoid trivial self recursion
 
-                        XPathy x = dict.andThenOr(ref, v, op);
-                        if (x != null) parts.add(x);
+                    for (Object ref : categoryNames) {
+                        if (ref instanceof String s) {
+                            if (s.isBlank()) continue;
+                            if (s.equals(host)) continue;
+
+                            XPathy x = dict.andThenOr(s, v, op);
+                            if (x != null) parts.add(x);
+                        } else if (ref instanceof Builder b) {
+                            XPathy x = tryConvertToXPathy(b.build(ignoredCategory, v, op));
+                            if (x != null) parts.add(x);
+                        }
                     }
 
-                    // Combine them into ONE "or" XPathy, return it as a single AND component
                     return dict.combine(parts, "or").orElse(null);
                 });
             }
             return this;
         }
+
+
+
+
+
+
 
 
         // --- inheritance (single canonical method; alias kept) ---
@@ -938,5 +973,12 @@ public class ExecutionDictionary {
         }
 
         return result.toArray(new Builder[0]);
+    }
+
+    public static String getXPathFromBuilder(Builder builder, String category, ValueWrapper value, Op op) {
+        Object xpath = builder.build(category, value, op);
+        if (xpath == null) return null;
+        if (xpath instanceof XPathy) return ((XPathy)xpath).getXpath();
+        return xpath.toString();
     }
 }

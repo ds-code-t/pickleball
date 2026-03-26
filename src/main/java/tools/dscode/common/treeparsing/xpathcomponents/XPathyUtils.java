@@ -6,6 +6,9 @@ import org.openqa.selenium.By;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -561,6 +564,63 @@ public final class XPathyUtils {
             return null;
         }
         return XPathy.from(asString);
+    }
+
+    public static String combineXPathParts(Object... parts) {
+        String[] strings = Arrays.stream(parts)
+                .filter(Objects::nonNull)
+                .map(o -> o instanceof XPathy x ? x.getXpath() : (String) o)
+                .toArray(String[]::new);
+
+        return combineXPathParts(strings);
+    }
+
+    public static String combineXPathParts(String... parts) {
+        List<String> predicates = new ArrayList<>();
+        List<String> tagXpaths = new ArrayList<>();
+
+        for (String raw : parts) {
+            if (raw == null || raw.isBlank()) continue;
+            String s = raw.trim();
+
+            if (isAnyTagXPath(s)) {
+                predicates.add(s.substring(3));
+            } else if (isSpecificTagXPath(s)) {
+                tagXpaths.add(s);
+            } else if (isPredicateOnly(s)) {
+                predicates.add(s);
+            } else {
+                throw new IllegalArgumentException("Unsupported xpath format: " + s);
+            }
+        }
+
+        if (tagXpaths.isEmpty()) {
+            return "//*" + String.join("", predicates);
+        }
+
+        if (tagXpaths.size() == 1) {
+            return tagXpaths.get(0) + String.join("", predicates);
+        }
+
+        String base = tagXpaths.get(tagXpaths.size() - 1);
+
+        for (int i = 0; i < tagXpaths.size() - 1; i++) {
+            predicates.add("[self::" + tagXpaths.get(i).substring(2) + "]");
+        }
+
+        return base + String.join("", predicates);
+    }
+
+    private static boolean isPredicateOnly(String s) {
+        return s.startsWith("[");
+    }
+
+    private static boolean isAnyTagXPath(String s) {
+        return s.startsWith("//*");
+    }
+
+    private static boolean isSpecificTagXPath(String s) {
+        return s.startsWith("//") && !s.startsWith("//*");
     }
 
 }
