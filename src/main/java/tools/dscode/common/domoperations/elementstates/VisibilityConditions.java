@@ -92,19 +92,25 @@ public final class VisibilityConditions {
 
     /**
      * NOTE:
-     * Keeping these non-style name checks as-is for behavior stability, except
-     * "sr-only" which is tightened to a whole class token match.
-     *
-     * The display:none check is now boundary-aware and whitespace-normalized.
+     *  - Actual CSS-property checks are boundary-aware and whitespace-normalized.
+     *  - The hidden-marker checks below are class-based heuristics, tightened to
+     *    whole class tokens or token prefixes instead of raw substring matching.
      */
     public static Condition noDisplay = Condition.or(
             styleOrInlineEqualsAny(display, "display", "none"),
+
+            // Common utility classes
             hasClassToken("sr-only"),
-            Condition.attribute(style).contains("visually-hidden"),
-            Condition.attribute(style).contains("visuallyhidden"),
-            Condition.attribute(style).contains("screen-reader-"),
-            Condition.attribute(style).contains("screenreader-"),
-            Condition.attribute(style).contains("offscreen")
+            hasClassToken("visually-hidden"),
+            hasClassToken("visuallyhidden"),
+            hasClassToken("offscreen"),
+            hasClassToken("off-screen"),
+
+            // Common class prefixes
+            hasClassTokenStartingWith("screen-reader-"),
+            hasClassTokenStartingWith("screenreader-"),
+            hasClassTokenStartingWith("offscreen-"),
+            hasClassTokenStartingWith("off-screen-")
     );
 
     /**
@@ -230,11 +236,22 @@ public final class VisibilityConditions {
     }
 
     /**
+     * Whole-token-prefix class match:
+     *   class="foo screen-reader-text bar" -> matches "screen-reader-"
+     *   class="foo myscreen-reader-text bar" -> does not match "screen-reader-"
+     */
+    private static Condition hasClassTokenStartingWith(String tokenPrefix) {
+        return rawPredicate(
+                "contains(concat(' ', normalize-space(@class), ' '), ' " + tokenPrefix + "')"
+        );
+    }
+
+    /**
      * Builds a normalized inline-style string expression:
      *
      *   concat(';', translate(normalize-space(@style), ' ', ''), ';')
      *
-`     * Examples:
+     * Examples:
      *   "width: 0px; color: red"
      *   -> ";width:0px;color:red;"
      */

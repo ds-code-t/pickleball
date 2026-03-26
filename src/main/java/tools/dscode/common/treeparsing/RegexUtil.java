@@ -17,10 +17,7 @@ public final class RegexUtil {
     public static String betweenWithEscapes(String start, String end) {
         String s = Pattern.quote(start);
         String e = Pattern.quote(end);
-//        return "(?s)" + s + "(?:\\\\.|(?!"+e+").)*" + e;
         return "(?s)" + s + "(?:\\\\.|(?!"+ e +").)*+" + e;
-//        return "(?s)" + s + "(?:\\\\.|(?!"+ e +").)++" + e;
-//        return "(?s)" + s + "[^"+ e +"]*" + e;
     }
 
 

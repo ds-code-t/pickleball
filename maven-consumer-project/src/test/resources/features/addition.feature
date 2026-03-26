@@ -5,7 +5,8 @@ Feature: Addition
 #    @[DEBUG]
 #    * navigate to: URL.select
   @[DEBUG]
-    * , select the last Option "Choose a car:" Dropdown
+    * , verify  "Choose a car:" Dropdown is displayed
+#    * , select the last Option "Choose a car:" Dropdown
 
   @T1
   Scenario: j test1
