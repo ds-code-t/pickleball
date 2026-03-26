@@ -58,9 +58,14 @@ public final class LeanWaits {
 
 
     public static void safeWaitForPageReady(WebDriver driver, Duration timeout, int startWaitMilliseconds) {
-        blur(driver);
-        waitMilliseconds(startWaitMilliseconds);
-        safeWaitForPageReady(driver, timeout);
+        try {
+            blur(driver);
+            waitMilliseconds(startWaitMilliseconds);
+            safeWaitForPageReady(driver, timeout);
+        }
+        catch (Exception e) {
+            return;
+        }
     }
 
     public static void safeWaitForPageReady(WebDriver driver, Duration timeout) {

@@ -193,7 +193,7 @@ public class StepExtension extends StepData {
         lifecycle.fire(Phase.AFTER_SCENARIO_STEP);
 
         if (!definitionFlags.contains(DefinitionFlag.NO_LOGGING)) {
-            if (webDriverUsed != null) {
+            if (webDriverUsed != null && webDriverUsed.getSessionId() != null) {
                 if (isPresent(webDriverUsed)) {
                     stepEntry.info("Browser Alert is present, cannot take screenshot.");
                     stepEntry.stop();

@@ -1,0 +1,19 @@
+constructor: CREATE_REMOTE_DRIVER
+browser: edge
+connection:
+  remoteUrl: "http://localhost:4444/wd/hub"
+capabilities:
+  browserName: MicrosoftEdge
+  acceptInsecureCerts: true
+  "ms:edgeOptions":
+    args:
+      - "--disable-notifications"
+      - "--disable-popup-blocking"
+postActions:
+  - "ENABLE_LOCAL_FILE_DETECTOR"
+  - "NAVIGATE: https://example.com"
+  - "MAXIMIZE"
+  - "CLEAR_COOKIES"
+  - "IMPLICIT_WAIT: 5000"
+  - "PAGE_LOAD_TIMEOUT: 30000"
+  - "SCRIPT_TIMEOUT: 30000"

@@ -37,8 +37,13 @@ public class DocStringBuilder {
     public static DocStringTransformer<?> docStringType(ParameterInfo parameterInfo) {
         return (text, contentType) -> {
             DocString docString = DocString.create(text, contentType, runtimeDocStringConverter());
-                    Type targetType = parameterInfo.getTypeResolver().resolve();
-            return docString.convert(Object.class.equals(targetType) ? DocString.class : targetType);
+            Type targetType = parameterInfo.getTypeResolver().resolve();
+
+            if (Object.class.equals(targetType) && !"registry".equalsIgnoreCase(String.valueOf(contentType))) {
+                targetType = DocString.class;
+            }
+
+            return docString.convert(targetType);
         };
     }
 

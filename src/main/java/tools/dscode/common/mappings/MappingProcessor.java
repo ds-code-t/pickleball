@@ -400,6 +400,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
     private Object getVar(String key) {
         Object returnObj = singletonMap.get().getByNormalizedPath(key);
         if (returnObj == null) return RUN_VARS.getByNormalizedPath(key);
+        if (returnObj instanceof List list) {
+            if (list.isEmpty()) return RUN_VARS.getByNormalizedPath(key);
+            return list.getFirst();
+        }
         return returnObj;
     }
 

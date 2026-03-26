@@ -29,7 +29,10 @@ import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 
-public class DriverWrapper implements AutoCloseable {
+public final class DriverConstruction {
+
+    private DriverConstruction() {
+    }
 
     private static final Set<String> RESERVED_ROOT_KEYS = Set.of(
             "connection",
@@ -39,67 +42,41 @@ public class DriverWrapper implements AutoCloseable {
             "metadata",
             "framework",
             "constructor",
+            "postActions",
             "_pathKey",
             "browser",
             "browserName"
     );
 
-    private final RemoteWebDriver driver;
-    private final ObjectNode configuration;
-
-    public DriverWrapper(RemoteWebDriver driver, ObjectNode configuration) {
-        this.driver = driver;
-        this.configuration = configuration == null ? null : configuration.deepCopy();
-    }
-
-    public RemoteWebDriver getDriver() {
-        return driver;
-    }
-
-    public ObjectNode getConfiguration() {
-        return configuration == null ? null : configuration.deepCopy();
-    }
-
-    public String getPathKey() {
-        return configuration == null ? null : trimToNull(configuration.path("_pathKey").asText(null));
-    }
-
-    @Override
-    public void close() {
-        if (driver != null) {
-            driver.quit();
-        }
-    }
-
-    public static DriverWrapper createDriver(ObjectNode configuration) throws Exception {
+    public static RemoteWebDriver createDriver(ObjectNode configuration) throws Exception {
         ObjectNode config = requireConfiguration(configuration);
         BrowserConfig browserConfig = BrowserConfig.from(toRawMap(config));
         String browserName = resolveBrowserName(config, browserConfig);
 
-        RemoteWebDriver driver = hasRemoteUrl(browserConfig)
+        return hasRemoteUrl(browserConfig)
                 ? createRemoteDriver(browserName, browserConfig, config, "Driver remoteUrl not found")
                 : createLocalDriver(browserName, browserConfig, config);
-
-        return new DriverWrapper(driver, config);
     }
 
-    public static DriverWrapper createLocalDriver(ObjectNode configuration) throws Exception {
+    public static RemoteWebDriver createLocalDriver(ObjectNode configuration) throws Exception {
         ObjectNode config = requireConfiguration(configuration);
         BrowserConfig browserConfig = BrowserConfig.from(toRawMap(config));
         String browserName = resolveBrowserName(config, browserConfig);
-        RemoteWebDriver driver = createLocalDriver(browserName, browserConfig, config);
-        return new DriverWrapper(driver, config);
+        return createLocalDriver(browserName, browserConfig, config);
     }
 
-    public static DriverWrapper createRemoteDriver(ObjectNode configuration) throws Exception {
+    public static RemoteWebDriver createRemoteDriver(ObjectNode configuration) throws Exception {
         ObjectNode config = requireConfiguration(configuration);
         BrowserConfig browserConfig = BrowserConfig.from(toRawMap(config));
         String browserName = resolveBrowserName(config, browserConfig);
-        RemoteWebDriver driver = createRemoteDriver(browserName, browserConfig, config, "Driver remoteUrl not found");
-        return new DriverWrapper(driver, config);
+        return createRemoteDriver(browserName, browserConfig, config, "Driver remoteUrl not found");
     }
 
-    public static RemoteWebDriver createLocalDriver(String browserName, BrowserConfig config, ObjectNode fullConfiguration) throws Exception {
+    public static RemoteWebDriver createLocalDriver(
+            String browserName,
+            BrowserConfig config,
+            ObjectNode fullConfiguration
+    ) throws Exception {
         ClientConfig clientConfig = buildClientConfig(config.connection());
 
         return switch (browserName) {

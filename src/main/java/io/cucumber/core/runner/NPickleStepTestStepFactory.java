@@ -35,8 +35,9 @@ public class NPickleStepTestStepFactory {
     public static PickleStepTestStep createPickleStepTestStep(URI uri, Step step, PickleStepDefinitionMatch pickleStepDefinitionMatch) {
         try {
             return new PickleStepTestStep(UUID.randomUUID(), toAbsoluteFileUri(uri), step, updatePickleStepDefinitionMatch(pickleStepDefinitionMatch));
-        } catch (Throwable t) {
-            throw new RuntimeException("Failed step text: " + step.getText(), t);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Failed step text: '" + step.getText() + "' due to " + e.getMessage(), e);
         }
     }
 
@@ -86,12 +87,10 @@ public class NPickleStepTestStepFactory {
 
 
     public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(PickleStepTestStep modelStep, String keyword, String stepText, String argument) {
-
         Pickle pickle = createGherkinMessagesPickle(keyword, stepText, argument);
         Step onlyStep = pickle.getSteps().getFirst();
         PickleStep pickleStep = (PickleStep) getProperty(onlyStep, "pickleStep");
         Step copiedStep = createGherkinMessagesStep(pickleStep, getGherkinDialect(), onlyStep.getPreviousGivenWhenThenKeyword(), modelStep.getStep().getLocation(), onlyStep.getKeyword());
-
         PickleStepDefinitionMatch pickleStepDefinitionMatch = getStepDefinitionMatch(modelStep.getUri(), copiedStep);
         return createPickleStepTestStep(modelStep.getUri(), copiedStep, pickleStepDefinitionMatch);
     }

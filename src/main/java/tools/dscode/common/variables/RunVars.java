@@ -8,6 +8,7 @@ import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.queries.Tokenized;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Pattern;
@@ -15,6 +16,7 @@ import java.util.regex.Pattern;
 
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
+import static tools.dscode.common.mappings.MappingProcessor.getSingletonMap;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
 
 
@@ -50,7 +52,6 @@ public class RunVars extends NodeMap {
     }
 
     static {
-        System.out.println(GLOBALS);
         RUN_VARS.merge(new HashMap<>(collectPrefixedAndUnprefixedVars()));
         JsonNode runConfigs = buildJsonFromPath(RUN_CONFIGS);
         if (runConfigs instanceof ObjectNode runConfigsNode) {
@@ -140,8 +141,15 @@ public class RunVars extends NodeMap {
     }
 
     public static Object resolveFromVars(String varName) {
-        varName = varName.toLowerCase().startsWith(VAR_PREFIX) ? varName.substring(VAR_PREFIX.length()) : varName;
-        return RUN_VARS.getByNormalizedPath(varName);
+        String SingletonKey = prefixed.matcher(varName).matches() ? varName : VAR_PREFIX + varName;
+        String runVarsKey = varName.toLowerCase().startsWith(VAR_PREFIX) ? varName.substring(VAR_PREFIX.length()) : varName;
+        Object returnObj = getSingletonMap().getByNormalizedPath(SingletonKey);
+        if (returnObj == null) return RUN_VARS.getByNormalizedPath(runVarsKey);
+        if (returnObj instanceof List list) {
+            if (list.isEmpty()) return RUN_VARS.getByNormalizedPath(runVarsKey);
+            return list.getFirst();
+        }
+        return returnObj;
     }
 
 

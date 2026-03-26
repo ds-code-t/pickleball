@@ -103,14 +103,11 @@ public final class Tokenized {
         if (isValueAssignmentKey)
             q = q.substring(0, q.length() - 1);
         query = wrapSegments(q);
-
-
         directPath = !query.replaceAll("\\[-?\\d+\\]", "")
                 .replaceAll("\\*|%|\\{|\\(|^|<|>|=|\\.\\.|,|:", "[").contains("\\[");
         tokens = Arrays.stream(query.replaceAll("(\\[[^\\[\\]]*\\])", ".$1").split("\\.")).collect(Collectors.toList());
         tokenCount = tokens.size();
         getQuery = query.replaceAll("\\." + topArrayFlag, "");
-
     }
 
     public static String rewrite(String input) {

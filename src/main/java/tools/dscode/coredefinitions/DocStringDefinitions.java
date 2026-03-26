@@ -17,6 +17,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static io.cucumber.core.runner.CurrentScenarioState.getScenarioObject;
+
 @SuppressWarnings("unused")
 public class DocStringDefinitions {
 
@@ -28,6 +30,21 @@ public class DocStringDefinitions {
     private static final TypeReference<ArrayList<Object>> LIST_TYPE = new TypeReference<>() {};
 
 
+
+    @DocStringType(contentType = "registry")
+    public Object registryObject(String pathKey) {
+        String key = pathKey == null ? null : pathKey.trim();
+        if (key == null || key.isEmpty()) {
+            throw new IllegalArgumentException("Registry docstring pathKey cannot be null or blank");
+        }
+
+        Object value = getScenarioObject(key);
+        if (value == null) {
+            throw new RuntimeException("No scenario object found for registry pathKey '" + key + "'");
+        }
+
+        return value;
+    }
 
     @DocStringType(contentType = "json")
     public ObjectNode jsonObjectNode(String docString) throws JsonProcessingException {

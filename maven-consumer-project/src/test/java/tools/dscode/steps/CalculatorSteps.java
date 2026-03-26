@@ -1,6 +1,7 @@
 package tools.dscode.steps;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.xpathy.Attribute;
 import com.xpathy.Condition;
 import com.xpathy.Tag;
@@ -16,10 +17,12 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.remote.RemoteWebDriver;
 import tools.dscode.common.annotations.LifecycleHook;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.domoperations.ExecutionDictionary;
+import tools.dscode.common.driver.DriverConstruction;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Status;
 import tools.dscode.common.servicecalls.JacksonUtils;
@@ -28,6 +31,7 @@ import tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils;
 import tools.dscode.common.util.datetime.BusinessCalendar;
 import tools.dscode.common.util.datetime.CalendarRegistry;
 import tools.dscode.coredefinitions.NavigationSteps;
+import tools.dscode.coredefinitions.ObjectRegistrationSteps;
 import tools.dscode.registry.GlobalRegistry;
 
 import java.util.List;
@@ -67,16 +71,27 @@ import static tools.dscode.common.util.datetime.CalendarRegistry.calendar;
 import static tools.dscode.common.util.datetime.CalendarRegistry.getCalendar;
 //import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getDefaultDriver;
 //import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getDriver;
+import static tools.dscode.coredefinitions.BrowserSteps.getDefaultDriver;
 import static tools.dscode.registry.GlobalRegistry.GLOBAL;
 
 import org.intellij.lang.annotations.Language;
 
 public class CalculatorSteps {
 
+//    @Given("_-CREATE_LOCAL_DRIVER")
+//    public RemoteWebDriver createDriver(ObjectNode configuration) throws Exception {
+//        return DriverConstruction.createDriver(configuration);
+//    }
+
     @Given("^test2(?: (.*))?$")
     public static void test2(String value) {
         System.out.println("@@test2: " + value);
-        System.out.println("@@" +value + ": " +  getFromRunningParsingMap(value));
+        RemoteWebDriver driver = getDefaultDriver();
+        System.out.println("@@driver: " + driver);
+        ObjectRegistrationSteps.cleanup(driver);
+        System.out.println("@@cleaned up: " + driver);
+//        System.out.println("@@test2: " + value);
+//        System.out.println("@@" +value + ": " +  getFromRunningParsingMap(value));
     }
 
     @Given("^zcapitalize:(.*)$")

@@ -394,6 +394,8 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     public static String normalizeRegistryKey(String s) {
         if (s == null) return null;
+        if(s.startsWith("_"))
+            return s;
         String returnString = s.strip()                       // remove leading/trailing whitespace
                 .replaceAll("\\s+", " ")       // collapse consecutive whitespace
                 .toLowerCase()                 // lowercase

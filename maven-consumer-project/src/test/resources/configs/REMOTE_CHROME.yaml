@@ -1,0 +1,16 @@
+constructor: CREATE_DRIVER
+browser: chrome
+connection:
+  remoteUrl: "http://your-remote-webdriver-host:4444/wd/hub"
+  enableTracing: true
+capabilities:
+  browserName: chrome
+  acceptInsecureCerts: true
+postActions:
+  - "ENABLE_LOCAL_FILE_DETECTOR"
+  - "NAVIGATE: https://example.com"
+  - "MAXIMIZE"
+  - "CLEAR_COOKIES"
+  - "IMPLICIT_WAIT: 5000"
+  - "PAGE_LOAD_TIMEOUT: 30000"
+  - "SCRIPT_TIMEOUT: 30000"
