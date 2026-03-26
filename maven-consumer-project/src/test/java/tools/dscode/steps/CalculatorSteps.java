@@ -82,7 +82,13 @@ public class CalculatorSteps {
 //    public RemoteWebDriver createDriver(ObjectNode configuration) throws Exception {
 //        return DriverConstruction.createDriver(configuration);
 //    }
+@Given("^dataTableTest1(?: (.*))?$")
+public static void dataTableTest1(String value, DataTable dataTable) {
+    System.out.println("@@dataTableTest1: " + value);
+    System.out.println("@@dataTable: " + dataTable);
 
+
+}
     @Given("^test2(?: (.*))?$")
     public static void test2(String value) {
         System.out.println("@@test2: " + value);

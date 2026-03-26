@@ -4,7 +4,9 @@ Feature: Addition
   Scenario: j test1
 #    * test2 JAVA_HOME
 #    * test2 NVM_HOME
-
+    * dataTableTest1 dataTableTestxx
+      | a | b |
+      | 1 | 2 |
     * navigate to: URL.select
     * , verify "Subscribe" Checkbox is on, and "Subscribe" Checkbox is true
 #    * , verify Button is not displayed, and wait 10 seconds
