@@ -40,6 +40,7 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETUR
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrPredicate;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.everyNth;
 
 
 public class ElementMatch {
@@ -57,6 +58,7 @@ public class ElementMatch {
     public String state;
     public List<Attribute> attributes = new ArrayList<>();
     public XPathy xPathy;
+    public XPathy xPathyWithIndex;
     public Set<ElementType> elementTypes;
     public ElementMatcher elementMatcher;
     public ContextWrapper contextWrapper;
@@ -297,9 +299,24 @@ public class ElementMatch {
         xPathy = combineAnd(elPredictXPaths);
 
         for (Attribute attribute : attributes) {
-
             xPathy = applyAttrPredicate(xPathy, attribute.attrName, attribute.predicateVal, attribute.predicateType);
+        }
 
+       if (xPathy == null || elementPosition.isEmpty()) {
+            xPathyWithIndex = xPathy;
+        } else if (elementPosition.equals("last")) {
+            xPathyWithIndex =  xPathy.last();
+        } else {
+            elementIndex = Integer.parseInt(elementPosition);
+            if (selectionType.isEmpty()) {
+                xPathyWithIndex = xPathy.nth(elementIndex);
+            } else {
+                if (elementIndex == 1) {
+                    xPathyWithIndex = xPathy;
+                } else {
+                    xPathyWithIndex = everyNth(xPathy, elementIndex);
+                }
+            }
         }
 //        }
 

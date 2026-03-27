@@ -93,8 +93,8 @@ public class ContextWrapper {
 
                 printDebug("##ContextWrapper-searchContext2: " + (searchContext == null ? "null" : searchContext.getClass().getSimpleName()));
             } else {
-                printDebug("phraseData4: " + phraseData.contextXPathy);
-                xPathyList.add(phraseData.contextXPathy);
+                printDebug("phraseData4: " + phraseData.contextXPathyWithIndex);
+                xPathyList.add(phraseData.contextXPathyWithIndex);
             }
         }
 

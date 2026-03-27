@@ -196,7 +196,7 @@ public abstract class PhraseData extends PassedData {
         } else if (!context.isBlank()) {
             phraseType = PhraseType.CONTEXT;
             isFrom = context.equals("from");
-            contextXPathy = getXPathyContext(context, getElementMatches());
+            getXPathyContext(this, getElementMatches());
         } else {
             setAction(phraseNode.getStringFromLocalState("action"));
             if (getAction().isBlank()) {
@@ -265,20 +265,47 @@ public abstract class PhraseData extends PassedData {
     }
 
 
-    public static XPathy getXPathyContext(String context, List<ElementMatch> elements) {
-        if (elements.isEmpty()) return null;
+    public static void getXPathyContext(PhraseData phraseData, List<ElementMatch> elements) {
+        if (elements.isEmpty()) phraseData.contextXPathy = null;
+
+        String context = phraseData.context.toLowerCase();
+
         XPathy xPathy = elements.getFirst().xPathy;
-        if (xPathy == null) return null;
-        return switch (context.toLowerCase()) {
-            case String s when s.startsWith("for") -> insideOf(xPathy);
-            case String s when s.startsWith("from") -> insideOf(xPathy);
-            case String s when s.startsWith("in") -> insideOf(xPathy);
-            case String s when s.startsWith("after") -> afterOf(xPathy);
-            case String s when s.startsWith("before") -> beforeOf(xPathy);
-            case String s when s.startsWith("between") -> inBetweenOf(xPathy, elements.get(1).xPathy);
-            default -> null;
-        };
+        if (xPathy == null) phraseData.contextXPathy = null;
+
+        phraseData.contextXPathy = resolveContextXPathy(
+                context,
+                xPathy,
+                elements.get(1).xPathy
+        );
+
+        if (phraseData.contextXPathy == null) {
+            phraseData.contextXPathyWithIndex = null;
+        } else {
+            phraseData.contextXPathyWithIndex = resolveContextXPathy(
+                    context,
+                    elements.getFirst().xPathyWithIndex,
+                    elements.get(1).xPathyWithIndex
+            );
+        }
     }
+
+    private static XPathy resolveContextXPathy(String context, XPathy first, XPathy second) {
+        if (context.startsWith("for") || context.startsWith("from") || context.startsWith("in")) {
+            return insideOf(first);
+        }
+        if (context.startsWith("after")) {
+            return afterOf(first);
+        }
+        if (context.startsWith("before")) {
+            return beforeOf(first);
+        }
+        if (context.startsWith("between")) {
+            return inBetweenOf(first, second);
+        }
+        return null;
+    }
+
 
 
     public abstract PhraseData runPhrase();
