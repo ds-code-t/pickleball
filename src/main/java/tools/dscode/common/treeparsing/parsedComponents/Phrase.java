@@ -171,7 +171,7 @@ public final class Phrase extends PhraseData {
                     }
                 }
             }
-        } else if (!firstElement.selectionType.isEmpty()) {
+        } else if (!firstElement.selectionType.isEmpty() || !firstElement.elementPosition.isEmpty()) {
             if (firstElement.getElementWrappers().isEmpty()) {
                 phraseConditionalMode = 0;
                 if (!firstElement.selectionType.equals("any")) {

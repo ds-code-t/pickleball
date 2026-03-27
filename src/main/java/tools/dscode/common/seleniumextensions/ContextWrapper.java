@@ -87,7 +87,7 @@ public class ContextWrapper {
                     break;
 
                 printDebug("##ContextWrapper-searchContext2: " + (searchContext == null ? "null" : searchContext.getClass().getSimpleName()));
-            } else  {
+            } else {
                 printDebug("phraseData4: " + phraseData.contextXPathyWithIndex);
                 xPathyList.add(phraseData.contextXPathyWithIndex);
             }
@@ -127,10 +127,10 @@ public class ContextWrapper {
 //        elementPath = XPathy.from(XPathyUtils.maybeDeepestMatches(xPathy.getXpath()));
         elementPath = combineAnd(xPathyList);
 
-//        if (elementMatch.elementPosition.isEmpty() && elementMatch.selectionType.isEmpty())
-//            elementMatch.elementPosition = "1";
-        if (elementMatch.elementPosition.isEmpty())
-            elementTerminalXPath = elementPath;
+        if (elementMatch.elementPosition.isEmpty() && elementMatch.selectionType.isEmpty())
+            elementTerminalXPath = elementPath.nth(1);
+//        else if (elementMatch.elementPosition.isEmpty())
+//            elementTerminalXPath = elementPath;
         else if (elementMatch.elementPosition.equals("last")) {
             elementTerminalXPath = elementPath.last();
         } else {
