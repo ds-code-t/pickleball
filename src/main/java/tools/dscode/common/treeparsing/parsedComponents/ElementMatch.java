@@ -41,6 +41,7 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrPredicate;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.everyNth;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.everyNthAppended;
 
 
 public class ElementMatch {
@@ -305,16 +306,16 @@ public class ElementMatch {
        if (xPathy == null || elementPosition.isEmpty()) {
             xPathyWithIndex = xPathy;
         } else if (elementPosition.equals("last")) {
-            xPathyWithIndex =  xPathy.last();
+            xPathyWithIndex = XPathy.from( xPathy.getXpath() + "[last()]");
         } else {
             elementIndex = Integer.parseInt(elementPosition);
             if (selectionType.isEmpty()) {
-                xPathyWithIndex = xPathy.nth(elementIndex);
+                xPathyWithIndex =   XPathy.from( xPathy.getXpath() + " [" + elementIndex + "]");
             } else {
                 if (elementIndex == 1) {
                     xPathyWithIndex = xPathy;
                 } else {
-                    xPathyWithIndex = everyNth(xPathy, elementIndex);
+                    xPathyWithIndex = everyNthAppended(xPathy, elementIndex);
                 }
             }
         }
