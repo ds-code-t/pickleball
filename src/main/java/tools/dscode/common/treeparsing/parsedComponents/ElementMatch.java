@@ -6,7 +6,6 @@ import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.browseroperations.WindowSwitch;
 
 import tools.dscode.common.domoperations.ExecutionDictionary;
-import tools.dscode.common.domoperations.elementstates.BinaryStateConditions;
 import tools.dscode.common.domoperations.elementstates.CollapsedExpandedConditions;
 import tools.dscode.common.domoperations.elementstates.EnabledDisabledConditions;
 import tools.dscode.common.domoperations.elementstates.RequiredInputConditions;
@@ -16,10 +15,8 @@ import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatcher;
 import tools.dscode.common.util.debug.DebugUtils;
 
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -31,7 +28,6 @@ import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.browseroperations.BrowserAlerts.getText;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.domoperations.ExecutionDictionary.Op.getOpFromString;
-import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.domoperations.elementstates.BinaryStateConditions.offElement;
 import static tools.dscode.common.domoperations.elementstates.BinaryStateConditions.onElement;
 import static tools.dscode.common.domoperations.elementstates.BlankElementConditions.blankElement;
@@ -225,12 +221,12 @@ public class ElementMatch {
 
 
         if (textOps.isEmpty()) {
-            ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, null, null);
+            ExecutionDictionary.CategoryResolution categoryResolution = dict.getFinalCategoryResolution(category, null, null);
             elPredictXPaths.add(categoryResolution.xpath());
         }
 
         for (TextOp textOp : textOps) {
-            ExecutionDictionary.CategoryResolution categoryResolution = dict.andThenOrWithFlags(category, textOp.text, textOp.op);
+            ExecutionDictionary.CategoryResolution categoryResolution = dict.getFinalCategoryResolution(category, textOp.text, textOp.op);
             elPredictXPaths.add(categoryResolution.xpath());
         }
 

@@ -540,8 +540,8 @@ public class ExecutionDictionary {
                                      Set<CategoryFlags> flags) {
     }
 
-    public CategoryResolution andThenOrWithFlags(String category, ValueWrapper value, Op op) {
-        XPathy xpath = andThenOr(category, value, op);
+    public CategoryResolution getFinalCategoryResolution(String category, ValueWrapper value, Op op) {
+        XPathy xpath = resolveFinalXPath(category, value, op);
         Set<CategoryFlags> flags = getResolvedCategoryFlags(category);
         return new CategoryResolution(category, value, op, xpath, flags);
     }
