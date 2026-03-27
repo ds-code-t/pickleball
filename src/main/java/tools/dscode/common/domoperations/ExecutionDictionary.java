@@ -42,11 +42,6 @@ public class ExecutionDictionary {
             "       [" +
                     "   count(descendant-or-self::*[self::input or self::textarea or self::select][not(@type='hidden')]) = 1" +
                     "   and descendant-or-self::*[self::input or self::textarea or self::select][not(@type='hidden')]" +
-//                    "   [" +
-//                    "       not(preceding-sibling::*[normalize-space(string(.)) != ''])" +
-//                    "       and " +
-//                    "       not(following-sibling::*[normalize-space(string(.)) != ''])" +
-//                    "   ]" +
                     "]";
 
 
@@ -125,7 +120,9 @@ public class ExecutionDictionary {
     private final ConcurrentMap<String, CopyOnWriteArrayList<Builder>> andReg = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ContextBuilder> contextReg = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, Set<CategoryFlags>> categoryFlags = new ConcurrentHashMap<>();
-    private final ConcurrentMap<String, XPathy> baseReg = new ConcurrentHashMap<>();
+
+    private final ConcurrentMap<String, XPathy> primaryBaseReg = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, XPathy> alternateBaseReg = new ConcurrentHashMap<>();
 
     // Per-instance cache: category -> resolved lineage (includes the category itself).
 // Safe for concurrent reads during XPath generation, and isolated per ExecutionDictionary instance.
@@ -284,24 +281,52 @@ public class ExecutionDictionary {
         });
     }
 
-    private void registerBaseXpath(String category, XPathy base) {
+    private void registerPrimaryBaseXpath(String category, XPathy base) {
         Objects.requireNonNull(category, "category must not be null");
         Objects.requireNonNull(base, "base xpath must not be null");
-        baseReg.put(category, base);
+        primaryBaseReg.put(category, base);
     }
 
-    private XPathy getBaseXpath(String category) {
+    private void registerAlternateBaseXpath(String category, XPathy base) {
+        Objects.requireNonNull(category, "category must not be null");
+        Objects.requireNonNull(base, "base xpath must not be null");
+        alternateBaseReg.put(category, base);
+    }
+
+    private XPathy getPrimaryBaseXpath(String category) {
+        if (category == null || category.isBlank()) return null;
+        return primaryBaseReg.get(category);
+    }
+
+    private XPathy getAlternateBaseXpath(String category) {
+        if (category == null || category.isBlank()) return null;
+        return alternateBaseReg.get(category);
+    }
+
+    private XPathy getResolvedPrimaryBaseXpath(String category) {
         if (category == null || category.isBlank()) return null;
 
-        // Prefer the most-specific category first, then parents (matches your lineage order)
         List<String> lineage = resolveCategoryLineage(category);
         for (String catKey : lineage) {
-            XPathy base = baseReg.get(catKey);
+            XPathy base = primaryBaseReg.get(catKey);
             if (base != null) return base;
         }
         return null;
     }
 
+    private Builder constantBuilder(XPathy xpath) {
+        return (ignoredCategory, ignoredValue, ignoredOp) -> xpath;
+    }
+
+    private boolean hasLocalBase(String category) {
+        return getPrimaryBaseXpath(category) != null || getAlternateBaseXpath(category) != null;
+    }
+
+    private enum BaseExpansionMode {
+        NONE,
+        NORMAL,
+        FINAL_XPATH
+    }
 
     // ========================================================
     // OR / AND builder registries
@@ -345,28 +370,57 @@ public class ExecutionDictionary {
         }
     }
 
-    public boolean categoryHasRegistration(String category) {
-        Objects.requireNonNull(category, "category must not be null");
-        List<String> lineage = resolveCategoryLineage(category);
-        return hasAnyRegisteredBuilders(lineage);
-    }
 
     //========================================================
     // Expansion with inheritance
     //========================================================
 
+
+
     private List<XPathy> expandInternal(
             ConcurrentMap<String, CopyOnWriteArrayList<Builder>> map,
             String category,
             ValueWrapper value,
-            Op op
+            Op op,
+            BaseExpansionMode baseMode
     ) {
         List<String> lineage = resolveCategoryLineage(category);
+
+        XPathy resolvedPrimaryBase =
+                (map == andReg && baseMode == BaseExpansionMode.FINAL_XPATH)
+                        ? getResolvedPrimaryBaseXpath(category)
+                        : null;
 
         List<Builder> allBuilders = new ArrayList<>();
         for (String catKey : lineage) {
             var builders = map.get(catKey);
-            if (builders != null && !builders.isEmpty()) allBuilders.addAll(builders);
+            if (builders != null && !builders.isEmpty()) {
+                allBuilders.addAll(builders);
+            }
+
+            if (map == andReg) {
+                XPathy baseToAdd = null;
+
+                switch (baseMode) {
+                    case NORMAL -> {
+                        XPathy alt = getAlternateBaseXpath(catKey);
+                        XPathy primary = getPrimaryBaseXpath(catKey);
+                        baseToAdd = (alt != null) ? alt : primary;
+                    }
+                    case FINAL_XPATH -> {
+                        if (resolvedPrimaryBase == null) {
+                            baseToAdd = getAlternateBaseXpath(catKey);
+                        }
+                    }
+                    case NONE -> {
+                        // no-op
+                    }
+                }
+
+                if (baseToAdd != null) {
+                    allBuilders.add(constantBuilder(baseToAdd));
+                }
+            }
         }
 
         if (allBuilders.isEmpty()) {
@@ -388,6 +442,7 @@ public class ExecutionDictionary {
                 .toList();
     }
 
+
     private String safeXpath(XPathy x) {
         try {
             return x == null ? "null" : x.getXpath();
@@ -398,20 +453,28 @@ public class ExecutionDictionary {
     }
 
     public List<XPathy> expandOr(String category, ValueWrapper value, Op op) {
-        return expandInternal(orReg, category, value, op);
+        return expandInternal(orReg, category, value, op, BaseExpansionMode.NONE);
     }
 
     public List<XPathy> expandAnd(String category, ValueWrapper value, Op op) {
         return Stream.concat(
-                        expandInternal(andReg, category, value, op).stream(),
-                        expandInternal(andReg, BASE_CATEGORY, value, op).stream()
+                        expandInternal(andReg, category, value, op, BaseExpansionMode.NORMAL).stream(),
+                        expandInternal(andReg, BASE_CATEGORY, value, op, BaseExpansionMode.NONE).stream()
                 )
                 .collect(Collectors.toList());
     }
 
-    //========================================================
-    // String-based combination helpers
-    //========================================================
+    private List<XPathy> expandAndForFinalXPath(String category, ValueWrapper value, Op op) {
+        return Stream.concat(
+                        expandInternal(andReg, category, value, op, BaseExpansionMode.FINAL_XPATH).stream(),
+                        expandInternal(andReg, BASE_CATEGORY, value, op, BaseExpansionMode.NONE).stream()
+                )
+                .collect(Collectors.toList());
+    }
+
+//========================================================
+// String-based combination helpers
+//========================================================
 
     private Optional<XPathy> combine(List<XPathy> list, String joiner) {
         if (list == null || list.isEmpty()) return Optional.empty();
@@ -448,17 +511,29 @@ public class ExecutionDictionary {
         return combine(expandAnd(category, value, op), "and");
     }
 
+    private Optional<XPathy> andAllForFinalXPath(String category, ValueWrapper value, Op op) {
+        return combine(expandAndForFinalXPath(category, value, op), "and");
+    }
+
+
     public Optional<XPathy> orAll(String category, ValueWrapper value, Op op) {
         return combine(expandOr(category, value, op), "or");
     }
 
     public XPathy andThenOr(String category, ValueWrapper value, Op op) {
-        Optional<XPathy> result = resolveToXPathy(category, value, op);
-        return result.orElse(null);
+        return resolveToXPathy(category, value, op).orElse(null);
+    }
+
+    public XPathy resolveFinalXPath(String category, ValueWrapper value, Op op) {
+        return resolveToFinalXPathy(category, value, op).orElse(null);
     }
 
     public XPathy getCategoryXPathy(String category) {
         return andThenOr(category, null, null);
+    }
+
+    public XPathy getFinalCategoryXPathy(String category) {
+        return resolveFinalXPath(category, null, null);
     }
 
     public record CategoryResolution(String category, ValueWrapper value, Op op, XPathy xpath,
@@ -471,19 +546,22 @@ public class ExecutionDictionary {
         return new CategoryResolution(category, value, op, xpath, flags);
     }
 
-    public Optional<XPathy> resolveToXPathy(String category, ValueWrapper value, Op op) {
-        XPathy base = getBaseXpath(category); // <-- resolve base first
-        Optional<XPathy> orPart = orAll(category, value, op);
-        Optional<XPathy> andPart = andAll(category, value, op);
-        // If nothing else exists (or everything filtered out), return base if present
+    private Optional<XPathy> resolveFromParts(
+            Optional<XPathy> andPart,
+            Optional<XPathy> orPart,
+            String prefix,
+            boolean returnPrefixIfNoParts
+    ) {
         if (andPart.isEmpty() && orPart.isEmpty()) {
-            return base == null ? Optional.empty() : Optional.of(base);
+            if (returnPrefixIfNoParts && prefix != null && !prefix.isBlank()) {
+                return Optional.of(XPathy.from(prefix.trim()));
+            }
+            return Optional.empty();
         }
 
-        // Convert each part into a predicate step (self::... form)
         String andStep = andPart.map(xPathy -> XPathyAssembly.toSelfStep(xPathy.getXpath())).orElse(null);
         String orStep = orPart.map(xPathy -> XPathyAssembly.toSelfStep(xPathy.getXpath())).orElse(null);
-        // Order them by specificity score (lower first, consistent with combine())
+
         record Step(String step, int score) {
         }
 
@@ -495,25 +573,38 @@ public class ExecutionDictionary {
             steps.add(new Step(orStep, xpathSpecificityScore(orPart.get().getXpath())));
         }
 
-        if (steps.isEmpty()) return Optional.empty();
+        if (steps.isEmpty()) {
+            if (returnPrefixIfNoParts && prefix != null && !prefix.isBlank()) {
+                return Optional.of(XPathy.from(prefix.trim()));
+            }
+            return Optional.empty();
+        }
+
         steps.sort(Comparator.comparingInt(Step::score));
         String combined = steps.stream()
                 .map(Step::step)
                 .map(s -> "(" + s + ")")
                 .collect(Collectors.joining(" and "));
-        String prefix = (base != null && base.getXpath() != null && !base.getXpath().isBlank())
-                ? base.getXpath().trim()
-                : "//*";
 
-        return Optional.of(XPathy.from(prefix + "[" + combined + "]"));
-
+        String resolvedPrefix = (prefix == null || prefix.isBlank()) ? "//*" : prefix.trim();
+        return Optional.of(XPathy.from(resolvedPrefix + "[" + combined + "]"));
     }
 
-    private int countChar(String s, char c) {
-        int count = 0;
-        for (int i = 0; i < s.length(); i++) if (s.charAt(i) == c) count++;
-        return count;
+    public Optional<XPathy> resolveToXPathy(String category, ValueWrapper value, Op op) {
+        Optional<XPathy> orPart = orAll(category, value, op);
+        Optional<XPathy> andPart = andAll(category, value, op);
+        return resolveFromParts(andPart, orPart, null, false);
     }
+
+    public Optional<XPathy> resolveToFinalXPathy(String category, ValueWrapper value, Op op) {
+        XPathy resolvedPrimaryBase = getResolvedPrimaryBaseXpath(category);
+        Optional<XPathy> orPart = orAll(category, value, op);
+        Optional<XPathy> andPart = andAllForFinalXPath(category, value, op);
+
+        String prefix = resolvedPrimaryBase == null ? "//*" : resolvedPrimaryBase.getXpath();
+        return resolveFromParts(andPart, orPart, prefix, resolvedPrimaryBase != null);
+    }
+
 
     private boolean hasAnyRegisteredBuilders(List<String> lineage) {
         for (String catKey : lineage) {
@@ -527,8 +618,7 @@ public class ExecutionDictionary {
 
     private boolean hasResolvedBase(List<String> lineage) {
         for (String catKey : lineage) {
-            XPathy base = baseReg.get(catKey);
-            if (base != null) return true;
+            if (hasLocalBase(catKey)) return true;
         }
         return false;
     }
@@ -585,7 +675,21 @@ public class ExecutionDictionary {
 
             for (String cat : categories) {
                 if (cat == null || cat.isBlank()) continue;
-                dict.registerBaseXpath(cat, xpath);
+                dict.registerPrimaryBaseXpath(cat, xpath);
+            }
+            return this;
+        }
+
+        public CategorySpec addAlternateBase(String xpath) {
+            return addAlternateBase(XPathy.from(xpath));
+        }
+
+        public CategorySpec addAlternateBase(XPathy xpath) {
+            Objects.requireNonNull(xpath, "xpath must not be null");
+
+            for (String cat : categories) {
+                if (cat == null || cat.isBlank()) continue;
+                dict.registerAlternateBaseXpath(cat, xpath);
             }
             return this;
         }
@@ -890,7 +994,7 @@ public class ExecutionDictionary {
                 .startingContext((category, value, op, driver, context) -> {
                     driver.switchTo().defaultContent();
 
-                    XPathy xpathy = andThenOr(category, value, op);
+                    XPathy xpathy = resolveFinalXPath(category, value, op);
                     if (xpathy == null) return driver;
 
                     WebElement frameEl = driver.findElement(By.xpath(xpathy.getXpath()));
@@ -905,7 +1009,7 @@ public class ExecutionDictionary {
         return categories(categoryNames)
                 .flags(CategoryFlags.IFRAME)
                 .context((category, value, op, driver, context) -> {
-                    XPathy xpathy = andThenOr(category, value, op);
+                    XPathy xpathy = resolveFinalXPath(category, value, op);
                     if (xpathy == null) return context;
 
                     WebElement frameEl = context.findElement(By.xpath(xpathy.getXpath()));
@@ -922,7 +1026,7 @@ public class ExecutionDictionary {
                 .startingContext((category, value, op, driver, context) -> {
                     driver.switchTo().defaultContent();
 
-                    XPathy xpathy = andThenOr(category, value, op);
+                    XPathy xpathy = resolveFinalXPath(category, value, op);
                     if (xpathy == null) return driver;
 
                     WebElement host = driver.findElement(By.xpath(xpathy.getXpath()));
@@ -936,7 +1040,7 @@ public class ExecutionDictionary {
         return categories(categoryNames)
                 .flags(CategoryFlags.SHADOW_HOST)
                 .context((category, value, op, driver, context) -> {
-                    XPathy xpathy = andThenOr(category, value, op);
+                    XPathy xpathy = resolveFinalXPath(category, value, op);
                     if (xpathy == null) return context;
 
                     WebElement host = context.findElement(By.xpath(xpathy.getXpath()));

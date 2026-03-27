@@ -249,7 +249,6 @@ public final class XPathyAssembly {
             return step;
         }
 
-
         int id = selfCounter.incrementAndGet();
         int nestingCount = countIdPairs(step);
         step = step.replaceFirst("^([A-Za-z_][A-Za-z0-9_.:-]*|\\*)", "self::$1[" + id + ">-" + nestingCount + "]") + "[" + id + ">-" + nestingCount + "]";
