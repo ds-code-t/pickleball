@@ -2,17 +2,16 @@ package tools.dscode.common.treeparsing.xpathcomponents;
 
 import com.xpathy.Tag;
 import com.xpathy.XPathy;
-import org.apache.poi.xssf.usermodel.XSSFPivotTable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static tools.dscode.common.util.debug.DebugUtils.debugFlags;
 import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 import static tools.dscode.common.util.debug.DebugUtils.substrings;
 
@@ -22,8 +21,37 @@ public final class XPathyAssembly {
         // utility class
     }
 
+    private static final AtomicInteger selfCounter = new AtomicInteger(1);
 
-    // In whatever util class you like, e.g. XPathyScopes or similar
+    private static final Pattern SELF_WRAP =
+            Pattern.compile(
+                    "^[^a-zA-Z]*self::(?:[A-Za-z_][A-Za-z0-9_.:-]*|\\*)\\[(\\d+)>-(\\d+)\\].*\\[\\1>-\\2\\][^a-zA-Z]*$",
+                    Pattern.DOTALL
+            );
+
+    private static final Pattern ID_PAIR_PATTERN =
+            Pattern.compile("\\[\\d+>-\\d+\\]");
+
+    private static final Pattern AXIS_PATTERN =
+            Pattern.compile("^[A-Za-z-]+::.*");
+
+    // Boundary is either a full self-step with tag OR a bare tag
+    private static final Pattern BOUNDARY =
+            Pattern.compile("self::(?:[A-Za-z_][A-Za-z0-9_.:-]*|\\*)\\[\\d+>-\\d+\\]|\\[\\d+>-\\d+\\]");
+
+    // Extract b from any tag [a>-b]
+    private static final Pattern PSEUDO_TAG =
+            Pattern.compile("\\[(\\d+)>-(\\d+)\\]");
+
+    public static final char match1 = '\u206A';
+    public static final char match2 = '\u207A';
+    public static final char match3 = '\u208A';
+    public static final String match1s = String.valueOf(match1);
+    public static final String match2s = String.valueOf(match2);
+    public static final String match3s = String.valueOf(match3);
+
+    public static Boolean stripPseudoTags = null;
+    public static Boolean normalizeWhiteSpace = null;
 
     /**
      * Normalize an XPath to be used as a relative step after an axis
@@ -34,10 +62,14 @@ public final class XPathyAssembly {
      * .//span          -> span
      * /div             -> div
      * a[@href]         -> a[@href]
+     *
+     * For parenthesized/node-set expressions like (//div)[3], this returns the
+     * expression unchanged. Those must not be forced into axis::step form.
      */
     public static String asRelativeStep(XPathy xp) {
         String s = xp.getXpath().trim();
 
+        if (isNodeSetExpression(s)) return s;
         if (s.startsWith(".//")) return s.substring(3);
         if (s.startsWith("./")) return s.substring(2);
         if (s.startsWith("//")) return s.substring(2);
@@ -46,82 +78,105 @@ public final class XPathyAssembly {
     }
 
     /**
-     * Build the predicate used for "between" relationships:
-     * [preceding::beforeStep and following::afterStep]
-     * <p>
-     * Example:
-     * before = //h2
-     * after  = //footer
-     * -> "preceding::h2 and following::footer"
+     * Build the predicate used for "between" relationships.
+     *
+     * For normal step-like anchors:
+     *   preceding::beforeStep and following::afterStep
+     *
+     * For parenthesized/node-set expressions:
+     *   current node is in afterOf(before) AND current node is in beforeOf(after)
      */
     public static String betweenPredicate(XPathy before, XPathy after) {
-        String beforeStep = asRelativeStep(before);
-        String afterStep = asRelativeStep(after);
-        return "preceding::" + beforeStep + " and following::" + afterStep;
+        String beforeRaw = before.getXpath().trim();
+        String afterRaw = after.getXpath().trim();
+
+        if (!isNodeSetExpression(beforeRaw) && !isNodeSetExpression(afterRaw)) {
+            String beforeStep = asRelativeStep(before);
+            String afterStep = asRelativeStep(after);
+            return "preceding::" + beforeStep + " and following::" + afterStep;
+        }
+
+        String afterBeforeSet = afterOf(before).getXpath();
+        String beforeAfterSet = beforeOf(after).getXpath();
+
+        return toMembershipPredicate(afterBeforeSet) + " and " + toMembershipPredicate(beforeAfterSet);
     }
 
-// -------------------------------------------------------------------------
-// Scope builders: inside / before / after / in-between
-// -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Scope builders: inside / before / after / in-between
+    // -------------------------------------------------------------------------
 
     /**
      * Scope: all nodes that are inside (descendants of) any node matched by {@code anchor}.
-     * <p>
-     * Example:
-     * anchor = //div[contains(@class,'classA')]
-     * result = //*[ancestor::div[contains(@class,'classA')]]
+     *
+     * Examples:
+     *   //div[contains(@class,'x')] -> //*[ancestor::div[contains(@class,'x')]]
+     *   (//div)[3]                  -> ((//div)[3])/descendant::*
      */
     public static XPathy insideOf(XPathy anchor) {
+        String raw = anchor.getXpath().trim();
+
+        if (isNodeSetExpression(raw)) {
+            return XPathy.from(wrapExpression(raw) + "/descendant::*");
+        }
+
         String step = asRelativeStep(anchor);
 
         if (step.startsWith("select[")) {
             String expr = "//*[ancestor::*[position()<=3][self::" + step + "][1]]";
-            return new XPathy(expr);
+            return XPathy.from(expr);
         }
 
         String expr = "//*[ancestor::" + step + "]";
-        return new XPathy(expr);
+        return XPathy.from(expr);
     }
 
     /**
      * Scope: all nodes that appear before any node matched by {@code anchor} in document order.
-     * <p>
-     * Example:
-     * anchor = //div[contains(@class,'classA')]
-     * result = //*[following::div[contains(@class,'classA')]]
+     *
+     * Examples:
+     *   //div[contains(@class,'x')] -> //*[following::div[contains(@class,'x')]]
+     *   (//div)[3]                  -> ((//div)[3])/preceding::*
      */
     public static XPathy beforeOf(XPathy anchor) {
+        String raw = anchor.getXpath().trim();
+
+        if (isNodeSetExpression(raw)) {
+            return XPathy.from(wrapExpression(raw) + "/preceding::*");
+        }
+
         String step = asRelativeStep(anchor);
         String expr = "//*[following::" + step + "]";
-        return new XPathy(expr);
+        return XPathy.from(expr);
     }
 
     /**
      * Scope: all nodes that appear after any node matched by {@code anchor} in document order.
-     * <p>
-     * Example:
-     * anchor = //div[contains(@class,'classA')]
-     * result = //*[preceding::div[contains(@class,'classA')]]
+     *
+     * Examples:
+     *   //div[contains(@class,'x')] -> //*[preceding::div[contains(@class,'x')]]
+     *   (//div)[3]                  -> ((//div)[3])/following::*
      */
     public static XPathy afterOf(XPathy anchor) {
+        String raw = anchor.getXpath().trim();
+
+        if (isNodeSetExpression(raw)) {
+            return XPathy.from(wrapExpression(raw) + "/following::*");
+        }
+
         String step = asRelativeStep(anchor);
         String expr = "//*[preceding::" + step + "]";
-        return new XPathy(expr);
+        return XPathy.from(expr);
     }
 
     /**
      * Scope: all nodes that are between any {@code before} node and any {@code after} node
      * in document order.
-     * <p>
-     * Example:
-     * before = //h2
-     * after  = //footer
-     * result = //*[preceding::h2 and following::footer]
      */
     public static XPathy inBetweenOf(XPathy before, XPathy after) {
         String predicate = betweenPredicate(before, after);
         String expr = "//*[" + predicate + "]";
-        return new XPathy(expr);
+        return XPathy.from(expr);
     }
 
     public static XPathy combineAnd(XPathy... items) {
@@ -144,15 +199,8 @@ public final class XPathyAssembly {
         return combineOr(Arrays.stream(items).map(XPathy::from).toList()).getXpath();
     }
 
-
-//
-//    public static XPathy combineAnd2(List<XPathy> list) {
-//        if (list.size() == 1) return list.getFirst();
-//        return XPathy.from(combine(list, "and").getXpath().replace("[]", ""));
-//    }
-
     /**
-     * Combine all XPathy with logical AND: //*[ self::... and self::... and ... ]
+     * Combine all XPathy with logical AND.
      */
     public static XPathy combineAnd(List<XPathy> list) {
         if (list.size() == 1) return list.getFirst();
@@ -161,24 +209,40 @@ public final class XPathyAssembly {
         return combineAndFinal(sorted);
     }
 
-
     public static XPathy combineAndFinal(List<XPathy> list) {
+        validateList(list);
+
         XPathy first = list.getFirst();
         if (list.size() == 1) return first;
-        List<String> xpathStrings = list.stream().map(xPathy -> xPathy.getXpath().trim()).toList();
-        if (xpathStrings.stream().allMatch(s -> s.startsWith("//*"))) {
-            return XPathy.from("//*" + xpathStrings.stream().map(string -> string.substring(3)).collect(Collectors.joining("")));
+
+        List<String> xpathStrings = list.stream()
+                .map(xPathy -> xPathy.getXpath().trim())
+                .toList();
+
+        // Fast path: all are //*[...]-style predicates -> concatenate predicate suffixes
+        if (xpathStrings.stream().allMatch(XPathyAssembly::isUniversalSelection)) {
+            return XPathy.from("//*" + xpathStrings.stream()
+                    .map(string -> string.substring(3))
+                    .collect(Collectors.joining("")));
         }
-        if (!xpathStrings.getFirst().startsWith("//*") && xpathStrings.getFirst().startsWith("//")) {
-            return XPathy.from(xpathStrings.getFirst() + combineAndFinal(list.subList(1, list.size())).getXpath().replace("[]", "").replaceFirst("^//\\*", ""));
-        } else {
-            return XPathy.from(combine(list, "and").getXpath().replace("[]", ""));
+
+        // Existing fast path: //tag[...] + //*[...] -> //tag[...][...]
+        String firstXpath = xpathStrings.getFirst();
+        if (isSimpleDoubleSlashPath(firstXpath)) {
+            String tail = combineAndFinal(list.subList(1, list.size()))
+                    .getXpath()
+                    .replace("[]", "")
+                    .replaceFirst("^//\\*", "");
+            return XPathy.from(firstXpath + tail);
         }
+
+        // General path: convert each input to a predicate that means
+        // "current node is selected by this component"
+        return XPathy.from(combine(list, "and").getXpath().replace("[]", ""));
     }
 
-
     /**
-     * Combine all XPathy with logical OR: //*[ self::... or self::... or ... ]
+     * Combine all XPathy with logical OR.
      */
     public static XPathy combineOr(List<XPathy> list) {
         if (list.size() == 1) return list.getFirst();
@@ -187,22 +251,13 @@ public final class XPathyAssembly {
         return combine(sorted, "or");
     }
 
-
     private static XPathy combine(List<XPathy> list, String joiner) {
+        validateList(list);
         if (list.size() == 1) return list.getFirst();
-        for (int i = 0; i < list.size(); i++) {
-            if (list.get(i) == null) {
-                throw new IllegalStateException("Null XPathy at index " + i);
-            }
-            if (list.get(i).getXpath() == null) {
-                throw new IllegalStateException("Null xpath string at index " + i);
-            }
-        }
-
 
         String combinedExpr = list.stream()
                 .map(XPathy::getXpath)
-                .map(XPathyAssembly::toSelfStep)
+                .map(XPathyAssembly::predicateForCurrentNode)
                 .collect(Collectors.joining(" " + joiner + " "));
 
         String fullXpath = "//*[" + combinedExpr + "]";
@@ -210,20 +265,27 @@ public final class XPathyAssembly {
     }
 
 
-    private static final java.util.concurrent.atomic.AtomicInteger selfCounter = new java.util.concurrent.atomic.AtomicInteger(1);
 
-    private static final Pattern SELF_WRAP =
-            Pattern.compile(
-                    "^[^a-zA-Z]*self::(?:[A-Za-z_][A-Za-z0-9_.:-]*|\\*)\\[(\\d+)>-(\\d+)\\].*\\[\\1>-\\2\\][^a-zA-Z]*$",
-                    Pattern.DOTALL
-            );
+    /**
+     * Membership predicate: true iff the current node is part of the node-set selected by xpath.
+     */
+    private static String toMembershipPredicate(String xpath) {
+        String s = xpath.trim();
+        return "count(. | " + s + ") = count(" + s + ")";
+    }
 
-
+    /**
+     * Convert a step-like xpath into a self::... predicate.
+     *
+     * For parenthesized/node-set expressions, fall back to membership predicate form.
+     */
     public static String toSelfStep(String xpath) {
         String s = xpath.trim();
+
         while (s.startsWith("(") && s.endsWith(")")) {
-            s = s.substring(1, s.length() - 1);
+            s = s.substring(1, s.length() - 1).trim();
         }
+
         if (SELF_WRAP.matcher(s).matches()) {
             if (s.startsWith("//*[self")) {
                 return s.substring(4, s.length() - 1);
@@ -233,30 +295,30 @@ public final class XPathyAssembly {
             return xpath;
         }
 
+        if (isNodeSetExpression(xpath)) {
+            return toMembershipPredicate(xpath);
+        }
 
-        if (s.matches("^[A-Za-z-]+::.*")) {
+        if (AXIS_PATTERN.matcher(s).matches()) {
             return s;
         }
-        String stripped = s
-                .replaceFirst("^[\\./]+", "").trim();     // /...
 
-//        if(stripped.startsWith("self::"))
-//            return xpath;
+        String stripped = s.replaceFirst("^[\\./]+", "").trim();
 
-        String step = stripped;
-
-        if (step.matches("^[A-Za-z-]+::.*")) {
-            return step;
+        if (AXIS_PATTERN.matcher(stripped).matches()) {
+            return stripped;
         }
 
         int id = selfCounter.incrementAndGet();
-        int nestingCount = countIdPairs(step);
-        step = step.replaceFirst("^([A-Za-z_][A-Za-z0-9_.:-]*|\\*)", "self::$1[" + id + ">-" + nestingCount + "]") + "[" + id + ">-" + nestingCount + "]";
+        int nestingCount = countIdPairs(stripped);
+
+        String step = stripped.replaceFirst(
+                "^([A-Za-z_][A-Za-z0-9_.:-]*|\\*)",
+                "self::$1[" + id + ">-" + nestingCount + "]"
+        ) + "[" + id + ">-" + nestingCount + "]";
+
         return step;
     }
-
-    private static final Pattern ID_PAIR_PATTERN =
-            Pattern.compile("\\[\\d+>-\\d+\\]");
 
     public static int countIdPairs(String input) {
         if (input == null || input.isEmpty()) {
@@ -269,16 +331,9 @@ public final class XPathyAssembly {
         while (m.find()) {
             count++;
         }
+
         return count;
     }
-
-
-    public static final char match1 = '\u206A';
-    public static final char match2 = '\u207A';
-    public static final char match3 = '\u208A';
-    public static final String match1s = String.valueOf(match1);
-    public static final String match2s = String.valueOf(match2);
-    public static final String match3s = String.valueOf(match3);
 
     /**
      * Heuristic specificity scoring. Lower score = "more specific".
@@ -289,7 +344,11 @@ public final class XPathyAssembly {
 
         int score = countChar(xpath, '*') * 10;
         printDebug("##Xscore score1: " + score);
-        if (xpath.startsWith("//*[preceding") || xpath.startsWith("//*[following") || xpath.startsWith("//*[ancestor") || xpath.startsWith("//*[descendant")) {
+
+        if (xpath.startsWith("//*[preceding")
+                || xpath.startsWith("//*[following")
+                || xpath.startsWith("//*[ancestor")
+                || xpath.startsWith("//*[descendant")) {
             score += 10_000_000;
             String firstTag = "";
             if (xpath.contains("::")) {
@@ -316,12 +375,12 @@ public final class XPathyAssembly {
         }
 
         printDebug("##Xscore score3: " + score);
+
         String noSpace = xpath
                 .replaceAll("\\b(?:or|body)\\b|\\|", match1s)
                 .replaceAll("(?:\\b::text|count|not|descendant|ancestor|preceding|following\\b)|//", match2s)
                 .replaceAll("(?:\\btranslate|contains|starts-with|position\\b)", match3s)
                 .replaceAll("\\s+|\\(|\\)", "");
-
 
         score += countChar(noSpace, match1) * 1000;
         score += countChar(noSpace, match2) * 500;
@@ -332,6 +391,7 @@ public final class XPathyAssembly {
         if (noSpace.contains("//*[not")) {
             score += 50_000;
         }
+
         printDebug("##Xscore score5: " + score);
 
         if (noSpace.contains("'opacity:0'")) {
@@ -352,21 +412,9 @@ public final class XPathyAssembly {
         return count;
     }
 
-
     public static String prettyPrintXPath(XPathy xpathy) {
         return prettyPrintXPath(xpathy.getXpath());
     }
-
-// Boundary is either a full self-step with tag OR a bare tag
-    private static final Pattern BOUNDARY =
-            Pattern.compile("self::(?:[A-Za-z_][A-Za-z0-9_.:-]*|\\*)\\[\\d+>-\\d+\\]|\\[\\d+>-\\d+\\]");
-
-    // Extract b from any tag [a>-b]
-    private static final Pattern PSEUDO_TAG =
-            Pattern.compile("\\[(\\d+)>-(\\d+)\\]");
-
-    public static Boolean stripPseudoTags = null;
-    public static Boolean normalizeWhiteSpace = null;
 
     public static String prettyPrintXPath(String xpath) {
         if (xpath == null) return null;
@@ -384,7 +432,6 @@ public final class XPathyAssembly {
             String trimmed = part.trim();
             if (trimmed.isEmpty()) continue;
 
-            // indent based on the FIRST pseudo tag found in this chunk (if any)
             int indentLevel = 0;
             Matcher t = PSEUDO_TAG.matcher(trimmed);
             if (t.find()) {
@@ -416,18 +463,15 @@ public final class XPathyAssembly {
             starts.add(m.start());
         }
 
-        // No boundaries found -> single chunk
         if (starts.isEmpty()) return List.of(s);
 
         List<String> parts = new ArrayList<>();
 
-        // Keep any prefix before the first boundary
         int first = starts.get(0);
         if (first > 0) {
             parts.add(s.substring(0, first));
         }
 
-        // Slice boundary-to-boundary
         for (int i = 0; i < starts.size(); i++) {
             int from = starts.get(i);
             int to = (i + 1 < starts.size()) ? starts.get(i + 1) : s.length();
@@ -436,7 +480,82 @@ public final class XPathyAssembly {
 
         return parts;
     }
+
+    private static void validateList(List<XPathy> list) {
+        for (int i = 0; i < list.size(); i++) {
+            if (list.get(i) == null) {
+                throw new IllegalStateException("Null XPathy at index " + i);
+            }
+            if (list.get(i).getXpath() == null) {
+                throw new IllegalStateException("Null xpath string at index " + i);
+            }
+        }
+    }
+
+    private static boolean isNodeSetExpression(String xpath) {
+        return xpath != null && xpath.trim().startsWith("(");
+    }
+
+    private static boolean isUniversalSelection(String xpath) {
+        if (xpath == null) return false;
+        String s = xpath.trim();
+        return s.startsWith("//*[") && isSingleTopLevelPredicatePath(s);
+    }
+
+    private static boolean isSingleTopLevelPredicatePath(String xpath) {
+        if (xpath == null) return false;
+        String s = xpath.trim();
+        if (!s.startsWith("//*[")) return false;
+
+        int depth = 0;
+        for (int i = 3; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '[') depth++;
+            else if (c == ']') depth--;
+            else if (depth == 0) return false; // any top-level char outside predicates is not allowed
+            if (depth < 0) return false;
+        }
+        return depth == 0;
+    }
+
+    private static boolean isSimpleDoubleSlashPath(String xpath) {
+        if (xpath == null) return false;
+        String s = xpath.trim();
+        return !isNodeSetExpression(s) && !s.startsWith("//*") && s.startsWith("//");
+    }
+
+    private static String wrapExpression(String xpath) {
+        return "(" + xpath.trim() + ")";
+    }
+
+    private static String unwrapOuterPredicate(String s) {
+        s = s.trim();
+        if (s.startsWith("[") && s.endsWith("]")) {
+            int depth = 0;
+            for (int i = 0; i < s.length(); i++) {
+                char ch = s.charAt(i);
+                if (ch == '[') depth++;
+                else if (ch == ']') depth--;
+                if (depth == 0 && i < s.length() - 1) {
+                    return s;
+                }
+            }
+            return s.substring(1, s.length() - 1).trim();
+        }
+        return s;
+    }
+
+    private static String predicateForCurrentNode(String xpath) {
+        String s = xpath.trim();
+
+        if (isUniversalSelection(s)) {
+            return unwrapOuterPredicate(s.substring(3));
+        }
+
+        if (isNodeSetExpression(s)) {
+            return toMembershipPredicate(s);
+        }
+
+        return toSelfStep(s);
+    }
 }
-
-
-

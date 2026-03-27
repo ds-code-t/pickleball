@@ -26,6 +26,7 @@ import java.util.stream.Collectors;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
+import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.StepMapping.copytoNewParsingMap;
@@ -96,7 +97,7 @@ public abstract class PhraseData extends PassedData {
     //    public XPathChainResult contextMatch;
     @Override
     public String toString() {
-        return (resolvedText == null ? text: resolvedText ).replaceAll(BOOK_END, "") + termination;
+        return (resolvedText == null ? text : resolvedText).replaceAll(BOOK_END, "") + termination;
     }
 
 
@@ -123,7 +124,6 @@ public abstract class PhraseData extends PassedData {
     }
 
 
-
     public void setPhraseParsingMap(ParsingMap newParsingMap) {
         this.phraseParsingMap = newParsingMap;
     }
@@ -143,7 +143,12 @@ public abstract class PhraseData extends PassedData {
         this(inputText, delimiter, lineData, null);
     }
 
+    public final boolean defaultContextPhrase;
+
     public PhraseData(String inputText, Character delimiter, LineData lineData, PhraseData previousPhrase) {
+        defaultContextPhrase = inputText.equals(STARTING_CONTEXT);
+        if (defaultContextPhrase)
+            inputText = "From " + inputText;
         setPreviousPhrase(previousPhrase);
         parsedLine = lineData;
         text = inputText;
@@ -267,12 +272,15 @@ public abstract class PhraseData extends PassedData {
 
     public static void getXPathyContext(PhraseData phraseData, List<ElementMatch> elements) {
         if (elements.isEmpty()) phraseData.contextXPathy = null;
-        XPathy secondXPathy = elements.size() ==1 ? null : elements.get(1).xPathy;
+        XPathy secondXPathy = elements.size() == 1 ? null : elements.get(1).xPathy;
         XPathy secondXPathyWithIndex = secondXPathy == null ? null : elements.get(1).xPathyWithIndex;
         String context = phraseData.context.toLowerCase();
 
         XPathy xPathy = elements.getFirst().xPathy;
-        if (xPathy == null) phraseData.contextXPathy = null;
+        if (xPathy == null) {
+            phraseData.contextXPathy = null;
+            return;
+        }
 
         phraseData.contextXPathy = resolveContextXPathy(
                 context,
@@ -307,7 +315,6 @@ public abstract class PhraseData extends PassedData {
         }
         return null;
     }
-
 
 
     public abstract PhraseData runPhrase();

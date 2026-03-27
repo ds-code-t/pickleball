@@ -2,10 +2,14 @@ Feature: Addition
 
 
   Scenario: debug tEst2
-#    @[DEBUG]
+    @[DEBUG,nobase,##]
 #    * navigate to: URL.select
-  @[DEBUG]
-    * , verify  "Choose a car:" Dropdown is displayed
+
+#    * , verify  Elm is displayed
+#      * , "Example Domain" Text is displayed
+#    * , from the Top Panel:
+#    * , verify   "Dropdown:" Ddd is displayed
+    * , verify  "Dropdown:" Dropdown is displayed
 #    * , select the last Option "Choose a car:" Dropdown
 
   @T1

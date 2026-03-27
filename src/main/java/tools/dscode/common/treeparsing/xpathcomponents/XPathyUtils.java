@@ -34,15 +34,6 @@ public final class XPathyUtils {
         return new XPathy("(" + raw + ")[" + predicate + "]");
     }
 
-    private static XPathy appendPredicate(XPathy xp, String predicate) {
-        if (xp == null) throw new IllegalArgumentException("XPathy must not be null");
-        String raw = xp.getXpath();
-        if (raw == null || raw.isBlank()) {
-            throw new IllegalArgumentException("XPathy xpath must not be null/blank");
-        }
-        return new XPathy(raw + "[" + predicate + "]");
-    }
-
     /**
      * Every nth match (1-based, multiples of step):
      * step=3 → 3rd, 6th, 9th, ...
@@ -52,10 +43,7 @@ public final class XPathyUtils {
         if (step < 1) throw new IllegalArgumentException("step must be >= 1");
         return wrapWithPredicate(xp, "position() mod " + step + " = 0");
     }
-    public static XPathy everyNthAppended(XPathy xp, int step) {
-        if (step < 1) throw new IllegalArgumentException("step must be >= 1");
-        return appendPredicate(xp, "position() mod " + step + " = 0");
-    }
+
     /**
      * Every nth match starting at a given 1-based offset:
      * start=1, step=3 → 1st, 4th, 7th, ...
@@ -68,7 +56,6 @@ public final class XPathyUtils {
         String predicate = "(position() - " + start + ") mod " + step + " = 0 and position() >= " + start;
         return wrapWithPredicate(xp, predicate);
     }
-
 
     // =========================================================================
     //  WHITESPACE NORMALIZATION TABLE (kept public for ValueWrapper static import)

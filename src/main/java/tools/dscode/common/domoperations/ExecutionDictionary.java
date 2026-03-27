@@ -427,7 +427,7 @@ public class ExecutionDictionary {
             if (category.equals(BASE_CATEGORY)) {
                 return List.of();
             }
-            if (!hasAnyRegisteredBuilders(lineage) && !hasResolvedBase(lineage)) {
+            if (!category.equals(STARTING_CONTEXT) && !hasAnyRegisteredBuilders(lineage) && !hasResolvedBase(lineage)) {
                 var starList = map.get("*");
                 if (starList == null || starList.isEmpty()) return List.of();
                 allBuilders.addAll(starList);

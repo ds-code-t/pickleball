@@ -21,7 +21,7 @@ public final class Phrase extends PhraseData {
 
 
     public Phrase(LineData parsedLine) {
-        super("From " + STARTING_CONTEXT, ',', parsedLine);
+        super( STARTING_CONTEXT, ',', parsedLine);
         isTopContext = true;
     }
 

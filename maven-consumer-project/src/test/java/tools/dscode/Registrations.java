@@ -22,9 +22,13 @@ import static com.xpathy.Case.LOWER;
 import static com.xpathy.Tag.any;
 import static com.xpathy.Tag.input;
 import static tools.dscode.common.domoperations.ExecutionDictionary.CONTAINS_TEXT;
+import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.colocatedDeepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.customElementSuffixPredicate;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedVisibleText;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.descendantDeepNormalizedVisibleText;
 import static tools.dscode.common.util.debug.DebugUtils.onMatch;
 import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 
@@ -59,13 +63,41 @@ public class Registrations {
         ExecutionDictionary dict = getExecutionDictionary();
 
 
+        dict.category("Elm").addBase("//div");
 
 
+        dict.category("Ddd").andAnyCategories("fff").inheritsFrom(CONTAINS_TEXT).or(
+                "//select",
+                "//div"
+        );
 
-        dict.category("Rrr").addBase("//div");
+//                .addBase("//select");
 
 
+        dict.category("fff").addBase("//div");
 
+        dict.category("sff")
+                .and(
+                        (category, v, op) -> {
+
+                            XPathy returnXpath = combineOr(
+                                    new XPathy("//select"),
+                                    new XPathy("//textarea")
+//                                    new XPathy("//*[@id and string-length(normalize-space(@id)) > 0 and @id = (ancestor::div[3]//descendant::*" + deepNormalizedVisibleText + "[@for and string-length(normalize-space(@for)) > 0][1]/@for)]"),
+//                                    new XPathy("//*[@aria-labelledby and string-length(normalize-space(@aria-labelledby)) > 0 and @aria-labelledby = (ancestor::div[3]//descendant::*" + deepNormalizedVisibleText + "[@id and string-length(normalize-space(@id)) > 0][1]/@id)]"),
+//                                    new XPathy("//*[ @headers and string-length(normalize-space(@headers)) > 0 and contains(concat(' ', @headers, ' '), concat(' ', (ancestor::div[3]//descendant::*" + deepNormalizedVisibleText + "[@id and string-length(normalize-space(@id)) > 0][1]/@id), ' ')) ]"),
+//                                    new XPathy("//*[ancestor-or-self::*[position() <= 7]" +
+//                                            "  [preceding-sibling::*[1]        " +
+//                                            descendantDeepNormalizedVisibleText(v, op) +
+//                                            "         [not(descendant::button or descendant::input or descendant::textarea or descendant::select or descendant::a)]" +
+//                                            "  ]" +
+//                                            "]"),
+//                                    XPathy.from("//*" + colocatedDeepNormalizedVisibleText(v, op))
+                            );
+                            printDebug("##textXpath forLabel:2 " + returnXpath);
+                            return returnXpath;
+                        }
+                );
 
 
         dict.category("Submit Button").or(

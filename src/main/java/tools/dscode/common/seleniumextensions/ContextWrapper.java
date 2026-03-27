@@ -32,12 +32,10 @@ public class ContextWrapper {
     }
 
 
-
-
     public List<WebElement> getElements() {
         printDebug("\n##ContextWrapper- getElements: " + elementMatch);
         SearchContext searchContext = getFinalSearchContext();
-        if(searchContext == null) return new ArrayList<>();
+        if (searchContext == null) return new ArrayList<>();
         printDebug("####ContextWrapper-searchContext: " + searchContext.getClass().getSimpleName());
         printDebug("####ContextWrapper-elementMatch.parentPhrase: " + elementMatch.parentPhrase);
         printDebug("####ContextWrapper-elementTerminalXPath ");
@@ -46,9 +44,6 @@ public class ContextWrapper {
         return getElementListFromSearchContext(searchContext, elementTerminalXPath, elementMatch);
 //        return searchContext.findElements(elementTerminalXPath.getLocator());
     }
-
-
-
 
 
     public SearchContext getFinalSearchContext() {
@@ -85,19 +80,18 @@ public class ContextWrapper {
                     xPathyList.clear();
                 }
 
-                    printDebug("##ContextWrapper-searchContext-1 " + searchContext);
-                    searchContext = getExecutionDictionary().applyContextBuilder(phraseData.getFirstElement().category, phraseData.getFirstElement().defaultText, phraseData.getFirstElement().defaultTextOp, elementMatch.parentPhrase.getDriver(), searchContext);
-                    printDebug("##ContextWrapper-searchContext-2 " + searchContext);
-                if(searchContext == null)
+                printDebug("##ContextWrapper-searchContext-1 " + searchContext);
+                searchContext = getExecutionDictionary().applyContextBuilder(phraseData.getFirstElement().category, phraseData.getFirstElement().defaultText, phraseData.getFirstElement().defaultTextOp, elementMatch.parentPhrase.getDriver(), searchContext);
+                printDebug("##ContextWrapper-searchContext-2 " + searchContext);
+                if (searchContext == null)
                     break;
 
                 printDebug("##ContextWrapper-searchContext2: " + (searchContext == null ? "null" : searchContext.getClass().getSimpleName()));
-            } else {
+            } else  {
                 printDebug("phraseData4: " + phraseData.contextXPathyWithIndex);
                 xPathyList.add(phraseData.contextXPathyWithIndex);
             }
         }
-
         xPathyList.add(elementMatch.xPathy);
         printDebug("##ContextWrapper-xPathyList: " + xPathyList);
         initializeElementXPaths(xPathyList);
@@ -112,7 +106,7 @@ public class ContextWrapper {
                 xpath = xpath.replaceFirst("//", "descendant-or-self::");
         }
 
-        printDebug("##XPath: getElementListFromSearchContext\n" + prettyPrintXPath(xpath) +"\n----------------" );
+        printDebug("##XPath: getElementListFromSearchContext\n" + prettyPrintXPath(xpath) + "\n----------------");
         return findWithRetry(searchContext, new By.ByXPath(xpath), elementMatch);
 //        return searchContext.findElements(new By.ByXPath(xpath));
     }

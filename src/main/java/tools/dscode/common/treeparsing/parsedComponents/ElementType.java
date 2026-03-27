@@ -16,8 +16,10 @@ import static io.cucumber.core.runner.util.TableUtils.HEADER_KEY;
 import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static io.cucumber.core.runner.util.TableUtils.VALUE_KEY;
+import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 
 public enum ElementType {
+    DEFAULT_STARTING_CONTEXT,
     SINGLE_ELEMENT_IN_PHRASE, MULTIPLE_ELEMENTS_IN_PHRASE,
     FIRST_ELEMENT, SECOND_ELEMENT, LAST_ELEMENT,
     PRECEDING_OPERATION, FOLLOWING_OPERATION, NO_OPERATION,
@@ -73,6 +75,12 @@ public enum ElementType {
 
     public static Set<ElementType> fromString(String raw) {
         Set<ElementType> returnSet = new java.util.HashSet<>();
+        if(raw.equals(STARTING_CONTEXT))
+        {
+            returnSet.add(DEFAULT_STARTING_CONTEXT);
+            return returnSet;
+        }
+
         String singular = raw.replaceAll("s$", "");
 
         if (singular.equals("Loading")) {
