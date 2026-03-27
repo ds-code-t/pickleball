@@ -267,7 +267,8 @@ public abstract class PhraseData extends PassedData {
 
     public static void getXPathyContext(PhraseData phraseData, List<ElementMatch> elements) {
         if (elements.isEmpty()) phraseData.contextXPathy = null;
-
+        XPathy secondXPathy = elements.size() ==1 ? null : elements.get(1).xPathy;
+        XPathy secondXPathyWithIndex = secondXPathy == null ? null : elements.get(1).xPathyWithIndex;
         String context = phraseData.context.toLowerCase();
 
         XPathy xPathy = elements.getFirst().xPathy;
@@ -276,7 +277,7 @@ public abstract class PhraseData extends PassedData {
         phraseData.contextXPathy = resolveContextXPathy(
                 context,
                 xPathy,
-                elements.get(1).xPathy
+                secondXPathy
         );
 
         if (phraseData.contextXPathy == null) {
@@ -285,7 +286,7 @@ public abstract class PhraseData extends PassedData {
             phraseData.contextXPathyWithIndex = resolveContextXPathy(
                     context,
                     elements.getFirst().xPathyWithIndex,
-                    elements.get(1).xPathyWithIndex
+                    secondXPathyWithIndex
             );
         }
     }
@@ -301,6 +302,7 @@ public abstract class PhraseData extends PassedData {
             return beforeOf(first);
         }
         if (context.startsWith("between")) {
+            if (second == null) second = first;
             return inBetweenOf(first, second);
         }
         return null;
