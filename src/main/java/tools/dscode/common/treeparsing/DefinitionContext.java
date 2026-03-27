@@ -366,7 +366,7 @@ public final class DefinitionContext {
                     );
 
 
-            category("Icon").children("Icons", "Image", "Images").andAnyCategories("forLabel", TEXT_CONTENT_OR_ATTRIBUTE, SrcHrfMatchBuilder)
+            category("Icon").children("Icons", "Image", "Images").andAnyCategories(HTML_NAME_ATTRIBUTES, SrcHrfMatchBuilder)
                     .addBase("(//img | //i | //a[normalize-space(.)=''] | //*[@role='icon' or local-name()='svg'])")
                     .addAlternateBase("//*[self::img or self::i or local-name()='svg' or @role='icon' or  self::a[normalize-space(.) = '']]");
 
