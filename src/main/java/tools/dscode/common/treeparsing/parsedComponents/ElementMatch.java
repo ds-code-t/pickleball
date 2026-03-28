@@ -69,8 +69,8 @@ public class ElementMatch {
 
     public String toString() {
         if (previouslyReturnedValues == null)
-            return "No Resolved Values , Element: " + fullText;
-        return "Resolved Values: " + previouslyReturnedValues + " , Element: " + fullText;
+            return "No Resolved Values - Element: " + fullText;
+        return "Resolved Values: " + previouslyReturnedValues + " - Element: " + fullText;
     }
 
     public List<ValueWrapper> nonHTMLValues = new ArrayList<>();

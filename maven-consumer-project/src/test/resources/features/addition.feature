@@ -3,8 +3,9 @@ Feature: Addition
 
   Scenario: debug tEst2
     @[DEBUG,nobase]
+      * , if Alert is displayed, verify Button is displayed
 #    * navigate to: URL.select
-  * , in the Column Header, click the 1st Icon
+#  * , in the Column Header, click the 1st Icon
 #    * , verify  Elm is displayed
 #      * , "Example Domain" Text is displayed
 #    * , from the Top Panel:

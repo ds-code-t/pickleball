@@ -24,7 +24,6 @@ public class ElementMatching {
                 elementMatches.add(i, createPlaceHolderElementMatch(phraseData ,elementMatcher));
             }
         }
-
         elementMatches.removeIf(e -> e.isPlaceHolder() && e.elementMatcher == null);
 
         if (elementMatches.size() != elementMatchers.length) {

@@ -82,29 +82,24 @@ public enum ElementType {
         }
 
         String singular = raw.replaceAll("s$", "");
-
         if (singular.equals("Loading")) {
             returnSet.add(HTML_LOADING);
             returnSet.add(HTML_TYPE);
             return returnSet;
         }
-
         if(DATA_ELEMENTS.contains(singular)) {
             returnSet.add(DATA_TYPE);
             returnSet.add(RETURNS_VALUE);
             return returnSet;
         }
-
         if(BROWSER_ELEMENTS.contains(singular)) {
             returnSet.add(BROWSER_TYPE);
         }
-
         if (singular.equals("Browser")) {
             returnSet.add(BROWSER_TYPE);
             returnSet.add(BROWSER_WINDOW);
             return returnSet;
         }
-
         if (raw.contains("Window")) {
             String windowNormalized = raw.replaceAll("Windows?", "").trim().toUpperCase(Locale.ROOT);
             if(windowNormalized.isBlank())
@@ -121,14 +116,12 @@ public enum ElementType {
             }
         }
 
-
-        if (singular.equals("Alerts")) {
+        if (singular.equals("Alert")) {
             returnSet.add(BROWSER_TYPE);
             returnSet.add(ALERT);
             returnSet.add(RETURNS_VALUE);
             return returnSet;
         }
-
         if(returnSet.contains(BROWSER_TYPE)) {
             return returnSet;
         }
