@@ -34,6 +34,7 @@ import tools.dscode.coredefinitions.NavigationSteps;
 import tools.dscode.coredefinitions.ObjectRegistrationSteps;
 import tools.dscode.registry.GlobalRegistry;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -61,6 +62,7 @@ import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMap;
 import static tools.dscode.common.servicecalls.ToJsonNode.sjson;
 import static tools.dscode.common.treeparsing.DefinitionContext.DEFAULT_EXECUTION_DICTIONARY;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.colocatedDeepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.customElementSuffixPredicate;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedText;
@@ -78,17 +80,38 @@ import org.intellij.lang.annotations.Language;
 
 public class CalculatorSteps {
 
-//    @Given("_-CREATE_LOCAL_DRIVER")
+    public static void main(String[] args) {
+        String x1 = "//div";
+        String x2 = "//div[@role]";
+//        String x2 = "(//img | //i | //a[normalize-space(.)=''] | //*[@role='icon' or local-name()='svg'])[parent::div]";
+        List<XPathy> list = new ArrayList<>();
+        list.add(XPathy.from(x1));
+        list.add(XPathy.from(x2));
+        System.out.println("$$combineAnd-list: " + list);
+        System.out.println("$$combineAnd-return: " + combineAnd(list));
+        System.out.println("$$combineAnd-return-reversed: " + combineAnd(list.reversed()));
+    }
+
+    //    @Given("_-CREATE_LOCAL_DRIVER")
 //    public RemoteWebDriver createDriver(ObjectNode configuration) throws Exception {
 //        return DriverConstruction.createDriver(configuration);
 //    }
-@Given("^dataTableTest1(?: (.*))?$")
-public static void dataTableTest1(String value, DataTable dataTable) {
-    System.out.println("@@dataTableTest1: " + value);
-    System.out.println("@@dataTable: " + dataTable);
+    @Given("^dataTableTest1(?: (.*))?$")
+    public static void dataTableTest1(String value, DataTable dataTable) {
+        System.out.println("@@dataTableTest1: " + value);
+        System.out.println("@@dataTable: " + dataTable);
 
 
-}
+    }
+
+    @Given("^test3(?: (.*))?$")
+    public static void test3(String value) {
+        String x1 = "//div";
+        String x2 = "//*[@role]";
+        System.out.println("@@combineAnd: " + combineAnd(x1, x2));
+    }
+
+
     @Given("^test2(?: (.*))?$")
     public static void test2(String value) {
         System.out.println("@@test2: " + value);
@@ -140,67 +163,7 @@ public static void dataTableTest1(String value, DataTable dataTable) {
     }
 
 
-    public static void main(String[] args) {
 
-        JsonNode j = JacksonUtils.toJSON("""
-                     {
-                     "name": "John"
-                     }
-                """);
-
-
-        JsonNode jsonNode = JacksonUtils.toJSON("""
-                {
-                  "name": "John",
-                  "age": 30
-                  }
-                """);
-
-
-        JsonNode yamlNode = JacksonUtils.toYAML("""
-                
-                        name: John
-                
-                
-                age: 30""");
-
-        JsonNode xmlNode = JacksonUtils.
-                toXML(
-                        """
-                                <person>
-                                  <name>John</
-                                    name>
-                                  <age>30</age>
-                                </person>""");
-        String formattedJson = JacksonUtils.formatJSON(
-                """
-                        
-                            {
-                          "name": "John",
-                          "age": 30
-                        }""");
-        System.out.println(
-                formattedJson);
-
-        String
-                formattedYaml = JacksonUtils
-                .formatYAML("""
-                        
-                                name: John
-                        
-                        
-                        age: 30""");
-        System.out.println(formattedYaml);
-
-        String formattedXml = JacksonUtils.formatXML(
-                """
-                        <person>
-                          <name>John</name>
-                          <age>30</age>
-                        </person>""");
-        System.out.println(formattedXml);
-
-    }
 
 //    static {
 //        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
@@ -269,8 +232,8 @@ public static void dataTableTest1(String value, DataTable dataTable) {
 //
 //        ValueWrapper v = ValueWrapper.createValueWrapper("Status");
 //        ExecutionDictionary.Op op = ExecutionDictionary.Op.EQUALS;
-    ////        XPathy t = new XPathy("//*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + "][ancestor::table and (count(preceding-sibling::*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + "]) + 1) = (count(((ancestor::table[1]//thead//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" +
-    ////                customElementSuffixPredicate("header") + dict.getDirectText(v, op) + ") | (ancestor::table[1]//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + dict.getDirectText(v, op) + "))[1]/preceding-sibling::*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + "]) + 1)]");
+    /// /        XPathy t = new XPathy("//*[self::td or self::th or@role='cell'or@role='gridcell'or@role='columnheader'or@role='rowheader'or self::*" + customElementSuffixPredicate("cell") + "][ancestor::table and (count(preceding-sibling::*[self::td or self::th or@role='cell'or@role='gridcell'or@role='columnheader'or@role='rowheader'or self::*" + customElementSuffixPredicate("cell") + "]) + 1) = (count(((ancestor::table[1]//thead//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" +
+    /// /                customElementSuffixPredicate("header") + dict.getDirectText(v, op) + ") | (ancestor::table[1]//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + "][1]//*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + dict.getDirectText(v, op) + "))[1]/preceding-sibling::*[self::th or@role='columnheader'or self::*" + customElementSuffixPredicate("header") + "]) + 1)]");
 //        XPathy t = dict.cellsInColumnByHeaderText(v, op, customElementSuffixPredicate("row"), customElementSuffixPredicate("cell"), customElementSuffixPredicate("header"));
 //        System.out.println("\n\n----------- ");
 //

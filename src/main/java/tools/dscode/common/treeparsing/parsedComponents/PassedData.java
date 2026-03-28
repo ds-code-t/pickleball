@@ -226,7 +226,7 @@ public abstract class PassedData {
     public PhraseData.PhraseType phraseType;
 
     public XPathy contextXPathy;
-    public XPathy contextXPathyWithIndex;
+//    public XPathy contextXPathyWithIndex;
 
     //    public String keyName = "";
     public boolean isClone = false;

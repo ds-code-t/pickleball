@@ -367,8 +367,10 @@ public final class DefinitionContext {
 
 
             category("Icon").children("Icons", "Image", "Images").andAnyCategories(HTML_NAME_ATTRIBUTES, SrcHrfMatchBuilder)
-                    .addBase("(//img | //i | //a[normalize-space(.)=''] | //*[@role='icon' or local-name()='svg'])")
-                    .addAlternateBase("//*[self::img or self::i or local-name()='svg' or @role='icon' or  self::a[normalize-space(.) = '']]");
+//                    .addBase("(//img | //i | //a[normalize-space(.)=''] | //*[@role='icon' or local-name()='svg'])")
+//                    .addAlternateBase("//*[self::img or self::i or local-name()='svg' or @role='icon' or  self::a[normalize-space(.) = '']]")
+                    .addBase("//*[self::img or self::i or local-name()='svg' or @role='icon' or  self::a[normalize-space(.) = '']]")
+            ;
 
 
             category("Button").children("Buttons").andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, CONTAINS_TEXT)

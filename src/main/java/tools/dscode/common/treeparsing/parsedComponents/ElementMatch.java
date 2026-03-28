@@ -57,7 +57,7 @@ public class ElementMatch {
     public String state;
     public List<Attribute> attributes = new ArrayList<>();
     public XPathy xPathy;
-    public XPathy xPathyWithIndex;
+//    public XPathy xPathyWithIndex;
     public Set<ElementType> elementTypes;
     public ElementMatcher elementMatcher;
     public ContextWrapper contextWrapper;
@@ -301,52 +301,11 @@ public class ElementMatch {
             xPathy = applyAttrPredicate(xPathy, attribute.attrName, attribute.predicateVal, attribute.predicateType);
         }
 
-       if (xPathy == null || elementPosition.isEmpty()) {
-            xPathyWithIndex = xPathy;
-        } else if (elementPosition.equals("last")) {
-            xPathyWithIndex =  xPathy.last();
-        } else {
-            elementIndex = Integer.parseInt(elementPosition);
-            if (selectionType.isEmpty()) {
-                xPathyWithIndex = xPathy.nth(elementIndex);
-            } else {
-                if (elementIndex == 1) {
-                    xPathyWithIndex = xPathy;
-                } else {
-                    xPathyWithIndex = everyNth(xPathy, elementIndex);
-                }
-            }
-        }
-//        }
 
 
     }
 
-//    public static ExecutionDictionary.Op getOpFromString(String input) {
-//        return switch (input) {
-//            case null -> null;
-//            case String s when s.isBlank() -> null;
-//            case String s when s.startsWith("equal") -> ExecutionDictionary.Op.EQUALS;
-//            case String s when s.startsWith("contain") -> ExecutionDictionary.Op.CONTAINS;
-//            case String s when s.startsWith("start") -> ExecutionDictionary.Op.STARTS_WITH;
-//            case String s when s.startsWith("end") -> ExecutionDictionary.Op.ENDS_WITH;
-//            default -> null;
-//        };
-//    }
 
-//    private List<PhraseData> phraseContextList;
-
-//    public List<PhraseData> getPhraseContextList() {
-//        if(parentPhrase.isNewContext())
-//        {
-//            PhraseData startingContextPhrase = new Phrase( parentPhrase.parsedLine);
-//            parentPhrase.contextPhrases.add(startingContextPhrase);
-//            return List.of(startingContextPhrase);
-//        }
-//
-//
-//        return parentPhrase.processContextList();
-//    }
 
 
     public String getDefaultElementValue(ElementWrapper elementWrapper) {

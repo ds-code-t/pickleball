@@ -273,7 +273,6 @@ public abstract class PhraseData extends PassedData {
     public static void getXPathyContext(PhraseData phraseData, List<ElementMatch> elements) {
         if (elements.isEmpty()) phraseData.contextXPathy = null;
         XPathy secondXPathy = elements.size() == 1 ? null : elements.get(1).xPathy;
-        XPathy secondXPathyWithIndex = secondXPathy == null ? null : elements.get(1).xPathyWithIndex;
         String context = phraseData.context.toLowerCase();
 
         XPathy xPathy = elements.getFirst().xPathy;
@@ -288,15 +287,6 @@ public abstract class PhraseData extends PassedData {
                 secondXPathy
         );
 
-        if (phraseData.contextXPathy == null) {
-            phraseData.contextXPathyWithIndex = null;
-        } else {
-            phraseData.contextXPathyWithIndex = resolveContextXPathy(
-                    context,
-                    elements.getFirst().xPathyWithIndex,
-                    secondXPathyWithIndex
-            );
-        }
     }
 
     private static XPathy resolveContextXPathy(String context, XPathy first, XPathy second) {

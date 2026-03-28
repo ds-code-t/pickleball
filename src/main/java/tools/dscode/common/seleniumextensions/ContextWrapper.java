@@ -32,6 +32,8 @@ public class ContextWrapper {
     }
 
 
+
+
     public List<WebElement> getElements() {
         printDebug("\n##ContextWrapper- getElements: " + elementMatch);
         SearchContext searchContext = getFinalSearchContext();
@@ -88,8 +90,8 @@ public class ContextWrapper {
 
                 printDebug("##ContextWrapper-searchContext2: " + (searchContext == null ? "null" : searchContext.getClass().getSimpleName()));
             } else {
-                printDebug("phraseData4: " + phraseData.contextXPathyWithIndex);
-                xPathyList.add(phraseData.contextXPathyWithIndex);
+                printDebug("phraseData4: " + phraseData.contextXPathy);
+                xPathyList.add(phraseData.contextXPathy);
             }
         }
         xPathyList.add(elementMatch.xPathy);
