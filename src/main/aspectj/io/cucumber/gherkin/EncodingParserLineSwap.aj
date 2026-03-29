@@ -43,7 +43,7 @@ public aspect EncodingParserLineSwap {
 
             String replacement = prefix + PARSER_FLAG +
                     g1.replaceFirst("\\*\\s+\\[","@[")
-                            .replace("\n"," ").strip();
+                            .replaceFirst("\n"," ").strip();
             matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
         }
         matcher.appendTail(sb);

@@ -2,8 +2,13 @@ Feature: Addition
 
 
   Scenario: debug tEst2
-    @[DEBUG,nobase]
-      * , if Alert is displayed, verify Button is displayed
+  @[DEBUG,nobase]
+    * , verify  "Text Input:" Textbox is displayed
+    * IF: "zText Input:" Textbox is displayed:
+  :   * , verify  "Text Input:" Textbox is displayed
+    * ELSE-IF: "Text Input:" Textbox is displayed:
+  :   * , verify  "Text Input:" Textbox is displayed
+#      * , if Alert is displayed, verify Button is displayed
 #    * navigate to: URL.select
 #  * , in the Column Header, click the 1st Icon
 #    * , verify  Elm is displayed
