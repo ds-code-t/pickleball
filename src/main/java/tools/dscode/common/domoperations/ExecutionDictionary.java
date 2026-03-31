@@ -27,6 +27,7 @@ import static com.xpathy.Attribute.title;
 import static com.xpathy.Tag.any;
 import static tools.dscode.common.domoperations.TableColumnByHeaderXPath.matchCellsByHeader;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepError;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.xpathSpecificityScore;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.colocatedDeepNormalizedVisibleText;
@@ -70,20 +71,22 @@ public class ExecutionDictionary {
         if (v == null)
             return null;
         ValueWrapper strippedValueWrapper = v.stripAllNonLetters();
-        return combineOr(
+        return combineAnd(
+                XPathy.from("//*[@id or @title or @name or @node_name or @data-node-id]"),
+                combineOr(
                 XPathyBuilder.build(any, id, strippedValueWrapper, op),
                 XPathyBuilder.build(any, title, strippedValueWrapper, op),
                 XPathyBuilder.build(any, name, strippedValueWrapper, op),
                 XPathyBuilder.build(any, Attribute.custom("node_name"), strippedValueWrapper, op),
                 XPathyBuilder.build(any, Attribute.custom("data-node-id"), strippedValueWrapper, op)
-        );
+        ));
     };
 
     public static final Builder SrcHrfMatchBuilder =  (category, v, op) -> {
         ValueWrapper strippedValue = v == null ? null : v.normalizeLowerCaseAndStripAllWhiteSpace();
         if (strippedValue == null)
             return null;
-        return combineXPathParts(XPathyBuilder.build(any, src, strippedValue, op) , XPathyBuilder.build(any, href, strippedValue, op));
+        return combineXPathParts("//*[@src or @href]",XPathyBuilder.build(any, src, strippedValue, op) , XPathyBuilder.build(any, href, strippedValue, op));
     };
 
 
