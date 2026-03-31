@@ -414,16 +414,8 @@ public final class DefinitionContext {
 
 
             category("Modal").children("Modals", "Dialog", "Dialogs").andAnyCategories(CONTAINS_TEXT, "forLabel", HTML_NAME_ATTRIBUTES)
-                    .addBase("//div")
-                    .and(
-                            (category, v, op) ->
-                                    combineOr(
-                                            XPathy.from(div).byAttribute(role).equals("dialog"),
-                                            XPathy.from(div).byAttribute(Attribute.custom("aria-model")).equals("true"),
-                                            XPathy.from(div).byAttribute(id).equals("modalWrapper")
-                                    ),
-                            (category, v, op) -> XPathy.from("//div[.//text()]")
-                    );
+                    .addBase("//div[@role='dialog' or @aria-model='true' or @id='modalWrapper'][normalize-space()]");
+
 
             category("Expandable Section").children("Expandable Sections").andAnyCategories(HTML_NAME_ATTRIBUTES, CONTAINS_TEXT)
                     .addBase("//div")
