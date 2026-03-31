@@ -4,7 +4,9 @@ import com.xpathy.Condition;
 import com.xpathy.XPathy;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import static com.xpathy.Attribute.*;
 
@@ -20,8 +22,20 @@ import static com.xpathy.Attribute.*;
  *   because XPathy expands that into substring-style checks like:
  *     contains(translate(@style, ' ', ''), 'width:0px;')
  *   which can false-match "border-width:0px;".
+ *
+ * Efficiency notes:
+ * - Expensive normalization/translation checks are placed last behind cheap
+ *   existence/sub-string guards so XPath can fail fast.
+ * - Repeated class-marker checks for noDisplay are grouped so normalized @class
+ *   is evaluated once instead of once per marker.
  */
 public final class VisibilityConditions {
+
+    private static final String NORMALIZED_CLASS_EXPRESSION =
+            "concat(' ', normalize-space(@class), ' ')";
+
+    private static final String NORMALIZED_INLINE_STYLE_EXPRESSION =
+            "concat(';', translate(normalize-space(@style), ' ', ''), ';')";
 
     private VisibilityConditions() {
         // utility class
@@ -86,19 +100,7 @@ public final class VisibilityConditions {
      */
     public static Condition noDisplay = Condition.or(
             cssPropertyEqualsAny("display", "none"),
-
-            // common utility classes / markers
-            hasClassToken("sr-only"),
-            hasClassToken("visually-hidden"),
-            hasClassToken("visuallyhidden"),
-            hasClassToken("offscreen"),
-            hasClassToken("off-screen"),
-
-            // common prefixed utility classes
-            hasClassTokenStartingWith("screen-reader-"),
-            hasClassTokenStartingWith("screenreader-"),
-            hasClassTokenStartingWith("offscreen-"),
-            hasClassTokenStartingWith("off-screen-")
+            noDisplayClassMarkers()
     );
 
     /**
@@ -110,11 +112,8 @@ public final class VisibilityConditions {
                 // display != none
                 Condition.not(noDisplay),
 
-                // visibility != hidden
-                Condition.not(cssPropertyEqualsAny("visibility", "hidden")),
-
-                // visibility != collapse
-                Condition.not(cssPropertyEqualsAny("visibility", "collapse")),
+                // visibility != hidden/collapse
+                Condition.not(cssPropertyEqualsAny("visibility", "hidden", "collapse")),
 
                 // opacity != 0
                 Condition.not(cssPropertyEqualsAny("opacity", "0")),
@@ -183,18 +182,33 @@ public final class VisibilityConditions {
      *   border-width:0px
      *   min-width:0px
      *   width:0.5rem
+     *
+     * Efficiency:
+     * - Short-circuits on @style existence.
+     * - Short-circuits on raw @style containing the property name.
+     * - Short-circuits on raw @style containing at least one candidate value.
+     * - Only then evaluates the normalized/boundary-safe contains checks.
      */
     private static Condition cssPropertyEqualsAny(String property, String... values) {
-        List<Condition> conditions = new ArrayList<>(values.length);
+        List<String> exactMatches = new ArrayList<>(values.length);
+        Set<String> quickValueHints = new LinkedHashSet<>();
 
         for (String value : values) {
             String compactValue = value.replace(" ", "");
-            conditions.add(rawPredicate(
-                    "contains(" + normalizedInlineStyleExpression() + ", ';" + property + ":" + compactValue + ";')"
-            ));
+            quickValueHints.add(compactValue);
+            exactMatches.add(
+                    "contains(" + NORMALIZED_INLINE_STYLE_EXPRESSION +
+                            ", ';" + property + ":" + compactValue + ";')"
+            );
         }
 
-        return Condition.or(conditions.toArray(new Condition[0]));
+        String predicate =
+                "@style" +
+                        " and contains(@style, '" + property + "')" +
+                        " and (" + orContains("@style", quickValueHints) + ")" +
+                        " and (" + orJoin(exactMatches) + ")";
+
+        return rawPredicate(predicate);
     }
 
     /**
@@ -205,10 +219,17 @@ public final class VisibilityConditions {
      *
      * Does not match:
      *   class="not-sr-only-ish"
+     *
+     * Efficiency:
+     * - Short-circuits on @class existence.
+     * - Short-circuits on raw @class containing the token text at all.
+     * - Only then evaluates normalized token-boundary matching.
      */
     private static Condition hasClassToken(String token) {
         return rawPredicate(
-                "contains(concat(' ', normalize-space(@class), ' '), ' " + token + " ')"
+                "@class" +
+                        " and contains(@class, '" + token + "')" +
+                        " and contains(" + NORMALIZED_CLASS_EXPRESSION + ", ' " + token + " ')"
         );
     }
 
@@ -220,11 +241,91 @@ public final class VisibilityConditions {
      *
      * Does not match:
      *   class="foo myscreen-reader-text bar"
+     *
+     * Efficiency:
+     * - Short-circuits on @class existence.
+     * - Short-circuits on raw @class containing the prefix text at all.
+     * - Only then evaluates normalized token-prefix matching.
      */
     private static Condition hasClassTokenStartingWith(String tokenPrefix) {
         return rawPredicate(
-                "contains(concat(' ', normalize-space(@class), ' '), ' " + tokenPrefix + "')"
+                "@class" +
+                        " and contains(@class, '" + tokenPrefix + "')" +
+                        " and contains(" + NORMALIZED_CLASS_EXPRESSION + ", ' " + tokenPrefix + "')"
         );
+    }
+
+    /**
+     * Groups the common class-based noDisplay markers into one predicate so
+     * normalized @class is evaluated once instead of once per OR branch.
+     */
+    private static Condition noDisplayClassMarkers() {
+        List<String> exactTokens = List.of(
+                "sr-only",
+                "visually-hidden",
+                "visuallyhidden",
+                "offscreen",
+                "off-screen"
+        );
+
+        List<String> tokenPrefixes = List.of(
+                "screen-reader-",
+                "screenreader-",
+                "offscreen-",
+                "off-screen-"
+        );
+
+        List<String> normalizedChecks = new ArrayList<>(exactTokens.size() + tokenPrefixes.size());
+        Set<String> quickHints = new LinkedHashSet<>();
+
+        for (String token : exactTokens) {
+            quickHints.add(token);
+            normalizedChecks.add(
+                    "contains(" + NORMALIZED_CLASS_EXPRESSION + ", ' " + token + " ')"
+            );
+        }
+
+        for (String prefix : tokenPrefixes) {
+            quickHints.add(prefix);
+            normalizedChecks.add(
+                    "contains(" + NORMALIZED_CLASS_EXPRESSION + ", ' " + prefix + "')"
+            );
+        }
+
+        String predicate =
+                "@class" +
+                        " and (" + orContains("@class", quickHints) + ")" +
+                        " and (" + orJoin(normalizedChecks) + ")";
+
+        return rawPredicate(predicate);
+    }
+
+    /**
+     * Builds an XPath OR-chain of contains(expression, 'value') checks.
+     */
+    private static String orContains(String expression, Iterable<String> values) {
+        List<String> parts = new ArrayList<>();
+
+        for (String value : values) {
+            parts.add("contains(" + expression + ", '" + value + "')");
+        }
+
+        return orJoin(parts);
+    }
+
+    /**
+     * Joins already-built XPath boolean expressions with OR.
+     */
+    private static String orJoin(List<String> expressions) {
+        if (expressions.isEmpty()) {
+            throw new IllegalArgumentException("At least one expression is required");
+        }
+
+        if (expressions.size() == 1) {
+            return expressions.get(0);
+        }
+
+        return String.join(" or ", expressions);
     }
 
     /**
@@ -238,7 +339,7 @@ public final class VisibilityConditions {
      *   ";width:0px;color:red;"
      */
     private static String normalizedInlineStyleExpression() {
-        return "concat(';', translate(normalize-space(@style), ' ', ''), ';')";
+        return NORMALIZED_INLINE_STYLE_EXPRESSION;
     }
 
     /**

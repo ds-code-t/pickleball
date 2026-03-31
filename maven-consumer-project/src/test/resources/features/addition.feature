@@ -2,12 +2,12 @@ Feature: Addition
 
 
   Scenario: debug tEst2
-  @[DEBUG,nobase]
+  @[DEBUG,nobase,##]
     * , verify  "Text Input:" Textbox is displayed
     * IF: "zText Input:" Textbox is displayed:
-  :   * , verify  "Text Input:" Textbox is displayed
+  :   * , save "A" as "A"
     * ELSE-IF: "Text Input:" Textbox is displayed:
-  :   * , verify  "Text Input:" Textbox is displayed
+  :   * , save "B" as "B"
 #      * , if Alert is displayed, verify Button is displayed
 #    * navigate to: URL.select
 #  * , in the Column Header, click the 1st Icon

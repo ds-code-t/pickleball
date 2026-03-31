@@ -96,7 +96,23 @@ public final class NestedByLocator {
             mode = NestingMode.OUTERMOST_ONLY;
         }
 
-        return findWithRetry(context, locator, Duration.ofSeconds(10), displayedElementsOnly, mode);
+        List<WebElement>  returnList = findWithRetry(context, locator, Duration.ofSeconds(10), displayedElementsOnly, mode);
+
+        if(elementMatch.selectionType.isEmpty()) {
+            if(elementMatch.elementIndex  > returnList.size())
+                return new ArrayList<>();
+            return new ArrayList<>(List.of(returnList.get(elementMatch.elementIndex-1)));
+        }
+        if(elementMatch.elementIndex ==1)
+            return returnList;
+
+        return sampleEvery(returnList, elementMatch.elementIndex-1, elementMatch.elementIndex);
+    }
+
+    public static <T> ArrayList<T> sampleEvery(List<T> list, int startIndex, int step) {
+        ArrayList<T> out = new ArrayList<>();
+        for (int i = startIndex; i < list.size(); i += step) out.add(list.get(i));
+        return out;
     }
 
     public static List<WebElement> findWithRetry(

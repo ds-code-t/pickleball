@@ -128,25 +128,26 @@ public class ContextWrapper {
 //        XPathy xPathy = combineAnd(xPathyList);
 //        elementPath = XPathy.from(XPathyUtils.maybeDeepestMatches(xPathy.getXpath()));
         elementPath = combineAnd(xPathyList);
-
-        if (elementMatch.elementPosition.isEmpty() && elementMatch.selectionType.isEmpty())
-            elementTerminalXPath = elementPath.nth(1);
-//        else if (elementMatch.elementPosition.isEmpty())
-//            elementTerminalXPath = elementPath;
-        else if (elementMatch.elementPosition.equals("last")) {
-            elementTerminalXPath = elementPath.last();
-        } else {
-            elementMatch.elementIndex = Integer.parseInt(elementMatch.elementPosition);
-            if (elementMatch.selectionType.isEmpty()) {
-                elementTerminalXPath = elementPath.nth(elementMatch.elementIndex);
-            } else {
-                if (elementMatch.elementIndex == 1) {
-                    elementTerminalXPath = elementPath;
-                } else {
-                    elementTerminalXPath = everyNth(elementPath, elementMatch.elementIndex);
-                }
-            }
-        }
+        elementTerminalXPath = elementPath;
+        elementMatch.elementIndex = elementMatch.elementPosition.isEmpty() ? 1 : Integer.parseInt(elementMatch.elementPosition);
+//        if (elementMatch.elementPosition.isEmpty() && elementMatch.selectionType.isEmpty())
+//            elementTerminalXPath = elementPath.nth(1);
+////        else if (elementMatch.elementPosition.isEmpty())
+////            elementTerminalXPath = elementPath;
+//        else if (elementMatch.elementPosition.equals("last")) {
+//            elementTerminalXPath = elementPath.last();
+//        } else {
+//            elementMatch.elementIndex = Integer.parseInt(elementMatch.elementPosition);
+//            if (elementMatch.selectionType.isEmpty()) {
+//                elementTerminalXPath = elementPath.nth(elementMatch.elementIndex);
+//            } else {
+//                if (elementMatch.elementIndex == 1) {
+//                    elementTerminalXPath = elementPath;
+//                } else {
+//                    elementTerminalXPath = everyNth(elementPath, elementMatch.elementIndex);
+//                }
+//            }
+//        }
 
 
     }

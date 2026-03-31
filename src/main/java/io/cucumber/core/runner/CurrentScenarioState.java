@@ -315,6 +315,10 @@ public class CurrentScenarioState extends ScenarioMapping {
             }
         }
 
+        if(!stepExtension.lineData.inheritancePhrases.isEmpty())
+            stepExtension.inheritancePhrase = stepExtension.lineData.inheritancePhrases.getFirst();
+
+
         if (stepExtension.nextSibling != null) {
             runStep((StepExtension) stepExtension.nextSibling);
         }

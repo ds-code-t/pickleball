@@ -12,7 +12,6 @@ import tools.dscode.coredefinitions.GeneralSteps;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 
 import static tools.dscode.common.mappings.MapConfigurations.MapType.STEP_MAP;
@@ -64,7 +63,7 @@ public abstract class StepBase implements Cloneable {
     public boolean hardFail = false;
     public boolean softFail = false;
     public boolean skipped = false;
-    protected List<ConditionalStates> conditionalStates = new ArrayList<>();
+//    protected List<ConditionalStates> conditionalStates = new ArrayList<>();
 
     public DocString docString;
     public DataTable dataTable;
@@ -73,9 +72,9 @@ public abstract class StepBase implements Cloneable {
         return stepParsingMap;
     }
 
-    public enum ConditionalStates {
-        SKIP, FALSE, TRUE
-    }
+//    public enum ConditionalStates {
+//        SKIP, FALSE, TRUE
+//    }
 
 
     public abstract void setStepParsingMap(ParsingMap stepParsingMap);
@@ -86,7 +85,7 @@ public abstract class StepBase implements Cloneable {
     protected abstract DataTable getDataTable();
 
 
-    public abstract Collection<ConditionalStates> getConditionalStates();
+//    public abstract Collection<ConditionalStates> getConditionalStates();
 
     public static PhraseData getInheritancePhrase(StepBase stepBase) {
         if (stepBase == null) return null;
@@ -125,7 +124,7 @@ public abstract class StepBase implements Cloneable {
             copy.bookmarks = shallowCopyList(this.bookmarks);
             copy.arguments = shallowCopyList(this.arguments);
             copy.stepFlags = shallowCopyList(this.stepFlags);
-            copy.conditionalStates = shallowCopyList(this.conditionalStates);
+//            copy.conditionalStates = shallowCopyList(this.conditionalStates);
 
             if (nextSibling != null) {
                 copy.nextSibling = nextSibling.clone();

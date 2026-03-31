@@ -234,7 +234,7 @@ public final class XPathyAssembly {
         }
 
 
-        if (s.matches("^[A-Za-z-]+::.*")) {
+        if (s.matches("^(?s)[A-Za-z-]+::.*")) {
             return s;
         }
         String stripped = s
@@ -245,7 +245,7 @@ public final class XPathyAssembly {
 
         String step = stripped;
 
-        if (step.matches("^[A-Za-z-]+::.*")) {
+        if (step.matches("^(?s)[A-Za-z-]+::.*")) {
             return step;
         }
 

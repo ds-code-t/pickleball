@@ -47,13 +47,13 @@ public abstract class StepData extends StepMapping {
     }
 
 
-    public List<ConditionalStates> getConditionalStates() {
-        return conditionalStates;
-    }
-
-    public void addConditionalStates(ConditionalStates... states) {
-        this.conditionalStates.addAll(Arrays.stream(states).toList());
-    }
+//    public List<ConditionalStates> getConditionalStates() {
+//        return conditionalStates;
+//    }
+//
+//    public void addConditionalStates(ConditionalStates... states) {
+//        this.conditionalStates.addAll(Arrays.stream(states).toList());
+//    }
 
 
     public StepBase initializeChildSteps() {
