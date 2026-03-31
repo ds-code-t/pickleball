@@ -373,7 +373,7 @@ public final class DefinitionContext {
             ;
 
 
-            category("Button").children("Buttons").andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, CONTAINS_TEXT)
+            category("Button").children("Buttons").andAnyCategories( HTML_NAME_ATTRIBUTES, CONTAINS_TEXT)
                     .addBase("//*[self::button or @role='button']");
 
 
@@ -410,7 +410,7 @@ public final class DefinitionContext {
                     );
 
 
-            category("Modal").children("Modals", "Dialog", "Dialogs").andAnyCategories(CONTAINS_TEXT, "forLabel", HTML_NAME_ATTRIBUTES)
+            category("Modal").children("Modals", "Dialog", "Dialogs").andAnyCategories(CONTAINS_TEXT,  HTML_NAME_ATTRIBUTES)
                     .addBase("//div[@role='dialog' or @aria-model='true' or @id='modalWrapper'][normalize-space()]");
 
 
@@ -649,10 +649,10 @@ public final class DefinitionContext {
                                 String deepNormalizedVisibleText = deepNormalizedVisibleText(v, op);
 
                                 XPathy returnXpath = combineOr(
-                                        new XPathy("//*[@id and string-length(normalize-space(@id)) > 0 and @id = (ancestor::div[2]/descendant::*" + deepNormalizedVisibleText + "[@for and string-length(normalize-space(@for)) > 0][1]/@for)]"),
-                                        new XPathy("//*[@aria-labelledby and string-length(normalize-space(@aria-labelledby)) > 0 and @aria-labelledby = (ancestor::div[2]/descendant::*" + deepNormalizedVisibleText + "[@id and string-length(normalize-space(@id)) > 0][1]/@id)]"),
-                                        new XPathy("//*[ @headers and string-length(normalize-space(@headers)) > 0 and contains(concat(' ', @headers, ' '), concat(' ', (ancestor::div[2]/descendant::*" + deepNormalizedVisibleText + "[@id and string-length(normalize-space(@id)) > 0][1]/@id), ' ')) ]"),
-                                        new XPathy("//*[ancestor-or-self::*[position() <= 5]" +
+                                        new XPathy("//*[@id and string-length(normalize-space(@id)) > 0 and @id = (ancestor::div[3]/descendant::*" + deepNormalizedVisibleText + "[@for and string-length(normalize-space(@for)) > 0][1]/@for)]"),
+                                        new XPathy("//*[@aria-labelledby and string-length(normalize-space(@aria-labelledby)) > 0 and @aria-labelledby = (ancestor::div[3]/descendant::*" + deepNormalizedVisibleText + "[@id and string-length(normalize-space(@id)) > 0][1]/@id)]"),
+                                        new XPathy("//*[ @headers and string-length(normalize-space(@headers)) > 0 and contains(concat(' ', @headers, ' '), concat(' ', (ancestor::div[3]/descendant::*" + deepNormalizedVisibleText + "[@id and string-length(normalize-space(@id)) > 0][1]/@id), ' ')) ]"),
+                                        new XPathy("//*[ancestor-or-self::*[position() <= 7]" +
                                                 "  [preceding-sibling::*[1]        " +
                                                 descendantDeepNormalizedVisibleText(v, op) +
                                                 "         [not(descendant::button or descendant::input or descendant::textarea or descendant::select or descendant::a)]" +
