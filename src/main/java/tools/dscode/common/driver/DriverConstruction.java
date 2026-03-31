@@ -340,12 +340,18 @@ public final class DriverConstruction {
 
         String window = trimToNull(postStart.get("window"));
         if (window != null) {
-            switch (window.toLowerCase(Locale.ROOT)) {
-                case "maximize" -> driver.manage().window().maximize();
-                case "minimize" -> driver.manage().window().minimize();
-                case "fullscreen" -> driver.manage().window().fullscreen();
-                default -> {
+            try {
+                switch (window.toLowerCase(Locale.ROOT)) {
+                    case "maximize" -> driver.manage().window().maximize();
+                    case "minimize" -> driver.manage().window().minimize();
+                    case "fullscreen" -> driver.manage().window().fullscreen();
+                    default -> {
+                    }
                 }
+            }
+            catch (Exception e)
+            {
+                System.out.println("Failed to " + window + " due to " + e.getMessage());
             }
         }
 

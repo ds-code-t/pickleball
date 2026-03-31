@@ -62,14 +62,23 @@ public class BrowserSteps {
     @Given(ObjectRegistrationSteps.objAction + "MAXIMIZE$")
     public Object maximize(Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
-        driver.manage().window().maximize();
+        try {
+            driver.manage().window().maximize();
+        }
+        catch (Exception e) {
+            System.out.println("Failed to maximize window: " + e.getMessage());
+        }
         return value;
     }
 
     @Given(ObjectRegistrationSteps.objAction + "MINIMIZE$")
     public Object minimize(Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
-        driver.manage().window().minimize();
+        try {
+            driver.manage().window().minimize();
+        } catch (Exception e) {
+            System.out.println("Failed to minimize window: " + e.getMessage());
+        }
         return value;
     }
 
