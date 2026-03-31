@@ -374,11 +374,8 @@ public final class DefinitionContext {
 
 
             category("Button").children("Buttons").andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, CONTAINS_TEXT)
-                    .or(
-                            (category, v, op) -> XPathy.from(Tag.button),
-                            (category, v, op) -> XPathy.from(Tag.img).byAttribute(role).equals("button"),
-                            (category, v, op) -> XPathy.from(Tag.a).byAttribute(role).equals("button")
-                    );
+                    .addBase("//*[self::button or @role='button']");
+
 
             category("Section").children("Sections")
                     .addBase("//div")
