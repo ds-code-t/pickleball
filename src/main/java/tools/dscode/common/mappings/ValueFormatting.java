@@ -26,6 +26,14 @@ public abstract class ValueFormatting {
         MAPPER.registerModule(new GuavaModule());
     }
 
+    public Object directGet(String key) {
+        return root.get(key);
+    }
+
+    public void directPut(String key, Object value) {
+        root.put(key , MAPPER.valueToTree(value));
+    }
+
     public static final String NON_SERIALIZABLE_FIELD = "_NonSerializableReferenceID";
     protected final ObjectNode root;
 

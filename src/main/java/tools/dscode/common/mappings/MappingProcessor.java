@@ -35,6 +35,7 @@ import static tools.dscode.common.dataoperations.TableQueries.findRows;
 
 import static tools.dscode.common.evaluations.AviatorUtil.eval;
 import static tools.dscode.common.evaluations.AviatorUtil.evalToBoolean;
+import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.mappings.queries.Tokenized.AS_LIST_SUFFIX;
@@ -439,18 +440,33 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
 
     public Object get(String key) {
+        System.out.println("@@get: " + key);
         if (key.startsWith("$"))
             return getRunningStep().resolveStepFromString(key.substring(1));
 
-        if (prefixed.matcher(key).matches()) {
-            return getVar(key);
+       boolean directGet = (key.startsWith("`") && key.endsWith("`"));
+
+        if (directGet) {
+            key = key.substring(1, key.length() - 1);
+        }
+        else
+        {
+            if (key.contains("/")) {
+                System.out.println("@@buildJsonFromPath: " + key);
+                System.out.println("@@buildJsonFromPath(key): " + buildJsonFromPath(key));
+                return buildJsonFromPath(key);
+            }
+
+            if (prefixed.matcher(key).matches()) {
+                return getVar(key);
+            }
         }
 
         Tokenized tokenized = new Tokenized(key);
         for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
             if (map == null)
                 continue;
-            Object replacement = map.get(tokenized);
+            Object replacement = directGet ? map.directGet(key) : map.get(tokenized);
             if (replacement != null) {
                 return replacement;
             }
@@ -529,6 +545,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
     public Object put(String key, Object value) {
         if (key == null || key.isBlank())
             throw new RuntimeException("key cannot be null or blank");
+
         if (prefixed.matcher(key).matches()) {
             Object oldValue = getVar(key);
             putVar(key, value);
@@ -540,6 +557,14 @@ public abstract class MappingProcessor implements Map<String, Object> {
             getRootSingletonMap().put(tokenized, value);
             return oldValue;
         }
+
+        if (key.startsWith("`") && key.endsWith("`")) {
+            key = key.substring(1, key.length() - 1);
+            Object oldValue = getPrimaryRunMap().directGet(key);
+            getPrimaryRunMap().directPut(key, value);
+            return oldValue;
+        }
+
         Object oldValue = getPrimaryRunMap().get(tokenized);
         getPrimaryRunMap().put(tokenized, value);
         return oldValue;

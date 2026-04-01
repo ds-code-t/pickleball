@@ -1,6 +1,12 @@
 Feature: Addition
 
 
+
+  Scenario: test path
+    * , save "<configs>" as "A"
+
+
+
   Scenario: debug run Scena
     * Scenario Log: starting scenarios
     * RUN SCENARIOS:

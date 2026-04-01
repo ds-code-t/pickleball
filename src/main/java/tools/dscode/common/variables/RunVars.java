@@ -47,9 +47,6 @@ public class RunVars extends NodeMap {
         root.setAll((ObjectNode) MAPPER.valueToTree(value));
     }
 
-    public Object directGet(String key) {
-        return root.get(key);
-    }
 
     static {
         RUN_VARS.merge(new HashMap<>(collectPrefixedAndUnprefixedVars()));
