@@ -1,6 +1,29 @@
 Feature: Addition
 
 
+  Scenario: debug run Scena
+    * Scenario Log: starting scenarios
+    * RUN SCENARIOS:
+      | Tags   | A   | B   |
+      | %tag99 | 111 | 222 |
+
+
+  Scenario Outline: called scenario11 a= '<A>' , c= '<C>'
+    * Scenario Log: exlog1 a= '<A>' , c= '<C>'
+    * Scenario Log: exlog2 a= '<A>' , c= '<C>'
+    Examples:
+      | Scenario Tags | A   | C   |
+      | %tag99        | xxx | zzz |
+
+
+  Scenario Outline: sfdd
+    * Scenario Log: called scenario1 <A>
+    * Scenario Log: called scenario2 <A>
+    Examples:
+      | @NotBlank Scexnario Tags | A      |
+      | %xcztag99                | ~skip~ |
+
+
   Scenario: debug tEst2
   @[DEBUG,nobase,##]
     * , verify  "Text Input:" Textbox is displayed

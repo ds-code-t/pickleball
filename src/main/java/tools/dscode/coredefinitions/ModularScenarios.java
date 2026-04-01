@@ -10,6 +10,7 @@ import org.intellij.lang.annotations.Language;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
+import tools.dscode.common.mappings.ParsingMap;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,8 +25,8 @@ import static tools.dscode.common.util.Reflect.getProperty;
 public class ModularScenarios extends CoreSteps {
 
 
-//    @DefinitionFlags(NO_LOGGING)
-    @Given("^RUN SCENARIOS:?(.*)?$")
+    //    @DefinitionFlags(NO_LOGGING)
+    @Given("^RUN SCENARIOS?:?(.*)?$")
     public static void runScenarios(String inlineTags, DataTable dataTable) {
         List<Map<String, String>> maps = dataTable.asMaps().stream()
                 .map(HashMap::new) // copy each to a mutable map
@@ -47,30 +48,30 @@ public class ModularScenarios extends CoreSteps {
         filterAndExecutePickles(maps);
     }
 
-    static final @Language("RegExp") String tagRegexReplacement = "(?<!@)("+ COMPONENT_TAG_META_CHAR + "[A-Za-z])";
+    static final @Language("RegExp") String tagRegexReplacement = "(?<!@)(" + COMPONENT_TAG_META_CHAR + "[A-Za-z])";
 
     public static void filterAndExecutePickles(List<Map<String, String>> maps, String... messageString) {
         StepExtension currentStep = getRunningStep();
         StepExtension lastScenarioNameStep = null;
 
         for (Map<String, String> map : maps) {
-            String tagString = map.getOrDefault("Tags", "");
+            String tagString = map.getOrDefault("Tags", map.getOrDefault("Run Tags", ""));
             tagString = tagString.replaceAll(tagRegexReplacement, "@$1");
             List<Pickle> pickles = CucumberScanUtil.listPicklesByTags(tagString);
 
             ScenarioStep currentScenarioNameStep;
             for (Pickle gherkinMessagesPickle : pickles) {
-                currentScenarioNameStep = createScenarioStep(gherkinMessagesPickle);
-                io.cucumber.messages.types.Pickle pickle = (io.cucumber.messages.types.Pickle) getProperty(gherkinMessagesPickle, "pickle");
+                ParsingMap scenarioStepParsingMap = new ParsingMap();
                 NodeMap passedMap = new NodeMap(MapConfigurations.MapType.PASSED_MAP);
                 passedMap.merge(map);
-                currentScenarioNameStep.getStepParsingMap().addMaps(passedMap);
-                    if(pickle.getValueRow()!=null && !pickle.getValueRow().isEmpty()) {
-                        NodeMap examples = new NodeMap(MapConfigurations.MapType.EXAMPLE_MAP);
-                        examples.merge(pickle.getHeaderRow(), pickle.getValueRow());
-                        currentScenarioNameStep.getStepParsingMap().addMaps(examples);
-                    }
-
+                scenarioStepParsingMap.addMaps(passedMap);
+                io.cucumber.messages.types.Pickle pickle = (io.cucumber.messages.types.Pickle) getProperty(gherkinMessagesPickle, "pickle");
+                if (pickle.getValueRow() != null && !pickle.getValueRow().isEmpty()) {
+                    NodeMap examples = new NodeMap(MapConfigurations.MapType.EXAMPLE_MAP);
+                    examples.merge(pickle.getHeaderRow(), pickle.getValueRow());
+                    scenarioStepParsingMap.addMaps(examples);
+                }
+                currentScenarioNameStep = createScenarioStep(gherkinMessagesPickle, scenarioStepParsingMap);
                 currentStep.childSteps.add(currentScenarioNameStep);
 
                 if (lastScenarioNameStep != null) {

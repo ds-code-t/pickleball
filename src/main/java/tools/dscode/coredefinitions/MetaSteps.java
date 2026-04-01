@@ -9,7 +9,7 @@ import static tools.dscode.common.GlobalConstants.defaultMatchFlag;
 
 public class MetaSteps  extends CoreSteps {
 
-    public static final String RUN_SCENARIO = "RUN SCENARIO:";
+    public static final String RUN_SCENARIO = "\u207A RUN SCENARIO:";
 
     @Given("^" + RUN_SCENARIO + "(.*)$")
     public static void runScenario(String scenarioName) {

@@ -27,8 +27,8 @@ public abstract class StepMapping extends StepBase {
         defaultStepNodeMap.put(String.valueOf(key), value);
     }
 
-    public void setStepParsingMap(ParsingMap stepParsingMap) {
-        copyParsingMap(stepParsingMap);
+    public void setStepParsingMap(ParsingMap inputParsingMap) {
+        copyParsingMap(inputParsingMap);
         if (dataContextStepNodeMap != null)
             this.stepParsingMap.addMapsToStart(dataContextStepNodeMap);
         this.stepParsingMap.addMapsToStart(defaultStepNodeMap);
@@ -39,29 +39,25 @@ public abstract class StepMapping extends StepBase {
     }
 
     public String evalWithStepMaps(String expression) {
-
         return String.valueOf(eval(expression, getStepParsingMap()));
     }
 
-    public void copyParsingMap(ParsingMap parsingMap) {
-        this.stepParsingMap.clear();
-        this.stepParsingMap.keyOrder.clear();
+    static final  Set<MapConfigurations.MapType> includeStepMaps = EnumSet.of(MapConfigurations.MapType.STEP_MAP);
+    static final  Set<MapConfigurations.MapType> includeStepExamplePassedMaps = EnumSet.of(MapConfigurations.MapType.STEP_MAP, MapConfigurations.MapType.EXAMPLE_MAP, MapConfigurations.MapType.PASSED_MAP);
+
+
+    public void copyParsingMap(ParsingMap inputParsingMap) {
+        this.stepParsingMap.removeMaps(MapConfigurations.MapType.STEP_MAP);
         if (this instanceof ScenarioStep) {
-            Set<MapConfigurations.MapType> exclude = EnumSet.of(MapConfigurations.MapType.PASSED_MAP, MapConfigurations.MapType.EXAMPLE_MAP);
-            this.stepParsingMap.maps.putAll(Multimaps.filterKeys(parsingMap.getMaps(), k -> !exclude.contains(k)));
-            this.stepParsingMap.keyOrder.addAll(parsingMap.keyOrder());
+            this.stepParsingMap.maps.putAll(Multimaps.filterKeys(inputParsingMap.getMaps(), includeStepMaps::contains));
         } else {
-            this.stepParsingMap.maps.putAll(parsingMap.getMaps());
-            this.stepParsingMap.keyOrder.addAll(parsingMap.keyOrder());
+            this.stepParsingMap.maps.putAll(Multimaps.filterKeys(inputParsingMap.getMaps(), includeStepExamplePassedMaps::contains));
         }
     }
 
     public static ParsingMap copytoNewParsingMap( ParsingMap parsingMap) {
         ParsingMap newParsingMap = new ParsingMap();
-        newParsingMap.clear();
-        newParsingMap.keyOrder.clear();
-        newParsingMap.maps.putAll(parsingMap.getMaps());
-        newParsingMap.keyOrder.addAll(parsingMap.keyOrder());
+        newParsingMap.maps.putAll(Multimaps.filterKeys(parsingMap.getMaps(), includeStepExamplePassedMaps::contains));
         return newParsingMap;
     }
 }

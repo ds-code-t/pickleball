@@ -10,12 +10,14 @@ import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
@@ -633,11 +635,25 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     @Override
     public String toString() {
-        return "\n====\n" + getMapsForResolution()
-                .stream()
-//                .filter(m -> m.getMapType() == MapConfigurations.MapType.STEP_MAP)
-                .map(String::valueOf) // safely converts each element to its
-                // string form
-                .collect(Collectors.joining(System.lineSeparator())) + "\n---\n";
+        return formatMaps(getMapsForResolution().stream());
     }
+
+    public String toString(MapConfigurations.MapType... mapTypes) {
+        if (mapTypes == null || mapTypes.length == 0) {
+            return toString();
+        }
+
+        var allowed = EnumSet.copyOf(Arrays.asList(mapTypes));
+
+        return formatMaps(getMapsForResolution().stream()
+                .filter(m -> allowed.contains(m.getMapType())));
+    }
+
+    private String formatMaps(Stream<?> stream) {
+        return "\n====\n" + stream
+                .map(String::valueOf)
+                .collect(Collectors.joining(System.lineSeparator()))
+                + "\n---\n";
+    }
+
 }

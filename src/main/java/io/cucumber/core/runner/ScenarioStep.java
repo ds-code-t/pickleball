@@ -4,6 +4,8 @@ package io.cucumber.core.runner;
 
 import io.cucumber.core.gherkin.Pickle;
 import tools.dscode.common.annotations.DefinitionFlag;
+import tools.dscode.common.mappings.MapConfigurations;
+import tools.dscode.common.mappings.ParsingMap;
 
 import java.util.HashMap;
 import java.util.List;
@@ -28,9 +30,18 @@ public class ScenarioStep extends StepExtension {
     }
 
     public static ScenarioStep createScenarioStep(Pickle pickle) {
+        return createScenarioStep(pickle, null);
+    }
+
+    public static ScenarioStep createScenarioStep(Pickle pickle, ParsingMap parsingMap) {
         io.cucumber.core.runner.TestCase topLevel  =   GlobalState.getTestCase();
-        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = getPickleStepTestStepFromStrings(pickle, getGivenKeyword() ,  SCENARIO_STEP + pickle.getName(), null);
+        String scenarioName =  SCENARIO_STEP + (parsingMap == null ? pickle.getName() : parsingMap.resolveWholeText(pickle.getName()));
+        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = getPickleStepTestStepFromStrings(pickle, getGivenKeyword() ,   scenarioName, null);
         ScenarioStep scenarioStep = new ScenarioStep(topLevel, scenarioPickleStepTestStep);
+        if(parsingMap!= null) {
+            scenarioStep.stepParsingMap.clear();
+            scenarioStep.stepParsingMap.getMaps().putAll(parsingMap.getMaps());
+        }
         scenarioStep.initializeScenarioSteps(createPickleStepTestStepsFromPickle(pickle).stream().map(step -> new StepExtension(getTestCase(), step)).toList());
         return scenarioStep;
     }
