@@ -1,6 +1,7 @@
 package tools.dscode.common.treeparsing.preparsing;
 
 import io.cucumber.core.runner.StepExtension;
+import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
@@ -43,7 +44,6 @@ public final class ParsedLine extends LineData {
         if(stepEntry != null) {
             phrase.phraseEntry = getRunningStep().stepEntry.logWithType("PHRASE", phrase.toString()).start();
         }
-
         PhraseData nextResolvedPhrase = phrase.runPhrase();
 
         if( phrase.phraseEntry != null)

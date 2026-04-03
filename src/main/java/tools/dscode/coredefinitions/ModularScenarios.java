@@ -28,7 +28,11 @@ public class ModularScenarios extends CoreSteps {
     //    @DefinitionFlags(NO_LOGGING)
     @Given("^RUN SCENARIOS?:?(.*)?$")
     public static void runScenarios(String inlineTags, DataTable dataTable) {
-        List<Map<String, String>> maps = dataTable.asMaps().stream()
+        populateRunScenariosStep(getRunningStep(), inlineTags, dataTable);
+    }
+
+    public static void populateRunScenariosStep(StepExtension topStep , String inlineTags, DataTable dataTable) {
+        List<Map<String, String>> maps = dataTable == null ? new ArrayList<>() : dataTable.asMaps().stream()
                 .map(HashMap::new) // copy each to a mutable map
                 .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
         if (inlineTags != null && !inlineTags.isBlank()) {
@@ -37,7 +41,6 @@ public class ModularScenarios extends CoreSteps {
                 Map<String, String> singleMap = new HashMap<>();
                 singleMap.put("Tags", scenarioTags);
                 maps.add(singleMap);
-
             } else {
                 maps.forEach(map -> {
                     String mapTags = (scenarioTags + " " + map.getOrDefault(" Tags ", "")).trim();
@@ -45,13 +48,13 @@ public class ModularScenarios extends CoreSteps {
                 });
             }
         }
-        filterAndExecutePickles(maps);
+        filterAndParsePickles(topStep, maps);
     }
+
 
     static final @Language("RegExp") String tagRegexReplacement = "(?<!@)(" + COMPONENT_TAG_META_CHAR + "[A-Za-z])";
 
-    public static void filterAndExecutePickles(List<Map<String, String>> maps, String... messageString) {
-        StepExtension currentStep = getRunningStep();
+    public static void filterAndParsePickles(StepExtension topStep , List<Map<String, String>> maps, String... messageString) {
         StepExtension lastScenarioNameStep = null;
 
         for (Map<String, String> map : maps) {
@@ -72,7 +75,7 @@ public class ModularScenarios extends CoreSteps {
                     scenarioStepParsingMap.addMaps(examples);
                 }
                 currentScenarioNameStep = createScenarioStep(gherkinMessagesPickle, scenarioStepParsingMap);
-                currentStep.childSteps.add(currentScenarioNameStep);
+                topStep.childSteps.add(currentScenarioNameStep);
 
                 if (lastScenarioNameStep != null) {
                     lastScenarioNameStep.nextSibling = currentScenarioNameStep;

@@ -42,12 +42,12 @@ public abstract class StepMapping extends StepBase {
         return String.valueOf(eval(expression, getStepParsingMap()));
     }
 
-    static final  Set<MapConfigurations.MapType> includeStepMaps = EnumSet.of(MapConfigurations.MapType.STEP_MAP);
-    static final  Set<MapConfigurations.MapType> includeStepExamplePassedMaps = EnumSet.of(MapConfigurations.MapType.STEP_MAP, MapConfigurations.MapType.EXAMPLE_MAP, MapConfigurations.MapType.PASSED_MAP);
+    static final  Set<MapConfigurations.MapType> includeStepMaps = EnumSet.of(MapConfigurations.MapType.STEP_MAP, MapConfigurations.MapType.PHRASE_MAP);
+    static final  Set<MapConfigurations.MapType> includeStepExamplePassedMaps = EnumSet.of(MapConfigurations.MapType.STEP_MAP, MapConfigurations.MapType.EXAMPLE_MAP, MapConfigurations.MapType.PASSED_MAP, MapConfigurations.MapType.PHRASE_MAP);
 
 
     public void copyParsingMap(ParsingMap inputParsingMap) {
-        this.stepParsingMap.removeMaps(MapConfigurations.MapType.STEP_MAP);
+        this.stepParsingMap.removeMaps(MapConfigurations.MapType.STEP_MAP, MapConfigurations.MapType.PHRASE_MAP);
         if (this instanceof ScenarioStep) {
             this.stepParsingMap.maps.putAll(Multimaps.filterKeys(inputParsingMap.getMaps(), includeStepMaps::contains));
         } else {

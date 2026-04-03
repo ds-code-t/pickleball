@@ -397,7 +397,7 @@ public abstract class PassedData {
 
     public void setResolvedPhrase(PhraseData resolvedPhrase) {
         this.resolvedPhrase = resolvedPhrase;
-        this.resolvedPhrase.phraseParsingMap = phraseParsingMap;
+//        this.resolvedPhrase.phraseParsingMap = phraseParsingMap;
         this.resolvedPhrase.phraseNode = phraseNode;
         resolvedPhrase.templatePhrase = (PhraseData) this;
     }

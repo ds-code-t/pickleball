@@ -56,11 +56,9 @@ public final class TableQueries {
         if (node.isObject()) {
             for (Map.Entry<String, JsonNode> entry : node.properties()) {
                 JsonNode value = entry.getValue();
-
                 if (ROW_KEY.equals(entry.getKey()) && value.isArray()) {
                     addArrayElements((ArrayNode) value, rows);
                 }
-
                 collectRows(value, rows);
             }
             return;

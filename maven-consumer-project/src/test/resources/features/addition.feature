@@ -60,7 +60,7 @@ Feature: Addition
     * test2 Q
 #    * test2 ~INT~:3
 
-  Scenario: data test C
+  Scenario: data test ssC
 
 #    * , in "YYY" Data Table,  for every "B" Data Cell:
 #    * , in Data Table, for every Data Row:

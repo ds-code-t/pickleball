@@ -51,6 +51,7 @@ import static tools.dscode.registry.GlobalRegistry.LOCAL;
 import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
 
 public class CurrentScenarioState extends ScenarioMapping {
+    public boolean endCurrentScenario;
 
     public List<Throwable> stepFailures = new ArrayList<>();
 
@@ -76,12 +77,17 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     public static final ThreadLocal<CurrentScenarioState> currentScenarioState = new ThreadLocal<>();
 
+    public final String scenarioName;
+    public final String scenarioNameAndLine;
+
 
     public CurrentScenarioState(TestCase testCase) {
         LOCAL.set(new ConcurrentHashMap<>());
         GlobalRegistry.putLocal(testCase.getClass().getCanonicalName(), testCase);
         this.testCase = testCase;
         this.pickle = (Pickle) getProperty(testCase, "pickle");
+        scenarioName = pickle.getName();
+        scenarioNameAndLine = scenarioName + " , Line " + pickle.getLocation().getLine();
     }
 
 
@@ -125,6 +131,8 @@ public class CurrentScenarioState extends ScenarioMapping {
         entry.fields.putAll(dataTable.asMap());
         return entry.timestamp();
     }
+
+
 
     public void startScenarioRun() {
         String scenarioName = pickle.getName() + " , Line " + pickle.getLocation().getLine();
@@ -225,16 +233,19 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void runStep(StepExtension stepExtension) {
+        if(endCurrentScenario)
+            return;
         currentStep = stepExtension;
         stepExtension.lineData = new ParsedLine(stepExtension.getUnmodifiedText());
         stepExtension.lineData.setInheritance(stepExtension);
         currentPhrase = (Phrase) stepExtension.lineData.inheritedPhrase;
         runningStep(stepExtension);
+        if(stepExtension instanceof ScenarioStep)
+            endCurrentScenario = false;
     }
 
 
     public void runningStep(StepExtension stepExtension) {
-//        scenarioInfo("Running " + stepExtension);
         if (!shouldRun(stepExtension)) {
             stepExtension.skipped = true;
             if (stepExtension.nextSibling != null) {
@@ -251,13 +262,16 @@ public class CurrentScenarioState extends ScenarioMapping {
             result = stepExtension.run();
         }
 
+        if(!stepExtension.lineData.inheritancePhrases.isEmpty())
+            stepExtension.inheritancePhrase = stepExtension.lineData.inheritancePhrases.getFirst();
 
-        io.cucumber.plugin.event.Status status = result.getStatus();
+
+        Status status = result.getStatus();
         Throwable throwable = result.getError();
 
         if (!result.getStatus().equals(Status.PASSED) && !result.getStatus().equals(Status.SKIPPED) && throwable == null) {
 
-            if (status.equals(io.cucumber.plugin.event.Status.UNDEFINED))
+            if (status.equals(Status.UNDEFINED))
                 throwable = new RuntimeException("'" + stepExtension.pickleStepTestStep.getStep().getText() + "' step is undefined");
             else
                 throwable = new RuntimeException("Step failed with status: " + status);
@@ -278,6 +292,28 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 //        if (isScenarioComplete())
 //            return;
+            if(!stepExtension.replacementSteps.isEmpty())
+            {
+                StepBase last = null;
+                int insertionCount = stepExtension.parentStep.childSteps.indexOf(stepExtension);
+                for (StepBase replacementStep : stepExtension.replacementSteps) {
+                    insertionCount++;
+                    stepExtension.parentStep.childSteps.add(insertionCount, replacementStep);
+                    if(last == null) {
+                        replacementStep.previousSibling = stepExtension.previousSibling;
+                    }
+                    else {
+                        last.nextSibling = replacementStep;
+                        replacementStep.previousSibling = last;
+                    }
+                    last = replacementStep;
+                }
+                last.nextSibling = stepExtension.nextSibling;
+                stepExtension.nextSibling = stepExtension.replacementSteps.getFirst();
+                last.childSteps.addAll(stepExtension.childSteps);
+                stepExtension.childSteps.clear();
+            }
+
 
 
         for (StepBase attachedStep : stepExtension.attachedSteps) {
@@ -288,6 +324,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         if (stepExtension.logAndIgnore && stepExtension.definitionFlags.contains(IGNORE_CHILDREN_IF_FALSE)) {
             return;
         }
+
 
         if (!stepExtension.definitionFlags.contains(IGNORE_CHILDREN)) {
             if (stepExtension.lineData.inheritancePhrases.isEmpty())
@@ -315,8 +352,6 @@ public class CurrentScenarioState extends ScenarioMapping {
             }
         }
 
-        if(!stepExtension.lineData.inheritancePhrases.isEmpty())
-            stepExtension.inheritancePhrase = stepExtension.lineData.inheritancePhrases.getFirst();
 
 
         if (stepExtension.nextSibling != null) {
@@ -329,7 +364,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     private boolean isScenarioSoftFail = false;
     private boolean isScenarioComplete = false;
 
-    public static void endScenario() {
+    public static void endTest() {
         getCurrentScenarioState().isScenarioComplete = true;
     }
 

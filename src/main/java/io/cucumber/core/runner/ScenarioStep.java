@@ -15,7 +15,6 @@ import static io.cucumber.core.runner.GlobalState.getGivenKeyword;
 import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.createPickleStepTestStepsFromPickle;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
-import static tools.dscode.common.GlobalConstants.NEXT_SIBLING_STEP;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.setProperty;

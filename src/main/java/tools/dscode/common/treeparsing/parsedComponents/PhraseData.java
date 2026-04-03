@@ -1,5 +1,7 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.xpathy.XPathy;
 import org.openqa.selenium.SearchContext;
@@ -25,11 +27,13 @@ import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
+import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.StepMapping.copytoNewParsingMap;
+import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseError;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
@@ -113,9 +117,7 @@ public abstract class PhraseData extends PassedData {
             } else {
                 phraseParsingMap = previousPhrase.getPhraseParsingMap();
             }
-
         }
-
         return phraseParsingMap;
     }
 
@@ -128,10 +130,24 @@ public abstract class PhraseData extends PassedData {
         this.phraseParsingMap = newParsingMap;
     }
 
-    public void setPhraseParsingMap(ObjectNode data) {
+    public void setPhraseParsingMap(JsonNode data) {
+        ObjectNode objectNode;
+        if(data instanceof ObjectNode) {
+            objectNode = (ObjectNode) data;
+        }
+        else if(data instanceof ArrayNode)
+        {
+            objectNode = MAPPER.createObjectNode();
+            objectNode.put(ROW_KEY, data);
+        }
+        else
+        {
+            throw new RuntimeException("Unexpected data type: " + data.getClass().getName());
+        }
+
         phraseParsingMap = copytoNewParsingMap(getPhraseParsingMap());
         phraseParsingMap.removeMaps(MapConfigurations.MapType.PHRASE_MAP);
-        NodeMap phraseNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP, data);
+        NodeMap phraseNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP, objectNode);
         phraseParsingMap.addMapsToStart(phraseNodeMap);
         ElementMatch dataElement = getDataElement();
         String categoryName = dataElement == null ? null : dataElement.category.replaceFirst("(?i:s)$", "");

@@ -1,20 +1,49 @@
 Feature: Additiontest
+  Scenario: data test C
 
+#    * , in "YYY" Data Table,  for every "B" Data Cell:
+    * , in "YYY" Data Table, for every "y2" Data Row, for every Data Cell:
+#    : * print "cellhere"
+  :   * , save "<A>-<B>" as "WW"
+    * "YYY" DATA TABLE
+      | A  | B    | C  |
+      | y1 | a2   | a3 |
+      | y2 | b2-1 | b3 |
+      | y2 | b2-2 | b3 |
+      | y2 | b2-3 | b3 |
+      | y2 | b2-4 | b3 |
+      | y1 | b2   | b3 |
+      | y3 | b2   | b3 |
+
+  Scenario: adfsdfdsf
+  @[DEBUG]
+#    * , if "Example Domain" Window is displayed, save "A" as "v"
+    * IF: "Examplse Domain" Window is displayed THEN: , save "A1" as "v"  ELSE:  , save "C1" as "v"
+#    * IF: "Example Domain" Window is displayed THEN: , save "A1" as "v" , ELSE-IF: "Google" Window is displayed THEN: , save "B1" as "v"
+#    * IF: "Example Domain" Window is displayed THEN: , save "A1" as "v" , ELSE-IF: "Google" Window is displayed THEN: , save "B1" as "v" ELSE:  , save "C1" as "v"
+#    * IF: "Google" Window is displayed THEN: , save "A2" as "v" , ELSE-IF: "Example Domain" Window is displayed THEN: , save "B2" as "v" ELSE:  , save "C2" as "v"
+#    * IF: "aa" Window is displayed THEN: , save "A3" as "v" , ELSE-IF: "Examplaae Domain" Window is displayed THEN: , save "B3" as "v" ELSE:  , save "C3" as "v"
+#    * , if "Google" Window is displayed, save "A" as "v"
 
   Scenario: test dd match1
-  @[DEBUG]
-  * test2
+    * , in the "/files/items.yaml" Data , for every Data Entry:
+  : * , save "<a>" as "B"
+#    * , save "<files/items.yaml>" as "B"
+#    * , save "</files/items.yaml>" as "B"
+#    * , in the "files/items.yaml" Data Value, save "<a>" as "B"
+#  @[DEBUG]
+#  * test2
 
 
 #  @[DEBUG,##MatchNode]
   Scenario: test match1
   @[DEBUG,##MatchNode]
-  * RUN SCENARIOS
-    |@test4 |
+    * RUN SCENARIOS
+      | @test4 |
 #    * , I verify  "Get your own website" Link matches "^Gxet.*$
-  * ,  verify "2343242" matches "\d+"
-  * ,  verify "\d+"  matches "2343242"
-  * ,  verify "a" equal "a"
+    * ,  verify "2343242" matches "\d+"
+    * ,  verify "\d+"  matches "2343242"
+    * ,  verify "a" equal "a"
 
   @test4
   Scenario: aaasdsave2
@@ -67,11 +96,12 @@ Feature: Additiontest
 #    * , until "<A>" equals "aaaa":
 #  : * , wait 1 seconds ,  save "a<A>" as "A"
 
+  @zz22
   Scenario: sente test1
-  @[DEBUG,##]
+#  @[DEBUG,##]
     * navigate to: URL.textbox
-    * , from the Top Panel:
-  : * IF: "aa" THEN: , click "Get your own website" Link
+#    * , from the Top Panel:
+#  : * IF: "aa" THEN: , click "Get your own website" Link
 
 #    : * , click the "Run ❯" Button, and the "Get your website" Link, and wait 2 seconds
 #    * , switch Window

@@ -1,24 +1,29 @@
 constructor: CREATE_LOCAL_DRIVER
 browser: chrome
-capabilities:
-  browserName: chrome
-  acceptInsecureCerts: true
-  pageLoadStrategy: normal
-  "goog:chromeOptions":
+
+driver:
+  capabilities:
+    browserName: chrome
+    acceptInsecureCerts: true
+    pageLoadStrategy: normal
+
+  options:
     args:
       - "--disable-notifications"
       - "--disable-popup-blocking"
       - "--remote-allow-origins=*"
-#service:
-#  port: 0
-#  verbose: false
-#postActions:
+
+  service:
+    port: 0
+    verbose: false
+
+postActions:
 #  - "NAVIGATE: about:blank"
-#  - "MAXIMIZE"
-#  - "CLEAR_COOKIES"
-#  - "IMPLICIT_WAIT: 5000"
-#  - "PAGE_LOAD_TIMEOUT: 30000"
-#  - "SCRIPT_TIMEOUT: 30000"
-#
-#cleanup:
-#  - QUIT_LOCAL_DRIVER
+  - "MAXIMIZE"
+  - "CLEAR_COOKIES"
+  - "IMPLICIT_WAIT: 5000"
+  - "PAGE_LOAD_TIMEOUT: 30000"
+  - "SCRIPT_TIMEOUT: 30000"
+
+cleanup:
+  - "QUIT_LOCAL_DRIVER"

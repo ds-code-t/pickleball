@@ -71,7 +71,6 @@ public class ConditionalSteps extends CoreSteps {
         String stepString = "";
         for (int i = 0; i < parts.size(); i++) {
             TokenPart part = parts.get(i);
-
             switch (part.token()) {
                 case IF -> {
                     stepString += " , if " + part.text() + " : ";
@@ -89,23 +88,19 @@ public class ConditionalSteps extends CoreSteps {
                     stepString += part.text();
                 }
             }
-
             if(stepString.isBlank())
                 continue;
 
 
             if (part.token() == ConditionalToken.THEN) {
                 StepExtension modifiedStep = lastNonThenStep.modifyStepExtension(stepString);
-
-
                 lastNonThenStep.addChildStep(modifiedStep);
 
             } else {
                 StepExtension modifiedStep = currentStep.modifyStepExtension(stepString);
-                currentStep.insertReplacement(modifiedStep);
+                currentStep.addReplacementStep(modifiedStep);
                 modifiedStep.addDefinitionFlag(NO_LOGGING);
                 modifiedStep.addDefinitionFlag(IGNORE_CHILDREN_IF_FALSE);
-
 
                 if (lastNonThenStep != null) {
                     modifiedStep.previousSibling = lastNonThenStep;
@@ -117,8 +112,6 @@ public class ConditionalSteps extends CoreSteps {
                     if(!part.text().isBlank()) {
                         StepExtension modifiedStep2 = currentStep.modifyStepExtension(part.text());
                         modifiedStep2.addDefinitionFlag(IGNORE_CHILDREN_IF_FALSE);
-
-
                         lastNonThenStep.addChildStep(modifiedStep2);
                     }
                 }

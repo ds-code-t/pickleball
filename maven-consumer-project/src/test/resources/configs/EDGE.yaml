@@ -1,16 +1,21 @@
 constructor: CREATE_LOCAL_DRIVER
 browser: edge
-capabilities:
-  browserName: edge
-  acceptInsecureCerts: true
-  pageLoadStrategy: normal
-  "ms:edgeOptions":
+
+driver:
+  capabilities:
+    browserName: MicrosoftEdge
+    acceptInsecureCerts: true
+    pageLoadStrategy: normal
+
+  options:
     args:
       - "--disable-notifications"
       - "--disable-popup-blocking"
-service:
-  port: 0
-  verbose: false
+
+  service:
+    port: 0
+    verbose: false
+
 postActions:
   - "NAVIGATE: about:blank"
   - "MAXIMIZE"
@@ -18,3 +23,6 @@ postActions:
   - "IMPLICIT_WAIT: 5000"
   - "PAGE_LOAD_TIMEOUT: 30000"
   - "SCRIPT_TIMEOUT: 30000"
+
+cleanup:
+  - "QUIT_LOCAL_DRIVER"

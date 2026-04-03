@@ -1,19 +1,31 @@
 constructor: CREATE_REMOTE_DRIVER
 browser: chrome
-connection:
-  remoteUrl: "http://localhost:4444/wd/hub"
-capabilities:
-  browserName: chrome
-  acceptInsecureCerts: true
-  "goog:chromeOptions":
+
+driver:
+  connection:
+    remoteUrl: "http://localhost:4444/wd/hub"
+    clientConfig:
+      readTimeoutMs: 120000
+      connectionTimeoutMs: 30000
+
+  capabilities:
+    browserName: chrome
+    acceptInsecureCerts: true
+    pageLoadStrategy: normal
+
+  options:
     args:
       - "--disable-notifications"
       - "--disable-popup-blocking"
+      - "--remote-allow-origins=*"
+
 postActions:
-  - "ENABLE_LOCAL_FILE_DETECTOR"
-  - "NAVIGATE: https://example.com"
+  - "NAVIGATE: about:blank"
   - "MAXIMIZE"
   - "CLEAR_COOKIES"
   - "IMPLICIT_WAIT: 5000"
   - "PAGE_LOAD_TIMEOUT: 30000"
   - "SCRIPT_TIMEOUT: 30000"
+
+cleanup:
+  - "QUIT_LOCAL_DRIVER"

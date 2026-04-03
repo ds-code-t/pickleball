@@ -89,5 +89,16 @@ public class GeneralSteps extends CoreSteps {
 
     }
 
+    @Given("(?i)^ScenarioName$")
+    public static String getScenarioName()
+    {
+        return getCurrentScenarioState().scenarioName;
+    }
+
+    @Given("(?i)^ScenarioNameAndLine$")
+    public static String getScenarionNameAndLine()
+    {
+        return getCurrentScenarioState().scenarioNameAndLine;
+    }
 }
 

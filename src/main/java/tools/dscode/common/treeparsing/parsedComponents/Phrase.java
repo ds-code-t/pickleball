@@ -3,6 +3,7 @@ package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import tools.dscode.common.domoperations.ExecutionDictionary;
+import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.preparsing.LineData;
@@ -21,7 +22,7 @@ public final class Phrase extends PhraseData {
 
 
     public Phrase(LineData parsedLine) {
-        super( STARTING_CONTEXT, ',', parsedLine);
+        super(STARTING_CONTEXT, ',', parsedLine);
         isTopContext = true;
     }
 
@@ -44,10 +45,8 @@ public final class Phrase extends PhraseData {
                     phraseConditionalMode = 0;
                     previouslyResolvedBoolean = false;
                 }
-            } else if (getPreviousPhrase().phraseConditionalMode > -1)
-                phraseConditionalMode = 0;
-            else
-                phraseConditionalMode = 1;
+            } else if (getPreviousPhrase().phraseConditionalMode > -1) phraseConditionalMode = 0;
+            else phraseConditionalMode = 1;
         } else {
             phraseConditionalMode = getPreviousPhrase() == null ? 1 : getPreviousPhrase().phraseConditionalMode;
         }
@@ -149,16 +148,15 @@ public final class Phrase extends PhraseData {
         ElementMatch firstElement = getFirstElement();
         if (firstElement.elementTypes.contains(ElementType.DATA_TYPE)) {
             categoryFlags.add(ExecutionDictionary.CategoryFlags.DATA_CONTEXT);
-            String categoryName = firstElement.category.replaceFirst("(?i:s)$", "");
-//            String key = categoryName.equals(CELL_KEY) ? CELL_KEY : null;
+//            String categoryName = firstElement.category.replaceFirst("(?i:s)$", "");
             String key = null;
+            List obj = getPhraseParsingMap().get(firstElement);
             if (firstElement.selectionType.isEmpty()) {
-                List<?> obj = getPhraseParsingMap().get(firstElement);
                 if (obj == null || obj.isEmpty())
                     phraseConditionalMode = 0;
-                saveToPhraseParsingMap(key, obj.getLast());
+                else
+                    saveToPhraseParsingMap(key, obj.getLast());
             } else {
-                List<?> obj = getPhraseParsingMap().get(firstElement);
                 if (obj == null || obj.isEmpty()) {
                     phraseConditionalMode = 0;
                     if (!firstElement.selectionType.equals("any")) {
@@ -208,16 +206,14 @@ public final class Phrase extends PhraseData {
     }
 
     public void saveToPhraseParsingMap(PhraseData phraseData, String key, Object object) {
-
         if (key == null) {
             if (object instanceof ObjectNode objectNode) {
                 phraseData.setPhraseParsingMap(objectNode);
             } else {
-                phraseData.setPhraseParsingMap((ObjectNode) MAPPER.valueToTree(object));
+                phraseData.setPhraseParsingMap(MAPPER.valueToTree(object));
             }
         } else {
-            phraseData.setPhraseParsingMap(MAPPER.createObjectNode()
-                    .set(key, MAPPER.valueToTree(object)));
+            phraseData.setPhraseParsingMap(MAPPER.createObjectNode().set(key, MAPPER.valueToTree(object)));
         }
     }
 
@@ -298,8 +294,7 @@ public final class Phrase extends PhraseData {
 
     public static PhraseData updateChainAndInheritances(PhraseData nextResolvedPhrase) {
         nextResolvedPhrase.setOperationInheritance();
-        if (nextResolvedPhrase.phraseType == PhraseType.CONTEXT)
-            return nextResolvedPhrase;
+        if (nextResolvedPhrase.phraseType == PhraseType.CONTEXT) return nextResolvedPhrase;
 
         PhraseData previousPhrase = nextResolvedPhrase.getPreviousPhrase();
         if (nextResolvedPhrase.isChainStart) {

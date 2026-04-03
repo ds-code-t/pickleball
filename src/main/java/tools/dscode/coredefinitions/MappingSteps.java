@@ -39,7 +39,7 @@ public class MappingSteps extends CoreSteps {
         rowName = rowName == null || rowName.isBlank() ? "" : rowName;
         StepExtension currentStep = getRunningStep();
         StepExtension modifiedStep = currentStep.modifyStepExtension(", in the " + tableName + "Data Table, for every " + rowName + "Data Row:");
-        currentStep.insertReplacement(modifiedStep);
+        currentStep.addReplacementStep(modifiedStep);
     }
 
 

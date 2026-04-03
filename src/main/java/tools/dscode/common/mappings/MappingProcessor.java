@@ -2,6 +2,7 @@ package tools.dscode.common.mappings;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.LinkedListMultimap;
 import tools.dscode.common.mappings.queries.Tokenized;
@@ -10,6 +11,7 @@ import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -22,12 +24,13 @@ import java.util.stream.Stream;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
+import static io.cucumber.core.runner.util.TableUtils.DATA_OBJECT_KEY;
+import static io.cucumber.core.runner.util.TableUtils.DOCSTRING_KEY;
 import static io.cucumber.core.runner.util.TableUtils.HEADER_KEY;
+import static io.cucumber.core.runner.util.TableUtils.ENTRY_KEY;
 import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
-import static io.cucumber.core.runner.util.TableUtils.VALUE_KEY;
 import static tools.dscode.common.dataoperations.DataComparisons.filterGroupedValues;
-import static tools.dscode.common.dataoperations.TableQueries.findCellValues;
 
 import static tools.dscode.common.dataoperations.TableQueries.findCells;
 import static tools.dscode.common.dataoperations.TableQueries.findHeaders;
@@ -44,7 +47,6 @@ import static tools.dscode.common.util.StringUtilities.encodeToPlaceHolders;
 import static tools.dscode.common.variables.RunVars.RUN_VARS;
 import static tools.dscode.common.variables.RunVars.VAR_PREFIX;
 import static tools.dscode.common.variables.RunVars.prefixed;
-import static tools.dscode.common.variables.RunVars.resolveFromVars;
 
 public abstract class MappingProcessor implements Map<String, Object> {
 
@@ -66,6 +68,16 @@ public abstract class MappingProcessor implements Map<String, Object> {
         defaultsMap.set(new NodeMap(MapConfigurations.MapType.DEFAULT));
         dataTableMap.set(new NodeMap(MapConfigurations.MapType.DATATABLE));
         docStringMap.set(new NodeMap(MapConfigurations.MapType.DOCSTRING));
+    }
+
+    public NodeMap getOrAddAndGetMap(MapConfigurations.MapType mapType) {
+        List<NodeMap> returnMaps = maps.get(mapType);
+        if (returnMaps.isEmpty()) {
+            NodeMap newMap = new NodeMap(mapType);
+            addMaps(newMap);
+            return newMap;
+        }
+        return returnMaps.getFirst();
     }
 
     public static NodeMap getRunMap() {
@@ -130,7 +142,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     public NodeMap getPhraseMap() {
-        return maps.get(MapConfigurations.MapType.PHRASE_MAP).getFirst();
+        return getOrAddAndGetMap(MapConfigurations.MapType.PHRASE_MAP);
     }
 
     public NodeMap getPrimaryRunMap() {
@@ -402,9 +414,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     private Object getVar(String key) {
         Object returnObj = singletonMap.get().getByNormalizedPath(key);
-        if (returnObj == null) return RUN_VARS.getByNormalizedPath(key);
+        if (returnObj == null) return RUN_VARS.getByNormalizedPath(key.replaceFirst("^" + VAR_PREFIX, ""));
         if (returnObj instanceof List list) {
-            if (list.isEmpty()) return RUN_VARS.getByNormalizedPath(key);
+            if (list.isEmpty()) return RUN_VARS.getByNormalizedPath(key.replaceFirst("^" + VAR_PREFIX, ""));
             return list.getFirst();
         }
         return returnObj;
@@ -440,21 +452,16 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
 
     public Object get(String key) {
-        System.out.println("@@get: " + key);
         if (key.startsWith("$"))
             return getRunningStep().resolveStepFromString(key.substring(1));
 
-       boolean directGet = (key.startsWith("`") && key.endsWith("`"));
+        boolean directGet = (key.startsWith("`") && key.endsWith("`"));
 
         if (directGet) {
             key = key.substring(1, key.length() - 1);
-        }
-        else
-        {
-            if (key.contains("/")) {
-                System.out.println("@@buildJsonFromPath: " + key);
-                System.out.println("@@buildJsonFromPath(key): " + buildJsonFromPath(key));
-                return buildJsonFromPath(key);
+        } else {
+            if (key.startsWith("/")) {
+                return buildJsonFromPath(key.substring(1));
             }
 
             if (prefixed.matcher(key).matches()) {
@@ -481,33 +488,44 @@ public abstract class MappingProcessor implements Map<String, Object> {
             if (noQuotedText) {
                 return element.parentPhrase.getPhraseParsingMap().getPhraseMap().getAsList(TABLE_KEY);
             } else {
-                ObjectNode objectNode = (ObjectNode) getDataTableMap().get(TABLE_KEY);
+                java.util.LinkedHashMap<String, JsonNode> tableList = (java.util.LinkedHashMap) getDataTableMap().get(TABLE_KEY);
                 List<String> tableNames = new ArrayList<>();
                 List<JsonNode> tableNodes = new ArrayList<>();
-                for (Map.Entry<String, JsonNode> entry : objectNode.properties()) {
+//                for (Map.Entry<String, JsonNode> entry : tableList.entrySet())
+                for (Map.Entry<String, JsonNode> entry : tableList.entrySet()) {
                     tableNames.add(entry.getKey());
-                    tableNodes.add(entry.getValue());
+                    tableNodes.add(MAPPER.valueToTree(entry.getValue()));
                 }
                 return filterGroupedValues(tableNames, tableNodes, element, false);
             }
+        } else if (categoryName.equals(DOCSTRING_KEY)) {
+            if (noQuotedText) {
+                return element.parentPhrase.getPhraseParsingMap().getPhraseMap().getAsList(DOCSTRING_KEY);
+            } else {
+                ObjectNode objectNode = (ObjectNode) getDocStringMap().get(DOCSTRING_KEY);
+                return new ArrayList<>(Collections.singleton(objectNode));
+            }
         }
-
-
-        NodeMap map = getPhraseMap();
-        if (map == null)
-            return null;
-
+        NodeMap phraseMap = getPhraseMap();
 
         switch (categoryName) {
+            case ENTRY_KEY:
+                JsonNode jsonNode = phraseMap.getRoot().get(ROW_KEY);
+                ArrayList<JsonNode> list = new ArrayList<>();
+                if (jsonNode instanceof ArrayNode arrayNode) {
+                    arrayNode.forEach(list::add);
+                } else {
+                    phraseMap.getRoot().elements().forEachRemaining(list::add);
+                }
+                return list;
             case ROW_KEY:
-                List<JsonNode> rowsArray = findRows(map.getRoot());
+                List<JsonNode> rowsArray = findRows(phraseMap.getRoot());
                 List<String> keyList = new ArrayList<>();
                 rowsArray.forEach(row -> keyList.add(row.values().next().get(0).asText()));
                 return filterGroupedValues(keyList, rowsArray, element, false);
             case CELL_KEY:
 
-                List<JsonNode> cellsArray = findCells(map.getRoot());
-
+                List<JsonNode> cellsArray = findCells(phraseMap.getRoot());
                 List<String> cellKeys = new ArrayList<>();
                 List<String> cellValues = new ArrayList<>();
 
@@ -529,11 +547,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
                 return filterGroupedValues(cellKeys, keyedCellValues, element, false);
             case HEADER_KEY:
-                List<String> headers = findHeaders(map.root);
+                List<String> headers = findHeaders(phraseMap.root);
                 return filterGroupedValues(headers, headers, element, false);
-            case VALUE_KEY:
-                List<String> values = findCellValues(map.root);
-                return filterGroupedValues(values, values, element, false);
+            case DATA_OBJECT_KEY:
+                return Collections.singletonList(get(element.defaultText.toString()));
             default:
                 return null;
         }

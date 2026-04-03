@@ -134,7 +134,6 @@ public class StepExtension extends StepData {
                 ? null
                 : instanceOrNull;
 
-
         try {
             return method.invoke(target, arguments.stream().map(arg -> arg.getValue()).toArray());
         } catch (Throwable t) {
@@ -353,33 +352,8 @@ public class StepExtension extends StepData {
         return modifiedStep;
     }
 
-    public static Object runDynamicStep(String stepText) {
-        return runDynamicStep(stepText, "");
-    }
 
-    public static Object runDynamicStep(String stepText, String argumentText) {
-        argumentText = argumentText == null || argumentText.isBlank() ? "" : argumentText;
-        StepExtension currentStep = getRunningStep();
-        try {
-            StepExtension modifiedStep = new StepExtension(currentStep.testCase, getPickleStepTestStepFromStrings(currentStep.pickleStepTestStep.getStep().getKeyword(), stepText, argumentText));
-            modifiedStep.setStepParsingMap(getRunningParsingMap());
-            return modifiedStep.runAndGetReturnValue();
-        } catch (Throwable t) {
-            throw new StepCreationException("Failed to create Step '" + stepText + "'" + (argumentText.isBlank() ? " with argument '" + argumentText + "'" : "") + t.getMessage(), t);
-        }
-    }
 
-    public static Object tryToRunDynamicStep(String stepText, String argumentText) {
-        argumentText = argumentText == null || argumentText.isBlank() ? "" : argumentText;
-        StepExtension currentStep = getRunningStep();
-        try {
-            StepExtension modifiedStep = new StepExtension(currentStep.testCase, getPickleStepTestStepFromStrings(currentStep.pickleStepTestStep.getStep().getKeyword(), stepText, argumentText));
-            modifiedStep.setStepParsingMap(getRunningParsingMap());
-            return modifiedStep.runAndGetReturnValue();
-        } catch (Throwable t) {
-            return new StepCreationException("Failed to create Step '" + stepText + "'" + (argumentText.isBlank() ? " with argument '" + argumentText + "'" : "") + t.getMessage(), t);
-        }
-    }
 
 
 }

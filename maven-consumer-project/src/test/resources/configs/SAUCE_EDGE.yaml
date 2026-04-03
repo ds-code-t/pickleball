@@ -1,22 +1,43 @@
 constructor: CREATE_REMOTE_DRIVER
 browser: edge
-connection:
-  remoteUrl: "https://SAUCE_USERNAME:SAUCE_ACCESS_KEY@ondemand.us-west-1.saucelabs.com:443/wd/hub"
-capabilities:
-  browserName: MicrosoftEdge
-  browserVersion: latest
-  platformName: "Windows 11"
-  acceptInsecureCerts: true
-  "sauce:options":
-    name: "Sauce Edge Session"
-    build: "Local Build"
-    seleniumVersion: "4.0.0"
-    screenResolution: "1920x1080"
+
+driver:
+  connection:
+    remoteUrl: "https://ondemand.us-west-1.saucelabs.com:443/wd/hub"
+    clientConfig:
+      readTimeoutMs: 120000
+      connectionTimeoutMs: 30000
+
+  capabilities:
+    browserName: MicrosoftEdge
+    browserVersion: latest
+    platformName: "Windows 11"
+    acceptInsecureCerts: true
+    pageLoadStrategy: normal
+
+  options:
+    args:
+      - "--disable-notifications"
+      - "--disable-popup-blocking"
+
+  providerCapabilities:
+    sauce:options:
+      username: "<SAUCE_USERNAME>"
+      accessKey: "<SAUCE_ACCESS_KEY>"
+      name:  "<$ScenarioNameAndLine>"
+      build: "local-build"
+      tags:
+        - "selenium"
+        - "edge"
+      screenResolution: "1920x1080"
+
 postActions:
-  - "ENABLE_LOCAL_FILE_DETECTOR"
-  - "NAVIGATE: https://example.com"
+  - "NAVIGATE: about:blank"
   - "MAXIMIZE"
   - "CLEAR_COOKIES"
   - "IMPLICIT_WAIT: 5000"
   - "PAGE_LOAD_TIMEOUT: 30000"
   - "SCRIPT_TIMEOUT: 30000"
+
+cleanup:
+  - "QUIT_LOCAL_DRIVER"

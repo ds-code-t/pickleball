@@ -1,6 +1,6 @@
 package tools.dscode.common.driver;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.epam.reportportal.utils.IssueUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.openqa.selenium.MutableCapabilities;
@@ -13,7 +13,6 @@ import org.openqa.selenium.chromium.ChromiumOptions;
 import org.openqa.selenium.edge.EdgeDriver;
 import org.openqa.selenium.edge.EdgeDriverService;
 import org.openqa.selenium.edge.EdgeOptions;
-import org.openqa.selenium.remote.LocalFileDetector;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.remote.http.ClientConfig;
 import org.openqa.selenium.remote.service.DriverService;
@@ -23,12 +22,12 @@ import java.io.OutputStream;
 import java.net.URL;
 import java.time.Duration;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
-import static tools.dscode.common.domoperations.SeleniumUtils.ensureDevToolsPort;
 import static tools.dscode.common.domoperations.SeleniumUtils.isDevToolsListening;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
@@ -38,77 +37,105 @@ public final class DriverConstruction {
     private DriverConstruction() {
     }
 
-    private static final Set<String> RESERVED_ROOT_KEYS = Set.of(
+    private static final Set<String> DRIVER_KEYS = Set.of(
             "connection",
-            "capabilities",
             "service",
-            "postStart",
-            "metadata",
-            "framework",
-            "constructor",
-            "postActions",
-            "_pathKey",
-            "browser",
-            "browserName"
+            "capabilities",
+            "options",
+            "providerCapabilities"
+    );
+
+    private static final Set<String> CONNECTION_KEYS = Set.of(
+            "remoteUrl",
+            "enableTracing",
+            "clientConfig"
+    );
+
+    private static final Set<String> CLIENT_CONFIG_KEYS = Set.of(
+            "baseUrl",
+            "connectionTimeoutMs",
+            "readTimeoutMs",
+            "wsTimeoutMs",
+            "version",
+            "withRetries"
+    );
+
+    private static final Set<String> COMMON_OPTIONS_KEYS = Set.of(
+            "args",
+            "binary",
+            "prefs",
+            "experimentalOptions",
+            "excludeSwitches",
+            "mobileEmulation",
+            "localState",
+            "debuggerAddress",
+            "detach"
+    );
+
+    private static final Set<String> COMMON_SERVICE_KEYS = Set.of(
+            "driverExecutable",
+            "port",
+            "timeoutMs",
+            "logFile",
+            "logOutput",
+            "environment"
+    );
+
+    private static final Set<String> CHROMIUM_SERVICE_KEYS = Set.of(
+            "appendLog",
+            "buildCheckDisabled",
+            "verbose",
+            "silent",
+            "allowedListIps",
+            "readableTimestamp",
+            "logLevel"
     );
 
     public static RemoteWebDriver createDriver(ObjectNode configuration) throws Exception {
         ObjectNode config = requireConfiguration(configuration);
-        BrowserConfig browserConfig = BrowserConfig.from(toRawMap(config));
-        String browserName = resolveBrowserName(config, browserConfig);
+        String browserName = resolveBrowserName(config);
+        ObjectNode driver = getDriverSection(config);
 
-        return hasRemoteUrl(browserConfig)
-                ? createRemoteDriver(browserName, browserConfig, config, "Driver remoteUrl not found")
-                : createLocalDriver(browserName, browserConfig, config);
+        return hasRemoteUrl(driver)
+                ? createRemoteDriver(browserName, driver, config, "Driver remoteUrl not found")
+                : createLocalDriver(browserName, driver, config);
     }
 
     public static RemoteWebDriver createLocalDriver(ObjectNode configuration) throws Exception {
         ObjectNode config = requireConfiguration(configuration);
-        BrowserConfig browserConfig = BrowserConfig.from(toRawMap(config));
-        String browserName = resolveBrowserName(config, browserConfig);
-        return createLocalDriver(browserName, browserConfig, config);
+        return createLocalDriver(resolveBrowserName(config), getDriverSection(config), config);
     }
 
     public static RemoteWebDriver createRemoteDriver(ObjectNode configuration) throws Exception {
         ObjectNode config = requireConfiguration(configuration);
-        BrowserConfig browserConfig = BrowserConfig.from(toRawMap(config));
-        String browserName = resolveBrowserName(config, browserConfig);
-        return createRemoteDriver(browserName, browserConfig, config, "Driver remoteUrl not found");
+        return createRemoteDriver(resolveBrowserName(config), getDriverSection(config), config, "Driver remoteUrl not found");
     }
 
     public static RemoteWebDriver createLocalDriver(
             String browserName,
-            BrowserConfig config,
+            ObjectNode driverConfig,
             ObjectNode fullConfiguration
     ) throws Exception {
-        ClientConfig clientConfig = buildClientConfig(config.connection());
+        ClientConfig clientConfig = buildClientConfig(getObject(driverConfig, "connection"));
 
         return switch (browserName) {
             case "chrome" -> {
-                ChromeOptions options = buildChromeOptions(config.capabilities(), fullConfiguration);
-                ChromeDriverService service = buildChromeService(config.service());
+                ChromeOptions options = buildChromeOptions(driverConfig, fullConfiguration);
+                ChromeDriverService service = buildChromeService(toObjectMap(getObject(driverConfig, "service")));
 
-                ChromeDriver driver =
-                        service != null && clientConfig != null ? new ChromeDriver(service, options, clientConfig)
-                                : service != null ? new ChromeDriver(service, options)
-                                : clientConfig != null ? new ChromeDriver(options, clientConfig)
-                                : new ChromeDriver(options);
-
-                applyPostStart(driver, config.postStart());
-                yield driver;
+                yield service != null && clientConfig != null ? new ChromeDriver(service, options, clientConfig)
+                        : service != null ? new ChromeDriver(service, options)
+                        : clientConfig != null ? new ChromeDriver(options, clientConfig)
+                        : new ChromeDriver(options);
             }
             case "edge" -> {
-                EdgeOptions options = buildEdgeOptions(config.capabilities(), fullConfiguration);
-                EdgeDriverService service = buildEdgeService(config.service());
+                EdgeOptions options = buildEdgeOptions(driverConfig, fullConfiguration);
+                EdgeDriverService service = buildEdgeService(toObjectMap(getObject(driverConfig, "service")));
 
-                EdgeDriver driver =
-                        service != null && clientConfig != null ? new EdgeDriver(service, options, clientConfig)
-                                : service != null ? new EdgeDriver(service, options)
-                                : clientConfig != null ? new EdgeDriver(options, clientConfig)
-                                : new EdgeDriver(options);
-
-                applyPostStart(driver, config.postStart());
-                yield driver;
+                yield service != null && clientConfig != null ? new EdgeDriver(service, options, clientConfig)
+                        : service != null ? new EdgeDriver(service, options)
+                        : clientConfig != null ? new EdgeDriver(options, clientConfig)
+                        : new EdgeDriver(options);
             }
             default -> throw new RuntimeException("Unsupported local browser: " + browserName);
         };
@@ -116,61 +143,123 @@ public final class DriverConstruction {
 
     public static RemoteWebDriver createRemoteDriver(
             String browserName,
-            BrowserConfig config,
+            ObjectNode driverConfig,
             ObjectNode fullConfiguration,
             String missingRemoteUrlMessage
     ) throws Exception {
-        String remoteUrl = trimToNull(config.connection().get("remoteUrl"));
+        ObjectNode connection = getObject(driverConfig, "connection");
+        String remoteUrl = trimToNull(connection.path("remoteUrl").asText(null));
         if (remoteUrl == null) {
             throw new RuntimeException(missingRemoteUrlMessage);
         }
 
-        MutableCapabilities capabilities = buildRemoteCapabilities(browserName, config.capabilities(), fullConfiguration);
-        ClientConfig clientConfig = buildClientConfig(config.connection());
-        Boolean enableTracing = toBoolean(config.connection().get("enableTracing"));
+        MutableCapabilities capabilities = buildRemoteCapabilities(browserName, driverConfig, fullConfiguration);
+        ClientConfig clientConfig = buildClientConfig(connection);
+        Boolean enableTracing = toBoolean(toJavaValue(connection.get("enableTracing")));
 
-        RemoteWebDriver driver =
-                clientConfig != null && enableTracing != null ? new RemoteWebDriver(new URL(remoteUrl), capabilities, clientConfig, enableTracing)
-                        : clientConfig != null ? new RemoteWebDriver(new URL(remoteUrl), capabilities, clientConfig)
-                        : enableTracing != null ? new RemoteWebDriver(new URL(remoteUrl), capabilities, enableTracing)
-                        : new RemoteWebDriver(new URL(remoteUrl), capabilities);
-
-        applyPostStart(driver, config.postStart());
-        return driver;
+        return clientConfig != null && enableTracing != null ? new RemoteWebDriver(new URL(remoteUrl), capabilities, clientConfig, enableTracing)
+                : clientConfig != null ? new RemoteWebDriver(new URL(remoteUrl), capabilities, clientConfig)
+                : enableTracing != null ? new RemoteWebDriver(new URL(remoteUrl), capabilities, enableTracing)
+                : new RemoteWebDriver(new URL(remoteUrl), capabilities);
     }
 
     public static MutableCapabilities buildRemoteCapabilities(
             String browserName,
-            Map<String, Object> capabilities,
+            ObjectNode driverConfig,
             ObjectNode fullConfiguration
     ) {
         return switch (browserName) {
-            case "chrome" -> buildChromeOptions(capabilities, fullConfiguration);
-            case "edge" -> buildEdgeOptions(capabilities, fullConfiguration);
+            case "chrome" -> buildChromeOptions(driverConfig, fullConfiguration);
+            case "edge" -> buildEdgeOptions(driverConfig, fullConfiguration);
             default -> throw new RuntimeException("Unsupported remote browser: " + browserName);
         };
     }
 
-    public static ChromeOptions buildChromeOptions(Map<String, Object> capabilities, ObjectNode fullConfiguration) {
+    public static ChromeOptions buildChromeOptions(ObjectNode driverConfig, ObjectNode fullConfiguration) {
         ChromeOptions options = new ChromeOptions();
-        applyCapabilities(options, capabilities);
+        applyCapabilities(options, getObject(driverConfig, "capabilities"));
+        applyChromiumOptions(options, getObject(driverConfig, "options"), "chrome");
+        applyProviderCapabilities(options, getObject(driverConfig, "providerCapabilities"));
         applyDebugPort(options, "chrome", fullConfiguration);
         return options;
     }
 
-    public static EdgeOptions buildEdgeOptions(Map<String, Object> capabilities, ObjectNode fullConfiguration) {
+    public static EdgeOptions buildEdgeOptions(ObjectNode driverConfig, ObjectNode fullConfiguration) {
         EdgeOptions options = new EdgeOptions();
-        applyCapabilities(options, capabilities);
+        applyCapabilities(options, getObject(driverConfig, "capabilities"));
+        applyChromiumOptions(options, getObject(driverConfig, "options"), "edge");
+        applyProviderCapabilities(options, getObject(driverConfig, "providerCapabilities"));
         applyDebugPort(options, "edge", fullConfiguration);
         return options;
     }
 
-    public static void applyCapabilities(MutableCapabilities target, Map<String, Object> capabilities) {
-        safeMap(capabilities).forEach((key, value) -> {
-            if (key != null && value != null) {
-                target.setCapability(key, value);
+    public static void applyCapabilities(MutableCapabilities target, ObjectNode capabilities) {
+        capabilities.fields().forEachRemaining(entry -> {
+            Object value = toJavaValue(entry.getValue());
+            if (value != null) {
+                target.setCapability(entry.getKey(), value);
             }
         });
+    }
+
+    public static void applyProviderCapabilities(MutableCapabilities target, ObjectNode providerCapabilities) {
+        providerCapabilities.fields().forEachRemaining(entry -> {
+            Object value = toJavaValue(entry.getValue());
+            if (value != null) {
+                target.setCapability(entry.getKey(), value);
+            }
+        });
+    }
+
+    public static void applyChromiumOptions(ChromiumOptions<?> options, ObjectNode optionsConfig, String browserName) {
+        validateKeys(optionsConfig, COMMON_OPTIONS_KEYS, "driver.options for " + browserName);
+
+        List<String> args = toStringList(optionsConfig.get("args"), "driver.options.args");
+        if (!args.isEmpty()) {
+            options.addArguments(args);
+        }
+
+        String binary = trimToNull(optionsConfig.path("binary").asText(null));
+        if (binary != null) {
+            options.setBinary(binary);
+        }
+
+        Object prefs = toJavaValue(optionsConfig.get("prefs"));
+        if (prefs != null) {
+            options.setExperimentalOption("prefs", prefs);
+        }
+
+        Object excludeSwitches = toJavaValue(optionsConfig.get("excludeSwitches"));
+        if (excludeSwitches != null) {
+            options.setExperimentalOption("excludeSwitches", excludeSwitches);
+        }
+
+        Object mobileEmulation = toJavaValue(optionsConfig.get("mobileEmulation"));
+        if (mobileEmulation != null) {
+            options.setExperimentalOption("mobileEmulation", mobileEmulation);
+        }
+
+        Object localState = toJavaValue(optionsConfig.get("localState"));
+        if (localState != null) {
+            options.setExperimentalOption("localState", localState);
+        }
+
+        String debuggerAddress = trimToNull(optionsConfig.path("debuggerAddress").asText(null));
+        if (debuggerAddress != null) {
+            options.setExperimentalOption("debuggerAddress", debuggerAddress);
+        }
+
+        Boolean detach = toBoolean(toJavaValue(optionsConfig.get("detach")));
+        if (detach != null) {
+            options.setExperimentalOption("detach", detach);
+        }
+
+        Object experimentalOptions = toJavaValue(optionsConfig.get("experimentalOptions"));
+        if (experimentalOptions instanceof Map<?, ?> map) {
+            map.forEach((k, v) -> options.setExperimentalOption(String.valueOf(k), v));
+        } else if (experimentalOptions != null) {
+            throw new RuntimeException("driver.options.experimentalOptions must be an object");
+        }
     }
 
     public static ChromeDriverService buildChromeService(Map<String, Object> serviceMap) {
@@ -178,6 +267,8 @@ public final class DriverConstruction {
         if (service.isEmpty()) {
             return null;
         }
+
+        validateKeys(service, union(COMMON_SERVICE_KEYS, CHROMIUM_SERVICE_KEYS), "driver.service");
 
         ChromeDriverService.Builder builder = new ChromeDriverService.Builder();
         applyCommonServiceSettings(builder, service);
@@ -218,6 +309,8 @@ public final class DriverConstruction {
         if (service.isEmpty()) {
             return null;
         }
+
+        validateKeys(service, union(COMMON_SERVICE_KEYS, CHROMIUM_SERVICE_KEYS), "driver.service");
 
         EdgeDriverService.Builder builder = new EdgeDriverService.Builder();
         applyCommonServiceSettings(builder, service);
@@ -292,151 +385,98 @@ public final class DriverConstruction {
         }
     }
 
-    public static ClientConfig buildClientConfig(Map<String, Object> connectionSection) throws Exception {
-        Map<String, Object> client = safeMap(safeMap(connectionSection).get("clientConfig"));
+    public static ClientConfig buildClientConfig(ObjectNode connectionSection) throws Exception {
+        validateKeys(connectionSection, CONNECTION_KEYS, "driver.connection");
+
+        ObjectNode client = getObject(connectionSection, "clientConfig");
         if (client.isEmpty()) {
             return null;
         }
 
+        validateKeys(client, CLIENT_CONFIG_KEYS, "driver.connection.clientConfig");
+
         ClientConfig config = ClientConfig.defaultConfig();
 
-        String baseUrl = trimToNull(client.get("baseUrl"));
+        String baseUrl = trimToNull(client.path("baseUrl").asText(null));
         if (baseUrl != null) {
             config = config.baseUrl(new URL(baseUrl));
         }
 
-        Long connectionTimeoutMs = toLong(client.get("connectionTimeoutMs"));
+        Long connectionTimeoutMs = toLong(toJavaValue(client.get("connectionTimeoutMs")));
         if (connectionTimeoutMs != null && connectionTimeoutMs >= 0) {
             config = config.connectionTimeout(Duration.ofMillis(connectionTimeoutMs));
         }
 
-        Long readTimeoutMs = toLong(client.get("readTimeoutMs"));
+        Long readTimeoutMs = toLong(toJavaValue(client.get("readTimeoutMs")));
         if (readTimeoutMs != null && readTimeoutMs >= 0) {
             config = config.readTimeout(Duration.ofMillis(readTimeoutMs));
         }
 
-        Long wsTimeoutMs = toLong(client.get("wsTimeoutMs"));
+        Long wsTimeoutMs = toLong(toJavaValue(client.get("wsTimeoutMs")));
         if (wsTimeoutMs != null && wsTimeoutMs >= 0) {
             config = config.wsTimeout(Duration.ofMillis(wsTimeoutMs));
         }
 
-        String version = trimToNull(client.get("version"));
+        String version = trimToNull(client.path("version").asText(null));
         if (version != null) {
             config = config.version(version);
         }
 
-        if (booleanOrDefault(client.get("withRetries"), false)) {
+        if (booleanOrDefault(toJavaValue(client.get("withRetries")), false)) {
             config = config.withRetries();
         }
 
         return config;
     }
 
-    public static void applyPostStart(WebDriver driver, Map<String, Object> postStartSection) {
-        Map<String, Object> postStart = safeMap(postStartSection);
-        if (postStart.isEmpty()) {
-            return;
-        }
-
-        String window = trimToNull(postStart.get("window"));
-        if (window != null) {
-            try {
-                switch (window.toLowerCase(Locale.ROOT)) {
-                    case "maximize" -> driver.manage().window().maximize();
-                    case "minimize" -> driver.manage().window().minimize();
-                    case "fullscreen" -> driver.manage().window().fullscreen();
-                    default -> {
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                System.out.println("Failed to " + window + " due to " + e.getMessage());
-            }
-        }
-
-        if (booleanOrDefault(postStart.get("clearCookies"), false)) {
-            driver.manage().deleteAllCookies();
-        }
-
-        Long implicitWaitMs = toLong(postStart.get("implicitWaitMs"));
-        if (implicitWaitMs != null && implicitWaitMs >= 0) {
-            driver.manage().timeouts().implicitlyWait(Duration.ofMillis(implicitWaitMs));
-        }
-
-        Long pageLoadTimeoutMs = toLong(postStart.get("pageLoadTimeoutMs"));
-        if (pageLoadTimeoutMs != null && pageLoadTimeoutMs >= 0) {
-            driver.manage().timeouts().pageLoadTimeout(Duration.ofMillis(pageLoadTimeoutMs));
-        }
-
-        Long scriptTimeoutMs = toLong(postStart.get("scriptTimeoutMs"));
-        if (scriptTimeoutMs != null && scriptTimeoutMs >= 0) {
-            driver.manage().timeouts().scriptTimeout(Duration.ofMillis(scriptTimeoutMs));
-        }
-
-        if (booleanOrDefault(postStart.get("localFileDetector"), false) && driver instanceof RemoteWebDriver remote) {
-            remote.setFileDetector(new LocalFileDetector());
-        }
-
-        String initialUrl = trimToNull(postStart.get("initialUrl"));
-        if (initialUrl != null) {
-            driver.get(initialUrl);
-        }
-    }
-
-    public static String resolveBrowserName(ObjectNode fullConfiguration, BrowserConfig config) {
+    public static String resolveBrowserName(ObjectNode fullConfiguration) {
         String browserName = trimToNull(fullConfiguration.path("browser").asText(null));
         if (browserName == null) {
             browserName = trimToNull(fullConfiguration.path("browserName").asText(null));
         }
         if (browserName == null) {
-            browserName = trimToNull(fullConfiguration.path("metadata").path("browser").asText(null));
+            browserName = trimToNull(fullConfiguration.path("driver").path("capabilities").path("browserName").asText(null));
         }
         if (browserName == null) {
-            browserName = trimToNull(config.capabilities().get("browserName"));
+            browserName = trimToNull(fullConfiguration.path("metadata").path("browser").asText(null));
         }
         return normalizeBrowserName(browserName);
     }
 
-    public static boolean hasRemoteUrl(BrowserConfig config) {
-        return trimToNull(config.connection().get("remoteUrl")) != null;
+    public static boolean hasRemoteUrl(ObjectNode driverConfig) {
+        return trimToNull(driverConfig.path("connection").path("remoteUrl").asText(null)) != null;
     }
 
-
-    public static void applyDebugPort(ChromiumOptions options, String browserName, ObjectNode fullConfiguration) {
+    public static void applyDebugPort(ChromiumOptions<?> options, String browserName, ObjectNode fullConfiguration) {
         if (!getCurrentScenarioState().debugBrowser) {
             return;
         }
 
         Integer debugPort = resolveDebugPort(fullConfiguration);
 
-        if ( isDevToolsListening("127.0.0.1", debugPort)) {
-            // Attach to existing browser
-            closestEntryToPhrase().info("Attaching to existing browser on debugging port: " + debugPort);
-            options.setExperimentalOption("debuggerAddress", "127.0.0.1" + ":" + debugPort);
+        if (isDevToolsListening("127.0.0.1", debugPort)) {
+            closestEntryToPhrase().info("Attaching to existing " + browserName + " browser on debugging port: " + debugPort);
+            options.setExperimentalOption("debuggerAddress", "127.0.0.1:" + debugPort);
         } else {
-            // Start new browser with that DevTools port
-            closestEntryToPhrase().info("Starting new browser on debugging port: " + debugPort);
+            closestEntryToPhrase().info("Starting new " + browserName + " browser on debugging port: " + debugPort);
             options.addArguments("--remote-debugging-port=" + debugPort);
         }
     }
 
     public static Integer resolveDebugPort(ObjectNode fullConfiguration) {
-        if (fullConfiguration == null) {
-            return null;
+        JsonNode portNode = fullConfiguration.path("debuggingPort");
+        if (portNode.isMissingNode()) {
+            portNode = fullConfiguration.path("_pathKey");
+        }
+        if (portNode.isMissingNode()) {
+            portNode = fullConfiguration.path("browser");
+        }
+        if (portNode.isMissingNode()) {
+            throw new RuntimeException("Failed to set debugging port. Cannot find debuggingPort, _pathKey, or browser.");
         }
 
-        JsonNode portNode = fullConfiguration.path("debuggingPort");
-        if(portNode.isMissingNode())
-            portNode = fullConfiguration.path("_pathKey");
-        if(portNode.isMissingNode())
-            portNode = fullConfiguration.path("browser");
-        if(portNode.isMissingNode())
-            throw new RuntimeException("Failed to set debugging port. Cannot find properties: debuggingPort, _pathKey, or browser in configuration. ");
-
-        String pathKey = trimToNull(portNode.asText());
-        return 9000 + (Math.abs(pathKey.toLowerCase(Locale.ROOT).hashCode()) % 1000);
-//        return 20000 + Math.floorMod(pathKey.toLowerCase(Locale.ROOT).hashCode(), 20000);
+        String token = trimToNull(portNode.asText());
+        return 9000 + (Math.abs(token.toLowerCase(Locale.ROOT).hashCode()) % 1000);
     }
 
     public static ObjectNode requireConfiguration(ObjectNode configuration) {
@@ -446,8 +486,87 @@ public final class DriverConstruction {
         return configuration.deepCopy();
     }
 
-    public static Map<String, Object> toRawMap(ObjectNode configuration) {
-        return MAPPER.convertValue(configuration, new TypeReference<>() {});
+    public static ObjectNode getDriverSection(ObjectNode configuration) {
+        JsonNode driverNode = configuration.get("driver");
+        if (driverNode == null || driverNode.isNull()) {
+            return getLegacyDriverSection(configuration);
+        }
+        if (!driverNode.isObject()) {
+            throw new RuntimeException("Top-level 'driver' must be an object");
+        }
+
+        ObjectNode driver = ((ObjectNode) driverNode).deepCopy();
+        validateKeys(driver, DRIVER_KEYS, "driver");
+        return driver;
+    }
+
+    public static ObjectNode getLegacyDriverSection(ObjectNode configuration) {
+        ObjectNode driver = MAPPER.createObjectNode();
+
+        copyObject(configuration, driver, "connection");
+        copyObject(configuration, driver, "service");
+        copyObject(configuration, driver, "capabilities");
+        copyObject(configuration, driver, "options");
+        copyObject(configuration, driver, "providerCapabilities");
+
+        if (configuration.has("remoteUrl")) {
+            ObjectNode connection = getObject(driver, "connection");
+            connection.putIfAbsent("remoteUrl", configuration.get("remoteUrl"));
+            driver.set("connection", connection);
+        }
+
+        validateKeys(driver, DRIVER_KEYS, "driver");
+        return driver;
+    }
+
+    public static void copyObject(ObjectNode source, ObjectNode target, String fieldName) {
+        JsonNode node = source.get(fieldName);
+        if (node == null || node.isNull()) {
+            return;
+        }
+        if (!node.isObject()) {
+            throw new RuntimeException("Top-level '" + fieldName + "' must be an object");
+        }
+        target.set(fieldName, node.deepCopy());
+    }
+
+    public static ObjectNode getObject(ObjectNode parent, String fieldName) {
+        JsonNode node = parent.get(fieldName);
+        if (node == null || node.isNull()) {
+            return MAPPER.createObjectNode();
+        }
+        if (!node.isObject()) {
+            throw new RuntimeException("Expected object at '" + fieldName + "'");
+        }
+        return (ObjectNode) node;
+    }
+
+    public static Object toJavaValue(JsonNode node) {
+        if (node == null || node.isNull() || node.isMissingNode()) {
+            return null;
+        }
+        return MAPPER.convertValue(node, Object.class);
+    }
+
+    public static List<String> toStringList(JsonNode node, String path) {
+        if (node == null || node.isNull() || node.isMissingNode()) {
+            return List.of();
+        }
+        if (!node.isArray()) {
+            throw new RuntimeException(path + " must be an array");
+        }
+
+        return MAPPER.convertValue(node, MAPPER.getTypeFactory().constructCollectionType(List.class, String.class));
+    }
+
+    public static Map<String, Object> toObjectMap(JsonNode node) {
+        if (node == null || node.isNull() || node.isMissingNode()) {
+            return new LinkedHashMap<>();
+        }
+        if (!node.isObject()) {
+            throw new RuntimeException("Expected object but got: " + node.getNodeType());
+        }
+        return MAPPER.convertValue(node, MAPPER.getTypeFactory().constructMapType(LinkedHashMap.class, String.class, Object.class));
     }
 
     public static String normalizeBrowserName(String browserName) {
@@ -562,51 +681,25 @@ public final class DriverConstruction {
         return result;
     }
 
-    public record BrowserConfig(
-            Map<String, Object> connection,
-            Map<String, Object> capabilities,
-            Map<String, Object> service,
-            Map<String, Object> postStart
-    ) {
-        public static BrowserConfig from(Map<String, Object> rawMap) {
-            Map<String, Object> raw = rawMap == null ? new LinkedHashMap<>() : new LinkedHashMap<>(rawMap);
-
-            boolean structured = raw.keySet().stream().anyMatch(RESERVED_ROOT_KEYS::contains);
-
-            if (structured) {
-                Map<String, Object> connection = safeMap(raw.get("connection"));
-                Map<String, Object> capabilities = safeMap(raw.get("capabilities"));
-                Map<String, Object> service = safeMap(raw.get("service"));
-                Map<String, Object> postStart = safeMap(raw.get("postStart"));
-
-                if (capabilities.isEmpty()) {
-                    raw.forEach((k, v) -> {
-                        if (!RESERVED_ROOT_KEYS.contains(k) && !"remoteUrl".equals(k)) {
-                            capabilities.put(k, v);
-                        }
-                    });
-                }
-
-                if (!connection.containsKey("remoteUrl") && raw.containsKey("remoteUrl")) {
-                    connection.put("remoteUrl", raw.get("remoteUrl"));
-                }
-
-                return new BrowserConfig(connection, capabilities, service, postStart);
+    public static void validateKeys(ObjectNode node, Set<String> allowedKeys, String sectionName) {
+        node.fieldNames().forEachRemaining(key -> {
+            if (!allowedKeys.contains(key)) {
+                throw new RuntimeException("Unsupported property '" + key + "' in " + sectionName);
             }
+        });
+    }
 
-            Map<String, Object> connection = new LinkedHashMap<>();
-            Map<String, Object> capabilities = new LinkedHashMap<>(raw);
-
-            if (capabilities.containsKey("remoteUrl")) {
-                connection.put("remoteUrl", capabilities.remove("remoteUrl"));
+    public static void validateKeys(Map<String, Object> map, Set<String> allowedKeys, String sectionName) {
+        map.keySet().forEach(key -> {
+            if (!allowedKeys.contains(key)) {
+                throw new RuntimeException("Unsupported property '" + key + "' in " + sectionName);
             }
+        });
+    }
 
-            return new BrowserConfig(
-                    connection,
-                    capabilities,
-                    new LinkedHashMap<>(),
-                    new LinkedHashMap<>()
-            );
-        }
+    public static Set<String> union(Set<String> left, Set<String> right) {
+        Set<String> result = new java.util.LinkedHashSet<>(left);
+        result.addAll(right);
+        return result;
     }
 }

@@ -98,6 +98,7 @@ public abstract class StepBase implements Cloneable {
         return clone;
     }
 
+
     @Override
     public StepBase clone() {
         try {
@@ -114,7 +115,6 @@ public abstract class StepBase implements Cloneable {
             copy.childSteps = deepCloneSteps(this.childSteps);
             copy.grandChildrenSteps = deepCloneSteps(this.grandChildrenSteps);
             copy.attachedSteps = deepCloneSteps(this.attachedSteps);
-
             // 3. Shallow-copy non-StepBase lists (new list, same elements)
             copy.inheritableDefinitionFlags = shallowCopyList(this.inheritableDefinitionFlags);
             copy.definitionFlags = shallowCopyList(this.definitionFlags);

@@ -12,7 +12,6 @@ public class StepLogic {
         {
             return new ArrayList<>(List.of((StepExtension) stepExtension.clone(inheritancePhrase)));
         }
-
         List<StepExtension> returnList = new ArrayList<>();
 
         for(PhraseData branchPhrase: inheritancePhrase.branchedPhrases)
