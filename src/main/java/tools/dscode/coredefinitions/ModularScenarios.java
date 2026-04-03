@@ -18,12 +18,15 @@ import java.util.List;
 import java.util.Map;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static io.cucumber.core.runner.PredefinedSteps.getTempStep;
 import static io.cucumber.core.runner.ScenarioStep.createScenarioStep;
 import static tools.dscode.common.GlobalConstants.COMPONENT_TAG_META_CHAR;
+import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.util.Reflect.getProperty;
 
 public class ModularScenarios extends CoreSteps {
 
+    final static String RUN_TAGS = "Run Tags";
 
     //    @DefinitionFlags(NO_LOGGING)
     @Given("^RUN SCENARIOS?:?(.*)?$")
@@ -31,7 +34,9 @@ public class ModularScenarios extends CoreSteps {
         populateRunScenariosStep(getRunningStep(), inlineTags, dataTable);
     }
 
-    public static void populateRunScenariosStep(StepExtension topStep , String inlineTags, DataTable dataTable) {
+
+
+    public static void populateRunScenariosStep(StepExtension topStep, String inlineTags, DataTable dataTable) {
         List<Map<String, String>> maps = dataTable == null ? new ArrayList<>() : dataTable.asMaps().stream()
                 .map(HashMap::new) // copy each to a mutable map
                 .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
@@ -39,12 +44,12 @@ public class ModularScenarios extends CoreSteps {
             final String scenarioTags = inlineTags;
             if (maps.isEmpty()) {
                 Map<String, String> singleMap = new HashMap<>();
-                singleMap.put("Tags", scenarioTags);
+                singleMap.put(RUN_TAGS, scenarioTags);
                 maps.add(singleMap);
             } else {
                 maps.forEach(map -> {
-                    String mapTags = (scenarioTags + " " + map.getOrDefault(" Tags ", "")).trim();
-                    map.put("Tags", mapTags);
+                    String mapTags = (scenarioTags + " " + map.getOrDefault(RUN_TAGS, map.getOrDefault("Tags", ""))).trim();
+                    map.put(RUN_TAGS, mapTags);
                 });
             }
         }
@@ -54,11 +59,11 @@ public class ModularScenarios extends CoreSteps {
 
     static final @Language("RegExp") String tagRegexReplacement = "(?<!@)(" + COMPONENT_TAG_META_CHAR + "[A-Za-z])";
 
-    public static void filterAndParsePickles(StepExtension topStep , List<Map<String, String>> maps, String... messageString) {
+    public static void filterAndParsePickles(StepExtension topStep, List<Map<String, String>> maps, String... messageString) {
         StepExtension lastScenarioNameStep = null;
 
         for (Map<String, String> map : maps) {
-            String tagString = map.getOrDefault("Tags", map.getOrDefault("Run Tags", ""));
+            String tagString = map.getOrDefault(RUN_TAGS, map.getOrDefault(RUN_TAGS, ""));
             tagString = tagString.replaceAll(tagRegexReplacement, "@$1");
             List<Pickle> pickles = CucumberScanUtil.listPicklesByTags(tagString);
 

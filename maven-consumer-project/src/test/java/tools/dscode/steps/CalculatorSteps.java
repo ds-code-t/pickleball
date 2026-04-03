@@ -55,6 +55,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.noDisplay;
+import static tools.dscode.common.gherkinoperations.DynamicExecution.runScenarioFromTag;
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
 import static tools.dscode.common.mappings.FileAndDataParsing.readResourceFile;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
@@ -115,10 +116,13 @@ public class CalculatorSteps {
     @Given("^test2(?: (.*))?$")
     public static void test2(String value) {
         System.out.println("@@test2: " + value);
-        RemoteWebDriver driver = getDefaultDriver();
-        System.out.println("@@driver: " + driver);
-        ObjectRegistrationSteps.cleanup(driver);
-        System.out.println("@@cleaned up: " + driver);
+
+        runScenarioFromTag("%aztag99");
+
+//        RemoteWebDriver driver = getDefaultDriver();
+//        System.out.println("@@driver: " + driver);
+//        ObjectRegistrationSteps.cleanup(driver);
+//        System.out.println("@@cleaned up: " + driver);
 //        System.out.println("@@test2: " + value);
 //        System.out.println("@@" +value + ": " +  getFromRunningParsingMap(value));
     }

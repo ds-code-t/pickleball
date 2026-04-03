@@ -1,4 +1,19 @@
 Feature: Additiontest
+  
+  Scenario:  a sdfsdfd
+    * test2 %aztag99
+#  * RUN SCENARIOS: %aztag99
+
+
+
+  Scenario Outline: aaacalled scenario11 a= '<A>' , c= '<C>'
+    * Scenario Log: exlog1 a= '<A>' , c= '<C>'
+    * Scenario Log: exlog2 a= '<A>' , c= '<C>'
+    Examples:
+      | Scenario Tags | A   | C   |
+      | %aztag99        | xxx | zzz |
+
+
   Scenario: data test C
 
 #    * , in "YYY" Data Table,  for every "B" Data Cell:

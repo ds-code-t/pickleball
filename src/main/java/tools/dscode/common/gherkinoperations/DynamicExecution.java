@@ -5,15 +5,16 @@ import io.cucumber.core.runner.StepExtension;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.exceptions.StepCreationException;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.GeneralGherkinUtils.getKeyWord;
+import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
+import static io.cucumber.core.runner.PredefinedSteps.getTempStep;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
+import static tools.dscode.coredefinitions.ModularScenarios.populateRunScenariosStep;
 
 public class DynamicExecution {
 
@@ -48,28 +49,26 @@ public class DynamicExecution {
     }
 
     public static ScenarioStep getScenarioFromTag(String tags) {
-        return getScenariosFromTag(tags).getFirst();
+        return getScenariosFromTags(tags).getFirst();
     }
 
-    public static List<ScenarioStep> getScenariosFromTag(String tags) {
-        StepExtension currentStep = getRunningStep();
-        try {
-            StepExtension modifiedStep = new StepExtension(currentStep.testCase, getPickleStepTestStepFromStrings(getKeyWord(currentStep), "RUN SCENARIOS" + tags, ""));
-            modifiedStep.setStepParsingMap(getRunningParsingMap());
-            modifiedStep.initializeChildSteps();
-//            setStepAndDescendantsToNoLog(modifiedStep);
-            return modifiedStep.childSteps.stream().filter(childStep -> childStep instanceof ScenarioStep).map(childStep -> (ScenarioStep) childStep).collect(Collectors.toList());
-        } catch (Throwable t) {
-            throw new StepCreationException("Failed to create scenario for tags '" + tags + "'");
-        }
+    public static List<ScenarioStep> getScenariosFromTags(String tags) {
+        StepExtension topStep = getTempStep();
+        topStep.setStepParsingMap(getRunningParsingMap());
+        populateRunScenariosStep(topStep, tags, null);
+        setStepAndDescendantsToNoLog(topStep);
+        return topStep.childSteps.stream().map(s -> (ScenarioStep) s).collect(java.util.stream.Collectors.toList());
     }
+
 
     public static Object runScenarioFromTag(String tags) {
-        return getScenarioFromTag(tags).runAndGetReturnValue();
+        ScenarioStep scenarioStep = getScenarioFromTag(tags);
+        getCurrentScenarioState().runStep(scenarioStep);
+        return scenarioStep;
     }
 
     public static List<Object> runScenariosFromTag(String tags) {
-        return getScenariosFromTag(tags).stream().map(StepExtension::runAndGetReturnValue).collect(Collectors.toList());
+        return getScenariosFromTags(tags).stream().map(StepExtension::runAndGetReturnValue).collect(Collectors.toList());
     }
 
     private static void setStepAndDescendantsToNoLog(StepExtension step) {

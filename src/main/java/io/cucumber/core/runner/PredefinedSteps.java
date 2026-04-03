@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static io.cucumber.core.runner.GlobalState.getGivenKeyword;
+import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.GlobalConstants.INFO_STEP;
@@ -21,6 +22,10 @@ public class PredefinedSteps {
             invokeAnyMethod(rootStep, "setNoLogging", true);
         }
         return rootStep;
+    }
+
+    public static StepExtension getTempStep() {
+        return new StepExtension(getTestCase() ,getPickleStepTestStepFromStrings(getGivenKeyword(), ROOT_STEP, null));
     }
 
 
