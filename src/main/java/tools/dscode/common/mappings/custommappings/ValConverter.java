@@ -16,8 +16,9 @@ import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMap;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
 import static tools.dscode.common.mappings.ParsingMap.resolveToStringWithRunningParsingMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
-import static tools.dscode.common.variables.RunVars.VAR_PREFIX;
-import static tools.dscode.common.variables.RunVars.prefixed;
+import static tools.dscode.common.variables.RunVars.hasPkbPrefix;
+import static tools.dscode.common.variables.RunVars.resolveFromVars;
+
 
 public class ValConverter extends CustomReader {
     public ValConverter(ObjectMapper mapper) {
@@ -73,11 +74,10 @@ public class ValConverter extends CustomReader {
 
         if ("~VAR~".equals(key)) {
             String val = String.valueOf(modify(innerValue, parent));
-            String var_key = prefixed.matcher(val).matches() ? key : VAR_PREFIX + val;
-            return getFromRunningParsingMapCaseInsensitive(var_key);
+            return resolveFromVars(val);
         }
 
-        if(key.startsWith("~RESOLVE")) {
+        if (key.startsWith("~RESOLVE")) {
             if ("~RESOLVE~".equals(key)) {
                 return getFromRunningParsingMap(String.valueOf(modify(innerValue, parent)));
             }
@@ -120,23 +120,29 @@ public class ValConverter extends CustomReader {
 
     private Object convertToMap(Object innerValue) throws Exception {
         if (innerValue instanceof String s) {
-            return mapper.readValue(s, new TypeReference<Map<String, Object>>() {});
+            return mapper.readValue(s, new TypeReference<Map<String, Object>>() {
+            });
         }
-        return mapper.convertValue(innerValue, new TypeReference<Map<String, Object>>() {});
+        return mapper.convertValue(innerValue, new TypeReference<Map<String, Object>>() {
+        });
     }
 
     private Object convertToList(Object innerValue) throws Exception {
         if (innerValue instanceof String s) {
-            return mapper.readValue(s, new TypeReference<List<Object>>() {});
+            return mapper.readValue(s, new TypeReference<List<Object>>() {
+            });
         }
-        return mapper.convertValue(innerValue, new TypeReference<List<Object>>() {});
+        return mapper.convertValue(innerValue, new TypeReference<List<Object>>() {
+        });
     }
 
     private Object convertToSet(Object innerValue) throws Exception {
         if (innerValue instanceof String s) {
-            return mapper.readValue(s, new TypeReference<LinkedHashSet<Object>>() {});
+            return mapper.readValue(s, new TypeReference<LinkedHashSet<Object>>() {
+            });
         }
-        return mapper.convertValue(innerValue, new TypeReference<LinkedHashSet<Object>>() {});
+        return mapper.convertValue(innerValue, new TypeReference<LinkedHashSet<Object>>() {
+        });
     }
 
     private Object convertToObject(Object innerValue) throws Exception {

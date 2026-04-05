@@ -45,8 +45,8 @@ import static tools.dscode.common.mappings.queries.Tokenized.AS_LIST_SUFFIX;
 import static tools.dscode.common.util.StringUtilities.decodeBackToText;
 import static tools.dscode.common.util.StringUtilities.encodeToPlaceHolders;
 import static tools.dscode.common.variables.RunVars.RUN_VARS;
-import static tools.dscode.common.variables.RunVars.VAR_PREFIX;
-import static tools.dscode.common.variables.RunVars.prefixed;
+import static tools.dscode.common.variables.RunVars.hasRecognizedPrefix;
+import static tools.dscode.common.variables.RunVars.resolveFromVars;
 
 public abstract class MappingProcessor implements Map<String, Object> {
 
@@ -397,8 +397,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
 //    }
 
     public Object getCaseInsensitive(String key) {
-        if (prefixed.matcher(key).matches()) {
-            return getVar(key);
+        if (hasRecognizedPrefix(key)) {
+            return resolveFromVars(key);
         }
         Tokenized tokenized = new Tokenized(key);
         for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
@@ -412,15 +412,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return null;
     }
 
-    private Object getVar(String key) {
-        Object returnObj = singletonMap.get().getByNormalizedPath(key);
-        if (returnObj == null) return RUN_VARS.getByNormalizedPath(key.replaceFirst("^" + VAR_PREFIX, ""));
-        if (returnObj instanceof List list) {
-            if (list.isEmpty()) return RUN_VARS.getByNormalizedPath(key.replaceFirst("^" + VAR_PREFIX, ""));
-            return list.getFirst();
-        }
-        return returnObj;
-    }
 
     private void putVar(String key, Object value) {
         singletonMap.get().root.remove(key);
@@ -464,8 +455,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 return buildJsonFromPath(key.substring(1));
             }
 
-            if (prefixed.matcher(key).matches()) {
-                return getVar(key);
+            if (hasRecognizedPrefix(key)) {
+                return resolveFromVars(key);
             }
         }
 
@@ -563,8 +554,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
         if (key == null || key.isBlank())
             throw new RuntimeException("key cannot be null or blank");
 
-        if (prefixed.matcher(key).matches()) {
-            Object oldValue = getVar(key);
+        if (hasRecognizedPrefix(key)) {
+            Object oldValue = resolveFromVars(key);
             putVar(key, value);
             return oldValue;
         }

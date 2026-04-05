@@ -12,7 +12,7 @@ import java.time.Duration;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitiveOrDefault;
-import static tools.dscode.common.variables.RunVars.VAR_PREFIX;
+import static tools.dscode.common.variables.RunVars.resolveFromVarsOrDefault;
 import static tools.dscode.coredefinitions.ObjectRegistrationSteps.constructObjectFromParsingMap;
 
 public class BrowserSteps {
@@ -23,7 +23,7 @@ public class BrowserSteps {
 
     public static RemoteWebDriver getDefaultDriver() {
         String browserName = String.valueOf(
-                getFromRunningParsingMapCaseInsensitiveOrDefault(VAR_PREFIX + "BROWSER", "CHROME")
+                resolveFromVarsOrDefault( "BROWSER", "CHROME")
         );
         return getDriver(browserName);
     }

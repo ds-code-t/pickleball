@@ -9,6 +9,7 @@ import tools.dscode.common.mappings.queries.Tokenized;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Pattern;
@@ -21,17 +22,16 @@ import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCa
 
 
 public class RunVars extends NodeMap {
-
-    public static final Pattern prefixed = Pattern.compile("(?i)^[a-z]{3}_[^\\s\\.]+$");
-
     private static final String ENV_PREFIX = "env_";
     private static final String SYS_PREFIX = "sys_";
+
+
     public static final String PKB_PREFIX = "pkb_";
-    public static final String VAR_PREFIX = "var_";
+
 
     private static final String RUN_CONFIGS = "runconfigs";
     private static final String PROFILES_DIR = "profiles";
-    private static final String PROFILEProp = "profile";
+    private static final String PROFILEProp = PKB_PREFIX + "profile";
 
     public final static RunVars RUN_VARS = new RunVars();
 
@@ -49,7 +49,7 @@ public class RunVars extends NodeMap {
 
 
     static {
-        RUN_VARS.merge(new HashMap<>(collectPrefixedAndUnprefixedVars()));
+        RUN_VARS.merge(collectPickleBallVars());
         JsonNode runConfigs = buildJsonFromPath(RUN_CONFIGS);
         if (runConfigs instanceof ObjectNode runConfigsNode) {
             RUN_VARS.put(RUN_CONFIGS, runConfigsNode);
@@ -62,7 +62,7 @@ public class RunVars extends NodeMap {
     }
 
     public static String getProfileName() {
-        Object profile = getFromRunningParsingMapCaseInsensitive(VAR_PREFIX + PROFILEProp);
+        Object profile = getFromRunningParsingMapCaseInsensitive(PROFILEProp);
         if (profile == null)
             profile = RUN_VARS.getByNormalizedPath(PROFILEProp);
         if (profile == null || profile.toString().isBlank())
@@ -79,39 +79,28 @@ public class RunVars extends NodeMap {
         return null;
     }
 
-
-    public static Map<String, Object> collectPrefixedAndUnprefixedVars() {
+    public static Map<String, Object> collectPickleBallVars() {
         Map<String, Object> result = new HashMap<>();
-        System.getenv().forEach((k, v) ->
-                result.put(prefixed.matcher(k).matches() ? k : ENV_PREFIX + k, v));
 
-        Properties props = System.getProperties();
-        props.forEach((k, v) -> {
-            String key = String.valueOf(k);
-            result.put(prefixed.matcher(key).matches() ? key : SYS_PREFIX + key, v);
-        });
-//
-        Map<String, Object> snapshot = new HashMap<>(result);
-
-        snapshot.forEach((k, v) -> {
-            if (k.startsWith(ENV_PREFIX)) {
-                result.put(k.substring(4), v);
+        System.getenv().forEach((key, value) -> {
+            if (key != null
+                    && key.length() >= PKB_PREFIX.length()
+                    && key.regionMatches(true, 0, PKB_PREFIX, 0, PKB_PREFIX.length())) {
+                result.put(key.toLowerCase(Locale.ROOT), value);
             }
         });
 
-        snapshot.forEach((k, v) -> {
-            if (k.startsWith(SYS_PREFIX)) {
-                result.put(k.substring(4), v);
+        System.getProperties().forEach((key, value) -> {
+            String k = String.valueOf(key);
+            if (k.length() >= PKB_PREFIX.length()
+                    && k.regionMatches(true, 0, PKB_PREFIX, 0, PKB_PREFIX.length())) {
+                result.put(k.toLowerCase(Locale.ROOT), value); // overwrites env entry if same normalized key
             }
         });
 
-        snapshot.forEach((k, v) -> {
-            if (k.startsWith(PKB_PREFIX)) {
-                result.put(k.substring(4), v);
-            }
-        });
         return result;
     }
+
 
     public static void parseRunConfigs() {
         Object runConfigs = RUN_VARS.directGet(RUN_CONFIGS);
@@ -137,16 +126,89 @@ public class RunVars extends NodeMap {
             RUN_VARS.putAll(profileNode);
     }
 
+    public static Object resolveFromVarsOrDefault(String varName, Object defaultValue) {
+        Object returnObj = resolveFromVars(varName);
+        return returnObj == null ? defaultValue : returnObj;
+    }
+
     public static Object resolveFromVars(String varName) {
-        String SingletonKey = prefixed.matcher(varName).matches() ? varName : VAR_PREFIX + varName;
-        String runVarsKey = varName.toLowerCase().startsWith(VAR_PREFIX) ? varName.substring(VAR_PREFIX.length()) : varName;
-        Object returnObj = getSingletonMap().getByNormalizedPath(SingletonKey);
-        if (returnObj == null) return RUN_VARS.getByNormalizedPath(runVarsKey);
+        if (varName == null || varName.isBlank()) {
+            return null;
+        }
+        String key = hasRecognizedPrefix(varName) ? varName : PKB_PREFIX + varName;
+        Object returnObj = getSingletonMap().getByNormalizedPath(key);
+        if (returnObj == null) return resolveProperty(key);
         if (returnObj instanceof List list) {
-            if (list.isEmpty()) return RUN_VARS.getByNormalizedPath(runVarsKey);
-            return list.getFirst();
+            if (list.isEmpty()) return resolveProperty(key);
+            return list.getLast();
         }
         return returnObj;
+    }
+
+    public static boolean hasRecognizedPrefix(String s) {
+        return hasPrefixIgnoreCase(s, PKB_PREFIX)
+                || hasPrefixIgnoreCase(s, ENV_PREFIX)
+                || hasPrefixIgnoreCase(s, SYS_PREFIX);
+    }
+
+    public static boolean hasPkbPrefix(String s) {
+        return s != null
+                && s.length() >= PKB_PREFIX.length()
+                && s.regionMatches(true, 0, PKB_PREFIX, 0, PKB_PREFIX.length());
+    }
+
+
+    public static String ensurePkbPrefix(String s) {
+        if (s == null || s.isBlank()) {
+            return s;
+        }
+        return hasPkbPrefix(s) ? s : PKB_PREFIX + s;
+    }
+
+
+    private static Object resolveProperty(String propertyName) {
+        if (propertyName == null || propertyName.isBlank()) {
+            return null;
+        }
+
+        if (hasPkbPrefix(propertyName)) {
+            return RUN_VARS.root.get(propertyName);
+        }
+
+        String key = stripPrefixIfPresent(propertyName, SYS_PREFIX);
+        if (key != null) {
+            return System.getProperty(key);
+        }
+
+        key = stripPrefixIfPresent(propertyName, ENV_PREFIX);
+        if (key != null) {
+            return System.getenv(key);
+        }
+
+        Object value = RUN_VARS.root.get(PKB_PREFIX + propertyName);
+        if (value != null) {
+            return value;
+        }
+
+        value = System.getProperty(propertyName);
+        if (value != null) {
+            return value;
+        }
+
+        return System.getenv(propertyName);
+    }
+
+    private static boolean hasPrefixIgnoreCase(String s, String prefix) {
+        return s != null
+                && prefix != null
+                && s.length() >= prefix.length()
+                && s.regionMatches(true, 0, prefix, 0, prefix.length());
+    }
+
+    private static String stripPrefixIfPresent(String s, String prefix) {
+        return hasPrefixIgnoreCase(s, prefix)
+                ? s.substring(prefix.length())
+                : null;
     }
 
 
