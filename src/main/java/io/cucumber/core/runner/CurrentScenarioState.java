@@ -13,6 +13,7 @@ import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
 import tools.dscode.common.reporting.logging.Entry;
+import tools.dscode.common.reporting.logging.reportportal.ReportPortalBridgeConverter;
 import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
 import tools.dscode.common.exceptions.SoftExceptionInterface;
 import tools.dscode.common.exceptions.SoftRuntimeException;
@@ -47,6 +48,8 @@ import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
+import static tools.dscode.common.variables.RunVars.getDependencyProperty;
+import static tools.dscode.common.variables.RunVars.getDependencyPropertyBoolean;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
 import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
 
@@ -98,9 +101,11 @@ public class CurrentScenarioState extends ScenarioMapping {
     public static StepExpressionFactory getStepExpressionFactory() {
         return (StepExpressionFactory) getProperty(getCurrentScenarioState().cachingGlue, "stepExpressionFactory");
     }
+
     public static DocStringTypeRegistryDocStringConverter getDocStringTypeRegistryDocStringConverter() {
         return (DocStringTypeRegistryDocStringConverter) getProperty(getStepExpressionFactory(), "docStringConverter");
     }
+
     public static DataTableTypeRegistryTableConverter getDataTableTypeRegistryTableConverter() {
         return (DataTableTypeRegistryTableConverter) getProperty(getStepExpressionFactory(), "tableConverter");
     }
@@ -132,7 +137,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         return entry.timestamp();
     }
 
-
+    public static boolean logToReportPortal = getDependencyPropertyBoolean("rp.enable");
 
     public void startScenarioRun() {
         String scenarioName = pickle.getName() + " , Line " + pickle.getLocation().getLine();
@@ -142,8 +147,11 @@ public class CurrentScenarioState extends ScenarioMapping {
                         .tag("SCENARIO")
                         .on(new SimpleHtmlReportConverter(
                                 Path.of("reports/tests", safeFileName(scenarioName + ".html"))
-                        ))
-                        .start();
+                        ));
+        if(logToReportPortal)
+            scenarioLog.on(new ReportPortalBridgeConverter());
+
+        scenarioLog.start();
 
 
         lifecycle.fire(Phase.BEFORE_SCENARIO_RUN);
@@ -233,14 +241,14 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void runStep(StepExtension stepExtension) {
-        if(endCurrentScenario)
+        if (endCurrentScenario)
             return;
         currentStep = stepExtension;
         stepExtension.lineData = new ParsedLine(stepExtension.getUnmodifiedText());
         stepExtension.lineData.setInheritance(stepExtension);
         currentPhrase = (Phrase) stepExtension.lineData.inheritedPhrase;
         runningStep(stepExtension);
-        if(stepExtension instanceof ScenarioStep)
+        if (stepExtension instanceof ScenarioStep)
             endCurrentScenario = false;
     }
 
@@ -262,7 +270,7 @@ public class CurrentScenarioState extends ScenarioMapping {
             result = stepExtension.run();
         }
 
-        if(!stepExtension.lineData.inheritancePhrases.isEmpty())
+        if (!stepExtension.lineData.inheritancePhrases.isEmpty())
             stepExtension.inheritancePhrase = stepExtension.lineData.inheritancePhrases.getFirst();
 
 
@@ -292,28 +300,25 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 //        if (isScenarioComplete())
 //            return;
-            if(!stepExtension.replacementSteps.isEmpty())
-            {
-                StepBase last = null;
-                int insertionCount = stepExtension.parentStep.childSteps.indexOf(stepExtension);
-                for (StepBase replacementStep : stepExtension.replacementSteps) {
-                    insertionCount++;
-                    stepExtension.parentStep.childSteps.add(insertionCount, replacementStep);
-                    if(last == null) {
-                        replacementStep.previousSibling = stepExtension.previousSibling;
-                    }
-                    else {
-                        last.nextSibling = replacementStep;
-                        replacementStep.previousSibling = last;
-                    }
-                    last = replacementStep;
+        if (!stepExtension.replacementSteps.isEmpty()) {
+            StepBase last = null;
+            int insertionCount = stepExtension.parentStep.childSteps.indexOf(stepExtension);
+            for (StepBase replacementStep : stepExtension.replacementSteps) {
+                insertionCount++;
+                stepExtension.parentStep.childSteps.add(insertionCount, replacementStep);
+                if (last == null) {
+                    replacementStep.previousSibling = stepExtension.previousSibling;
+                } else {
+                    last.nextSibling = replacementStep;
+                    replacementStep.previousSibling = last;
                 }
-                last.nextSibling = stepExtension.nextSibling;
-                stepExtension.nextSibling = stepExtension.replacementSteps.getFirst();
-                last.childSteps.addAll(stepExtension.childSteps);
-                stepExtension.childSteps.clear();
+                last = replacementStep;
             }
-
+            last.nextSibling = stepExtension.nextSibling;
+            stepExtension.nextSibling = stepExtension.replacementSteps.getFirst();
+            last.childSteps.addAll(stepExtension.childSteps);
+            stepExtension.childSteps.clear();
+        }
 
 
         for (StepBase attachedStep : stepExtension.attachedSteps) {
@@ -351,7 +356,6 @@ public class CurrentScenarioState extends ScenarioMapping {
                 }
             }
         }
-
 
 
         if (stepExtension.nextSibling != null) {
@@ -433,7 +437,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     public static String normalizeRegistryKey(String s) {
         if (s == null) return null;
-        if(s.startsWith("_"))
+        if (s.startsWith("_"))
             return s;
         String returnString = s.strip()                       // remove leading/trailing whitespace
                 .replaceAll("\\s+", " ")       // collapse consecutive whitespace

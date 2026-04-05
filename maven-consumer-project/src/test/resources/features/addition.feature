@@ -4,8 +4,13 @@ Feature: Addition
 
 
   Scenario: test path
-    * , save "<configs>" as "A"
-
+#    * test2 <any>
+#    * , save "A" as "A"
+#    * , save "</configs>" as "A"
+    * , save "</configs/yamlDrivers/configs2/yamlDrivers/chrome.connection>" as "A"
+    * , save "</configs/yamlDrivers/Configs2.yamlDrivers/chrome.connection>" as "A"
+    * , save "</configs/yamlDrivers/configs2.yamlDrivers/Chrome.connection>" as "A"
+#
 
 
   Scenario: debug run Scena

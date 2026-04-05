@@ -12,7 +12,10 @@ import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
 import io.reactivex.Maybe;
+import io.reactivex.exceptions.UndeliverableException;
+import io.reactivex.plugins.RxJavaPlugins;
 
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Date;
@@ -24,6 +27,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Static convenience wrapper for ReportPortal client-java 5.4.8 APIs.
@@ -50,11 +54,42 @@ public final class ReportPortalBridge {
 
     private ReportPortalBridge() {}
 
+
+    private static final AtomicReference<Throwable> ASYNC_FAILURE = new AtomicReference<>();
+    private static volatile boolean rxErrorHandlerInstalled;
+
+    private static void installRxErrorHandlerIfNeeded() {
+        if (rxErrorHandlerInstalled) return;
+        synchronized (INIT_LOCK) {
+            if (rxErrorHandlerInstalled) return;
+
+            RxJavaPlugins.setErrorHandler(e -> {
+                Throwable t = (e instanceof UndeliverableException ude && ude.getCause() != null)
+                        ? ude.getCause()
+                        : e;
+                ASYNC_FAILURE.compareAndSet(null, t);
+            });
+
+            rxErrorHandlerInstalled = true;
+        }
+    }
+
+    public static void throwIfAsyncFailure() {
+        Throwable t = ASYNC_FAILURE.getAndSet(null);
+        if (t == null) return;
+
+        if (t instanceof RuntimeException re) throw re;
+        if (t instanceof Error err) throw err;
+        throw new RuntimeException("ReportPortal async failure", t);
+    }
+
+
     // -----------------------------
     // Init / config
     // -----------------------------
 
     public static void initIfNeeded() {
+        installRxErrorHandlerIfNeeded();
         if (initialized) return;
         synchronized (INIT_LOCK) {
             if (initialized) return;
@@ -242,37 +277,25 @@ public final class ReportPortalBridge {
             File file = tmp.toFile();
 
             if (currentItem == null) {
-                // Launch-level log with attachment
                 launch.log(launchId -> {
                     try {
                         return ReportPortal.toSaveLogRQ(launchId, null, lvl, now, new ReportPortalMessage(file, msg));
                     } catch (IOException e) {
-                        SaveLogRQ rq = new SaveLogRQ();
-                        rq.setLaunchUuid(launchId);
-                        rq.setLevel(lvl);
-                        rq.setLogTime(now);
-                        rq.setMessage(msg + " (attachment read failed: " + e.getMessage() + ")");
-                        return rq;
+                        throw new UncheckedIOException("Failed to build ReportPortal launch attachment log", e);
                     }
                 });
             } else {
-                // Item-level log with attachment
                 launch.log(currentItem, launchId -> {
                     try {
                         return ReportPortal.toSaveLogRQ(launchId, null, lvl, now, new ReportPortalMessage(file, msg));
                     } catch (IOException e) {
-                        SaveLogRQ rq = new SaveLogRQ();
-                        rq.setLaunchUuid(launchId);
-                        rq.setLevel(lvl);
-                        rq.setLogTime(now);
-                        rq.setMessage(msg + " (attachment read failed: " + e.getMessage() + ")");
-                        return rq;
+                        throw new UncheckedIOException("Failed to build ReportPortal item attachment log", e);
                     }
                 });
             }
 
         } catch (IOException e) {
-            log("WARN", msg + " (attachment write failed: " + e.getMessage() + ")");
+            throw new UncheckedIOException("Failed to write ReportPortal attachment temp file", e);
         } finally {
             if (tmp != null) {
                 try { Files.deleteIfExists(tmp); } catch (Exception ignored) {}

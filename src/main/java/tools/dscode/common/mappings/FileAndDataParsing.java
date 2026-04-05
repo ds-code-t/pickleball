@@ -29,6 +29,12 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import com.fasterxml.jackson.databind.node.NullNode;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+
+import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+
 public final class FileAndDataParsing {
 
     private FileAndDataParsing() {
@@ -47,6 +53,26 @@ public final class FileAndDataParsing {
             "txt",
             "csv"
     );
+
+    private static final int BUILD_JSON_CACHE_MAX_SIZE = 256;
+    private static final long BUILD_JSON_CACHE_TTL_NANOS = TimeUnit.MINUTES.toNanos(10);
+    private static final JsonNode NULL_SENTINEL = NullNode.getInstance();
+    private static final ConcurrentHashMap<String, CacheEntry> BUILD_JSON_CACHE = new ConcurrentHashMap<>();
+
+    private static final class CacheEntry {
+        private final JsonNode value;
+        private final long expiresAtNanos;
+
+        private CacheEntry(JsonNode value, long expiresAtNanos) {
+            this.value = value;
+            this.expiresAtNanos = expiresAtNanos;
+        }
+
+        private boolean isExpired(long now) {
+            return now >= expiresAtNanos;
+        }
+    }
+
 
     private static final class ParseFailureException extends RuntimeException {
         private ParseFailureException(String message, Throwable cause) {
@@ -75,6 +101,79 @@ public final class FileAndDataParsing {
     }
 
     public static JsonNode buildJsonFromPath(String resourcePath) {
+        String key = resourcePath.replace(".", "/");
+        long now = System.nanoTime();
+
+        CacheEntry entry = BUILD_JSON_CACHE.compute(key, (k, existing) -> {
+            if (existing != null && !existing.isExpired(now)) {
+                return existing;
+            }
+
+            JsonNode jsonNode = attemptBuildJsonFromPath(k);
+            if (jsonNode instanceof ObjectNode objectNode && objectNode.has("_unmatchedPath")) {
+                String unmatchedPath = objectNode.get("_unmatchedPath").asText();
+                jsonNode = MAPPER.valueToTree(
+                        new NodeMap(objectNode)
+                                .getByNormalizedPath("_returnedValue." + unmatchedPath.replaceFirst("/", "."))
+                );
+            }
+
+            return new CacheEntry(
+                    jsonNode == null ? NULL_SENTINEL : jsonNode.deepCopy(),
+                    now + BUILD_JSON_CACHE_TTL_NANOS
+            );
+        });
+
+        cleanupBuildJsonCache(now);
+        return entry.value == NULL_SENTINEL ? null : entry.value.deepCopy();
+    }
+
+    private static void cleanupBuildJsonCache(long now) {
+        if (BUILD_JSON_CACHE.size() <= BUILD_JSON_CACHE_MAX_SIZE) {
+            return;
+        }
+
+        BUILD_JSON_CACHE.entrySet().removeIf(e -> e.getValue().isExpired(now));
+
+        int overflow = BUILD_JSON_CACHE.size() - BUILD_JSON_CACHE_MAX_SIZE;
+        if (overflow <= 0) {
+            return;
+        }
+
+        var it = BUILD_JSON_CACHE.keySet().iterator();
+        while (overflow-- > 0 && it.hasNext()) {
+            it.next();
+            it.remove();
+        }
+    }
+
+
+    public static JsonNode attemptBuildJsonFromPath(String resourcePath) {
+        JsonNode exact = buildJsonFromExactPath(resourcePath);
+        if (exact != null) {
+            return exact;
+        }
+
+        String original = resourcePath.replace('\\', '/');
+        String matchedPath = original;
+
+        for (int slash = matchedPath.lastIndexOf('/'); slash >= 0; slash = matchedPath.lastIndexOf('/')) {
+            matchedPath = matchedPath.substring(0, slash);
+
+            JsonNode matched = buildJsonFromExactPath(matchedPath);
+            if (matched != null) {
+                ObjectNode result = JSON_MAPPER.createObjectNode();
+                result.set("_returnedValue", matched);
+                result.put("_matchedPath", matchedPath);
+                result.put("_unmatchedPath", original.substring(matchedPath.length() + 1));
+                return result;
+            }
+        }
+
+        return null;
+    }
+
+    private static JsonNode buildJsonFromExactPath(String resourcePath) {
         URL url = getResourceUrl(resourcePath);
         if (url == null) {
             return null;

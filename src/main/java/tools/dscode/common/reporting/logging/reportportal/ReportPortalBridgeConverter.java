@@ -23,14 +23,17 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
     @Override
     public void onStart(Entry scope, Entry entry) {
+        ReportPortalBridge.throwIfAsyncFailure();
         ReportPortalBridge.startLaunchIfNeeded(null, null);
 
         String type = (entry.parent == null) ? "TEST" : "STEP";
         ReportPortalBridge.startItem(entry.text, type, null);
+        ReportPortalBridge.throwIfAsyncFailure();
     }
 
     @Override
     public void onTimestamp(Entry scope, Entry entry) {
+        ReportPortalBridge.throwIfAsyncFailure();
         ReportPortalBridge.log(level(entry.level), entry.text);
 
         for (int i = 0; i < entry.attachments.size(); i++) {
@@ -43,7 +46,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
             try {
                 bytes = Files.readAllBytes(Path.of(a.path()));
             } catch (Exception e) {
-                continue;
+                throw new RuntimeException("Failed to read attachment: " + a.path(), e);
             }
 
             String filename = (a.name() == null || a.name().isBlank())
@@ -51,18 +54,21 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                     : a.name();
 
             ReportPortalBridge.logAttachment(level(entry.level), entry.text, bytes, filename);
+            ReportPortalBridge.throwIfAsyncFailure();
         }
     }
 
     @Override
     public void onStop(Entry scope, Entry entry) {
-        // Only inject scenario summary once: at the end of the scenario root item.
+        ReportPortalBridge.throwIfAsyncFailure();
+
         if (entry.parent == null) {
             String rowKey = GlobalState.getCurrentScenarioState().id.toString();
             renderScenarioSummary(scope, rowKey);
         }
 
         ReportPortalBridge.finishCurrentItem(status(entry.status));
+        ReportPortalBridge.throwIfAsyncFailure();
     }
 
     @Override
@@ -84,8 +90,10 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
     @Override
     protected void onClose() {
+        ReportPortalBridge.throwIfAsyncFailure();
         ReportPortalBridge.finishAllOpenItems("PASSED");
         ReportPortalBridge.finishLaunch("PASSED");
+        ReportPortalBridge.throwIfAsyncFailure();
     }
 
     @Override

@@ -1,27 +1,36 @@
 package tools.dscode.common.variables;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
-import tools.dscode.common.mappings.queries.Tokenized;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
-import java.util.regex.Pattern;
 
 
+import static tools.dscode.common.evaluations.AviatorUtil.isStringTruthy;
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
-import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.mappings.MappingProcessor.getSingletonMap;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
 
 
 public class RunVars extends NodeMap {
+
+    public static final Map<String, String> FILE_PROPERTIES =        loadAllPropertiesFiles(Path.of("src/test/resources"));
+
+
+
+
+
     private static final String ENV_PREFIX = "env_";
     private static final String SYS_PREFIX = "sys_";
 
@@ -211,5 +220,50 @@ public class RunVars extends NodeMap {
                 : null;
     }
 
+
+
+
+
+    public static boolean getDependencyPropertyBoolean(String key) {
+        String value = getDependencyProperty(key);
+        if(value == null || value.isBlank())
+            return false;
+        return isStringTruthy(value);
+    }
+
+    public static String getDependencyProperty(String key) {
+        String value = System.getProperty(key);
+        if (value != null) return value;
+
+        value = System.getenv(key);
+        if (value != null) return value;
+
+        value = System.getenv(key.replace('.', '_').toUpperCase(Locale.ROOT));
+        if (value != null) return value;
+
+        return FILE_PROPERTIES.get(key);
+    }
+
+    private static Map<String, String> loadAllPropertiesFiles(Path root) {
+        Map<String, String> map = new HashMap<>();
+
+        try (var paths = Files.walk(root)) {
+            paths.filter(Files::isRegularFile)
+                    .filter(p -> p.toString().endsWith(".properties"))
+                    .forEach(p -> {
+                        Properties props = new Properties();
+                        try (InputStream in = Files.newInputStream(p)) {
+                            props.load(in);
+                            props.forEach((k, v) -> map.put(String.valueOf(k), String.valueOf(v)));
+                        } catch (IOException e) {
+                            throw new UncheckedIOException("Failed to read " + p, e);
+                        }
+                    });
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to scan " + root, e);
+        }
+
+        return Map.copyOf(map);
+    }
 
 }

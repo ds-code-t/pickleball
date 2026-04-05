@@ -74,6 +74,11 @@ public class NodeMap  extends ValueFormatting{
         setMapType(mapType);
     }
 
+    public NodeMap(ObjectNode objectNode) {
+        super(objectNode);
+        setMapType(MapConfigurations.MapType.DEFAULT);
+    }
+
     public NodeMap(MapConfigurations.MapType mapType, MapConfigurations.DataSource... dataSources) {
         this(mapType);
         this.dataSources = Arrays.stream(dataSources).collect(Collectors.toSet());
