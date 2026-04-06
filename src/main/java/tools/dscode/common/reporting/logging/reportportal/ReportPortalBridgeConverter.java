@@ -10,10 +10,12 @@ import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.common.reporting.logging.Status;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -125,11 +127,13 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                 ? "screenshot.png"
                 : (name.endsWith(".png") ? name : name + ".png");
 
+        // Log immediately to ReportPortal
         ReportPortalBridge.logAttachment("INFO", "Screenshot", Base64.getDecoder().decode(b64), filename);
 
+        // Still keep the attachment on the Entry in case other converters need it
         Entry out = entry.attach(filename, "image/png;base64", b64);
 
-        // Prevent later flushAttachments(...) from trying to read the base64 payload as a file path
+        // Mark this exact attachment slot as already handled so later flushes skip it
         int idx = out.attachments.size() - 1;
         if (idx >= 0) {
             sent.add(out.id + ":" + idx);
@@ -145,20 +149,78 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
             Attachment a = entry.attachments.get(i);
 
-            byte[] bytes;
-            try {
-                bytes = Files.readAllBytes(Path.of(a.path()));
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to read attachment: " + a.path(), e);
-            }
+            String payload = a.path();
+            String mime = a.mime();
 
-            String filename = (a.name() == null || a.name().isBlank())
-                    ? Path.of(a.path()).getFileName().toString()
-                    : a.name();
+            byte[] bytes;
+            String filename = resolveFilename(a, payload, mime);
+
+            try {
+                if (isBase64Attachment(mime)) {
+                    bytes = Base64.getDecoder().decode(payload);
+                } else if (isExistingPath(payload)) {
+                    Path p = Path.of(payload);
+                    bytes = Files.readAllBytes(p);
+
+                    if (a.name() == null || a.name().isBlank()) {
+                        filename = p.getFileName().toString();
+                    }
+                } else {
+                    // Fallback: treat it as inline text payload rather than a file path
+                    bytes = payload == null ? new byte[0] : payload.getBytes(StandardCharsets.UTF_8);
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to materialize attachment: " + describeAttachment(a), e);
+            }
 
             ReportPortalBridge.logAttachment(level, message, bytes, filename);
             ReportPortalBridge.throwIfAsyncFailure();
         }
+    }
+
+    private static boolean isBase64Attachment(String mime) {
+        return mime != null && mime.toLowerCase(Locale.ROOT).contains("base64");
+    }
+
+    private static boolean isExistingPath(String payload) {
+        if (payload == null || payload.isBlank()) return false;
+        try {
+            return Files.exists(Path.of(payload));
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private static String resolveFilename(Attachment a, String payload, String mime) {
+        if (a.name() != null && !a.name().isBlank()) {
+            return a.name();
+        }
+
+        if (isExistingPath(payload)) {
+            try {
+                return Path.of(payload).getFileName().toString();
+            } catch (Exception ignored) {
+            }
+        }
+
+        if (mime != null) {
+            String m = mime.toLowerCase(Locale.ROOT);
+            if (m.startsWith("image/png")) return "attachment.png";
+            if (m.startsWith("image/jpeg")) return "attachment.jpg";
+            if (m.startsWith("application/json")) return "attachment.json";
+            if (m.startsWith("text/plain")) return "attachment.txt";
+        }
+
+        return "attachment.bin";
+    }
+
+    private static String describeAttachment(Attachment a) {
+        String payload = a.path();
+        String preview = payload == null
+                ? "null"
+                : (payload.length() <= 32 ? payload : payload.substring(0, 32) + "...");
+
+        return "name='" + a.name() + "', mime='" + a.mime() + "', payload='" + preview + "'";
     }
 
     private static boolean isRpNestScope(Entry scope) {
