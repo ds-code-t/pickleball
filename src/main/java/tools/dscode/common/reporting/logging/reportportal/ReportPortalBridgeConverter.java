@@ -1,4 +1,3 @@
-// file: tools/dscode/common/reporting/logging/reportportal/ReportPortalBridgeConverter.java
 package tools.dscode.common.reporting.logging.reportportal;
 
 import io.cucumber.core.runner.GlobalState;
@@ -13,7 +12,6 @@ import tools.dscode.common.reporting.logging.Status;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.Base64;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,19 +20,25 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
     private static final String RP_NEST_TAG = "RP_NEST";
 
-    private final Set<String> sent = ConcurrentHashMap.newKeySet();
+    private final Set<String> sentAttachments = ConcurrentHashMap.newKeySet();
+    private final Set<String> startedRpItems = ConcurrentHashMap.newKeySet();
+    private final Set<String> finishedRpItems = ConcurrentHashMap.newKeySet();
 
     @Override
     public void onStart(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
         ReportPortalBridge.startLaunchIfNeeded(null, null);
 
+        // Ensure the scenario/root RP item exists before any nested RP child starts.
+        if (isRpNest(scope)) {
+            ensureRpItemStarted(scope);
+        }
+
         if (!isRpNest(entry)) {
             return;
         }
 
-        String type = (entry.parent == null) ? "TEST" : "STEP";
-        ReportPortalBridge.startItem(entry.text, type, null);
+        ensureRpItemStarted(entry);
         ReportPortalBridge.throwIfAsyncFailure();
     }
 
@@ -42,6 +46,12 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     public void onTimestamp(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
 
+        // Ensure root/scenario RP item exists even if the first thing we see is a timestamped child log.
+        if (isRpNest(scope)) {
+            ensureRpItemStarted(scope);
+        }
+
+        // If this event lives inside a non-RP span, buffer it until that span stops.
         if (isInsideBufferedSpan(entry)) {
             return;
         }
@@ -50,7 +60,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
         for (int i = 0; i < entry.attachments.size(); i++) {
             String key = entry.id + ":" + i;
-            if (!sent.add(key)) continue;
+            if (!sentAttachments.add(key)) continue;
 
             Attachment a = entry.attachments.get(i);
 
@@ -74,17 +84,26 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     public void onStop(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
 
+        // Make sure the scenario/root item exists before summary logging.
+        if (isRpNest(scope)) {
+            ensureRpItemStarted(scope);
+        }
+
         if (entry.parent == null) {
             String rowKey = GlobalState.getCurrentScenarioState().id.toString();
             renderScenarioSummary(scope, rowKey);
         }
 
         if (isRpNest(entry)) {
-            ReportPortalBridge.finishCurrentItem(status(entry.status));
-            ReportPortalBridge.throwIfAsyncFailure();
+            if (finishedRpItems.add(entry.id)) {
+                ensureRpItemStarted(entry);
+                ReportPortalBridge.finishCurrentItem(status(entry.status));
+                ReportPortalBridge.throwIfAsyncFailure();
+            }
             return;
         }
 
+        // Only the outermost buffered span emits the flattened summary.
         if (isSpan(entry) && !hasBufferedSpanAncestor(entry.parent)) {
             ReportPortalBridge.log(level(entry.level), flattenSpan(entry));
             ReportPortalBridge.throwIfAsyncFailure();
@@ -108,21 +127,57 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
     @Override
     protected void onClose() {
-        // launch finished automatically via JVM shutdown hook
+        // Intentionally no-op.
+        // The launch should be finished once per whole run, not per scenario converter instance.
     }
 
     @Override
     public Entry screenshot(Entry entry, WebDriver driver, String name) {
+        Entry rpScope = nearestRpNest(entry);
+        if (rpScope != null) {
+            ensureRpItemStarted(rpScope);
+        }
+
         String b64 = ((TakesScreenshot) driver).getScreenshotAs(OutputType.BASE64);
 
-        String filename = (name == null || name.isBlank()) ? "screenshot.png"
+        String filename = (name == null || name.isBlank())
+                ? "screenshot.png"
                 : (name.endsWith(".png") ? name : name + ".png");
 
+        // If inside a buffered span, keep it attached to the Entry only.
+        // The flattened stop-summary will mention attachments.
         if (!isInsideBufferedSpan(entry)) {
             ReportPortalBridge.logAttachment("INFO", "Screenshot", Base64.getDecoder().decode(b64), filename);
+            ReportPortalBridge.throwIfAsyncFailure();
         }
 
         return entry.attach(name, "image/png;base64", b64);
+    }
+
+    private void ensureRpItemStarted(Entry entry) {
+        if (entry == null || !isRpNest(entry)) {
+            return;
+        }
+        if (!startedRpItems.add(entry.id)) {
+            return;
+        }
+
+        boolean root = entry.parent == null;
+
+        // Keep root item behavior close to your previous implementation.
+        String type = root ? "TEST" : "STEP";
+
+        // ReportPortal nested steps are STEP items with hasStats=false.
+        Boolean hasStats = root ? null : Boolean.FALSE;
+
+        ReportPortalBridge.startItem(entry.text, type, null, hasStats);
+    }
+
+    private static Entry nearestRpNest(Entry entry) {
+        for (Entry e = entry; e != null; e = e.parent) {
+            if (isRpNest(e)) return e;
+        }
+        return null;
     }
 
     private static boolean isRpNest(Entry entry) {
