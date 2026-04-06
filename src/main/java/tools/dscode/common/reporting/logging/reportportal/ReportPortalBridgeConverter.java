@@ -1,3 +1,4 @@
+// file: tools/dscode/common/reporting/logging/reportportal/ReportPortalBridgeConverter.java
 package tools.dscode.common.reporting.logging.reportportal;
 
 import io.cucumber.core.runner.GlobalState;
@@ -41,7 +42,6 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     public void onTimestamp(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
 
-        // If this event lives inside a non-RP span, buffer it until that span stops.
         if (isInsideBufferedSpan(entry)) {
             return;
         }
@@ -85,7 +85,6 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
             return;
         }
 
-        // Only the outermost buffered span emits the flattened summary.
         if (isSpan(entry) && !hasBufferedSpanAncestor(entry.parent)) {
             ReportPortalBridge.log(level(entry.level), flattenSpan(entry));
             ReportPortalBridge.throwIfAsyncFailure();
@@ -109,8 +108,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
     @Override
     protected void onClose() {
-        // no-op
-        // finish the launch once per whole run, not per scenario converter
+        // launch finished automatically via JVM shutdown hook
     }
 
     @Override
@@ -120,8 +118,6 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         String filename = (name == null || name.isBlank()) ? "screenshot.png"
                 : (name.endsWith(".png") ? name : name + ".png");
 
-        // If inside a buffered span, keep it attached to the Entry only.
-        // The flattened stop-summary will mention attachments.
         if (!isInsideBufferedSpan(entry)) {
             ReportPortalBridge.logAttachment("INFO", "Screenshot", Base64.getDecoder().decode(b64), filename);
         }

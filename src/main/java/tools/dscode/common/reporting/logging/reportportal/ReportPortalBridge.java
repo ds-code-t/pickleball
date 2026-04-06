@@ -1,3 +1,4 @@
+// file: tools/dscode/common/reporting/logging/reportportal/ReportPortalBridge.java
 package tools.dscode.common.reporting.logging.reportportal;
 
 import com.epam.reportportal.listeners.ListenerParameters;
@@ -29,15 +30,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * Static convenience wrapper for ReportPortal client-java APIs.
- *
- * Notes:
- * - Loads configuration from reportportal.properties automatically
- * - No-ops when rp.enable=false or client can't be built
- * - Maintains a per-thread RP item stack for explicit started items only
- * - Plain logs go to the current open RP item if present, otherwise launch level
- */
 public final class ReportPortalBridge {
 
     private static final Object INIT_LOCK = new Object();
@@ -48,15 +40,15 @@ public final class ReportPortalBridge {
     private static volatile ReportPortal rp;
     private static volatile Launch launch;
 
-    /** launch UUID promise (Maybe<String>) */
     private static volatile Maybe<String> launchUuid = Maybe.empty();
 
-    /** Each thread has its own stack of currently opened RP items */
     private static final ThreadLocal<Deque<Maybe<String>>> ITEM_STACK =
             ThreadLocal.withInitial(ArrayDeque::new);
 
     private static final AtomicReference<Throwable> ASYNC_FAILURE = new AtomicReference<>();
     private static volatile boolean rxErrorHandlerInstalled;
+
+    private static volatile boolean shutdownHookRegistered = false;
 
     private ReportPortalBridge() { }
 
@@ -77,6 +69,15 @@ public final class ReportPortalBridge {
         }
     }
 
+    private static void registerShutdownHook() {
+        if (shutdownHookRegistered) return;
+        synchronized (INIT_LOCK) {
+            if (shutdownHookRegistered) return;
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> finishLaunch("PASSED"), "ReportPortal-Shutdown"));
+            shutdownHookRegistered = true;
+        }
+    }
+
     public static void throwIfAsyncFailure() {
         Throwable t = ASYNC_FAILURE.getAndSet(null);
         if (t == null) return;
@@ -85,10 +86,6 @@ public final class ReportPortalBridge {
         if (t instanceof Error err) throw err;
         throw new RuntimeException("ReportPortal async failure", t);
     }
-
-    // -----------------------------
-    // Init / config
-    // -----------------------------
 
     public static void initIfNeeded() {
         installRxErrorHandlerIfNeeded();
@@ -108,6 +105,8 @@ public final class ReportPortalBridge {
             if (!enabled) {
                 launch = Launch.NOOP_LAUNCH;
                 launchUuid = Maybe.empty();
+            } else {
+                registerShutdownHook();
             }
 
             initialized = true;
@@ -119,14 +118,6 @@ public final class ReportPortalBridge {
         return enabled && launch != null && launch != Launch.NOOP_LAUNCH;
     }
 
-    // -----------------------------
-    // Launch lifecycle
-    // -----------------------------
-
-    /**
-     * Start launch if needed. Returns a launch UUID promise (Maybe<String>).
-     * Idempotent.
-     */
     public static Maybe<String> startLaunchIfNeeded(String launchNameOverride, Set<ItemAttributesRQ> attributes) {
         initIfNeeded();
         if (!enabled) return Maybe.empty();
@@ -165,14 +156,6 @@ public final class ReportPortalBridge {
         launchUuid = Maybe.empty();
     }
 
-    // -----------------------------
-    // Item lifecycle
-    // -----------------------------
-
-    /**
-     * Starts an item under the current parent item (if present) or as a root item under launch.
-     * Returns item UUID promise (Maybe<String>).
-     */
     public static Maybe<String> startItem(String name, String type, Set<ItemAttributesRQ> attributes) {
         initIfNeeded();
         if (!enabled) return Maybe.empty();
@@ -225,13 +208,6 @@ public final class ReportPortalBridge {
         }
     }
 
-    // -----------------------------
-    // Logging
-    // -----------------------------
-
-    /**
-     * Log at current item level if an item exists, otherwise launch level.
-     */
     public static void log(String level, String message) {
         initIfNeeded();
         if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH) return;
@@ -243,7 +219,6 @@ public final class ReportPortalBridge {
         Date now = Date.from(Instant.now());
 
         if (currentItem == null) {
-            // Launch-level log
             launch.log(launchId -> {
                 SaveLogRQ rq = new SaveLogRQ();
                 rq.setLaunchUuid(launchId);
@@ -253,7 +228,6 @@ public final class ReportPortalBridge {
                 return rq;
             });
         } else {
-            // Item-level log
             launch.log(currentItem, itemId -> {
                 SaveLogRQ rq = new SaveLogRQ();
                 rq.setItemUuid(itemId);
@@ -265,9 +239,6 @@ public final class ReportPortalBridge {
         }
     }
 
-    /**
-     * Log with attachment bytes.
-     */
     public static void logAttachment(String level, String message, byte[] bytes, String filenameHint) {
         initIfNeeded();
         if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH) return;
@@ -331,22 +302,8 @@ public final class ReportPortalBridge {
         }
     }
 
-    // -----------------------------
-    // Attributes / tags
-    // -----------------------------
-
-    /**
-     * Best practice: apply attributes when starting the item.
-     * Kept as a no-op to preserve API surface.
-     */
     public static void addAttributesToCurrent(Set<ItemAttributesRQ> attributes) {
-        // Not supported by this bridge as an update-after-start operation.
-        // Apply attributes in startItem(...).
     }
-
-    // -----------------------------
-    // Helpers
-    // -----------------------------
 
     private static String fallback(String s, String def) {
         String v = blankToNull(s);
