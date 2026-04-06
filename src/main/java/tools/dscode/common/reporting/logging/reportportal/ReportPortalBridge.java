@@ -222,10 +222,9 @@ public final class ReportPortalBridge {
     // -----------------------------
 
     public static void log(String level, String message) {
-        log(level, message, null);
+        log(level, message, Instant.now());
     }
 
-    /** Log at current item level if an item exists, otherwise launch level. */
     public static void log(String level, String message, Instant logTime) {
         initIfNeeded();
         if (!enabled) return;
@@ -234,21 +233,23 @@ public final class ReportPortalBridge {
         String msg = fallback(message, "");
 
         Maybe<String> currentItem = ITEM_STACK.get().peekLast();
-        Date when = toDate(logTime);
+        Date when = Date.from(logTime != null ? logTime : Instant.now());
 
         if (currentItem == null) {
-            launch.log(launchId -> {
+            // Launch-level log
+            launch.log(launchUuid -> {
                 SaveLogRQ rq = new SaveLogRQ();
-                rq.setLaunchUuid(launchId);
+                rq.setLaunchUuid(launchUuid);
                 rq.setLevel(lvl);
                 rq.setLogTime(when);
                 rq.setMessage(msg);
                 return rq;
             });
         } else {
-            launch.log(currentItem, launchId -> {
+            // Item-level log
+            launch.log(currentItem, itemUuid -> {
                 SaveLogRQ rq = new SaveLogRQ();
-                rq.setLaunchUuid(launchId);
+                rq.setItemUuid(itemUuid);
                 rq.setLevel(lvl);
                 rq.setLogTime(when);
                 rq.setMessage(msg);
@@ -258,7 +259,7 @@ public final class ReportPortalBridge {
     }
 
     public static void logAttachment(String level, String message, byte[] bytes, String filenameHint) {
-        logAttachment(level, message, bytes, filenameHint, null);
+        logAttachment(level, message, bytes, filenameHint, Instant.now());
     }
 
     public static void logAttachment(String level,
@@ -274,7 +275,7 @@ public final class ReportPortalBridge {
         byte[] data = Objects.requireNonNullElseGet(bytes, () -> new byte[0]);
 
         Maybe<String> currentItem = ITEM_STACK.get().peekLast();
-        Date when = toDate(logTime);
+        Date when = Date.from(logTime != null ? logTime : Instant.now());
 
         Path tmp = null;
         try {
@@ -288,35 +289,42 @@ public final class ReportPortalBridge {
             File file = tmp.toFile();
 
             if (currentItem == null) {
-                launch.log(launchId -> {
+                launch.log(launchUuid -> {
                     try {
                         return ReportPortal.toSaveLogRQ(
-                                launchId, null, lvl, when, new ReportPortalMessage(file, msg)
+                                launchUuid,
+                                null,
+                                lvl,
+                                when,
+                                new ReportPortalMessage(file, msg)
                         );
                     } catch (IOException e) {
                         throw new UncheckedIOException("Failed to build ReportPortal launch attachment log", e);
                     }
                 });
             } else {
-                launch.log(currentItem, launchId -> {
+                launch.log(currentItem, itemUuid -> {
                     try {
                         return ReportPortal.toSaveLogRQ(
-                                launchId, null, lvl, when, new ReportPortalMessage(file, msg)
+                                null,
+                                itemUuid,
+                                lvl,
+                                when,
+                                new ReportPortalMessage(file, msg)
                         );
                     } catch (IOException e) {
                         throw new UncheckedIOException("Failed to build ReportPortal item attachment log", e);
                     }
                 });
             }
+
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to write ReportPortal attachment temp file", e);
         } finally {
             if (tmp != null) {
                 try {
                     Files.deleteIfExists(tmp);
-                } catch (Exception ignored) {
-                    // ignore cleanup failure
-                }
+                } catch (Exception ignored) { }
             }
         }
     }
