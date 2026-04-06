@@ -1,5 +1,14 @@
 Feature: Addition
 
+
+  Scenario: sdf
+    * , save "A1" as "B1" ,
+    * , save "A2" as "B2"
+    * , save "xA1" as "B" , save  "xC1" as "D" ,
+    * , save "xA2" as "B" , save  "xC2" as "D"
+    * , save "yA1" as "B" , save  "yC1" as "D" ,
+    * , save "yA2" as "B" , save  "yC2" as "D"
+
   @zz22
   Scenario: sente test1
 #  @[DEBUG,##]

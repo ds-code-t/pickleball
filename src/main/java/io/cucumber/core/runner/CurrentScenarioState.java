@@ -320,6 +320,7 @@ public class CurrentScenarioState extends ScenarioMapping {
             stepExtension.nextSibling = stepExtension.replacementSteps.getFirst();
             last.childSteps.addAll(stepExtension.childSteps);
             stepExtension.childSteps.clear();
+            stepExtension.parentStep.childSteps.remove(stepExtension);
         }
 
 

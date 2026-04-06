@@ -103,21 +103,29 @@ public class ScenarioStep extends StepExtension {
                 StepExtension nextStep = currentStep;
                 String newStepText = ",";
                 List<StepBase> childList = new ArrayList<>();
-
+                int indexOfCurrentStep = currentStep.parentStep.childSteps.indexOf(currentStep);
                     while(newStepText.endsWith(",") && nextStep != null && nextStep.isDynamicStep)
                     {
+                        currentStep.parentStep.childSteps.remove(nextStep);
                         s++;
                         newStepText += nextStep.getUnmodifiedText().trim().substring(1);
-                        nextStep = (StepExtension) nextStep.nextSibling;
                         childList.addAll(nextStep.childSteps);
+                        nextStep = (StepExtension) nextStep.nextSibling;
                     }
+                    s--;
                 StepExtension newStep = new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep, pickleStepTestStep.getStep().getKeyword(), newStepText, getGherkinArgumentText(pickleStepTestStep.getStep())));
                 newStep.setStepParsingMap(getStepParsingMap());
-                currentStep.parentStep.childSteps.add(currentStep.parentStep.childSteps.indexOf(currentStep), newStep);
                 newStep.parentStep = currentStep.parentStep;
+                currentStep.parentStep.childSteps.add(indexOfCurrentStep, newStep);
                 newStep.childSteps.addAll(childList);
-                newStep.previousSibling = currentStep.previousSibling;
-                newStep.nextSibling = nextStep.previousSibling;
+                if(currentStep.previousSibling != null) {
+                    newStep.previousSibling = currentStep.previousSibling;
+                    currentStep.previousSibling.nextSibling = newStep;
+                }
+                if(nextStep != null) {
+                    newStep.nextSibling = nextStep;
+                    nextStep.previousSibling = newStep;
+                }
             }
 
         }

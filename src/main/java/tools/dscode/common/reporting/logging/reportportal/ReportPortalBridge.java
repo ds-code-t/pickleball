@@ -10,32 +10,22 @@ import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
 import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.attribute.ItemAttributesRQ;
 import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
-import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
 import io.reactivex.Maybe;
 import io.reactivex.exceptions.UndeliverableException;
 import io.reactivex.plugins.RxJavaPlugins;
 
+import java.io.File;
+import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
-import java.util.ArrayDeque;
 import java.util.Date;
-import java.util.Deque;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * Static convenience wrapper for ReportPortal client-java 5.4.8 APIs.
- *
- * - Loads configuration from reportportal.properties automatically
- * - No-ops when rp.enable=false or client can't be built
- * - Maintains per-thread item stack (SUITE -> TEST -> STEP, etc.)
- */
 public final class ReportPortalBridge {
 
     private static final Object INIT_LOCK = new Object();
@@ -44,19 +34,12 @@ public final class ReportPortalBridge {
 
     private static volatile ReportPortal rp;
     private static volatile Launch launch;
-
-    /** launch UUID promise (Maybe<String>) */
     private static volatile Maybe<String> launchUuid = Maybe.empty();
-
-    /** Each thread has its own "current item" stack (store promises, not resolved strings) */
-    private static final ThreadLocal<Deque<Maybe<String>>> ITEM_STACK =
-            ThreadLocal.withInitial(ArrayDeque::new);
-
-    private ReportPortalBridge() {}
-
 
     private static final AtomicReference<Throwable> ASYNC_FAILURE = new AtomicReference<>();
     private static volatile boolean rxErrorHandlerInstalled;
+
+    private ReportPortalBridge() { }
 
     private static void installRxErrorHandlerIfNeeded() {
         if (rxErrorHandlerInstalled) return;
@@ -83,18 +66,13 @@ public final class ReportPortalBridge {
         throw new RuntimeException("ReportPortal async failure", t);
     }
 
-
-    // -----------------------------
-    // Init / config
-    // -----------------------------
-
     public static void initIfNeeded() {
         installRxErrorHandlerIfNeeded();
         if (initialized) return;
+
         synchronized (INIT_LOCK) {
             if (initialized) return;
 
-            // This matches your dependency: it auto-loads reportportal.properties via PropertiesLoader.load()
             ListenerParameters params = new ListenerParameters(PropertiesLoader.load());
             rp = ReportPortal.builder()
                     .withParameters(params)
@@ -110,19 +88,6 @@ public final class ReportPortalBridge {
         }
     }
 
-    public static boolean isEnabled() {
-        initIfNeeded();
-        return enabled && launch != null && launch != Launch.NOOP_LAUNCH;
-    }
-
-    // -----------------------------
-    // Launch lifecycle
-    // -----------------------------
-
-    /**
-     * Start launch if needed. Returns a launch UUID promise (Maybe<String>).
-     * Idempotent.
-     */
     public static Maybe<String> startLaunchIfNeeded(String launchNameOverride, Set<ItemAttributesRQ> attributes) {
         initIfNeeded();
         if (!enabled) return Maybe.empty();
@@ -139,32 +104,7 @@ public final class ReportPortalBridge {
         return launchUuid;
     }
 
-    public static void finishLaunch(String status) {
-        initIfNeeded();
-        if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH) return;
-
-        // clear any thread local stacks (optional safety)
-        ITEM_STACK.remove();
-
-        FinishExecutionRQ rq = new FinishExecutionRQ();
-        rq.setEndTime(Date.from(Instant.now()));
-        rq.setStatus(Optional.ofNullable(blankToNull(status)).orElse("PASSED"));
-
-        launch.finish(rq);
-
-        launch = null;
-        launchUuid = Maybe.empty();
-    }
-
-    // -----------------------------
-    // Item lifecycle
-    // -----------------------------
-
-    /**
-     * Starts an item under the current parent item (if present) or as root item under launch.
-     * Returns item UUID promise (Maybe<String>).
-     */
-    public static Maybe<String> startItem(String name, String type, Set<ItemAttributesRQ> attributes) {
+    public static Maybe<String> startItem(Maybe<String> parentItem, String name, String type, Set<ItemAttributesRQ> attributes) {
         initIfNeeded();
         if (!enabled) return Maybe.empty();
 
@@ -176,46 +116,41 @@ public final class ReportPortalBridge {
         rq.setName(fallback(name, "Unnamed"));
         rq.setType(fallback(type, "STEP"));
         rq.setStartTime(Date.from(Instant.now()));
-        if (attributes != null && !attributes.isEmpty()) rq.setAttributes(attributes);
+        if ("STEP".equalsIgnoreCase(rq.getType())) {
+            rq.setHasStats(false);
+        }
+        if (attributes != null && !attributes.isEmpty()) {
+            rq.setAttributes(attributes);
+        }
 
-        Deque<Maybe<String>> stack = ITEM_STACK.get();
-        Maybe<String> parent = stack.peekLast();
-
-        Maybe<String> item = (parent == null)
+        return parentItem == null
                 ? launch.startTestItem(rq)
-                : launch.startTestItem(parent, rq);
-
-        stack.addLast(item);
-        return item;
+                : launch.startTestItem(parentItem, rq);
     }
 
-    public static void finishCurrentItem(String status) {
+    public static void finishItem(Maybe<String> item, String status) {
         initIfNeeded();
-        if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH) return;
-
-        Deque<Maybe<String>> stack = ITEM_STACK.get();
-        Maybe<String> item = stack.pollLast();
-        if (item == null) return;
+        if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH || item == null) return;
 
         FinishTestItemRQ rq = new FinishTestItemRQ();
         rq.setEndTime(Date.from(Instant.now()));
         rq.setStatus(Optional.ofNullable(blankToNull(status)).orElse("PASSED"));
 
-        // returns Maybe<OperationCompletionRS> but we don't need to block
         launch.finishTestItem(item, rq);
     }
 
-    public static void finishAllOpenItems(String status) {
+    public static void finishLaunch(String status) {
         initIfNeeded();
-        if (!enabled) return;
-        while (ITEM_STACK.get().peekLast() != null) {
-            finishCurrentItem(status);
-        }
-    }
+        if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH) return;
 
-    // -----------------------------
-    // Logging
-    // -----------------------------
+        FinishExecutionRQ rq = new FinishExecutionRQ();
+        rq.setEndTime(Date.from(Instant.now()));
+        rq.setStatus(Optional.ofNullable(blankToNull(status)).orElse("PASSED"));
+
+        launch.finish(rq);
+        launch = null;
+        launchUuid = Maybe.empty();
+    }
 
     public static void log(String level, String message) {
         initIfNeeded();
@@ -225,27 +160,9 @@ public final class ReportPortalBridge {
         String msg = fallback(message, "");
         Date now = Date.from(Instant.now());
 
-        // Preferred path: use the active ReportPortal logging context for the current item.
-        if (ReportPortal.emitLog(msg, lvl, now)) {
-            return;
+        if (!ReportPortal.emitLog(msg, lvl, now)) {
+            ReportPortal.emitLaunchLog(msg, lvl, now);
         }
-
-        // Fallback: explicit item routing via our own stack.
-        Maybe<String> currentItem = ITEM_STACK.get().peekLast();
-        if (currentItem != null) {
-            launch.log(currentItem, itemId -> {
-                SaveLogRQ rq = new SaveLogRQ();
-                rq.setItemUuid(itemId);
-                rq.setLevel(lvl);
-                rq.setLogTime(now);
-                rq.setMessage(msg);
-                return rq;
-            });
-            return;
-        }
-
-        // Final fallback: launch-level log.
-        ReportPortal.emitLaunchLog(msg, lvl, now);
     }
 
     public static void logAttachment(String level, String message, byte[] bytes, String filenameHint) {
@@ -255,7 +172,6 @@ public final class ReportPortalBridge {
         String lvl = Optional.ofNullable(blankToNull(level)).orElse("INFO");
         String msg = Optional.ofNullable(blankToNull(message)).orElse("attachment");
         byte[] data = Objects.requireNonNullElseGet(bytes, () -> new byte[0]);
-        Date now = Date.from(Instant.now());
 
         Path tmp = null;
         try {
@@ -266,74 +182,18 @@ public final class ReportPortalBridge {
             Files.write(tmp, data);
             File file = tmp.toFile();
 
-            Maybe<String> currentItem = ITEM_STACK.get().peekLast();
-
-            if (currentItem != null) {
-                // Preferred path: active ReportPortal item context
-                if (ReportPortal.emitLog(new ReportPortalMessage(file, msg), lvl, now)) {
-                    return;
-                }
-
-                // Fallback: explicit item routing
-                launch.log(currentItem, itemId -> {
-                    try {
-                        return ReportPortal.toSaveLogRQ(null, itemId, lvl, now, new ReportPortalMessage(file, msg));
-                    } catch (IOException e) {
-                        throw new UncheckedIOException("Failed to build ReportPortal item attachment log", e);
-                    }
-                });
-                return;
+            Date now = Date.from(Instant.now());
+            if (!ReportPortal.emitLog(new ReportPortalMessage(file, msg), lvl, now)) {
+                ReportPortal.emitLaunchLog(new ReportPortalMessage(file, msg), lvl, now);
             }
-
-            // Preferred launch-level path
-            if (ReportPortal.emitLaunchLog(new ReportPortalMessage(file, msg), lvl, now)) {
-                return;
-            }
-
-            // Final launch-level fallback
-            launch.log(launchId -> {
-                try {
-                    return ReportPortal.toSaveLogRQ(launchId, null, lvl, now, new ReportPortalMessage(file, msg));
-                } catch (IOException e) {
-                    throw new UncheckedIOException("Failed to build ReportPortal launch attachment log", e);
-                }
-            });
-
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to write ReportPortal attachment temp file", e);
         } finally {
             if (tmp != null) {
-                try { Files.deleteIfExists(tmp); } catch (Exception ignored) {}
+                try { Files.deleteIfExists(tmp); } catch (Exception ignored) { }
             }
         }
     }
-
-    private static SaveLogRQ nullSafeLaunchLogRq(String msg, String lvl, Date now, String launchId) {
-        SaveLogRQ rq = new SaveLogRQ();
-        rq.setLaunchUuid(launchId);
-        rq.setLevel(lvl);
-        rq.setLogTime(now);
-        rq.setMessage(msg);
-        return rq;
-    }
-
-
-    // -----------------------------
-    // Attributes / tags
-    // -----------------------------
-    /**
-     * In 5.4.8 Launch has no updateTestItem(...) in the class you pasted.
-     * Best practice: apply attributes at item start (StartTestItemRQ#setAttributes).
-     *
-     * This is kept as a no-op for now to preserve a convenient API surface.
-     */
-    public static void addAttributesToCurrent(Set<ItemAttributesRQ> attributes) {
-        // Not supported by Launch API you provided. Apply attributes when starting the item.
-    }
-
-    // -----------------------------
-    // Helpers
-    // -----------------------------
 
     private static String fallback(String s, String def) {
         String v = blankToNull(s);
@@ -345,6 +205,4 @@ public final class ReportPortalBridge {
         String t = s.trim();
         return t.isEmpty() ? null : t;
     }
-
-
 }
