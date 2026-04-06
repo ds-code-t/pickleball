@@ -24,9 +24,11 @@ import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Date;
 import java.util.Deque;
+import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -35,7 +37,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * - Loads configuration from reportportal.properties automatically
  * - No-ops when rp.enable=false or client can't be built
  * - Maintains per-thread item stack
- * - Supports an optional shared SUITE item under the launch
+ * - Supports named shared root items (e.g. SUITE) per launch
  */
 public final class ReportPortalBridge {
 
@@ -49,13 +51,16 @@ public final class ReportPortalBridge {
     /** launch UUID promise (Maybe<String>) */
     private static volatile Maybe<String> launchUuid = Maybe.empty();
 
-    /** optional shared SUITE item under the launch */
-    private static volatile Maybe<String> launchSuiteUuid = Maybe.empty();
-    private static volatile boolean launchSuiteOpen;
-
     /** Each thread has its own "current item" stack (store promises, not resolved strings) */
     private static final ThreadLocal<Deque<Maybe<String>>> ITEM_STACK =
             ThreadLocal.withInitial(ArrayDeque::new);
+
+    /**
+     * Shared named root items for the active launch.
+     * Example key: "SUITE\u0000Scenarios_root"
+     */
+    private static final ConcurrentHashMap<String, Maybe<String>> NAMED_ROOT_ITEMS =
+            new ConcurrentHashMap<>();
 
     private static final AtomicReference<Throwable> ASYNC_FAILURE = new AtomicReference<>();
     private static volatile boolean rxErrorHandlerInstalled;
@@ -107,8 +112,7 @@ public final class ReportPortalBridge {
             if (!enabled) {
                 launch = Launch.NOOP_LAUNCH;
                 launchUuid = Maybe.empty();
-                launchSuiteUuid = Maybe.empty();
-                launchSuiteOpen = false;
+                NAMED_ROOT_ITEMS.clear();
             }
 
             initialized = true;
@@ -141,95 +145,16 @@ public final class ReportPortalBridge {
 
         launch = rp.newLaunch(rq);
         launchUuid = launch.start();
+        NAMED_ROOT_ITEMS.clear();
         return launchUuid;
-    }
-
-    /**
-     * Starts one shared SUITE item under the current launch if needed.
-     * Intended to hold multiple TEST items beneath it.
-     */
-    public static Maybe<String> startLaunchSuiteIfNeeded(String suiteName,
-                                                         Set<ItemAttributesRQ> attributes,
-                                                         Instant startTime) {
-        initIfNeeded();
-        if (!enabled) return Maybe.empty();
-
-        if (launch == null || launch == Launch.NOOP_LAUNCH) {
-            startLaunchIfNeeded(null, null);
-        }
-
-        synchronized (INIT_LOCK) {
-            if (launchSuiteOpen) return launchSuiteUuid;
-
-            StartTestItemRQ rq = new StartTestItemRQ();
-            rq.setName(fallback(suiteName, "Scenarios"));
-            rq.setType("SUITE");
-            rq.setStartTime(toDate(startTime));
-            if (attributes != null && !attributes.isEmpty()) rq.setAttributes(attributes);
-
-            launchSuiteUuid = launch.startTestItem(rq);
-            launchSuiteOpen = true;
-            return launchSuiteUuid;
-        }
-    }
-
-    /**
-     * Push an existing item context onto the current thread's stack without starting a new item.
-     * Useful when a converter wants subsequent started items to be parented under an already-open suite.
-     */
-    public static void pushContext(Maybe<String> item) {
-        initIfNeeded();
-        if (!enabled || item == null) return;
-
-        Deque<Maybe<String>> stack = ITEM_STACK.get();
-        Maybe<String> last = stack.peekLast();
-        if (sameMaybe(last, item)) return;
-
-        stack.addLast(item);
-    }
-
-    /**
-     * Pops the current thread's top context if it matches the expected item.
-     * If expected is null, pops whatever is on top.
-     */
-    public static void popContext(Maybe<String> expected) {
-        initIfNeeded();
-        if (!enabled) return;
-
-        Deque<Maybe<String>> stack = ITEM_STACK.get();
-        Maybe<String> last = stack.peekLast();
-        if (last == null) return;
-
-        if (expected == null || sameMaybe(last, expected)) {
-            Maybe<String> removed = stack.pollLast();
-            if (sameMaybe(removed, launchSuiteUuid)) {
-                clearSuiteState();
-            }
-        }
-    }
-
-    public static void finishLaunchSuiteIfNeeded(String status, Instant endTime) {
-        initIfNeeded();
-        if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH) return;
-
-        synchronized (INIT_LOCK) {
-            if (!launchSuiteOpen) return;
-
-            FinishTestItemRQ rq = new FinishTestItemRQ();
-            rq.setEndTime(toDate(endTime));
-            rq.setStatus(Optional.ofNullable(blankToNull(status)).orElse("PASSED"));
-
-            launch.finishTestItem(launchSuiteUuid, rq);
-            clearSuiteState();
-        }
     }
 
     public static void finishLaunch(String status) {
         initIfNeeded();
         if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH) return;
 
-        // Safety: finish suite too if still open
-        finishLaunchSuiteIfNeeded(status, Instant.now());
+        // Named shared roots are not on any one thread's stack, so close them explicitly.
+        finishNamedRootItems(status, Instant.now());
 
         ITEM_STACK.remove();
 
@@ -241,7 +166,102 @@ public final class ReportPortalBridge {
 
         launch = null;
         launchUuid = Maybe.empty();
-        clearSuiteState();
+        NAMED_ROOT_ITEMS.clear();
+    }
+
+    // -----------------------------
+    // Named shared root items
+    // -----------------------------
+
+    public static Maybe<String> startNamedRootIfNeeded(String name,
+                                                       String type,
+                                                       Set<ItemAttributesRQ> attributes) {
+        return startNamedRootIfNeeded(name, type, attributes, null);
+    }
+
+    public static Maybe<String> startNamedRootIfNeeded(String name,
+                                                       String type,
+                                                       Set<ItemAttributesRQ> attributes,
+                                                       Instant startTime) {
+        initIfNeeded();
+        if (!enabled) return Maybe.empty();
+
+        if (launch == null || launch == Launch.NOOP_LAUNCH) {
+            startLaunchIfNeeded(null, null);
+        }
+
+        String resolvedName = fallback(name, "Root");
+        String resolvedType = fallback(type, "SUITE");
+        String key = rootKey(resolvedType, resolvedName);
+
+        Maybe<String> existing = NAMED_ROOT_ITEMS.get(key);
+        if (existing != null) return existing;
+
+        synchronized (INIT_LOCK) {
+            existing = NAMED_ROOT_ITEMS.get(key);
+            if (existing != null) return existing;
+
+            StartTestItemRQ rq = new StartTestItemRQ();
+            rq.setName(resolvedName);
+            rq.setType(resolvedType);
+            rq.setStartTime(toDate(startTime));
+            if (attributes != null && !attributes.isEmpty()) rq.setAttributes(attributes);
+
+            Maybe<String> item = launch.startTestItem(rq);
+            NAMED_ROOT_ITEMS.put(key, item);
+            return item;
+        }
+    }
+
+    /**
+     * Push an already-open RP item handle into the current thread's context stack.
+     * This is how parallel threads can share the same suite root while keeping their
+     * own per-thread parent chains.
+     */
+    public static void pushParentContext(Maybe<String> parent) {
+        initIfNeeded();
+        if (!enabled || parent == null) return;
+
+        Deque<Maybe<String>> stack = ITEM_STACK.get();
+        Maybe<String> current = stack.peekLast();
+        if (sameMaybe(current, parent)) return;
+
+        stack.addLast(parent);
+    }
+
+    /**
+     * Pop the current thread's context if it matches the expected handle.
+     */
+    public static void popParentContext(Maybe<String> expected) {
+        initIfNeeded();
+        if (!enabled) return;
+
+        Deque<Maybe<String>> stack = ITEM_STACK.get();
+        Maybe<String> current = stack.peekLast();
+        if (current == null) return;
+
+        if (expected == null || sameMaybe(current, expected)) {
+            stack.pollLast();
+        }
+    }
+
+    private static void finishNamedRootItems(String status, Instant endTime) {
+        synchronized (INIT_LOCK) {
+            if (launch == null || launch == Launch.NOOP_LAUNCH || NAMED_ROOT_ITEMS.isEmpty()) {
+                NAMED_ROOT_ITEMS.clear();
+                return;
+            }
+
+            FinishTestItemRQ rq = new FinishTestItemRQ();
+            rq.setEndTime(toDate(endTime));
+            rq.setStatus(Optional.ofNullable(blankToNull(status)).orElse("PASSED"));
+
+            for (Maybe<String> item : new LinkedHashSet<>(NAMED_ROOT_ITEMS.values())) {
+                launch.finishTestItem(item, rq);
+            }
+
+            NAMED_ROOT_ITEMS.clear();
+        }
     }
 
     // -----------------------------
@@ -297,10 +317,6 @@ public final class ReportPortalBridge {
         rq.setStatus(Optional.ofNullable(blankToNull(status)).orElse("PASSED"));
 
         launch.finishTestItem(item, rq);
-
-        if (sameMaybe(item, launchSuiteUuid)) {
-            clearSuiteState();
-        }
     }
 
     public static void finishAllOpenItems(String status) {
@@ -436,17 +452,16 @@ public final class ReportPortalBridge {
     // Helpers
     // -----------------------------
 
-    private static Date toDate(Instant instant) {
-        return Date.from(instant != null ? instant : Instant.now());
+    private static String rootKey(String type, String name) {
+        return type + '\u0000' + name;
     }
 
     private static boolean sameMaybe(Maybe<String> a, Maybe<String> b) {
         return a == b || Objects.equals(a, b);
     }
 
-    private static void clearSuiteState() {
-        launchSuiteUuid = Maybe.empty();
-        launchSuiteOpen = false;
+    private static Date toDate(Instant instant) {
+        return Date.from(instant != null ? instant : Instant.now());
     }
 
     private static String fallback(String s, String def) {

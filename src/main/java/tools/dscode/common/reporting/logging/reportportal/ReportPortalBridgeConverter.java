@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.Locale;
 import java.util.Set;
@@ -23,9 +24,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class ReportPortalBridgeConverter extends BaseConverter {
 
     private static final String RP_NEST = "RP_NEST";
-    private static final String RP_STEP = "RP_STEP";
-    private static final String RP_SUITE = "RP_SUITE";
-    private static final String DEFAULT_SUITE_NAME = "Scenarios";
 
     private final Set<String> sent = ConcurrentHashMap.newKeySet();
     private Maybe<String> suiteContext = Maybe.empty();
@@ -37,16 +35,20 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
         if (isRpNestScope(scope)) {
             if (scope == entry) {
-                suiteContext = ReportPortalBridge.startLaunchSuiteIfNeeded(
-                        resolveSuiteName(scope, entry),
-                        null,
-                        entry.startedAt
-                );
-                ReportPortalBridge.pushContext(suiteContext);
-                ReportPortalBridge.startItem(entry.text, "TEST", null, entry.startedAt);
-            } else if (shouldCreateStepItem(entry)) {
-                ReportPortalBridge.startItem(entry.text, "STEP", null, entry.startedAt);
+                String suiteName = extractSuiteName(scope);
+                if (suiteName != null) {
+                    suiteContext = ReportPortalBridge.startNamedRootIfNeeded(
+                            suiteName, "SUITE", null, entry.startedAt
+                    );
+                    ReportPortalBridge.pushParentContext(suiteContext);
+                } else {
+                    suiteContext = Maybe.empty();
+                }
+
+                String type = (entry.parent == null) ? "TEST" : "STEP";
+                ReportPortalBridge.startItem(entry.text, type, null, entry.startedAt);
             } else {
+                // Descendant span inside RP_NEST scope -> log it, don't create RP child item.
                 ReportPortalBridge.log(level(entry.level), "STARTED: " + safe(entry.text), entry.startedAt);
             }
 
@@ -64,8 +66,9 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     public void onTimestamp(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
 
-        ReportPortalBridge.log(level(entry.level), safe(entry.text), entry.timestampedAt);
-        flushAttachments(entry, level(entry.level), safe(entry.text), entry.timestampedAt);
+        Instant when = entry.timestampedAt;
+        ReportPortalBridge.log(level(entry.level), safe(entry.text), when);
+        flushAttachments(entry, level(entry.level), safe(entry.text), when);
 
         ReportPortalBridge.throwIfAsyncFailure();
     }
@@ -76,25 +79,26 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
         if (isRpNestScope(scope)) {
             if (scope == entry) {
-                if (entry.parent == null) {
-                    String rowKey = GlobalState.getCurrentScenarioState().id.toString();
-                    renderScenarioSummary(scope, rowKey);
+                try {
+                    if (entry.parent == null) {
+                        String rowKey = GlobalState.getCurrentScenarioState().id.toString();
+                        renderScenarioSummary(scope, rowKey);
+                    }
+
+                    flushAttachments(entry, levelForStop(entry), safe(entry.text), entry.stoppedAt);
+                    ReportPortalBridge.finishCurrentItem(status(entry.status), entry.stoppedAt);
+                } finally {
+                    if (suiteContext != null) {
+                        ReportPortalBridge.popParentContext(suiteContext);
+                        suiteContext = Maybe.empty();
+                    }
                 }
 
-                flushAttachments(entry, levelForStop(entry), safe(entry.text), entry.stoppedAt);
-                ReportPortalBridge.finishCurrentItem(status(entry.status), entry.stoppedAt);
-                ReportPortalBridge.popContext(suiteContext);
                 ReportPortalBridge.throwIfAsyncFailure();
                 return;
             }
 
-            if (shouldCreateStepItem(entry)) {
-                flushAttachments(entry, levelForStop(entry), safe(entry.text), entry.stoppedAt);
-                ReportPortalBridge.finishCurrentItem(status(entry.status), entry.stoppedAt);
-                ReportPortalBridge.throwIfAsyncFailure();
-                return;
-            }
-
+            // Descendant span inside RP_NEST scope -> plain log, not RP child item.
             flushAttachments(entry, levelForStop(entry), safe(entry.text), entry.stoppedAt);
             ReportPortalBridge.log(levelForStop(entry), formatNestedSpan(entry), entry.stoppedAt);
             ReportPortalBridge.throwIfAsyncFailure();
@@ -124,14 +128,13 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                     .append('\n');
         }
 
-        ReportPortalBridge.log("INFO", sb.toString());
+        ReportPortalBridge.log("INFO", sb.toString(), Instant.now());
     }
 
     @Override
     protected void onClose() {
         ReportPortalBridge.throwIfAsyncFailure();
         ReportPortalBridge.finishAllOpenItems("PASSED");
-        ReportPortalBridge.finishLaunchSuiteIfNeeded("PASSED", null);
         ReportPortalBridge.finishLaunch("PASSED");
         ReportPortalBridge.throwIfAsyncFailure();
     }
@@ -144,10 +147,19 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                 ? "screenshot.png"
                 : (name.endsWith(".png") ? name : name + ".png");
 
-        ReportPortalBridge.logAttachment("INFO", "Screenshot", Base64.getDecoder().decode(b64), filename);
+        // Log immediately to ReportPortal
+        ReportPortalBridge.logAttachment(
+                "INFO",
+                "Screenshot",
+                Base64.getDecoder().decode(b64),
+                filename,
+                Instant.now()
+        );
 
+        // Still keep the attachment on the Entry in case other converters need it
         Entry out = entry.attach(filename, "image/png;base64", b64);
 
+        // Mark this exact attachment slot as already handled so later flushes skip it
         int idx = out.attachments.size() - 1;
         if (idx >= 0) {
             sent.add(out.id + ":" + idx);
@@ -156,7 +168,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         return out;
     }
 
-    private void flushAttachments(Entry entry, String level, String message, java.time.Instant when) {
+    private void flushAttachments(Entry entry, String level, String message, Instant when) {
         for (int i = 0; i < entry.attachments.size(); i++) {
             String key = entry.id + ":" + i;
             if (!sent.add(key)) continue;
@@ -180,6 +192,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                         filename = p.getFileName().toString();
                     }
                 } else {
+                    // Fallback: treat it as inline text payload rather than a file path
                     bytes = payload == null ? new byte[0] : payload.getBytes(StandardCharsets.UTF_8);
                 }
             } catch (Exception e) {
@@ -191,36 +204,32 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         }
     }
 
-    private static boolean shouldCreateStepItem(Entry entry) {
-        if (entry == null) return false;
-        if (hasTag(entry, RP_STEP)) return true;
+    private static boolean isRpNestScope(Entry scope) {
+        if (scope == null) return false;
 
-        String text = safe(entry.text).trim();
-        return text.regionMatches(true, 0, "STEP ", 0, 5);
-    }
+        for (String tag : scope.tags) {
+            if (tag == null) continue;
+            String t = tag.trim();
 
-    private static boolean hasTag(Entry entry, String wanted) {
-        if (entry == null || wanted == null) return false;
-        for (String tag : entry.tags) {
-            if (tag != null && wanted.equalsIgnoreCase(tag.trim())) {
-                return true;
-            }
+            if (RP_NEST.equalsIgnoreCase(t)) return true;
+            if (t.regionMatches(true, 0, RP_NEST + ":", 0, RP_NEST.length() + 1)) return true;
         }
         return false;
     }
 
-    private static String resolveSuiteName(Entry scope, Entry entry) {
-        Object fromScope = scope == null ? null : scope.fields.get(RP_SUITE);
-        if (fromScope != null && !String.valueOf(fromScope).isBlank()) {
-            return String.valueOf(fromScope);
-        }
+    private static String extractSuiteName(Entry scope) {
+        if (scope == null) return null;
 
-        Object fromEntry = entry == null ? null : entry.fields.get(RP_SUITE);
-        if (fromEntry != null && !String.valueOf(fromEntry).isBlank()) {
-            return String.valueOf(fromEntry);
-        }
+        for (String tag : scope.tags) {
+            if (tag == null) continue;
+            String t = tag.trim();
 
-        return DEFAULT_SUITE_NAME;
+            if (t.regionMatches(true, 0, RP_NEST + ":", 0, RP_NEST.length() + 1)) {
+                String suffix = t.substring(RP_NEST.length() + 1).trim();
+                return suffix.isEmpty() ? null : suffix;
+            }
+        }
+        return null;
     }
 
     private static boolean isBase64Attachment(String mime) {
@@ -244,9 +253,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         if (isExistingPath(payload)) {
             try {
                 return Path.of(payload).getFileName().toString();
-            } catch (Exception ignored) {
-                // ignore
-            }
+            } catch (Exception ignored) { }
         }
 
         if (mime != null) {
@@ -267,10 +274,6 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                 : (payload.length() <= 32 ? payload : payload.substring(0, 32) + "...");
 
         return "name='" + a.name() + "', mime='" + a.mime() + "', payload='" + preview + "'";
-    }
-
-    private static boolean isRpNestScope(Entry scope) {
-        return hasTag(scope, RP_NEST);
     }
 
     private static String formatNestedSpan(Entry entry) {

@@ -144,7 +144,8 @@ public class CurrentScenarioState extends ScenarioMapping {
         pickleballLog.info("Starting scenario: '" + scenarioName + "'");
         scenarioLog =
                 Entry.of(scenarioName)
-                        .tag("SCENARIO").tag("RP_NEST")
+                        .tag("SCENARIO")
+                        .tag("RP_NEST:Scenarios_root")
                         .on(new SimpleHtmlReportConverter(
                                 Path.of("reports/tests", safeFileName(scenarioName + ".html"))
                         ))
