@@ -38,10 +38,10 @@ public final class ReportPortalBridge {
     private static volatile ReportPortal rp;
     private static volatile Launch launch;
 
-    /** Launch UUID promise (Maybe<String>) */
+    /** launch UUID promise */
     private static volatile Maybe<String> launchUuid = Maybe.empty();
 
-    /** Each thread has its own stack of currently opened RP items */
+    /** each thread has its own stack of currently opened RP items */
     private static final ThreadLocal<Deque<Maybe<String>>> ITEM_STACK =
             ThreadLocal.withInitial(ArrayDeque::new);
 
@@ -77,7 +77,7 @@ public final class ReportPortalBridge {
     }
 
     // -----------------------------
-    // Init / config
+    // init / config
     // -----------------------------
 
     public static void initIfNeeded() {
@@ -93,8 +93,8 @@ public final class ReportPortalBridge {
                     .withParameters(params)
                     .build();
 
-            // Trust the built client instead of trying to reinterpret rp.enable ourselves.
-            enabled = rp != null && rp.getClient() != null;
+            // If rp.enable is missing, default to enabled.
+            enabled = Optional.ofNullable(rp.getParameters().getEnable()).orElse(true);
 
             if (!enabled) {
                 launch = Launch.NOOP_LAUNCH;
@@ -122,13 +122,9 @@ public final class ReportPortalBridge {
     }
 
     // -----------------------------
-    // Launch lifecycle
+    // launch lifecycle
     // -----------------------------
 
-    /**
-     * Start launch if needed. Returns a launch UUID promise (Maybe<String>).
-     * Idempotent.
-     */
     public static Maybe<String> startLaunchIfNeeded(String launchNameOverride, Set<ItemAttributesRQ> attributes) {
         initIfNeeded();
         if (!enabled) return Maybe.empty();
@@ -160,7 +156,6 @@ public final class ReportPortalBridge {
         synchronized (INIT_LOCK) {
             if (launch == null || launch == Launch.NOOP_LAUNCH) return;
 
-            // Best effort: finish anything still open on this thread before closing launch.
             finishAllOpenItems(status);
 
             FinishExecutionRQ rq = new FinishExecutionRQ();
@@ -176,25 +171,10 @@ public final class ReportPortalBridge {
     }
 
     // -----------------------------
-    // Item lifecycle
+    // item lifecycle
     // -----------------------------
 
-    /**
-     * Starts an item under the current parent item (if present) or as a root item under launch.
-     * Returns item UUID promise (Maybe<String>).
-     */
     public static Maybe<String> startItem(String name, String type, Set<ItemAttributesRQ> attributes) {
-        return startItem(name, type, attributes, null);
-    }
-
-    /**
-     * Starts an item under the current parent item (if present) or as a root item under launch.
-     * If hasStats is false, ReportPortal treats it as a nested step.
-     */
-    public static Maybe<String> startItem(String name,
-                                          String type,
-                                          Set<ItemAttributesRQ> attributes,
-                                          Boolean hasStats) {
         ensureLaunchStarted();
         if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH) return Maybe.empty();
 
@@ -205,9 +185,6 @@ public final class ReportPortalBridge {
 
         if (attributes != null && !attributes.isEmpty()) {
             rq.setAttributes(attributes);
-        }
-        if (hasStats != null) {
-            rq.setHasStats(hasStats);
         }
 
         Deque<Maybe<String>> stack = ITEM_STACK.get();
@@ -246,7 +223,7 @@ public final class ReportPortalBridge {
     }
 
     // -----------------------------
-    // Logging
+    // logging
     // -----------------------------
 
     /**
@@ -286,9 +263,9 @@ public final class ReportPortalBridge {
     /**
      * Log with attachment bytes.
      *
-     * Uses a temp file because current ReportPortal helper APIs already support
-     * ReportPortalMessage(File/String) flow cleanly. Do NOT delete the file immediately:
-     * async reporting may still be reading it.
+     * Uses a temp file because ReportPortalMessage(File, message) is the simplest
+     * stable path here. The file is NOT deleted immediately because async reporting
+     * may still be reading it.
      */
     public static void logAttachment(String level, String message, byte[] bytes, String filenameHint) {
         ensureLaunchStarted();
@@ -314,21 +291,33 @@ public final class ReportPortalBridge {
             file.deleteOnExit();
 
             if (currentItem == null) {
-                launch.log(launchId -> ReportPortal.toSaveLogRQ(
-                        launchId,
-                        null,
-                        lvl,
-                        now,
-                        new ReportPortalMessage(file, msg)
-                ));
+                launch.log(launchId -> {
+                    try {
+                        return ReportPortal.toSaveLogRQ(
+                                launchId,
+                                null,
+                                lvl,
+                                now,
+                                new ReportPortalMessage(file, msg)
+                        );
+                    } catch (IOException e) {
+                        throw new UncheckedIOException("Failed to build ReportPortal launch attachment log", e);
+                    }
+                });
             } else {
-                launch.log(currentItem, itemId -> ReportPortal.toSaveLogRQ(
-                        null,
-                        itemId,
-                        lvl,
-                        now,
-                        new ReportPortalMessage(file, msg)
-                ));
+                launch.log(currentItem, itemId -> {
+                    try {
+                        return ReportPortal.toSaveLogRQ(
+                                null,
+                                itemId,
+                                lvl,
+                                now,
+                                new ReportPortalMessage(file, msg)
+                        );
+                    } catch (IOException e) {
+                        throw new UncheckedIOException("Failed to build ReportPortal item attachment log", e);
+                    }
+                });
             }
 
         } catch (IOException e) {
@@ -337,20 +326,15 @@ public final class ReportPortalBridge {
     }
 
     // -----------------------------
-    // Attributes / tags
+    // attributes / tags
     // -----------------------------
 
-    /**
-     * Best practice: apply attributes when starting the item.
-     * Kept as a no-op to preserve API surface.
-     */
     public static void addAttributesToCurrent(Set<ItemAttributesRQ> attributes) {
-        // Not supported by this bridge as an update-after-start operation.
-        // Apply attributes in startItem(...).
+        // no-op by design; apply attributes at startItem(...)
     }
 
     // -----------------------------
-    // Helpers
+    // helpers
     // -----------------------------
 
     private static String fallback(String s, String def) {

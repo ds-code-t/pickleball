@@ -20,38 +20,39 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
     private static final String RP_NEST_TAG = "RP_NEST";
 
+    /** prevent duplicate launch/test item start for root scenario entries */
+    private final Set<String> startedRootItems = ConcurrentHashMap.newKeySet();
+
+    /** prevent duplicate root finish */
+    private final Set<String> finishedRootItems = ConcurrentHashMap.newKeySet();
+
+    /** prevent duplicate attachment sends */
     private final Set<String> sentAttachments = ConcurrentHashMap.newKeySet();
-    private final Set<String> startedRpItems = ConcurrentHashMap.newKeySet();
-    private final Set<String> finishedRpItems = ConcurrentHashMap.newKeySet();
 
     @Override
     public void onStart(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
         ReportPortalBridge.startLaunchIfNeeded(null, null);
 
-        // Ensure the scenario/root RP item exists before any nested RP child starts.
-        if (isRpNest(scope)) {
-            ensureRpItemStarted(scope);
+        // Root RP_NEST span becomes the real RP TEST item.
+        if (isRootRpSpan(entry)) {
+            ensureRootRpItemStarted(entry);
+            ReportPortalBridge.throwIfAsyncFailure();
         }
 
-        if (!isRpNest(entry)) {
-            return;
-        }
-
-        ensureRpItemStarted(entry);
-        ReportPortalBridge.throwIfAsyncFailure();
+        // Nested RP_NEST spans are buffered only and logged once on stop().
     }
 
     @Override
     public void onTimestamp(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
 
-        // Ensure root/scenario RP item exists even if the first thing we see is a timestamped child log.
-        if (isRpNest(scope)) {
-            ensureRpItemStarted(scope);
+        Entry rootRp = nearestRootRpSpan(scope != null ? scope : entry);
+        if (rootRp != null) {
+            ensureRootRpItemStarted(rootRp);
         }
 
-        // If this event lives inside a non-RP span, buffer it until that span stops.
+        // If this event lives inside a buffered span, suppress immediate emission.
         if (isInsideBufferedSpan(entry)) {
             return;
         }
@@ -63,18 +64,10 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
             if (!sentAttachments.add(key)) continue;
 
             Attachment a = entry.attachments.get(i);
+            byte[] bytes = tryReadAttachmentBytes(a);
+            if (bytes == null) continue;
 
-            byte[] bytes;
-            try {
-                bytes = Files.readAllBytes(Path.of(a.path()));
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to read attachment: " + a.path(), e);
-            }
-
-            String filename = (a.name() == null || a.name().isBlank())
-                    ? Path.of(a.path()).getFileName().toString()
-                    : a.name();
-
+            String filename = attachmentName(a);
             ReportPortalBridge.logAttachment(level(entry.level), entry.text, bytes, filename);
             ReportPortalBridge.throwIfAsyncFailure();
         }
@@ -84,26 +77,36 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     public void onStop(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
 
-        // Make sure the scenario/root item exists before summary logging.
-        if (isRpNest(scope)) {
-            ensureRpItemStarted(scope);
+        Entry rootRp = nearestRootRpSpan(scope != null ? scope : entry);
+        if (rootRp != null) {
+            ensureRootRpItemStarted(rootRp);
         }
 
-        if (entry.parent == null) {
-            String rowKey = GlobalState.getCurrentScenarioState().id.toString();
-            renderScenarioSummary(scope, rowKey);
-        }
+        // Root RP_NEST span closes the real RP TEST item.
+        if (isRootRpSpan(entry)) {
+            if (entry.parent == null) {
+                String rowKey = GlobalState.getCurrentScenarioState().id.toString();
+                renderScenarioSummary(scope, rowKey);
+            }
 
-        if (isRpNest(entry)) {
-            if (finishedRpItems.add(entry.id)) {
-                ensureRpItemStarted(entry);
+            if (finishedRootItems.add(entry.id)) {
                 ReportPortalBridge.finishCurrentItem(status(entry.status));
                 ReportPortalBridge.throwIfAsyncFailure();
             }
             return;
         }
 
-        // Only the outermost buffered span emits the flattened summary.
+        // Nested RP_NEST spans stay as Entry spans only.
+        // Only the outermost buffered span emits, to avoid duplication.
+        if (isRpNest(entry)) {
+            if (!hasBufferedSpanAncestor(entry.parent)) {
+                ReportPortalBridge.log(level(entry.level), flattenSpan(entry));
+                ReportPortalBridge.throwIfAsyncFailure();
+            }
+            return;
+        }
+
+        // Same buffered behavior for non-RP spans.
         if (isSpan(entry) && !hasBufferedSpanAncestor(entry.parent)) {
             ReportPortalBridge.log(level(entry.level), flattenSpan(entry));
             ReportPortalBridge.throwIfAsyncFailure();
@@ -127,15 +130,15 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
     @Override
     protected void onClose() {
-        // Intentionally no-op.
-        // The launch should be finished once per whole run, not per scenario converter instance.
+        // no-op
+        // finish the launch once per whole run, not per scenario converter
     }
 
     @Override
     public Entry screenshot(Entry entry, WebDriver driver, String name) {
-        Entry rpScope = nearestRpNest(entry);
-        if (rpScope != null) {
-            ensureRpItemStarted(rpScope);
+        Entry rootRp = nearestRootRpSpan(entry);
+        if (rootRp != null) {
+            ensureRootRpItemStarted(rootRp);
         }
 
         String b64 = ((TakesScreenshot) driver).getScreenshotAs(OutputType.BASE64);
@@ -144,8 +147,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                 ? "screenshot.png"
                 : (name.endsWith(".png") ? name : name + ".png");
 
-        // If inside a buffered span, keep it attached to the Entry only.
-        // The flattened stop-summary will mention attachments.
+        // If inside a buffered span, keep it attached only to the Entry tree.
         if (!isInsideBufferedSpan(entry)) {
             ReportPortalBridge.logAttachment("INFO", "Screenshot", Base64.getDecoder().decode(b64), filename);
             ReportPortalBridge.throwIfAsyncFailure();
@@ -154,34 +156,28 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         return entry.attach(name, "image/png;base64", b64);
     }
 
-    private void ensureRpItemStarted(Entry entry) {
-        if (entry == null || !isRpNest(entry)) {
-            return;
-        }
-        if (!startedRpItems.add(entry.id)) {
-            return;
-        }
+    private void ensureRootRpItemStarted(Entry entry) {
+        if (!isRootRpSpan(entry)) return;
+        if (!startedRootItems.add(entry.id)) return;
 
-        boolean root = entry.parent == null;
-
-        // Keep root item behavior close to your previous implementation.
-        String type = root ? "TEST" : "STEP";
-
-        // ReportPortal nested steps are STEP items with hasStats=false.
-        Boolean hasStats = root ? null : Boolean.FALSE;
-
-        ReportPortalBridge.startItem(entry.text, type, null, hasStats);
+        ReportPortalBridge.startItem(entry.text, "TEST", null);
     }
 
-    private static Entry nearestRpNest(Entry entry) {
+    private static Entry nearestRootRpSpan(Entry entry) {
         for (Entry e = entry; e != null; e = e.parent) {
-            if (isRpNest(e)) return e;
+            if (isRootRpSpan(e)) {
+                return e;
+            }
         }
         return null;
     }
 
     private static boolean isRpNest(Entry entry) {
         return hasTag(entry, RP_NEST_TAG);
+    }
+
+    private static boolean isRootRpSpan(Entry entry) {
+        return entry != null && entry.parent == null && isRpNest(entry);
     }
 
     private static boolean hasTag(Entry entry, String wantedTag) {
@@ -199,10 +195,20 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         return entry != null && entry.startedAt != null;
     }
 
+    /**
+     * Buffered span ancestors are:
+     * - any nested RP_NEST span
+     * - any non-RP span
+     *
+     * Root RP_NEST is NOT buffered; it is the real RP TEST item.
+     */
     private static boolean hasBufferedSpanAncestor(Entry entry) {
         for (Entry e = entry; e != null; e = e.parent) {
-            if (isRpNest(e)) {
+            if (isRootRpSpan(e)) {
                 return false;
+            }
+            if (isRpNest(e)) {
+                return true;
             }
             if (isSpan(e)) {
                 return true;
@@ -215,10 +221,52 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         return hasBufferedSpanAncestor(entry.parent);
     }
 
+    private static byte[] tryReadAttachmentBytes(Attachment a) {
+        if (a == null) return null;
+
+        try {
+            String path = a.path();
+            if (path == null || path.isBlank()) return null;
+
+            Path p = Path.of(path);
+            if (!Files.exists(p) || Files.isDirectory(p)) return null;
+
+            return Files.readAllBytes(p);
+        } catch (Exception ignored) {
+            // Ignore non-file attachments here.
+            // Base64 screenshots are already handled directly in screenshot(...).
+            return null;
+        }
+    }
+
+    private static String attachmentName(Attachment a) {
+        if (a == null) return "attachment";
+
+        try {
+            if (a.name() != null && !a.name().isBlank()) {
+                return a.name();
+            }
+        } catch (Exception ignored) { }
+
+        try {
+            String path = a.path();
+            if (path != null && !path.isBlank()) {
+                return Path.of(path).getFileName().toString();
+            }
+        } catch (Exception ignored) { }
+
+        return "attachment";
+    }
+
     private static String flattenSpan(Entry entry) {
         StringBuilder sb = new StringBuilder(1024);
 
-        sb.append("SPAN: ").append(nullSafe(entry.text)).append('\n');
+        if (isRpNest(entry)) {
+            sb.append("RP_NEST SPAN: ").append(nullSafe(entry.text)).append('\n');
+        } else {
+            sb.append("SPAN: ").append(nullSafe(entry.text)).append('\n');
+        }
+
         sb.append("- status: ").append(status(entry.status)).append('\n');
 
         if (entry.startedAt != null) {
@@ -240,7 +288,24 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     private static void appendChildren(StringBuilder sb, Entry parent, String indent) {
         for (Entry child : parent.children) {
             if (isRpNest(child)) {
-                sb.append(indent).append("[RP_NEST] ").append(nullSafe(child.text)).append('\n');
+                sb.append(indent)
+                        .append("[RP_NEST SPAN] ")
+                        .append(nullSafe(child.text))
+                        .append(" | status=").append(status(child.status));
+
+                if (child.startedAt != null) {
+                    sb.append(" | started=").append(child.startedAt);
+                }
+                if (child.stoppedAt != null) {
+                    sb.append(" | stopped=").append(child.stoppedAt);
+                }
+                if (child.startedAt != null) {
+                    sb.append(" | duration=").append(child.durationFormatted());
+                }
+                sb.append('\n');
+
+                appendAttachments(sb, child, indent + "  ");
+                appendChildren(sb, child, indent + "  ");
                 continue;
             }
 
@@ -281,7 +346,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
     private static void appendAttachments(StringBuilder sb, Entry entry, String indent) {
         for (Attachment a : entry.attachments) {
-            String name = (a.name() == null || a.name().isBlank()) ? "attachment" : a.name();
+            String name = attachmentName(a);
             sb.append(indent).append("[ATTACHMENT] ").append(name).append('\n');
         }
     }
