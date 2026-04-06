@@ -219,26 +219,20 @@ public final class ReportPortalBridge {
 
     public static void log(String level, String message) {
         initIfNeeded();
-        if (!enabled) return;
+        if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH) return;
 
         String lvl = Optional.ofNullable(blankToNull(level)).orElse("INFO");
         String msg = fallback(message, "");
-
-        Maybe<String> currentItem = ITEM_STACK.get().peekLast();
         Date now = Date.from(Instant.now());
 
-        if (currentItem == null) {
-            // Launch-level log
-            launch.log(launchId -> {
-                SaveLogRQ rq = new SaveLogRQ();
-                rq.setLaunchUuid(launchId);
-                rq.setLevel(lvl);
-                rq.setLogTime(now);
-                rq.setMessage(msg);
-                return rq;
-            });
-        } else {
-            // Item-level log
+        // Preferred path: use the active ReportPortal logging context for the current item.
+        if (ReportPortal.emitLog(msg, lvl, now)) {
+            return;
+        }
+
+        // Fallback: explicit item routing via our own stack.
+        Maybe<String> currentItem = ITEM_STACK.get().peekLast();
+        if (currentItem != null) {
             launch.log(currentItem, itemId -> {
                 SaveLogRQ rq = new SaveLogRQ();
                 rq.setItemUuid(itemId);
@@ -247,7 +241,11 @@ public final class ReportPortalBridge {
                 rq.setMessage(msg);
                 return rq;
             });
+            return;
         }
+
+        // Final fallback: launch-level log.
+        ReportPortal.emitLaunchLog(msg, lvl, now);
     }
 
     public static void logAttachment(String level, String message, byte[] bytes, String filenameHint) {
@@ -257,8 +255,6 @@ public final class ReportPortalBridge {
         String lvl = Optional.ofNullable(blankToNull(level)).orElse("INFO");
         String msg = Optional.ofNullable(blankToNull(message)).orElse("attachment");
         byte[] data = Objects.requireNonNullElseGet(bytes, () -> new byte[0]);
-
-        Maybe<String> currentItem = ITEM_STACK.get().peekLast();
         Date now = Date.from(Instant.now());
 
         Path tmp = null;
@@ -270,15 +266,15 @@ public final class ReportPortalBridge {
             Files.write(tmp, data);
             File file = tmp.toFile();
 
-            if (currentItem == null) {
-                launch.log(launchId -> {
-                    try {
-                        return ReportPortal.toSaveLogRQ(launchId, null, lvl, now, new ReportPortalMessage(file, msg));
-                    } catch (IOException e) {
-                        throw new UncheckedIOException("Failed to build ReportPortal launch attachment log", e);
-                    }
-                });
-            } else {
+            Maybe<String> currentItem = ITEM_STACK.get().peekLast();
+
+            if (currentItem != null) {
+                // Preferred path: active ReportPortal item context
+                if (ReportPortal.emitLog(new ReportPortalMessage(file, msg), lvl, now)) {
+                    return;
+                }
+
+                // Fallback: explicit item routing
                 launch.log(currentItem, itemId -> {
                     try {
                         return ReportPortal.toSaveLogRQ(null, itemId, lvl, now, new ReportPortalMessage(file, msg));
@@ -286,7 +282,22 @@ public final class ReportPortalBridge {
                         throw new UncheckedIOException("Failed to build ReportPortal item attachment log", e);
                     }
                 });
+                return;
             }
+
+            // Preferred launch-level path
+            if (ReportPortal.emitLaunchLog(new ReportPortalMessage(file, msg), lvl, now)) {
+                return;
+            }
+
+            // Final launch-level fallback
+            launch.log(launchId -> {
+                try {
+                    return ReportPortal.toSaveLogRQ(launchId, null, lvl, now, new ReportPortalMessage(file, msg));
+                } catch (IOException e) {
+                    throw new UncheckedIOException("Failed to build ReportPortal launch attachment log", e);
+                }
+            });
 
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to write ReportPortal attachment temp file", e);

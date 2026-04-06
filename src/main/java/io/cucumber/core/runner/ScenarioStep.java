@@ -7,10 +7,12 @@ import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.ParsingMap;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
 import static io.cucumber.core.runner.GlobalState.getGivenKeyword;
 import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.createPickleStepTestStepsFromPickle;
@@ -89,6 +91,35 @@ public class ScenarioStep extends StepExtension {
             }
             nestingMap.put(currentNesting, currentStep);
             lastNestingLevel = currentNesting;
+        }
+
+        for (int s = 0; s < size; s++) {
+            StepExtension currentStep = steps.get(s);
+            if(currentStep.isDynamicStep &&
+                    currentStep.nextSibling != null &&
+                    currentStep.nextSibling.isDynamicStep &&
+                    currentStep.getUnmodifiedText().trim().endsWith(",")
+            ){
+                StepExtension nextStep = currentStep;
+                String newStepText = ",";
+                List<StepBase> childList = new ArrayList<>();
+
+                    while(newStepText.endsWith(",") && nextStep != null && nextStep.isDynamicStep)
+                    {
+                        s++;
+                        newStepText += nextStep.getUnmodifiedText().trim().substring(1);
+                        nextStep = (StepExtension) nextStep.nextSibling;
+                        childList.addAll(nextStep.childSteps);
+                    }
+                StepExtension newStep = new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep, pickleStepTestStep.getStep().getKeyword(), newStepText, getGherkinArgumentText(pickleStepTestStep.getStep())));
+                newStep.setStepParsingMap(getStepParsingMap());
+                currentStep.parentStep.childSteps.add(currentStep.parentStep.childSteps.indexOf(currentStep), newStep);
+                newStep.parentStep = currentStep.parentStep;
+                newStep.childSteps.addAll(childList);
+                newStep.previousSibling = currentStep.previousSibling;
+                newStep.nextSibling = nextStep.previousSibling;
+            }
+
         }
     }
 
