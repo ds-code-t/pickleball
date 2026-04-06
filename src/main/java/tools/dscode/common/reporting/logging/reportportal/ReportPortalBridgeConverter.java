@@ -129,7 +129,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
         Entry out = entry.attach(filename, "image/png;base64", b64);
 
-        // Prevent later attachment flushing from trying to read the base64 payload as a filesystem path.
+        // Prevent later flushAttachments(...) from trying to read the base64 payload as a file path
         int idx = out.attachments.size() - 1;
         if (idx >= 0) {
             sent.add(out.id + ":" + idx);
