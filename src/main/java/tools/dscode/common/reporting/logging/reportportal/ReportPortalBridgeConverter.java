@@ -12,7 +12,7 @@ import tools.dscode.common.reporting.logging.Status;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -28,19 +28,28 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         ReportPortalBridge.throwIfAsyncFailure();
         ReportPortalBridge.startLaunchIfNeeded(null, null);
 
-        if (shouldOpenRpItem(scope, entry)) {
-            String type = (entry.parent == null) ? "TEST" : "STEP";
-            ReportPortalBridge.startItem(entry.text, type, null, entry.startedAt);
-            ReportPortalBridge.throwIfAsyncFailure();
+        if (isRpNestScope(scope)) {
+            // Only the tagged scope itself owns the RP test item lifecycle.
+            if (scope == entry) {
+                String type = (entry.parent == null) ? "TEST" : "STEP";
+                ReportPortalBridge.startItem(entry.text, type, null);
+                ReportPortalBridge.throwIfAsyncFailure();
+            }
+            return;
         }
+
+        // Original behavior for non-RP_NEST scopes.
+        String type = (entry.parent == null) ? "TEST" : "STEP";
+        ReportPortalBridge.startItem(entry.text, type, null);
+        ReportPortalBridge.throwIfAsyncFailure();
     }
 
     @Override
     public void onTimestamp(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
 
-        ReportPortalBridge.log(level(entry.level), entry.text, entry.timestampedAt);
-        flushAttachments(entry, entry.timestampedAt, level(entry.level), entry.text);
+        ReportPortalBridge.log(level(entry.level), entry.text);
+        flushAttachments(entry, level(entry.level), entry.text);
 
         ReportPortalBridge.throwIfAsyncFailure();
     }
@@ -49,22 +58,35 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     public void onStop(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
 
+        if (isRpNestScope(scope)) {
+            if (scope == entry) {
+                // Closing the real RP test item for the scenario/root scope.
+                if (entry.parent == null) {
+                    String rowKey = GlobalState.getCurrentScenarioState().id.toString();
+                    renderScenarioSummary(scope, rowKey);
+                }
+
+                flushAttachments(entry, levelForStop(entry), entry.text);
+                ReportPortalBridge.finishCurrentItem(status(entry.status));
+                ReportPortalBridge.throwIfAsyncFailure();
+                return;
+            }
+
+            // Descendant span inside RP_NEST scope:
+            // do NOT create/finish RP child items; just log summary inside the scenario item.
+            flushAttachments(entry, levelForStop(entry), entry.text);
+            ReportPortalBridge.log(levelForStop(entry), formatNestedSpan(entry));
+            ReportPortalBridge.throwIfAsyncFailure();
+            return;
+        }
+
+        // Original behavior for non-RP_NEST scopes.
         if (entry.parent == null) {
             String rowKey = GlobalState.getCurrentScenarioState().id.toString();
             renderScenarioSummary(scope, rowKey);
         }
 
-        if (shouldOpenRpItem(scope, entry)) {
-            flushAttachments(entry, entry.stoppedAt, levelForStop(entry), entry.text);
-            ReportPortalBridge.finishCurrentItem(status(entry.status), entry.stoppedAt);
-        } else {
-            flushAttachments(entry, entry.stoppedAt, levelForStop(entry), entry.text);
-
-            if (shouldEmitSpanStopSummary(entry)) {
-                ReportPortalBridge.log(levelForStop(entry), formatSpanStop(entry), entry.stoppedAt);
-            }
-        }
-
+        ReportPortalBridge.finishCurrentItem(status(entry.status));
         ReportPortalBridge.throwIfAsyncFailure();
     }
 
@@ -80,7 +102,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                     .append('\n');
         }
 
-        ReportPortalBridge.log("INFO", sb.toString(), Instant.now());
+        ReportPortalBridge.log("INFO", sb.toString());
     }
 
     @Override
@@ -99,19 +121,11 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                 ? "screenshot.png"
                 : (name.endsWith(".png") ? name : name + ".png");
 
-        ReportPortalBridge.logAttachment(
-                "INFO",
-                "Screenshot",
-                Base64.getDecoder().decode(b64),
-                filename,
-                Instant.now()
-        );
-        ReportPortalBridge.throwIfAsyncFailure();
+        ReportPortalBridge.logAttachment("INFO", "Screenshot", Base64.getDecoder().decode(b64), filename);
 
         Entry out = entry.attach(filename, "image/png;base64", b64);
 
-        // Mark this just-added attachment as already sent so a later timestamp()/stop()
-        // does not try to re-read the base64 string as if it were a file path.
+        // Prevent later attachment flushing from trying to read the base64 payload as a filesystem path.
         int idx = out.attachments.size() - 1;
         if (idx >= 0) {
             sent.add(out.id + ":" + idx);
@@ -120,7 +134,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         return out;
     }
 
-    private void flushAttachments(Entry entry, Instant when, String level, String message) {
+    private void flushAttachments(Entry entry, String level, String message) {
         for (int i = 0; i < entry.attachments.size(); i++) {
             String key = entry.id + ":" + i;
             if (!sent.add(key)) continue;
@@ -138,76 +152,51 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                     ? Path.of(a.path()).getFileName().toString()
                     : a.name();
 
-            ReportPortalBridge.logAttachment(level, message, bytes, filename, when);
+            ReportPortalBridge.logAttachment(level, message, bytes, filename);
             ReportPortalBridge.throwIfAsyncFailure();
         }
     }
 
-    /**
-     * Open an RP item only when:
-     * - the entry itself is tagged RP_NEST, OR
-     * - we are not inside an RP_NEST ancestor scope at all (preserves old behavior outside RP_NEST usage).
-     *
-     * Effect:
-     * - scenario/root tagged RP_NEST becomes the ReportPortal test item
-     * - ordinary descendants inside that RP_NEST scope are logged inside the test, not created as nested tests
-     * - if you intentionally tag a child span with RP_NEST, that child will open its own RP item
-     */
-    private static boolean shouldOpenRpItem(Entry scope, Entry entry) {
-        return isRpNest(entry) || !isDescendantOfRpNestScope(scope, entry);
-    }
-
-    private static boolean isDescendantOfRpNestScope(Entry scope, Entry entry) {
-        return scope != null && entry != null && scope != entry && isRpNest(scope);
-    }
-
-    private static boolean isRpNest(Entry entry) {
-        if (entry == null) return false;
-        for (String tag : entry.tags) {
-            if (tag != null && RP_NEST.equalsIgnoreCase(tag)) {
+    private static boolean isRpNestScope(Entry scope) {
+        if (scope == null) return false;
+        for (String tag : scope.tags) {
+            if (tag != null && RP_NEST.equalsIgnoreCase(tag.trim())) {
                 return true;
             }
         }
         return false;
     }
 
-    /**
-     * For descendant spans inside an RP_NEST scenario, avoid noisy duplicate logs for the common pattern:
-     * scenarioLog.logWithType(...).start() ... stop()
-     *
-     * That pattern already emitted a timestamp log before start(), so on stop() we only add another log when
-     * there is useful extra information to preserve.
-     */
-    private static boolean shouldEmitSpanStopSummary(Entry entry) {
-        return entry.timestampedAt == null
-                || entry.status == Status.FAIL
-                || entry.status == Status.SKIP
-                || !entry.fields.isEmpty();
-    }
-
-    private static String formatSpanStop(Entry entry) {
+    private static String formatNestedSpan(Entry entry) {
         StringBuilder sb = new StringBuilder(256);
 
-        sb.append("SPAN");
-        sb.append(" [").append(status(entry.status)).append("] ");
         sb.append(entry.text == null ? "" : entry.text);
 
-        if (entry.startedAt != null) {
-            sb.append("\nstart: ").append(entry.startedAt);
-        }
-        if (entry.stoppedAt != null) {
-            sb.append("\nstop: ").append(entry.stoppedAt);
-        }
         if (entry.startedAt != null && entry.stoppedAt != null) {
-            sb.append("\nduration: ").append(entry.durationFormatted());
+            Duration d = Duration.between(entry.startedAt, entry.stoppedAt);
+            sb.append("\nstatus: ").append(status(entry.status));
+            sb.append("\nduration: ").append(formatDuration(d));
+        } else if (entry.stoppedAt != null) {
+            sb.append("\nstatus: ").append(status(entry.status));
         }
 
         if (!entry.fields.isEmpty()) {
             sb.append("\nfields:");
-            entry.fields.forEach((k, v) -> sb.append("\n- ").append(k).append(": ").append(v));
+            entry.fields.forEach((k, v) ->
+                    sb.append("\n- ").append(k).append(": ").append(v == null ? "" : v));
         }
 
         return sb.toString();
+    }
+
+    private static String formatDuration(Duration d) {
+        long millis = d.toMillis();
+        long hours = millis / 3_600_000;
+        long minutes = (millis % 3_600_000) / 60_000;
+        long seconds = (millis % 60_000) / 1_000;
+        long ms = millis % 1_000;
+
+        return String.format("%02d:%02d:%02d.%03d", hours, minutes, seconds, ms);
     }
 
     private static String level(Level lvl) {
