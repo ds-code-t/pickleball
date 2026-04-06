@@ -11,7 +11,6 @@ import tools.dscode.common.driver.DriverConstruction;
 import java.time.Duration;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitiveOrDefault;
 import static tools.dscode.common.variables.RunVars.resolveFromVarsOrDefault;
 import static tools.dscode.coredefinitions.ObjectRegistrationSteps.constructObjectFromParsingMap;
 

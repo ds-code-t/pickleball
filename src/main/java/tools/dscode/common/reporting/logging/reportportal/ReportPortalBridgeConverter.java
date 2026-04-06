@@ -19,15 +19,28 @@ import tools.dscode.common.reporting.logging.Status;
 
 public final class ReportPortalBridgeConverter extends BaseConverter {
 
+    private static final String RP_NEST_TAG = "RP_NEST";
+
     private final Set<String> sent = ConcurrentHashMap.newKeySet();
+
+    /**
+     * Tracks only entries that actually opened a real ReportPortal item,
+     * so onStop() only closes those.
+     */
+    private final Set<String> startedRpItems = ConcurrentHashMap.newKeySet();
 
     @Override
     public void onStart(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
         ReportPortalBridge.startLaunchIfNeeded(null, null);
 
+        if (!shouldCreateRpItem(entry)) {
+            return;
+        }
+
         String type = (entry.parent == null) ? "TEST" : "STEP";
         ReportPortalBridge.startItem(entry.text, type, null);
+        startedRpItems.add(entry.id);
         ReportPortalBridge.throwIfAsyncFailure();
     }
 
@@ -67,14 +80,14 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
             renderScenarioSummary(scope, rowKey);
         }
 
-        ReportPortalBridge.finishCurrentItem(status(entry.status));
-        ReportPortalBridge.throwIfAsyncFailure();
+        if (startedRpItems.remove(entry.id)) {
+            ReportPortalBridge.finishCurrentItem(status(entry.status));
+            ReportPortalBridge.throwIfAsyncFailure();
+        }
     }
 
     @Override
     protected void onScenarioSummary(Entry scope, String rowKey, RowData data) {
-        // ReportPortal is happiest with readable text/markdown-ish logs.
-        // Keep it compact: one line per column.
         StringBuilder sb = new StringBuilder(1024);
         sb.append("Scenario Summary\n");
 
@@ -105,6 +118,22 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
         ReportPortalBridge.logAttachment("INFO", "Screenshot", Base64.getDecoder().decode(b64), filename);
         return entry.attach(name, "image/png;base64", b64);
+    }
+
+    private static boolean shouldCreateRpItem(Entry entry) {
+        // Always create the top-level scenario/test item.
+        return entry.parent == null || hasTag(entry, RP_NEST_TAG);
+    }
+
+    private static boolean hasTag(Entry entry, String wantedTag) {
+        if (entry == null || wantedTag == null) return false;
+
+        for (String tag : entry.tags) {
+            if (tag != null && wantedTag.equalsIgnoreCase(tag.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String level(Level lvl) {
