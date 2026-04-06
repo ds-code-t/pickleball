@@ -35,6 +35,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * - Loads configuration from reportportal.properties automatically
  * - No-ops when rp.enable=false or client can't be built
  * - Maintains per-thread item stack
+ * - Supports an optional shared SUITE item under the launch
  */
 public final class ReportPortalBridge {
 
@@ -47,6 +48,10 @@ public final class ReportPortalBridge {
 
     /** launch UUID promise (Maybe<String>) */
     private static volatile Maybe<String> launchUuid = Maybe.empty();
+
+    /** optional shared SUITE item under the launch */
+    private static volatile Maybe<String> launchSuiteUuid = Maybe.empty();
+    private static volatile boolean launchSuiteOpen;
 
     /** Each thread has its own "current item" stack (store promises, not resolved strings) */
     private static final ThreadLocal<Deque<Maybe<String>>> ITEM_STACK =
@@ -102,6 +107,8 @@ public final class ReportPortalBridge {
             if (!enabled) {
                 launch = Launch.NOOP_LAUNCH;
                 launchUuid = Maybe.empty();
+                launchSuiteUuid = Maybe.empty();
+                launchSuiteOpen = false;
             }
 
             initialized = true;
@@ -137,9 +144,92 @@ public final class ReportPortalBridge {
         return launchUuid;
     }
 
+    /**
+     * Starts one shared SUITE item under the current launch if needed.
+     * Intended to hold multiple TEST items beneath it.
+     */
+    public static Maybe<String> startLaunchSuiteIfNeeded(String suiteName,
+                                                         Set<ItemAttributesRQ> attributes,
+                                                         Instant startTime) {
+        initIfNeeded();
+        if (!enabled) return Maybe.empty();
+
+        if (launch == null || launch == Launch.NOOP_LAUNCH) {
+            startLaunchIfNeeded(null, null);
+        }
+
+        synchronized (INIT_LOCK) {
+            if (launchSuiteOpen) return launchSuiteUuid;
+
+            StartTestItemRQ rq = new StartTestItemRQ();
+            rq.setName(fallback(suiteName, "Scenarios"));
+            rq.setType("SUITE");
+            rq.setStartTime(toDate(startTime));
+            if (attributes != null && !attributes.isEmpty()) rq.setAttributes(attributes);
+
+            launchSuiteUuid = launch.startTestItem(rq);
+            launchSuiteOpen = true;
+            return launchSuiteUuid;
+        }
+    }
+
+    /**
+     * Push an existing item context onto the current thread's stack without starting a new item.
+     * Useful when a converter wants subsequent started items to be parented under an already-open suite.
+     */
+    public static void pushContext(Maybe<String> item) {
+        initIfNeeded();
+        if (!enabled || item == null) return;
+
+        Deque<Maybe<String>> stack = ITEM_STACK.get();
+        Maybe<String> last = stack.peekLast();
+        if (sameMaybe(last, item)) return;
+
+        stack.addLast(item);
+    }
+
+    /**
+     * Pops the current thread's top context if it matches the expected item.
+     * If expected is null, pops whatever is on top.
+     */
+    public static void popContext(Maybe<String> expected) {
+        initIfNeeded();
+        if (!enabled) return;
+
+        Deque<Maybe<String>> stack = ITEM_STACK.get();
+        Maybe<String> last = stack.peekLast();
+        if (last == null) return;
+
+        if (expected == null || sameMaybe(last, expected)) {
+            Maybe<String> removed = stack.pollLast();
+            if (sameMaybe(removed, launchSuiteUuid)) {
+                clearSuiteState();
+            }
+        }
+    }
+
+    public static void finishLaunchSuiteIfNeeded(String status, Instant endTime) {
+        initIfNeeded();
+        if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH) return;
+
+        synchronized (INIT_LOCK) {
+            if (!launchSuiteOpen) return;
+
+            FinishTestItemRQ rq = new FinishTestItemRQ();
+            rq.setEndTime(toDate(endTime));
+            rq.setStatus(Optional.ofNullable(blankToNull(status)).orElse("PASSED"));
+
+            launch.finishTestItem(launchSuiteUuid, rq);
+            clearSuiteState();
+        }
+    }
+
     public static void finishLaunch(String status) {
         initIfNeeded();
         if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH) return;
+
+        // Safety: finish suite too if still open
+        finishLaunchSuiteIfNeeded(status, Instant.now());
 
         ITEM_STACK.remove();
 
@@ -151,6 +241,7 @@ public final class ReportPortalBridge {
 
         launch = null;
         launchUuid = Maybe.empty();
+        clearSuiteState();
     }
 
     // -----------------------------
@@ -206,6 +297,10 @@ public final class ReportPortalBridge {
         rq.setStatus(Optional.ofNullable(blankToNull(status)).orElse("PASSED"));
 
         launch.finishTestItem(item, rq);
+
+        if (sameMaybe(item, launchSuiteUuid)) {
+            clearSuiteState();
+        }
     }
 
     public static void finishAllOpenItems(String status) {
@@ -343,6 +438,15 @@ public final class ReportPortalBridge {
 
     private static Date toDate(Instant instant) {
         return Date.from(instant != null ? instant : Instant.now());
+    }
+
+    private static boolean sameMaybe(Maybe<String> a, Maybe<String> b) {
+        return a == b || Objects.equals(a, b);
+    }
+
+    private static void clearSuiteState() {
+        launchSuiteUuid = Maybe.empty();
+        launchSuiteOpen = false;
     }
 
     private static String fallback(String s, String def) {
