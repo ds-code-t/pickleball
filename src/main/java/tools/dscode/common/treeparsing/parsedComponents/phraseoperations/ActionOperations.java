@@ -80,6 +80,20 @@ public enum ActionOperations implements OperationsInterface {
             });
         }
     },
+    GET {
+        @Override
+        public void execute(PhraseData phraseData) {
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+                    new ElementMatcher()
+                            .mustMatchAll(ElementType.RETURNS_VALUE).mustNotMatchAny(ElementType.KEY_VALUE),
+                    new ElementMatcher()
+                            .mustMatchAll(ElementType.KEY_VALUE)
+            );
+
+            ElementMatch valueElement = phraseData.resultElements.getFirst();
+            ElementMatch keyElement = phraseData.resultElements.get(1);
+        }
+    },
     SAVE {
         @Override
         public void execute(PhraseData phraseData) {

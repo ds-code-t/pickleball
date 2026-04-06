@@ -1,7 +1,6 @@
 package tools.dscode.common.reporting.logging.reportportal;
 
 import io.cucumber.core.runner.GlobalState;
-import io.reactivex.Maybe;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
@@ -13,8 +12,8 @@ import tools.dscode.common.reporting.logging.Status;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.Base64;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -23,29 +22,30 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     private static final String RP_NEST_TAG = "RP_NEST";
 
     private final Set<String> sent = ConcurrentHashMap.newKeySet();
-    private final Map<String, Maybe<String>> rpItemsByEntryId = new ConcurrentHashMap<>();
 
     @Override
     public void onStart(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
         ReportPortalBridge.startLaunchIfNeeded(null, null);
 
-        if (!hasTag(entry, RP_NEST_TAG)) {
+        if (!isRpNest(entry)) {
             return;
         }
 
-        Maybe<String> parent = nearestParentItem(entry.parent);
-        String type = (parent == null) ? "TEST" : "STEP";
-
-        Maybe<String> item = ReportPortalBridge.startItem(parent, entry.text, type, null);
-        rpItemsByEntryId.put(entry.id, item);
-
+        String type = (entry.parent == null) ? "TEST" : "STEP";
+        ReportPortalBridge.startItem(entry.text, type, null);
         ReportPortalBridge.throwIfAsyncFailure();
     }
 
     @Override
     public void onTimestamp(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
+
+        // If this event lives inside a non-RP span, buffer it until that span stops.
+        if (isInsideBufferedSpan(entry)) {
+            return;
+        }
+
         ReportPortalBridge.log(level(entry.level), entry.text);
 
         for (int i = 0; i < entry.attachments.size(); i++) {
@@ -79,31 +79,38 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
             renderScenarioSummary(scope, rowKey);
         }
 
-        Maybe<String> item = rpItemsByEntryId.remove(entry.id);
-        if (item != null) {
-            ReportPortalBridge.finishItem(item, status(entry.status));
+        if (isRpNest(entry)) {
+            ReportPortalBridge.finishCurrentItem(status(entry.status));
+            ReportPortalBridge.throwIfAsyncFailure();
+            return;
         }
 
-        ReportPortalBridge.throwIfAsyncFailure();
+        // Only the outermost buffered span emits the flattened summary.
+        if (isSpan(entry) && !hasBufferedSpanAncestor(entry.parent)) {
+            ReportPortalBridge.log(level(entry.level), flattenSpan(entry));
+            ReportPortalBridge.throwIfAsyncFailure();
+        }
     }
 
     @Override
     protected void onScenarioSummary(Entry scope, String rowKey, RowData data) {
         StringBuilder sb = new StringBuilder(1024);
         sb.append("Scenario Summary\n");
+
         for (String h : data.headers()) {
             Object v = data.valuesByHeader().get(h);
             sb.append("- ").append(h).append(": ")
                     .append(v == null ? "" : String.valueOf(v))
                     .append('\n');
         }
+
         ReportPortalBridge.log("INFO", sb.toString());
     }
 
     @Override
     protected void onClose() {
-        ReportPortalBridge.throwIfAsyncFailure();
-        // Intentionally do NOT finish the launch here if this converter is per-scenario.
+        // no-op
+        // finish the launch once per whole run, not per scenario converter
     }
 
     @Override
@@ -113,26 +120,123 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         String filename = (name == null || name.isBlank()) ? "screenshot.png"
                 : (name.endsWith(".png") ? name : name + ".png");
 
-        ReportPortalBridge.logAttachment("INFO", "Screenshot", Base64.getDecoder().decode(b64), filename);
+        // If inside a buffered span, keep it attached to the Entry only.
+        // The flattened stop-summary will mention attachments.
+        if (!isInsideBufferedSpan(entry)) {
+            ReportPortalBridge.logAttachment("INFO", "Screenshot", Base64.getDecoder().decode(b64), filename);
+        }
+
         return entry.attach(name, "image/png;base64", b64);
     }
 
-    private Maybe<String> nearestParentItem(Entry entry) {
-        for (Entry e = entry; e != null; e = e.parent) {
-            Maybe<String> item = rpItemsByEntryId.get(e.id);
-            if (item != null) return item;
-        }
-        return null;
+    private static boolean isRpNest(Entry entry) {
+        return hasTag(entry, RP_NEST_TAG);
     }
 
     private static boolean hasTag(Entry entry, String wantedTag) {
         if (entry == null || wantedTag == null) return false;
+
         for (String tag : entry.tags) {
             if (tag != null && wantedTag.equalsIgnoreCase(tag.trim())) {
                 return true;
             }
         }
         return false;
+    }
+
+    private static boolean isSpan(Entry entry) {
+        return entry != null && entry.startedAt != null;
+    }
+
+    private static boolean hasBufferedSpanAncestor(Entry entry) {
+        for (Entry e = entry; e != null; e = e.parent) {
+            if (isRpNest(e)) {
+                return false;
+            }
+            if (isSpan(e)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isInsideBufferedSpan(Entry entry) {
+        return hasBufferedSpanAncestor(entry.parent);
+    }
+
+    private static String flattenSpan(Entry entry) {
+        StringBuilder sb = new StringBuilder(1024);
+
+        sb.append("SPAN: ").append(nullSafe(entry.text)).append('\n');
+        sb.append("- status: ").append(status(entry.status)).append('\n');
+
+        if (entry.startedAt != null) {
+            sb.append("- started: ").append(entry.startedAt).append('\n');
+        }
+        if (entry.stoppedAt != null) {
+            sb.append("- stopped: ").append(entry.stoppedAt).append('\n');
+        }
+        if (entry.startedAt != null) {
+            sb.append("- duration: ").append(entry.durationFormatted()).append('\n');
+        }
+
+        appendAttachments(sb, entry, "  ");
+        appendChildren(sb, entry, "  ");
+
+        return sb.toString();
+    }
+
+    private static void appendChildren(StringBuilder sb, Entry parent, String indent) {
+        for (Entry child : parent.children) {
+            if (isRpNest(child)) {
+                sb.append(indent).append("[RP_NEST] ").append(nullSafe(child.text)).append('\n');
+                continue;
+            }
+
+            if (isSpan(child)) {
+                sb.append(indent)
+                        .append("[SPAN] ")
+                        .append(nullSafe(child.text))
+                        .append(" | status=").append(status(child.status));
+
+                if (child.startedAt != null) {
+                    sb.append(" | started=").append(child.startedAt);
+                }
+                if (child.stoppedAt != null) {
+                    sb.append(" | stopped=").append(child.stoppedAt);
+                }
+                if (child.startedAt != null) {
+                    sb.append(" | duration=").append(child.durationFormatted());
+                }
+                sb.append('\n');
+
+                appendAttachments(sb, child, indent + "  ");
+                appendChildren(sb, child, indent + "  ");
+            } else {
+                sb.append(indent).append("- ").append(nullSafe(child.text));
+
+                if (child.level != null) {
+                    sb.append(" [").append(level(child.level)).append(']');
+                }
+                if (child.timestampedAt != null) {
+                    sb.append(" @ ").append(child.timestampedAt);
+                }
+                sb.append('\n');
+
+                appendAttachments(sb, child, indent + "  ");
+            }
+        }
+    }
+
+    private static void appendAttachments(StringBuilder sb, Entry entry, String indent) {
+        for (Attachment a : entry.attachments) {
+            String name = (a.name() == null || a.name().isBlank()) ? "attachment" : a.name();
+            sb.append(indent).append("[ATTACHMENT] ").append(name).append('\n');
+        }
+    }
+
+    private static String nullSafe(String s) {
+        return s == null ? "" : s;
     }
 
     private static String level(Level lvl) {

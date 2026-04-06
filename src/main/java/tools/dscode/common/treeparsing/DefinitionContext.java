@@ -224,7 +224,7 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite|clear|save|creates? and attach|attach|switch|close|accept|dismiss)(?:s|ed|ing|es)?\\b") {
+        ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite|clear|save|get|create and attach|attach|switch|close|accept|dismiss)(?:s|es)?\\b") {
             @Override
             public String onCapture(MatchNode self) {
                 self.parent().putToLocalState("action", self.resolvedGroupText("base"));
@@ -244,7 +244,6 @@ public final class DefinitionContext {
             }
         };
 
-//        ParseNode assertion = new ParseNode("\\b(?:starts?\\s+with|ends?\\s+with|contains?|match(?:es)?|required|(non-?)?required|displayed|collapsed|expanded|(?:un)?selected|(?:un)?checked|enabled|disabled|equals?|less\\s+than|greater\\s+than|has\\s+values?|(?:has|is)\\s+blank|is\\s+on|is\\s+off)\\b")
         ParseNode assertion = new ParseNode("\\b(?:starts?\\s+with|ends?\\s+with|contains?|match(?:es)?|required|(non-?)?required|displayed|present|collapsed|expanded|(?:un)?selected|(?:un)?checked|enabled|disabled|equals?|less\\s+than|greater\\s+than|(?:has|is)\\s+(?:<<no>>\\s+)?(?:values?|blank|on|off))\\b") {
             @Override
             public String onCapture(MatchNode self) {
