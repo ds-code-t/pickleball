@@ -1,6 +1,12 @@
 Feature: Addition
 
-
+  @zz22
+  Scenario: sente test1
+#  @[DEBUG,##]
+    * navigate to: URL.textbox
+    * Scenario Log: exlog1 a= '<A>' , c= '<C>'
+    * Scenario Log: exlog2 a= '<A>' , c= '<C>'
+    * , wait 1 seconds
 
 
   Scenario: test path

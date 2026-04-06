@@ -22,9 +22,7 @@ public class BrowserSteps {
     }
 
     public static RemoteWebDriver getDefaultDriver() {
-        String browserName = String.valueOf(
-                resolveFromVarsOrDefault( "BROWSER", "CHROME")
-        );
+        String browserName = String.valueOf(resolveFromVarsOrDefault( "BROWSER", "CHROME"));
         return getDriver(browserName);
     }
 

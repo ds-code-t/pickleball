@@ -26,7 +26,9 @@ public abstract class CustomReader {
         this.mapper = Objects.requireNonNull(mapper, "mapper");
     }
 
-    public Object convert(Object input)  {
+    public Object convert(Object input) {
+        if ( input == null|| (input instanceof JsonNode node && (node.isNull() || node.isMissingNode())))
+            return null;
         try {
             return read(input);
         } catch (Exception e) {

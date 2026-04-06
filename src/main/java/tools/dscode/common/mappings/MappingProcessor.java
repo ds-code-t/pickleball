@@ -45,6 +45,7 @@ import static tools.dscode.common.mappings.queries.Tokenized.AS_LIST_SUFFIX;
 import static tools.dscode.common.util.StringUtilities.decodeBackToText;
 import static tools.dscode.common.util.StringUtilities.encodeToPlaceHolders;
 import static tools.dscode.common.variables.RunVars.RUN_VARS;
+import static tools.dscode.common.variables.RunVars.appendDefaultPKBPrefix;
 import static tools.dscode.common.variables.RunVars.hasRecognizedPrefix;
 import static tools.dscode.common.variables.RunVars.resolveFromVars;
 
@@ -414,6 +415,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
 
     private void putVar(String key, Object value) {
+        key = appendDefaultPKBPrefix(key);
         singletonMap.get().root.remove(key);
         singletonMap.get().root.set(key, MAPPER.valueToTree(value));
     }

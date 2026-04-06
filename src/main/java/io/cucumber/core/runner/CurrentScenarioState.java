@@ -137,7 +137,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         return entry.timestamp();
     }
 
-    public static boolean logToReportPortal = getDependencyPropertyBoolean("rp.enable");
+//    public static boolean logToReportPortal = getDependencyPropertyBoolean("rp.enable");
 
     public void startScenarioRun() {
         String scenarioName = pickle.getName() + " , Line " + pickle.getLocation().getLine();
@@ -147,9 +147,11 @@ public class CurrentScenarioState extends ScenarioMapping {
                         .tag("SCENARIO")
                         .on(new SimpleHtmlReportConverter(
                                 Path.of("reports/tests", safeFileName(scenarioName + ".html"))
-                        ));
-        if(logToReportPortal)
-            scenarioLog.on(new ReportPortalBridgeConverter());
+                        ))
+                        .on(new ReportPortalBridgeConverter());
+
+//        if(logToReportPortal)
+//            scenarioLog.on(new ReportPortalBridgeConverter());
 
         scenarioLog.start();
 

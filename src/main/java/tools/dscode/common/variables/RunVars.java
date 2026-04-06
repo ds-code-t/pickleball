@@ -21,14 +21,12 @@ import static tools.dscode.common.evaluations.AviatorUtil.isStringTruthy;
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
 import static tools.dscode.common.mappings.MappingProcessor.getSingletonMap;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
+import static tools.dscode.common.mappings.custommappings.ValConverter.valConverter;
 
 
 public class RunVars extends NodeMap {
 
-    public static final Map<String, String> FILE_PROPERTIES =        loadAllPropertiesFiles(Path.of("src/test/resources"));
-
-
-
+    public static final Map<String, String> FILE_PROPERTIES = loadAllPropertiesFiles(Path.of("src/test/resources"));
 
 
     private static final String ENV_PREFIX = "env_";
@@ -92,17 +90,14 @@ public class RunVars extends NodeMap {
         Map<String, Object> result = new HashMap<>();
 
         System.getenv().forEach((key, value) -> {
-            if (key != null
-                    && key.length() >= PKB_PREFIX.length()
-                    && key.regionMatches(true, 0, PKB_PREFIX, 0, PKB_PREFIX.length())) {
+            if (hasPkbPrefix(key)) {
                 result.put(key.toLowerCase(Locale.ROOT), value);
             }
         });
 
         System.getProperties().forEach((key, value) -> {
             String k = String.valueOf(key);
-            if (k.length() >= PKB_PREFIX.length()
-                    && k.regionMatches(true, 0, PKB_PREFIX, 0, PKB_PREFIX.length())) {
+            if (hasPkbPrefix(k)) {
                 result.put(k.toLowerCase(Locale.ROOT), value); // overwrites env entry if same normalized key
             }
         });
@@ -137,21 +132,23 @@ public class RunVars extends NodeMap {
 
     public static Object resolveFromVarsOrDefault(String varName, Object defaultValue) {
         Object returnObj = resolveFromVars(varName);
-        return returnObj == null ? defaultValue : returnObj;
+        return returnObj == null ? valConverter.convertValue(defaultValue) : returnObj;
     }
 
     public static Object resolveFromVars(String varName) {
         if (varName == null || varName.isBlank()) {
             return null;
         }
-        String key = hasRecognizedPrefix(varName) ? varName : PKB_PREFIX + varName;
+        String key = appendDefaultPKBPrefix(varName);
         Object returnObj = getSingletonMap().getByNormalizedPath(key);
-        if (returnObj == null) return resolveProperty(key);
+        if (returnObj == null) returnObj = resolveProperty(key);
         if (returnObj instanceof List list) {
-            if (list.isEmpty()) return resolveProperty(key);
-            return list.getLast();
+            if (list.isEmpty())
+                returnObj = resolveProperty(key);
+            else
+                returnObj = list.getLast();
         }
-        return returnObj;
+        return valConverter.convertValue(returnObj);
     }
 
     public static boolean hasRecognizedPrefix(String s) {
@@ -159,6 +156,11 @@ public class RunVars extends NodeMap {
                 || hasPrefixIgnoreCase(s, ENV_PREFIX)
                 || hasPrefixIgnoreCase(s, SYS_PREFIX);
     }
+
+    public static String appendDefaultPKBPrefix(String s) {
+        return hasRecognizedPrefix(s) ? s : PKB_PREFIX + s.toLowerCase(Locale.ROOT);
+    }
+
 
     public static boolean hasPkbPrefix(String s) {
         return s != null
@@ -181,7 +183,7 @@ public class RunVars extends NodeMap {
         }
 
         if (hasPkbPrefix(propertyName)) {
-            return RUN_VARS.root.get(propertyName);
+            return RUN_VARS.root.get(propertyName.toLowerCase(Locale.ROOT));
         }
 
         String key = stripPrefixIfPresent(propertyName, SYS_PREFIX);
@@ -194,7 +196,7 @@ public class RunVars extends NodeMap {
             return System.getenv(key);
         }
 
-        Object value = RUN_VARS.root.get(PKB_PREFIX + propertyName);
+        Object value = RUN_VARS.root.get(PKB_PREFIX + propertyName.toLowerCase(Locale.ROOT));
         if (value != null) {
             return value;
         }
@@ -221,12 +223,9 @@ public class RunVars extends NodeMap {
     }
 
 
-
-
-
     public static boolean getDependencyPropertyBoolean(String key) {
         String value = getDependencyProperty(key);
-        if(value == null || value.isBlank())
+        if (value == null || value.isBlank())
             return false;
         return isStringTruthy(value);
     }

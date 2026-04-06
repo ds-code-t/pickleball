@@ -111,7 +111,7 @@ Feature: Additiontest
 #    * , until "<A>" equals "aaaa":
 #  : * , wait 1 seconds ,  save "a<A>" as "A"
 
-  @zz22
+  @zdzzz22
   Scenario: sente test1
 #  @[DEBUG,##]
     * navigate to: URL.textbox

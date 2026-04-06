@@ -13,6 +13,7 @@ import static io.cucumber.core.runner.CurrentScenarioState.registerScenarioObjec
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.mappings.ParsingMap.configsRoot;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
+import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 
 public class ObjectRegistrationSteps {
