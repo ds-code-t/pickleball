@@ -29,12 +29,16 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         ReportPortalBridge.startLaunchIfNeeded(null, null);
 
         if (isRpNestScope(scope)) {
-            // Only the tagged scope itself owns the RP test item lifecycle.
+            // The tagged scope itself owns the real RP test item.
             if (scope == entry) {
                 String type = (entry.parent == null) ? "TEST" : "STEP";
                 ReportPortalBridge.startItem(entry.text, type, null);
-                ReportPortalBridge.throwIfAsyncFailure();
+            } else {
+                // Descendant span inside RP_NEST -> log it, don't create RP child item.
+                ReportPortalBridge.log(level(entry.level), "STARTED: " + safe(entry.text));
             }
+
+            ReportPortalBridge.throwIfAsyncFailure();
             return;
         }
 
@@ -48,8 +52,8 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     public void onTimestamp(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
 
-        ReportPortalBridge.log(level(entry.level), entry.text);
-        flushAttachments(entry, level(entry.level), entry.text);
+        ReportPortalBridge.log(level(entry.level), safe(entry.text));
+        flushAttachments(entry, level(entry.level), safe(entry.text));
 
         ReportPortalBridge.throwIfAsyncFailure();
     }
@@ -60,21 +64,20 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
         if (isRpNestScope(scope)) {
             if (scope == entry) {
-                // Closing the real RP test item for the scenario/root scope.
+                // Close the real RP test item for the scenario/root scope.
                 if (entry.parent == null) {
                     String rowKey = GlobalState.getCurrentScenarioState().id.toString();
                     renderScenarioSummary(scope, rowKey);
                 }
 
-                flushAttachments(entry, levelForStop(entry), entry.text);
+                flushAttachments(entry, levelForStop(entry), safe(entry.text));
                 ReportPortalBridge.finishCurrentItem(status(entry.status));
                 ReportPortalBridge.throwIfAsyncFailure();
                 return;
             }
 
-            // Descendant span inside RP_NEST scope:
-            // do NOT create/finish RP child items; just log summary inside the scenario item.
-            flushAttachments(entry, levelForStop(entry), entry.text);
+            // Descendant span inside RP_NEST -> plain log, not RP child item.
+            flushAttachments(entry, levelForStop(entry), safe(entry.text));
             ReportPortalBridge.log(levelForStop(entry), formatNestedSpan(entry));
             ReportPortalBridge.throwIfAsyncFailure();
             return;
@@ -86,6 +89,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
             renderScenarioSummary(scope, rowKey);
         }
 
+        flushAttachments(entry, levelForStop(entry), safe(entry.text));
         ReportPortalBridge.finishCurrentItem(status(entry.status));
         ReportPortalBridge.throwIfAsyncFailure();
     }
@@ -170,14 +174,12 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     private static String formatNestedSpan(Entry entry) {
         StringBuilder sb = new StringBuilder(256);
 
-        sb.append(entry.text == null ? "" : entry.text);
+        sb.append("STOPPED: ").append(safe(entry.text));
+        sb.append("\nstatus: ").append(status(entry.status));
 
         if (entry.startedAt != null && entry.stoppedAt != null) {
             Duration d = Duration.between(entry.startedAt, entry.stoppedAt);
-            sb.append("\nstatus: ").append(status(entry.status));
             sb.append("\nduration: ").append(formatDuration(d));
-        } else if (entry.stoppedAt != null) {
-            sb.append("\nstatus: ").append(status(entry.status));
         }
 
         if (!entry.fields.isEmpty()) {
@@ -197,6 +199,10 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         long ms = millis % 1_000;
 
         return String.format("%02d:%02d:%02d.%03d", hours, minutes, seconds, ms);
+    }
+
+    private static String safe(String s) {
+        return s == null ? "" : s;
     }
 
     private static String level(Level lvl) {
