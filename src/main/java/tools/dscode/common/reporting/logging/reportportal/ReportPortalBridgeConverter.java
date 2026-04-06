@@ -1,21 +1,25 @@
 package tools.dscode.common.reporting.logging.reportportal;
 
+import io.cucumber.core.runner.GlobalState;
+import io.reactivex.Maybe;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
-
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Base64;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
-import io.cucumber.core.runner.GlobalState;
 import tools.dscode.common.reporting.logging.Attachment;
 import tools.dscode.common.reporting.logging.BaseConverter;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.common.reporting.logging.Status;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class ReportPortalBridgeConverter extends BaseConverter {
 
@@ -23,32 +27,37 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
     private final Set<String> sent = ConcurrentHashMap.newKeySet();
 
-    /**
-     * Tracks only entries that actually opened a real ReportPortal item,
-     * so onStop() only closes those.
-     */
-    private final Set<String> startedRpItems = ConcurrentHashMap.newKeySet();
+    /** entry.id -> RP item uuid promise */
+    private final Map<String, Maybe<String>> rpItemsByEntryId = new ConcurrentHashMap<>();
+
+    /** entry.id -> original Entry, only for cleanup ordering */
+    private final Map<String, Entry> rpEntriesById = new ConcurrentHashMap<>();
 
     @Override
     public void onStart(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
         ReportPortalBridge.startLaunchIfNeeded(null, null);
 
-        if (shouldCreateRpItem(entry)) {
-            String type = (entry.parent == null) ? "TEST" : "STEP";
-            ReportPortalBridge.startItem(entry.text, type, null);
-            startedRpItems.add(entry.id);
+        Maybe<String> rpItem = null;
+
+        if (entry.parent == null) {
+            rpItem = ReportPortalBridge.startRootItem(entry.text, "TEST", null);
+        } else if (hasTag(entry, RP_NEST_TAG)) {
+            Maybe<String> parentRpItem = nearestRpItem(entry.parent);
+            rpItem = ReportPortalBridge.startChildItem(parentRpItem, entry.text, "STEP", null);
+        }
+
+        if (rpItem != null) {
+            rpItemsByEntryId.put(entry.id, rpItem);
+            rpEntriesById.put(entry.id, entry);
             ReportPortalBridge.throwIfAsyncFailure();
             return;
         }
 
-        // For plain spans that are NOT meant to become RP nested items,
-        // emit a normal log line so they are still visible in the scenario.
-        //
-        // Guard against duplicate output when the same entry was already
-        // emitted as a timestamp event earlier (example: logWithType(...).start()).
+        // Untagged span: do not create a nested RP item, but still show something.
+        // Avoid duplicate output when this entry was already timestamped earlier.
         if (entry.timestampedAt == null) {
-            ReportPortalBridge.log(level(entry.level), entry.text);
+            ReportPortalBridge.logToItem(nearestRpItem(entry), level(entry.level), entry.text);
             ReportPortalBridge.throwIfAsyncFailure();
         }
     }
@@ -56,7 +65,9 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     @Override
     public void onTimestamp(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
-        ReportPortalBridge.log(level(entry.level), entry.text);
+
+        Maybe<String> rpItem = nearestRpItem(entry);
+        ReportPortalBridge.logToItem(rpItem, level(entry.level), entry.text);
 
         for (int i = 0; i < entry.attachments.size(); i++) {
             String key = entry.id + ":" + i;
@@ -75,7 +86,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                     ? Path.of(a.path()).getFileName().toString()
                     : a.name();
 
-            ReportPortalBridge.logAttachment(level(entry.level), entry.text, bytes, filename);
+            ReportPortalBridge.logAttachmentToItem(rpItem, level(entry.level), entry.text, bytes, filename);
             ReportPortalBridge.throwIfAsyncFailure();
         }
     }
@@ -89,8 +100,11 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
             renderScenarioSummary(scope, rowKey);
         }
 
-        if (startedRpItems.remove(entry.id)) {
-            ReportPortalBridge.finishCurrentItem(status(entry.status));
+        Maybe<String> rpItem = rpItemsByEntryId.remove(entry.id);
+        rpEntriesById.remove(entry.id);
+
+        if (rpItem != null) {
+            ReportPortalBridge.finishItem(rpItem, status(entry.status));
             ReportPortalBridge.throwIfAsyncFailure();
         }
     }
@@ -107,13 +121,24 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                     .append('\n');
         }
 
-        ReportPortalBridge.log("INFO", sb.toString());
+        ReportPortalBridge.logToItem(rpItemsByEntryId.get(scope.id), "INFO", sb.toString());
     }
 
     @Override
     protected void onClose() {
         ReportPortalBridge.throwIfAsyncFailure();
-        ReportPortalBridge.finishAllOpenItems("PASSED");
+
+        List<Entry> open = new ArrayList<>(rpEntriesById.values());
+        open.sort(Comparator.comparingInt(this::depth).reversed());
+
+        for (Entry e : open) {
+            Maybe<String> rpItem = rpItemsByEntryId.remove(e.id);
+            rpEntriesById.remove(e.id);
+            if (rpItem != null) {
+                ReportPortalBridge.finishItem(rpItem, "PASSED");
+            }
+        }
+
         ReportPortalBridge.finishLaunch("PASSED");
         ReportPortalBridge.throwIfAsyncFailure();
     }
@@ -125,13 +150,29 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         String filename = (name == null || name.isBlank()) ? "screenshot.png"
                 : (name.endsWith(".png") ? name : name + ".png");
 
-        ReportPortalBridge.logAttachment("INFO", "Screenshot", Base64.getDecoder().decode(b64), filename);
+        ReportPortalBridge.logAttachmentToItem(
+                nearestRpItem(entry),
+                "INFO",
+                "Screenshot",
+                Base64.getDecoder().decode(b64),
+                filename
+        );
+
         return entry.attach(name, "image/png;base64", b64);
     }
 
-    private static boolean shouldCreateRpItem(Entry entry) {
-        // Always create the top-level scenario/test item.
-        return entry.parent == null || hasTag(entry, RP_NEST_TAG);
+    private Maybe<String> nearestRpItem(Entry entry) {
+        for (Entry n = entry; n != null; n = n.parent) {
+            Maybe<String> rpItem = rpItemsByEntryId.get(n.id);
+            if (rpItem != null) return rpItem;
+        }
+        return null;
+    }
+
+    private int depth(Entry entry) {
+        int d = 0;
+        for (Entry n = entry; n != null; n = n.parent) d++;
+        return d;
     }
 
     private static boolean hasTag(Entry entry, String wantedTag) {

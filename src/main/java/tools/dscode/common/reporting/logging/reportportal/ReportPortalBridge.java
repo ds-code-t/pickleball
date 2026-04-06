@@ -327,6 +327,143 @@ public final class ReportPortalBridge {
         // Not supported by Launch API you provided. Apply attributes when starting the item.
     }
 
+
+
+    public static Maybe<String> startRootItem(String name, String type, Set<ItemAttributesRQ> attributes) {
+        initIfNeeded();
+        if (!enabled) return Maybe.empty();
+
+        if (launch == null || launch == Launch.NOOP_LAUNCH) {
+            startLaunchIfNeeded(null, null);
+        }
+
+        StartTestItemRQ rq = new StartTestItemRQ();
+        rq.setName(fallback(name, "Unnamed"));
+        rq.setType(fallback(type, "STEP"));
+        rq.setStartTime(Date.from(Instant.now()));
+        if (attributes != null && !attributes.isEmpty()) rq.setAttributes(attributes);
+
+        return launch.startTestItem(rq);
+    }
+
+    public static Maybe<String> startChildItem(Maybe<String> parent, String name, String type, Set<ItemAttributesRQ> attributes) {
+        initIfNeeded();
+        if (!enabled) return Maybe.empty();
+
+        if (launch == null || launch == Launch.NOOP_LAUNCH) {
+            startLaunchIfNeeded(null, null);
+        }
+
+        if (parent == null) {
+            return startRootItem(name, type, attributes);
+        }
+
+        StartTestItemRQ rq = new StartTestItemRQ();
+        rq.setName(fallback(name, "Unnamed"));
+        rq.setType(fallback(type, "STEP"));
+        rq.setStartTime(Date.from(Instant.now()));
+        if (attributes != null && !attributes.isEmpty()) rq.setAttributes(attributes);
+
+        return launch.startTestItem(parent, rq);
+    }
+
+    public static void finishItem(Maybe<String> item, String status) {
+        initIfNeeded();
+        if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH || item == null) return;
+
+        FinishTestItemRQ rq = new FinishTestItemRQ();
+        rq.setEndTime(Date.from(Instant.now()));
+        rq.setStatus(Optional.ofNullable(blankToNull(status)).orElse("PASSED"));
+
+        launch.finishTestItem(item, rq);
+    }
+
+    public static void logToItem(Maybe<String> item, String level, String message) {
+        initIfNeeded();
+        if (!enabled) return;
+
+        if (launch == null || launch == Launch.NOOP_LAUNCH) {
+            startLaunchIfNeeded(null, null);
+        }
+
+        String lvl = Optional.ofNullable(blankToNull(level)).orElse("INFO");
+        String msg = fallback(message, "");
+        Date now = Date.from(Instant.now());
+
+        if (item == null) {
+            launch.log(launchId -> {
+                SaveLogRQ rq = new SaveLogRQ();
+                rq.setLaunchUuid(launchId);
+                rq.setLevel(lvl);
+                rq.setLogTime(now);
+                rq.setMessage(msg);
+                return rq;
+            });
+        } else {
+            launch.log(item, launchId -> {
+                SaveLogRQ rq = new SaveLogRQ();
+                rq.setLaunchUuid(launchId);
+                rq.setLevel(lvl);
+                rq.setLogTime(now);
+                rq.setMessage(msg);
+                return rq;
+            });
+        }
+    }
+
+    public static void logAttachmentToItem(Maybe<String> item, String level, String message, byte[] bytes, String filenameHint) {
+        initIfNeeded();
+        if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH) return;
+
+        String lvl = Optional.ofNullable(blankToNull(level)).orElse("INFO");
+        String msg = Optional.ofNullable(blankToNull(message)).orElse("attachment");
+        byte[] data = Objects.requireNonNullElseGet(bytes, () -> new byte[0]);
+
+        Date now = Date.from(Instant.now());
+
+        Path tmp = null;
+        try {
+            String safeName = Optional.ofNullable(blankToNull(filenameHint)).orElse("attachment.bin");
+            String suffix = safeName.contains(".") ? safeName.substring(safeName.lastIndexOf('.')) : ".bin";
+
+            tmp = Files.createTempFile("rp-", suffix);
+            Files.write(tmp, data);
+            File file = tmp.toFile();
+
+            if (item == null) {
+                launch.log(launchId -> {
+                    try {
+                        return ReportPortal.toSaveLogRQ(launchId, null, lvl, now, new ReportPortalMessage(file, msg));
+                    } catch (IOException e) {
+                        throw new UncheckedIOException("Failed to build ReportPortal launch attachment log", e);
+                    }
+                });
+            } else {
+                launch.log(item, launchId -> {
+                    try {
+                        return ReportPortal.toSaveLogRQ(launchId, null, lvl, now, new ReportPortalMessage(file, msg));
+                    } catch (IOException e) {
+                        throw new UncheckedIOException("Failed to build ReportPortal item attachment log", e);
+                    }
+                });
+            }
+
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to write ReportPortal attachment temp file", e);
+        } finally {
+            if (tmp != null) {
+                try { Files.deleteIfExists(tmp); } catch (Exception ignored) {}
+            }
+        }
+    }
+
+
+
+
+
+
+
+
     // -----------------------------
     // Helpers
     // -----------------------------
