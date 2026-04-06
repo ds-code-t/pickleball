@@ -34,14 +34,23 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         ReportPortalBridge.throwIfAsyncFailure();
         ReportPortalBridge.startLaunchIfNeeded(null, null);
 
-        if (!shouldCreateRpItem(entry)) {
+        if (shouldCreateRpItem(entry)) {
+            String type = (entry.parent == null) ? "TEST" : "STEP";
+            ReportPortalBridge.startItem(entry.text, type, null);
+            startedRpItems.add(entry.id);
+            ReportPortalBridge.throwIfAsyncFailure();
             return;
         }
 
-        String type = (entry.parent == null) ? "TEST" : "STEP";
-        ReportPortalBridge.startItem(entry.text, type, null);
-        startedRpItems.add(entry.id);
-        ReportPortalBridge.throwIfAsyncFailure();
+        // For plain spans that are NOT meant to become RP nested items,
+        // emit a normal log line so they are still visible in the scenario.
+        //
+        // Guard against duplicate output when the same entry was already
+        // emitted as a timestamp event earlier (example: logWithType(...).start()).
+        if (entry.timestampedAt == null) {
+            ReportPortalBridge.log(level(entry.level), entry.text);
+            ReportPortalBridge.throwIfAsyncFailure();
+        }
     }
 
     @Override
