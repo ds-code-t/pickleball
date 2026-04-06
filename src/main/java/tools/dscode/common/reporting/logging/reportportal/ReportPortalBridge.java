@@ -24,35 +24,41 @@ import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Date;
 import java.util.Deque;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
+/**
+ * Static convenience wrapper for ReportPortal client-java 5.4.8 APIs.
+ *
+ * - Loads configuration from reportportal.properties automatically
+ * - No-ops when rp.enable=false or client can't be built
+ * - Maintains per-thread item stack
+ */
 public final class ReportPortalBridge {
 
     private static final Object INIT_LOCK = new Object();
-
     private static volatile boolean initialized;
     private static volatile boolean enabled;
 
     private static volatile ReportPortal rp;
     private static volatile Launch launch;
 
-    /** launch UUID promise */
+    /** launch UUID promise (Maybe<String>) */
     private static volatile Maybe<String> launchUuid = Maybe.empty();
 
-    /** each thread has its own stack of currently opened RP items */
+    /** Each thread has its own "current item" stack (store promises, not resolved strings) */
     private static final ThreadLocal<Deque<Maybe<String>>> ITEM_STACK =
             ThreadLocal.withInitial(ArrayDeque::new);
 
     private static final AtomicReference<Throwable> ASYNC_FAILURE = new AtomicReference<>();
     private static volatile boolean rxErrorHandlerInstalled;
 
-    private ReportPortalBridge() { }
+    private ReportPortalBridge() {}
 
     private static void installRxErrorHandlerIfNeeded() {
         if (rxErrorHandlerInstalled) return;
-
         synchronized (INIT_LOCK) {
             if (rxErrorHandlerInstalled) return;
 
@@ -77,7 +83,7 @@ public final class ReportPortalBridge {
     }
 
     // -----------------------------
-    // init / config
+    // Init / config
     // -----------------------------
 
     public static void initIfNeeded() {
@@ -88,14 +94,11 @@ public final class ReportPortalBridge {
             if (initialized) return;
 
             ListenerParameters params = new ListenerParameters(PropertiesLoader.load());
-
             rp = ReportPortal.builder()
                     .withParameters(params)
                     .build();
 
-            // If rp.enable is missing, default to enabled.
-            enabled = Optional.ofNullable(rp.getParameters().getEnable()).orElse(true);
-
+            enabled = Optional.ofNullable(rp.getParameters().getEnable()).orElse(false);
             if (!enabled) {
                 launch = Launch.NOOP_LAUNCH;
                 launchUuid = Maybe.empty();
@@ -107,85 +110,73 @@ public final class ReportPortalBridge {
 
     public static boolean isEnabled() {
         initIfNeeded();
-        return enabled;
-    }
-
-    private static void ensureLaunchStarted() {
-        initIfNeeded();
-        if (!enabled) return;
-
-        if (launch != null && launch != Launch.NOOP_LAUNCH) {
-            return;
-        }
-
-        startLaunchIfNeeded(null, null);
+        return enabled && launch != null && launch != Launch.NOOP_LAUNCH;
     }
 
     // -----------------------------
-    // launch lifecycle
+    // Launch lifecycle
     // -----------------------------
 
+    /**
+     * Start launch if needed. Returns a launch UUID promise (Maybe<String>).
+     * Idempotent.
+     */
     public static Maybe<String> startLaunchIfNeeded(String launchNameOverride, Set<ItemAttributesRQ> attributes) {
         initIfNeeded();
         if (!enabled) return Maybe.empty();
+        if (launch != null && launch != Launch.NOOP_LAUNCH) return launchUuid;
 
-        synchronized (INIT_LOCK) {
-            if (launch != null && launch != Launch.NOOP_LAUNCH) {
-                return launchUuid;
-            }
+        StartLaunchRQ rq = new StartLaunchRQ();
+        rq.setName(Optional.ofNullable(blankToNull(launchNameOverride))
+                .orElseGet(() -> fallback(rp.getParameters().getLaunchName(), "Launch")));
+        rq.setStartTime(Date.from(Instant.now()));
+        if (attributes != null && !attributes.isEmpty()) rq.setAttributes(attributes);
 
-            StartLaunchRQ rq = new StartLaunchRQ();
-            rq.setName(Optional.ofNullable(blankToNull(launchNameOverride))
-                    .orElseGet(() -> fallback(rp.getParameters().getLaunchName(), "Launch")));
-            rq.setStartTime(Date.from(Instant.now()));
-
-            if (attributes != null && !attributes.isEmpty()) {
-                rq.setAttributes(attributes);
-            }
-
-            launch = rp.newLaunch(rq);
-            launchUuid = launch.start();
-            return launchUuid;
-        }
+        launch = rp.newLaunch(rq);
+        launchUuid = launch.start();
+        return launchUuid;
     }
 
     public static void finishLaunch(String status) {
         initIfNeeded();
-        if (!enabled) return;
+        if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH) return;
 
-        synchronized (INIT_LOCK) {
-            if (launch == null || launch == Launch.NOOP_LAUNCH) return;
+        ITEM_STACK.remove();
 
-            finishAllOpenItems(status);
+        FinishExecutionRQ rq = new FinishExecutionRQ();
+        rq.setEndTime(Date.from(Instant.now()));
+        rq.setStatus(Optional.ofNullable(blankToNull(status)).orElse("PASSED"));
 
-            FinishExecutionRQ rq = new FinishExecutionRQ();
-            rq.setEndTime(Date.from(Instant.now()));
-            rq.setStatus(Optional.ofNullable(blankToNull(status)).orElse("PASSED"));
+        launch.finish(rq);
 
-            launch.finish(rq);
-
-            ITEM_STACK.remove();
-            launch = null;
-            launchUuid = Maybe.empty();
-        }
+        launch = null;
+        launchUuid = Maybe.empty();
     }
 
     // -----------------------------
-    // item lifecycle
+    // Item lifecycle
     // -----------------------------
 
     public static Maybe<String> startItem(String name, String type, Set<ItemAttributesRQ> attributes) {
-        ensureLaunchStarted();
-        if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH) return Maybe.empty();
+        return startItem(name, type, attributes, null);
+    }
+
+    public static Maybe<String> startItem(String name,
+                                          String type,
+                                          Set<ItemAttributesRQ> attributes,
+                                          Instant startTime) {
+        initIfNeeded();
+        if (!enabled) return Maybe.empty();
+
+        if (launch == null || launch == Launch.NOOP_LAUNCH) {
+            startLaunchIfNeeded(null, null);
+        }
 
         StartTestItemRQ rq = new StartTestItemRQ();
         rq.setName(fallback(name, "Unnamed"));
         rq.setType(fallback(type, "STEP"));
-        rq.setStartTime(Date.from(Instant.now()));
-
-        if (attributes != null && !attributes.isEmpty()) {
-            rq.setAttributes(attributes);
-        }
+        rq.setStartTime(toDate(startTime));
+        if (attributes != null && !attributes.isEmpty()) rq.setAttributes(attributes);
 
         Deque<Maybe<String>> stack = ITEM_STACK.get();
         Maybe<String> parent = stack.peekLast();
@@ -199,6 +190,10 @@ public final class ReportPortalBridge {
     }
 
     public static void finishCurrentItem(String status) {
+        finishCurrentItem(status, null);
+    }
+
+    public static void finishCurrentItem(String status, Instant endTime) {
         initIfNeeded();
         if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH) return;
 
@@ -207,7 +202,7 @@ public final class ReportPortalBridge {
         if (item == null) return;
 
         FinishTestItemRQ rq = new FinishTestItemRQ();
-        rq.setEndTime(Date.from(Instant.now()));
+        rq.setEndTime(toDate(endTime));
         rq.setStatus(Optional.ofNullable(blankToNull(status)).orElse("PASSED"));
 
         launch.finishTestItem(item, rq);
@@ -223,119 +218,124 @@ public final class ReportPortalBridge {
     }
 
     // -----------------------------
-    // logging
+    // Logging
     // -----------------------------
 
-    /**
-     * Log at current item level if an item exists, otherwise launch level.
-     */
     public static void log(String level, String message) {
-        ensureLaunchStarted();
-        if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH) return;
+        log(level, message, null);
+    }
+
+    /** Log at current item level if an item exists, otherwise launch level. */
+    public static void log(String level, String message, Instant logTime) {
+        initIfNeeded();
+        if (!enabled) return;
 
         String lvl = Optional.ofNullable(blankToNull(level)).orElse("INFO");
         String msg = fallback(message, "");
 
         Maybe<String> currentItem = ITEM_STACK.get().peekLast();
-        Date now = Date.from(Instant.now());
+        Date when = toDate(logTime);
 
         if (currentItem == null) {
             launch.log(launchId -> {
                 SaveLogRQ rq = new SaveLogRQ();
                 rq.setLaunchUuid(launchId);
                 rq.setLevel(lvl);
-                rq.setLogTime(now);
+                rq.setLogTime(when);
                 rq.setMessage(msg);
                 return rq;
             });
         } else {
-            launch.log(currentItem, itemId -> {
+            launch.log(currentItem, launchId -> {
                 SaveLogRQ rq = new SaveLogRQ();
-                rq.setItemUuid(itemId);
+                rq.setLaunchUuid(launchId);
                 rq.setLevel(lvl);
-                rq.setLogTime(now);
+                rq.setLogTime(when);
                 rq.setMessage(msg);
                 return rq;
             });
         }
     }
 
-    /**
-     * Log with attachment bytes.
-     *
-     * Uses a temp file because ReportPortalMessage(File, message) is the simplest
-     * stable path here. The file is NOT deleted immediately because async reporting
-     * may still be reading it.
-     */
     public static void logAttachment(String level, String message, byte[] bytes, String filenameHint) {
-        ensureLaunchStarted();
+        logAttachment(level, message, bytes, filenameHint, null);
+    }
+
+    public static void logAttachment(String level,
+                                     String message,
+                                     byte[] bytes,
+                                     String filenameHint,
+                                     Instant logTime) {
+        initIfNeeded();
         if (!enabled || launch == null || launch == Launch.NOOP_LAUNCH) return;
 
         String lvl = Optional.ofNullable(blankToNull(level)).orElse("INFO");
         String msg = Optional.ofNullable(blankToNull(message)).orElse("attachment");
-        byte[] data = (bytes == null) ? new byte[0] : bytes;
+        byte[] data = Objects.requireNonNullElseGet(bytes, () -> new byte[0]);
 
         Maybe<String> currentItem = ITEM_STACK.get().peekLast();
-        Date now = Date.from(Instant.now());
+        Date when = toDate(logTime);
 
+        Path tmp = null;
         try {
             String safeName = Optional.ofNullable(blankToNull(filenameHint)).orElse("attachment.bin");
             String suffix = safeName.contains(".")
                     ? safeName.substring(safeName.lastIndexOf('.'))
                     : ".bin";
 
-            Path tmp = Files.createTempFile("rp-", suffix);
+            tmp = Files.createTempFile("rp-", suffix);
             Files.write(tmp, data);
-
             File file = tmp.toFile();
-            file.deleteOnExit();
 
             if (currentItem == null) {
                 launch.log(launchId -> {
                     try {
                         return ReportPortal.toSaveLogRQ(
-                                launchId,
-                                null,
-                                lvl,
-                                now,
-                                new ReportPortalMessage(file, msg)
+                                launchId, null, lvl, when, new ReportPortalMessage(file, msg)
                         );
                     } catch (IOException e) {
                         throw new UncheckedIOException("Failed to build ReportPortal launch attachment log", e);
                     }
                 });
             } else {
-                launch.log(currentItem, itemId -> {
+                launch.log(currentItem, launchId -> {
                     try {
                         return ReportPortal.toSaveLogRQ(
-                                null,
-                                itemId,
-                                lvl,
-                                now,
-                                new ReportPortalMessage(file, msg)
+                                launchId, null, lvl, when, new ReportPortalMessage(file, msg)
                         );
                     } catch (IOException e) {
                         throw new UncheckedIOException("Failed to build ReportPortal item attachment log", e);
                     }
                 });
             }
-
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to write ReportPortal attachment temp file", e);
+        } finally {
+            if (tmp != null) {
+                try {
+                    Files.deleteIfExists(tmp);
+                } catch (Exception ignored) {
+                    // ignore cleanup failure
+                }
+            }
         }
     }
 
     // -----------------------------
-    // attributes / tags
+    // Attributes / tags
     // -----------------------------
 
     public static void addAttributesToCurrent(Set<ItemAttributesRQ> attributes) {
-        // no-op by design; apply attributes at startItem(...)
+        // Not supported by Launch API you provided. Apply attributes when starting the item.
     }
 
     // -----------------------------
-    // helpers
+    // Helpers
     // -----------------------------
+
+    private static Date toDate(Instant instant) {
+        return Date.from(instant != null ? instant : Instant.now());
+    }
 
     private static String fallback(String s, String def) {
         String v = blankToNull(s);
