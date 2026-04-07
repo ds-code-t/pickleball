@@ -1,7 +1,6 @@
 package tools.dscode.common.reporting.logging.reportportal;
 
 import io.cucumber.core.runner.GlobalState;
-import io.reactivex.Maybe;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
@@ -15,7 +14,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Base64;
 import java.util.Locale;
 import java.util.Set;
@@ -23,42 +21,20 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class ReportPortalBridgeConverter extends BaseConverter {
 
-    private static final String RP_NEST = "RP_NEST";
+    private static final String RP_SUITE_PREFIX = "RP_SUITE:";
 
     private final Set<String> sent = ConcurrentHashMap.newKeySet();
-    private Maybe<String> suiteContext = Maybe.empty();
 
     @Override
     public void onStart(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
-        ReportPortalBridge.startLaunchIfNeeded(null, null);
 
-        if (isRpNestScope(scope)) {
-            if (scope == entry) {
-                String suiteName = extractSuiteName(scope);
-                if (suiteName != null) {
-                    suiteContext = ReportPortalBridge.startNamedRootIfNeeded(
-                            suiteName, "SUITE", null, entry.startedAt
-                    );
-                    ReportPortalBridge.pushParentContext(suiteContext);
-                } else {
-                    suiteContext = Maybe.empty();
-                }
-
-                String type = (entry.parent == null) ? "TEST" : "STEP";
-                ReportPortalBridge.startItem(entry.text, type, null, entry.startedAt);
-            } else {
-                // Descendant span inside RP_NEST scope -> log it, don't create RP child item.
-                ReportPortalBridge.log(level(entry.level), "STARTED: " + safe(entry.text), entry.startedAt);
-            }
-
-            ReportPortalBridge.throwIfAsyncFailure();
-            return;
+        if (isScenarioRoot(scope, entry)) {
+            ReportPortalBridge.startTest(entry.text, suiteName(scope));
+        } else {
+            ReportPortalBridge.log(level(entry.level), "STARTED: " + safe(entry.text));
         }
 
-        // Original behavior for non-RP_NEST scopes.
-        String type = (entry.parent == null) ? "TEST" : "STEP";
-        ReportPortalBridge.startItem(entry.text, type, null, entry.startedAt);
         ReportPortalBridge.throwIfAsyncFailure();
     }
 
@@ -66,9 +42,8 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     public void onTimestamp(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
 
-        Instant when = entry.timestampedAt;
-        ReportPortalBridge.log(level(entry.level), safe(entry.text), when);
-        flushAttachments(entry, level(entry.level), safe(entry.text), when);
+        ReportPortalBridge.log(level(entry.level), safe(entry.text));
+        flushAttachments(entry, level(entry.level), safe(entry.text));
 
         ReportPortalBridge.throwIfAsyncFailure();
     }
@@ -77,65 +52,41 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     public void onStop(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
 
-        if (isRpNestScope(scope)) {
-            if (scope == entry) {
-                try {
-                    if (entry.parent == null) {
-                        String rowKey = GlobalState.getCurrentScenarioState().id.toString();
-                        renderScenarioSummary(scope, rowKey);
-                    }
-
-                    flushAttachments(entry, levelForStop(entry), safe(entry.text), entry.stoppedAt);
-                    ReportPortalBridge.finishCurrentItem(status(entry.status), entry.stoppedAt);
-                } finally {
-                    if (suiteContext != null) {
-                        ReportPortalBridge.popParentContext(suiteContext);
-                        suiteContext = Maybe.empty();
-                    }
-                }
-
-                ReportPortalBridge.throwIfAsyncFailure();
-                return;
+        if (isScenarioRoot(scope, entry)) {
+            if (entry.parent == null) {
+                String rowKey = GlobalState.getCurrentScenarioState().id.toString();
+                renderScenarioSummary(scope, rowKey);
             }
 
-            // Descendant span inside RP_NEST scope -> plain log, not RP child item.
-            flushAttachments(entry, levelForStop(entry), safe(entry.text), entry.stoppedAt);
-            ReportPortalBridge.log(levelForStop(entry), formatNestedSpan(entry), entry.stoppedAt);
-            ReportPortalBridge.throwIfAsyncFailure();
-            return;
+            flushAttachments(entry, levelForStop(entry), safe(entry.text));
+            ReportPortalBridge.finishCurrentTest(status(entry.status));
+        } else {
+            flushAttachments(entry, levelForStop(entry), safe(entry.text));
+            ReportPortalBridge.log(levelForStop(entry), formatStoppedSpan(entry));
         }
 
-        // Original behavior for non-RP_NEST scopes.
-        if (entry.parent == null) {
-            String rowKey = GlobalState.getCurrentScenarioState().id.toString();
-            renderScenarioSummary(scope, rowKey);
-        }
-
-        flushAttachments(entry, levelForStop(entry), safe(entry.text), entry.stoppedAt);
-        ReportPortalBridge.finishCurrentItem(status(entry.status), entry.stoppedAt);
         ReportPortalBridge.throwIfAsyncFailure();
     }
 
     @Override
     protected void onScenarioSummary(Entry scope, String rowKey, RowData data) {
-        StringBuilder sb = new StringBuilder(1024);
+        StringBuilder sb = new StringBuilder(512);
         sb.append("Scenario Summary\n");
 
         for (String h : data.headers()) {
             Object v = data.valuesByHeader().get(h);
-            sb.append("- ").append(h).append(": ")
+            sb.append("- ")
+                    .append(h)
+                    .append(": ")
                     .append(v == null ? "" : String.valueOf(v))
                     .append('\n');
         }
 
-        ReportPortalBridge.log("INFO", sb.toString(), Instant.now());
+        ReportPortalBridge.log("INFO", sb.toString());
     }
 
     @Override
     protected void onClose() {
-        ReportPortalBridge.throwIfAsyncFailure();
-        ReportPortalBridge.finishAllOpenItems("PASSED");
-        ReportPortalBridge.finishLaunch("PASSED");
         ReportPortalBridge.throwIfAsyncFailure();
     }
 
@@ -147,19 +98,10 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                 ? "screenshot.png"
                 : (name.endsWith(".png") ? name : name + ".png");
 
-        // Log immediately to ReportPortal
-        ReportPortalBridge.logAttachment(
-                "INFO",
-                "Screenshot",
-                Base64.getDecoder().decode(b64),
-                filename,
-                Instant.now()
-        );
+        ReportPortalBridge.logAttachment("INFO", "Screenshot", Base64.getDecoder().decode(b64), filename);
 
-        // Still keep the attachment on the Entry in case other converters need it
         Entry out = entry.attach(filename, "image/png;base64", b64);
 
-        // Mark this exact attachment slot as already handled so later flushes skip it
         int idx = out.attachments.size() - 1;
         if (idx >= 0) {
             sent.add(out.id + ":" + idx);
@@ -168,13 +110,12 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         return out;
     }
 
-    private void flushAttachments(Entry entry, String level, String message, Instant when) {
+    private void flushAttachments(Entry entry, String level, String message) {
         for (int i = 0; i < entry.attachments.size(); i++) {
             String key = entry.id + ":" + i;
             if (!sent.add(key)) continue;
 
             Attachment a = entry.attachments.get(i);
-
             String payload = a.path();
             String mime = a.mime();
 
@@ -192,43 +133,34 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                         filename = p.getFileName().toString();
                     }
                 } else {
-                    // Fallback: treat it as inline text payload rather than a file path
                     bytes = payload == null ? new byte[0] : payload.getBytes(StandardCharsets.UTF_8);
                 }
             } catch (Exception e) {
                 throw new RuntimeException("Failed to materialize attachment: " + describeAttachment(a), e);
             }
 
-            ReportPortalBridge.logAttachment(level, message, bytes, filename, when);
+            ReportPortalBridge.logAttachment(level, message, bytes, filename);
             ReportPortalBridge.throwIfAsyncFailure();
         }
     }
 
-    private static boolean isRpNestScope(Entry scope) {
-        if (scope == null) return false;
-
-        for (String tag : scope.tags) {
-            if (tag == null) continue;
-            String t = tag.trim();
-
-            if (RP_NEST.equalsIgnoreCase(t)) return true;
-            if (t.regionMatches(true, 0, RP_NEST + ":", 0, RP_NEST.length() + 1)) return true;
-        }
-        return false;
+    private static boolean isScenarioRoot(Entry scope, Entry entry) {
+        return scope == entry && entry != null && entry.parent == null;
     }
 
-    private static String extractSuiteName(Entry scope) {
+    private static String suiteName(Entry scope) {
         if (scope == null) return null;
 
         for (String tag : scope.tags) {
             if (tag == null) continue;
-            String t = tag.trim();
 
-            if (t.regionMatches(true, 0, RP_NEST + ":", 0, RP_NEST.length() + 1)) {
-                String suffix = t.substring(RP_NEST.length() + 1).trim();
-                return suffix.isEmpty() ? null : suffix;
+            String t = tag.trim();
+            if (t.regionMatches(true, 0, RP_SUITE_PREFIX, 0, RP_SUITE_PREFIX.length())) {
+                String suite = t.substring(RP_SUITE_PREFIX.length()).trim();
+                return suite.isEmpty() ? null : suite;
             }
         }
+
         return null;
     }
 
@@ -276,7 +208,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         return "name='" + a.name() + "', mime='" + a.mime() + "', payload='" + preview + "'";
     }
 
-    private static String formatNestedSpan(Entry entry) {
+    private static String formatStoppedSpan(Entry entry) {
         StringBuilder sb = new StringBuilder(256);
 
         sb.append("STOPPED: ").append(safe(entry.text));
