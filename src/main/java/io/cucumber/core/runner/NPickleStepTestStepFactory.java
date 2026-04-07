@@ -4,6 +4,7 @@ import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.gherkin.Step;
 import io.cucumber.messages.types.PickleStep;
 import io.cucumber.messages.types.PickleStepArgument;
+import tools.dscode.common.exceptions.StepCreationException;
 import tools.dscode.common.mappings.ParsingMap;
 
 import java.net.URI;
@@ -36,8 +37,7 @@ public class NPickleStepTestStepFactory {
         try {
             return new PickleStepTestStep(UUID.randomUUID(), toAbsoluteFileUri(uri), step, updatePickleStepDefinitionMatch(pickleStepDefinitionMatch));
         } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException("Failed step text: '" + step.getText() + "' due to " + e.getMessage(), e);
+            throw new StepCreationException("Failed step text: '" + step.getText() + "'.  Ensure that a matching step definition is on the glue path. " + e.getMessage(), e);
         }
     }
 

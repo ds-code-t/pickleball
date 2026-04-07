@@ -1,8 +1,9 @@
 Feature: Addition
 
-
+  @AAAs
   Scenario: sdf
     * , get and save "A" as "B"
+    * asdsdgfdsf
 
 #    * , save "A1" as "B1" ,
 #    * , save "A2" as "B2"

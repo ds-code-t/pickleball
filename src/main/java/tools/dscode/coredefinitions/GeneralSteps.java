@@ -56,17 +56,17 @@ public class GeneralSteps extends CoreSteps {
         getCurrentScenarioState().startScenarioRun();
     }
 
-    @Given(INFO_STEP)
+    @Given("^"+INFO_STEP+ "(.*)$")
     public static void infoStep(String message) {
         stepInfo(message);
     }
 
-    @Given(HARD_ERROR_STEP)
+    @Given("^"+ HARD_ERROR_STEP+ "(.*)$")
     public static void hardFailStep(String message) {
         throw new RuntimeException(message);
     }
 
-    @Given(SOFT_ERROR_STEP)
+    @Given("^"+SOFT_ERROR_STEP+ "(.*)$")
     public static void softFailStep(String message) {
         throw new SoftRuntimeException(message);
     }

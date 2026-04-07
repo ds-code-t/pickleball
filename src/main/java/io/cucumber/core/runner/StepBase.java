@@ -21,6 +21,7 @@ public abstract class StepBase implements Cloneable {
     public PhraseData inheritancePhrase;
     public boolean dataArgumentStep = false;
     public boolean isDynamicStep;
+    public boolean isPreRunFailStep;
     public boolean isCoreConditionalStep;
     public boolean logAndIgnore = false;
     public boolean isClone = false;

@@ -48,8 +48,6 @@ import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
-import static tools.dscode.common.variables.RunVars.getDependencyProperty;
-import static tools.dscode.common.variables.RunVars.getDependencyPropertyBoolean;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
 import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
 
@@ -82,6 +80,8 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     public final String scenarioName;
     public final String scenarioNameAndLine;
+
+    public StepExtension runAndEndStep = null;
 
 
     public CurrentScenarioState(TestCase testCase) {
@@ -244,6 +244,12 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void runStep(StepExtension stepExtension) {
+        if ( runAndEndStep != null ) {
+            runAndEndStep.stepFlags.add(ALWAYS_RUN);
+            runningStep(runAndEndStep);
+            return;
+        }
+
         if (endCurrentScenario)
             return;
         currentStep = stepExtension;

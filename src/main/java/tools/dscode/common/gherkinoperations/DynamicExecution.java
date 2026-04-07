@@ -10,7 +10,9 @@ import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.GeneralGherkinUtils.getKeyWord;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
+import static io.cucumber.core.runner.GlobalState.getGivenKeyword;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.PredefinedSteps.getTempStep;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
@@ -26,26 +28,34 @@ public class DynamicExecution {
         argumentText = argumentText == null || argumentText.isBlank() ? "" : argumentText;
         StepExtension currentStep = getRunningStep();
         try {
-            return runDynamicStep(stepText, argumentText);
+            return runCustomStep(stepText, argumentText);
         } catch (Exception e) {
             return e;
         }
     }
 
-    public static Object runDynamicStep(String stepText) {
-        return runDynamicStep(stepText, "");
+    public static Object runCustomStep(String stepText) {
+        return runCustomStep(stepText, "");
     }
 
-    public static Object runDynamicStep(String stepText, String argumentText) {
+    public static Object runCustomStep(String stepText, String argumentText) {
         argumentText = argumentText == null || argumentText.isBlank() ? "" : argumentText;
-        StepExtension currentStep = getRunningStep();
         try {
-            StepExtension modifiedStep = new StepExtension(currentStep.testCase, getPickleStepTestStepFromStrings(getKeyWord(currentStep), stepText, argumentText));
-            modifiedStep.setStepParsingMap(getRunningParsingMap());
-            return modifiedStep.runAndGetReturnValue();
+            return getCustomStep(stepText, argumentText).runAndGetReturnValue();
         } catch (Throwable t) {
             throw new StepCreationException("Failed to create Step '" + stepText + "'" + (argumentText.isBlank() ? " with argument '" + argumentText + "'" : "") + t.getMessage(), t);
         }
+    }
+
+    public static StepExtension getCustomStep(String stepText) {
+        return getCustomStep(stepText, "");
+    }
+
+    public static StepExtension getCustomStep(String stepText, String argumentText) {
+        argumentText = argumentText == null || argumentText.isBlank() ? "" : argumentText;
+        StepExtension modifiedStep = new StepExtension(getTestCase(), getPickleStepTestStepFromStrings(getGivenKeyword(), stepText, argumentText));
+        modifiedStep.setStepParsingMap(getRunningParsingMap());
+        return modifiedStep;
     }
 
     public static ScenarioStep getScenarioFromTag(String tags) {

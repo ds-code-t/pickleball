@@ -88,7 +88,7 @@ public final class ReportPortalHierarchy {
     public static Maybe<String> startTest(String testName, Maybe<String> suiteId) {
         StartTestItemRQ rq = new StartTestItemRQ();
         rq.setName(testName);
-        rq.setType("TEST");
+        rq.setType("STEP");
         rq.setStartTime(new Date());
 
         Maybe<String> testId = getLaunch().startTestItem(suiteId, rq);

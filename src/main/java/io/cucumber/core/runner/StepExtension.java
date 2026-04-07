@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
 import static io.cucumber.core.runner.CurrentScenarioState.getScenarioLogRoot;
+import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getGlobalEventBus;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.getTestCase;
@@ -40,8 +41,10 @@ import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleSt
 import static io.cucumber.core.runner.util.TableUtils.DOCSTRING_KEY;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static io.cucumber.core.runner.util.TableUtils.toRowsMultimap;
+import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
+import static tools.dscode.common.gherkinoperations.DynamicExecution.getCustomStep;
 import static tools.dscode.common.mappings.MappingProcessor.getDataTableMap;
 import static tools.dscode.common.mappings.MappingProcessor.getDocStringMap;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
@@ -326,7 +329,14 @@ public class StepExtension extends StepData {
 
 
     public PickleStepTestStep resolveAndClone(ParsingMap parsingMap) {
-        PickleStepTestStep clonePickleStepTestStep = resolvePickleStepTestStep(pickleStepTestStep, parsingMap);
+        PickleStepTestStep clonePickleStepTestStep;
+        try {
+            clonePickleStepTestStep = resolvePickleStepTestStep(pickleStepTestStep, parsingMap);
+        }
+        catch (Exception e) {
+            clonePickleStepTestStep = getCustomStep(HARD_ERROR_STEP + e.getMessage()).pickleStepTestStep;
+            return clonePickleStepTestStep;
+        }
         if (definitionFlags.contains(DefinitionFlag.NO_LOGGING))
             clonePickleStepTestStep.setNoLogging(true);
         return clonePickleStepTestStep;

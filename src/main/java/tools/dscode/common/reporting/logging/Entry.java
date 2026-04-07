@@ -550,18 +550,6 @@ public class Entry {
                             .append('\n'));
         }
 
-        if (!entry.attachments.isEmpty()) {
-            sb.append(indent).append("attachments:").append('\n');
-            for (Attachment a : entry.attachments) {
-                sb.append(indent)
-                        .append("- ")
-                        .append(a.name() == null || a.name().isBlank() ? "attachment" : a.name())
-                        .append(" [")
-                        .append(a.mime() == null ? "" : a.mime())
-                        .append(']')
-                        .append('\n');
-            }
-        }
 
         for (Entry child : entry.children) {
             sb.append('\n');
