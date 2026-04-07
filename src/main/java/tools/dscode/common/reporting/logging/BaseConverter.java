@@ -77,4 +77,8 @@ public abstract class BaseConverter {
         return entry.attach(name, "image/png;base64", base64);
     }
 
+    protected String flatten(Entry entry) {
+        return entry == null ? "" : entry.flatten();
+    }
+
 }

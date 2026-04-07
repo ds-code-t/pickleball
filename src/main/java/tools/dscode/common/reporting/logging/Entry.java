@@ -508,6 +508,67 @@ public class Entry {
                 hours, minutes, seconds, ms);
     }
 
+    public String flatten() {
+        return guarded(() -> {
+            StringBuilder sb = new StringBuilder(512);
+            appendFlattened(sb, this, 0);
+            return sb.toString();
+        });
+    }
+
+    private static void appendFlattened(StringBuilder sb, Entry entry, int depth) {
+        String indent = "  ".repeat(Math.max(0, depth));
+
+        sb.append(indent).append(entry.text == null ? "" : entry.text).append('\n');
+
+        if (entry.status != null) {
+            sb.append(indent).append("status: ").append(entry.status).append('\n');
+        }
+        if (entry.level != null) {
+            sb.append(indent).append("level: ").append(entry.level).append('\n');
+        }
+        if (entry.startedAt != null) {
+            sb.append(indent).append("started: ").append(entry.startedAt).append('\n');
+        }
+        if (entry.stoppedAt != null) {
+            sb.append(indent).append("stopped: ").append(entry.stoppedAt).append('\n');
+        }
+        if (entry.startedAt != null || entry.stoppedAt != null) {
+            sb.append(indent).append("duration: ").append(entry.durationFormatted()).append('\n');
+        } else if (entry.timestampedAt != null) {
+            sb.append(indent).append("time: ").append(entry.timestampedAt).append('\n');
+        }
+
+        if (!entry.fields.isEmpty()) {
+            sb.append(indent).append("fields:").append('\n');
+            entry.fields.forEach((k, v) ->
+                    sb.append(indent)
+                            .append("- ")
+                            .append(k)
+                            .append(": ")
+                            .append(v == null ? "" : v)
+                            .append('\n'));
+        }
+
+        if (!entry.attachments.isEmpty()) {
+            sb.append(indent).append("attachments:").append('\n');
+            for (Attachment a : entry.attachments) {
+                sb.append(indent)
+                        .append("- ")
+                        .append(a.name() == null || a.name().isBlank() ? "attachment" : a.name())
+                        .append(" [")
+                        .append(a.mime() == null ? "" : a.mime())
+                        .append(']')
+                        .append('\n');
+            }
+        }
+
+        for (Entry child : entry.children) {
+            sb.append('\n');
+            appendFlattened(sb, child, depth + 1);
+        }
+    }
+
     // ---------------------------------------------------------
     // INTERNAL GUARD HELPERS
     // ---------------------------------------------------------
