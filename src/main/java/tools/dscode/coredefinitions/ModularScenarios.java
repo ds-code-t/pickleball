@@ -65,6 +65,7 @@ public class ModularScenarios extends CoreSteps {
         for (Map<String, String> map : maps) {
             String tagString = map.getOrDefault(RUN_TAGS, map.getOrDefault(RUN_TAGS, ""));
             tagString = tagString.replaceAll(tagRegexReplacement, "@$1");
+            if (tagString.isBlank()) continue;
             List<Pickle> pickles = CucumberScanUtil.listPicklesByTags(tagString);
 
             ScenarioStep currentScenarioNameStep;
