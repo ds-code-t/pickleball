@@ -2,8 +2,12 @@ Feature: Addition
 
   @AAAs
   Scenario: sdf
-    * , get and save "A" as "B"
-    * asdsdgfdsf
+    * ,  save any 3rd `\d` Match from "123456789"
+    * ,  save  3rd `\d` Match from "12312321"
+#    * ,  save 3rd "Case ID" Match from "12312321"
+    * ,  save 3rd "stateID" Match from "abcdEFghHIjkLMnoPQ"
+    * ,  save 2nd 'stateID' Match from "abcdEFghHIjkLMnoPQ"
+#    * asdsdgfdsf
 
 #    * , save "A1" as "B1" ,
 #    * , save "A2" as "B2"

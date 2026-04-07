@@ -224,7 +224,7 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite|clear|save|get|create and attach|attach|switch|close|accept|dismiss)(?:s|es)?\\b") {
+        ParseNode action = new ParseNode("\\b(?<base>select|press|dragAndDrop|double click|right click|hover|move|click|enter|scroll|wait|overwrite|clear|save|create and attach|attach|switch|close|accept|dismiss)(?:s|es)?\\b") {
             @Override
             public String onCapture(MatchNode self) {
                 self.parent().putToLocalState("action", self.resolvedGroupText("base"));

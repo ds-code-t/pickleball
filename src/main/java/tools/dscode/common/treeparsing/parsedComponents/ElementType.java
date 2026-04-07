@@ -30,7 +30,7 @@ public enum ElementType {
     DATA_TYPE,
     VALUE_TYPE, TIME_VALUE, NUMERIC_VALUE, INTEGER_VALUE, DECIMAL_VALUE, TEXT_VALUE, KEY_VALUE,
     RETURNS_VALUE,
-    REGEX_PATTERN;
+    REGEX_MATCH;
 
     public static final String VALUE_TYPE_MATCH = "InternalValueUnit";
     public static final String PLACE_HOLDER_MATCH = "InternalPLACEHOLDER";
@@ -84,6 +84,12 @@ public enum ElementType {
         }
 
         String singular = raw.replaceAll("s$", "");
+        if (singular.equals("Match")) {
+            returnSet.add(REGEX_MATCH);
+            return returnSet;
+        }
+
+
         if (singular.equals("Loading")) {
             returnSet.add(HTML_LOADING);
             returnSet.add(HTML_TYPE);

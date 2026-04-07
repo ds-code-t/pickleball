@@ -306,29 +306,38 @@ public class ElementMatch {
     }
 
 
-
-
-    public String getDefaultElementValue(ElementWrapper elementWrapper) {
-        String defaultValue = String.valueOf(elementWrapper.getElementReturnValue());
-        String currentValue = defaultValue;
+    public String getMatchElementStringValue() {
+        List<ValueWrapper> values =  getValues();
+        Object currentValue = values;
+//        String currentStringValue = values.stream().map(ValueWrapper::toNonNullString).collect(Collectors.joining());
 
         for (String valueType : valueTypes) {
+            if(valueType.endsWith("-attribute")){
+
+            }
+
             switch (valueType) {
+                case "count":
+                    if (currentValue instanceof List<?> list) {
+                        currentValue = list.size();
+                    } else
+                        currentValue = String.valueOf(currentValue).length();
+                    break;
                 case "length":
-                    currentValue = String.valueOf(currentValue.length());
+                    currentValue =  String.valueOf(currentValue).length();;
                     break;
                 case "lowercase":
-                    currentValue = currentValue.toLowerCase();
+                    currentValue = String.valueOf(currentValue).toLowerCase();
                     break;
                 case "uppercase":
-                    currentValue = currentValue.toUpperCase();
+                    currentValue = String.valueOf(currentValue).toUpperCase();
                     break;
                 default:
                     break; // unknown escape -> literal char
             }
         }
 
-        return currentValue;
+        return String.valueOf(currentValue);
     }
 
 //    public List<WebElement> getWebElements() {

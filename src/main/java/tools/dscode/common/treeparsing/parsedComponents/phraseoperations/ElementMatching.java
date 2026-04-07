@@ -25,7 +25,6 @@ public class ElementMatching {
             }
         }
         elementMatches.removeIf(e -> e.isPlaceHolder() && e.elementMatcher == null);
-
         if (elementMatches.size() != elementMatchers.length) {
             throw new RuntimeException("Operation expected " + elementMatchers.length + " elements, but found " + elementMatches.size() + ". " + elementMatches);
         }

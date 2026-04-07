@@ -5,6 +5,7 @@ import org.openqa.selenium.NoAlertPresentException;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.browseroperations.WindowSwitch;
+import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
@@ -12,7 +13,10 @@ import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.util.FileUploadUtil;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.MatchResult;
+import java.util.regex.Pattern;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.browseroperations.BrowserAlerts.accept;
@@ -30,6 +34,9 @@ import static tools.dscode.common.domoperations.KeyParser.sendComplexKeys;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitForDuration;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
+import static tools.dscode.common.mappings.ParsingMap.configsRoot;
+import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
+import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
 import static tools.dscode.coredefinitions.BrowserSteps.getDefaultDriver;
@@ -80,39 +87,82 @@ public enum ActionOperations implements OperationsInterface {
             });
         }
     },
-    GET {
-        @Override
-        public void execute(PhraseData phraseData) {
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE).mustNotMatchAny(ElementType.KEY_VALUE),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.KEY_VALUE)
-            );
-
-            ElementMatch valueElement = phraseData.resultElements.getFirst();
-            ElementMatch keyElement = phraseData.resultElements.get(1);
-        }
-    },
     SAVE {
         @Override
         public void execute(PhraseData phraseData) {
-//            System.out.println(phraseData + " : Executing " + this.name());
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE).mustNotMatchAny(ElementType.KEY_VALUE),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.KEY_VALUE)
-            );
+            System.out.println(phraseData + " : Executing " + this.name());
 
-            ElementMatch valueElement = phraseData.resultElements.getFirst();
-            ElementMatch keyElement = phraseData.resultElements.get(1);
-            String keyName = keyElement == null ? "saved" : keyElement.getValue().toString();
+            ElementMatch regexMatchElement = phraseData.getElementMatches().stream().filter(e -> e.elementTypes.contains(ElementType.REGEX_MATCH)).findFirst().orElse(null);
+            ElementMatch valueElement = phraseData.getElementMatches().stream().filter(e -> e.elementTypes.contains(ElementType.RETURNS_VALUE) && !e.elementTypes.contains(ElementType.KEY_VALUE)).findFirst().orElse(null);
+            ElementMatch keyElement = phraseData.getElementMatches().stream().filter(e -> e.elementTypes.contains(ElementType.KEY_VALUE)).findFirst().orElse(null);
+
+
+
+//            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+//                    new ElementMatcher()
+//                            .mustMatchAll(ElementType.RETURNS_VALUE).mustNotMatchAny(ElementType.KEY_VALUE),
+//                    new ElementMatcher()
+//                            .mustMatchAll(ElementType.KEY_VALUE)
+//            );
+
+            boolean regexMatchSave = regexMatchElement != null;
+            boolean regexMatchWithReference = regexMatchSave && regexMatchElement.defaultText.type != ValueWrapper.ValueTypes.BACK_TICKED;
+            String regexReference = regexMatchWithReference ? regexMatchElement.defaultText.toString() : "";
+            Pattern tempPattern = null;
+            if(regexMatchSave)
+            {
+                String regexString = regexMatchWithReference ? String.valueOf(getFromRunningParsingMapCaseInsensitive(configsRoot + ".REGEX." + regexReference)) : regexMatchElement.defaultText.toString();
+                tempPattern = Pattern.compile(regexString);
+                if(regexMatchElement.defaultText.type == ValueWrapper.ValueTypes.SINGLE_QUOTED)
+                    tempPattern = Pattern.compile(
+                            tempPattern.pattern(),
+                            tempPattern.flags() | Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
+                    );
+            }
+            final Pattern pattern = tempPattern;
+
+            String keyName = keyElement == null ? (regexMatchWithReference? regexReference : "saved") : keyElement.getValue().toString();
             phraseData.result = Attempt.run(() -> {
                 for (ValueWrapper valueWrapper : valueElement.getValues()) {
+                    Object value = valueWrapper.getValue();
+                    if(pattern != null){
+                        List<String> matches = pattern.matcher(String.valueOf(value))
+                                .results()
+                                .map(MatchResult::group)
+                                .toList();
+                        if(matches.isEmpty() && !regexMatchElement.selectionType.equalsIgnoreCase("any"))
+                            throw new RuntimeException("No matches found for regex: " + pattern  + " in value: " + value);
+
+                        if(regexMatchElement.elementPosition.equalsIgnoreCase("first"))
+                            value = matches.getFirst();
+                        else if(regexMatchElement.elementPosition.equalsIgnoreCase("last"))
+                            value = matches.getLast();
+                        else
+                        {
+                            int matchIndex = regexMatchElement.elementPosition.isBlank() ? matches.size() -1 : Integer.parseInt(regexMatchElement.elementPosition) -1;
+                            int repeatCount = matchIndex + 1;
+                            if(regexMatchElement.selectionType.isBlank())
+                            {
+                                value = matches.get(matchIndex);
+                            }
+                            else
+                            {
+                                if(regexMatchElement.elementPosition.isBlank())
+                                    value = String.join("", matches);
+                                else
+                                {
+                                    List<String> result = new ArrayList<>();
+                                    for (int i = matchIndex ; i < matches.size(); i += repeatCount) {
+                                        result.add(matches.get(i));
+                                    }
+                                    value = String.join("", result);
+                                }
+                            }
+                        }
+                    }
                     System.out.println(phraseData + " : Executing " + this.name());
-                    System.out.println("Action: " + this.name() + " : '" + valueWrapper + "' to key: '" + keyName + "'");
-                    getRunningStep().getStepParsingMap().put(keyName, valueWrapper.getValue());
+                    System.out.println("Action: " + this.name() + " : '" + value + "' to key: '" + keyName + "'");
+                    getRunningParsingMap().put(keyName, value);
                 }
                 return true;
             });
