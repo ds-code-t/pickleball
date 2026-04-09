@@ -260,6 +260,15 @@ public final class DefinitionContext {
                 self.parent().putToLocalState("assertion", assertion);
 
                 self.parent().putToLocalState("operationIndex", self.start);
+
+                if (assertion.equals("displayed")) {
+                    self.parent().children().forEach(em -> {
+                        if (em.name().equals("elementMatch") && em.resolvedGroupText("type").equals(VALUE_TYPE_MATCH)) {
+                            em.putToLocalState("type", "Text");
+                        }
+                    });
+                }
+
                 return self.originalText();
             }
         };
@@ -373,7 +382,7 @@ public final class DefinitionContext {
             ;
 
 
-            category("Button").children("Buttons").andAnyCategories( HTML_NAME_ATTRIBUTES, CONTAINS_TEXT)
+            category("Button").children("Buttons").andAnyCategories(HTML_NAME_ATTRIBUTES, CONTAINS_TEXT)
                     .addBase("//*[self::button or @role='button']");
 
 
@@ -410,7 +419,7 @@ public final class DefinitionContext {
                     );
 
 
-            category("Modal").children("Modals", "Dialog", "Dialogs").andAnyCategories(CONTAINS_TEXT,  HTML_NAME_ATTRIBUTES)
+            category("Modal").children("Modals", "Dialog", "Dialogs").andAnyCategories(CONTAINS_TEXT, HTML_NAME_ATTRIBUTES)
                     .addBase("//div[@role='dialog' or @aria-model='true' or @id='modalWrapper'][normalize-space()]");
 
 
@@ -552,7 +561,7 @@ public final class DefinitionContext {
                             XPathy.from("//*[self::thead or self::tr[th] or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)]")
                     );
 
-            category("Header").children("Headers" ,"Column Header", "Column Headers").inheritsFrom(CONTAINS_TEXT)
+            category("Header").children("Headers", "Column Header", "Column Headers").inheritsFrom(CONTAINS_TEXT)
                     .and((category, v, op) ->
                             XPathy.from("//*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)]")
                     );

@@ -145,7 +145,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         scenarioLog =
                 Entry.of(scenarioName)
                         .tag("SCENARIO")
-                        .tag("RP_SUITE:SuiteA")
+                        .tag("RP_SUITE:Root")
                         .on(new SimpleHtmlReportConverter(
                                 Path.of("reports/tests", safeFileName(scenarioName + ".html"))
                         ))

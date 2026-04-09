@@ -59,7 +59,7 @@ public final class Tokenized {
 
         while (m.find()) {
             String segment = m.group(1);
-            m.appendReplacement(sb, "`" + segment + "`");
+            m.appendReplacement(sb, Matcher.quoteReplacement("`" + segment + "`"));
         }
         m.appendTail(sb);
         return sb.toString();

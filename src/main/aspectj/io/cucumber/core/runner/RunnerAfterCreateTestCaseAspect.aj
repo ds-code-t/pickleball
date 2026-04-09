@@ -16,7 +16,7 @@ public aspect RunnerAfterCreateTestCaseAspect {
     }
 
     // Intercept Runner.createTestCaseForPickle(Pickle)
-    pointcut createTestCase(Runner runner, Pickle pickle) :
+    pointcut createTestCase(Runner runner, Pickle pickle):
             execution(private io.cucumber.core.runner.TestCase
                     io.cucumber.core.runner.Runner.createTestCaseForPickle(
                     io.cucumber.core.gherkin.Pickle))
@@ -24,12 +24,14 @@ public aspect RunnerAfterCreateTestCaseAspect {
                     && args(pickle);
 
     // Run AFTER the method completes successfully
-    after(Runner runner, Pickle pickle) returning (TestCase testCase) :
+    after(Runner runner, Pickle pickle) returning (TestCase testCase):
             createTestCase(runner, pickle) {
 
         CachingGlue glue = runner.__ajc_getGlue();
-        testCase.currentScenarioState.scenarioRunner = runner;
-        testCase.currentScenarioState.cachingGlue = glue;
+        if (testCase.currentScenarioState.scenarioRunner == null)
+            testCase.currentScenarioState.scenarioRunner = runner;
+        if (testCase.currentScenarioState.cachingGlue == null)
+            testCase.currentScenarioState.cachingGlue = glue;
         System.out.printf(
                 "AfterCreateTestCase: runner=%s glue=%s pickle=%s testCase=%s%n",
                 runner,

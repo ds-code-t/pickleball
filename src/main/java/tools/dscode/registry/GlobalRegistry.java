@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static io.cucumber.core.runner.GlobalState.globalRunner;
 
@@ -36,7 +37,7 @@ public final class GlobalRegistry {
         return normalizeKey(type.getName());
     }
 
-    public static List<Runner> runners = new ArrayList<>();
+    public static List<Runner> runners = new CopyOnWriteArrayList<>();
 
     public static void registerGlobal(Object instance) {
         if(globalRunner == null  && instance instanceof Runner runner){

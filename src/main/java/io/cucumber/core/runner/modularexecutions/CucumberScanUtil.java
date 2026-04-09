@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -28,9 +27,6 @@ import static io.cucumber.core.runner.modularexecutions.FilePathResolver.findFil
 import static tools.dscode.pickleruntime.CucumberOptionResolver.features;
 
 public final class CucumberScanUtil {
-
-    // Cache parsed Features keyed by normalized, sorted feature-URI list
-    private static final ConcurrentHashMap<String, List<Feature>> FEATURE_CACHE = new ConcurrentHashMap<>();
 
     private static String globalFeaturePathsString;
 
@@ -41,7 +37,6 @@ public final class CucumberScanUtil {
         }
         return globalFeaturePathsString;
     }
-
 
     // Default directories if cucumber.features is not provided
     private static final String[] DEFAULT_FEATURE_DIRS = {
@@ -54,18 +49,18 @@ public final class CucumberScanUtil {
 
     public static List<Pickle> listPicklesByTags(String tagString) {
         String featurePathsOption = getGlobalFeaturePathsString();
-        List<Feature> features = FEATURE_CACHE.computeIfAbsent(featurePathsOption, k ->
-        {
-            Map<String, String> featureOptions = new HashMap<>();
-            featureOptions.put("cucumber.features", k);
-            RuntimeOptions runtimeOptions = new CucumberPropertiesParser().parse(featureOptions).build();
-            return parseFeatures(runtimeOptions);
-        });;
+
+        Map<String, String> featureOptions = new HashMap<>();
+        featureOptions.put("cucumber.features", featurePathsOption);
+        RuntimeOptions runtimeOptions = new CucumberPropertiesParser().parse(featureOptions).build();
+        List<Feature> features = parseFeatures(runtimeOptions);
+
         Map<String, String> cucumberProps = new HashMap<>();
         cucumberProps.put("cucumber.filter.tags", tagString);
         RuntimeOptions cucumberOptions = new CucumberPropertiesParser().parse(cucumberProps).build();
         Filters filters = new Filters(cucumberOptions);
-          return features.stream()
+
+        return features.stream()
                 .flatMap(f -> f.getPickles().stream())
                 .filter(filters::test)
                 .collect(Collectors.toUnmodifiableList());
@@ -73,16 +68,16 @@ public final class CucumberScanUtil {
 
     /**
      * List matching scenarios (Pickles) for the given cucumber.* properties.
-     * Important keys you may pass: - cucumber.features (comma-separated URIs;
-     * file: or classpath:) - cucumber.filter.tags (tag expression) -
-     * cucumber.filter.name (regex) - (others are passed through; glue not
-     * required for listing)
+     * Important keys you may pass:
+     * - cucumber.features (comma-separated URIs; file: or classpath:)
+     * - cucumber.filter.tags (tag expression)
+     * - cucumber.filter.name (regex)
+     * - (others are passed through; glue not required for listing)
      */
     public static List<Pickle> listPickles(Map<String, String> cucumberProps) {
         Objects.requireNonNull(cucumberProps, "cucumberProps");
 
-        // 1) Ensure we have a concrete set of feature URIs in props (inject
-        // defaults if missing)
+        // 1) Ensure we have a concrete set of feature URIs in props (inject defaults if missing)
         Map<String, String> effectiveProps = new HashMap<>(cucumberProps);
         List<String> featureUris = resolveFeatureUris(effectiveProps.get("cucumber.features"));
         effectiveProps.put("cucumber.features", String.join(",", featureUris));
@@ -90,9 +85,8 @@ public final class CucumberScanUtil {
         // 2) Let Cucumber parse options (tags, name, lines, etc.)
         RuntimeOptions options = new CucumberPropertiesParser().parse(effectiveProps).build();
 
-        // 3) Load & cache features for this URI set
-        String cacheKey = normalizeKey(featureUris);
-        List<Feature> features = FEATURE_CACHE.computeIfAbsent(cacheKey, k -> parseFeatures(options));
+        // 3) Load fresh features every time so Pickles/steps are not reused across runs
+        List<Feature> features = parseFeatures(options);
 
         // 4) Apply filters (tags, name, line filters)
         Filters filters = new Filters(options);
@@ -103,10 +97,10 @@ public final class CucumberScanUtil {
     }
 
     /**
-     * Clear cached parsed features (e.g., after file changes).
+     * Clear cached resolved feature-path state (kept for API compatibility).
      */
     public static void clearCache() {
-        FEATURE_CACHE.clear();
+        globalFeaturePathsString = null;
     }
 
     // --------------------- internals ---------------------
@@ -135,8 +129,9 @@ public final class CucumberScanUtil {
         try {
             for (String path : findFileDirectoryPaths("/src/**/*.feature")) {
                 String u = toExistingUriOrNull(path);
-                if (u != null)
+                if (u != null) {
                     uris.add(u);
+                }
             }
             return uris;
         } catch (IOException e) {
@@ -145,13 +140,13 @@ public final class CucumberScanUtil {
             }
             return uris;
         }
-
     }
 
     private static String toExistingUriOrNull(String pathOrUri) {
         String uri = toUriString(pathOrUri);
-        if (uri.startsWith("classpath:"))
+        if (uri.startsWith("classpath:")) {
             return uri; // let Cucumber resolve
+        }
         try {
             String noScheme = uri.startsWith("file:") ? uri.substring("file:".length()) : uri;
             Path p = Paths.get(noScheme);
@@ -163,8 +158,9 @@ public final class CucumberScanUtil {
 
     private static String toUriString(String pathOrUri) {
         String s = pathOrUri.trim();
-        if (s.startsWith("classpath:") || s.startsWith("file:"))
+        if (s.startsWith("classpath:") || s.startsWith("file:")) {
             return s;
+        }
         Path abs = Paths.get(s).toAbsolutePath();
         return "file:" + abs.toString().replace('\\', '/');
     }
@@ -186,8 +182,7 @@ public final class CucumberScanUtil {
             System.out.println(" - " + p.getName() + " [" + p.getUri() + ":" + p.getLocation().getLine() + "]");
         }
 
-        // Cache demo
         List<Pickle> again = CucumberScanUtil.listPickles(props);
-        System.out.println("Second call (cached): " + again.size());
+        System.out.println("Second call (fresh parse): " + again.size());
     }
 }

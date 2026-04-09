@@ -1,5 +1,26 @@
 Feature: Addition
 
+
+  Scenario Outline: dynamic scenario run test <Scenario>
+    * test2 test1
+
+    Examples:
+      | Scenario  |
+      | Scenario1 |
+      | Scenario2 |
+      | Scenario3 |
+
+
+  Scenario Outline: zzsStart Run component
+    * , if "1" is "1":
+    : * , save "a" as "A"
+#    * , wait 6 seconds
+    * , if "1" is "1":
+  : * , save "a" as "A"
+    Examples:
+      | Scenario Tags |
+      | %zer1         |
+
   @AAAs
   Scenario: sdf
     * ,  save any 3rd `\d` Match from "123456789"

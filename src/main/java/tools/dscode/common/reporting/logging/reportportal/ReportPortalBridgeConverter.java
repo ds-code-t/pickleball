@@ -13,6 +13,7 @@ import tools.dscode.common.reporting.logging.Status;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.Locale;
 import java.util.Set;
@@ -30,6 +31,8 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
         if (isScenarioRoot(scope, entry)) {
             ReportPortalBridge.startTest(entry.text, suiteName(scope));
+        } else {
+            ReportPortalBridge.log(level(entry.level), "STARTED: " + safe(entry.text));
         }
 
         ReportPortalBridge.throwIfAsyncFailure();
@@ -39,7 +42,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     public void onTimestamp(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
 
-        ReportPortalHierarchy.logToCurrentTest(safe(entry.text), level(entry.level));
+        ReportPortalBridge.log(level(entry.level), safe(entry.text));
         flushAttachments(entry, level(entry.level), safe(entry.text));
 
         ReportPortalBridge.throwIfAsyncFailure();
@@ -59,7 +62,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
             ReportPortalBridge.finishCurrentTest(status(entry.status));
         } else {
             flushAttachments(entry, levelForStop(entry), safe(entry.text));
-            ReportPortalHierarchy.logToCurrentTest(flatten(entry), levelForStop(entry));
+            ReportPortalBridge.log(levelForStop(entry), formatStoppedSpan(entry));
         }
 
         ReportPortalBridge.throwIfAsyncFailure();
@@ -79,7 +82,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                     .append('\n');
         }
 
-        ReportPortalHierarchy.logToCurrentTest(sb.toString(), "INFO");
+        ReportPortalBridge.log("INFO", sb.toString());
     }
 
     @Override
@@ -203,6 +206,36 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                 : (payload.length() <= 32 ? payload : payload.substring(0, 32) + "...");
 
         return "name='" + a.name() + "', mime='" + a.mime() + "', payload='" + preview + "'";
+    }
+
+    private static String formatStoppedSpan(Entry entry) {
+        StringBuilder sb = new StringBuilder(256);
+
+        sb.append("STOPPED: ").append(safe(entry.text));
+        sb.append("\nstatus: ").append(status(entry.status));
+
+        if (entry.startedAt != null && entry.stoppedAt != null) {
+            Duration d = Duration.between(entry.startedAt, entry.stoppedAt);
+            sb.append("\nduration: ").append(formatDuration(d));
+        }
+
+        if (!entry.fields.isEmpty()) {
+            sb.append("\nfields:");
+            entry.fields.forEach((k, v) ->
+                    sb.append("\n- ").append(k).append(": ").append(v == null ? "" : v));
+        }
+
+        return sb.toString();
+    }
+
+    private static String formatDuration(Duration d) {
+        long millis = d.toMillis();
+        long hours = millis / 3_600_000;
+        long minutes = (millis % 3_600_000) / 60_000;
+        long seconds = (millis % 60_000) / 1_000;
+        long ms = millis % 1_000;
+
+        return String.format("%02d:%02d:%02d.%03d", hours, minutes, seconds, ms);
     }
 
     private static String safe(String s) {

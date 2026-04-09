@@ -354,7 +354,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
             if (stringReplacement.isEmpty() && key != null && !key.isBlank()) {
                 stringReplacement = key.startsWith("?") ? "<" + key + ">" : "<?" + key + ">";
             }
-            m.appendReplacement(sb, stringReplacement);
+            m.appendReplacement(sb, Matcher.quoteReplacement(stringReplacement));
             m.appendTail(sb);
             return sb.toString();
         } catch (Throwable t) {

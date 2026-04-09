@@ -43,6 +43,9 @@ public class ScenarioStep extends StepExtension {
             scenarioStep.stepParsingMap.clear();
             scenarioStep.stepParsingMap.getMaps().putAll(parsingMap.getMaps());
         }
+        System.out.println("@@##createScenarioStep: " + pickle);
+        System.out.println("@@##pickle.getUri(): " + pickle.getUri());
+       pickle.getSteps().forEach(step -> System.out.println("@@##step: " + step.getText()));
         scenarioStep.initializeScenarioSteps(createPickleStepTestStepsFromPickle(pickle).stream().map(step -> new StepExtension(getTestCase(), step)).toList());
         return scenarioStep;
     }

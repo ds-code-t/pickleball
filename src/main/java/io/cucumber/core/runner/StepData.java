@@ -125,6 +125,7 @@ public abstract class StepData extends StepMapping {
 
 
     StepData(TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
+        System.out.println("@@pickleStepTestStep===: " + pickleStepTestStep.getStep().getText());
         this.testCase = testCase;
 
         this.pickleStepTestStep = pickleStepTestStep;

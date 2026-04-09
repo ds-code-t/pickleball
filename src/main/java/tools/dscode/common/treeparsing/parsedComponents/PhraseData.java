@@ -219,8 +219,6 @@ public abstract class PhraseData extends PassedData {
             isFrom = context.equals("from");
             getXPathyContext(this, getElementMatches());
         } else {
-            System.out.println("@@phraseNode: " + phraseNode);
-            System.out.println("@@phraseNode.getStringFromLocalState(\"action\"): " + phraseNode.getStringFromLocalState("action"));
             setAction(phraseNode.getStringFromLocalState("action"));
             if (getAction().isBlank()) {
                 setAssertionType(phraseNode.getStringFromLocalState("assertionType"));

@@ -41,7 +41,13 @@ public class GlobalState {
 
 
     static {
-        String entryName = "Pickleball Run " + (tags().isEmpty() ? "" : tags());
+        String entryName = "Pickleball Run";
+        try {
+            entryName = entryName + " " + (tags().isEmpty() ? "" : tags());
+        }
+        catch (Exception ignored) {
+            // Options intermittently load at a later time
+        }
         pickleballLog =
                 Entry.of(entryName).excludeFromSummary()
                         .tag("RUNLOG")
@@ -72,29 +78,43 @@ public class GlobalState {
         return localOrGlobalOf(io.cucumber.core.runtime.Runtime.class);
     }
 
-    public static Runner globalRunner = null;
+    public static volatile Runner globalRunner = null;
+    private static volatile CachingGlue globalCachingGlue = null;
 
     public static Runner getGlobalRunner() {
-        int counter = 0;
-        while (globalRunner == null && counter++ < 10) {
-            for (Runner runner : runners) {
-                CachingGlue glue = (CachingGlue) getProperty(runner, "glue");
-                Map stepDefinitionsByPattern = (Map) getProperty(glue, "stepDefinitionsByPattern");
-                if (!stepDefinitionsByPattern.isEmpty()) {
-                    globalRunner = runner;
-                    globalCachingGlue = glue;
-                    break;
+        if (globalRunner != null) return globalRunner;
+
+        synchronized (GlobalState.class) {
+            if (globalRunner != null) return globalRunner;
+
+            int counter = 0;
+            while (globalRunner == null && counter++ < 10) {
+                for (Runner runner : runners) {
+                    CachingGlue glue = (CachingGlue) getProperty(runner, "glue");
+                    if (glue == null) continue;
+
+                    Map<?, ?> stepDefinitionsByPattern =
+                            (Map<?, ?>) getProperty(glue, "stepDefinitionsByPattern");
+
+                    if (stepDefinitionsByPattern != null && !stepDefinitionsByPattern.isEmpty()) {
+                        globalCachingGlue = glue;
+                        globalRunner = runner;
+                        break;
+                    }
+                }
+
+                if (globalRunner == null) {
+                    waitMilliseconds(1000);
                 }
             }
-            waitMilliseconds(1000);
+
+            runners.clear();
+            return globalRunner;
         }
-        runners.clear();
-        return globalRunner;
     }
 
-    private static CachingGlue globalCachingGlue = null;
-
     public static CachingGlue getGlobalCachingGlue() {
+        if (globalCachingGlue != null) return globalCachingGlue;
         getGlobalRunner();
         return globalCachingGlue;
     }
