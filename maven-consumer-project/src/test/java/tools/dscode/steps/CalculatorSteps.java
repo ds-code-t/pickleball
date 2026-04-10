@@ -113,6 +113,11 @@ public class CalculatorSteps {
     }
 
 
+    @Given("^call scenario(?: (.*))?$")
+    public static void callScenario(String scenarioTag) {
+        runScenarioFromTag(scenarioTag);
+    }
+
     @Given("^test2(?: (.*))?$")
     public static void test2(String value) {
         System.out.println("@@test: " + value);

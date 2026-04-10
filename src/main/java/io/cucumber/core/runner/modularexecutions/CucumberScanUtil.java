@@ -8,35 +8,33 @@ import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.options.CucumberPropertiesParser;
 import io.cucumber.core.options.RuntimeOptions;
 import io.cucumber.core.runtime.FeaturePathFeatureSupplier;
+import io.cucumber.core.gherkin.messages.GherkinMessagesFeatureParser;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import static io.cucumber.core.runner.modularexecutions.FilePathResolver.findFileDirectoryPaths;
 import static tools.dscode.pickleruntime.CucumberOptionResolver.features;
 
 public final class CucumberScanUtil {
 
-    private static String globalFeaturePathsString;
+    /**
+     * Cache only the AspectJ-modified source per feature URI, keyed by the normalized feature-URI set.
+     * This avoids reusing parsed Feature/Pickle object graphs across calls.
+     */
+    private static final ConcurrentHashMap<String, Map<URI, String>> FEATURE_CACHE = new ConcurrentHashMap<>();
 
-    public static synchronized String getGlobalFeaturePathsString() {
-        if (globalFeaturePathsString == null) {
-            List<String> features = features().stream().map(FilePathResolver::toAbsoluteFileUri).toList();
-            globalFeaturePathsString = features.isEmpty() ? normalizeKey(List.of(DEFAULT_FEATURE_DIRS)) : normalizeKey(features);
-        }
-        return globalFeaturePathsString;
-    }
+    private static String globalFeaturePathsString;
 
     // Default directories if cucumber.features is not provided
     private static final String[] DEFAULT_FEATURE_DIRS = {
@@ -47,13 +45,26 @@ public final class CucumberScanUtil {
     private CucumberScanUtil() {
     }
 
+    public static synchronized String getGlobalFeaturePathsString() {
+        if (globalFeaturePathsString == null) {
+            List<String> features = features().stream()
+                    .map(FilePathResolver::toAbsoluteFileUri)
+                    .toList();
+            globalFeaturePathsString = features.isEmpty()
+                    ? normalizeKey(List.of(DEFAULT_FEATURE_DIRS))
+                    : normalizeKey(features);
+        }
+        return globalFeaturePathsString;
+    }
+
     public static List<Pickle> listPicklesByTags(String tagString) {
         String featurePathsOption = getGlobalFeaturePathsString();
 
         Map<String, String> featureOptions = new HashMap<>();
         featureOptions.put("cucumber.features", featurePathsOption);
         RuntimeOptions runtimeOptions = new CucumberPropertiesParser().parse(featureOptions).build();
-        List<Feature> features = parseFeatures(runtimeOptions);
+
+        List<Feature> features = getFreshFeaturesFromCachedSources(featurePathsOption, runtimeOptions);
 
         Map<String, String> cucumberProps = new HashMap<>();
         cucumberProps.put("cucumber.filter.tags", tagString);
@@ -85,8 +96,9 @@ public final class CucumberScanUtil {
         // 2) Let Cucumber parse options (tags, name, lines, etc.)
         RuntimeOptions options = new CucumberPropertiesParser().parse(effectiveProps).build();
 
-        // 3) Load fresh features every time so Pickles/steps are not reused across runs
-        List<Feature> features = parseFeatures(options);
+        // 3) Load cached modified source, rebuild fresh Feature objects every call
+        String cacheKey = normalizeKey(featureUris);
+        List<Feature> features = getFreshFeaturesFromCachedSources(cacheKey, options);
 
         // 4) Apply filters (tags, name, line filters)
         Filters filters = new Filters(options);
@@ -97,10 +109,62 @@ public final class CucumberScanUtil {
     }
 
     /**
-     * Clear cached resolved feature-path state (kept for API compatibility).
+     * Clear cached modified feature source.
      */
     public static void clearCache() {
+        FEATURE_CACHE.clear();
         globalFeaturePathsString = null;
+    }
+
+    // --------------------- source cache / rebuild ---------------------
+
+    /**
+     * Returns fresh Feature instances rebuilt from cached modified source.
+     * The cache stores only source text, never parsed Feature graphs.
+     */
+    private static List<Feature> getFreshFeaturesFromCachedSources(String cacheKey, Options featureOptions) {
+        Map<URI, String> cachedSources = getOrLoadModifiedSources(cacheKey, featureOptions);
+        return rebuildFeaturesFromSources(cachedSources);
+    }
+
+    /**
+     * Gets cached modified source for the feature set, loading it once by parsing through the normal
+     * FeaturePathFeatureSupplier pipeline and extracting Feature.getSource().
+     */
+    private static Map<URI, String> getOrLoadModifiedSources(String cacheKey, Options featureOptions) {
+        return FEATURE_CACHE.computeIfAbsent(cacheKey, k -> loadModifiedSources(featureOptions));
+    }
+
+    /**
+     * Parses features once through the normal pipeline and caches only URI -> modified source.
+     */
+    private static Map<URI, String> loadModifiedSources(Options featureOptions) {
+        List<Feature> parsedFeatures = parseFeatures(featureOptions);
+        Map<URI, String> sourceMap = new LinkedHashMap<>();
+
+        for (Feature feature : parsedFeatures) {
+            URI uri = Objects.requireNonNull(feature.getUri(), "feature uri");
+            String source = Objects.requireNonNull(feature.getSource(), "feature source");
+            sourceMap.put(uri, source);
+        }
+
+        return Collections.unmodifiableMap(sourceMap);
+    }
+
+    /**
+     * Rebuild fresh Feature instances from already-cached modified source strings.
+     */
+    private static List<Feature> rebuildFeaturesFromSources(Map<URI, String> sourceMap) {
+        GherkinMessagesFeatureParser parser = new GherkinMessagesFeatureParser();
+        List<Feature> rebuilt = new ArrayList<>(sourceMap.size());
+
+        for (Map.Entry<URI, String> entry : sourceMap.entrySet()) {
+            Feature feature = parser.parse(entry.getKey(), entry.getValue(), UUID::randomUUID)
+                    .orElseThrow(() -> new IllegalStateException("No feature parsed for: " + entry.getKey()));
+            rebuilt.add(feature);
+        }
+
+        return rebuilt;
     }
 
     // --------------------- internals ---------------------
@@ -112,7 +176,10 @@ public final class CucumberScanUtil {
     }
 
     private static String normalizeKey(List<String> featureUris) {
-        return featureUris.stream().map(String::trim).sorted().collect(Collectors.joining(","));
+        return featureUris.stream()
+                .map(String::trim)
+                .sorted()
+                .collect(Collectors.joining(","));
     }
 
     private static List<String> resolveFeatureUris(String cucumberFeaturesProp) {
@@ -124,36 +191,13 @@ public final class CucumberScanUtil {
                     .collect(Collectors.toList());
         }
 
-        // No cucumber.features provided → use defaults that actually exist
-        List<String> uris = new ArrayList<>();
-        try {
-            for (String path : findFileDirectoryPaths("/src/**/*.feature")) {
-                String u = toExistingUriOrNull(path);
-                if (u != null) {
-                    uris.add(u);
-                }
-            }
-            return uris;
-        } catch (IOException e) {
-            if (uris.isEmpty()) {
-                uris.add("classpath:features");
-            }
-            return uris;
-        }
-    }
+        List<String> features = features().stream()
+                .map(FilePathResolver::toAbsoluteFileUri)
+                .toList();
 
-    private static String toExistingUriOrNull(String pathOrUri) {
-        String uri = toUriString(pathOrUri);
-        if (uri.startsWith("classpath:")) {
-            return uri; // let Cucumber resolve
-        }
-        try {
-            String noScheme = uri.startsWith("file:") ? uri.substring("file:".length()) : uri;
-            Path p = Paths.get(noScheme);
-            return Files.exists(p) ? uri : null;
-        } catch (Exception ignored) {
-            return null;
-        }
+        return features.isEmpty()
+                ? List.of(DEFAULT_FEATURE_DIRS)
+                : features;
     }
 
     private static String toUriString(String pathOrUri) {
@@ -161,20 +205,14 @@ public final class CucumberScanUtil {
         if (s.startsWith("classpath:") || s.startsWith("file:")) {
             return s;
         }
-        Path abs = Paths.get(s).toAbsolutePath();
-        return "file:" + abs.toString().replace('\\', '/');
+        return FilePathResolver.toAbsoluteFileUri(s);
     }
 
     // --------------------- demo ---------------------
 
     public static void main(String[] args) {
         Map<String, String> props = new HashMap<>();
-        // Supply filters the same way you would to Cucumber:
         props.put("cucumber.filter.tags", "@TagK");
-        // props.put("cucumber.filter.name", ".*Calculator.*");
-
-        // Optionally pin features explicitly:
-        // props.put("cucumber.features", "file:src/test/resources/features");
 
         List<Pickle> pickles = CucumberScanUtil.listPickles(props);
         System.out.println("Matching scenarios: " + pickles.size());
@@ -183,6 +221,6 @@ public final class CucumberScanUtil {
         }
 
         List<Pickle> again = CucumberScanUtil.listPickles(props);
-        System.out.println("Second call (fresh parse): " + again.size());
+        System.out.println("Second call (rebuilt from cached source): " + again.size());
     }
 }

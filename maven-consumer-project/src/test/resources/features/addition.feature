@@ -1,5 +1,8 @@
 Feature: Addition
 
+  Scenario: calling Test
+    * test2
+
 
   Scenario Outline: dynamic scenario run test <Scenario>
     * test2 test1
