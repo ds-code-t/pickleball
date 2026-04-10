@@ -5,18 +5,17 @@ import io.cucumber.core.feature.Options;
 import io.cucumber.core.filter.Filters;
 import io.cucumber.core.gherkin.Feature;
 import io.cucumber.core.gherkin.Pickle;
-import io.cucumber.core.gherkin.messages.GherkinMessagesFeatureParser;
 import io.cucumber.core.options.CucumberPropertiesParser;
 import io.cucumber.core.options.RuntimeOptions;
 import io.cucumber.core.runtime.FeaturePathFeatureSupplier;
+import io.cucumber.core.gherkin.messages.GherkinMessagesFeatureParser;
 
-import java.io.IOException;
 import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -29,18 +28,11 @@ import static tools.dscode.pickleruntime.CucumberOptionResolver.features;
 
 public final class CucumberScanUtil {
 
-    private static final GherkinMessagesFeatureParser FEATURE_PARSER = new GherkinMessagesFeatureParser();
     /**
-     * Cache only the resolved feature URIs per normalized feature-URI set.
-     * This avoids retaining large feature source strings or parsed Feature graphs.
+     * Cache only the AspectJ-modified source per feature URI, keyed by the normalized feature-URI set.
+     * This avoids reusing parsed Feature/Pickle object graphs across calls.
      */
-    private static final ConcurrentHashMap<String, List<URI>> FEATURE_CACHE = new ConcurrentHashMap<>();
-
-    /**
-     * Small per-URI lock map to reduce duplicate concurrent parsing of the same file.
-     * This is intentionally lightweight and only locks one URI at a time.
-     */
-    private static final ConcurrentHashMap<URI, Object> FEATURE_PARSE_LOCKS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Map<URI, String>> FEATURE_CACHE = new ConcurrentHashMap<>();
 
     private static String globalFeaturePathsString;
 
@@ -72,7 +64,7 @@ public final class CucumberScanUtil {
         featureOptions.put("cucumber.features", featurePathsOption);
         RuntimeOptions runtimeOptions = new CucumberPropertiesParser().parse(featureOptions).build();
 
-        List<Feature> features = getFreshFeaturesFromCachedUris(featurePathsOption, runtimeOptions);
+        List<Feature> features = getFreshFeaturesFromCachedSources(featurePathsOption, runtimeOptions);
 
         Map<String, String> cucumberProps = new HashMap<>();
         cucumberProps.put("cucumber.filter.tags", tagString);
@@ -96,15 +88,19 @@ public final class CucumberScanUtil {
     public static List<Pickle> listPickles(Map<String, String> cucumberProps) {
         Objects.requireNonNull(cucumberProps, "cucumberProps");
 
+        // 1) Ensure we have a concrete set of feature URIs in props (inject defaults if missing)
         Map<String, String> effectiveProps = new HashMap<>(cucumberProps);
         List<String> featureUris = resolveFeatureUris(effectiveProps.get("cucumber.features"));
         effectiveProps.put("cucumber.features", String.join(",", featureUris));
 
+        // 2) Let Cucumber parse options (tags, name, lines, etc.)
         RuntimeOptions options = new CucumberPropertiesParser().parse(effectiveProps).build();
 
+        // 3) Load cached modified source, rebuild fresh Feature objects every call
         String cacheKey = normalizeKey(featureUris);
-        List<Feature> features = getFreshFeaturesFromCachedUris(cacheKey, options);
+        List<Feature> features = getFreshFeaturesFromCachedSources(cacheKey, options);
 
+        // 4) Apply filters (tags, name, line filters)
         Filters filters = new Filters(options);
         return features.stream()
                 .flatMap(f -> f.getPickles().stream())
@@ -112,69 +108,68 @@ public final class CucumberScanUtil {
                 .collect(Collectors.toUnmodifiableList());
     }
 
-
-
-    public static Feature getFeatureFromUri(URI uri) {
-        Objects.requireNonNull(uri, "uri");
-
-        Object lock = FEATURE_PARSE_LOCKS.computeIfAbsent(uri, k -> new Object());
-
-        synchronized (lock) {
-            try {
-                String source = Files.readString(Path.of(uri));
-                return FEATURE_PARSER
-                        .parse(uri, source, UUID::randomUUID)
-                        .orElseThrow(() -> new IllegalStateException("No feature parsed for: " + uri));
-            } catch (IOException e) {
-                throw new RuntimeException("Failed reading feature source from: " + uri, e);
-            } finally {
-                FEATURE_PARSE_LOCKS.remove(uri, lock);
-            }
-        }
-    }
-
     /**
-     * Clear cached feature URI lists.
+     * Clear cached modified feature source.
      */
     public static void clearCache() {
         FEATURE_CACHE.clear();
-        FEATURE_PARSE_LOCKS.clear();
         globalFeaturePathsString = null;
     }
 
-    // --------------------- uri cache / rebuild ---------------------
+    // --------------------- source cache / rebuild ---------------------
 
     /**
-     * Returns fresh Feature instances rebuilt from cached URIs.
-     * The cache stores only URIs, never source text or parsed Feature graphs.
+     * Returns fresh Feature instances rebuilt from cached modified source.
+     * The cache stores only source text, never parsed Feature graphs.
      */
-    private static List<Feature> getFreshFeaturesFromCachedUris(String cacheKey, Options featureOptions) {
-        List<URI> cachedUris = getOrLoadFeatureUris(cacheKey, featureOptions);
-        List<Feature> rebuilt = new ArrayList<>(cachedUris.size());
+    private static List<Feature> getFreshFeaturesFromCachedSources(String cacheKey, Options featureOptions) {
+        Map<URI, String> cachedSources = getOrLoadModifiedSources(cacheKey, featureOptions);
+        return rebuildFeaturesFromSources(cachedSources);
+    }
 
-        for (URI uri : cachedUris) {
-            rebuilt.add(getFeatureFromUri(uri));
+
+    private static final Object LOCK = new Object();
+
+    /**
+     * Gets cached modified source for the feature set, loading it once by parsing through the normal
+     * FeaturePathFeatureSupplier pipeline and extracting Feature.getSource().
+     */
+    private static Map<URI, String> getOrLoadModifiedSources(String cacheKey, Options featureOptions) {
+        synchronized (LOCK) {
+            return FEATURE_CACHE.computeIfAbsent(cacheKey, k -> loadModifiedSources(featureOptions));
+        }
+    }
+
+    /**
+     * Parses features once through the normal pipeline and caches only URI -> modified source.
+     */
+    private static Map<URI, String> loadModifiedSources(Options featureOptions) {
+        List<Feature> parsedFeatures = parseFeatures(featureOptions);
+        Map<URI, String> sourceMap = new LinkedHashMap<>();
+
+        for (Feature feature : parsedFeatures) {
+            URI uri = Objects.requireNonNull(feature.getUri(), "feature uri");
+            String source = Objects.requireNonNull(feature.getSource(), "feature source");
+            sourceMap.put(uri, source);
+        }
+
+        return Collections.unmodifiableMap(sourceMap);
+    }
+
+    /**
+     * Rebuild fresh Feature instances from already-cached modified source strings.
+     */
+    private static List<Feature> rebuildFeaturesFromSources(Map<URI, String> sourceMap) {
+        GherkinMessagesFeatureParser parser = new GherkinMessagesFeatureParser();
+        List<Feature> rebuilt = new ArrayList<>(sourceMap.size());
+
+        for (Map.Entry<URI, String> entry : sourceMap.entrySet()) {
+            Feature feature = parser.parse(entry.getKey(), entry.getValue(), UUID::randomUUID)
+                    .orElseThrow(() -> new IllegalStateException("No feature parsed for: " + entry.getKey()));
+            rebuilt.add(feature);
         }
 
         return rebuilt;
-    }
-
-    /**
-     * Gets cached feature URIs for the feature set, loading them once
-     * through the normal FeaturePathFeatureSupplier pipeline.
-     */
-    private static List<URI> getOrLoadFeatureUris(String cacheKey, Options featureOptions) {
-        return FEATURE_CACHE.computeIfAbsent(cacheKey, k -> loadFeatureUris(featureOptions));
-    }
-
-    /**
-     * Parses features once through the normal pipeline and caches only the URIs.
-     */
-    private static List<URI> loadFeatureUris(Options featureOptions) {
-        return parseFeatures(featureOptions).stream()
-                .map(feature -> Objects.requireNonNull(feature.getUri(), "feature uri"))
-                .distinct()
-                .collect(Collectors.toUnmodifiableList());
     }
 
     // --------------------- internals ---------------------
@@ -231,6 +226,6 @@ public final class CucumberScanUtil {
         }
 
         List<Pickle> again = CucumberScanUtil.listPickles(props);
-        System.out.println("Second call (rebuilt from cached URIs): " + again.size());
+        System.out.println("Second call (rebuilt from cached source): " + again.size());
     }
 }
