@@ -261,7 +261,7 @@ public final class DefinitionContext {
 
                 self.parent().putToLocalState("operationIndex", self.start);
 
-                if (assertion.equals("displayed")) {
+                if (assertion.startsWith("displayed")) {
                     self.parent().children().forEach(em -> {
                         if (em.name().equals("elementMatch") && em.resolvedGroupText("type").equals(VALUE_TYPE_MATCH)) {
                             em.putToLocalState("type", "Text");

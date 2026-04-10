@@ -59,8 +59,6 @@ public privileged aspect PickleStepMetaTextAspect {
             PickleStepType type,
             String text
     ) : pickleStepCtorCall(argument, astNodeIds, id, type, text) {
-        System.out.println("@@[PickleStepMetaTextAspect] incoming text = [" + text + "]");
-        System.out.println("@@[PickleStepMetaTextAspect] has flag = " + (text != null && text.contains(PARSER_FLAG)));
         final String flag = PARSER_FLAG;
         if (text != null && flag != null && !flag.isEmpty()) {
             int idx = text.indexOf(flag);

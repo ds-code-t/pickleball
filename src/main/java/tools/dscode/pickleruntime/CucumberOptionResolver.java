@@ -125,15 +125,16 @@ public final class CucumberOptionResolver {
 
             boolean empty = normalized.isEmpty() || normalized.values().stream().allMatch(List::isEmpty);
             if (empty) {
-                System.out.println(
-                        "CucumberOptionResolver: No options discovered.\n" +
-                                "  Hints:\n" +
-                                "   • Ensure your consumer has a @Suite class with @ConfigurationParameter(GLUE_PROPERTY_NAME, \"...\")\n" +
-                                "   • Or set cucumber.glue in junit-platform.properties (in test resources)\n" +
-                                "   • Or pass -Dcucumber.glue=... on the build/test command\n" +
-                                "   • If using JPMS, confirm test classes are on the runtime module/class path"
-                );
-                throw new IllegalStateException("CucumberOptionResolver: No global Cucumber options were discovered.");
+                return normalized;
+//                System.out.println(
+//                        "CucumberOptionResolver: No options discovered.\n" +
+//                                "  Hints:\n" +
+//                                "   • Ensure your consumer has a @Suite class with @ConfigurationParameter(GLUE_PROPERTY_NAME, \"...\")\n" +
+//                                "   • Or set cucumber.glue in junit-platform.properties (in test resources)\n" +
+//                                "   • Or pass -Dcucumber.glue=... on the build/test command\n" +
+//                                "   • If using JPMS, confirm test classes are on the runtime module/class path"
+//                );
+//                throw new IllegalStateException("CucumberOptionResolver: No global Cucumber options were discovered.");
             }
 
             // Inject default glue if missing

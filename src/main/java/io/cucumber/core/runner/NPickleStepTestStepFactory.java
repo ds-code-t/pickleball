@@ -28,28 +28,16 @@ import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 public class NPickleStepTestStepFactory {
 
     public static List<PickleStepTestStep> createPickleStepTestStepsFromPickle(Pickle pickle) {
-        System.out.println("@@createPickleStepTestStepsFromPickle: " + pickle);
-        return pickle.getSteps().stream().map(step ->{
-            System.out.println("@@step: " + step.getText());
-            System.out.println("@@pickle.getUri(): " + step.getText());
-                return createPickleStepTestStep(pickle.getUri(), step, getStepDefinitionMatch(pickle.getUri(), step));
-    }
+        return pickle.getSteps().stream().map(step -> {
+                    return createPickleStepTestStep(pickle.getUri(), step, getStepDefinitionMatch(pickle.getUri(), step));
+                }
         ).toList();
     }
 
     public static PickleStepTestStep createPickleStepTestStep(URI uri, Step step, PickleStepDefinitionMatch pickleStepDefinitionMatch) {
-        System.out.println("@@createPickleStepTestStep: "  + step.getText());
-        System.out.println("@@uri: "  + uri);
-        System.out.println("@@pickleStepDefinitionMatch1: "  + pickleStepDefinitionMatch);
-        if(pickleStepDefinitionMatch == null)
-            throw new StepCreationException("11Failed step text: '" + step.getText() + "'.  Ensure that a matching step definition is on the glue path.");
-        System.out.println("@@pattern1: " + pickleStepDefinitionMatch.getStepDefinition().getPattern());
+        if (pickleStepDefinitionMatch == null)
+            throw new StepCreationException("Failed to find PickleStepDefinitionMatch for step text: '" + step.getText() + "'.  Ensure that a matching step definition is on the glue path.");
         pickleStepDefinitionMatch = updatePickleStepDefinitionMatch(pickleStepDefinitionMatch);
-        System.out.println("@@pickleStepDefinitionMatch2: "  + pickleStepDefinitionMatch);
-        if(pickleStepDefinitionMatch == null)
-            throw new StepCreationException("22Failed step text: '" + step.getText() + "'.  Ensure that a matching step definition is on the glue path.");
-        System.out.println("@@pattern2: " + pickleStepDefinitionMatch.getStepDefinition().getPattern());
-
         try {
             return new PickleStepTestStep(UUID.randomUUID(), toAbsoluteFileUri(uri), step, pickleStepDefinitionMatch);
         } catch (Exception e) {
@@ -83,16 +71,10 @@ public class NPickleStepTestStepFactory {
 
 
     public static io.cucumber.core.runner.PickleStepTestStep getPickleStepTestStepFromStrings(String keyword, String stepText, String argument) {
-        System.out.println("@@getPickleStepTestStepFromStrings: "  + stepText);
-        System.out.println("@@keyword: "  + keyword);
-        System.out.println("@@argument: "  + argument);
         Pickle pickle = createGherkinMessagesPickle(keyword, stepText, argument);
-        pickle.getSteps().forEach(step -> System.out.println("@@step--: " + step.getText()));
         Step onlyStep = pickle.getSteps().getFirst();
-        System.out.println("@@onlyStep = " + onlyStep.getText());
-        System.out.println("@@pickle.getUri() = " + pickle.getUri());
         PickleStepDefinitionMatch pickleStepDefinitionMatch = getStepDefinitionMatch(pickle.getUri(), onlyStep);
-        if(pickleStepDefinitionMatch == null)
+        if (pickleStepDefinitionMatch == null)
             throw new StepCreationException("Failed step text: '" + stepText + "'.  Ensure that a matching step definition is on the glue path.");
         return createPickleStepTestStep(pickle.getUri(), onlyStep, pickleStepDefinitionMatch);
     }
@@ -119,7 +101,7 @@ public class NPickleStepTestStepFactory {
         return createPickleStepTestStep(modelStep.getUri(), copiedStep, pickleStepDefinitionMatch);
     }
 
-    public static PickleStepDefinitionMatch getStepDefinitionMatch(URI uri, Step step)  {
+    public static PickleStepDefinitionMatch getStepDefinitionMatch(URI uri, Step step) {
         try {
             return attemptStepDefinitionMatch(uri, step);
         } catch (AmbiguousStepDefinitionsException e) {
@@ -134,8 +116,7 @@ public class NPickleStepTestStepFactory {
         final CachingGlue globalGlue = getGlobalCachingGlue();
         final String text = step.getText();
 
-        final boolean preferGlobal =
-                text.startsWith(SCENARIO_STEP) || text.equals(ROOT_STEP);
+        final boolean preferGlobal = glue == null || text.startsWith(SCENARIO_STEP) || text.equals(ROOT_STEP);
 
         final CachingGlue first = preferGlobal ? globalGlue : glue;
         final CachingGlue second = preferGlobal ? glue : globalGlue;

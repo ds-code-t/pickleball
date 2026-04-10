@@ -91,7 +91,6 @@ public class StepExtension extends StepData {
         }
 
         String metaText = pickleStepTestStep.getPickleStep().getMetaText();
-        System.out.println("@@metaText::: " + metaText);
         Matcher matcher = pattern.matcher(metaText);
 
         while (matcher.find()) {

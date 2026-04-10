@@ -95,6 +95,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
     public static CachingGlue getGlue() {
+        if (getCurrentScenarioState() == null) return null;
         return getCurrentScenarioState().cachingGlue;
     }
 

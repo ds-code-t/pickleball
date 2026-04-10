@@ -30,7 +30,6 @@ public aspect EncodingParserLineSwap {
      */
     String around(): readWithEncoding() {
         String ret = proceed();
-        System.out.println("@@EncodingParserLineSwap fired");
         String original = (ret == null) ? "" : ret;
         Matcher matcher = LINE_SWAP_PATTERN.matcher(original);
         StringBuffer sb = new StringBuffer();
