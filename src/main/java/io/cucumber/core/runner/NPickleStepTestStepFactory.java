@@ -11,6 +11,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
+import static io.cucumber.core.gherkin.messages.CucumberDeepCloneUtil.deepCloneGherkinMessagesStep;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.createGherkinMessagesPickle;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.createGherkinMessagesStep;
@@ -29,7 +30,8 @@ public class NPickleStepTestStepFactory {
 
     public static List<PickleStepTestStep> createPickleStepTestStepsFromPickle(Pickle pickle) {
         return pickle.getSteps().stream().map(step -> {
-                    return createPickleStepTestStep(pickle.getUri(), step, getStepDefinitionMatch(pickle.getUri(), step));
+                    Step cloneStep = deepCloneGherkinMessagesStep(step);
+                    return createPickleStepTestStep(pickle.getUri(), cloneStep, getStepDefinitionMatch(pickle.getUri(), cloneStep));
                 }
         ).toList();
     }
