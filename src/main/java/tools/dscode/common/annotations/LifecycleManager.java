@@ -6,11 +6,15 @@ import io.github.classgraph.ClassInfoList;
 import io.github.classgraph.MethodInfo;
 import io.github.classgraph.ScanResult;
 
+import java.io.File;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class LifecycleManager {
 
@@ -43,24 +47,33 @@ public class LifecycleManager {
             handlersByPhase.put(p, new ArrayList<>());
         }
 
+        List<String> scanRoots = consumerClasspathDirectories();
+        if (scanRoots.isEmpty()) {
+            finalizeRegistry();
+            return;
+        }
+
         try (ScanResult scan = new ClassGraph()
+                .overrideClasspath(scanRoots)
+                .disableNestedJarScanning()
                 .enableClassInfo()
                 .enableMethodInfo()
                 .enableAnnotationInfo()
-                .ignoreClassVisibility()
                 .scan()) {
 
             ClassInfoList classes = scan.getClassesWithMethodAnnotation(LifecycleHook.class.getName());
             for (ClassInfo ci : classes) {
+                Class<?> clazz = ci.loadClass();
+
                 for (MethodInfo mi : ci.getDeclaredMethodInfo()) {
                     if (!mi.hasAnnotation(LifecycleHook.class.getName())) continue;
-                    Method method = ci.loadClass().getDeclaredMethod(mi.getName());
-                    if (!java.lang.reflect.Modifier.isStatic(method.getModifiers()) ||
-                            method.getParameterCount() != 0) {
-                        // skip invalid methods; you could also log or throw
-                        continue;
-                    }
+                    if (!mi.isStatic()) continue;
+                    if (mi.getParameterInfo().length != 0) continue;
+
+                    Method method = clazz.getDeclaredMethod(mi.getName());
                     LifecycleHook ann = method.getAnnotation(LifecycleHook.class);
+                    if (ann == null) continue;
+
                     Phase phase = ann.value();
                     int order = ann.order();
                     handlersByPhase.get(phase).add(new LifecycleHandler(phase, order, method));
@@ -70,6 +83,10 @@ public class LifecycleManager {
             throw new RuntimeException(e);
         }
 
+        finalizeRegistry();
+    }
+
+    private void finalizeRegistry() {
         for (Phase phase : Phase.values()) {
             List<LifecycleHandler> list = handlersByPhase.get(phase);
             list.sort((a, b) -> {
@@ -82,5 +99,38 @@ public class LifecycleManager {
             });
             handlersByPhase.put(phase, List.copyOf(list));
         }
+    }
+
+    private static List<String> consumerClasspathDirectories() {
+        String cp = System.getProperty("java.class.path", "");
+        if (cp.isBlank()) return List.of();
+
+        Set<String> dirs = new LinkedHashSet<>();
+        for (String entry : cp.split(File.pathSeparator)) {
+            if (entry == null || entry.isBlank()) continue;
+
+            File f = new File(entry).getAbsoluteFile();
+            if (!f.isDirectory()) continue;
+
+            String path = normalizePath(f);
+            if (looksLikeConsumerOutputDir(path)) {
+                dirs.add(path);
+            }
+        }
+        return new ArrayList<>(dirs);
+    }
+
+    private static boolean looksLikeConsumerOutputDir(String path) {
+        String p = path.replace('\\', '/');
+        return p.endsWith("/target/classes")
+                || p.endsWith("/target/test-classes")
+                || p.contains("/build/classes/java/main")
+                || p.contains("/build/classes/java/test")
+                || p.contains("/out/production/")
+                || p.contains("/out/test/");
+    }
+
+    private static String normalizePath(File f) {
+        return f.getAbsolutePath();
     }
 }
