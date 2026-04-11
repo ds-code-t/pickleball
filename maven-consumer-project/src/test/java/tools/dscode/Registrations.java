@@ -9,6 +9,7 @@ import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.domoperations.elementstates.BinaryStateConditions;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathyBuilder;
+import tools.dscode.pickleruntime.CucumberOptionResolver;
 
 import java.util.List;
 
@@ -58,7 +59,12 @@ public class Registrations {
 
     @LifecycleHook(Phase.BEFORE_CUCUMBER_RUN)
     public static void beforeRun() {
+        System.out.println("Lifecycle hook invoked.");
+        System.out.println("Resolved options: " + CucumberOptionResolver.getAllOptions());
 
+        if (CucumberOptionResolver.getAllOptions().isEmpty()) {
+            throw new IllegalStateException("CucumberOptionResolver returned an empty options map.");
+        }
 
         ExecutionDictionary dict = getExecutionDictionary();
 
