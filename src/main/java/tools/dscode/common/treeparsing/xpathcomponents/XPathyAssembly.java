@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -155,6 +156,7 @@ public final class XPathyAssembly {
      * Combine all XPathy with logical AND: //*[ self::... and self::... and ... ]
      */
     public static XPathy combineAnd(List<XPathy> list) {
+        list = list.stream().filter(Objects::nonNull).toList();
         if (list.size() == 1) return list.getFirst();
         List<XPathy> sorted = new ArrayList<>(list);
         sorted.sort(Comparator.comparingInt(x -> xpathSpecificityScore(x.getXpath())));
@@ -181,6 +183,7 @@ public final class XPathyAssembly {
      * Combine all XPathy with logical OR: //*[ self::... or self::... or ... ]
      */
     public static XPathy combineOr(List<XPathy> list) {
+        list = list.stream().filter(Objects::nonNull).toList();
         if (list.size() == 1) return list.getFirst();
         List<XPathy> sorted = new ArrayList<>(list);
         sorted.sort(Comparator.comparingInt(x -> xpathSpecificityScore(x.getXpath())));

@@ -46,6 +46,7 @@ import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_PASSING;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_FALSE;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN;
+import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
@@ -440,7 +441,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
     public static Object getScenarioObject(String key) {
         key = normalizeRegistryKey(key);
-        Object returnObject = GlobalState.getRunningStep().getStepParsingMap().get(key);
+        Object returnObject = getRunningParsingMap().get(key);
         return returnObject == null ? GlobalRegistry.getLocal(key) : returnObject;
     }
 
