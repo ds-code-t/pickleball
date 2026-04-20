@@ -1,20 +1,14 @@
 package tools.dscode.common.annotations;
 
-import io.github.classgraph.ClassGraph;
-import io.github.classgraph.ClassInfo;
-import io.github.classgraph.ClassInfoList;
-import io.github.classgraph.MethodInfo;
-import io.github.classgraph.ScanResult;
+import tools.dscode.testengine.DynamicSuiteBase;
+import tools.dscode.testengine.DynamicSuiteBootstrap;
 
-import java.io.File;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public class LifecycleManager {
 
@@ -23,8 +17,7 @@ public class LifecycleManager {
 
     public void fire(Phase phase) {
         ensureInitialized();
-        List<LifecycleHandler> handlers = handlersByPhase.getOrDefault(phase, List.of());
-        for (LifecycleHandler h : handlers) {
+        for (LifecycleHandler h : handlersByPhase.getOrDefault(phase, List.of())) {
             try {
                 h.method.invoke(null);
             } catch (Exception e) {
@@ -37,50 +30,33 @@ public class LifecycleManager {
         if (initialized) return;
         synchronized (this) {
             if (initialized) return;
-            scanAndBuildRegistry();
+            buildRegistry();
             initialized = true;
         }
     }
 
-    private void scanAndBuildRegistry() {
+    private void buildRegistry() {
         for (Phase p : Phase.values()) {
             handlersByPhase.put(p, new ArrayList<>());
         }
 
-        List<String> scanRoots = consumerClasspathDirectories();
-        if (scanRoots.isEmpty()) {
+        Class<? extends DynamicSuiteBase> suiteClass = DynamicSuiteBootstrap.getDiscoveredSuiteClass();
+        if (suiteClass == null) {
             finalizeRegistry();
             return;
         }
 
-        try (ScanResult scan = new ClassGraph()
-                .overrideClasspath(scanRoots)
-                .disableNestedJarScanning()
-                .enableClassInfo()
-                .enableMethodInfo()
-                .enableAnnotationInfo()
-                .scan()) {
+        for (Method method : suiteClass.getDeclaredMethods()) {
+            if (!Modifier.isStatic(method.getModifiers())) continue;
+            if (method.getParameterCount() != 0) continue;
 
-            ClassInfoList classes = scan.getClassesWithMethodAnnotation(LifecycleHook.class.getName());
-            for (ClassInfo ci : classes) {
-                Class<?> clazz = ci.loadClass();
+            LifecycleHook ann = method.getAnnotation(LifecycleHook.class);
+            if (ann == null) continue;
 
-                for (MethodInfo mi : ci.getDeclaredMethodInfo()) {
-                    if (!mi.hasAnnotation(LifecycleHook.class.getName())) continue;
-                    if (!mi.isStatic()) continue;
-                    if (mi.getParameterInfo().length != 0) continue;
-
-                    Method method = clazz.getDeclaredMethod(mi.getName());
-                    LifecycleHook ann = method.getAnnotation(LifecycleHook.class);
-                    if (ann == null) continue;
-
-                    Phase phase = ann.value();
-                    int order = ann.order();
-                    handlersByPhase.get(phase).add(new LifecycleHandler(phase, order, method));
-                }
-            }
-        } catch (NoSuchMethodException e) {
-            throw new RuntimeException(e);
+            method.setAccessible(true);
+            handlersByPhase
+                    .get(ann.value())
+                    .add(new LifecycleHandler(ann.value(), ann.order(), method));
         }
 
         finalizeRegistry();
@@ -99,38 +75,5 @@ public class LifecycleManager {
             });
             handlersByPhase.put(phase, List.copyOf(list));
         }
-    }
-
-    private static List<String> consumerClasspathDirectories() {
-        String cp = System.getProperty("java.class.path", "");
-        if (cp.isBlank()) return List.of();
-
-        Set<String> dirs = new LinkedHashSet<>();
-        for (String entry : cp.split(File.pathSeparator)) {
-            if (entry == null || entry.isBlank()) continue;
-
-            File f = new File(entry).getAbsoluteFile();
-            if (!f.isDirectory()) continue;
-
-            String path = normalizePath(f);
-            if (looksLikeConsumerOutputDir(path)) {
-                dirs.add(path);
-            }
-        }
-        return new ArrayList<>(dirs);
-    }
-
-    private static boolean looksLikeConsumerOutputDir(String path) {
-        String p = path.replace('\\', '/');
-        return p.endsWith("/target/classes")
-                || p.endsWith("/target/test-classes")
-                || p.contains("/build/classes/java/main")
-                || p.contains("/build/classes/java/test")
-                || p.contains("/out/production/")
-                || p.contains("/out/test/");
-    }
-
-    private static String normalizePath(File f) {
-        return f.getAbsolutePath();
     }
 }

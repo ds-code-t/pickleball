@@ -17,10 +17,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static tools.dscode.common.GlobalConstants.ROOT_STEP;
 import static tools.dscode.common.util.Reflect.getProperty;
 
 
 public abstract class StepData extends StepMapping {
+//    public final boolean isRootStep;
+
     public Entry stepEntry;
 
     public RemoteWebDriver webDriverUsed = null;
@@ -125,6 +128,7 @@ public abstract class StepData extends StepMapping {
 
 
     StepData(TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
+//        isRootStep = pickleStepTestStep.getStepText().equals(ROOT_STEP);
         this.testCase = testCase;
 
         this.pickleStepTestStep = pickleStepTestStep;

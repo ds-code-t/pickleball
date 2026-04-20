@@ -44,10 +44,9 @@ import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.mappings.queries.Tokenized.AS_LIST_SUFFIX;
 import static tools.dscode.common.util.StringUtilities.decodeBackToText;
 import static tools.dscode.common.util.StringUtilities.encodeToPlaceHolders;
-import static tools.dscode.common.variables.RunVars.RUN_VARS;
-import static tools.dscode.common.variables.RunVars.appendDefaultPKBPrefix;
-import static tools.dscode.common.variables.RunVars.hasRecognizedPrefix;
+
 import static tools.dscode.common.variables.RunVars.resolveFromVars;
+import static tools.dscode.testengine.DynamicSuiteBase.PKB_PREFIX;
 
 public abstract class MappingProcessor implements Map<String, Object> {
 
@@ -398,7 +397,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
 //    }
 
     public Object getCaseInsensitive(String key) {
-        if (hasRecognizedPrefix(key)) {
+        if (key.contains("_") && key.toLowerCase().startsWith(PKB_PREFIX)) {
             return resolveFromVars(key);
         }
         Tokenized tokenized = new Tokenized(key);
@@ -415,7 +414,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
 
     private void putVar(String key, Object value) {
-        key = appendDefaultPKBPrefix(key);
+        key = (key.contains("_") && key.toLowerCase().startsWith(PKB_PREFIX)) ? key.toLowerCase() : PKB_PREFIX + key.toLowerCase();
         singletonMap.get().root.remove(key);
         singletonMap.get().root.set(key, MAPPER.valueToTree(value));
     }
@@ -456,8 +455,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
             if (key.startsWith("/")) {
                 return buildJsonFromPath(key.substring(1));
             }
-
-            if (hasRecognizedPrefix(key)) {
+            if (key.contains("_") && key.toLowerCase().startsWith(PKB_PREFIX)) {
                 return resolveFromVars(key);
             }
         }
@@ -556,9 +554,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
         if (key == null || key.isBlank())
             throw new RuntimeException("key cannot be null or blank");
 
-        if (hasRecognizedPrefix(key)) {
+        if (key.contains("_") && key.toLowerCase().startsWith(PKB_PREFIX)) {
             Object oldValue = resolveFromVars(key);
-            putVar(key, value);
+            putVar(key.toLowerCase(), value);
             return oldValue;
         }
         Tokenized tokenized = new Tokenized(key);

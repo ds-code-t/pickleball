@@ -24,11 +24,10 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
     public ScenarioStep io.cucumber.core.runner.TestCase.rootScenarioStep;
 
     public ScenarioStep io.cucumber.core.runner.TestCase.getRootScenarioStep() {
-        if(rootScenarioStep == null)
-        {
+        if (rootScenarioStep == null) {
             rootScenarioStep = ScenarioStep.createRootScenarioStep(this);
         }
-       return rootScenarioStep;
+        return rootScenarioStep;
     }
     // ✅ New field introduced as requested
     public CurrentScenarioState io.cucumber.core.runner.TestCase.currentScenarioState;
@@ -38,7 +37,7 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
                       List beforeHooks,
                       List afterHooks,
                       Pickle pickle,
-                      boolean dryRun) :
+                      boolean dryRun):
             call(io.cucumber.core.runner.TestCase.new(UUID, List, List, List, Pickle, boolean))
                     && args(id, testSteps, beforeHooks, afterHooks, pickle, dryRun);
 
@@ -49,15 +48,20 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
             List afterHooks,
             Pickle pickle,
             boolean dryRun
-    ) : ctorCall(id, testSteps, beforeHooks, afterHooks, pickle, dryRun) {
-        GlobalState.language = pickle.getLanguage();
+    ): ctorCall(id, testSteps, beforeHooks, afterHooks, pickle, dryRun) {
+        if (GlobalState.language == null) {
+            synchronized (GlobalState.class) {
+                if (GlobalState.language == null)
+                    GlobalState.language = pickle.getLanguage();
+            }
+        }
         resetCommonMaps();
         List original = testSteps;
 
 
         // Replace Cucumber runtime execution list with rootStep only
         List replaced = new ArrayList(1);
-        replaced.add(getRootStep() );
+        replaced.add(getRootStep());
 
         // Build TestCase normally but with replaced list
         TestCase tc = (TestCase) proceed(id, replaced, beforeHooks, afterHooks, pickle, dryRun);

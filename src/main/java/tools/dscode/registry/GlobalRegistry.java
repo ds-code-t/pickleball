@@ -1,7 +1,9 @@
 // src/main/java/tools/dscode/registry/GlobalRegistry.java
 package tools.dscode.registry;
 
+import io.cucumber.core.backend.Glue;
 import io.cucumber.core.runner.Runner;
+import org.apache.poi.ss.formula.functions.T;
 import org.openqa.selenium.WebDriver;
 
 import java.util.ArrayList;
@@ -11,7 +13,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-import static io.cucumber.core.runner.GlobalState.globalRunner;
+//import static io.cucumber.core.runner.GlobalState.globalRunner;
+import static io.cucumber.core.runner.GlobalState.isGluePopulated;
+//import static io.cucumber.core.runner.GlobalState.setGlobalRunner;
+import static io.cucumber.core.runner.NPickleStepTestStepFactory.printGlueInfo;
 
 public final class GlobalRegistry {
 
@@ -37,12 +42,18 @@ public final class GlobalRegistry {
         return normalizeKey(type.getName());
     }
 
-    public static List<Runner> runners = new CopyOnWriteArrayList<>();
+//    public static List<Runner> runners = new CopyOnWriteArrayList<>();
 
     public static void registerGlobal(Object instance) {
-        if(globalRunner == null  && instance instanceof Runner runner){
-            runners.add(runner);
-        }
+//        if (globalRunner == null && instance instanceof Runner runner) {
+//            System.out.println("@@globalRunner!!");
+//            if (isGluePopulated(runner)) {
+//                System.out.println("@@setting-runner");
+//                setGlobalRunner(runner);
+//                System.out.println("@@globalRunner::::: " + globalRunner);
+//            }
+//            return;
+//        }
         GLOBAL.putIfAbsent(keyFor(instance.getClass()), instance);
         // DEBUG (optional):
         // System.out.println("[Reg][GLOBAL] " + instance.getClass().getName());
@@ -51,11 +62,14 @@ public final class GlobalRegistry {
     public static void registerLocal(Object instance) {
         LOCAL.get().putIfAbsent(keyFor(instance.getClass()), instance);
 
-         System.out.println("[Reg][LOCAL ] " + instance.getClass().getName());
+        System.out.println("[Reg][LOCAL ] " + instance.getClass().getName());
     }
 
     public static void registerBoth(Object instance) {
-
+//        System.out.println("@@registerBoth:: " + instance);
+//        if (instance instanceof Glue cachingGlue) {
+//            printGlueInfo(cachingGlue);
+//        }
         registerGlobal(instance);
         registerLocal(instance);
     }
@@ -65,7 +79,6 @@ public final class GlobalRegistry {
     }
 
     public static <T> T getLocal(String key) {
-
 
 
         return (T) LOCAL.get().get(normalizeKey(key));

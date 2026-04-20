@@ -18,6 +18,7 @@ public aspect RegisterBothByList {
     /* Allow-list by FQCN (loader-agnostic matching) */
     private static final String[] TARGET_FQCNS = new String[] {
             "io.cucumber.core.runner.Runner",
+            "io.cucumber.core.runner.CachingGlue",
             "io.cucumber.core.runtime.Runtime",
             "io.cucumber.core.feature.FeatureParser",
             "io.cucumber.core.runtime.FeaturePathFeatureSupplier",

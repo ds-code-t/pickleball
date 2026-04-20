@@ -25,7 +25,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.modularexecutions.FilePathResolver.findFileDirectoryPaths;
-import static tools.dscode.pickleruntime.CucumberOptionResolver.features;
+import static tools.dscode.testengine.DynamicSuiteConfigUtils.getFeaturePaths;
 
 public final class CucumberScanUtil {
 
@@ -36,7 +36,7 @@ public final class CucumberScanUtil {
 
     public static synchronized String getGlobalFeaturePathsString() {
         if (globalFeaturePathsString == null) {
-            List<String> features = features().stream().map(FilePathResolver::toAbsoluteFileUri).toList();
+            List<String> features = getFeaturePaths().stream().map(FilePathResolver::toAbsoluteFileUri).toList();
             globalFeaturePathsString = features.isEmpty() ? normalizeKey(List.of(DEFAULT_FEATURE_DIRS)) : normalizeKey(features);
         }
         return globalFeaturePathsString;

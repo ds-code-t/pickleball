@@ -1,6 +1,8 @@
 package io.cucumber.core.runner;
 
+import io.cucumber.core.backend.Glue;
 import io.cucumber.core.eventbus.EventBus;
+import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.gherkin.GherkinDialect;
 import io.cucumber.gherkin.GherkinDialects;
 import io.cucumber.plugin.event.PickleStepTestStep;
@@ -14,6 +16,7 @@ import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverte
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Optional;
 
 
@@ -22,12 +25,13 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static io.cucumber.core.runner.CurrentScenarioState.currentScenarioState;
-import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.util.Reflect.getProperty;
+import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
-import static tools.dscode.pickleruntime.CucumberOptionResolver.tags;
+//import static tools.dscode.pickleruntime.CucumberOptionResolver.tags;
 import static tools.dscode.registry.GlobalRegistry.localOrGlobalOf;
-import static tools.dscode.registry.GlobalRegistry.runners;
+import static tools.dscode.testengine.DynamicSuiteConfigUtils.getPkbValues;
+
 
 public class GlobalState {
 
@@ -43,9 +47,8 @@ public class GlobalState {
     static {
         String entryName = "Pickleball Run";
         try {
-            entryName = entryName + " " + (tags().isEmpty() ? "" : tags());
-        }
-        catch (Exception ignored) {
+            entryName = entryName + " " + getPkbValues();
+        } catch (Exception ignored) {
             // Options intermittently load at a later time
         }
         pickleballLog =
@@ -81,41 +84,45 @@ public class GlobalState {
     public static volatile Runner globalRunner = null;
     private static volatile CachingGlue globalCachingGlue = null;
 
-    public static Runner getGlobalRunner() {
-        if (globalRunner != null) return globalRunner;
+    private static volatile Locale globalLocale = null;
 
+    public static Locale getOrSetGlobalLocale(Pickle pickle) {
+        if(globalLocale != null) return globalLocale;
+        if(pickle == null) return null;
         synchronized (GlobalState.class) {
-            if (globalRunner != null) return globalRunner;
+            globalLocale = (Locale) invokeAnyMethod(getGlobalRunner(),"localeForPickle", pickle);
+        }
+        return globalLocale;
+    }
 
-            int counter = 0;
-            while (globalRunner == null && counter++ < 10) {
-                for (Runner runner : runners) {
-                    CachingGlue glue = (CachingGlue) getProperty(runner, "glue");
-                    if (glue == null) continue;
-
-                    Map<?, ?> stepDefinitionsByPattern =
-                            (Map<?, ?>) getProperty(glue, "stepDefinitionsByPattern");
-
-                    if (stepDefinitionsByPattern != null && !stepDefinitionsByPattern.isEmpty()) {
-                        globalCachingGlue = glue;
-                        globalRunner = runner;
-                        break;
-                    }
-                }
-
-                if (globalRunner == null) {
-                    waitMilliseconds(1000);
-                }
-            }
-
-            runners.clear();
-            return globalRunner;
+    public static void setGlobalCachingGlue(Glue cachingGlue) {
+        if (globalCachingGlue != null) return;
+        synchronized (GlobalState.class) {
+            globalCachingGlue = (CachingGlue) cachingGlue;
         }
     }
 
+    public static void setGlobalRunner(Runner runner) {
+        if (globalRunner != null) return;
+        synchronized (GlobalState.class) {
+            globalRunner = runner;
+        }
+    }
+
+    public static boolean isGluePopulated(Runner runner) {
+        CachingGlue glue = (CachingGlue) getProperty(runner, "glue");
+        if (glue == null) return false;
+
+        Map<?, ?> stepDefinitionsByPattern =
+                (Map<?, ?>) getProperty(glue, "stepDefinitionsByPattern");
+        return stepDefinitionsByPattern != null && !stepDefinitionsByPattern.isEmpty();
+    }
+
+    public static Runner getGlobalRunner() {
+        return globalRunner;
+    }
+
     public static CachingGlue getGlobalCachingGlue() {
-        if (globalCachingGlue != null) return globalCachingGlue;
-        getGlobalRunner();
         return globalCachingGlue;
     }
 
@@ -208,17 +215,16 @@ public class GlobalState {
 
 
     public static StepExtension getRunningStep() {
-        CurrentScenarioState currentScenarioState =  getCurrentScenarioState();
-        if(currentScenarioState == null) return null;
+        CurrentScenarioState currentScenarioState = getCurrentScenarioState();
+        if (currentScenarioState == null) return null;
         return currentScenarioState.getCurrentStep();
     }
+
     public static Phrase getRunningPhrase() {
-        CurrentScenarioState currentScenarioState =  getCurrentScenarioState();
-        if(currentScenarioState == null) return null;
+        CurrentScenarioState currentScenarioState = getCurrentScenarioState();
+        if (currentScenarioState == null) return null;
         return currentScenarioState.currentPhrase;
     }
-
-
 
 
     public static void enterInDefaultReport(String columnName, Object value) {

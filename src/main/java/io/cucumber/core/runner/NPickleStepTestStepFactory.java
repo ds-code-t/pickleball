@@ -1,14 +1,25 @@
 package io.cucumber.core.runner;
 
+import io.cucumber.core.backend.Glue;
+import io.cucumber.core.backend.JavaMethodReference;
+import io.cucumber.core.backend.StepDefinition;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.gherkin.Step;
+import io.cucumber.core.stepexpression.Argument;
+import io.cucumber.core.stepexpression.StepExpression;
+import io.cucumber.core.stepexpression.StepExpressionFactory;
+import io.cucumber.core.stepexpression.StepTypeRegistry;
 import io.cucumber.messages.types.PickleStep;
 import io.cucumber.messages.types.PickleStepArgument;
 import tools.dscode.common.exceptions.StepCreationException;
 import tools.dscode.common.mappings.ParsingMap;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Type;
 import java.net.URI;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 import static io.cucumber.core.gherkin.messages.CucumberDeepCloneUtil.deepCloneGherkinMessagesStep;
@@ -18,13 +29,19 @@ import static io.cucumber.core.gherkin.messages.NGherkinFactory.createGherkinMes
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
 import static io.cucumber.core.runner.ArgStepFunctions.updatePickleStepDefinitionMatch;
 import static io.cucumber.core.runner.CurrentScenarioState.getGlue;
+import static io.cucumber.core.runner.CurrentScenarioState.getRunner;
 import static io.cucumber.core.runner.GlobalState.getGherkinDialect;
 import static io.cucumber.core.runner.GlobalState.getGlobalCachingGlue;
+import static io.cucumber.core.runner.GlobalState.getGlobalRunner;
+import static io.cucumber.core.runner.PickleStepDefinitionMatches.fromStaticZeroArgMethod;
 import static io.cucumber.core.runner.modularexecutions.FilePathResolver.toAbsoluteFileUri;
+import static tools.dscode.common.GlobalConstants.NON_GLUE_STEP_PREFIX;
 import static tools.dscode.common.GlobalConstants.ROOT_STEP;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.invokeAnyMethod;
+import static tools.dscode.coredefinitions.GeneralSteps.rootStepMethod;
+import static tools.dscode.coredefinitions.GeneralSteps.scenarioStepMethod;
 
 public class NPickleStepTestStepFactory {
 
@@ -40,6 +57,7 @@ public class NPickleStepTestStepFactory {
         if (pickleStepDefinitionMatch == null)
             throw new StepCreationException("Failed to find PickleStepDefinitionMatch for step text: '" + step.getText() + "'.  Ensure that a matching step definition is on the glue path.");
         pickleStepDefinitionMatch = updatePickleStepDefinitionMatch(pickleStepDefinitionMatch);
+
         try {
             return new PickleStepTestStep(UUID.randomUUID(), toAbsoluteFileUri(uri), step, pickleStepDefinitionMatch);
         } catch (Exception e) {
@@ -111,28 +129,27 @@ public class NPickleStepTestStepFactory {
         }
     }
 
+    public static void printGlueInfo(Glue cachingGlue) {
+        CachingGlue glue = (CachingGlue) cachingGlue;
+    }
+
     private static PickleStepDefinitionMatch attemptStepDefinitionMatch(URI uri, Step step)
             throws AmbiguousStepDefinitionsException {
+        if (step.getText().startsWith(NON_GLUE_STEP_PREFIX)) {
+            if (step.getText().equals(ROOT_STEP))
+                return fromStaticZeroArgMethod(rootStepMethod);
+            if (step.getText().startsWith(SCENARIO_STEP))
+                return fromStaticZeroArgMethod(scenarioStepMethod);
+        }
 
-        final CachingGlue glue = getGlue();
         final CachingGlue globalGlue = getGlobalCachingGlue();
-        final String text = step.getText();
 
-        final boolean preferGlobal = glue == null || text.startsWith(SCENARIO_STEP) || text.equals(ROOT_STEP);
+        synchronized (globalGlue) {
+            PickleStepDefinitionMatch pickleStepDefinitionMatch = globalGlue.stepDefinitionMatch(uri, step);
+            return pickleStepDefinitionMatch;
+        }
 
-        final CachingGlue first = preferGlobal ? globalGlue : glue;
-        final CachingGlue second = preferGlobal ? glue : globalGlue;
-
-        final PickleStepDefinitionMatch match;
-        synchronized (first) {
-            match = first.stepDefinitionMatch(uri, step);
-        }
-        if (match != null) {
-            return match;
-        }
-        synchronized (second) {
-            return second.stepDefinitionMatch(uri, step);
-        }
     }
+
 
 }

@@ -40,11 +40,13 @@ public class GlobalConstants {
     public static final String NEXT_SIBLING_STEP  = "\u207ANXT";
     public static final String PARSER_FLAG  = "\u207A-F";
     public static final String STEP_PREFIX = "\uFEFF\u200B\u00A0\u200C";
-    public static final String ROOT_STEP = STEP_PREFIX + "-ROOT-STEP-";
+    public static final String NON_GLUE_STEP_PREFIX = STEP_PREFIX + "_NG_";
+    public static final String ROOT_STEP = NON_GLUE_STEP_PREFIX + "-ROOT-STEP-";
+    public static final String SCENARIO_STEP = NON_GLUE_STEP_PREFIX + "SCENARIO: ";
     public static final String INFO_STEP = STEP_PREFIX + "INFO: ";
     public static final String HARD_ERROR_STEP = STEP_PREFIX + "FAIL ERROR: ";
     public static final String SOFT_ERROR_STEP = STEP_PREFIX + "ERROR: ";
-    public static final String SCENARIO_STEP = STEP_PREFIX + "SCENARIO: ";
+
 //    public static final String SCENARIO_STEP = "SCENARIO:";
     // public static final String ROOT_STEP = "ROOTSTEP";
     public static final UUID SKIP_LOGGING = new UUID(0L, 0xFFL);

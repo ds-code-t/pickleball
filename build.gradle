@@ -78,6 +78,7 @@ dependencies {
     // ✅ Change 2: update JUnit to what Cucumber 7.27.x expects
     api("org.junit.platform:junit-platform-suite-api:1.13.4")
     api("org.junit.platform:junit-platform-suite-engine:1.13.4")
+    api("org.junit.platform:junit-platform-launcher:1.13.4")
     api("org.junit.jupiter:junit-jupiter-api:5.13.4")
 
     api("com.google.guava:guava:33.5.0-jre")
@@ -102,7 +103,7 @@ dependencies {
     api 'com.epam.reportportal:client-java:5.4.8'
     compileOnly 'org.apache.logging.log4j:log4j-core:2.25.3'
 
-    implementation("io.github.classgraph:classgraph:4.8.184")
+//    implementation("io.github.classgraph:classgraph:4.8.184")
     implementation("org.apache.poi:poi-ooxml:5.5.1")
 
     // AspectJ toolchain + runtime

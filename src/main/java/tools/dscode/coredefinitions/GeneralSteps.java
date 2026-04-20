@@ -7,9 +7,13 @@ import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.DefinitionFlags;
+import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.reporting.logging.Log;
 import tools.dscode.common.exceptions.SoftRuntimeException;
+
+import java.lang.reflect.Method;
+
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.GlobalState.pickleballLog;
@@ -25,6 +29,32 @@ import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 
 public class GeneralSteps extends CoreSteps {
 
+    public static Method rootStepMethod;
+    public static Method scenarioStepMethod;
+
+    static {
+        try {
+            rootStepMethod = GeneralSteps.class.getMethod("rootStep");
+            scenarioStepMethod = GeneralSteps.class.getMethod("scenarioStep");
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Given("^" + SCENARIO_STEP + "\\s*(?:.*)$")
+    public static void scenarioStep() {
+
+    }
+
+
+    @DefinitionFlags(DefinitionFlag.RUN_METHOD_DIRECTLY)
+    @Given(ROOT_STEP)
+    public static void rootStep() {
+        getCurrentScenarioState().startScenarioRun();
+    }
+
+
+
     @BeforeAll
     public static void beforeAll() {
 
@@ -38,23 +68,6 @@ public class GeneralSteps extends CoreSteps {
         pickleballLog.stop();
     }
 
-
-
-
-
-
-
-    @Given("^" + SCENARIO_STEP + "\\s*(?:.*)$")
-    public static void scenarioStep() {
-
-    }
-
-    @DefinitionFlags(DefinitionFlag.RUN_METHOD_DIRECTLY)
-    @Given(ROOT_STEP)
-    public static void rootStep() {
-
-        getCurrentScenarioState().startScenarioRun();
-    }
 
     @Given("^"+INFO_STEP+ "(.*)$")
     public static void infoStep(String message) {

@@ -9,8 +9,8 @@ import io.cucumber.messages.types.PickleStepArgument;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import tools.dscode.common.annotations.DefinitionFlag;
+import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
-import tools.dscode.common.exceptions.StepCreationException;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
 import static io.cucumber.core.runner.CurrentScenarioState.getScenarioLogRoot;
-import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
+
 import static io.cucumber.core.runner.GlobalState.getGlobalEventBus;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.getTestCase;
@@ -54,6 +54,7 @@ import static tools.dscode.common.util.GeneralUtils.stackTraceToString;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
 import static tools.dscode.common.util.debug.DebugUtils.parseDebugString;
+import static tools.dscode.coredefinitions.GeneralSteps.rootStep;
 
 public class StepExtension extends StepData {
     private static final Pattern pattern = Pattern.compile("@\\[([^\\[\\]]*)\\]");
@@ -155,6 +156,10 @@ public class StepExtension extends StepData {
     }
 
     public Result run() {
+//        if(isRootStep){
+//            rootStep();
+//            return null;
+//        }
         if (stepEntry == null) {
             stepEntry = closestEntryToScenario();
         }

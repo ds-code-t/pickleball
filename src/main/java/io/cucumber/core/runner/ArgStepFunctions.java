@@ -17,8 +17,6 @@ import static tools.dscode.common.util.Reflect.getProperty;
 public class ArgStepFunctions {
 
     public static PickleStepDefinitionMatch updatePickleStepDefinitionMatch(PickleStepDefinitionMatch pickleStepDefinitionMatch) {
-
-
         List<Argument> args = pickleStepDefinitionMatch.getArguments();
         StepDefinition stepDefinition = pickleStepDefinitionMatch.getStepDefinition();
         if (!stepDefinition.getClass().getName().equals("io.cucumber.core.runner.CoreStepDefinition"))

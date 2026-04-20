@@ -8,6 +8,7 @@ import io.cucumber.docstring.DocStringTypeRegistryDocStringConverter;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import org.openqa.selenium.WebDriver;
+import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
@@ -34,6 +35,9 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
+import static io.cucumber.core.runner.GlobalState.getGlobalCachingGlue;
+import static io.cucumber.core.runner.GlobalState.getGlobalRunner;
+import static io.cucumber.core.runner.GlobalState.getOrSetGlobalLocale;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.GlobalState.pickleballLog;
@@ -48,6 +52,7 @@ import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.util.Reflect.getProperty;
+import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
 import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
@@ -113,8 +118,11 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public static Runner getRunner() {
+        if (getCurrentScenarioState() == null)
+            return null;
         return getCurrentScenarioState().scenarioRunner;
     }
+
 
     public Entry scenarioLog;
 
@@ -142,6 +150,11 @@ public class CurrentScenarioState extends ScenarioMapping {
 //    public static boolean logToReportPortal = getDependencyPropertyBoolean("rp.enable");
 
     public void startScenarioRun() {
+        CachingGlue glue = getGlobalCachingGlue();
+        if(glue.getStepPatternByStepText().isEmpty()) {
+            glue.prepareGlue(getOrSetGlobalLocale(pickle));
+        }
+
         String scenarioName = pickle.getName() + " , Line " + pickle.getLocation().getLine();
         pickleballLog.info("Starting scenario: '" + scenarioName + "'");
         scenarioLog =
@@ -246,7 +259,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void runStep(StepExtension stepExtension) {
-        if ( runAndEndStep != null ) {
+        if (runAndEndStep != null) {
             runAndEndStep.stepFlags.add(ALWAYS_RUN);
             runningStep(runAndEndStep);
             return;

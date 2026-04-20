@@ -3,6 +3,21 @@ Feature: Addition
   Scenario: calling Test
     * test2
 
+#    * , select the last Option "Choose a car:" Dropdown
+
+  @T122
+  Scenario: j test1ssszzz
+#    * test2 JAVA_HOME
+#    * test2 NVM_HOME
+    * dataTableTest1 dataTableTestxx
+      | a | b |
+      | 1 | 2 |
+    * navigate to: URL.select
+    * , verify "Subscribe" Checkbox is on, and "Subscribe" Checkbox is true
+#    * , verify Button is not displayed, and wait 10 seconds
+    * test2 Q
+
+
 
   Scenario Outline: dynamic scenario run test <Scenario>
     * test2 test1
@@ -100,7 +115,7 @@ Feature: Addition
 #    * , select the last Option "Choose a car:" Dropdown
 
   @T1
-  Scenario: j test1
+  Scenario: j test1sss
 #    * test2 JAVA_HOME
 #    * test2 NVM_HOME
     * dataTableTest1 dataTableTestxx
