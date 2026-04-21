@@ -129,7 +129,9 @@ public class ContextWrapper {
 //        elementPath = XPathy.from(XPathyUtils.maybeDeepestMatches(xPathy.getXpath()));
         elementPath = combineAnd(xPathyList);
         elementTerminalXPath = elementPath;
-        elementMatch.elementIndex = elementMatch.elementPosition.isEmpty() ? 1 : Integer.parseInt(elementMatch.elementPosition);
+
+        if(!elementMatch.elementPosition.equalsIgnoreCase("last"))
+            elementMatch.elementIndex = elementMatch.elementPosition.isEmpty() ? 1 : Integer.parseInt(elementMatch.elementPosition);
 //        if (elementMatch.elementPosition.isEmpty() && elementMatch.selectionType.isEmpty())
 //            elementTerminalXPath = elementPath.nth(1);
 ////        else if (elementMatch.elementPosition.isEmpty())

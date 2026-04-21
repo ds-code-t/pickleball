@@ -82,11 +82,11 @@ public abstract class PassedData {
                         if (currentPhrase.isOperationPhrase) {
                             if (!currentPhrase.getAction().isBlank()) {
                                 setAction(currentPhrase.getAction());
-                                operationIndex = firstElement.elementIndex + 1000;
+                                operationIndex = firstElement.position + 1000;
                                 setElementGroupings();
                             } else if (!currentPhrase.getAssertion().isBlank()) {
                                 setAssertion(currentPhrase.getAssertion());
-                                operationIndex = firstElement.elementIndex + 1000;
+                                operationIndex = firstElement.position + 1000;
                                 setElementGroupings();
                             }
                         }

@@ -98,6 +98,9 @@ public final class NestedByLocator {
 
         List<WebElement>  returnList = findWithRetry(context, locator, Duration.ofSeconds(10), displayedElementsOnly, mode);
 
+        if(elementMatch.elementPosition.equalsIgnoreCase("last"))
+            return new ArrayList<>(List.of(returnList.getLast()));
+
         if(elementMatch.selectionType.isEmpty()) {
             if(elementMatch.elementIndex  > returnList.size())
                 return new ArrayList<>();
