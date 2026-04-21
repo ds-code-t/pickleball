@@ -351,7 +351,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
 
 
-        if (stepExtension.logAndIgnore && stepExtension.definitionFlags.contains(IGNORE_CHILDREN_IF_FALSE)) {
+        if (stepExtension.lineData.lineConditionalMode < 1 && stepExtension.definitionFlags.contains(IGNORE_CHILDREN_IF_FALSE)) {
             return;
         }
 

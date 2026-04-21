@@ -24,13 +24,17 @@ public final class CucumberDeepCloneUtil {
 
         IdentityHashMap<Object, Object> seen = new IdentityHashMap<>();
 
-        return new PickleStep(
+        PickleStep clone =  new PickleStep(
                 deepCloneAny(source.getArgument().orElse(null), seen),
                 new ArrayList<>(source.getAstNodeIds()),
                 source.getId(),
                 source.getType().orElse(null),
                 source.getText()
         );
+        clone.metaText = source.metaText;
+        clone.nestingLevel = source.nestingLevel;
+
+        return clone;
     }
 
     public static GherkinMessagesStep deepCloneGherkinMessagesStep(io.cucumber.plugin.event.Step inputStep) {

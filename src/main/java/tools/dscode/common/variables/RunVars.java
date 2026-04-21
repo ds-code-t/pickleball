@@ -46,11 +46,11 @@ public class RunVars extends NodeMap {
     public final static RunVars RUN_VARS = new RunVars();
 
     @Override
-    public void put(String key, Object value) {
+    public synchronized void put(String key, Object value) {
         root.set(key, MAPPER.valueToTree(value));
     }
 
-    public void putAll(Object value) {
+    public synchronized void putAll(Object value) {
         if (value == null) {
             return;
         }

@@ -6,6 +6,7 @@ import org.junit.platform.engine.discovery.ClassSelector;
 import org.junit.platform.engine.discovery.PackageSelector;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.reflect.Modifier;
 import java.net.URI;
 import java.nio.file.Files;
@@ -15,6 +16,8 @@ import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
@@ -44,7 +47,7 @@ public final class DynamicSuiteBootstrap {
         }
     }
 
-    static DynamicSuiteBase initializeFromRuntimeClasspath() {
+    public static DynamicSuiteBase initializeFromRuntimeClasspath() {
         DynamicSuiteBase current = DynamicSuiteBase.rawInstance();
         if (current != null) {
             return current;
@@ -321,12 +324,52 @@ public final class DynamicSuiteBootstrap {
         List<URI> roots = new ArrayList<>(entries.length);
 
         for (String entry : entries) {
-            if (!entry.isBlank()) {
-                roots.add(Path.of(entry).toUri());
+            if (entry.isBlank()) {
+                continue;
+            }
+            URI uri = Path.of(entry).toUri();
+            roots.add(uri);
+
+            if (entry.endsWith(".jar")) {
+                roots.addAll(extractManifestClassPath(entry));
             }
         }
 
         return roots;
+    }
+
+    private static List<URI> extractManifestClassPath(String jarPath) {
+        List<URI> result = new ArrayList<>();
+        try (JarFile jarFile = new JarFile(jarPath)) {
+            Manifest manifest = jarFile.getManifest();
+            if (manifest == null) {
+                return result;
+            }
+
+            String manifestCp = manifest.getMainAttributes().getValue("Class-Path");
+            if (manifestCp == null || manifestCp.isBlank()) {
+                return result;
+            }
+
+            for (String cpEntry : manifestCp.split("\\s+")) {
+                if (cpEntry.isBlank()) {
+                    continue;
+                }
+                try {
+                    URI entryUri = URI.create(cpEntry);
+                    if (!entryUri.isAbsolute()) {
+                        URI jarUri = Path.of(jarPath).toAbsolutePath().getParent().toUri();
+                        entryUri = jarUri.resolve(cpEntry);
+                    }
+                    result.add(entryUri);
+                } catch (Exception e) {
+                    // Skip malformed manifest classpath entries
+                }
+            }
+        } catch (IOException e) {
+            // JAR has no readable manifest; skip
+        }
+        return result;
     }
 
     private static String classNames(Iterable<Class<?>> classes) {

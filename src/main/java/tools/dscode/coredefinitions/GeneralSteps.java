@@ -50,6 +50,7 @@ public class GeneralSteps extends CoreSteps {
     @DefinitionFlags(DefinitionFlag.RUN_METHOD_DIRECTLY)
     @Given(ROOT_STEP)
     public static void rootStep() {
+        System.out.println("@@rootStep!!!!!!!");
         getCurrentScenarioState().startScenarioRun();
     }
 

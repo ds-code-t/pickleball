@@ -372,7 +372,6 @@ publishing {
                 }
             }
 
-            // --- FIX: Build a correct POM dependencies list ---
             pom.withXml {
                 def pomNode = asNode()
 
@@ -382,91 +381,78 @@ publishing {
                         ? (groovy.util.Node) depsNodeList[0]
                         : pomNode.appendNode('dependencies')
 
-                // Remove anything Gradle/Shadow may have inserted (we're taking control)
+                // Clear anything Gradle/Shadow inserted
                 depsNode.children().clear()
 
-                // Coordinates you bundle/override -> must NOT be published as transitive deps
-                Set<String> bundledOrOverriddenGA = (
-                        ['org.aspectj:aspectjrt'] +                 // shaded via ajcRuntime
-                                ['io.cucumber:cucumber-bom']         // don't publish BOM as a normal dep
-                ) as Set
+                // These are bundled/woven into your shadow jar and must NOT be published
+                Set<String> bundledOrOverriddenGA = [
+                        'org.aspectj:aspectjrt',
+                        'io.cucumber:cucumber-bom',
+                        'io.cucumber:cucumber-core',
+                        'io.cucumber:cucumber-java',
+                        'io.cucumber:cucumber-plugin',
+                        'io.cucumber:messages',
+                        'io.cucumber:gherkin'
+                ] as Set
 
-                def declared = []
-                declared.addAll(configurations.api.allDependencies)
-                declared.addAll(configurations.implementation.allDependencies)
-
-                def resolvedVersionFor = { String g, String a ->
-                    def ra = configurations.runtimeClasspath
-                            .resolvedConfiguration
-                            .resolvedArtifacts
-                            .find { it.moduleVersion.id.group == g && it.name == a }
-                    return ra?.moduleVersion?.id?.version
+                // Optional: keep special version text for selenium
+                def declaredVersionFor = { String g, String a ->
+                    def dep = (configurations.api.allDependencies + configurations.implementation.allDependencies)
+                            .find { it.group == g && it.name == a }
+                    return dep?.version
                 }
 
                 Set<String> added = new LinkedHashSet<>()
 
-                declared.each { dep ->
-                    if (!(dep instanceof org.gradle.api.artifacts.ModuleDependency)) return
-                    if (!dep.group || !dep.name) return
+                // Publish the FULL resolved runtime graph, minus bundled modules
+                configurations.runtimeClasspath
+                        .resolvedConfiguration
+                        .resolvedArtifacts
+                        .each { ra ->
 
-                    String ga = "${dep.group}:${dep.name}"
+                            String g = ra.moduleVersion.id.group
+                            String a = ra.name
+                            String v = ra.moduleVersion.id.version
+                            String ga = "${g}:${a}"
 
-                    if (bundledOrOverriddenGA.contains(ga)) return
+                            if (!g || !a || !v) return
+                            if (bundledOrOverriddenGA.contains(ga)) return
+                            if (!added.add(ga)) return
 
-                    if (added.contains(ga)) return
-                    added.add(ga)
+                            def d = depsNode.appendNode('dependency')
+                            d.appendNode('groupId', g)
+                            d.appendNode('artifactId', a)
 
-                    String versionString
+                            // Preserve your selenium version range if desired
+                            if (ga == "org.seleniumhq.selenium:selenium-java") {
+                                d.appendNode('version', '[4.0,5.0)')
+                            } else {
+                                d.appendNode('version', v)
+                            }
 
-                    if (ga == "org.seleniumhq.selenium:selenium-java") {
-                        versionString = "[4.0,5.0)"
-                    } else {
-                        versionString = dep.version
-                        if (!versionString) {
-                            versionString = resolvedVersionFor(dep.group, dep.name)
+                            d.appendNode('scope', 'compile')
                         }
-                    }
 
-                    if (!versionString) {
-                        throw new GradleException("Cannot determine version for published dependency: ${ga}")
-                    }
+                // Preserve the exclusions on cucumber-junit-platform-engine as an extra safeguard
+                def engineDep = depsNode.children().find {
+                    it instanceof groovy.util.Node &&
+                            it.get('groupId')?.text() == 'io.cucumber' &&
+                            it.get('artifactId')?.text() == 'cucumber-junit-platform-engine'
+                }
 
-                    def d = depsNode.appendNode('dependency')
-                    d.appendNode('groupId', dep.group)
-                    d.appendNode('artifactId', dep.name)
-                    d.appendNode('version', versionString)
-                    d.appendNode('scope', 'compile')
-
-                    def existingExcls = d.get('exclusions') as groovy.util.NodeList
-                    def exclsNode = (existingExcls && existingExcls.size() > 0)
-                            ? (groovy.util.Node) existingExcls[0]
-                            : null
-
-                    if (ga == "io.cucumber:cucumber-junit-platform-engine") {
-                        if (exclsNode == null) exclsNode = d.appendNode('exclusions')
-
-                        [
-                                "io.cucumber:cucumber-core",
-                                "io.cucumber:cucumber-java",
-                                "io.cucumber:cucumber-plugin",
-                                "io.cucumber:messages",
-                                "io.cucumber:gherkin"
-                        ].each { gav ->
-                            def (eg, ea) = gav.split(':', 2)
-                            def ex = exclsNode.appendNode('exclusion')
-                            ex.appendNode('groupId', eg)
-                            ex.appendNode('artifactId', ea)
-                        }
-                    }
-
-                    if (dep.excludeRules && !dep.excludeRules.isEmpty()) {
-                        if (exclsNode == null) exclsNode = d.appendNode('exclusions')
-
-                        dep.excludeRules.each { er ->
-                            def ex = exclsNode.appendNode('exclusion')
-                            ex.appendNode('groupId', er.group ?: '*')
-                            ex.appendNode('artifactId', er.module ?: '*')
-                        }
+                if (engineDep instanceof groovy.util.Node) {
+                    def exclsNode = engineDep.appendNode('exclusions')
+                    [
+                            "io.cucumber:cucumber-core",
+                            "io.cucumber:cucumber-java",
+                            "io.cucumber:cucumber-plugin",
+                            "io.cucumber:messages",
+                            "io.cucumber:gherkin"
+                    ].each { gav ->
+                        def (eg, ea) = gav.split(':', 2)
+                        def ex = exclsNode.appendNode('exclusion')
+                        ex.appendNode('groupId', eg)
+                        ex.appendNode('artifactId', ea)
                     }
                 }
             }
