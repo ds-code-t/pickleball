@@ -2,8 +2,10 @@ package tools.dscode.common.reporting.logging.reportportal;
 
 import com.epam.reportportal.listeners.ListenerParameters;
 import com.epam.reportportal.message.ReportPortalMessage;
+import com.epam.reportportal.message.TypeAwareByteSource;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
+import com.epam.reportportal.utils.files.ByteSource;
 import com.epam.reportportal.utils.properties.PropertiesLoader;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
@@ -15,6 +17,7 @@ import io.reactivex.plugins.RxJavaPlugins;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -207,55 +210,25 @@ public final class ReportPortalBridge {
         byte[] data = Objects.requireNonNullElseGet(bytes, () -> new byte[0]);
         Date when = Date.from(logTime != null ? logTime : Instant.now());
 
-        Path tmp = null;
+
         try {
             String safeName = fallback(filenameHint, "attachment.bin");
-            String suffix = safeName.contains(".")
-                    ? safeName.substring(safeName.lastIndexOf('.'))
-                    : ".bin";
+            String mimeType = URLConnection.guessContentTypeFromName(safeName);
+            if (mimeType == null) mimeType = "application/octet-stream";
 
-            tmp = Files.createTempFile("rp-", suffix);
-            Files.write(tmp, data);
-            File file = tmp.toFile();
+            TypeAwareByteSource source = new TypeAwareByteSource(ByteSource.wrap(data), mimeType);
+            ReportPortalMessage rpMessage = new ReportPortalMessage(source, msg);
 
             Maybe<String> test = CURRENT_TEST.get();
             if (test != null) {
-                ReportPortalHierarchy.getLaunch().log(test, itemUuid -> {
-                    try {
-                        return ReportPortal.toSaveLogRQ(
-                                null,
-                                itemUuid,
-                                lvl,
-                                when,
-                                new ReportPortalMessage(file, msg)
-                        );
-                    } catch (IOException e) {
-                        throw new UncheckedIOException("Failed to build ReportPortal item attachment", e);
-                    }
-                });
+                ReportPortalHierarchy.getLaunch().log(test, itemUuid ->
+                        ReportPortal.toSaveLogRQ(null, itemUuid, lvl, when, rpMessage));
             } else {
-                ReportPortalHierarchy.getLaunch().log(launchId -> {
-                    try {
-                        return ReportPortal.toSaveLogRQ(
-                                launchId,
-                                null,
-                                lvl,
-                                when,
-                                new ReportPortalMessage(file, msg)
-                        );
-                    } catch (IOException e) {
-                        throw new UncheckedIOException("Failed to build ReportPortal launch attachment", e);
-                    }
-                });
+                ReportPortalHierarchy.getLaunch().log(launchId ->
+                        ReportPortal.toSaveLogRQ(launchId, null, lvl, when, rpMessage));
             }
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed to write ReportPortal attachment temp file", e);
-        } finally {
-            if (tmp != null) {
-                try {
-                    Files.deleteIfExists(tmp);
-                } catch (Exception ignored) { }
-            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to log ReportPortal attachment", e);
         }
     }
 

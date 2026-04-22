@@ -150,12 +150,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 //    public static boolean logToReportPortal = getDependencyPropertyBoolean("rp.enable");
 
     public void startScenarioRun() {
-        CachingGlue glue = getGlobalCachingGlue();
-        if(glue.getStepPatternByStepText().isEmpty()) {
-            glue.prepareGlue(getOrSetGlobalLocale(pickle));
-        }
-
-        String scenarioName = pickle.getName() + " , Line " + pickle.getLocation().getLine();
+         String scenarioName = pickle.getName() + " , Line " + pickle.getLocation().getLine();
         pickleballLog.info("Starting scenario: '" + scenarioName + "'");
         scenarioLog =
                 Entry.of(scenarioName)
@@ -447,15 +442,17 @@ public class CurrentScenarioState extends ScenarioMapping {
     //Singleton registration of object in both step nodes, and local register.
     public static void registerScenarioObject(String key, Object value) {
         key = normalizeRegistryKey(key);
-        GlobalState.getRunningStep().getDefaultStepNodeMap().put(key, value);
-        GlobalRegistry.putLocal(key, value);
+        getRunningParsingMap().getPrimaryRunMap().put(key, value);
+//        GlobalState.getRunningStep().getDefaultStepNodeMap().put(key, value);
+//        GlobalRegistry.putLocal(key, value);
     }
 
 
     public static Object getScenarioObject(String key) {
         key = normalizeRegistryKey(key);
-        Object returnObject = getRunningParsingMap().get(key);
-        return returnObject == null ? GlobalRegistry.getLocal(key) : returnObject;
+        return getRunningParsingMap().getPrimaryRunMap().get(key);
+//        Object returnObject = getRunningParsingMap().get(key);
+//        return returnObject == null ? GlobalRegistry.getLocal(key) : returnObject;
     }
 
     public static final String normalizationPrefix = "_obj_";

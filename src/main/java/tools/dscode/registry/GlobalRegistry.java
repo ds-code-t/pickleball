@@ -1,22 +1,11 @@
 // src/main/java/tools/dscode/registry/GlobalRegistry.java
 package tools.dscode.registry;
-
-import io.cucumber.core.backend.Glue;
-import io.cucumber.core.runner.Runner;
-import org.apache.poi.ss.formula.functions.T;
 import org.openqa.selenium.WebDriver;
-
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
-//import static io.cucumber.core.runner.GlobalState.globalRunner;
-import static io.cucumber.core.runner.GlobalState.isGluePopulated;
-//import static io.cucumber.core.runner.GlobalState.setGlobalRunner;
-import static io.cucumber.core.runner.NPickleStepTestStepFactory.printGlueInfo;
 
 public final class GlobalRegistry {
 

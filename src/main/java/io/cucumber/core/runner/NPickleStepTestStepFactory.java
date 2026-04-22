@@ -30,6 +30,7 @@ import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgume
 import static io.cucumber.core.runner.ArgStepFunctions.updatePickleStepDefinitionMatch;
 import static io.cucumber.core.runner.CurrentScenarioState.getGlue;
 import static io.cucumber.core.runner.CurrentScenarioState.getRunner;
+import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getGherkinDialect;
 import static io.cucumber.core.runner.GlobalState.getGlobalCachingGlue;
 import static io.cucumber.core.runner.GlobalState.getGlobalRunner;
@@ -142,7 +143,7 @@ public class NPickleStepTestStepFactory {
                 return fromStaticZeroArgMethod(scenarioStepMethod);
         }
 
-        final CachingGlue globalGlue = getGlobalCachingGlue();
+        final CachingGlue globalGlue = getCurrentScenarioState().cachingGlue == null ? getGlobalCachingGlue() : getCurrentScenarioState().cachingGlue;
 
         synchronized (globalGlue) {
             PickleStepDefinitionMatch pickleStepDefinitionMatch = globalGlue.stepDefinitionMatch(uri, step);

@@ -83,6 +83,7 @@ public class GlobalState {
 
     public static volatile Runner globalRunner = null;
     private static volatile CachingGlue globalCachingGlue = null;
+    private static volatile boolean gluePrepared = false;
 
     private static volatile Locale globalLocale = null;
 
@@ -95,12 +96,6 @@ public class GlobalState {
         return globalLocale;
     }
 
-    public static void setGlobalCachingGlue(Glue cachingGlue) {
-        if (globalCachingGlue != null) return;
-        synchronized (GlobalState.class) {
-            globalCachingGlue = (CachingGlue) cachingGlue;
-        }
-    }
 
     public static void setGlobalRunner(Runner runner) {
         if (globalRunner != null) return;
@@ -109,21 +104,29 @@ public class GlobalState {
         }
     }
 
-    public static boolean isGluePopulated(Runner runner) {
-        CachingGlue glue = (CachingGlue) getProperty(runner, "glue");
-        if (glue == null) return false;
-
-        Map<?, ?> stepDefinitionsByPattern =
-                (Map<?, ?>) getProperty(glue, "stepDefinitionsByPattern");
-        return stepDefinitionsByPattern != null && !stepDefinitionsByPattern.isEmpty();
-    }
 
     public static Runner getGlobalRunner() {
         return globalRunner;
     }
 
+
+    public static void setGlobalCachingGlue(Glue cachingGlue) {
+        if (globalCachingGlue != null) return;
+        synchronized (GlobalState.class) {
+            if (globalCachingGlue == null)
+                globalCachingGlue = (CachingGlue) cachingGlue;
+        }
+    }
+
     public static CachingGlue getGlobalCachingGlue() {
-        return globalCachingGlue;
+        if(gluePrepared) return globalCachingGlue;
+        synchronized (GlobalState.class) {
+            if(!gluePrepared) {
+                globalCachingGlue.prepareGlue(getOrSetGlobalLocale(getGherkinMessagesPickle()));
+                gluePrepared = true;
+            }
+            return globalCachingGlue;
+        }
     }
 
 //    public static io.cucumber.core.runner.Runner getRunner() {
