@@ -163,19 +163,18 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
 
     private void writeCombinedReport(Path outFile) throws IOException {
-        Map<String, ScopeState> snapshot;
+        Map<String, ScopeState> snapshot = new LinkedHashMap<>();
+
         synchronized (SharedSingleFile.LOCK) {
-            snapshot = new LinkedHashMap<>(SharedSingleFile.ALL_SCOPES);
+            for (Map.Entry<String, ScopeState> e : SharedSingleFile.ALL_SCOPES.entrySet()) {
+                snapshot.put(e.getKey(), deepCopyScopeState(e.getValue()));
+            }
         }
 
         if (outFile.getParent() != null) Files.createDirectories(outFile.getParent());
 
         String html = renderHtmlDocument(snapshot, outFile);
         Files.writeString(outFile, html, StandardCharsets.UTF_8);
-
-//        for (ScopeState s : snapshot.values()) {
-//            if (s.rowKey != null) GlobalState.registerScenarioHtml(s.rowKey, outFile);
-//        }
 
         System.out.println("[SimpleHtmlReportConverter] wrote combined: " + outFile.toAbsolutePath());
     }
@@ -189,9 +188,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
         synchronized (lock) {
             HtmlNode node = ensureNode(s, scope, entry);
-            applyMetaOncePerChange(s, entry, node);
 
-            // Capture lifecycle/timing on the node itself for cleaner headers.
             if (phase == Phase.START) {
                 node.startedAt = (entry.startedAt != null) ? entry.startedAt : Instant.now();
             } else if (phase == Phase.TIMESTAMP) {
@@ -203,20 +200,43 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
             if (entry.level != null) node.level = entry.level;
 
-            // Keep logs (still useful for “what happened”), but don’t rely on them for header timing.
+            // Only keep text log rows when they add information beyond the node title itself.
             if (phase == Phase.TIMESTAMP) {
                 Status st = (entry.status != null) ? entry.status : Status.INFO;
-                node.addLogLine(LogLine.of(tsOf(entry.timestampedAt), mapStatusCss(st), entry.text));
+
+                String nodeTitlePlain = normalizeNodeTitle(node.title);
+                String entryTextPlain = normalizeNodeTitle(sanitizeNodeName(entry.text));
+
+                if (!entryTextPlain.equals(nodeTitlePlain)) {
+                    node.addLogLine(LogLine.of(
+                            (entry.timestampedAt != null) ? entry.timestampedAt : Instant.now(),
+                            mapStatusCss(st),
+                            entry.text,
+                            node.nextEventOrder++
+                    ));
+                }
             }
 
             if (phase == Phase.START) {
-                node.addLogLine(LogLine.of(tsOf(entry.startedAt), "muted", "START"));
+                node.addLogLine(LogLine.of(
+                        (entry.startedAt != null) ? entry.startedAt : Instant.now(),
+                        "muted",
+                        "START",
+                        node.nextEventOrder++
+                ));
             }
 
             if (phase == Phase.STOP) {
                 Status st = (entry.status != null) ? entry.status : Status.UNKNOWN;
-                node.addLogLine(LogLine.of(tsOf(entry.stoppedAt), mapStatusCss(st), "STOP " + labelForStatus(st)));
+                node.addLogLine(LogLine.of(
+                        (entry.stoppedAt != null) ? entry.stoppedAt : Instant.now(),
+                        mapStatusCss(st),
+                        "STOP " + labelForStatus(st),
+                        node.nextEventOrder++
+                ));
             }
+
+            applyMetaOncePerChange(s, entry, node, phase);
         }
     }
 
@@ -283,7 +303,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         return false;
     }
 
-    private void applyMetaOncePerChange(ScopeState s, Entry e, HtmlNode node) {
+    private void applyMetaOncePerChange(ScopeState s, Entry e, HtmlNode node, Phase phase) {
         int tagsN = e.tags.size();
         int fieldsN = e.fields.size();
         int attachesN = e.attachments.size();
@@ -300,44 +320,65 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             m.fieldsN = fieldsN;
         }
 
+        Instant attachmentTime = timeForPhase(e, phase);
+
         for (int i = m.attachesN; i < attachesN; i++) {
             Attachment a = e.attachments.get(i);
+            String fp = attachmentFingerprint(a);
 
-            String name = sanitizeAttachmentName(
-                    (a.name() == null || a.name().isBlank()) ? "Attachment" : a.name()
-            );
+            // hard dedupe: do not render the same attachment payload twice for the same node
+            if (!m.attachmentFingerprints.add(fp)) {
+                continue;
+            }
+
+            String rawName = (a.name() == null || a.name().isBlank()) ? "Attachment" : a.name();
             String mime = (a.mime() == null) ? "" : a.mime();
             String data = a.path();
 
-            if (mime.startsWith("image/")) {
-                InlineImage img = inlineImage(name, mime, data);
+            boolean image = mime.startsWith("image/");
+            String displayName = displayAttachmentLabel(rawName, image);
+
+            if (image) {
+                InlineImage img = inlineImage(
+                        displayName,
+                        mime,
+                        data,
+                        attachmentTime,
+                        node.nextEventOrder++
+                );
                 node.attachments.add(img);
             } else {
-                node.attachments.add(InlineImage.textOnly(name, sanitizeLogText(String.valueOf(data))));
+                node.attachments.add(InlineImage.textOnly(
+                        displayName,
+                        sanitizeLogText(String.valueOf(data)),
+                        attachmentTime,
+                        node.nextEventOrder++
+                ));
             }
         }
+
         m.attachesN = attachesN;
     }
 
-    private InlineImage inlineImage(String name, String mime, String data) {
+    private InlineImage inlineImage(String name, String mime, String data, Instant at, int order) {
         try {
             if (mime.contains("base64")) {
                 String raw = rawBase64(data);
                 if (raw == null || raw.isBlank()) {
-                    return InlineImage.textOnly(name, sanitizeLogText("<empty base64>"));
+                    return InlineImage.textOnly(name, sanitizeLogText("<empty base64>"), at, order);
                 }
                 String mediaType = mime.substring(0, mime.indexOf(';') >= 0 ? mime.indexOf(';') : mime.length());
                 String src = "data:" + mediaType + ";base64," + raw;
-                return InlineImage.image(name, src);
+                return InlineImage.image(name, src, at, order);
             }
 
             String trimmed = (data == null) ? "" : data.trim();
             if (trimmed.startsWith("data:image")) {
-                return InlineImage.image(name, trimmed);
+                return InlineImage.image(name, trimmed, at, order);
             }
 
             if (trimmed.isBlank()) {
-                return InlineImage.textOnly(name, sanitizeLogText("<empty path>"));
+                return InlineImage.textOnly(name, sanitizeLogText("<empty path>"), at, order);
             }
 
             Path p = Path.of(trimmed);
@@ -347,24 +388,29 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             }
 
             if (!Files.exists(p)) {
-                return InlineImage.textOnly(name, sanitizeLogText("Missing image file: " + trimmed));
+                return InlineImage.textOnly(name, sanitizeLogText("Missing image file: " + trimmed), at, order);
             }
 
             long size = Files.size(p);
             if (size > MAX_INLINE_IMAGE_BYTES) {
                 return InlineImage.textOnly(
                         name,
-                        sanitizeLogText("Image too large to inline (" + size + " bytes). Not embedded.")
+                        sanitizeLogText("Image too large to inline (" + size + " bytes). Not embedded."),
+                        at,
+                        order
                 );
             }
 
-            byte[] bytes = Files.readAllBytes(p);
-            String b64 = Base64.getEncoder().encodeToString(bytes);
-            String src = "data:" + mime + ";base64," + b64;
-            return InlineImage.image(name, src);
+            String guessed = Files.probeContentType(p);
+            if (guessed == null || !guessed.startsWith("image/")) {
+                guessed = "image/png";
+            }
 
-        } catch (Throwable ex) {
-            return InlineImage.textOnly(name, sanitizeLogText("Failed to inline image: " + ex));
+            byte[] bytes = Files.readAllBytes(p);
+            String src = "data:" + guessed + ";base64," + Base64.getEncoder().encodeToString(bytes);
+            return InlineImage.image(name, src, at, order);
+        } catch (Exception ex) {
+            return InlineImage.textOnly(name, sanitizeLogText("Failed to inline image: " + ex), at, order);
         }
     }
 
@@ -497,7 +543,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             if (root == null) continue;
 
             rebuildChildrenLinks(s);
-
+            collapseRedundantEchoNodes(root);
             out.append("<section class=\"scope tabPanel\" id=\"sc").append(i).append("\">\n");
 
             if (s.rowKey != null) renderScenarioSummary(out, s.rowKey);
@@ -758,24 +804,29 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         if (hasDetails) out.append("<details open>");
         out.append("<summary class=\"nodeHeader ").append(headerBgClass(node)).append("\">");
 
-        // left: title
         out.append("<div class=\"hdrLeft\">");
         out.append("<div class=\"hdrTitle\">").append(node.title).append("</div>");
         out.append("<div class=\"hdrMeta\">").append(escapeHtml(headerMeta(node))).append("</div>");
         out.append("</div>");
 
-        // right: pills
         out.append("<div class=\"hdrRight\">");
+
+        boolean sameLevelAndStatusInfo =
+                node.level == Level.INFO &&
+                        node.status == Status.INFO;
+
         if (node.level != null) {
             out.append("<span class=\"badge ").append(mapLevelCss(node.level)).append("\">")
                     .append(escapeHtml(node.level.name()))
                     .append("</span>");
         }
-        if (node.status != null) {
+
+        if (node.status != null && !sameLevelAndStatusInfo) {
             out.append("<span class=\"badge ").append(mapStatusCss(node.status)).append("\">")
                     .append(escapeHtml(labelForStatus(node.status)))
                     .append("</span>");
         }
+
         out.append("</div>");
 
         out.append("</summary>");
@@ -801,44 +852,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                 out.append("</span></div>");
             }
 
-            if (!node.attachments.isEmpty()) {
-                out.append("<div class=\"row\"><span class=\"v\">");
-                out.append("<div class=\"attachments\">");
-                for (InlineImage a : node.attachments) {
-                    out.append("<div class=\"att\">");
-                    out.append("<div class=\"attName\">").append(a.name).append("</div>");
-                    if (a.isImage && a.src != null && !a.src.isBlank()) {
-                        out.append("<details class=\"imgDetails\">");
-                        out.append("<summary class=\"imgSummary\">");
-                        out.append("<img class=\"imgThumb\" alt=\"").append(a.name).append("\" src=\"")
-                                .append(a.src).append("\">");
-                        out.append("</summary>");
-                        out.append("<div class=\"imgFullWrap\">");
-                        out.append("<img class=\"imgFull\" alt=\"").append(a.name).append("\" src=\"")
-                                .append(a.src).append("\">");
-                        out.append("</div>");
-                        out.append("</details>");
-                    } else {
-                        out.append("<div class=\"attText\">").append(a.text == null ? "" : a.text).append("</div>");
-                    }
-                    out.append("</div>");
-                }
-                out.append("</div>");
-                out.append("</span></div>");
-            }
-
-            if (!node.logs.isEmpty()) {
-                out.append("<div class=\"row\"><span class=\"v\">");
-                out.append("<div class=\"log\">");
-                for (LogLine line : node.logs) {
-                    out.append("<div class=\"logLine ").append(line.cssClass).append("\">");
-                    out.append("<span class=\"ts\">").append(line.ts).append("</span>");
-                    out.append("<span class=\"msg\">").append(line.msg).append("</span>");
-                    out.append("</div>");
-                }
-                out.append("</div>");
-                out.append("</span></div>");
-            }
+            renderTimeline(out, node);
 
             if (!node.children.isEmpty()) {
                 out.append("<div class=\"kids\">");
@@ -846,11 +860,11 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                 out.append("</div>");
             }
 
-            out.append("</div>"); // details
+            out.append("</div>");
             out.append("</details>");
         }
 
-        out.append("</div>\n"); // node
+        out.append("</div>\n");
     }
 
     private static String headerMeta(HtmlNode node) {
@@ -936,11 +950,12 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         int tagsN;
         int fieldsN;
         int attachesN;
+        final Set<String> attachmentFingerprints = new LinkedHashSet<>();
     }
 
     private static final class HtmlNode {
         final String id;
-        final String title;     // already sanitized/escaped
+        final String title;
         final String parentId;
 
         Status status;
@@ -950,11 +965,13 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         Instant stoppedAt;
         Instant timestampedAt;
 
-        List<String> tags = List.of();               // already escaped
-        Map<String, String> fields = Map.of();       // escaped key/value
+        List<String> tags = List.of();
+        Map<String, String> fields = Map.of();
         final List<InlineImage> attachments = new ArrayList<>();
         final List<LogLine> logs = new ArrayList<>();
         final List<HtmlNode> children = new ArrayList<>();
+
+        int nextEventOrder = 0;
 
         HtmlNode(String id, String title, String parentId) {
             this.id = id;
@@ -978,6 +995,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             c.fields = (this.fields == null) ? Map.of() : Map.copyOf(this.fields);
             c.attachments.addAll(this.attachments);
             c.logs.addAll(this.logs);
+            c.nextEventOrder = this.nextEventOrder;
             return c;
         }
     }
@@ -986,18 +1004,24 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         final String ts;
         final String cssClass;
         final String msg;
+        final long sortKey;
+        final int order;
 
-        private LogLine(String ts, String cssClass, String msg) {
+        private LogLine(String ts, String cssClass, String msg, long sortKey, int order) {
             this.ts = ts;
             this.cssClass = cssClass;
             this.msg = msg;
+            this.sortKey = sortKey;
+            this.order = order;
         }
 
-        static LogLine of(String ts, String cssClass, String msg) {
+        static LogLine of(Instant at, String cssClass, String msg, int order) {
             return new LogLine(
-                    escapeHtml(ts),
+                    escapeHtml(tsOf(at)),
                     cssClass == null ? "info" : cssClass,
-                    sanitizeLogText(msg)
+                    sanitizeLogText(msg),
+                    sortKeyOf(at),
+                    order
             );
         }
     }
@@ -1005,22 +1029,44 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     private static final class InlineImage {
         final String name;
         final boolean isImage;
-        final String src;    // data: uri (NOT escaped)
-        final String text;   // escaped (for non-image)
+        final String src;
+        final String text;
+        final String ts;
+        final long sortKey;
+        final int order;
 
-        private InlineImage(String name, boolean isImage, String src, String text) {
+        private InlineImage(String name, boolean isImage, String src, String text, String ts, long sortKey, int order) {
             this.name = name;
             this.isImage = isImage;
             this.src = src;
             this.text = text;
+            this.ts = ts;
+            this.sortKey = sortKey;
+            this.order = order;
         }
 
-        static InlineImage image(String name, String dataUri) {
-            return new InlineImage(escapeHtml(name), true, dataUri, null);
+        static InlineImage image(String name, String dataUri, Instant at, int order) {
+            return new InlineImage(
+                    escapeHtml(name),
+                    true,
+                    dataUri,
+                    null,
+                    escapeHtml(tsOf(at)),
+                    sortKeyOf(at),
+                    order
+            );
         }
 
-        static InlineImage textOnly(String name, String text) {
-            return new InlineImage(escapeHtml(name), false, null, text);
+        static InlineImage textOnly(String name, String text, Instant at, int order) {
+            return new InlineImage(
+                    escapeHtml(name),
+                    false,
+                    null,
+                    text,
+                    escapeHtml(tsOf(at)),
+                    sortKeyOf(at),
+                    order
+            );
         }
     }
 
@@ -1214,7 +1260,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
             // Ensure tree relationships exist
             rebuildChildrenLinks(s);
-
+            collapseRedundantEchoNodes(root);
             // Optional: wrap each excluded scope in a container so it’s visually separated
             out.append("      <div class=\"excludedBlock\">\n");
             out.append("        <div class=\"excludedBlockTitle\">")
@@ -1689,6 +1735,200 @@ a { color: inherit; }
   margin-bottom: 8px;
   color: var(--info);
 }
-
+.timelineAttachment {
+  align-items: flex-start;
+}
+.timelineAttachment .msgBlock {
+  display: block;
+  min-width: 0;
+  width: 100%;
+}
+.timelineAttachment .msgLabel {
+  font-weight: 700;
+  margin-bottom: 8px;
+  word-break: break-word;
+}
+.timelineAttachment .imgDetails {
+  max-width: 480px;
+}
+.timelineAttachment .imgThumb {
+  height: 220px;
+  max-width: 100%;
+}
+.timelineAttachment .attText {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
 """;
+
+
+
+
+
+    private static Instant timeForPhase(Entry entry, Phase phase) {
+        if (phase == Phase.START) {
+            return entry.startedAt != null ? entry.startedAt : Instant.now();
+        }
+        if (phase == Phase.STOP) {
+            return entry.stoppedAt != null ? entry.stoppedAt : Instant.now();
+        }
+        return entry.timestampedAt != null ? entry.timestampedAt : Instant.now();
+    }
+
+    private static long sortKeyOf(Instant at) {
+        return at == null ? Long.MAX_VALUE : at.toEpochMilli();
+    }
+
+    private static String displayAttachmentLabel(String rawName, boolean image) {
+        String cleaned = sanitizeAttachmentName(rawName);
+        if (image) cleaned = stripKnownImageExtension(cleaned);
+        if (cleaned == null || cleaned.isBlank()) return image ? "Screenshot" : "Attachment";
+        return cleaned;
+    }
+
+    private static String stripKnownImageExtension(String s) {
+        if (s == null) return "";
+        String t = s.trim();
+        String lower = t.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".png"))  return t.substring(0, t.length() - 4);
+        if (lower.endsWith(".jpg"))  return t.substring(0, t.length() - 4);
+        if (lower.endsWith(".jpeg")) return t.substring(0, t.length() - 5);
+        if (lower.endsWith(".gif"))  return t.substring(0, t.length() - 4);
+        if (lower.endsWith(".bmp"))  return t.substring(0, t.length() - 4);
+        if (lower.endsWith(".webp")) return t.substring(0, t.length() - 5);
+        return t;
+    }
+
+    private static void renderTimeline(StringBuilder out, HtmlNode node) {
+        int total = node.logs.size() + node.attachments.size();
+        if (total == 0) return;
+
+        List<Object> items = new ArrayList<>(total);
+        items.addAll(node.logs);
+        items.addAll(node.attachments);
+
+        items.sort((a, b) -> {
+            long ak = timelineSortKey(a);
+            long bk = timelineSortKey(b);
+            if (ak != bk) return Long.compare(ak, bk);
+
+            int ao = timelineOrder(a);
+            int bo = timelineOrder(b);
+            return Integer.compare(ao, bo);
+        });
+
+        out.append("<div class=\"row\"><span class=\"v\">");
+        out.append("<div class=\"log\">");
+
+        for (Object item : items) {
+            if (item instanceof LogLine line) {
+                out.append("<div class=\"logLine ").append(line.cssClass).append("\">");
+                out.append("<span class=\"ts\">").append(line.ts).append("</span>");
+                out.append("<span class=\"msg\">").append(line.msg).append("</span>");
+                out.append("</div>");
+                continue;
+            }
+
+            InlineImage a = (InlineImage) item;
+            out.append("<div class=\"logLine info timelineAttachment\">");
+            out.append("<span class=\"ts\">").append(a.ts).append("</span>");
+            out.append("<div class=\"msg msgBlock\">");
+
+            out.append("<div class=\"msgLabel\">").append(a.name).append("</div>");
+
+            if (a.isImage && a.src != null && !a.src.isBlank()) {
+                out.append("<details class=\"imgDetails\">");
+                out.append("<summary class=\"imgSummary\">");
+                out.append("<img class=\"imgThumb\" alt=\"").append(a.name).append("\" src=\"")
+                        .append(a.src).append("\">");
+                out.append("</summary>");
+                out.append("<div class=\"imgFullWrap\">");
+                out.append("<img class=\"imgFull\" alt=\"").append(a.name).append("\" src=\"")
+                        .append(a.src).append("\">");
+                out.append("</div>");
+                out.append("</details>");
+            } else {
+                out.append("<div class=\"attText\">").append(a.text == null ? "" : a.text).append("</div>");
+            }
+
+            out.append("</div>");
+            out.append("</div>");
+        }
+
+        out.append("</div>");
+        out.append("</span></div>");
+    }
+
+    private static long timelineSortKey(Object o) {
+        if (o instanceof LogLine l) return l.sortKey;
+        return ((InlineImage) o).sortKey;
+    }
+
+    private static int timelineOrder(Object o) {
+        if (o instanceof LogLine l) return l.order;
+        return ((InlineImage) o).order;
+    }
+
+    private static void collapseRedundantEchoNodes(HtmlNode parent) {
+        if (parent == null || parent.children.isEmpty()) return;
+
+        List<HtmlNode> kept = new ArrayList<>();
+
+        for (HtmlNode child : parent.children) {
+            collapseRedundantEchoNodes(child);
+
+            if (isRedundantEchoChild(parent, child)) {
+                mergeEchoChildIntoParent(parent, child);
+            } else {
+                kept.add(child);
+            }
+        }
+
+        parent.children.clear();
+        parent.children.addAll(kept);
+    }
+
+    private static boolean isRedundantEchoChild(HtmlNode parent, HtmlNode child) {
+        if (parent == null || child == null) return false;
+
+        String p = normalizeNodeTitle(parent.title);
+        String c = normalizeNodeTitle(child.title);
+
+        if (!p.equals(c)) return false;
+
+        boolean childIsPlainEvent = child.startedAt == null && child.stoppedAt == null;
+        boolean childHasNoExtraMeta = (child.tags == null || child.tags.isEmpty())
+                && (child.fields == null || child.fields.isEmpty());
+
+        return childIsPlainEvent && childHasNoExtraMeta;
+    }
+
+    private static void mergeEchoChildIntoParent(HtmlNode parent, HtmlNode child) {
+        parent.logs.addAll(child.logs);
+        parent.attachments.addAll(child.attachments);
+        parent.children.addAll(child.children);
+    }
+
+    private static String normalizeNodeTitle(String s) {
+        return stripTagsForSort(s == null ? "" : s).replaceAll("\\s+", " ").trim();
+    }
+
+    private static String attachmentFingerprint(Attachment a) {
+        if (a == null) return "null";
+
+        String name = a.name() == null ? "" : a.name().trim();
+        String mime = a.mime() == null ? "" : a.mime().trim();
+        String path = a.path() == null ? "" : a.path().trim();
+
+        String payloadKey;
+        if (path.length() > 256) {
+            payloadKey = Integer.toHexString(path.hashCode()) + ":" + path.length();
+        } else {
+            payloadKey = path;
+        }
+
+        return name + "|" + mime + "|" + payloadKey;
+    }
+
 }

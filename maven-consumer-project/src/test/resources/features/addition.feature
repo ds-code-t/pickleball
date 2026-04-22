@@ -11,11 +11,11 @@ Feature: Addition
 #    * , verify the "Choose a car:" Dropdown is displayed
     * , select the last Option "Choose a car:" Dropdown
 
-#    * test2 JAVA_HOME
-#    * test2 NVM_HOME
-#    * dataTableTest1 dataTableTestxx
-#      | a | b |
-#      | 1 | 2 |
+    * test2 JAVA_HOME
+    * test2 NVM_HOME
+    * dataTableTest1 dataTableTestxx
+      | a | b |
+      | 1 | 2 |
 #    * navigate to: URL.select
 #    * , verify "Subscribe" Checkbox is on, and "Subscribe" Checkbox is true
 ##    * , verify Button is not displayed, and wait 10 seconds

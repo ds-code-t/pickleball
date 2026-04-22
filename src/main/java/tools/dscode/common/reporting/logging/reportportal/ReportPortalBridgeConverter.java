@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.Locale;
 import java.util.Set;
@@ -23,6 +24,10 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
     private static final String RP_SUITE_PREFIX = "RP_SUITE:";
 
+    /**
+     * Tracks attachments already sent to ReportPortal so they are only flushed once.
+     * Key format: entryId:indexWithinEntryAttachments
+     */
     private final Set<String> sent = ConcurrentHashMap.newKeySet();
 
     @Override
@@ -32,7 +37,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         if (isScenarioRoot(scope, entry)) {
             ReportPortalBridge.startTest(entry.text, suiteName(scope));
         } else {
-            ReportPortalBridge.log(level(entry.level), "STARTED: " + safe(entry.text));
+            ReportPortalBridge.log(level(entry.level), "STARTED: " + safe(entry.text), effectiveTime(entry.startedAt));
         }
 
         ReportPortalBridge.throwIfAsyncFailure();
@@ -42,8 +47,16 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     public void onTimestamp(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
 
-        ReportPortalBridge.log(level(entry.level), safe(entry.text));
-        flushAttachments(entry, level(entry.level), safe(entry.text));
+        String lvl = level(entry.level);
+        Instant when = effectiveTime(entry.timestampedAt);
+
+        // If this instant event has attachments, emit ONE attachment-backed log message,
+        // not a plain text log + a second attachment log.
+        if (hasUnsentAttachments(entry)) {
+            flushAttachments(entry, lvl, safe(entry.text), when);
+        } else {
+            ReportPortalBridge.log(lvl, safe(entry.text), when);
+        }
 
         ReportPortalBridge.throwIfAsyncFailure();
     }
@@ -52,17 +65,26 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     public void onStop(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
 
+        String lvl = levelForStop(entry);
+        Instant when = effectiveTime(entry.stoppedAt);
+
         if (isScenarioRoot(scope, entry)) {
             if (entry.parent == null) {
                 String rowKey = GlobalState.getCurrentScenarioState().id.toString();
                 renderScenarioSummary(scope, rowKey);
             }
 
-            flushAttachments(entry, levelForStop(entry), safe(entry.text));
+            if (hasUnsentAttachments(entry)) {
+                flushAttachments(entry, lvl, safe(entry.text), when);
+            }
+
             ReportPortalBridge.finishCurrentTest(status(entry.status));
         } else {
-            flushAttachments(entry, levelForStop(entry), safe(entry.text));
-            ReportPortalBridge.log(levelForStop(entry), formatStoppedSpan(entry));
+            if (hasUnsentAttachments(entry)) {
+                flushAttachments(entry, lvl, safe(entry.text), when);
+            }
+
+            ReportPortalBridge.log(lvl, formatStoppedSpan(entry), when);
         }
 
         ReportPortalBridge.throwIfAsyncFailure();
@@ -90,6 +112,16 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         ReportPortalBridge.throwIfAsyncFailure();
     }
 
+    /**
+     * IMPORTANT CHANGE:
+     * Do NOT log to ReportPortal immediately here.
+     * Just attach the screenshot to the agnostic Entry and let normal onTimestamp/onStop
+     * flush it once, using the entry's real text and time.
+     *
+     * This removes:
+     * - the duplicate "Screenshot" entry
+     * - the confusing split between a text log and a broken attachment row
+     */
     @Override
     public Entry screenshot(Entry entry, WebDriver driver, String name) {
         String b64 = ((TakesScreenshot) driver).getScreenshotAs(OutputType.BASE64);
@@ -98,19 +130,18 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                 ? "screenshot.png"
                 : (name.endsWith(".png") ? name : name + ".png");
 
-        ReportPortalBridge.logAttachment("INFO", "Screenshot", Base64.getDecoder().decode(b64), filename);
-
-        Entry out = entry.attach(filename, "image/png;base64", b64);
-
-        int idx = out.attachments.size() - 1;
-        if (idx >= 0) {
-            sent.add(out.id + ":" + idx);
-        }
-
-        return out;
+        return entry.attach(filename, "image/png;base64", b64);
     }
 
-    private void flushAttachments(Entry entry, String level, String message) {
+    private boolean hasUnsentAttachments(Entry entry) {
+        for (int i = 0; i < entry.attachments.size(); i++) {
+            String key = entry.id + ":" + i;
+            if (!sent.contains(key)) return true;
+        }
+        return false;
+    }
+
+    private void flushAttachments(Entry entry, String level, String defaultMessage, Instant when) {
         for (int i = 0; i < entry.attachments.size(); i++) {
             String key = entry.id + ":" + i;
             if (!sent.add(key)) continue;
@@ -139,9 +170,53 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                 throw new RuntimeException("Failed to materialize attachment: " + describeAttachment(a), e);
             }
 
-            ReportPortalBridge.logAttachment(level, message, bytes, filename);
+            String message = resolveAttachmentMessage(entry, a, defaultMessage);
+
+            ReportPortalBridge.logAttachment(
+                    level,
+                    message,
+                    bytes,
+                    filename,
+                    when
+            );
+
             ReportPortalBridge.throwIfAsyncFailure();
         }
+    }
+
+    private static String resolveAttachmentMessage(Entry entry, Attachment a, String defaultMessage) {
+        String fromEntry = blankToNull(safe(entry == null ? null : entry.text));
+        String fromDefault = blankToNull(defaultMessage);
+        String fromName = blankToNull(stripExtension(a == null ? null : a.name()));
+
+        String chosen = (fromEntry != null) ? fromEntry : fromDefault;
+
+        if (chosen == null || chosen.equalsIgnoreCase("screenshot")) {
+            chosen = (fromName != null) ? fromName : "Screenshot";
+        }
+
+        return chosen;
+    }
+
+    private static Instant effectiveTime(Instant t) {
+        return t != null ? t : Instant.now();
+    }
+
+    private static String stripExtension(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        int slash = Math.max(t.lastIndexOf('/'), t.lastIndexOf('\\'));
+        if (slash >= 0 && slash + 1 < t.length()) t = t.substring(slash + 1);
+
+        int dot = t.lastIndexOf('.');
+        if (dot > 0) return t.substring(0, dot);
+        return t;
+    }
+
+    private static String blankToNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
     }
 
     private static boolean isScenarioRoot(Entry scope, Entry entry) {

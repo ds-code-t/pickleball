@@ -140,12 +140,16 @@ public class Entry {
     public Entry on(BaseConverter converter) {
         Objects.requireNonNull(converter, "converter");
         return guarded(() -> {
+            for (BaseConverter existing : converters) {
+                if (existing == converter) {
+                    return this;
+                }
+            }
             converters.add(converter);
             Log.global().register(converter);
             return this;
         });
     }
-
     // ---------------------------------------------------------
     // HIERARCHY
     // ---------------------------------------------------------
@@ -474,8 +478,14 @@ public class Entry {
     }
 
     private void emitUnsafe(EmitCall call) {
+        IdentityHashMap<BaseConverter, Entry> seen = new IdentityHashMap<>();
+
         for (Entry n = this; n != null; n = n.parent) {
-            for (BaseConverter c : n.converters) call.apply(n, c); // scope = n
+            for (BaseConverter c : n.converters) {
+                if (seen.putIfAbsent(c, n) == null) {
+                    call.apply(n, c);
+                }
+            }
         }
     }
 
