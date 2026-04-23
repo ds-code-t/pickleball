@@ -87,6 +87,11 @@ public class GlobalState {
 
     private static volatile Locale globalLocale = null;
 
+    public static Locale getLocale() {
+        if(globalLocale != null) return globalLocale;
+        return Locale.getDefault();
+    }
+
     public static Locale getOrSetGlobalLocale(Pickle pickle) {
         if(globalLocale != null) return globalLocale;
         if(pickle == null) return null;

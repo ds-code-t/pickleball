@@ -112,26 +112,6 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         ReportPortalBridge.throwIfAsyncFailure();
     }
 
-    /**
-     * IMPORTANT CHANGE:
-     * Do NOT log to ReportPortal immediately here.
-     * Just attach the screenshot to the agnostic Entry and let normal onTimestamp/onStop
-     * flush it once, using the entry's real text and time.
-     *
-     * This removes:
-     * - the duplicate "Screenshot" entry
-     * - the confusing split between a text log and a broken attachment row
-     */
-    @Override
-    public Entry screenshot(Entry entry, WebDriver driver, String name) {
-        String b64 = ((TakesScreenshot) driver).getScreenshotAs(OutputType.BASE64);
-
-        String filename = (name == null || name.isBlank())
-                ? "screenshot.png"
-                : (name.endsWith(".png") ? name : name + ".png");
-
-        return entry.attach(filename, "image/png;base64", b64);
-    }
 
     private boolean hasUnsentAttachments(Entry entry) {
         for (int i = 0; i < entry.attachments.size(); i++) {

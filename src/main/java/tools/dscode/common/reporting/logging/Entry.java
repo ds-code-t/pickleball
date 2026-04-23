@@ -1,6 +1,8 @@
 // file: tools/dscode/common/reporting/logging/Entry.java
 package tools.dscode.common.reporting.logging;
 
+import org.openqa.selenium.OutputType;
+import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 
 import java.time.Duration;
@@ -362,11 +364,20 @@ public class Entry {
     public Entry screenshot(WebDriver driver, String name) {
         return guarded(() -> {
             try {
-                emit((scope, converter) -> converter.screenshot(this, driver, name));
+                String base64 = ((TakesScreenshot) driver).getScreenshotAs(OutputType.BASE64);
+                String filename = (name == null || name.isBlank())
+                        ? "screenshot.png"
+                        : (name.endsWith(".png") ? name : name + ".png");
+
+                createChild(filename)
+                        .level(Level.INFO)
+                        .status(Status.INFO)
+                        .attach(filename, "image/png;base64", base64)
+                        .timestamp();
+
                 printInfo("Screenshot attached");
             } catch (Throwable t) {
-                // keep it safe: log an error event and continue
-                error("Failed to take Screenshot due to '" + t.getMessage() + "'");
+                error("Failed to take Screenshot due to \"" + t.getMessage() + "\"");
             }
             return this;
         });

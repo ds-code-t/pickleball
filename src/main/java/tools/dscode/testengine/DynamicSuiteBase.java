@@ -39,17 +39,22 @@ public abstract class DynamicSuiteBase {
     protected DynamicSuiteBase() {
         debug("Constructing suite subclass: " + getClass().getName());
 
-        mergeResourcePropertiesIfMissing("junit-platform.properties");
-        mergeResourcePropertiesIfMissing("junit.properties");
-        mergeResourcePropertiesIfMissing("cucumber.properties");
+        INSTANCE = this;
+
+        mergeResourcePropertiesIfMissing("pickleball.properties");
+        mergeResourcePropertiesOverwriting("pickleball_local.properties");
 
         debug("Values after resource property merge: " + values);
+
+        mergeAllSystemProperties();
+
+        debug("Values after system property merge: " + values);
 
         globalTestProperties();
 
         debug("Values after globalTestProperties(): " + values);
 
-        mergeSystemPropertiesOverwriting();
+        mergeAllSystemProperties();
 
         debug("Values after system property overrides: " + values);
 
@@ -131,27 +136,48 @@ public abstract class DynamicSuiteBase {
         }
     }
 
-    private void mergeSystemPropertiesOverwriting() {
+    private void mergeResourcePropertiesOverwriting(String resourceName) {
+        try {
+            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            if (cl == null) {
+                cl = DynamicSuiteBase.class.getClassLoader();
+            }
+
+            Enumeration<URL> resources = cl.getResources(resourceName);
+            int count = 0;
+
+            while (resources.hasMoreElements()) {
+                URL url = resources.nextElement();
+                count++;
+                debug("Loading resource properties from: " + url);
+
+                Properties props = new Properties();
+                try (InputStream in = url.openStream()) {
+                    props.load(in);
+                }
+
+                for (String key : props.stringPropertyNames()) {
+                    values.put(key, props.getProperty(key));
+                }
+            }
+
+            debug("Loaded " + count + " resource(s) named " + resourceName);
+        } catch (Exception e) {
+            System.err.println("[DynamicSuiteBase] Failed loading " + resourceName + ": " + e);
+            throw new RuntimeException("Failed loading " + resourceName, e);
+        }
+    }
+
+    private void mergeAllSystemProperties() {
         Properties sys = System.getProperties();
         int count = 0;
 
         for (String key : sys.stringPropertyNames()) {
-            if (isSupportedInputProperty(key)) {
-                values.put(key, sys.getProperty(key));
-                count++;
-            }
+            values.put(key, sys.getProperty(key));
+            count++;
         }
 
-        debug("Applied " + count + " junit/cucumber/pkb system property override(s)");
-    }
-
-    private static boolean isSupportedInputProperty(String key) {
-        return key != null && (
-                key.startsWith("junit.jupiter.")
-                        || key.startsWith("junit.platform.")
-                        || key.startsWith("cucumber.")
-                        || key.startsWith(PKB_PREFIX)
-        );
+        debug("Applied " + count + " system property override(s)");
     }
 
     static boolean isSupportedProperty(String key) {

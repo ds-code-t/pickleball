@@ -68,15 +68,6 @@ public abstract class BaseConverter {
         return closed.get();
     }
 
-    public Entry screenshot(Entry entry, WebDriver driver) {
-        return screenshot(entry, driver, null);
-    }
-
-    public Entry screenshot(Entry entry, WebDriver driver, String name) {
-        String base64 = ((TakesScreenshot) driver).getScreenshotAs(OutputType.BASE64);
-        return entry.attach(name, "image/png;base64", base64);
-    }
-
     protected String flatten(Entry entry) {
         return entry == null ? "" : entry.flatten();
     }
