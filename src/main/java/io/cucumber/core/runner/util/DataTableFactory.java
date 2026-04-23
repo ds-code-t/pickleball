@@ -48,7 +48,7 @@ public final class DataTableFactory {
     /** Gherkin-style pipe-delimited string -> DataTable. */
     public static DataTable fromString(String tableText) {
         List<List<String>> raw = new ArrayList<>();
-        for (String line : tableText.split("\n")) {
+        for (String line : tableText.split("\\R")) {
             String t = line.trim();
             if (t.isEmpty()) continue;
             String core = t.replaceFirst("^\\|", "").replaceFirst("\\|$", "");
@@ -59,7 +59,7 @@ public final class DataTableFactory {
         return create(raw);
     }
 
-    public static DataTable create(List<List<String>> raw) {
+    private static DataTable create(List<List<String>> raw) {
         var registry = new StepTypeRegistry(getLocale()).dataTableTypeRegistry();
         return DataTable.create(raw, new DataTableTypeRegistryTableConverter(registry));
     }

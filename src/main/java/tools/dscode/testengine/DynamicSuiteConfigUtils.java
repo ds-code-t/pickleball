@@ -6,13 +6,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static tools.dscode.testengine.DynamicSuiteBase.CUCUMBER_FEATURES;
-import static tools.dscode.testengine.DynamicSuiteBase.CUCUMBER_GLUE;
-import static tools.dscode.testengine.DynamicSuiteBase.CUCUMBER_TAGS;
-import static tools.dscode.testengine.DynamicSuiteBase.PKB_FEATURES;
-import static tools.dscode.testengine.DynamicSuiteBase.PKB_GLUE;
-import static tools.dscode.testengine.DynamicSuiteBase.PKB_PREFIX;
-import static tools.dscode.testengine.DynamicSuiteBase.PKB_TAGS;
+import static tools.dscode.testengine.PickleballRunner.CUCUMBER_FEATURES;
+import static tools.dscode.testengine.PickleballRunner.CUCUMBER_GLUE;
+import static tools.dscode.testengine.PickleballRunner.CUCUMBER_TAGS;
+import static tools.dscode.testengine.PickleballRunner.PKB_FEATURES;
+import static tools.dscode.testengine.PickleballRunner.PKB_GLUE;
+import static tools.dscode.testengine.PickleballRunner.PKB_PREFIX;
+import static tools.dscode.testengine.PickleballRunner.PKB_TAGS;
 
 public final class DynamicSuiteConfigUtils {
 
@@ -35,7 +35,7 @@ public final class DynamicSuiteConfigUtils {
 
     public static HashMap<String, Object> getPkbValues() {
         HashMap<String, Object> out = new HashMap<>();
-        for (Map.Entry<String, String> entry : DynamicSuiteBase.getInstance().values().entrySet()) {
+        for (Map.Entry<String, String> entry : PickleballRunner.getInstance().values().entrySet()) {
             String key = entry.getKey();
             if (key != null && key.startsWith(PKB_PREFIX)) {
                 out.put(key, entry.getValue());
@@ -45,7 +45,7 @@ public final class DynamicSuiteConfigUtils {
     }
 
     private static String getFirstNonBlank(String... keys) {
-        Map<String, String> values = DynamicSuiteBase.getInstance().values();
+        Map<String, String> values = PickleballRunner.getInstance().values();
         for (String key : keys) {
             String value = values.get(key);
             if (value != null && !value.isBlank()) {

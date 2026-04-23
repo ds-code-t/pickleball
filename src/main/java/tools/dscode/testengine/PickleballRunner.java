@@ -14,9 +14,9 @@ import static io.cucumber.core.options.Constants.FILTER_TAGS_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
 
 
-public abstract class DynamicSuiteBase {
+public abstract class PickleballRunner {
 
-    private static volatile DynamicSuiteBase INSTANCE;
+    private static volatile PickleballRunner INSTANCE;
     public static final String PKB_PREFIX = "pkb_";
     static final String PKB_GLUE = PKB_PREFIX + "glue";
     static final String PKB_FEATURES = PKB_PREFIX + "features";
@@ -36,7 +36,7 @@ public abstract class DynamicSuiteBase {
     protected final LinkedHashMap<String, String> values = new LinkedHashMap<>();
     private final Map<String, String> readOnlyValues = Collections.unmodifiableMap(values);
 
-    protected DynamicSuiteBase() {
+    protected PickleballRunner() {
         debug("Constructing suite subclass: " + getClass().getName());
 
         INSTANCE = this;
@@ -92,15 +92,15 @@ public abstract class DynamicSuiteBase {
         return getInstance().get(key);
     }
 
-    public static DynamicSuiteBase getInstance() {
-        DynamicSuiteBase current = INSTANCE;
+    public static PickleballRunner getInstance() {
+        PickleballRunner current = INSTANCE;
         if (current != null) {
             return current;
         }
         return DynamicSuiteBootstrap.initializeFromRuntimeClasspath();
     }
 
-    static DynamicSuiteBase rawInstance() {
+    static PickleballRunner rawInstance() {
         return INSTANCE;
     }
 
@@ -108,7 +108,7 @@ public abstract class DynamicSuiteBase {
         try {
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
             if (cl == null) {
-                cl = DynamicSuiteBase.class.getClassLoader();
+                cl = PickleballRunner.class.getClassLoader();
             }
 
             Enumeration<URL> resources = cl.getResources(resourceName);
@@ -140,7 +140,7 @@ public abstract class DynamicSuiteBase {
         try {
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
             if (cl == null) {
-                cl = DynamicSuiteBase.class.getClassLoader();
+                cl = PickleballRunner.class.getClassLoader();
             }
 
             Enumeration<URL> resources = cl.getResources(resourceName);

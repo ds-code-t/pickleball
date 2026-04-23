@@ -4,7 +4,7 @@ import java.util.LinkedHashMap;
 
 public final class PKB_props {
 
-    private static final String PREFIX = DynamicSuiteBase.PKB_PREFIX;
+    private static final String PREFIX = PickleballRunner.PKB_PREFIX;
 
     public static final String PKB_GLUE     = PREFIX + "glue";
     public static final String PKB_FEATURES = PREFIX + "features";
@@ -17,7 +17,7 @@ public final class PKB_props {
     private PKB_props() {}
 
     private static LinkedHashMap<String, String> values() {
-        return DynamicSuiteBase.rawInstance().values;
+        return PickleballRunner.rawInstance().values;
     }
 
     public static String get(String key) {

@@ -1,6 +1,6 @@
 package tools.dscode.common.annotations;
 
-import tools.dscode.testengine.DynamicSuiteBase;
+import tools.dscode.testengine.PickleballRunner;
 import tools.dscode.testengine.DynamicSuiteBootstrap;
 
 import java.lang.reflect.Method;
@@ -40,7 +40,7 @@ public class LifecycleManager {
             handlersByPhase.put(p, new ArrayList<>());
         }
 
-        Class<? extends DynamicSuiteBase> suiteClass = DynamicSuiteBootstrap.getDiscoveredSuiteClass();
+        Class<? extends PickleballRunner> suiteClass = DynamicSuiteBootstrap.getDiscoveredSuiteClass();
         if (suiteClass == null) {
             finalizeRegistry();
             return;

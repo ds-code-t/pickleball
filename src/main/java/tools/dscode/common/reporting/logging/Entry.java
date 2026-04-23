@@ -346,7 +346,7 @@ public class Entry {
     }
 
     // ---------------------------------------------------------
-    // SCREENSHOT (emits; converter decides how to attach)
+    // SCREENSHOT (creates a normal timestamped cild with attachment)
     // ---------------------------------------------------------
 
     public Entry screenshot() {

@@ -9,7 +9,6 @@ import org.junit.platform.engine.TestEngine;
 import org.junit.platform.engine.UniqueId;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -28,7 +27,7 @@ public final class DynamicSuiteEngine implements TestEngine {
     public TestDescriptor discover(EngineDiscoveryRequest discoveryRequest, UniqueId uniqueId) {
         try {
             System.err.println("[DynamicSuiteEngine] discover() called");
-            DynamicSuiteBase suite = DynamicSuiteBootstrap.initialize(discoveryRequest);
+            PickleballRunner suite = DynamicSuiteBootstrap.initialize(discoveryRequest);
             System.err.println("[DynamicSuiteEngine] Discovery succeeded using suite subclass: " + suite.getClass().getName());
 
             MergedConfigurationParameters mergedParameters =
@@ -58,7 +57,7 @@ public final class DynamicSuiteEngine implements TestEngine {
         try {
             System.err.println("[DynamicSuiteEngine] execute() called");
 
-            DynamicSuiteBase suite = DynamicSuiteBase.getInstance();
+            PickleballRunner suite = PickleballRunner.getInstance();
             System.err.println("[DynamicSuiteEngine] Using suite singleton: " + suite.getClass().getName());
 
             MergedConfigurationParameters mergedParameters =
@@ -92,7 +91,7 @@ public final class DynamicSuiteEngine implements TestEngine {
 
         for (Map.Entry<String, String> entry : values.entrySet()) {
             String key = entry.getKey();
-            if (!DynamicSuiteBase.isSupportedProperty(key)) {
+            if (!PickleballRunner.isSupportedProperty(key)) {
                 continue;
             }
 
@@ -112,7 +111,7 @@ public final class DynamicSuiteEngine implements TestEngine {
 
     private static void restoreSystemProperties(Map<String, String> previous, Map<String, String> values) {
         for (String key : values.keySet()) {
-            if (!DynamicSuiteBase.isSupportedProperty(key)) {
+            if (!PickleballRunner.isSupportedProperty(key)) {
                 continue;
             }
 

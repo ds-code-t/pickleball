@@ -9,6 +9,7 @@ import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.testengine.DynamicSuiteBase;
+import tools.dscode.testengine.PKB_props;
 
 import java.util.List;
 
@@ -26,9 +27,9 @@ import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 public class RunTests extends DynamicSuiteBase {
     @Override
     public void globalTestProperties() {
-        values.put(GLUE_PROPERTY_NAME, "tools.dscode.steps");
-        values.put(FEATURES_PROPERTY_NAME, "classpath:features");
-        values.put(PLUGIN_PROPERTY_NAME, "pretty");
+        PKB_props.glue("tools.dscode.steps");
+        PKB_props.profile("classpath:features");
+        PKB_props.plugins("pretty");
     }
 
 

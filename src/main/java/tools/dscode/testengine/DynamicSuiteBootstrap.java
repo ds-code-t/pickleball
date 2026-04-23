@@ -27,39 +27,39 @@ public final class DynamicSuiteBootstrap {
     private DynamicSuiteBootstrap() {
     }
 
-    static DynamicSuiteBase initialize(EngineDiscoveryRequest discoveryRequest) {
-        DynamicSuiteBase current = DynamicSuiteBase.rawInstance();
+    static PickleballRunner initialize(EngineDiscoveryRequest discoveryRequest) {
+        PickleballRunner current = PickleballRunner.rawInstance();
         if (current != null) {
             debug("Reusing existing DynamicSuiteBase instance: " + current.getClass().getName());
             return current;
         }
 
-        synchronized (DynamicSuiteBase.class) {
-            current = DynamicSuiteBase.rawInstance();
+        synchronized (PickleballRunner.class) {
+            current = PickleballRunner.rawInstance();
             if (current != null) {
                 debug("Reusing existing DynamicSuiteBase instance after lock: " + current.getClass().getName());
                 return current;
             }
 
-            DynamicSuiteBase suite = instantiateResolvedSuite(discoveryRequest);
+            PickleballRunner suite = instantiateResolvedSuite(discoveryRequest);
             debug("Bootstrap instantiated suite: " + suite.getClass().getName());
             return suite;
         }
     }
 
-    public static DynamicSuiteBase initializeFromRuntimeClasspath() {
-        DynamicSuiteBase current = DynamicSuiteBase.rawInstance();
+    public static PickleballRunner initializeFromRuntimeClasspath() {
+        PickleballRunner current = PickleballRunner.rawInstance();
         if (current != null) {
             return current;
         }
 
-        synchronized (DynamicSuiteBase.class) {
-            current = DynamicSuiteBase.rawInstance();
+        synchronized (PickleballRunner.class) {
+            current = PickleballRunner.rawInstance();
             if (current != null) {
                 return current;
             }
 
-            DynamicSuiteBase suite = instantiateResolvedSuite(null);
+            PickleballRunner suite = instantiateResolvedSuite(null);
             debug("Fallback bootstrap instantiated suite: " + suite.getClass().getName());
             return suite;
         }
@@ -112,19 +112,19 @@ public final class DynamicSuiteBootstrap {
         return glue;
     }
 
-    private static volatile Class<? extends DynamicSuiteBase> DISCOVERED_SUITE_CLASS;
+    private static volatile Class<? extends PickleballRunner> DISCOVERED_SUITE_CLASS;
 
-    public static Class<? extends DynamicSuiteBase> getDiscoveredSuiteClass() {
+    public static Class<? extends PickleballRunner> getDiscoveredSuiteClass() {
         return DISCOVERED_SUITE_CLASS;
     }
 
-    private static DynamicSuiteBase instantiateResolvedSuite(EngineDiscoveryRequest discoveryRequest) {
-        Class<? extends DynamicSuiteBase> suiteClass = findDynamicSuiteSubclass(discoveryRequest);
+    private static PickleballRunner instantiateResolvedSuite(EngineDiscoveryRequest discoveryRequest) {
+        Class<? extends PickleballRunner> suiteClass = findDynamicSuiteSubclass(discoveryRequest);
         if (suiteClass != null) {
             DISCOVERED_SUITE_CLASS = suiteClass;
             debug("Bootstrap selected DynamicSuiteBase subclass: " + suiteClass.getName());
 
-            DynamicSuiteBase suite = ReflectionSupport.newInstance(suiteClass);
+            PickleballRunner suite = ReflectionSupport.newInstance(suiteClass);
 
             String suiteClassName = suiteClass.getName();
             String existingGlue = suite.values.get(GLUE_PROPERTY_NAME);
@@ -157,7 +157,7 @@ public final class DynamicSuiteBootstrap {
     }
 
     @SuppressWarnings("unchecked")
-    private static Class<? extends DynamicSuiteBase> findDynamicSuiteSubclass(EngineDiscoveryRequest discoveryRequest) {
+    private static Class<? extends PickleballRunner> findDynamicSuiteSubclass(EngineDiscoveryRequest discoveryRequest) {
         Set<Class<?>> matches = new LinkedHashSet<>();
 
         if (discoveryRequest != null) {
@@ -170,7 +170,7 @@ public final class DynamicSuiteBootstrap {
                 debug("ClassSelector candidate: " + candidate.getName());
                 if (isCandidate(candidate)) {
                     debug("Accepted ClassSelector candidate: " + candidate.getName());
-                    return (Class<? extends DynamicSuiteBase>) candidate;
+                    return (Class<? extends PickleballRunner>) candidate;
                 }
             }
 
@@ -190,11 +190,11 @@ public final class DynamicSuiteBootstrap {
                 matches.addAll(found);
 
                 if (matches.size() == 1) {
-                    return (Class<? extends DynamicSuiteBase>) matches.iterator().next();
+                    return (Class<? extends PickleballRunner>) matches.iterator().next();
                 }
                 if (matches.size() > 1) {
                     throw new IllegalStateException(
-                            "Expected exactly one concrete subclass of " + DynamicSuiteBase.class.getName()
+                            "Expected exactly one concrete subclass of " + PickleballRunner.class.getName()
                                     + " but found " + classNames(matches)
                     );
                 }
@@ -206,7 +206,7 @@ public final class DynamicSuiteBootstrap {
     }
 
     @SuppressWarnings("unchecked")
-    private static Class<? extends DynamicSuiteBase> findDynamicSuiteSubclassInPreferredTestRoots() {
+    private static Class<? extends PickleballRunner> findDynamicSuiteSubclassInPreferredTestRoots() {
         Set<Class<?>> matches = new LinkedHashSet<>();
 
         for (URI root : classpathRoots()) {
@@ -221,12 +221,12 @@ public final class DynamicSuiteBootstrap {
 
             if (matches.size() == 1) {
                 debug("Stopping scan after first matching preferred test root: " + root);
-                return (Class<? extends DynamicSuiteBase>) matches.iterator().next();
+                return (Class<? extends PickleballRunner>) matches.iterator().next();
             }
 
             if (matches.size() > 1) {
                 throw new IllegalStateException(
-                        "Expected exactly one concrete subclass of " + DynamicSuiteBase.class.getName()
+                        "Expected exactly one concrete subclass of " + PickleballRunner.class.getName()
                                 + " but found " + classNames(matches)
                 );
             }
@@ -260,7 +260,7 @@ public final class DynamicSuiteBootstrap {
 
         if (found.size() > 1) {
             throw new IllegalStateException(
-                    "Expected exactly one concrete subclass of " + DynamicSuiteBase.class.getName()
+                    "Expected exactly one concrete subclass of " + PickleballRunner.class.getName()
                             + " in classpath root " + root + " but found " + classNames(found)
             );
         }
@@ -270,8 +270,8 @@ public final class DynamicSuiteBootstrap {
 
     private static boolean isCandidate(Class<?> c) {
         return c != null
-                && DynamicSuiteBase.class.isAssignableFrom(c)
-                && c != DynamicSuiteBase.class
+                && PickleballRunner.class.isAssignableFrom(c)
+                && c != PickleballRunner.class
                 && !c.isInterface()
                 && !Modifier.isAbstract(c.getModifiers());
     }
@@ -386,7 +386,7 @@ public final class DynamicSuiteBootstrap {
 
 
 
-    private static final class DefaultDynamicSuite extends DynamicSuiteBase {
+    private static final class DefaultDynamicSuite extends PickleballRunner {
         @Override
         public void globalTestProperties() {
             // Intentionally empty.

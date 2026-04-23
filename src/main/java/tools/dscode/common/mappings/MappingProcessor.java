@@ -46,7 +46,7 @@ import static tools.dscode.common.util.StringUtilities.decodeBackToText;
 import static tools.dscode.common.util.StringUtilities.encodeToPlaceHolders;
 
 import static tools.dscode.common.variables.RunVars.resolveFromVars;
-import static tools.dscode.testengine.DynamicSuiteBase.PKB_PREFIX;
+import static tools.dscode.testengine.PickleballRunner.PKB_PREFIX;
 
 public abstract class MappingProcessor implements Map<String, Object> {
 
