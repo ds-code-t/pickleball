@@ -25,7 +25,7 @@ public final class CucumberDeepCloneUtil {
         IdentityHashMap<Object, Object> seen = new IdentityHashMap<>();
 
         PickleStep clone =  new PickleStep(
-                deepCloneAny(source.getArgument().orElse(null), seen),
+                source.getArgument().orElse(null),
                 new ArrayList<>(source.getAstNodeIds()),
                 source.getId(),
                 source.getType().orElse(null),
@@ -47,7 +47,7 @@ public final class CucumberDeepCloneUtil {
         GherkinMessagesStep clone = allocateInstance(GherkinMessagesStep.class);
 
         setField(clone, "pickleStep", deepClonePickleStep(getField(source, "pickleStep")));
-        setField(clone, "argument", deepCloneAny(source.getArgument(), seen));
+        setField(clone, "argument", source.getArgument());
         setField(clone, "keyWord", source.getKeyword());
         setField(clone, "stepType", source.getType());
         setField(clone, "previousGwtKeyWord", source.getPreviousGivenWhenThenKeyword());
