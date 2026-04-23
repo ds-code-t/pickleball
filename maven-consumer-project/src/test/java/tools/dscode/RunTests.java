@@ -8,7 +8,7 @@ import tools.dscode.common.annotations.LifecycleHook;
 import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.domoperations.ExecutionDictionary;
-import tools.dscode.testengine.DynamicSuiteBase;
+import tools.dscode.testengine.PickleballRunner;
 import tools.dscode.testengine.PKB_props;
 
 import java.util.List;
@@ -24,7 +24,7 @@ import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDict
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
 import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 
-public class RunTests extends DynamicSuiteBase {
+public class RunTests extends PickleballRunner {
     @Override
     public void globalTestProperties() {
         PKB_props.glue("tools.dscode.steps");

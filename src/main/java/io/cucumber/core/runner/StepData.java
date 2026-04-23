@@ -24,6 +24,8 @@ import static tools.dscode.common.util.Reflect.getProperty;
 public abstract class StepData extends StepMapping {
 //    public final boolean isRootStep;
 
+//    public StepData sharedConditionalModeSteps;
+
     public Entry stepEntry;
 
     public RemoteWebDriver webDriverUsed = null;

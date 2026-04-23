@@ -35,7 +35,6 @@ public aspect JavaBackend_LoadGlue_Mutator {
                     target(backend) &&
                     args(glue, gluePaths) {
 
-        System.out.println("@@loadGlue!!!");
 
         List<URI> modified = new ArrayList<>();
         List<String> globalPaths = glueDistinct();

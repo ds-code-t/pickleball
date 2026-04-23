@@ -1,5 +1,35 @@
 Feature: Addition
 
+
+  Scenario: condtion nesting testing1
+    * , from the Top Panel:
+  : * IF: "A" equals "A":
+  :: * , save "x1"
+  : * ELSE-IF: "A" equals "A":
+  :: * , save "x2"
+
+  Scenario: condtion nesting testing2
+    * , from the Top Panel:
+  : * , if "A" equals "A":
+  :: * , save "x1"
+  : * , else if "A" equals "A":
+  :: * , save "x2"
+
+  Scenario: condtion nesting testing2.5
+
+   * , if "A" equals "A":
+  : * , save "x1"
+   * , else if "A" equals "A":
+  : * , save "x2"
+
+
+  Scenario: condtion nesting testing3
+    * IF: "A" equals "A":
+  : * , save "x1"
+    * ELSE-IF: "A" equals "A":
+  : * , save "x2"
+
+
   Scenario: calling Test
     * test2
 
@@ -7,7 +37,7 @@ Feature: Addition
 
   @T122
   Scenario: j test1ssszzz
-    @[DEBUG]
+  @[DEBUG]
 #    * , verify the "Choose a car:" Dropdown is displayed
     * , select the last Option "Choose a car:" Dropdown
 
@@ -35,7 +65,7 @@ Feature: Addition
 
   Scenario Outline: zzsStart Run component
     * , if "1" is "1":
-    : * , save "a" as "A"
+  : * , save "a" as "A"
 #    * , wait 6 seconds
     * , if "1" is "1":
   : * , save "a" as "A"

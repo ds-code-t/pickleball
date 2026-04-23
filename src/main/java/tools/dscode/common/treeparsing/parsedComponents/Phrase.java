@@ -45,8 +45,16 @@ public final class Phrase extends PhraseData {
                     phraseConditionalMode = 0;
                     previouslyResolvedBoolean = false;
                 }
-            } else if (getPreviousPhrase().phraseConditionalMode > -1) phraseConditionalMode = 0;
-            else phraseConditionalMode = 1;
+            } else if(this.position ==0 && parsedLine.previousSiblingConditionalState > -1)
+            {
+                phraseConditionalMode = 0;
+                previouslyResolvedBoolean = false;
+            }
+            else if (getPreviousPhrase().phraseConditionalMode > -1) {
+                phraseConditionalMode = 0;
+            } else {
+                phraseConditionalMode = 1;
+            }
         } else {
             phraseConditionalMode = getPreviousPhrase() == null ? 1 : getPreviousPhrase().phraseConditionalMode;
         }
