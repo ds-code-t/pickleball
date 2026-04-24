@@ -306,8 +306,6 @@ public final class Phrase extends PhraseData {
 
         PhraseData previousPhrase = nextResolvedPhrase.getPreviousPhrase();
         if (nextResolvedPhrase.isChainStart) {
-//            if (previousPhrase != null)
-//                previousPhrase.resolveResults();
             setConjunctionChain(nextResolvedPhrase);
         } else {
             if (previousPhrase != null) {

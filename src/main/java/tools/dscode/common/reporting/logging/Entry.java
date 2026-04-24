@@ -365,11 +365,12 @@ public class Entry {
         return guarded(() -> {
             try {
                 String base64 = ((TakesScreenshot) driver).getScreenshotAs(OutputType.BASE64);
+                String label = (name == null || name.isBlank()) ? "Screenshot" : name;
                 String filename = (name == null || name.isBlank())
                         ? "screenshot.png"
                         : (name.endsWith(".png") ? name : name + ".png");
 
-                createChild(filename)
+                createChild(label)
                         .level(Level.INFO)
                         .status(Status.INFO)
                         .attach(filename, "image/png;base64", base64)

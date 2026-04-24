@@ -260,13 +260,28 @@ public final class Tokenized {
         return root;
     }
 
-    public static JsonNode setProperty(ObjectNode objectNode, String fieldName, Object value) {
-        if (fieldName.startsWith("`") && fieldName.endsWith("`")) {
+    private static JsonNode setProperty(ObjectNode objectNode, String fieldName, Object value) {
+        if (fieldName.startsWith("\"") && fieldName.endsWith("\"")) {
             fieldName = fieldName.substring(1, fieldName.length() - 1);
         }
-        JsonNode valueToSet = value instanceof JsonNode valueNode ? valueNode : objectNode.get(fieldName);
-        if (valueToSet == null)
-            valueToSet = value.equals(ArrayNode.class) ? MAPPER.createArrayNode() : MAPPER.createObjectNode();
+
+        JsonNode valueToSet;
+        if (value instanceof JsonNode valueNode) {
+            valueToSet = valueNode;
+        } else {
+            JsonNode existing = objectNode.get(fieldName);
+            boolean wantsArray = value.equals(ArrayNode.class);
+            // Reuse existing node only if it's the right container type
+            if (wantsArray && existing instanceof ArrayNode) {
+                valueToSet = existing;
+            } else if (!wantsArray && existing instanceof ObjectNode) {
+                valueToSet = existing;
+            } else {
+                // Wrong type or absent - create fresh
+                valueToSet = wantsArray ? MAPPER.createArrayNode() : MAPPER.createObjectNode();
+            }
+        }
+
         objectNode.set(fieldName, valueToSet);
         return valueToSet;
     }
