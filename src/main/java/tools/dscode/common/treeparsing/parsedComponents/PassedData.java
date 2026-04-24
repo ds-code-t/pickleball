@@ -23,6 +23,7 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.HTML_
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.NO_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PRECEDING_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE;
+import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ASSERTION;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
 import static tools.dscode.coredefinitions.BrowserSteps.getDefaultDriver;
 
@@ -60,7 +61,7 @@ public abstract class PassedData {
         if (elementCount > 0) {
             if (phraseType == ELEMENT_ONLY || (!getAssertion().isBlank() && getAssertionType().isBlank())) {
                 if (lastOperationPhrase == null || lastOperationPhrase.equals(this)) {
-                    if (hasTerminationConditional()) {
+//                    if (hasTerminationConditional()) {
                         setConditional("if");
                         lastOperationPhrase = (PhraseData) this;
                         PhraseData currentPhrase = (PhraseData) this;
@@ -72,7 +73,7 @@ public abstract class PassedData {
                                 break;
                             currentPhrase = currentPhrase.getNextPhrase();
                         }
-                    }
+//                    }
                 }
             }
             if (phraseType == ELEMENT_ONLY) {
@@ -107,7 +108,6 @@ public abstract class PassedData {
                 }
             }
         }
-
         if (!isOperationPhrase)
             return;
 
@@ -116,9 +116,13 @@ public abstract class PassedData {
             return;
         }
 
-        if (phraseType != null && lastOperationPhrase.phraseType != phraseType) {
+        if (phraseType == null) return;
+
+        if(phraseType == ASSERTION && getAssertionType().isBlank() && !lastOperationPhrase.getAssertionType().isBlank()) {
+            setAssertionType(lastOperationPhrase.getAssertionType());
+            phraseType = lastOperationPhrase.phraseType;
+        } else if (lastOperationPhrase.phraseType != phraseType) {
             isChainStart = true;
-            return;
         }
     }
 
@@ -393,7 +397,7 @@ public abstract class PassedData {
         if (assertionType == null || assertionType.isBlank()) return false;
         this.assertionType = assertionType;
         isOperationPhrase = true;
-        phraseType = assertionType.startsWith("conditional") ? PhraseData.PhraseType.CONDITIONAL : PhraseData.PhraseType.ASSERTION;
+        phraseType = assertionType.equalsIgnoreCase("conditional") ? PhraseData.PhraseType.CONDITIONAL : PhraseData.PhraseType.ASSERTION;
         return true;
     }
 

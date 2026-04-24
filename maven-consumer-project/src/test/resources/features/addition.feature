@@ -1,5 +1,43 @@
 Feature: Addition
 
+  Scenario: Chain testing1
+    * , until "1" is "1":
+    : * , wait 1 second
+    : * , save "<A>1" as "A"
+
+
+  Scenario: Chain testing
+
+    When ,  1 is 1 , 2 is 2 ,  and 3 is 3?
+  : * , save "YES!!"
+
+    When ,  1 is 2 , 2 is 2 , or 3 is 3?
+  : * , save "YES!!1"
+
+    When ,  if 1 is 1 , and 2 is 2:
+  : * , save "YES!!!"
+
+    When ,  if 1 is 2 , or 2 is 2:
+  : * , save "YES!!!!"
+
+    When ,  1 is 1 , 2 is 3 , 3 is 3 , and 4 is 4?
+  : * , save "NO!!!!"
+
+    When ,  if 1 is 2 , 2 is 3 , or 3 is 3:
+  : * , save "YES"
+
+    When ,  1 is 1 , and 2 is 3?
+  : * , save "NO!!!!"
+
+    When ,  if 1 is 1 , 2 is 2 , 3 is 3 , or 4 is 5:
+  : * , save "YES"
+
+    When ,  1 is 2 , 2 is 2 , 3 is 3 , or 4 is 5?
+  : * , save "YES!!!!"
+
+    When ,  if 1 is 1 , 2 is 3 , and 3 is 3:
+  : * , save "NO!!!!"
+
 
   Scenario: condtion nesting testing1
     * , from the Top Panel:

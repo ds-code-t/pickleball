@@ -212,10 +212,12 @@ public abstract class PhraseData extends PassedData {
         if (getConditional().contains("if")) {
             setAssertionType("conditional");
             setAssertion(phraseNode.getStringFromLocalState("assertion"));
-        } else if (termination.equals('?')) {
-            setAssertionType("conditionalTermination");
-            setAssertion(phraseNode.getStringFromLocalState("assertion"));
-        } else if (!context.isBlank()) {
+        }
+//        else if (termination.equals('?')) {
+//            setAssertionType("conditionalTermination");
+//            setAssertion(phraseNode.getStringFromLocalState("assertion"));
+//        }
+        else if (!context.isBlank()) {
             phraseType = PhraseType.CONTEXT;
             isFrom = context.equals("from");
             getXPathyContext(this, getElementMatches());
@@ -412,11 +414,6 @@ public abstract class PhraseData extends PassedData {
                     .map(Object::toString)
                     .collect(Collectors.joining("\n", "\n", ""));
 
-//        if (invertConditional) {
-//            previouslyResolvedBoolean = !previouslyResolvedBoolean;
-//        }
-
-
         switch (getAssertionType().replace("Termination", "")) {
             case "ensure" -> {
                 if (!previouslyResolvedBoolean) {
@@ -439,23 +436,19 @@ public abstract class PhraseData extends PassedData {
                         phraseConditionalMode = 0;
                     }
                 }
+                for (PhraseData resultPhrase : chainStartPhrase.resultPhrases) {
+                    resultPhrase.phraseConditionalMode = phraseConditionalMode;
+                }
             }
         }
-
         return previouslyResolvedBoolean;
     }
 
     public boolean getBooleanResult() {
-
         boolean andConjunction = !conjunction.equals("or");
-
         for (PhraseData resultPhrase : chainStartPhrase.resultPhrases) {
             Object resultObject = resultPhrase.result.value();
-
-
             boolean isTrue = resultObject != null && (boolean) resultObject;
-
-
             if (andConjunction) {
                 if (!isTrue) {
                     return false; // AND: one failure breaks
@@ -466,7 +459,6 @@ public abstract class PhraseData extends PassedData {
                 }
             }
         }
-
         return andConjunction;
     }
 

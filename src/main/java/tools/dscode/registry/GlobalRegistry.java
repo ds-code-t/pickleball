@@ -34,18 +34,7 @@ public final class GlobalRegistry {
 //    public static List<Runner> runners = new CopyOnWriteArrayList<>();
 
     public static void registerGlobal(Object instance) {
-//        if (globalRunner == null && instance instanceof Runner runner) {
-//            System.out.println("@@globalRunner!!");
-//            if (isGluePopulated(runner)) {
-//                System.out.println("@@setting-runner");
-//                setGlobalRunner(runner);
-//                System.out.println("@@globalRunner::::: " + globalRunner);
-//            }
-//            return;
-//        }
         GLOBAL.putIfAbsent(keyFor(instance.getClass()), instance);
-        // DEBUG (optional):
-        // System.out.println("[Reg][GLOBAL] " + instance.getClass().getName());
     }
 
     public static void registerLocal(Object instance) {
@@ -55,10 +44,6 @@ public final class GlobalRegistry {
     }
 
     public static void registerBoth(Object instance) {
-//        System.out.println("@@registerBoth:: " + instance);
-//        if (instance instanceof Glue cachingGlue) {
-//            printGlueInfo(cachingGlue);
-//        }
         registerGlobal(instance);
         registerLocal(instance);
     }
