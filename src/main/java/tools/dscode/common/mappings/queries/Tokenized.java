@@ -261,7 +261,7 @@ public final class Tokenized {
     }
 
     private static JsonNode setProperty(ObjectNode objectNode, String fieldName, Object value) {
-        if (fieldName.startsWith("\"") && fieldName.endsWith("\"")) {
+        if (fieldName.startsWith("`") && fieldName.endsWith("`")) {
             fieldName = fieldName.substring(1, fieldName.length() - 1);
         }
 
