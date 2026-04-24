@@ -73,8 +73,24 @@ public abstract class PickleballRunner {
 
         debug("Final values after defaults + alias sync: " + values);
 
+        publishToSystemProperties();
+
         INSTANCE = this;
         debug("Registered singleton instance: " + getClass().getName());
+    }
+
+    private void publishToSystemProperties() {
+        int count = 0;
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            if (key != null && value != null) {
+                System.setProperty(key, value);
+                count++;
+            }
+        }
+
+        debug("Published " + count + " value(s) to system properties");
     }
 
     public void globalTestProperties() {

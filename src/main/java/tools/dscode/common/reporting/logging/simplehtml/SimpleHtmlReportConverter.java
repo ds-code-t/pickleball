@@ -66,7 +66,8 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         if (p != null && !p.isBlank()) {
             try {
                 return Path.of(p.trim());
-            } catch (Throwable ignored) { }
+            } catch (Throwable ignored) {
+            }
         }
 
         Path dir = (perScenarioReportFile != null && perScenarioReportFile.getParent() != null)
@@ -124,7 +125,9 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         }
     }
 
-    /** Returns the resolved default output file for the single combined report. */
+    /**
+     * Returns the resolved default output file for the single combined report.
+     */
     public static Path defaultReportFile(Path anyPerScenarioPath) {
         return resolveSingleFileOutput(anyPerScenarioPath);
     }
@@ -179,9 +182,20 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         System.out.println("[SimpleHtmlReportConverter] wrote combined: " + outFile.toAbsolutePath());
     }
 
-    @Override public void onStart(Entry scope, Entry entry) { emit(scope, entry, Phase.START); }
-    @Override public void onTimestamp(Entry scope, Entry entry) { emit(scope, entry, Phase.TIMESTAMP); }
-    @Override public void onStop(Entry scope, Entry entry) { emit(scope, entry, Phase.STOP); }
+    @Override
+    public void onStart(Entry scope, Entry entry) {
+        emit(scope, entry, Phase.START);
+    }
+
+    @Override
+    public void onTimestamp(Entry scope, Entry entry) {
+        emit(scope, entry, Phase.TIMESTAMP);
+    }
+
+    @Override
+    public void onStop(Entry scope, Entry entry) {
+        emit(scope, entry, Phase.STOP);
+    }
 
     private void emit(Entry scope, Entry entry, Phase phase) {
         ScopeState s = scopes.computeIfAbsent(scope.id, id -> initScope(scope));
@@ -680,7 +694,11 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         final class Row {
             final String tabId;
             final Map<String, Object> values;
-            Row(String tabId, Map<String, Object> values) { this.tabId = tabId; this.values = values; }
+
+            Row(String tabId, Map<String, Object> values) {
+                this.tabId = tabId;
+                this.values = values;
+            }
         }
 
         List<Row> rows = new ArrayList<>();
@@ -1184,6 +1202,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             out.append("  </div>\n");
         });
     }
+
     private static void renderSummaryTable(
             StringBuilder out,
             List<String> summaryHeaders,
@@ -1276,494 +1295,500 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
 
     private static final String CSS = """
-:root {
-  --bg: #ffffff;
-  --fg: #111827;
-  --muted: #6b7280;
-  --card: #f9fafb;
-  --line: #e5e7eb;
-  --pill: #eef2ff;
-  --pass: #065f46;
-  --fail: #991b1b;
-  --warn: #92400e;
-  --info: #1f2937;
-  --skip: #374151;
-  --main: #1d4ed8;
-
-  --hdrFail: #F26144;
-  --hdrWarn: #fffbeb;
-  --hdrSkip: #f3f4f6;
-  --hdrNormal: #89D18B;
-}
-
-* { box-sizing: border-box; }
-html, body {
-  margin: 0;
-  padding: 0;
-  background: var(--bg);
-  color: var(--fg);
-  font-family: Arial, Helvetica, sans-serif;
-}
-a { color: inherit; }
-
-.page { display: flex; height: 100vh; overflow: hidden; }
-
-/* ---------------- Left rail / tabs ---------------- */
-.leftRail {
-  width: 320px;
-  min-width: 240px;
-  max-width: 420px;
-  border-right: 1px solid var(--line);
-  background: #fafafa;
-  display: flex;
-  flex-direction: column;
-}
-
-.railHeader {
-  padding: 14px 14px 12px 14px;
-  border-bottom: 1px solid var(--line);
-  background: #fff;
-}
-
-.topSummary .summaryTitle { font-weight: 800; font-size: 14px; margin-bottom: 6px; }
-.topSummary .summaryMeta { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
-
-.summaryNumbers { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
-
-.pill {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: 999px;
-  background: var(--pill);
-  border: 1px solid #e0e7ff;
-  font-size: 12px;
-  white-space: nowrap;
-}
-.passPill { border-color: #bbf7d0; background: #ecfdf5; color: var(--pass); }
-.failPill { border-color: #fecaca; background: #fef2f2; color: var(--fail); }
-.pctPill  { border-color: #e5e7eb; background: #fff; color: var(--info); }
-
-.barWrap {
-  position: relative;
-  height: 14px;
-  border-radius: 999px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  background: #fff;
-}
-.barFail { position: absolute; inset: 0; background: #d63a3a; }
-.barPass { position: absolute; inset: 0; background: #1f9d4c; }
-
-.railTabs { padding: 10px; overflow: auto; flex: 1; }
-.tabButtons { display: flex; flex-direction: column; gap: 8px; }
-
-.tabBtn {
-  cursor: pointer;
-  border: 1px solid var(--line);
-  background: #fff;
-  color: var(--fg);
-  border-radius: 10px;
-  padding: 10px 10px;
-  font-size: 13px;
-  line-height: 1.2;
-  text-align: left;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.tabBtn.active { outline: 2px solid #111827; border-color: #111827; }
-.tabBtn.pass { border-left: 10px solid #1f9d4c; }
-.tabBtn.fail { border-left: 10px solid #d63a3a; }
-.tabBtn.main { border-left: 10px solid var(--main); }
-
-.statusDot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex: 0 0 10px;
-  border: 1px solid var(--line);
-  background: #fff;
-}
-.statusDot.pass { background: #1f9d4c; border-color: #1f9d4c; }
-.statusDot.fail { background: #d63a3a; border-color: #d63a3a; }
-
-/* ---------------- Main panels ---------------- */
-.main { flex: 1; overflow: auto; background: #fff; }
-
-.tabPanel { display: none; }
-.tabPanel.active { display: block; }
-
-.scope {
-  margin: 14px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  overflow: hidden;
-  background: #fff;
-}
-.scopeHeader {
-  display: flex;
-  gap: 10px;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 12px 12px;
-  border-bottom: 1px solid var(--line);
-  background: var(--card);
-}
-.scopeName { font-weight: 700; }
-
-/* ---------------- Tree / nodes ---------------- */
-.tree { padding: 10px; }
-.node { margin: 10px 0; }
-
-.node details {
-  border: 2px solid var(--line);          /* stronger outlines */
-  border-radius: 12px;
-  background: #fff;
-  overflow: hidden;
-}
-
-/* Reset summary defaults cleanly */
-.node summary {
-  list-style: none;
-  cursor: pointer;
-//  padding: 0;
-}
-.node summary::-webkit-details-marker { display: none; }
-
-.nodeHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
-}
-.nodeHeader.bgFail { background: var(--hdrFail); }
-.nodeHeader.bgWarn { background: var(--hdrWarn); }
-.nodeHeader.bgSkip { background: var(--hdrSkip); }
-.nodeHeader.bgNormal { background: var(--hdrNormal); }
-
-.hdrLeft { min-width: 0; }
-.hdrTitle { font-weight: 700; word-break: break-word; }
-.hdrMeta { margin-top: 4px; font-size: 12px; color: var(--muted); }
-
-.hdrRight { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-
-.details { padding: 10px 12px 12px 12px; background: #fff; }
-
-.badge {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background: #fff;
-  color: var(--info);
-  white-space: nowrap;
-}
-.badge.pass { color: var(--pass); border-color: #bbf7d0; background: #ecfdf5; }
-.badge.fail { color: var(--fail); border-color: #fecaca; background: #fef2f2; }
-.badge.warn { color: var(--warn); border-color: #fde68a; background: #fffbeb; }
-.badge.skip { color: var(--skip); border-color: #e5e7eb; background: #f9fafb; }
-.badge.info { color: var(--info); border-color: #e5e7eb; background: #f9fafb; }
-.badge.muted { color: var(--muted); border-color: #e5e7eb; background: #fff; }
-
-.row { margin-top: 10px; }
-.v { display: block; min-width: 0; }
-
-.pill { margin: 0 6px 6px 0; }
-
-.fields { width: 100%; border-collapse: collapse; }
-.fields td { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; }
-.fk { width: 220px; color: var(--muted); font-size: 12px; }
-.fv { font-size: 12px; white-space: pre-wrap; word-break: break-word; }
-
-/* ---------------- Attachments (screenshots) ---------------- */
-/* Bigger cards so single screenshot doesn’t look tiny */
-.attachments {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-  gap: 12px;
-}
-
-/* Make each card feel intentional */
-.att {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--card);
-  overflow: hidden;
-}
-
-.attName {
-  padding: 8px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  border-bottom: 1px solid var(--line);
-  background: #fff;
-}
-
-/* Reset <details>/<summary> quirks */
-.imgDetails {
-  border-top: 0;
-  background: #fff;
-//  width: 100%;
-}
-.imgDetails > summary {
-  list-style: none;
-//  width: 100%;
-  margin: 0;
-  padding: 12px;
-  cursor: pointer;
-
-  /* Force block sizing and prevent browser centering quirks */
-  display: block !important;
-}
-.imgDetails > summary::-webkit-details-marker { display: none; }
-
-/* Stack thumbnail + hint normally (NOT side-by-side) */
-.imgSummary {
-//  width: 100%;
-}
-.imgThumb {
-//  width: 100%;
-  height: 320px;              /* main “presence” control */
-  object-fit: contain;        /* keep screenshots readable */
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: #fff;
-  display: block;
-}
-
-/* Expanded image */
-.imgFullWrap {
-  padding: 10px;
-  border-top: 1px solid var(--line);
-  background: var(--card);
-}
-.imgFull {
-  width: 100%;
-  height: auto;
-  border-radius: 10px;
-  border: 1px solid var(--line);
-  background: #fff;
-}
-
-/* Non-image attachments */
-.attText {
-  padding: 8px 10px;
-  font-size: 12px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  color: var(--fg);
-}
-
-/* ---------------- Log ---------------- */
-.log { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
-.logLine { display: flex; gap: 10px; padding: 6px 10px; border-top: 1px solid var(--line); font-size: 12px; }
-.logLine:first-child { border-top: none; }
-.ts { color: var(--muted); white-space: nowrap; }
-.msg { white-space: pre-wrap; word-break: break-word; }
-.logLine.pass .msg { color: var(--pass); }
-.logLine.fail .msg { color: var(--fail); }
-.logLine.warn .msg { color: var(--warn); }
-.logLine.skip .msg { color: var(--skip); }
-
-.kids { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
-
-/* Indentation */
-.d0 { margin-left: 0px; }
-.d1 { margin-left: 12px; }
-.d2 { margin-left: 24px; }
-.d3 { margin-left: 36px; }
-.d4 { margin-left: 48px; }
-.d5 { margin-left: 60px; }
-.d6 { margin-left: 72px; }
-
-/* ---------------- Scenario summary ---------------- */
-.scenarioSummary {
-  margin: 12px 12px 16px 12px;
-  padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background: #fafafa;
-}
-.scenarioSummaryTitle { font-weight: 700; margin-bottom: 8px; }
-.summaryTable { width: 100%; border-collapse: collapse; font-size: 13px; }
-.summaryTable th, .summaryTable td {
-  border: 1px solid #e0e0e0;
-  padding: 6px 8px;
-  vertical-align: top;
-}
-.summaryTable th { background: #f2f2f2; text-align: left; }
-
-
-/* Summary tables (shared by main + scenario tabs) */
-.summaryTable { width: 100%; border-collapse: collapse; font-size: 13px; }
-.summaryTable th, .summaryTable td {
-  border: 1px solid #e0e0e0;
-  padding: 6px 8px;
-  vertical-align: top;
-}
-.summaryTable th { background: #f2f2f2; text-align: left; }
-
-/* STATUS cell indicators */
-.statusCell {
-  font-weight: 700;
-  white-space: nowrap;
-}
-.statusCell.pass {
-  color: var(--pass);
-  background: #ecfdf5;
-}
-.statusCell.fail {
-  color: var(--fail);
-  background: #fef2f2;
-}
-.statusCell.pass::before {
-  content: "✓ ";
-}
-.statusCell.fail::before {
-  content: "✕ ";
-}
-
-/* ---------------- Overview table ---------------- */
-.overview { padding: 12px; }
-.overviewHint { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
-.overviewTableWrap { overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
-.overviewTable { width: 100%; border-collapse: collapse; font-size: 13px; }
-.overviewTable th, .overviewTable td { border: 1px solid var(--line); padding: 8px 10px; vertical-align: top; }
-.overviewTable th { background: var(--card); text-align: left; position: sticky; top: 0; z-index: 5; }
-.ovScenario { font-weight: 700; min-width: 220px; }
-.ovResult { white-space: nowrap; }
-.ovPill.pass { color: var(--pass); border-color: #bbf7d0; background: #ecfdf5; }
-.ovPill.fail { color: var(--fail); border-color: #fecaca; background: #fef2f2; }
-
-/* MAIN tab controls */
-.overviewControls {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px 0 12px;
-}
-.statusRadios {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-  font-size: 12px;
-  color: var(--fg);
-}
-.statusRadios label { display: inline-flex; gap: 6px; align-items: center; }
-
-/* Make header row look clickable for sorting */
-.summaryTable--multi thead tr.hdrRow th.sortable {
-  cursor: pointer;
-  user-select: none;
-  position: sticky;
-  top: 0;
-  z-index: 6;
-}
-.summaryTable--multi thead tr.hdrRow th.sortable:hover {
-  filter: brightness(0.98);
-}
-
-/* Visual sort indicator using data-sort */
-.summaryTable--multi thead tr.hdrRow th[data-sort="asc"]::after  { content: " ▲"; color: var(--muted); }
-.summaryTable--multi thead tr.hdrRow th[data-sort="desc"]::after { content: " ▼"; color: var(--muted); }
-
-/* Filter row sticks below header row */
-.summaryTable--multi thead tr.filterRow th {
-  position: sticky;
-  top: 34px;          /* approx height of header row; adjust if needed */
-  z-index: 5;
-  background: #fff;
-}
-.colFilter {
-  width: 100%;
-  font-size: 12px;
-  padding: 6px 8px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-
-/* Link column */
-.linkCol { width: 42px; min-width: 42px; max-width: 42px; text-align: center; }
-.jumpBtn {
-  cursor: pointer;
-  border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 10px;
-  padding: 4px 8px;
-  font-size: 12px;
-}
-.jumpBtn:hover { filter: brightness(0.98); }
-
-/* Optional subtle row tint for quick scan */
-.summaryTable--multi tbody tr.rowPass td { background: #fcfffd; }
-.summaryTable--multi tbody tr.rowFail td { background: #fffdfd; }
-
-/* STATUS cell indicators (you already have these, keep/merge) */
-.statusCell { font-weight: 700; white-space: nowrap; }
-.statusCell.pass { color: var(--pass); background: #ecfdf5; }
-.statusCell.fail { color: var(--fail); background: #fef2f2; }
-.statusCell.pass::before { content: "✓ "; }
-.statusCell.fail::before { content: "✕ "; }
-/* ---------------- Excluded / General logs under MAIN ---------------- */
-.excludedSection {
-  margin-top: 14px;
-  border-top: 1px dashed var(--line);
-  padding-top: 12px;
-}
-.excludedHeader {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 0 12px 8px 12px;
-}
-.excludedTitle { font-weight: 800; }
-.excludedHint { color: var(--muted); font-size: 12px; }
-.excludedBlock {
-  margin: 10px 12px 14px 12px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fff;
-}
-.excludedBlockTitle {
-  font-weight: 700;
-  margin-bottom: 8px;
-  color: var(--info);
-}
-.timelineAttachment {
-  align-items: flex-start;
-}
-.timelineAttachment .msgBlock {
-  display: block;
-  min-width: 0;
-  width: 100%;
-}
-.timelineAttachment .msgLabel {
-  font-weight: 700;
-  margin-bottom: 8px;
-  word-break: break-word;
-}
-.timelineAttachment .imgDetails {
-  max-width: 480px;
-}
-.timelineAttachment .imgThumb {
-  height: 220px;
-  max-width: 100%;
-}
-.timelineAttachment .attText {
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-""";
-
-
-
+            :root {
+              --bg: #ffffff;
+              --fg: #111827;
+              --muted: #6b7280;
+              --card: #f9fafb;
+              --line: #e5e7eb;
+              --pill: #eef2ff;
+              --pass: #065f46;
+              --fail: #991b1b;
+              --warn: #92400e;
+              --info: #1f2937;
+              --skip: #374151;
+              --main: #1d4ed8;
+            
+              --hdrFail: #F26144;
+              --hdrWarn: #fffbeb;
+              --hdrSkip: #f3f4f6;
+              --hdrNormal: #89D18B;
+            }
+            
+            * { box-sizing: border-box; }
+            html, body {
+              margin: 0;
+              padding: 0;
+              background: var(--bg);
+              color: var(--fg);
+              font-family: Arial, Helvetica, sans-serif;
+            }
+            a { color: inherit; }
+            
+            .page { display: flex; height: 100vh; overflow: hidden; }
+            
+            /* ---------------- Left rail / tabs ---------------- */
+            .leftRail {
+              width: 320px;
+              min-width: 240px;
+              max-width: 420px;
+              border-right: 1px solid var(--line);
+              background: #fafafa;
+              display: flex;
+              flex-direction: column;
+            }
+            
+            .railHeader {
+              padding: 14px 14px 12px 14px;
+              border-bottom: 1px solid var(--line);
+              background: #fff;
+            }
+            
+            .topSummary .summaryTitle { font-weight: 800; font-size: 14px; margin-bottom: 6px; }
+            .topSummary .summaryMeta { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+            
+            .summaryNumbers { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+            
+            .pill {
+              display: inline-block;
+              padding: 2px 10px;
+              border-radius: 999px;
+              background: var(--pill);
+              border: 1px solid #e0e7ff;
+              font-size: 12px;
+              white-space: nowrap;
+            }
+            .passPill { border-color: #bbf7d0; background: #ecfdf5; color: var(--pass); }
+            .failPill { border-color: #fecaca; background: #fef2f2; color: var(--fail); }
+            .pctPill  { border-color: #e5e7eb; background: #fff; color: var(--info); }
+            
+            .barWrap {
+              position: relative;
+              height: 14px;
+              border-radius: 999px;
+              overflow: hidden;
+              border: 1px solid var(--line);
+              background: #fff;
+            }
+            .barFail { position: absolute; inset: 0; background: #d63a3a; }
+            .barPass { position: absolute; inset: 0; background: #1f9d4c; }
+            
+            .railTabs { padding: 10px; overflow: auto; flex: 1; }
+            .tabButtons { display: flex; flex-direction: column; gap: 8px; }
+            
+            .tabBtn {
+              cursor: pointer;
+              border: 1px solid var(--line);
+              background: #fff;
+              color: var(--fg);
+              border-radius: 10px;
+              padding: 10px 10px;
+              font-size: 13px;
+              line-height: 1.2;
+              text-align: left;
+              display: flex;
+              align-items: center;
+              gap: 8px;
+            }
+            .tabBtn.active { outline: 2px solid #111827; border-color: #111827; }
+            .tabBtn.pass { border-left: 10px solid #1f9d4c; }
+            .tabBtn.fail { border-left: 10px solid #d63a3a; }
+            .tabBtn.main { border-left: 10px solid var(--main); }
+            
+            .statusDot {
+              width: 10px;
+              height: 10px;
+              border-radius: 50%;
+              flex: 0 0 10px;
+              border: 1px solid var(--line);
+              background: #fff;
+            }
+            .statusDot.pass { background: #1f9d4c; border-color: #1f9d4c; }
+            .statusDot.fail { background: #d63a3a; border-color: #d63a3a; }
+            
+            /* ---------------- Main panels ---------------- */
+            .main { flex: 1; overflow: auto; background: #fff; }
+            
+            .tabPanel { display: none; }
+            .tabPanel.active { display: block; }
+            
+            .scope {
+              margin: 14px;
+              border: 1px solid var(--line);
+              border-radius: 10px;
+              overflow: hidden;
+              background: #fff;
+            }
+            .scopeHeader {
+              display: flex;
+              gap: 10px;
+              justify-content: space-between;
+              align-items: baseline;
+              padding: 12px 12px;
+              border-bottom: 1px solid var(--line);
+              background: var(--card);
+            }
+            .scopeName { font-weight: 700; }
+            
+            /* ---------------- Tree / nodes ---------------- */
+            .tree { padding: 10px; }
+            .node { margin: 10px 0; }
+            
+            .node details {
+              border: 2px solid var(--line);          /* stronger outlines */
+              border-radius: 12px;
+              background: #fff;
+              overflow: hidden;
+            }
+            
+            /* Reset summary defaults cleanly */
+            .node summary {
+              list-style: none;
+              cursor: pointer;
+            //  padding: 0;
+            }
+            .node summary::-webkit-details-marker { display: none; }
+            
+            .nodeHeader {
+              display: flex;
+              align-items: flex-start;
+              justify-content: space-between;
+              gap: 12px;
+              padding: 10px 12px;
+              border-bottom: 1px solid var(--line);
+            }
+            .nodeHeader.bgFail { background: var(--hdrFail); }
+            .nodeHeader.bgWarn { background: var(--hdrWarn); }
+            .nodeHeader.bgSkip { background: var(--hdrSkip); }
+            .nodeHeader.bgNormal { background: var(--hdrNormal); }
+            
+            .hdrLeft { min-width: 0; }
+            .hdrTitle { font-weight: 700; word-break: break-word; }
+            .hdrMeta { margin-top: 4px; font-size: 12px; color: var(--muted); }
+            
+            .hdrRight { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+            
+            .details { padding: 10px 12px 12px 12px; background: #fff; }
+            
+            .badge {
+              font-size: 11px;
+              padding: 2px 8px;
+              border-radius: 999px;
+              border: 1px solid var(--line);
+              background: #fff;
+              color: var(--info);
+              white-space: nowrap;
+            }
+            .badge.pass { color: var(--pass); border-color: #bbf7d0; background: #ecfdf5; }
+            .badge.fail { color: var(--fail); border-color: #fecaca; background: #fef2f2; }
+            .badge.warn { color: var(--warn); border-color: #fde68a; background: #fffbeb; }
+            .badge.skip { color: var(--skip); border-color: #e5e7eb; background: #f9fafb; }
+            .badge.info { color: var(--info); border-color: #e5e7eb; background: #f9fafb; }
+            .badge.muted { color: var(--muted); border-color: #e5e7eb; background: #fff; }
+            
+            .row { margin-top: 10px; }
+            .v { display: block; min-width: 0; }
+            
+            .pill { margin: 0 6px 6px 0; }
+            
+            .fields { width: 100%; border-collapse: collapse; }
+            .fields td { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; }
+            .fk { width: 220px; color: var(--muted); font-size: 12px; }
+            .fv { font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+            
+            /* ---------------- Attachments (screenshots) ---------------- */
+            /* Bigger cards so single screenshot doesn’t look tiny */
+            .attachments {
+              display: grid;
+              grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+              gap: 12px;
+            }
+            
+            /* Make each card feel intentional */
+            .att {
+              border: 1px solid var(--line);
+              border-radius: 12px;
+              background: var(--card);
+              overflow: hidden;
+            }
+            
+            .attName {
+              padding: 8px 10px;
+              font-size: 12px;
+              font-weight: 700;
+              border-bottom: 1px solid var(--line);
+              background: #fff;
+            }
+            
+            /* Reset <details>/<summary> quirks */
+            .imgDetails {
+              border-top: 0;
+              background: #fff;
+            //  width: 100%;
+            }
+            .imgDetails > summary {
+              list-style: none;
+            //  width: 100%;
+              margin: 0;
+              padding: 12px;
+              cursor: pointer;
+            
+              /* Force block sizing and prevent browser centering quirks */
+              display: block !important;
+            }
+            .imgDetails > summary::-webkit-details-marker { display: none; }
+            
+            /* Stack thumbnail + hint normally (NOT side-by-side) */
+            .imgSummary {
+            //  width: 100%;
+            }
+            
+            .imgThumb {
+                height: 120px;
+                max-width: 240px;
+                object-fit: contain;
+                border-radius: 6px;
+                border: 1px solid var(--line);
+                background: #fff;
+                display: block;
+                cursor: pointer;
+            }
+            
+            /* Lightbox overlay for full-size screenshot */
+            .imgOverlay {
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,.75);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 99999;
+                cursor: pointer;
+            }
+            
+            .imgOverlay img {
+                max-width: 92vw;
+                max-height: 92vh;
+                object-fit: contain;
+                border-radius: 10px;
+                box-shadow: 0 8px 32px rgba(0,0,0,.5);
+                background: #fff;
+            }
+            
+            /* Non-image attachments */
+            .attText {
+              padding: 8px 10px;
+              font-size: 12px;
+              white-space: pre-wrap;
+              word-break: break-word;
+              color: var(--fg);
+            }
+            
+            /* ---------------- Log ---------------- */
+            .log { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #fff; }
+            .logLine { display: flex; gap: 10px; padding: 6px 10px; border-top: 1px solid var(--line); font-size: 12px; }
+            .logLine:first-child { border-top: none; }
+            .ts { color: var(--muted); white-space: nowrap; }
+            .msg { white-space: pre-wrap; word-break: break-word; }
+            .logLine.pass .msg { color: var(--pass); }
+            .logLine.fail .msg { color: var(--fail); }
+            .logLine.warn .msg { color: var(--warn); }
+            .logLine.skip .msg { color: var(--skip); }
+            
+            .kids { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
+            
+            /* Indentation */
+            .d0 { margin-left: 0px; }
+            .d1 { margin-left: 12px; }
+            .d2 { margin-left: 24px; }
+            .d3 { margin-left: 36px; }
+            .d4 { margin-left: 48px; }
+            .d5 { margin-left: 60px; }
+            .d6 { margin-left: 72px; }
+            
+            /* ---------------- Scenario summary ---------------- */
+            .scenarioSummary {
+              margin: 12px 12px 16px 12px;
+              padding: 10px 12px;
+              border: 1px solid #ddd;
+              border-radius: 8px;
+              background: #fafafa;
+            }
+            .scenarioSummaryTitle { font-weight: 700; margin-bottom: 8px; }
+            .summaryTable { width: 100%; border-collapse: collapse; font-size: 13px; }
+            .summaryTable th, .summaryTable td {
+              border: 1px solid #e0e0e0;
+              padding: 6px 8px;
+              vertical-align: top;
+            }
+            .summaryTable th { background: #f2f2f2; text-align: left; }
+            
+            
+            /* Summary tables (shared by main + scenario tabs) */
+            .summaryTable { width: 100%; border-collapse: collapse; font-size: 13px; }
+            .summaryTable th, .summaryTable td {
+              border: 1px solid #e0e0e0;
+              padding: 6px 8px;
+              vertical-align: top;
+            }
+            .summaryTable th { background: #f2f2f2; text-align: left; }
+            
+            /* STATUS cell indicators */
+            .statusCell {
+              font-weight: 700;
+              white-space: nowrap;
+            }
+            .statusCell.pass {
+              color: var(--pass);
+              background: #ecfdf5;
+            }
+            .statusCell.fail {
+              color: var(--fail);
+              background: #fef2f2;
+            }
+            .statusCell.pass::before {
+              content: "✓ ";
+            }
+            .statusCell.fail::before {
+              content: "✕ ";
+            }
+            
+            /* ---------------- Overview table ---------------- */
+            .overview { padding: 12px; }
+            .overviewHint { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+            .overviewTableWrap { overflow: auto; border: 1px solid var(--line); border-radius: 10px; }
+            .overviewTable { width: 100%; border-collapse: collapse; font-size: 13px; }
+            .overviewTable th, .overviewTable td { border: 1px solid var(--line); padding: 8px 10px; vertical-align: top; }
+            .overviewTable th { background: var(--card); text-align: left; position: sticky; top: 0; z-index: 5; }
+            .ovScenario { font-weight: 700; min-width: 220px; }
+            .ovResult { white-space: nowrap; }
+            .ovPill.pass { color: var(--pass); border-color: #bbf7d0; background: #ecfdf5; }
+            .ovPill.fail { color: var(--fail); border-color: #fecaca; background: #fef2f2; }
+            
+            /* MAIN tab controls */
+            .overviewControls {
+              display: flex;
+              gap: 12px;
+              align-items: center;
+              justify-content: space-between;
+              padding: 10px 12px 0 12px;
+            }
+            .statusRadios {
+              display: flex;
+              gap: 10px;
+              align-items: center;
+              flex-wrap: wrap;
+              font-size: 12px;
+              color: var(--fg);
+            }
+            .statusRadios label { display: inline-flex; gap: 6px; align-items: center; }
+            
+            /* Make header row look clickable for sorting */
+            .summaryTable--multi thead tr.hdrRow th.sortable {
+              cursor: pointer;
+              user-select: none;
+              position: sticky;
+              top: 0;
+              z-index: 6;
+            }
+            .summaryTable--multi thead tr.hdrRow th.sortable:hover {
+              filter: brightness(0.98);
+            }
+            
+            /* Visual sort indicator using data-sort */
+            .summaryTable--multi thead tr.hdrRow th[data-sort="asc"]::after  { content: " ▲"; color: var(--muted); }
+            .summaryTable--multi thead tr.hdrRow th[data-sort="desc"]::after { content: " ▼"; color: var(--muted); }
+            
+            /* Filter row sticks below header row */
+            .summaryTable--multi thead tr.filterRow th {
+              position: sticky;
+              top: 34px;          /* approx height of header row; adjust if needed */
+              z-index: 5;
+              background: #fff;
+            }
+            .colFilter {
+              width: 100%;
+              font-size: 12px;
+              padding: 6px 8px;
+              border: 1px solid var(--line);
+              border-radius: 8px;
+            }
+            
+            /* Link column */
+            .linkCol { width: 42px; min-width: 42px; max-width: 42px; text-align: center; }
+            .jumpBtn {
+              cursor: pointer;
+              border: 1px solid var(--line);
+              background: #fff;
+              border-radius: 10px;
+              padding: 4px 8px;
+              font-size: 12px;
+            }
+            .jumpBtn:hover { filter: brightness(0.98); }
+            
+            /* Optional subtle row tint for quick scan */
+            .summaryTable--multi tbody tr.rowPass td { background: #fcfffd; }
+            .summaryTable--multi tbody tr.rowFail td { background: #fffdfd; }
+            
+            /* STATUS cell indicators (you already have these, keep/merge) */
+            .statusCell { font-weight: 700; white-space: nowrap; }
+            .statusCell.pass { color: var(--pass); background: #ecfdf5; }
+            .statusCell.fail { color: var(--fail); background: #fef2f2; }
+            .statusCell.pass::before { content: "✓ "; }
+            .statusCell.fail::before { content: "✕ "; }
+            /* ---------------- Excluded / General logs under MAIN ---------------- */
+            .excludedSection {
+              margin-top: 14px;
+              border-top: 1px dashed var(--line);
+              padding-top: 12px;
+            }
+            .excludedHeader {
+              display: flex;
+              align-items: baseline;
+              justify-content: space-between;
+              gap: 10px;
+              padding: 0 12px 8px 12px;
+            }
+            .excludedTitle { font-weight: 800; }
+            .excludedHint { color: var(--muted); font-size: 12px; }
+            .excludedBlock {
+              margin: 10px 12px 14px 12px;
+              padding: 10px;
+              border: 1px solid var(--line);
+              border-radius: 10px;
+              background: #fff;
+            }
+            .excludedBlockTitle {
+              font-weight: 700;
+              margin-bottom: 8px;
+              color: var(--info);
+            }
+            .timelineAttachment {
+              align-items: flex-start;
+            }
+            .timelineAttachment .msgBlock {
+              display: block;
+              min-width: 0;
+              width: 100%;
+            }
+            .timelineAttachment .msgLabel {
+              font-weight: 700;
+              margin-bottom: 8px;
+              word-break: break-word;
+            }
+            .timelineAttachment .imgDetails {
+              max-width: 480px;
+            }
+            .timelineAttachment .imgThumb {
+              height: 120px;
+              max-width: 240px;
+            }
+            .timelineAttachment .attText {
+              padding: 0;
+              border: 0;
+              background: transparent;
+            }
+            """;
 
 
     private static Instant timeForPhase(Entry entry, Phase phase) {
@@ -1791,11 +1816,11 @@ a { color: inherit; }
         if (s == null) return "";
         String t = s.trim();
         String lower = t.toLowerCase(Locale.ROOT);
-        if (lower.endsWith(".png"))  return t.substring(0, t.length() - 4);
-        if (lower.endsWith(".jpg"))  return t.substring(0, t.length() - 4);
+        if (lower.endsWith(".png")) return t.substring(0, t.length() - 4);
+        if (lower.endsWith(".jpg")) return t.substring(0, t.length() - 4);
         if (lower.endsWith(".jpeg")) return t.substring(0, t.length() - 5);
-        if (lower.endsWith(".gif"))  return t.substring(0, t.length() - 4);
-        if (lower.endsWith(".bmp"))  return t.substring(0, t.length() - 4);
+        if (lower.endsWith(".gif")) return t.substring(0, t.length() - 4);
+        if (lower.endsWith(".bmp")) return t.substring(0, t.length() - 4);
         if (lower.endsWith(".webp")) return t.substring(0, t.length() - 5);
         return t;
     }
@@ -1838,16 +1863,11 @@ a { color: inherit; }
             out.append("<div class=\"msgLabel\">").append(a.name).append("</div>");
 
             if (a.isImage && a.src != null && !a.src.isBlank()) {
-                out.append("<details class=\"imgDetails\">");
-                out.append("<summary class=\"imgSummary\">");
-                out.append("<img class=\"imgThumb\" alt=\"").append(a.name).append("\" src=\"")
-                        .append(a.src).append("\">");
-                out.append("</summary>");
-                out.append("<div class=\"imgFullWrap\">");
-                out.append("<img class=\"imgFull\" alt=\"").append(a.name).append("\" src=\"")
-                        .append(a.src).append("\">");
-                out.append("</div>");
-                out.append("</details>");
+                out.append("<img class=\"imgThumb\" alt=\"")
+                        .append(a.name)
+                        .append("\" src=\"")
+                        .append(a.src)
+                        .append("\" onclick=\"(function(s){var o=document.createElement('div');o.className='imgOverlay';o.onclick=function(){o.remove()};var i=document.createElement('img');i.src=s;o.appendChild(i);document.body.appendChild(o)})(this.src)\">");
             } else {
                 out.append("<div class=\"attText\">").append(a.text == null ? "" : a.text).append("</div>");
             }
@@ -1880,6 +1900,8 @@ a { color: inherit; }
 
             if (isRedundantEchoChild(parent, child)) {
                 mergeEchoChildIntoParent(parent, child);
+            } else if (isScreenshotOnlyChild(child)) {
+                mergeScreenshotChildIntoParent(parent, child);
             } else {
                 kept.add(child);
             }
@@ -1887,6 +1909,26 @@ a { color: inherit; }
 
         parent.children.clear();
         parent.children.addAll(kept);
+    }
+
+    private static boolean isScreenshotOnlyChild(HtmlNode child) {
+        if (child == null) return false;
+        if (child.startedAt != null || child.stoppedAt != null) return false;
+        if (!child.children.isEmpty()) return false;
+        if (child.attachments.isEmpty()) return false;
+        if (child.tags != null && !child.tags.isEmpty()) return false;
+        if (child.fields != null && !child.fields.isEmpty()) return false;
+
+        // All attachments must be images
+        for (InlineImage att : child.attachments) {
+            if (!att.isImage) return false;
+        }
+
+        return true;
+    }
+
+    private static void mergeScreenshotChildIntoParent(HtmlNode parent, HtmlNode child) {
+        parent.attachments.addAll(child.attachments);
     }
 
     private static boolean isRedundantEchoChild(HtmlNode parent, HtmlNode child) {

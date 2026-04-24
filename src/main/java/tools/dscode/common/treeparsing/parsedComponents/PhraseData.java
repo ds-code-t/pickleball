@@ -173,7 +173,7 @@ public abstract class PhraseData extends PassedData {
         hasResolvedText = !text.trim().equalsIgnoreCase(resolvedText.trim());
         hasTextToResolve = hasResolvedText || text.matches(".*<.*>.*");
         termination = delimiter;
-        contextTermination = !termination.equals(',');
+        contextTermination = termination.equals('.') || termination.equals('?') || termination.equals(':');
         MatchNode returnMatchNode = getNodeDictionary().parse(resolvedText);
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;

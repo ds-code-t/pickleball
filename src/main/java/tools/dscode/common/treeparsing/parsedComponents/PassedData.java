@@ -68,7 +68,7 @@ public abstract class PassedData {
                             if (currentPhrase.phraseType == ELEMENT_ONLY) {
                                 currentPhrase.setAssertion("True");
                             }
-                            if (currentPhrase.termination.equals('?'))
+                            if (currentPhrase.contextTermination)
                                 break;
                             currentPhrase = currentPhrase.getNextPhrase();
                         }
@@ -494,10 +494,11 @@ public abstract class PassedData {
 
     public boolean hasTerminationConditional() {
         PhraseData nextPhrase = (PhraseData) this;
+        int chainCount = 0;
         while (nextPhrase != null) {
-            if (nextPhrase.isSeparatorPhrase())
+            if (chainCount++ >0 && nextPhrase.isSeparatorPhrase())
                 return false;
-            if (nextPhrase.termination.equals('?'))
+            if (nextPhrase.termination.equals('?') || nextPhrase.termination.equals(':'))
                 return true;
             nextPhrase = nextPhrase.getNextPhrase();
         }

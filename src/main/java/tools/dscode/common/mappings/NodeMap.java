@@ -125,6 +125,10 @@ public class NodeMap  extends ValueFormatting{
         return (new Tokenized(key)).get(root);
     }
 
+    public void putAsSingleton(String key, Object value) {
+        put(new Tokenized("-" + key), value);
+    }
+
     public void put(String key, Object value) {
         put(new Tokenized(key), value);
     }

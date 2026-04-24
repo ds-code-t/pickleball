@@ -416,7 +416,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
     private void putVar(String key, Object value) {
         key = (key.contains("_") && key.toLowerCase().startsWith(PKB_PREFIX)) ? key.toLowerCase() : PKB_PREFIX + key.toLowerCase();
         singletonMap.get().root.remove(key);
-        singletonMap.get().root.set(key, MAPPER.valueToTree(value));
+        singletonMap.get().putAsSingleton(key, value);
     }
 
     public List<Object> getList(String key) {
