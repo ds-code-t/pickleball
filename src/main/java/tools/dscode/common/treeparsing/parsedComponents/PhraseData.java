@@ -35,6 +35,7 @@ import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.StepMapping.copytoNewParsingMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseError;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
@@ -58,6 +59,8 @@ public abstract class PhraseData extends PassedData {
     public boolean shouldRepeatPhrase = false;
     public boolean repeatRootPhrase = false;
     public List<PhraseData> repeatedChain = new ArrayList<>();
+
+    public List<PhraseData> assertionChain = new ArrayList<>();
     //    public boolean evaluateResults = true;
 //    boolean invertConditional = false;
     List<Object> repetitionContext = new ArrayList<>();
@@ -370,7 +373,9 @@ public abstract class PhraseData extends PassedData {
         if (result.failed()) {
             throw new RuntimeException("operation '" + operation + "' failed", result.error());
         }
-
+        if(assertionOperation != null) {
+            closestEntryToPhrase().info(assertionOperation.name() + " assertion evaluated to: " + result.value());
+        }
 //        if(blurAfterOperation && !termination.equals(';')){
 //            blur(getDefaultDriver());
 //        }
@@ -407,14 +412,15 @@ public abstract class PhraseData extends PassedData {
 
         previouslyResolvedBoolean = getBooleanResult();
 
-        String assertionMessage = "Assertion phrase '" + resolvedText + "' evaluates to: " + previouslyResolvedBoolean;
+        String assertionMessage = "Assertion chain evaluates to: " + previouslyResolvedBoolean;
+
         phraseInfo(assertionMessage);
         if (!resultElements.isEmpty())
             assertionMessage += " , elements:" + resultElements.stream()
                     .map(Object::toString)
                     .collect(Collectors.joining("\n", "\n", ""));
 
-        switch (getAssertionType().replace("Termination", "")) {
+        switch (getAssertionType()) {
             case "ensure" -> {
                 if (!previouslyResolvedBoolean) {
                     phraseError("Failed hard assertion in Phrase '" + resolvedText + "'");

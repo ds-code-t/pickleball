@@ -110,6 +110,10 @@ public final class Phrase extends PhraseData {
             setAssertion("true");
         }
 
+        if (!parsedLine.executedPhrases.isEmpty() && this.shouldRepeatPhrase && (parsedLine.executedPhrases.getLast().shouldRepeatPhrase || parsedLine.executedPhrases.getLast().repeatRootPhrase)) {
+            parsedLine.executedPhrases.removeLast();
+        }
+
         parsedLine.executedPhrases.add(this);
 
         if (!text.equals(resolvedText)) {

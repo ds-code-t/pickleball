@@ -1,9 +1,57 @@
 Feature: Addition
 
+  Scenario: rfere
+
+  Scenario: ssif test1sdads
+    * , if "111" is "111", and "3222" is "222":
+  :   * , save "<A><X>" as "A"
+    * , if "222" is "111", or "222" is "222":
+  :   * , save "<A><X>" as "A"
+
+  Scenario: save concurrent test
+#    * , save "1" as "A"
+    * , save "<A>1" as "A"
+    * , save "<A>1" as "A"
+    * , save "<A>1" as "A"
+
+  Scenario: ssif test1
+    * , if "222" is "111", or "3222" is "222":
+  :   * , save "<A><X>" as "A"
+    * , until "222" is "111", or "3222" is "222":
+  :   * , save "<A><X>" as "A"
+
+  Scenario: if test1
+    * , if "222" is "111", or "2s22" is "222":
+  :   * , save "<A><X>" as "A"
+
+  Scenario: until test1
+    * , save "1" as "X"
+    * , save "<X>" as "A"
+    * , until "<A>" is "111":
+  :   * , save "<A><X>" as "A"
+
+  Scenario: if until test2
+    * , save "2" as "X"
+    * , save "<X>" as "A"
+    * , if "<A>" is "2",  "<A>" is "222", or  "<A>" is "aa":
+  :   * , save "<A><X>" as "A"
+
+  Scenario: until test2
+    * , save "2" as "X"
+    * , save "<X>" as "A"
+    * , until "<A>" is "11111", or "<A>" is "222":
+  :   * , save "<A><X>" as "A"
+
   Scenario: Chain testing1
-    * , until "1" is "1":
-    : * , wait 1 second
-    : * , save "<A>1" as "A"
+    * , save "2" as "X"
+    * , save "<X>" as "A"
+#    * , until "<A>" is "111":
+    * , if "<A>" is "111", or "<A>" is "222":
+  :   * , save "qqqqq" as "Q"
+    * , until "<A>" is "111", or "<A>" is "222":
+#    * , until "<A>" is "11":
+  :   * , wait 1 second
+  :   * , save "<A><X>" as "A"
 
 
   Scenario: Chain testing
@@ -55,9 +103,9 @@ Feature: Addition
 
   Scenario: condtion nesting testing2.5
 
-   * , if "A" equals "A":
+    * , if "A" equals "A":
   : * , save "x1"
-   * , else if "A" equals "A":
+    * , else if "A" equals "A":
   : * , save "x2"
 
 

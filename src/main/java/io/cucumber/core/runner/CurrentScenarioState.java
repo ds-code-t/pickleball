@@ -354,7 +354,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         if (!stepExtension.definitionFlags.contains(IGNORE_CHILDREN)) {
             if (stepExtension.lineData.inheritancePhrases.isEmpty())
                 stepExtension.lineData.inheritancePhrases.add(null);
-            for (PhraseData inheritancePhrase : stepExtension.lineData.inheritancePhrases) {
+            for (PhraseData inheritancePhrase : new ArrayList<>(stepExtension.lineData.inheritancePhrases)) {
                 if (inheritancePhrase != null && inheritancePhrase.repeatRootPhrase) {
                     while (true) {
                         PhraseData clonedChainStart = inheritancePhrase.cloneRepeatedChain();

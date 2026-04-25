@@ -11,6 +11,7 @@ import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import java.util.HashSet;
 import java.util.Set;
 
+import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
 
 public enum AssertionOperations implements OperationsInterface {
@@ -19,7 +20,7 @@ public enum AssertionOperations implements OperationsInterface {
     EQUAL {
         @Override
         public void execute(PhraseData phraseData) {
-            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
 
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
                     new ElementMatcher()
@@ -47,7 +48,7 @@ public enum AssertionOperations implements OperationsInterface {
     START_WITH {
         @Override
         public void execute(PhraseData phraseData) {
-            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.FIRST_ELEMENT),
@@ -71,7 +72,7 @@ public enum AssertionOperations implements OperationsInterface {
     END_WITH {
         @Override
         public void execute(PhraseData phraseData) {
-            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.FIRST_ELEMENT),
@@ -94,7 +95,7 @@ public enum AssertionOperations implements OperationsInterface {
     MATCH {
         @Override
         public void execute(PhraseData phraseData) {
-            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.FIRST_ELEMENT),
@@ -120,7 +121,7 @@ public enum AssertionOperations implements OperationsInterface {
     VALUE {
         @Override
         public void execute(PhraseData phraseData) {
-            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE)
@@ -139,7 +140,7 @@ public enum AssertionOperations implements OperationsInterface {
     BLANK {
         @Override
         public void execute(PhraseData phraseData) {
-            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE)
@@ -157,7 +158,7 @@ public enum AssertionOperations implements OperationsInterface {
     DISPLAYED {
         @Override
         public void execute(PhraseData phraseData) {
-            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
 
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
                     new ElementMatcher()
@@ -195,7 +196,7 @@ public enum AssertionOperations implements OperationsInterface {
     ENABLED {
         @Override
         public void execute(PhraseData phraseData) {
-            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
@@ -214,7 +215,7 @@ public enum AssertionOperations implements OperationsInterface {
     EXPANDED {
         @Override
         public void execute(PhraseData phraseData) {
-            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
@@ -234,7 +235,7 @@ public enum AssertionOperations implements OperationsInterface {
     COLLAPSED {
         @Override
         public void execute(PhraseData phraseData) {
-            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
@@ -254,7 +255,7 @@ public enum AssertionOperations implements OperationsInterface {
     REQUIRED {
         @Override
         public void execute(PhraseData phraseData) {
-            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
@@ -275,7 +276,7 @@ public enum AssertionOperations implements OperationsInterface {
     ON {
         @Override
         public void execute(PhraseData phraseData) {
-            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
 
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatches(),
                     new ElementMatcher()
@@ -296,7 +297,7 @@ public enum AssertionOperations implements OperationsInterface {
     OFF {
         @Override
         public void execute(PhraseData phraseData) {
-            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatches(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
@@ -316,7 +317,7 @@ public enum AssertionOperations implements OperationsInterface {
     TRUE {
         @Override
         public void execute(PhraseData phraseData) {
-            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatches(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE)
@@ -336,7 +337,7 @@ public enum AssertionOperations implements OperationsInterface {
     FALSE {
         @Override
         public void execute(PhraseData phraseData) {
-            System.out.println(phraseData + " : Executing Assertion " + this.name());
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatches(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE)

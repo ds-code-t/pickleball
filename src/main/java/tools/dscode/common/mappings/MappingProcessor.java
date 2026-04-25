@@ -30,6 +30,7 @@ import static io.cucumber.core.runner.util.TableUtils.HEADER_KEY;
 import static io.cucumber.core.runner.util.TableUtils.ENTRY_KEY;
 import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
+import static tools.dscode.common.GlobalConstants.MATCH_BREAK;
 import static tools.dscode.common.dataoperations.DataComparisons.filterGroupedValues;
 
 import static tools.dscode.common.dataoperations.TableQueries.findCells;
@@ -325,7 +326,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 } while (!input.equals(prev));
                 input = input.replaceAll("<\\?[^<>{}]+>", "");
             } while (!input.equals(originalInput));
-            return decodeBackToText(input);
+            return decodeBackToText(input.replaceAll(MATCH_BREAK,""));
         } catch (Throwable t) {
             t.printStackTrace();
             throw new RuntimeException("Could not resolve '" + input + "' due to '" + t.getMessage() + "'", t);
@@ -341,6 +342,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
             while (m.find()) {
                 key = m.group(1);
+                if(key.contains(MATCH_BREAK)) {
+                    replacement = "<" + key + ">";
+                    break;
+                }
                 replacement = get(key);
                 if (replacement != null)
                     break;
@@ -352,6 +357,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
             String stringReplacement = getStringValue(replacement);
             if (stringReplacement.isEmpty() && key != null && !key.isBlank()) {
                 stringReplacement = key.startsWith("?") ? "<" + key + ">" : "<?" + key + ">";
+            }
+            if(stringReplacement.contains("<") && !key.contains(MATCH_BREAK) && stringReplacement.contains("<" + key + ">"))
+            {
+                stringReplacement = stringReplacement.replaceAll("<" + key + ">", "<" + MATCH_BREAK + key + ">");
             }
             m.appendReplacement(sb, Matcher.quoteReplacement(stringReplacement));
             m.appendTail(sb);
