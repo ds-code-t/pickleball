@@ -18,6 +18,8 @@ import static tools.dscode.common.mappings.MapConfigurations.MapType.STEP_MAP;
 
 
 public abstract class StepBase implements Cloneable {
+    public PhraseData overridePhrase;
+
     public PhraseData inheritancePhrase;
     public boolean dataArgumentStep = false;
     public boolean isDynamicStep;

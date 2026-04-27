@@ -1,6 +1,7 @@
 package tools.dscode.common.treeparsing.preparsing;
 
 import io.cucumber.core.runner.StepBase;
+import tools.dscode.common.assertions.AssertionChain;
 import tools.dscode.common.mappings.QuoteParser;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
@@ -20,6 +21,9 @@ import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
 
 public abstract class LineData implements Cloneable {
+    public boolean isAssertionChainStep = false;
+    public AssertionChain stepAssertionChain;
+
     public int lineConditionalMode = 1;
     public int startPhraseIndex = 0;
     //    public LineData inheritedLineData;

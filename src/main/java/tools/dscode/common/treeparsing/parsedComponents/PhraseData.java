@@ -6,8 +6,8 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.xpathy.XPathy;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebElement;
-import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
+import tools.dscode.common.assertions.AssertionChain;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 
 import tools.dscode.common.mappings.MapConfigurations;
@@ -18,6 +18,7 @@ import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.exceptions.SoftRuntimeException;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ActionOperations;
+import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.AssertionOperations;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.OperationsInterface;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHolderMatch;
 import tools.dscode.common.treeparsing.preparsing.LineData;
@@ -48,19 +49,26 @@ import static tools.dscode.common.util.debug.DebugUtils.onMatch;
 
 
 public abstract class PhraseData extends PassedData {
+    public boolean isChainedAssertion = false;
     public Entry phraseEntry;
     //    boolean isStartingContext;
     public final String text;
     public final String resolvedText;
-    public final Character termination; // nullable
+    public Character termination; // nullable
     public final LineData parsedLine;
     private SearchContext searchContext;
     //    public PhraseData repeatedPhraseMaster = null;
-    public boolean shouldRepeatPhrase = false;
-    public boolean repeatRootPhrase = false;
-    public List<PhraseData> repeatedChain = new ArrayList<>();
+//    public boolean shouldRepeatPhrase = false;
+//    public boolean repeatRootPhrase = false;
+//    public List<PhraseData> repeatedChain = new ArrayList<>();
 
-    public List<PhraseData> assertionChain = new ArrayList<>();
+    public boolean untilPhrase = false;
+
+//    public boolean runAssertionChain = false;
+
+
+    public AssertionChain assertionChain;
+    public AssertionChain assertionChainMembership;
     //    public boolean evaluateResults = true;
 //    boolean invertConditional = false;
     List<Object> repetitionContext = new ArrayList<>();
@@ -165,6 +173,10 @@ public abstract class PhraseData extends PassedData {
 
     public final boolean defaultContextPhrase;
 
+    public boolean isContextTermination() {
+        return (termination.equals('.') || termination.equals('?') || termination.equals(':'));
+    }
+
     public PhraseData(String inputText, Character delimiter, LineData lineData, PhraseData previousPhrase) {
         defaultContextPhrase = inputText.equals(STARTING_CONTEXT);
         if (defaultContextPhrase)
@@ -176,7 +188,7 @@ public abstract class PhraseData extends PassedData {
         hasResolvedText = !text.trim().equalsIgnoreCase(resolvedText.trim());
         hasTextToResolve = hasResolvedText || text.matches(".*<.*>.*");
         termination = delimiter;
-        contextTermination = termination.equals('.') || termination.equals('?') || termination.equals(':');
+//        contextTermination = termination.equals('.') || termination.equals('?') || termination.equals(':');
         MatchNode returnMatchNode = getNodeDictionary().parse(resolvedText);
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
@@ -184,7 +196,7 @@ public abstract class PhraseData extends PassedData {
         String conditional = phraseNode.getStringFromLocalState("conditional");
         if (conditional.equalsIgnoreCase("until")) {
             conditional = "if";
-            repeatRootPhrase = true;
+            untilPhrase = true;
 //            evaluateResults = false;
 //            invertConditional = true;
         }
@@ -333,7 +345,7 @@ public abstract class PhraseData extends PassedData {
 
     public abstract PhraseData cloneInheritedPhrase();
 
-    public abstract PhraseData cloneRepeatedChain();
+//    public abstract PhraseData cloneRepeatedChain();
 
     public abstract PhraseData clonePhrase(PhraseData previous, Character newTermination);
 
@@ -369,17 +381,29 @@ public abstract class PhraseData extends PassedData {
         if (operation instanceof ActionOperations) {
             waitMilliseconds(300);
         }
-        operation.execute(this);
+        if (operation instanceof AssertionOperations && assertionChain != null) {
+            assertionChain.executeAssertionChain();
+//            if(!untilPhrase)
+//                assertionChain.executeAssertionChain();
+//            result = new Attempt.Result(assertionChainMembership.chainStatus, assertionChainMembership.exception);
+        }
+        else {
+            operation.execute(this);
+        }
+//        if(untilPhrase)
+//            return;
         if (result.failed()) {
             throw new RuntimeException("operation '" + operation + "' failed", result.error());
         }
         if(assertionOperation != null) {
             closestEntryToPhrase().info(assertionOperation.name() + " assertion evaluated to: " + result.value());
         }
+//        resultPhrases.add(this);
+
 //        if(blurAfterOperation && !termination.equals(';')){
 //            blur(getDefaultDriver());
 //        }
-        chainStartPhrase.resultPhrases.add(this);
+//        chainStartPhrase.resultPhrases.add(this);
     }
 
     public void runUntilOperation() {
@@ -391,26 +415,29 @@ public abstract class PhraseData extends PassedData {
         if (result.failed()) {
             throw new RuntimeException("operation '" + operation + "' failed", result.error());
         }
-        chainStartPhrase.resultPhrases.add(this);
+//        chainStartPhrase.resultPhrases.add(this);
     }
 
     Boolean previouslyResolvedBoolean = null;
 
     public boolean resolveResults() {
-        if (!isOperationPhrase)
-            return true;
-        if (!isChainStart) {
-            return chainStartPhrase.resolveResults();
-        }
-
-        if (previouslyResolvedBoolean != null)
-            return previouslyResolvedBoolean;
-
-
-        if (getAssertionType().isBlank())
+        if(getAssertion().isBlank())
             return true;
 
-        previouslyResolvedBoolean = getBooleanResult();
+//        if (!isOperationPhrase)
+//            return true;
+//        if (!isChainStart) {
+//            return chainStartPhrase.resolveResults();
+//        }
+
+//        if (previouslyResolvedBoolean != null)
+//            return previouslyResolvedBoolean;
+//
+//
+//        if (getAssertionType().isBlank())
+//            return true;
+
+        previouslyResolvedBoolean = result.value() != null && (boolean) result.value();
 
         String assertionMessage = "Assertion chain evaluates to: " + previouslyResolvedBoolean;
 
@@ -435,37 +462,38 @@ public abstract class PhraseData extends PassedData {
             }
             case "conditional" -> {
                 phraseConditionalMode = previouslyResolvedBoolean ? 1 : -1;
-                if (shouldRepeatPhrase) {
+
+                if (untilPhrase) {
                     if (phraseConditionalMode <= 0) {
                         phraseConditionalMode = 1;
                     } else {
                         phraseConditionalMode = 0;
                     }
                 }
-                for (PhraseData resultPhrase : chainStartPhrase.resultPhrases) {
-                    resultPhrase.phraseConditionalMode = phraseConditionalMode;
-                }
+//                for (PhraseData resultPhrase : chainStartPhrase.resultPhrases) {
+//                    resultPhrase.phraseConditionalMode = phraseConditionalMode;
+//                }
             }
         }
         return previouslyResolvedBoolean;
     }
 
-    public boolean getBooleanResult() {
-        boolean andConjunction = !conjunction.equals("or");
-        for (PhraseData resultPhrase : chainStartPhrase.resultPhrases) {
-            Object resultObject = resultPhrase.result.value();
-            boolean isTrue = resultObject != null && (boolean) resultObject;
-            if (andConjunction) {
-                if (!isTrue) {
-                    return false; // AND: one failure breaks
-                }
-            } else {
-                if (isTrue) {
-                    return true; // OR: one success breaks
-                }
-            }
-        }
-        return andConjunction;
-    }
+//    public boolean getBooleanResult() {
+//        boolean andConjunction = !conjunction.equals("or");
+//        for (PhraseData resultPhrase : chainStartPhrase.resultPhrases) {
+//            Object resultObject = resultPhrase.result.value();
+//            boolean isTrue = resultObject != null && (boolean) resultObject;
+//            if (andConjunction) {
+//                if (!isTrue) {
+//                    return false; // AND: one failure breaks
+//                }
+//            } else {
+//                if (isTrue) {
+//                    return true; // OR: one success breaks
+//                }
+//            }
+//        }
+//        return andConjunction;
+//    }
 
 }

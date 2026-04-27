@@ -8,8 +8,8 @@ import io.cucumber.docstring.DocStringTypeRegistryDocStringConverter;
 import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import org.openqa.selenium.WebDriver;
-import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
+import tools.dscode.common.assertions.AssertionChain;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
@@ -35,9 +35,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
-import static io.cucumber.core.runner.GlobalState.getGlobalCachingGlue;
-import static io.cucumber.core.runner.GlobalState.getGlobalRunner;
-import static io.cucumber.core.runner.GlobalState.getOrSetGlobalLocale;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.GlobalState.pickleballLog;
@@ -50,9 +47,11 @@ import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_PASSING;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_FALSE;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN;
+import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
+import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
+import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.util.Reflect.getProperty;
-import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
 import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
@@ -263,10 +262,16 @@ public class CurrentScenarioState extends ScenarioMapping {
         if (endCurrentScenario)
             return;
         currentStep = stepExtension;
+//        boolean isAssertionChainStep = stepExtension.lineData != null && stepExtension.lineData.isAssertionChainStep;
+        int lineConditionalMode = stepExtension.lineData == null ?  1 :  stepExtension.lineData.lineConditionalMode;
         stepExtension.lineData = new ParsedLine(stepExtension.getUnmodifiedText());
+        stepExtension.lineData.lineConditionalMode = lineConditionalMode;
         stepExtension.lineData.setInheritance(stepExtension);
+//        stepExtension.lineData.isAssertionChainStep = isAssertionChainStep;
         currentPhrase = (Phrase) stepExtension.lineData.inheritedPhrase;
+
         runningStep(stepExtension);
+
         if (stepExtension instanceof ScenarioStep)
             endCurrentScenario = false;
     }
@@ -345,26 +350,73 @@ public class CurrentScenarioState extends ScenarioMapping {
             runStep((StepExtension) attachedStep);
         }
 
-
         if (stepExtension.lineData.lineConditionalMode < 1 && stepExtension.definitionFlags.contains(IGNORE_CHILDREN_IF_FALSE)) {
             return;
         }
 
+        if(stepExtension.lineData.stepExtension.overridePhrase != null && stepExtension.lineData.stepExtension.overridePhrase.result != null && (boolean) stepExtension.lineData.stepExtension.overridePhrase.result.value())
+            return;
 
         if (!stepExtension.definitionFlags.contains(IGNORE_CHILDREN)) {
             if (stepExtension.lineData.inheritancePhrases.isEmpty())
                 stepExtension.lineData.inheritancePhrases.add(null);
             for (PhraseData inheritancePhrase : new ArrayList<>(stepExtension.lineData.inheritancePhrases)) {
-                if (inheritancePhrase != null && inheritancePhrase.repeatRootPhrase) {
+                if (inheritancePhrase != null && inheritancePhrase.untilPhrase) {
                     while (true) {
-                        PhraseData clonedChainStart = inheritancePhrase.cloneRepeatedChain();
-                        clonedChainStart.parsedLine.runPhraseFromLine(clonedChainStart);
-                        if (clonedChainStart.phraseConditionalMode < 1) break;
-                        StepExtension firstChild = (StepExtension) ((StepExtension) stepExtension.clone(inheritancePhrase)).initializeChildSteps();
-                        if (firstChild != null) {
-                            runStep(firstChild);
+//                        String newStepText = inheritancePhrase
+//                                .assertionChain.phraseChain.stream().map(
+//                                phrase -> String.join("", phrase.text , String.valueOf(phrase.termination)))
+//                                .collect(Collectors.joining(" "));
+//                        StepExtension newStep = stepExtension.modifyStepExtension(newStepText);
+                        StepExtension clonedStep = stepCloner(inheritancePhrase, stepExtension,NO_LOGGING, _NO_LOGGING, IGNORE_CHILDREN_IF_FALSE).getFirst();
+//                        clonedStep.overrideLoggingText = "-----------------";
+                        PhraseData clonedPhrase = inheritancePhrase.clonePhrase(inheritancePhrase.getPreviousPhrase());
+                        clonedPhrase.untilPhrase = true;
+                        clonedPhrase.assertionChain = new AssertionChain(clonedPhrase);
+                        for(PhraseData phraseData : inheritancePhrase.assertionChain.phraseChain)
+                        {
+                            clonedPhrase.assertionChain.addAssertionPhrase(phraseData);
                         }
+                        clonedStep.overridePhrase = clonedPhrase;
+//                        clonedStep.lineData.phrases.clear();
+//                        PhraseData clonedPhrase = inheritancePhrase.clonePhrase(inheritancePhrase.getPreviousPhrase());
+//                        clonedPhrase.untilPhrase = false;
+//                        clonedPhrase.assertionChain = inheritancePhrase.assertionChain;
+//                        clonedStep.lineData.phrases.add(clonedPhrase);
+//                        clonedStep.lineData.startPhraseIndex = inheritancePhrase.position;
+                        clonedStep.nextSibling = null;
+
+                        waitMilliseconds(400);
+                        runStep(clonedStep);
+                        if ((boolean) clonedPhrase.result.value())
+                            break;
+
+//                        inheritancePhrase.runAssertionChain = true;
+//                        List<PhraseData> newPhrases = inheritancePhrase.assertionChain.phraseChain;
+//                        newPhrases.forEach(phraseData -> {
+//                            phraseData.isChainedAssertion = false;
+//                            phraseData.assertionChainMembership = null;
+//                        });
+//                        newPhrases.getLast().termination = ':';
+//                        clonedStep.lineData.phrases.addAll(newPhrases);
+//                        clonedStep.lineData.isAssertionChainStep = true;
+
+//                        StepExtension firstChild = (StepExtension) clonedStep.initializeChildSteps();
+//                        if (firstChild != null) {
+//                            runStep(firstChild);
+//                        }
                     }
+
+
+//                    while (true) {
+//                        PhraseData clonedChainStart = inheritancePhrase.cloneRepeatedChain();
+//                        clonedChainStart.parsedLine.runPhraseFromLine(clonedChainStart);
+//                        if (clonedChainStart.phraseConditionalMode < 1) break;
+//                        StepExtension firstChild = (StepExtension) ((StepExtension) stepExtension.clone(inheritancePhrase)).initializeChildSteps();
+//                        if (firstChild != null) {
+//                            runStep(firstChild);
+//                        }
+//                    }
                 } else {
                     List<StepExtension> clonedSteps = stepCloner(inheritancePhrase, stepExtension);
                     for (StepExtension repeatStep : clonedSteps) {

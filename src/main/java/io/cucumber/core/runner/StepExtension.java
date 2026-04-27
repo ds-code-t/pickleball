@@ -60,6 +60,8 @@ public class StepExtension extends StepData {
     private static final Pattern pattern = Pattern.compile("@\\[([^\\[\\]]*)\\]");
 
 
+
+
     public StepExtension(io.cucumber.core.runner.TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
         super(testCase, pickleStepTestStep);
 
@@ -156,6 +158,7 @@ public class StepExtension extends StepData {
     }
 
     public Result run() {
+
 //        if(isRootStep){
 //            rootStep();
 //            return null;
@@ -169,7 +172,8 @@ public class StepExtension extends StepData {
             executingPickleStepTestStep = pickleStepTestStep;
             executionMode = ExecutionMode.SKIP;
         } else if (isDynamicStep) {
-            overrideLoggingText = lineData.runningText;
+            if(!lineData.runningText.startsWith("-"))
+                overrideLoggingText = lineData.runningText;
             executingPickleStepTestStep = pickleStepTestStep;
         } else {
             executingPickleStepTestStep = resolveAndClone(getStepParsingMap());

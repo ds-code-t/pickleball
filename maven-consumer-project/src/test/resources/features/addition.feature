@@ -33,7 +33,7 @@ Feature: Addition
   Scenario: if until test2
     * , save "2" as "X"
     * , save "<X>" as "A"
-    * , if "<A>" is "2",  "<A>" is "222", or  "<A>" is "aa":
+    * , if "<A>" is "11111", or "<A>" is "222":
   :   * , save "<A><X>" as "A"
 
   Scenario: until test2
@@ -53,8 +53,18 @@ Feature: Addition
   :   * , wait 1 second
   :   * , save "<A><X>" as "A"
 
+  Scenario: Chain testingw3
+    When ,  1 is 1 , 2 is 23 ,  and 3 is 3?
+  : * , save "NO!!"
+
+  Scenario: Chain testingw
+    When ,  1 is 1 , 2 is 2 ,  and 3 is 2?
+     : * , save "NO!!"
+
 
   Scenario: Chain testing
+    When ,  1 is 1 , 2 is 2 ,  and 3 is 2?
+  : * , save "NO!!"
 
     When ,  1 is 1 , 2 is 2 ,  and 3 is 3?
   : * , save "YES!!"
