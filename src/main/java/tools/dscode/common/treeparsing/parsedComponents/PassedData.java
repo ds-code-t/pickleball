@@ -23,111 +23,13 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.HTML_
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.NO_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PRECEDING_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE;
-import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ACTION;
-import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ASSERTION;
-import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.CONTEXT;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
-import static tools.dscode.coredefinitions.BrowserSteps.getDefaultDriver;
+import static tools.dscode.coredefinitions.BrowserSteps.getCurrentDriver;
 
 
 public abstract class PassedData {
-//    protected NodeMap phraseNodeMap;
-
+    public boolean wasPhraseSkipped = false;
     ParsingMap phraseParsingMap;
-//    NodeMap phraseNodeMap;
-
-//    public PhraseData chainStartPhrase;
-    int chainStart;
-    int chainEnd;
-
-//    boolean groupSeparator = false;
-//    public boolean isChainStart = false;
-
-//    public PhraseData lastOperationPhrase;
-
-    public boolean isSeparatorPhrase() {
-        return ( isNewContext() || getPreviousPhrase() == null || getPreviousPhrase().isContextTermination() || !assertionType.isBlank());
-    }
-
-
-
-//    public void setOperationInheritance() {
-//        if (isSeparatorPhrase()) {
-//            lastOperationPhrase = isOperationPhrase ? (PhraseData) this : null;
-//        } else {
-//            lastOperationPhrase = getPreviousPhrase().lastOperationPhrase;
-//            if (lastOperationPhrase == null) {
-//                lastOperationPhrase = isOperationPhrase ? (PhraseData) this : null;
-//            }
-//        }
-//
-//        if (elementCount > 0) {
-//            if (phraseType == ELEMENT_ONLY || (!getAssertion().isBlank() && getAssertionType().isBlank())) {
-//                if (lastOperationPhrase == null || lastOperationPhrase.equals(this)) {
-////                    if (hasTerminationConditional()) {
-//                    setConditional("if");
-//                    lastOperationPhrase = (PhraseData) this;
-//                    PhraseData currentPhrase = (PhraseData) this;
-//                    while (currentPhrase != null) {
-//                        if (currentPhrase.phraseType == ELEMENT_ONLY) {
-//                            currentPhrase.setAssertion("True");
-//                        }
-//                        if (currentPhrase.contextTermination)
-//                            break;
-//                        currentPhrase = currentPhrase.getNextPhrase();
-//                    }
-////                    }
-//                }
-//            }
-//            if (phraseType == ELEMENT_ONLY) {
-//                if (lastOperationPhrase == null || lastOperationPhrase.equals(this)) {
-//                    PhraseData currentPhrase = getNextPhrase() == null ? null : getNextPhrase().getResolvedPhrase();
-//                    while (currentPhrase != null) {
-//                        if (currentPhrase.isOperationPhrase) {
-//                            if (!currentPhrase.getAction().isBlank()) {
-//                                setAction(currentPhrase.getAction());
-//                                operationIndex = firstElement.position + 1000;
-//                                setElementGroupings();
-//                            } else if (!currentPhrase.getAssertion().isBlank()) {
-//                                setAssertion(currentPhrase.getAssertion());
-//                                operationIndex = firstElement.position + 1000;
-//                                setElementGroupings();
-//                            }
-//                        }
-//                        currentPhrase = currentPhrase.getNextPhrase() == null ? null : currentPhrase.getNextPhrase().getResolvedPhrase();
-//                        if (currentPhrase == null || currentPhrase.isSeparatorPhrase())
-//                            break;
-//                    }
-//                } else {
-//                    if (!lastOperationPhrase.getAction().isBlank()) {
-//                        setAction(lastOperationPhrase.getAction());
-//                        operationIndex = 0;
-//                        setElementGroupings();
-//                    } else if (!lastOperationPhrase.getAssertion().isBlank()) {
-//                        setAssertion(lastOperationPhrase.getAssertion());
-//                        operationIndex = 0;
-//                        setElementGroupings();
-//                    }
-//                }
-//            }
-//        }
-//        if (!isOperationPhrase)
-//            return;
-//
-//        if (lastOperationPhrase == null || lastOperationPhrase.equals(this)) {
-//            isChainStart = true;
-//            return;
-//        }
-//
-//        if (phraseType == null) return;
-//
-//        if (phraseType == ASSERTION && getAssertionType().isBlank() && !lastOperationPhrase.getAssertionType().isBlank()) {
-//            setAssertionType(lastOperationPhrase.getAssertionType());
-//            phraseType = lastOperationPhrase.phraseType;
-//        } else if (lastOperationPhrase.phraseType != phraseType) {
-//            isChainStart = true;
-//        }
-//    }
 
     private PhraseData previousPhrase;
     private PhraseData nextPhrase;
@@ -478,45 +380,12 @@ public abstract class PassedData {
     }
 
 
-    static int setConjunctionChain(PhraseData phraseData) {
-//        phraseData.chainStartPhrase = phraseData;
-        phraseData.chainStart = phraseData.position;
-
-        PhraseData nextResolvedPhrase = phraseData.getNextPhrase() == null ? null : phraseData.getNextPhrase().resolvePhrase();
-
-        if (nextResolvedPhrase == null || nextResolvedPhrase.isSeparatorPhrase()) {
-            phraseData.chainEnd = phraseData.position;
-            return phraseData.chainEnd;
-        }
-
-        nextResolvedPhrase.chainStart = phraseData.chainStart;
-
-        phraseData.chainEnd = setConjunctionChain(nextResolvedPhrase);
-        String newConjunction = nextResolvedPhrase.conjunction.isBlank() ? phraseData.conjunction : nextResolvedPhrase.conjunction;
-        phraseData.conjunction = newConjunction;
-        nextResolvedPhrase.conjunction = newConjunction;
-        return phraseData.chainEnd;
-    }
-
-
-    public boolean hasTerminationConditional() {
-        PhraseData nextPhrase = (PhraseData) this;
-        int chainCount = 0;
-        while (nextPhrase != null) {
-            if (chainCount++ > 0 && nextPhrase.isSeparatorPhrase())
-                return false;
-            if (nextPhrase.termination.equals('?') || nextPhrase.termination.equals(':'))
-                return true;
-            nextPhrase = nextPhrase.getNextPhrase();
-        }
-        return false;
-    }
 
 
     public WebDriver getDriver() {
 
         if (driver == null)
-            driver = getDefaultDriver();
+            driver = getCurrentDriver();
         return driver;
     }
 

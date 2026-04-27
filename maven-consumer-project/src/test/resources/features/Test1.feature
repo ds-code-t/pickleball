@@ -462,13 +462,18 @@ Feature: Additiontest
   @[DEBUG]
     * , from the Top Panel:
 #    : * , click "Get your own website" Link
-  : * , if "Get your own website" Link is displayed, click it
+  : * , if "Get your own website" Link is displayed
+#  : * , if "Get your own website" Link is displayed, click it
 #    : * IF: "Get your own website" Link is displayed THEN: , click it
 
-  Scenario: save test
-    * , save 'Azzz2A' as "B"
-    * , save "<B>" as "C"
-
+  Scenario: save testsd
+  @[DEBUG]
+    * , from the Top Panel:
+#  : * IF: "" THEN: , I verify  "Get your own website" Link matches "^Get.*$"
+  : * , if "" , I verify  1 is 1:
+  :: * , if "true" , I verify  2 is 2
+  : * , if "" , I verify  "Get your own website" Link matches "^Get.*$"
+  : * , I verify  "Get your own website" Link equals  "Get your own website"
 
   Scenario Outline: sssgssatesssssf
 

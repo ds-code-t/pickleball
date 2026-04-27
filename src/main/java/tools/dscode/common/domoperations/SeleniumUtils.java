@@ -1,10 +1,9 @@
 package tools.dscode.common.domoperations;
 
-import org.openqa.selenium.MutableCapabilities;
-import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chromium.ChromiumOptions;
+import org.openqa.selenium.remote.RemoteWebDriver;
 
 import java.io.IOException;
 import java.net.URI;
@@ -13,15 +12,37 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+import static tools.dscode.coredefinitions.BrowserSteps.getCurrentDriverForNonUse;
+
 public class SeleniumUtils {
+
+    private static final Map<String, Set<String>> WINDOW_HANDLES_BY_SESSION =
+            new ConcurrentHashMap<>();
+
+
+    public static boolean windowsChanged() {
+        return windowsChanged(getCurrentDriverForNonUse());
+    }
+
+    public static boolean windowsChanged(WebDriver driver) {
+        String sessionId = String.valueOf(((RemoteWebDriver) driver).getSessionId());
+
+        Set<String> currentHandles = Set.copyOf(driver.getWindowHandles());
+        Set<String> previousHandles =
+                WINDOW_HANDLES_BY_SESSION.put(sessionId, currentHandles);
+
+        return previousHandles != null && !previousHandles.equals(currentHandles);
+    }
+
     public static void waitSeconds(int seconds) {
         long l = seconds * 1000;
         waitMilliseconds(l);

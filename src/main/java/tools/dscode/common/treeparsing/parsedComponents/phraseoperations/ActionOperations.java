@@ -5,7 +5,6 @@ import org.openqa.selenium.NoAlertPresentException;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.browseroperations.WindowSwitch;
-import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
@@ -18,7 +17,6 @@ import java.util.List;
 import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
 
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.browseroperations.BrowserAlerts.accept;
 import static tools.dscode.common.browseroperations.BrowserAlerts.dismiss;
 import static tools.dscode.common.domoperations.HumanInteractions.clear;
@@ -40,7 +38,7 @@ import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
-import static tools.dscode.coredefinitions.BrowserSteps.getDefaultDriver;
+import static tools.dscode.coredefinitions.BrowserSteps.getCurrentDriver;
 
 
 public enum ActionOperations implements OperationsInterface {
@@ -61,7 +59,7 @@ public enum ActionOperations implements OperationsInterface {
 
             phraseData.result = Attempt.run(() -> {
                 WebElement inputElement = fileInputElement.getElementWrappers().getFirst().getElement();
-                FileUploadUtil.createTempAndUpload(getDefaultDriver(), inputElement, filePathElement.getValue().toString());
+                FileUploadUtil.createTempAndUpload(getCurrentDriver(), inputElement, filePathElement.getValue().toString());
                 return true;
             });
         }
@@ -83,7 +81,7 @@ public enum ActionOperations implements OperationsInterface {
 
             phraseData.result = Attempt.run(() -> {
                 WebElement inputElement = fileInputElement.getElementWrappers().getFirst().getElement();
-                FileUploadUtil.upload(getDefaultDriver(), inputElement, filePathElement.getValue().toString());
+                FileUploadUtil.upload(getCurrentDriver(), inputElement, filePathElement.getValue().toString());
                 return true;
             });
         }
@@ -174,7 +172,7 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
-            sendKeys(getDefaultDriver(), Keys.chord(Keys.CONTROL, Keys.SHIFT));
+            sendKeys(getCurrentDriver(), Keys.chord(Keys.CONTROL, Keys.SHIFT));
         }
     },
 
@@ -190,7 +188,7 @@ public enum ActionOperations implements OperationsInterface {
 
             phraseData.result = Attempt.run(() -> {
                 if (waitElementMatch.elementTypes.contains(ElementType.HTML_ELEMENT)) {
-                    safeWaitForPageReady(getDefaultDriver(), Duration.ofSeconds(60), 300);
+                    safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     boolean waitingOnLoading = waitElementMatch.elementTypes.contains(ElementType.HTML_LOADING);
                     while (true) {
                         List<ElementWrapper> wrappers = getWrappedElements(waitElementMatch);
@@ -231,7 +229,7 @@ public enum ActionOperations implements OperationsInterface {
                 int count = 0;
                 for (ElementWrapper dropDownWrapper : dropDowns.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if (count > 0) {
-                        safeWaitForPageReady(getDefaultDriver(), Duration.ofSeconds(60), 300);
+                        safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
 
                     if (selection.elementTypes.contains(ElementType.HTML_TYPE)) {
@@ -240,12 +238,12 @@ public enum ActionOperations implements OperationsInterface {
                         ElementWrapper optionElement = selection.getElementWrappers().getFirst();
 
                         if (optionElement.getTagName().equalsIgnoreCase("option")) {
-                            selectDropdownByIndex(getDefaultDriver(), dropDownWrapper.getElement(), optionElement.getSameTagIndex());
+                            selectDropdownByIndex(getCurrentDriver(), dropDownWrapper.getElement(), optionElement.getSameTagIndex());
                         } else {
-                            click(getDefaultDriver(), optionElement.getElement());
+                            click(getCurrentDriver(), optionElement.getElement());
                         }
                     } else {
-                        selectDropdownByVisibleText(getDefaultDriver(), dropDownWrapper.getElement(), selection.getValue());
+                        selectDropdownByVisibleText(getCurrentDriver(), dropDownWrapper.getElement(), selection.getValue());
                     }
                     count++;
                 }
@@ -270,9 +268,9 @@ public enum ActionOperations implements OperationsInterface {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if (count > 0) {
-                        safeWaitForPageReady(getDefaultDriver(), Duration.ofSeconds(60), 300);
+                        safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
-                    click(getDefaultDriver(), elementWrapper.getElement());
+                    click(getCurrentDriver(), elementWrapper.getElement());
                     count++;
                 }
                 return true;
@@ -295,9 +293,9 @@ public enum ActionOperations implements OperationsInterface {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if (count > 0) {
-                        safeWaitForPageReady(getDefaultDriver(), Duration.ofSeconds(60), 300);
+                        safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
-                    doubleClick(getDefaultDriver(), elementWrapper.getElement());
+                    doubleClick(getCurrentDriver(), elementWrapper.getElement());
                     count++;
                 }
                 return true;
@@ -319,9 +317,9 @@ public enum ActionOperations implements OperationsInterface {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if (count > 0) {
-                        safeWaitForPageReady(getDefaultDriver(), Duration.ofSeconds(60), 300);
+                        safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
-                    contextClick(getDefaultDriver(), elementWrapper.getElement());
+                    contextClick(getCurrentDriver(), elementWrapper.getElement());
                     count++;
                 }
                 return true;
@@ -370,9 +368,9 @@ public enum ActionOperations implements OperationsInterface {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if (count > 0) {
-                        safeWaitForPageReady(getDefaultDriver(), Duration.ofSeconds(60), 300);
+                        safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
-                    wheelScrollBy(getDefaultDriver(), elementWrapper.getElement());
+                    wheelScrollBy(getCurrentDriver(), elementWrapper.getElement());
                     count++;
                 }
                 return true;
@@ -422,7 +420,7 @@ public enum ActionOperations implements OperationsInterface {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if (count > 0) {
-                        safeWaitForPageReady(getDefaultDriver(), Duration.ofSeconds(60), 300);
+                        safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
                     elementWrapper.close();
                     count++;
@@ -440,7 +438,7 @@ public enum ActionOperations implements OperationsInterface {
                 try {
                     if(!phraseData.getFirstElement().category.startsWith("Alert"))
                         throw new RuntimeException("Accept only works on Alerts");
-                    accept(getDefaultDriver());
+                    accept(getCurrentDriver());
                 } catch (NoAlertPresentException e) {
                     if(!phraseData.getFirstElement().selectionType.equals("any"))
                         throw e;
@@ -453,7 +451,7 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
             phraseData.result = Attempt.runVoid(() ->
-                    dismiss(getDefaultDriver())
+                    dismiss(getCurrentDriver())
             );
         }
     };
@@ -513,7 +511,7 @@ public enum ActionOperations implements OperationsInterface {
                     WebElement webElement = (wrapper == null) ? null : wrapper.getElement();
 
                     if (count > 0) {
-                        safeWaitForPageReady(getDefaultDriver(), Duration.ofSeconds(60), 300);
+                        safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
 
                     applyTextOps(webElement, valuesToEnter, shouldClear, shouldEnterText, enterKeys);
@@ -532,7 +530,7 @@ public enum ActionOperations implements OperationsInterface {
                               boolean enterKeys) {
 
         if (shouldClear) {
-            clear(getDefaultDriver(), webElement);
+            clear(getCurrentDriver(), webElement);
         }
 
         if (!shouldEnterText) {
@@ -543,9 +541,9 @@ public enum ActionOperations implements OperationsInterface {
             String text = value.toString();
 
             if (enterKeys || value.type == ValueWrapper.ValueTypes.BACK_TICKED) {
-                sendComplexKeys(getDefaultDriver(), webElement, text.toUpperCase());
+                sendComplexKeys(getCurrentDriver(), webElement, text.toUpperCase());
             } else {
-                typeText(getDefaultDriver(), webElement, text);
+                typeText(getCurrentDriver(), webElement, text);
             }
             waitMilliseconds(300);
         }

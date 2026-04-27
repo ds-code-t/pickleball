@@ -45,11 +45,11 @@ public final class Phrase extends PhraseData {
             if (getPreviousPhrase() == null) {
                 if (parsedLine.previousSiblingConditionalState > -1) {
                     phraseConditionalMode = 0;
-//                    previouslyResolvedBoolean = false;
+                    previouslyResolvedBoolean = false;
                 }
             } else if (this.position == 0 && parsedLine.previousSiblingConditionalState > -1) {
                 phraseConditionalMode = 0;
-//                previouslyResolvedBoolean = false;
+                previouslyResolvedBoolean = false;
             } else if (getPreviousPhrase().phraseConditionalMode > -1) {
                 phraseConditionalMode = 0;
             } else {
@@ -125,8 +125,9 @@ public final class Phrase extends PhraseData {
         if (shouldRun()) {
             phraseInfo("Running Phrase: " + this);
         } else {
-            assertionChain = null;
             phraseInfo("Skipping Phrase: " + this);
+            wasPhraseSkipped = true;
+            assertionChain = null;
             return;
         }
 
@@ -142,11 +143,6 @@ public final class Phrase extends PhraseData {
             if (e.elementTypes.contains(ElementType.HTML_TYPE)) e.contextWrapper = new ContextWrapper(e);
         });
 
-
-//        if (chainStartPhrase != null && chainStartPhrase.repeatRootPhrase) {
-//            repeatRootPhrase = true;
-//            return;
-//        }
 
 
         if (isOperationPhrase) {
@@ -244,29 +240,7 @@ public final class Phrase extends PhraseData {
         return clonePhrase(previous, null);
     }
 
-//    @Override
-//    public PhraseData cloneRepeatedChain() {
-//
-//        PhraseData chainStartClone = null;
-//        PhraseData lastClone = chainStartPhrase.getPreviousPhrase();
-//        for (int p = 0; p < chainStartPhrase.repeatedChain.size(); p++) {
-//            PhraseData currentPhrase = chainStartPhrase.repeatedChain.get(p);
-//            PhraseData currentClone = currentPhrase.clonePhrase(lastClone, null);
-//            if (p == 0) {
-//                chainStartClone = currentClone;
-//                currentClone.isChainStart = true;
-//                branchedPhrases.add(currentPhrase);
-//            } else {
-//                lastClone.setNextPhrase(currentClone);
-//            }
-//            currentClone.chainStartPhrase = chainStartClone;
-//            currentClone.shouldRepeatPhrase = true;
-//            currentClone.repeatRootPhrase = false;
-//            chainStartClone.repeatedChain.add(currentClone);
-//            lastClone = currentClone;
-//        }
-//        return chainStartClone;
-//    }
+
 
     @Override
     public PhraseData clonePhrase(PhraseData previous, Character newTermination) {
@@ -304,27 +278,8 @@ public final class Phrase extends PhraseData {
         this.setNextPhrase(nextResolvedPhrase);
 
         return nextResolvedPhrase;
-//        return zupdateChainAndInheritances(nextResolvedPhrase);
     }
 
-//    public static PhraseData zupdateChainAndInheritances(PhraseData nextResolvedPhrase) {
-//        nextResolvedPhrase.setOperationInheritance();
-//        if (nextResolvedPhrase.phraseType == PhraseType.CONTEXT) return nextResolvedPhrase;
-//
-//        PhraseData previousPhrase = nextResolvedPhrase.getPreviousPhrase();
-//        if (nextResolvedPhrase.isChainStart) {
-//            setConjunctionChain(nextResolvedPhrase);
-//        } else {
-//            if (previousPhrase != null) {
-//                nextResolvedPhrase.chainStartPhrase = previousPhrase.chainStartPhrase;
-//                nextResolvedPhrase.chainStart = previousPhrase.chainStart;
-//                nextResolvedPhrase.chainEnd = previousPhrase.chainEnd;
-//                nextResolvedPhrase.conjunction = previousPhrase.conjunction;
-//            }
-//        }
-//
-//        return nextResolvedPhrase;
-//    }
 
 
 }

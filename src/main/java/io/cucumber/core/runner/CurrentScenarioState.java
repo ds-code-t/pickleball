@@ -262,12 +262,10 @@ public class CurrentScenarioState extends ScenarioMapping {
         if (endCurrentScenario)
             return;
         currentStep = stepExtension;
-//        boolean isAssertionChainStep = stepExtension.lineData != null && stepExtension.lineData.isAssertionChainStep;
         int lineConditionalMode = stepExtension.lineData == null ?  1 :  stepExtension.lineData.lineConditionalMode;
         stepExtension.lineData = new ParsedLine(stepExtension.getUnmodifiedText());
         stepExtension.lineData.lineConditionalMode = lineConditionalMode;
         stepExtension.lineData.setInheritance(stepExtension);
-//        stepExtension.lineData.isAssertionChainStep = isAssertionChainStep;
         currentPhrase = (Phrase) stepExtension.lineData.inheritedPhrase;
 
         runningStep(stepExtension);
@@ -363,13 +361,8 @@ public class CurrentScenarioState extends ScenarioMapping {
             for (PhraseData inheritancePhrase : new ArrayList<>(stepExtension.lineData.inheritancePhrases)) {
                 if (inheritancePhrase != null && inheritancePhrase.untilPhrase) {
                     while (true) {
-//                        String newStepText = inheritancePhrase
-//                                .assertionChain.phraseChain.stream().map(
-//                                phrase -> String.join("", phrase.text , String.valueOf(phrase.termination)))
-//                                .collect(Collectors.joining(" "));
-//                        StepExtension newStep = stepExtension.modifyStepExtension(newStepText);
+
                         StepExtension clonedStep = stepCloner(inheritancePhrase, stepExtension,NO_LOGGING, _NO_LOGGING, IGNORE_CHILDREN_IF_FALSE).getFirst();
-//                        clonedStep.overrideLoggingText = "-----------------";
                         PhraseData clonedPhrase = inheritancePhrase.clonePhrase(inheritancePhrase.getPreviousPhrase());
                         clonedPhrase.untilPhrase = true;
                         clonedPhrase.assertionChain = new AssertionChain(clonedPhrase);
@@ -378,12 +371,6 @@ public class CurrentScenarioState extends ScenarioMapping {
                             clonedPhrase.assertionChain.addAssertionPhrase(phraseData);
                         }
                         clonedStep.overridePhrase = clonedPhrase;
-//                        clonedStep.lineData.phrases.clear();
-//                        PhraseData clonedPhrase = inheritancePhrase.clonePhrase(inheritancePhrase.getPreviousPhrase());
-//                        clonedPhrase.untilPhrase = false;
-//                        clonedPhrase.assertionChain = inheritancePhrase.assertionChain;
-//                        clonedStep.lineData.phrases.add(clonedPhrase);
-//                        clonedStep.lineData.startPhraseIndex = inheritancePhrase.position;
                         clonedStep.nextSibling = null;
 
                         waitMilliseconds(400);
@@ -391,32 +378,9 @@ public class CurrentScenarioState extends ScenarioMapping {
                         if ((boolean) clonedPhrase.result.value())
                             break;
 
-//                        inheritancePhrase.runAssertionChain = true;
-//                        List<PhraseData> newPhrases = inheritancePhrase.assertionChain.phraseChain;
-//                        newPhrases.forEach(phraseData -> {
-//                            phraseData.isChainedAssertion = false;
-//                            phraseData.assertionChainMembership = null;
-//                        });
-//                        newPhrases.getLast().termination = ':';
-//                        clonedStep.lineData.phrases.addAll(newPhrases);
-//                        clonedStep.lineData.isAssertionChainStep = true;
 
-//                        StepExtension firstChild = (StepExtension) clonedStep.initializeChildSteps();
-//                        if (firstChild != null) {
-//                            runStep(firstChild);
-//                        }
                     }
 
-
-//                    while (true) {
-//                        PhraseData clonedChainStart = inheritancePhrase.cloneRepeatedChain();
-//                        clonedChainStart.parsedLine.runPhraseFromLine(clonedChainStart);
-//                        if (clonedChainStart.phraseConditionalMode < 1) break;
-//                        StepExtension firstChild = (StepExtension) ((StepExtension) stepExtension.clone(inheritancePhrase)).initializeChildSteps();
-//                        if (firstChild != null) {
-//                            runStep(firstChild);
-//                        }
-//                    }
                 } else {
                     List<StepExtension> clonedSteps = stepCloner(inheritancePhrase, stepExtension);
                     for (StepExtension repeatStep : clonedSteps) {

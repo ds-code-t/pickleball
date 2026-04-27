@@ -50,9 +50,6 @@ public class ElementWrapper {
         return elementWrappers;
     }
 
-    public ElementWrapper(WebDriver driver, WebElement element, ElementMatch elementMatch) {
-        this(element, elementMatch, null);
-    }
 
 
     private ElementWrapper(WebElement element, ElementMatch elementMatch, Integer matchIndex) {
@@ -66,8 +63,8 @@ public class ElementWrapper {
 
         // Build the persistent locating XPath (no JS).
         // Uses default attribute priority when varargs are omitted.
-        this.xpath1 = buildXPathForElement(element, 10, 30, List.of("id", "data-user-id"), List.of("name", "title"), List.of("role", "aria-label", "class"));
-        this.xpath2 = buildXPathForElement(element, 10, 15, List.of("href", "target", "src", "index"));
+        this.xpath1 = buildXPathForElement(driver, element, 10, 30, List.of("id", "data-user-id"), List.of("name", "title"), List.of("role", "aria-label", "class"));
+        this.xpath2 = buildXPathForElement(driver, element, 10, 15, List.of("href", "target", "src", "index"));
 
 
     }
@@ -88,7 +85,7 @@ public class ElementWrapper {
         );
         attributeSnapshot.put("textContent", textContent == null ? "" : textContent);
 
-        List<WebElement> children = element.findElements(By.xpath("./*[@selected]"));
+        List<WebElement> children = withoutImplicitWait(driver, () -> element.findElements(By.xpath("./*[@selected]")));
         String childValue = "";
         if (!children.isEmpty()) {
             for (WebElement child : children) {
@@ -164,7 +161,7 @@ public class ElementWrapper {
 
         switch (elementMatch.category) {
             case "Field":
-                List<WebElement> valueElements = element.findElements(By.xpath("descendant::*[contains(@class,'Read')]"));
+                List<WebElement> valueElements = withoutImplicitWait(driver, () -> element.findElements(By.xpath("descendant::*[contains(@class,'Read')]")));
                 if (!valueElements.isEmpty()) {
                     String returnVal = valueElements.getLast().getText();
                     attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
@@ -196,6 +193,21 @@ public class ElementWrapper {
     // -------------------------
     // Internal helpers
     // -------------------------
+
+    /**
+     * Use this only for internal/probe searches where "not found" is expected.
+     * This prevents Selenium implicit-wait polling from turning optional lookups
+     * into multi-second delays.
+     */
+    private static <T> T withoutImplicitWait(WebDriver driver, java.util.function.Supplier<T> action) {
+        Duration original = driver.manage().timeouts().getImplicitWaitTimeout();
+        try {
+            driver.manage().timeouts().implicitlyWait(Duration.ZERO);
+            return action.get();
+        } finally {
+            driver.manage().timeouts().implicitlyWait(original);
+        }
+    }
 
     private boolean isStale(WebElement el) {
         if (el == null) return true;
@@ -279,6 +291,7 @@ public class ElementWrapper {
     }
 
     private static String buildXPathForElement(
+            WebDriver driver,
             WebElement element,
             int maxAncestorNodes,
             int maxDescendantNodes,
@@ -318,7 +331,7 @@ public class ElementWrapper {
                     xpathExpr = ".//*[@" + attr + "]";
                 }
 
-                WebElement d = element.findElement(By.xpath(xpathExpr));
+                WebElement d = withoutImplicitWait(driver, () -> element.findElement(By.xpath(xpathExpr)));
                 String v = getAttrOrEmpty(d, attr);
                 if (!v.isEmpty()) {
                     descAttrName = attr;
@@ -335,7 +348,7 @@ public class ElementWrapper {
             mainPredicate = "descendant-or-self::*[@" + descAttrName + "="
                     + quoteForXPath(descAttrValue) + "]";
         } else {
-            mainPredicate = buildChildrenShapePredicate(element);
+            mainPredicate = buildChildrenShapePredicate(driver, element);
         }
 
         // 3) Build ancestor-or-self predicate using closest ancestor with prioritized attributes
@@ -357,7 +370,11 @@ public class ElementWrapper {
                 WebElement parent;
                 try {
                     // move up to the parent element first
-                    parent = current.findElement(By.xpath("parent::*"));
+                    final WebElement currentForParentLookup = current;
+                    parent = withoutImplicitWait(
+                            driver,
+                            () -> currentForParentLookup.findElement(By.xpath("parent::*"))
+                    );
                 } catch (NoSuchElementException | InvalidSelectorException e) {
                     break; // hit the top (e.g. <html> or document boundary)
                 }
@@ -394,6 +411,7 @@ public class ElementWrapper {
     }
 
     private static String buildXPathForElement(
+            WebDriver driver,
             WebElement element,
             int maxAncestorNodes,
             int maxDescendantNodes,
@@ -445,7 +463,7 @@ public class ElementWrapper {
                     xpathExpr = ".//*[" + orPredicate + "]";
                 }
 
-                WebElement d = element.findElement(By.xpath(xpathExpr));
+                WebElement d = withoutImplicitWait(driver, () -> element.findElement(By.xpath(xpathExpr)));
 
                 // pick first attribute in group priority order
                 for (String attr : group) {
@@ -468,7 +486,7 @@ public class ElementWrapper {
             mainPredicate = "descendant-or-self::*[@" + descAttrName + "="
                     + quoteForXPath(descAttrValue) + "]";
         } else {
-            mainPredicate = buildChildrenShapePredicate(element);
+            mainPredicate = buildChildrenShapePredicate(driver, element);
         }
 
         // ------------------------------------------------------------
@@ -489,7 +507,8 @@ public class ElementWrapper {
 
                 WebElement parent;
                 try {
-                    parent = current.findElement(By.xpath("parent::*"));
+                    final WebElement currentForParentLookup = current;
+                    parent = withoutImplicitWait(driver, () -> currentForParentLookup.findElement(By.xpath("parent::*")));
                 } catch (NoSuchElementException | InvalidSelectorException e) {
                     break;
                 }
@@ -532,18 +551,19 @@ public class ElementWrapper {
 
     // Convenience overload: uses default attr priority
     private static String buildXPathForElement(
+            WebDriver driver,
             WebElement element,
             int maxAncestorDepth,
             int maxDescendantDepth) {
-        return buildXPathForElement(element, maxAncestorDepth, maxDescendantDepth, (String[]) null);
+        return buildXPathForElement(driver, element, maxAncestorDepth, maxDescendantDepth, (String[]) null);
     }
 
     /**
      * If we don't have any good attributes in the subtree, describe the shape of the direct
      * children: either [not(*)] for no children, or [child::tag1 and child::tag2 ...].
      */
-    private static String buildChildrenShapePredicate(WebElement element) {
-        List<WebElement> children = element.findElements(By.xpath("./*"));
+    private static String buildChildrenShapePredicate(WebDriver driver, WebElement element) {
+        List<WebElement> children = withoutImplicitWait(driver, () -> element.findElements(By.xpath("./*")));
         if (children.isEmpty()) {
             return "not(*)";
         }
@@ -603,7 +623,7 @@ public class ElementWrapper {
 
     private List<WebElement> getElementList(WebDriver driver, String xpathyWithId) {
         printDebug("##XPath: ElementWrapper.getElementList:\n" + xpathyWithId + "\n----------------");
-        return elementMatch.contextWrapper.getFinalSearchContext().findElements(new By.ByXPath(xpathyWithId));
+        return withoutImplicitWait(driver, () -> elementMatch.contextWrapper.getFinalSearchContext().findElements(new By.ByXPath(xpathyWithId)));
     }
 
     public boolean isDisplayed() {

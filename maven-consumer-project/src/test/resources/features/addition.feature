@@ -39,7 +39,7 @@ Feature: Addition
   Scenario: until test2
     * , save "2" as "X"
     * , save "<X>" as "A"
-    * , until "<A>" is "11111", or "<A>" is "222":
+    * , until "<A>" is "11111", or "<A>" is "222" , save "<A><X>" as "A"
   :   * , save "<A><X>" as "A"
 
   Scenario: Chain testing1
@@ -60,6 +60,42 @@ Feature: Addition
   Scenario: Chain testingw
     When ,  1 is 1 , 2 is 2 ,  and 3 is 2?
      : * , save "NO!!"
+
+
+  Scenario: Chain testing sing
+    When ,  3 is 2?
+  : * , save "NO!!"
+
+    When ,  1 is 1 ?
+  : * , save "YES!!"
+
+    When ,  3 is 3?
+  : * , save "YES!!1"
+
+    When ,  if 2 is 2:
+  : * , save "YES!!!"
+
+    When ,  if 2 is 2:
+  : * , save "YES!!!!"
+
+    When ,   2 is 3 ?
+  : * , save "NO!!!!"
+
+    When ,  if  3 is 3:
+  : * , save "YES"
+
+    When ,  2 is 3?
+  : * , save "NO!!!!"
+
+    When ,  if 1 is 1 :
+  : * , save "YES"
+
+    When ,   3 is 3 ?
+  : * , save "YES!!!!"
+
+    When ,  if  2 is 3 :
+  : * , save "NO!!!!"
+
 
 
   Scenario: Chain testing

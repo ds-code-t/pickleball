@@ -17,10 +17,17 @@ import static tools.dscode.coredefinitions.ObjectRegistrationSteps.constructObje
 public class BrowserSteps {
 
     public static JavascriptExecutor getJavascriptExecutor() {
-        return (JavascriptExecutor) getDefaultDriver();
+        return (JavascriptExecutor) getCurrentDriver();
     }
 
-    public static RemoteWebDriver getDefaultDriver() {
+    public static RemoteWebDriver getCurrentDriver() {
+        String browserName = String.valueOf(resolveFromVarsOrDefault( "BROWSER", "CHROME"));
+        RemoteWebDriver webDriver = getDriver(browserName);
+        getRunningStep().webDriverUsed = webDriver;
+        return webDriver;
+    }
+
+    public static RemoteWebDriver getCurrentDriverForNonUse() {
         String browserName = String.valueOf(resolveFromVarsOrDefault( "BROWSER", "CHROME"));
         return getDriver(browserName);
     }
@@ -28,7 +35,6 @@ public class BrowserSteps {
     public static RemoteWebDriver getDriver(String browserName) {
         Object created = constructObjectFromParsingMap(browserName);
         RemoteWebDriver webDriver = (RemoteWebDriver) created;
-        getRunningStep().webDriverUsed = webDriver;
         return webDriver;
     }
 

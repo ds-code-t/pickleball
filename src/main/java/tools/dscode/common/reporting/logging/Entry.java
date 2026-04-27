@@ -19,7 +19,7 @@ import static tools.dscode.common.reporting.WorkBookConsolePrinter.printError;
 import static tools.dscode.common.reporting.WorkBookConsolePrinter.printInfo;
 import static tools.dscode.common.reporting.WorkBookConsolePrinter.printTrace;
 import static tools.dscode.common.reporting.WorkBookConsolePrinter.printWarn;
-import static tools.dscode.coredefinitions.BrowserSteps.getDefaultDriver;
+import static tools.dscode.coredefinitions.BrowserSteps.getCurrentDriver;
 
 /**
  * Entry is NOT inherently thread-safe by default.
@@ -350,11 +350,11 @@ public class Entry {
     // ---------------------------------------------------------
 
     public Entry screenshot() {
-        return screenshot(getDefaultDriver(), null);
+        return screenshot(getCurrentDriver(), null);
     }
 
     public Entry screenshot(String name) {
-        return screenshot(getDefaultDriver(), name);
+        return screenshot(getCurrentDriver(), name);
     }
 
     public Entry screenshot(WebDriver driver) {

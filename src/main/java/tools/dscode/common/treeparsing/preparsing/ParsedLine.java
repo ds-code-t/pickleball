@@ -47,9 +47,6 @@ public final class ParsedLine extends LineData {
 
     @Override
     public PhraseData runPhraseFromLine(PhraseData phrase) {
-        System.out.println("@phrase.untilPhrase: " + phrase.untilPhrase);
-//        if(phrase.parsedLine.isAssertionChainStep)
-//            phrase.untilPhrase = false;
         if (!phrase.getAssertion().isBlank() && phrase.assertionChainMembership == null && phrase.assertionChain==null) {
             if(phrase.getAssertionType().isBlank())
                 phrase.setConditional("if");
@@ -94,10 +91,6 @@ public final class ParsedLine extends LineData {
 
         getCurrentScenarioState().currentPhrase = null;
 
-//        if (phrase.repeatRootPhrase) {
-//            phrase.chainStartPhrase.repeatedChain.add(phrase);
-//        }
-
         if (phrase.assertionChainMembership != null) {;
             phrase.assertionChainMembership.setPhraseIndex(phrase);
             if(phrase.isChainedAssertion)
@@ -109,15 +102,7 @@ public final class ParsedLine extends LineData {
             return phrase;
         }
 
-//        if (phrase.repeatRootPhrase) {
-//            if (nextResolvedPhrase.chainStartPhrase == null || nextResolvedPhrase.chainStartPhrase != phrase.chainStartPhrase) {
-//                PhraseData cloneChainStart;
-//                do {
-//                    cloneChainStart = phrase.cloneRepeatedChain();
-//                    runPhraseFromLine(cloneChainStart);
-//                } while (cloneChainStart.phraseConditionalMode == 1);
-//            }
-//        } else
+
         if (phrase.branchedPhrases.isEmpty()) {
             runPhraseFromLine(nextResolvedPhrase);
         } else {
@@ -128,10 +113,7 @@ public final class ParsedLine extends LineData {
         return phrase;
     }
 
-//    public static PhraseData runRepeatChain(PhraseData phrase) {
-//        PhraseData cloneChainStart = phrase.cloneRepeatedChain();
-//        return (phrase.parsedLine.runPhraseFromLine(cloneChainStart).phraseConditionalMode < 1);
-//    }
+
 
 
 }

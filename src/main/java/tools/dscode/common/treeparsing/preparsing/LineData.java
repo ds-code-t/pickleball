@@ -21,9 +21,6 @@ import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
 
 public abstract class LineData implements Cloneable {
-    public boolean isAssertionChainStep = false;
-    public AssertionChain stepAssertionChain;
-
     public int lineConditionalMode = 1;
     public int startPhraseIndex = 0;
     //    public LineData inheritedLineData;

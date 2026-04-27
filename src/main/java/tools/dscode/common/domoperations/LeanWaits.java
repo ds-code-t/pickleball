@@ -19,6 +19,7 @@ import java.util.function.Function;
 
 import static tools.dscode.common.domoperations.HumanInteractions.blur;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
+import static tools.dscode.common.domoperations.SeleniumUtils.windowsChanged;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseWarn;
 
 public final class LeanWaits {
@@ -59,6 +60,9 @@ public final class LeanWaits {
 
     public static void safeWaitForPageReady(WebDriver driver, Duration timeout, int startWaitMilliseconds) {
         try {
+            if(windowsChanged()){
+                waitMilliseconds(2000);
+            }
             blur(driver);
             waitMilliseconds(startWaitMilliseconds);
             safeWaitForPageReady(driver, timeout);

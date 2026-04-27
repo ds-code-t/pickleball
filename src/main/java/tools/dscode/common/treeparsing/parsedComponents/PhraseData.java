@@ -144,16 +144,12 @@ public abstract class PhraseData extends PassedData {
 
     public void setPhraseParsingMap(JsonNode data) {
         ObjectNode objectNode;
-        if(data instanceof ObjectNode) {
+        if (data instanceof ObjectNode) {
             objectNode = (ObjectNode) data;
-        }
-        else if(data instanceof ArrayNode)
-        {
+        } else if (data instanceof ArrayNode) {
             objectNode = MAPPER.createObjectNode();
             objectNode.put(ROW_KEY, data);
-        }
-        else
-        {
+        } else {
             throw new RuntimeException("Unexpected data type: " + data.getClass().getName());
         }
 
@@ -383,27 +379,17 @@ public abstract class PhraseData extends PassedData {
         }
         if (operation instanceof AssertionOperations && assertionChain != null) {
             assertionChain.executeAssertionChain();
-//            if(!untilPhrase)
-//                assertionChain.executeAssertionChain();
-//            result = new Attempt.Result(assertionChainMembership.chainStatus, assertionChainMembership.exception);
-        }
-        else {
+        } else {
             operation.execute(this);
         }
-//        if(untilPhrase)
-//            return;
+
         if (result.failed()) {
             throw new RuntimeException("operation '" + operation + "' failed", result.error());
         }
-        if(assertionOperation != null) {
+        if (assertionOperation != null) {
             closestEntryToPhrase().info(assertionOperation.name() + " assertion evaluated to: " + result.value());
         }
-//        resultPhrases.add(this);
 
-//        if(blurAfterOperation && !termination.equals(';')){
-//            blur(getDefaultDriver());
-//        }
-//        chainStartPhrase.resultPhrases.add(this);
     }
 
     public void runUntilOperation() {
@@ -415,29 +401,16 @@ public abstract class PhraseData extends PassedData {
         if (result.failed()) {
             throw new RuntimeException("operation '" + operation + "' failed", result.error());
         }
-//        chainStartPhrase.resultPhrases.add(this);
     }
 
     Boolean previouslyResolvedBoolean = null;
 
     public boolean resolveResults() {
-        if(getAssertion().isBlank())
+        if (wasPhraseSkipped || !isOperationPhrase || getAssertion().isBlank())
             return true;
 
-//        if (!isOperationPhrase)
-//            return true;
-//        if (!isChainStart) {
-//            return chainStartPhrase.resolveResults();
-//        }
+        previouslyResolvedBoolean = (result == null || result.value() == null) ? null : (boolean) result.value();
 
-//        if (previouslyResolvedBoolean != null)
-//            return previouslyResolvedBoolean;
-//
-//
-//        if (getAssertionType().isBlank())
-//            return true;
-
-        previouslyResolvedBoolean = result.value() != null && (boolean) result.value();
 
         String assertionMessage = "Assertion chain evaluates to: " + previouslyResolvedBoolean;
 
@@ -470,30 +443,11 @@ public abstract class PhraseData extends PassedData {
                         phraseConditionalMode = 0;
                     }
                 }
-//                for (PhraseData resultPhrase : chainStartPhrase.resultPhrases) {
-//                    resultPhrase.phraseConditionalMode = phraseConditionalMode;
-//                }
+
             }
         }
         return previouslyResolvedBoolean;
     }
 
-//    public boolean getBooleanResult() {
-//        boolean andConjunction = !conjunction.equals("or");
-//        for (PhraseData resultPhrase : chainStartPhrase.resultPhrases) {
-//            Object resultObject = resultPhrase.result.value();
-//            boolean isTrue = resultObject != null && (boolean) resultObject;
-//            if (andConjunction) {
-//                if (!isTrue) {
-//                    return false; // AND: one failure breaks
-//                }
-//            } else {
-//                if (isTrue) {
-//                    return true; // OR: one success breaks
-//                }
-//            }
-//        }
-//        return andConjunction;
-//    }
 
 }
