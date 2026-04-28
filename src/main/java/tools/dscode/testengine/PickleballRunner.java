@@ -81,16 +81,34 @@ public abstract class PickleballRunner {
 
     private void publishToSystemProperties() {
         int count = 0;
+        int skipped = 0;
         for (Map.Entry<String, String> entry : values.entrySet()) {
             String key = entry.getKey();
             String value = entry.getValue();
-            if (key != null && value != null) {
-                System.setProperty(key, value);
-                count++;
+            if (key == null || value == null) {
+                continue;
             }
+
+            if(isForeignEngineDiscoveryKey(key))
+            {
+                skipped++;
+                continue;
+            }
+            System.setProperty(key, value);
+            count++;
         }
 
-        debug("Published " + count + " value(s) to system properties");
+
+        debug("Published " + count + " value(s) to system properties (skipped "
+                + skipped + "key(s) that could trigger foreign TestEngine discovery)");
+    }
+
+    public static boolean isForeignEngineDiscoveryKey(String key) {
+        return key != null && (
+                key.startsWith("cucumber.")
+                        || key.startsWith("junit.platform.")
+                        || key.startsWith("junit.jupiter.")
+        );
     }
 
     public void globalTestProperties() {
