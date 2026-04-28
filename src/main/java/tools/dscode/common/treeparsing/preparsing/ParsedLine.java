@@ -15,7 +15,6 @@ import static tools.dscode.common.assertions.AssertionChain.isAssertionChainBord
 import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 
 
-
 public final class ParsedLine extends LineData {
 
     public ParsedLine() {
@@ -32,8 +31,8 @@ public final class ParsedLine extends LineData {
 
     @Override
     public void runPhrases() {
-        if( stepExtension.overridePhrase != null) {
-            runPhraseFromLine( stepExtension.overridePhrase);
+        if (stepExtension.overridePhrase != null) {
+            runPhraseFromLine(stepExtension.overridePhrase);
             return;
 //            phrases.clear();
 //            phrases.add(stepExtension.overridePhrase);
@@ -47,16 +46,14 @@ public final class ParsedLine extends LineData {
 
     @Override
     public PhraseData runPhraseFromLine(PhraseData phrase) {
-        if (!phrase.getAssertion().isBlank() && phrase.assertionChainMembership == null && phrase.assertionChain==null) {
-            if(phrase.getAssertionType().isBlank())
+        if (!phrase.getAssertion().isBlank() && phrase.assertionChainMembership == null && phrase.assertionChain == null) {
+            if (phrase.getAssertionType().isBlank())
                 phrase.setConditional("if");
             phrase.assertionChain = new AssertionChain(phrase);
             PhraseData currentPhrase = phrase;
             while (true) {
                 phrase.assertionChain.addAssertionPhrase(currentPhrase);
                 currentPhrase = currentPhrase.getNextPhrase();
-//                currentPhrase = currentPhrase.getNextPhrase();
-
                 if (isAssertionChainBorder(currentPhrase)) {
                     phrase.setNextPhrase(currentPhrase);
                     if (currentPhrase != null) {
@@ -67,13 +64,17 @@ public final class ParsedLine extends LineData {
             }
             phrase.termination = phrase.assertionChain.phraseChain.getLast().termination;
 
-            if(phrase.untilPhrase && phrase.isContextTermination())
-            {
+            if (phrase.untilPhrase && phrase.isContextTermination()) {
                 if (phrase.termination.equals(':') || phrase.termination.equals('?')) {
                     phrase.parsedLine.inheritancePhrases.add(phrase);
                     return phrase;
                 }
             }
+        }
+
+
+        if (phrase.phraseType == PhraseData.PhraseType.ELEMENT_ONLY && phrase.getAction().isBlank() && phrase.getPreviousPhrase() != null && !phrase.getPreviousPhrase().getAction().isBlank()) {
+            phrase.setAction(phrase.getPreviousPhrase().getAction());
         }
 
 
@@ -91,9 +92,10 @@ public final class ParsedLine extends LineData {
 
         getCurrentScenarioState().currentPhrase = null;
 
-        if (phrase.assertionChainMembership != null) {;
+        if (phrase.assertionChainMembership != null) {
+            ;
             phrase.assertionChainMembership.setPhraseIndex(phrase);
-            if(phrase.isChainedAssertion)
+            if (phrase.isChainedAssertion)
                 return phrase;
         }
 
@@ -112,8 +114,6 @@ public final class ParsedLine extends LineData {
         }
         return phrase;
     }
-
-
 
 
 }

@@ -122,7 +122,7 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesPrecedingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE)
             );
@@ -141,7 +141,7 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesPrecedingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.RETURNS_VALUE)
             );
@@ -160,7 +160,7 @@ public enum AssertionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
 
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesPrecedingOperation(),
                     new ElementMatcher()
                             .mustMatchAtLeastOne(ElementType.HTML_ELEMENT, ElementType.ALERT, ElementType.BROWSER_WINDOW)
             );
@@ -197,7 +197,7 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesPrecedingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
@@ -216,7 +216,7 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesPrecedingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
@@ -236,7 +236,7 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesPrecedingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
@@ -256,7 +256,7 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesProceedingOperation(),
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesPrecedingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );

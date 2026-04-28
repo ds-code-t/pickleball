@@ -475,7 +475,7 @@ public enum ActionOperations implements OperationsInterface {
         // - if browserElement != null -> act once with null element
         // - else -> use htmlElementMatches; if empty -> act once with null element
         List<ElementMatch> elementMatches =
-                (phraseData.browserElement != null) ? List.of() : phraseData.htmlElementMatches;
+                (phraseData.getBrowserElement() != null) ? List.of() : phraseData.getClosestWebElementMatches();
 
         // Precompute values once (so we don't re-walk value matches per input)
         List<ValueWrapper> valuesToEnter = phraseData.getValueTypeEntryElementMatches()

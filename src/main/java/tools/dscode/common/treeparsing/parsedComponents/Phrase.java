@@ -147,7 +147,7 @@ public final class Phrase extends PhraseData {
 
         if (isOperationPhrase) {
             runOperation();
-        } else if (phraseType.equals(PhraseType.CONTEXT)) {
+        } else if (phraseType == PhraseType.CONTEXT) {
             processContextPhrase();
         }
     }

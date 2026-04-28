@@ -41,6 +41,7 @@ import static tools.dscode.common.reporting.logging.LogForwarder.phraseError;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
+import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inBetweenOf;
@@ -198,8 +199,8 @@ public abstract class PhraseData extends PassedData {
         }
         setConditional(conditional);
 
-        operationIndex = (Integer) phraseNode.getFromLocalState("operationIndex");
-
+        Integer opIndex = (Integer) phraseNode.getFromLocalState("operationIndex");
+        operationIndex = opIndex == null ? 0 : opIndex;
 
         hasNo = phraseNode.localStateBoolean("no");
 
@@ -252,7 +253,9 @@ public abstract class PhraseData extends PassedData {
             System.out.println("PhraseType: " + phraseType + " set for '" + text + "'");
         }
 
-
+        if (phraseType == null && !elementMatches.isEmpty()) {
+            phraseType = ELEMENT_ONLY;
+        }
     }
 
     public ElementMatch getElementMatch(MatchNode elementNode) {

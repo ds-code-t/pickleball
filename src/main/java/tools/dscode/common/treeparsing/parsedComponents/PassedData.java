@@ -20,7 +20,6 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.BROWS
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.DATA_TYPE;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.FOLLOWING_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.HTML_ELEMENT;
-import static tools.dscode.common.treeparsing.parsedComponents.ElementType.NO_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PRECEDING_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
@@ -34,35 +33,11 @@ public abstract class PassedData {
     private PhraseData previousPhrase;
     private PhraseData nextPhrase;
 
-    public ElementMatch browserElement;
+//    public ElementMatch browserElement;
     protected List<ElementMatch> elementMatches = new ArrayList<>();
-    private List<ElementMatch> elementMatchesProceedingOperation = new ArrayList<>();
-    private List<ElementMatch> elementMatchesFollowingOperation = new ArrayList<>();
-
-
-    private final List<ElementMatch> valueTypeEntryElementMatches = new ArrayList<>();
-
-    public List<ElementMatch> getValueTypeEntryElementMatches() {
-        if (valueTypeEntryElementMatches.isEmpty()) {
-            if (previousPhrase != null) {
-                valueTypeEntryElementMatches.addAll(previousPhrase.getValueTypeEntryElementMatches());
-            }
-        }
-        return valueTypeEntryElementMatches;
-    }
-
-
-    public final List<ElementMatch> webElementMatches = new ArrayList<>();
-    public final List<ElementMatch> htmlElementMatches = new ArrayList<>();
-
-    public List<ElementMatch> getClosestWebElementMatches() {
-        if (webElementMatches.isEmpty()) {
-            if (previousPhrase != null) {
-                webElementMatches.addAll(previousPhrase.webElementMatches);
-            }
-        }
-        return webElementMatches;
-    }
+//    private List<ElementMatch> elementMatchesProceedingOperation = new ArrayList<>();
+//    private List<ElementMatch> elementMatchesFollowingOperation = new ArrayList<>();
+//    private final List<ElementMatch> valueTypeEntryElementMatches = new ArrayList<>();
 
 //    private SearchContext currentSearchContext;
 
@@ -83,16 +58,16 @@ public abstract class PassedData {
     public boolean separator;
 //    public boolean missingData;
 
-    public int elementCount;
+//    public int elementCount;
 
 
-    private ElementMatch firstElement = null;
-    private ElementMatch secondElement = null;
-    private ElementMatch elementBeforeOperation = null;
-    private ElementMatch elementAfterOperation = null;
+//    private ElementMatch firstElement = null;
+//    private ElementMatch secondElement = null;
+//    private ElementMatch elementBeforeOperation = null;
+//    private ElementMatch elementAfterOperation = null;
 
 
-    private ElementMatch lastElement = null;
+//    private ElementMatch lastElement = null;
 
     private PhraseData resolvedPhrase;
     protected PhraseData templatePhrase;
@@ -140,14 +115,8 @@ public abstract class PassedData {
     //    public String keyName = "";
     public boolean isClone = false;
 
-    public Integer operationIndex;
+    public int operationIndex = 0;
 
-    public PhraseData getPreviousConditionalPhrase() {
-        PhraseData prevPhrase = previousPhrase == null ? ((PhraseData) this).parsedLine.inheritedPhrase : previousPhrase;
-        if (prevPhrase == null || prevPhrase.getResolvedPhrase() == null)
-            return prevPhrase;
-        return prevPhrase.getResolvedPhrase();
-    }
 
     public PhraseData getPreviousPhrase() {
         PhraseData prevPhrase = previousPhrase == null ? ((PhraseData) this).parsedLine.inheritedPhrase : previousPhrase;
@@ -155,6 +124,75 @@ public abstract class PassedData {
             return prevPhrase;
         return prevPhrase.getResolvedPhrase();
     }
+
+    public PhraseData getResolvedPhrase() {
+        return resolvedPhrase;
+    }
+
+    public List<ElementMatch> getValueTypeEntryElementMatches() {
+        List<ElementMatch> matches = new ArrayList<>(elementMatches.stream().filter(e -> e.elementTypes.contains(VALUE_TYPE)).toList());
+        if (matches.isEmpty() && getPreviousPhrase() != null) {
+            return getPreviousPhrase().getValueTypeEntryElementMatches();
+        }
+        return matches;
+    }
+
+    public void setResolvedPhrase(PhraseData resolvedPhrase) {
+        this.resolvedPhrase = resolvedPhrase;
+//        this.resolvedPhrase.phraseParsingMap = phraseParsingMap;
+        this.resolvedPhrase.phraseNode = phraseNode;
+        resolvedPhrase.templatePhrase = (PhraseData) this;
+    }
+
+//    public final List<ElementMatch> webElementMatches = new ArrayList<>();
+//    public final List<ElementMatch> htmlElementMatches = new ArrayList<>();
+
+    public List<ElementMatch> getClosestWebElementMatches() {
+        List<ElementMatch> matches = new ArrayList<>(elementMatches.stream().filter(e -> e.elementTypes.contains(HTML_ELEMENT)).toList());
+        if (matches.isEmpty() && getPreviousPhrase() != null) {
+            return getPreviousPhrase().getValueTypeEntryElementMatches();
+        }
+        return matches;
+    }
+
+    public List<ElementMatch> getElementMatchesPrecedingOperation() {
+        List<ElementMatch> matches = new ArrayList<>(elementMatches.stream().filter(e -> e.startIndex < operationIndex).toList());
+        if (matches.isEmpty() && getPreviousPhrase() != null) {
+            return getPreviousPhrase().getValueTypeEntryElementMatches();
+        }
+        matches.forEach(e -> e.elementTypes.add(PRECEDING_OPERATION));
+        return matches;
+    }
+
+    public List<ElementMatch> getElementMatchesFollowingOperation() {
+        List<ElementMatch> matches = new ArrayList<>(elementMatches.stream().filter(e -> e.startIndex > operationIndex).toList());
+        if (matches.isEmpty() && getPreviousPhrase() != null) {
+            return getPreviousPhrase().getValueTypeEntryElementMatches();
+        }
+        matches.forEach(e -> e.elementTypes.add(FOLLOWING_OPERATION));
+        return matches;
+    }
+
+    public ElementMatch getBrowserElement() {
+        return elementMatches.stream().filter(e -> e.elementTypes.contains(BROWSER)).findFirst().orElse(null);
+    }
+    public ElementMatch getFirstElement() {
+        return elementMatches.isEmpty() ? null : elementMatches.getFirst();
+    }
+
+    public ElementMatch getSecondElement() {
+        return elementMatches.size() <2 ? null : elementMatches.get(1);
+    }
+
+
+    public List<ElementMatch> getElementMatchesBeforeAndAfterOperation() {
+        getElementMatchesPrecedingOperation();
+        ElementMatch elementMatch1 = elementMatches.stream().filter(e -> e.startIndex > operationIndex).findFirst().orElse(new PlaceHolderMatch((PhraseData) this));
+        ElementMatch elementMatch2 = elementMatches.stream().filter(e -> e.startIndex > operationIndex).findFirst().orElse(new PlaceHolderMatch((PhraseData) this));
+        return List.of(elementMatch1, elementMatch2);
+    }
+
+
 
     public void setPreviousPhrase(PhraseData previousPhrase) {
         this.previousPhrase = previousPhrase;
@@ -175,83 +213,59 @@ public abstract class PassedData {
         return elementMatches;
     }
 
+
+
     public void setElementMatches(List<ElementMatch> elementMatchesInput) {
         elementMatches = elementMatchesInput.size() > 2 ? new ArrayList<>(elementMatchesInput.stream().filter(elementMatch -> !elementMatch.isPlaceHolder()).toList()) : new ArrayList<>(elementMatchesInput);
         elementMatches.forEach(elementMatch -> elementMatch.parentPhrase = (PhraseData) this);
         elementMatches.forEach(element -> categoryFlags.addAll(element.categoryFlags));
-        elementCount = elementMatches.size();
-
-        if (elementCount > 0) {
-            firstElement = elementMatches.getFirst();
-            firstElement.elementTypes.add(ElementType.FIRST_ELEMENT);
-            lastElement = elementMatches.getLast();
-            lastElement.elementTypes.add(ElementType.LAST_ELEMENT);
-            if (elementCount > 1) {
-                elementMatches.forEach(elementMatch -> elementMatch.elementTypes.add(ElementType.MULTIPLE_ELEMENTS_IN_PHRASE));
-                secondElement = elementMatches.get(1);
-                secondElement.elementTypes.add(ElementType.SECOND_ELEMENT);
-            } else {
-                firstElement.elementTypes.add(ElementType.SINGLE_ELEMENT_IN_PHRASE);
-            }
-        }
-
-        if (phraseType == null) {
-            if (!elementMatches.isEmpty())
-                phraseType = ELEMENT_ONLY;
-        }
-
-
-        if (operationIndex != null) {
-            setElementGroupings();
-        } else {
-            elementMatches.forEach(em -> em.elementTypes.add(NO_OPERATION));
-        }
+//        elementCount = elementMatches.size();
     }
-
-    public void setElementGroupings() {
-        elementMatchesFollowingOperation = new ArrayList<>();
-        elementMatchesProceedingOperation = new ArrayList<>();
-        for (ElementMatch em : elementMatches) {
-            if (em.elementTypes.contains(HTML_ELEMENT)) {
-                htmlElementMatches.add(em);
-            } else if (em.elementTypes.contains(BROWSER)) {
-                browserElement = em;
-            }
-            if (em.startIndex < operationIndex) {
-                em.elementTypes.add(PRECEDING_OPERATION);
-                elementMatchesProceedingOperation.add(em);
-            } else if (em.startIndex > operationIndex) {
-                elementMatchesFollowingOperation.add(em);
-                em.elementTypes.add(FOLLOWING_OPERATION);
-            }
-        }
-        if (elementMatchesProceedingOperation.isEmpty()) {
-            elementMatchesFollowingOperation.forEach(em -> {
-                if (em.elementTypes.contains(VALUE_TYPE)) {
-                    valueTypeEntryElementMatches.add(em);
-                } else if (em.elementTypes.contains(HTML_ELEMENT)) {
-                    webElementMatches.add(em);
-                }
-            });
-        }
-        if (webElementMatches.isEmpty()) {
-            elementMatchesProceedingOperation.forEach(em -> {
-                if (em.elementTypes.contains(HTML_ELEMENT)) {
-                    webElementMatches.add(em);
-                }
-            });
-        }
-        if (valueTypeEntryElementMatches.isEmpty()) {
-            elementMatchesProceedingOperation.forEach(em -> {
-                if (em.elementTypes.contains(VALUE_TYPE)) {
-                    valueTypeEntryElementMatches.add(em);
-                }
-            });
-        }
-
-        elementBeforeOperation = elementMatchesProceedingOperation.isEmpty() ? null : elementMatchesProceedingOperation.getFirst();
-        elementAfterOperation = elementMatchesFollowingOperation.isEmpty() ? null : elementMatchesFollowingOperation.getFirst();
-    }
+//
+//    public void setElementGroupings() {
+//        elementMatchesFollowingOperation = new ArrayList<>();
+//        elementMatchesProceedingOperation = new ArrayList<>();
+//        for (ElementMatch em : elementMatches) {
+//            if (em.elementTypes.contains(HTML_ELEMENT)) {
+//                htmlElementMatches.add(em);
+//            } else if (em.elementTypes.contains(BROWSER)) {
+//                browserElement = em;
+//            }
+//            if (em.startIndex < operationIndex) {
+//                em.elementTypes.add(PRECEDING_OPERATION);
+//                elementMatchesProceedingOperation.add(em);
+//            } else if (em.startIndex > operationIndex) {
+//                elementMatchesFollowingOperation.add(em);
+//                em.elementTypes.add(FOLLOWING_OPERATION);
+//            }
+//        }
+//        if (elementMatchesProceedingOperation.isEmpty()) {
+//            elementMatchesFollowingOperation.forEach(em -> {
+//                if (em.elementTypes.contains(VALUE_TYPE)) {
+//                    valueTypeEntryElementMatches.add(em);
+//                } else if (em.elementTypes.contains(HTML_ELEMENT)) {
+//                    webElementMatches.add(em);
+//                }
+//            });
+//        }
+//        if (webElementMatches.isEmpty()) {
+//            elementMatchesProceedingOperation.forEach(em -> {
+//                if (em.elementTypes.contains(HTML_ELEMENT)) {
+//                    webElementMatches.add(em);
+//                }
+//            });
+//        }
+//        if (valueTypeEntryElementMatches.isEmpty()) {
+//            elementMatchesProceedingOperation.forEach(em -> {
+//                if (em.elementTypes.contains(VALUE_TYPE)) {
+//                    valueTypeEntryElementMatches.add(em);
+//                }
+//            });
+//        }
+//
+//        elementBeforeOperation = elementMatchesProceedingOperation.isEmpty() ? null : elementMatchesProceedingOperation.getFirst();
+//        elementAfterOperation = elementMatchesFollowingOperation.isEmpty() ? null : elementMatchesFollowingOperation.getFirst();
+//    }
 
     public String getConditional() {
         return conditional;
@@ -306,69 +320,14 @@ public abstract class PassedData {
         return true;
     }
 
-    public PhraseData getResolvedPhrase() {
-        return resolvedPhrase;
-    }
-
-    public void setResolvedPhrase(PhraseData resolvedPhrase) {
-        this.resolvedPhrase = resolvedPhrase;
-//        this.resolvedPhrase.phraseParsingMap = phraseParsingMap;
-        this.resolvedPhrase.phraseNode = phraseNode;
-        resolvedPhrase.templatePhrase = (PhraseData) this;
-    }
 
     public ElementMatch getDataElement() {
         return elementMatches.stream().filter(e -> e.elementTypes.contains(DATA_TYPE)).findFirst().orElse(null);
     }
 
-    public ElementMatch getFirstElement() {
-//        if(firstElement == null || firstElement.elementTypes.contains(ElementType.PLACE_HOLDER))
-//            return null;
-        return firstElement;
-    }
-
-    public ElementMatch getSecondElement() {
-//        if( secondElement == null ||  secondElement.elementTypes.contains(ElementType.PLACE_HOLDER))
-//            return null;
-        return secondElement;
-    }
-
-    public ElementMatch getElementBeforeOperation() {
-//        if( elementBeforeOperation == null ||  elementBeforeOperation.elementTypes.contains(ElementType.PLACE_HOLDER))
-//            return null;
-        return elementBeforeOperation;
-    }
-
-    public ElementMatch getElementAfterOperation() {
-//        if(elementAfterOperation == null ||  elementAfterOperation.elementTypes.contains(ElementType.PLACE_HOLDER))
-//            return null;
-        return elementAfterOperation;
-    }
-
-    public List<ElementMatch> getElementMatchesBeforeAndAfterOperation() {
-        if (elementBeforeOperation != null && elementAfterOperation != null)
-            return List.of(elementBeforeOperation, elementAfterOperation);
-        ElementMatch elementMatch1 = elementBeforeOperation == null ? new PlaceHolderMatch((PhraseData) this) : elementBeforeOperation;
-        ElementMatch elementMatch2 = elementAfterOperation == null ? new PlaceHolderMatch((PhraseData) this) : elementAfterOperation;
-        return List.of(elementMatch1, elementMatch2);
-    }
 
 
-    public List<ElementMatch> getElementMatchesProceedingOperation() {
-        return elementMatchesProceedingOperation;
-    }
 
-    public void setElementMatchesProceedingOperation(List<ElementMatch> elementMatchesProceedingOperation) {
-        this.elementMatchesProceedingOperation = elementMatchesProceedingOperation;
-    }
-
-    public List<ElementMatch> getElementMatchesFollowingOperation() {
-        return elementMatchesFollowingOperation;
-    }
-
-    public void setElementMatchesFollowingOperation(List<ElementMatch> elementMatchesFollowingOperation) {
-        this.elementMatchesFollowingOperation = elementMatchesFollowingOperation;
-    }
 
 
     public boolean isNewContext() {
@@ -378,8 +337,6 @@ public abstract class PassedData {
     public void setNewContext(boolean newContext) {
         this.newContext = newContext;
     }
-
-
 
 
     public WebDriver getDriver() {
