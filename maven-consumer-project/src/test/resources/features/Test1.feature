@@ -461,8 +461,9 @@ Feature: Additiontest
   Scenario: gene test2
   @[DEBUG]
 #    * navigate to: URL.buttons
-    * , from the Top Panel:
-    : * , click the "Apples" Checkbox, the "Bananas" Checkbox, and the "Strawberries" Checkbox
+    * , switch to the 'Checkboxes' Window
+#    * , from the Top Panel:
+#    : * , click the "Apples" Checkbox, the "Bananas" Checkbox, and the "Strawberries" Checkbox
 #    * , click the "Spaces" Link, the "Teacher" Link
 #    : * , click "Get your own website" Link
 #  : * , if "Get your own website" Link is displayed
