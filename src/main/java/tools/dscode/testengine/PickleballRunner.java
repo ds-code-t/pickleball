@@ -103,12 +103,10 @@ public abstract class PickleballRunner {
                 + skipped + "key(s) that could trigger foreign TestEngine discovery)");
     }
 
-    public static boolean isForeignEngineDiscoveryKey(String key) {
-        return key != null && (
-                key.startsWith("cucumber.")
+    private static boolean isForeignEngineDiscoveryKey(String key) {
+        return key.startsWith("cucumber.")
                         || key.startsWith("junit.platform.")
-                        || key.startsWith("junit.jupiter.")
-        );
+                        || key.startsWith("junit.jupiter.");
     }
 
     public void globalTestProperties() {
