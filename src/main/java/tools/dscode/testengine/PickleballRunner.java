@@ -17,7 +17,7 @@ import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
 public abstract class PickleballRunner {
 
     static {
-        EngineFilterBootstrap.ensureEngineFilterApplied("PickleballRunner.<clint>");
+        EngineFilterBootstrap.ensureEngineFilterApplied("PickleballRunner.<clinit>");
     }
 
     private static volatile PickleballRunner INSTANCE;

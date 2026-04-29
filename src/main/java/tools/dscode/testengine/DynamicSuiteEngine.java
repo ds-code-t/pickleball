@@ -13,10 +13,10 @@ import java.util.TreeMap;
 
 public final class DynamicSuiteEngine implements TestEngine {
 
-    public static final String ENGINE_ID = "dynamic-cucumber-suite";
+    public static final String ENGINE_ID = "pickleball-test-engine";
 
     static {
-        EngineFilterBootstrap.ensureEngineFilterApplied("DynamicSuiteEngine.<clint>");
+        EngineFilterBootstrap.ensureEngineFilterApplied("DynamicSuiteEngine.<clinit>");
     }
 
     private final CucumberTestEngine delegate = new CucumberTestEngine();
