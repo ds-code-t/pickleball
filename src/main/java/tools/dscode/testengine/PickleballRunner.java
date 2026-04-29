@@ -16,6 +16,10 @@ import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
 
 public abstract class PickleballRunner {
 
+    static {
+        EngineFilterBootstrap.ensureEngineFilterApplied("PickleballRunner.<clint>");
+    }
+
     private static volatile PickleballRunner INSTANCE;
     public static final String PKB_PREFIX = "pkb_";
     static final String PKB_GLUE = PKB_PREFIX + "glue";
@@ -27,6 +31,7 @@ public abstract class PickleballRunner {
     static final String CUCUMBER_TAGS = "cucumber.filter.tags";
     private static final String PKB_NAME =  PKB_PREFIX +"name";
     private static final String PKB_PARALLEL =  PKB_PREFIX + "parallel";
+    private static final String PKB_DEBUG_BROWSER =  PKB_PREFIX + "debugBrowser";
 
     private static final String CUCUMBER_PARALLEL_ENABLED = "cucumber.execution.parallel.enabled";
     private static final String CUCUMBER_PARALLEL_STRATEGY = "cucumber.execution.parallel.config.strategy";
@@ -38,6 +43,9 @@ public abstract class PickleballRunner {
 
     protected PickleballRunner() {
         debug("Constructing suite subclass: " + getClass().getName());
+
+        EngineFilterBootstrap.ensureEngineFilterApplied("PickleballRunner.<init>");
+
 
         INSTANCE = this;
 
@@ -75,8 +83,19 @@ public abstract class PickleballRunner {
 
         publishToSystemProperties();
 
+        applyDebugBrowserFlag();
+
         INSTANCE = this;
         debug("Registered singleton instance: " + getClass().getName());
+    }
+
+    private void applyDebugBrowserFlag() {
+        String raw = values.get(PKB_DEBUG_BROWSER);
+        if (raw == null || !"true".equalsIgnoreCase(raw.trim())) {
+            return;
+        }
+        io.cucumber.core.runner.CurrentScenarioState.globalDebugBrowser = true;
+        debug("Applied " + PKB_DEBUG_BROWSER + "=true -> CurrentScenarioState.globalDebugBrowser=true");
     }
 
     private void publishToSystemProperties() {

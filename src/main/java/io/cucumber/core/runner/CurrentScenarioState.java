@@ -79,7 +79,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     private StepExtension currentStep;
     public Phrase currentPhrase;
 
-    public boolean globalDebugBrowser = false;
+    public static boolean globalDebugBrowser = false;
     public boolean debugBrowser = false;
 
     public static final ThreadLocal<CurrentScenarioState> currentScenarioState = new ThreadLocal<>();

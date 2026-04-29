@@ -15,6 +15,10 @@ public final class DynamicSuiteEngine implements TestEngine {
 
     public static final String ENGINE_ID = "dynamic-cucumber-suite";
 
+    static {
+        EngineFilterBootstrap.ensureEngineFilterApplied("DynamicSuiteEngine.<clint>");
+    }
+
     private final CucumberTestEngine delegate = new CucumberTestEngine();
 
     @Override

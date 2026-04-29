@@ -13,6 +13,7 @@ public final class PKB_props {
     public static final String PKB_PROFILE  = PREFIX + "profile";
     public static final String PKB_PLUGINS  = PREFIX + "plugins";
     public static final String PKB_PARALLEL = PREFIX + "parallel";
+    public static final String PKB_DEBUG_BROWSER = PREFIX + "debugBrowser";
 
     private PKB_props() {}
 
@@ -89,6 +90,17 @@ public final class PKB_props {
 
     public static void parallel(String count) {
         put(PKB_PARALLEL, count);
+    }
+
+    public static String debugBrowser() {
+        return get(PKB_DEBUG_BROWSER);
+    }
+    public static void debugBrowser(String enable) {
+        put(PKB_DEBUG_BROWSER, enable);
+    }
+
+    public static void debugBrowser(boolean enable) {
+        put(PKB_DEBUG_BROWSER, Boolean.toString(enable));
     }
 
 }
