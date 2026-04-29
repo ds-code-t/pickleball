@@ -212,13 +212,6 @@ public abstract class PickleballRunner {
         debug("Applied " + count + " system property override(s)");
     }
 
-    static boolean isSupportedProperty(String key) {
-        return key != null && (
-                key.startsWith("junit.jupiter.")
-                        || key.startsWith("junit.platform.")
-                        || key.startsWith("cucumber.")
-        );
-    }
 
     private void applyPkbAliases() {
         syncPair(PKB_GLUE, GLUE_PROPERTY_NAME);

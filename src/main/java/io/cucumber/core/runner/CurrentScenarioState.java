@@ -79,6 +79,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     private StepExtension currentStep;
     public Phrase currentPhrase;
 
+    public boolean globalDebugBrowser = false;
     public boolean debugBrowser = false;
 
     public static final ThreadLocal<CurrentScenarioState> currentScenarioState = new ThreadLocal<>();
@@ -96,6 +97,8 @@ public class CurrentScenarioState extends ScenarioMapping {
         this.pickle = (Pickle) getProperty(testCase, "pickle");
         scenarioName = pickle.getName();
         scenarioNameAndLine = scenarioName + " , Line " + pickle.getLocation().getLine();
+        if(globalDebugBrowser)
+            debugBrowser = true;
     }
 
 
