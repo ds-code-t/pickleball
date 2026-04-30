@@ -18,9 +18,11 @@ import java.util.Set;
 
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.BROWSER;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.DATA_TYPE;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.FIRST_ELEMENT;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.FOLLOWING_OPERATION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.HTML_ELEMENT;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PRECEDING_OPERATION;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.SECOND_ELEMENT;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
 import static tools.dscode.coredefinitions.BrowserSteps.getCurrentDriver;
@@ -33,66 +35,26 @@ public abstract class PassedData {
     private PhraseData previousPhrase;
     private PhraseData nextPhrase;
 
-//    public ElementMatch browserElement;
     protected List<ElementMatch> elementMatches = new ArrayList<>();
-//    private List<ElementMatch> elementMatchesProceedingOperation = new ArrayList<>();
-//    private List<ElementMatch> elementMatchesFollowingOperation = new ArrayList<>();
-//    private final List<ElementMatch> valueTypeEntryElementMatches = new ArrayList<>();
-
-//    private SearchContext currentSearchContext;
-
-//    public List<PhraseData> contextPhrases = new ArrayList<>();
-
-//    public String selectionType = "";
-
     public boolean hasNo;
-
-
     private String conditional = "";
-
-
     public String body;
     public int phraseConditionalMode = 1;
-
     public boolean isOperationPhrase;
     public boolean separator;
-//    public boolean missingData;
-
-//    public int elementCount;
-
-
-//    private ElementMatch firstElement = null;
-//    private ElementMatch secondElement = null;
-//    private ElementMatch elementBeforeOperation = null;
-//    private ElementMatch elementAfterOperation = null;
-
-
-//    private ElementMatch lastElement = null;
-
     private PhraseData resolvedPhrase;
     protected PhraseData templatePhrase;
-
     public Attempt.Result result;
     public List<ElementMatch> resultElements = new ArrayList<>();
-//    public List<PhraseData> resultPhrases = new ArrayList<>();
-
     private WebDriver driver = null;
     public List<PhraseData> branchedPhrases = new ArrayList<>();
-
     public ElementWrapper contextElement;
-
     public boolean noExecution = false;
-
-
-//    public boolean contextTermination;
-
     public ActionOperations actionOperation;
     public AssertionOperations assertionOperation;
-
     public int position;
     private boolean newContext = false;
     public MatchNode phraseNode;
-
     public String context = "";
     public boolean isFrom;
     public boolean isTopContext;
@@ -105,14 +67,10 @@ public abstract class PassedData {
 
 
     private String assertionType = "";
-    //    public List<Component> components;
     public Set<ExecutionDictionary.CategoryFlags> categoryFlags = new HashSet<>();
     public PhraseData.PhraseType phraseType;
 
     public XPathy contextXPathy;
-//    public XPathy contextXPathyWithIndex;
-
-    //    public String keyName = "";
     public boolean isClone = false;
 
     public int operationIndex = 0;
@@ -139,13 +97,9 @@ public abstract class PassedData {
 
     public void setResolvedPhrase(PhraseData resolvedPhrase) {
         this.resolvedPhrase = resolvedPhrase;
-//        this.resolvedPhrase.phraseParsingMap = phraseParsingMap;
         this.resolvedPhrase.phraseNode = phraseNode;
         resolvedPhrase.templatePhrase = (PhraseData) this;
     }
-
-//    public final List<ElementMatch> webElementMatches = new ArrayList<>();
-//    public final List<ElementMatch> htmlElementMatches = new ArrayList<>();
 
     public List<ElementMatch> getClosestWebElementMatches() {
         List<ElementMatch> matches = new ArrayList<>(elementMatches.stream().filter(e -> e.elementTypes.contains(HTML_ELEMENT)).toList());
@@ -187,8 +141,8 @@ public abstract class PassedData {
 
     public List<ElementMatch> getElementMatchesBeforeAndAfterOperation() {
         getElementMatchesPrecedingOperation();
-        ElementMatch elementMatch1 = elementMatches.stream().filter(e -> e.startIndex > operationIndex).findFirst().orElse(new PlaceHolderMatch((PhraseData) this));
-        ElementMatch elementMatch2 = elementMatches.stream().filter(e -> e.startIndex > operationIndex).findFirst().orElse(new PlaceHolderMatch((PhraseData) this));
+        ElementMatch elementMatch1 = getElementMatchesPrecedingOperation().stream().findFirst().orElse(new PlaceHolderMatch((PhraseData) this));
+        ElementMatch elementMatch2 = getElementMatchesFollowingOperation().stream().findFirst().orElse(new PlaceHolderMatch((PhraseData) this));
         return List.of(elementMatch1, elementMatch2);
     }
 
@@ -219,53 +173,15 @@ public abstract class PassedData {
         elementMatches = elementMatchesInput.size() > 2 ? new ArrayList<>(elementMatchesInput.stream().filter(elementMatch -> !elementMatch.isPlaceHolder()).toList()) : new ArrayList<>(elementMatchesInput);
         elementMatches.forEach(elementMatch -> elementMatch.parentPhrase = (PhraseData) this);
         elementMatches.forEach(element -> categoryFlags.addAll(element.categoryFlags));
-//        elementCount = elementMatches.size();
+        if(!elementMatches.isEmpty())
+        {
+            elementMatches.getFirst().elementTypes.add(FIRST_ELEMENT);
+            if(elementMatches.size() >= 1)
+            {
+                elementMatches.get(1).elementTypes.add(SECOND_ELEMENT);
+            }
+        }
     }
-//
-//    public void setElementGroupings() {
-//        elementMatchesFollowingOperation = new ArrayList<>();
-//        elementMatchesProceedingOperation = new ArrayList<>();
-//        for (ElementMatch em : elementMatches) {
-//            if (em.elementTypes.contains(HTML_ELEMENT)) {
-//                htmlElementMatches.add(em);
-//            } else if (em.elementTypes.contains(BROWSER)) {
-//                browserElement = em;
-//            }
-//            if (em.startIndex < operationIndex) {
-//                em.elementTypes.add(PRECEDING_OPERATION);
-//                elementMatchesProceedingOperation.add(em);
-//            } else if (em.startIndex > operationIndex) {
-//                elementMatchesFollowingOperation.add(em);
-//                em.elementTypes.add(FOLLOWING_OPERATION);
-//            }
-//        }
-//        if (elementMatchesProceedingOperation.isEmpty()) {
-//            elementMatchesFollowingOperation.forEach(em -> {
-//                if (em.elementTypes.contains(VALUE_TYPE)) {
-//                    valueTypeEntryElementMatches.add(em);
-//                } else if (em.elementTypes.contains(HTML_ELEMENT)) {
-//                    webElementMatches.add(em);
-//                }
-//            });
-//        }
-//        if (webElementMatches.isEmpty()) {
-//            elementMatchesProceedingOperation.forEach(em -> {
-//                if (em.elementTypes.contains(HTML_ELEMENT)) {
-//                    webElementMatches.add(em);
-//                }
-//            });
-//        }
-//        if (valueTypeEntryElementMatches.isEmpty()) {
-//            elementMatchesProceedingOperation.forEach(em -> {
-//                if (em.elementTypes.contains(VALUE_TYPE)) {
-//                    valueTypeEntryElementMatches.add(em);
-//                }
-//            });
-//        }
-//
-//        elementBeforeOperation = elementMatchesProceedingOperation.isEmpty() ? null : elementMatchesProceedingOperation.getFirst();
-//        elementAfterOperation = elementMatchesFollowingOperation.isEmpty() ? null : elementMatchesFollowingOperation.getFirst();
-//    }
 
     public String getConditional() {
         return conditional;
@@ -324,11 +240,6 @@ public abstract class PassedData {
     public ElementMatch getDataElement() {
         return elementMatches.stream().filter(e -> e.elementTypes.contains(DATA_TYPE)).findFirst().orElse(null);
     }
-
-
-
-
-
 
     public boolean isNewContext() {
         return newContext;

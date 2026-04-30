@@ -102,9 +102,6 @@ public abstract class PhraseData extends PassedData {
     }
 
     private List<ElementWrapper> wrappedElements = new ArrayList<>();
-    //    public List<ValueMatch> values;
-//    public ElementMatch elementMatch;
-
 
     public enum PhraseType {
         INITIAL, CONTEXT, ACTION, ASSERTION, CONDITIONAL, ELEMENT_ONLY, NO_EXECUTION, DATA_OPERATION, BROWSER_OPERATION
@@ -185,7 +182,6 @@ public abstract class PhraseData extends PassedData {
         hasResolvedText = !text.trim().equalsIgnoreCase(resolvedText.trim());
         hasTextToResolve = hasResolvedText || text.matches(".*<.*>.*");
         termination = delimiter;
-//        contextTermination = termination.equals('.') || termination.equals('?') || termination.equals(':');
         MatchNode returnMatchNode = getNodeDictionary().parse(resolvedText);
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
@@ -194,8 +190,6 @@ public abstract class PhraseData extends PassedData {
         if (conditional.equalsIgnoreCase("until")) {
             conditional = "if";
             untilPhrase = true;
-//            evaluateResults = false;
-//            invertConditional = true;
         }
         setConditional(conditional);
 
@@ -209,10 +203,6 @@ public abstract class PhraseData extends PassedData {
         separator = phraseNode.localStateBoolean("separator");
         setElementMatches(phraseNode.getOrderedChildren("elementMatch").stream().map(this::getElementMatch).collect(Collectors.toList()));
 
-//        components.forEach(component -> component.parentPhrase = this);
-//        elements = getNextComponents(-1, "elementMatch").stream().map(m -> (ElementMatch) m).toList();
-//        values = getNextComponents(-1, "valueMatch").stream().map(m -> (ValueMatch) m).toList();
-//        elementMatch = elementMatches.isEmpty() ? null : elementMatches.getFirst();
         isTopContext = categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT);
         isPageContext = isTopContext || categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT);
 
