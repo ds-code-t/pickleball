@@ -110,42 +110,39 @@ public abstract class PassedData {
     }
 
     public List<ElementMatch> getElementMatchesPrecedingOperation() {
-        List<ElementMatch> matches = new ArrayList<>(elementMatches.stream().filter(e -> e.startIndex < operationIndex).toList());
+        List<ElementMatch> matches = new ArrayList<>(elementMatches.stream().filter(e -> e.elementTypes.contains(PRECEDING_OPERATION)).toList());
         if (matches.isEmpty() && getPreviousPhrase() != null) {
             return getPreviousPhrase().getValueTypeEntryElementMatches();
         }
-        matches.forEach(e -> e.elementTypes.add(PRECEDING_OPERATION));
         return matches;
     }
 
     public List<ElementMatch> getElementMatchesFollowingOperation() {
-        List<ElementMatch> matches = new ArrayList<>(elementMatches.stream().filter(e -> e.startIndex > operationIndex).toList());
+        List<ElementMatch> matches = new ArrayList<>(elementMatches.stream().filter(e -> e.elementTypes.contains(FOLLOWING_OPERATION)).toList());
         if (matches.isEmpty() && getPreviousPhrase() != null) {
             return getPreviousPhrase().getValueTypeEntryElementMatches();
         }
-        matches.forEach(e -> e.elementTypes.add(FOLLOWING_OPERATION));
         return matches;
     }
 
     public ElementMatch getBrowserElement() {
         return elementMatches.stream().filter(e -> e.elementTypes.contains(BROWSER)).findFirst().orElse(null);
     }
+
     public ElementMatch getFirstElement() {
         return elementMatches.isEmpty() ? null : elementMatches.getFirst();
     }
 
     public ElementMatch getSecondElement() {
-        return elementMatches.size() <2 ? null : elementMatches.get(1);
+        return elementMatches.size() < 2 ? null : elementMatches.get(1);
     }
 
 
     public List<ElementMatch> getElementMatchesBeforeAndAfterOperation() {
-        getElementMatchesPrecedingOperation();
         ElementMatch elementMatch1 = getElementMatchesPrecedingOperation().stream().findFirst().orElse(new PlaceHolderMatch((PhraseData) this));
         ElementMatch elementMatch2 = getElementMatchesFollowingOperation().stream().findFirst().orElse(new PlaceHolderMatch((PhraseData) this));
         return List.of(elementMatch1, elementMatch2);
     }
-
 
 
     public void setPreviousPhrase(PhraseData previousPhrase) {
@@ -168,17 +165,33 @@ public abstract class PassedData {
     }
 
 
-
     public void setElementMatches(List<ElementMatch> elementMatchesInput) {
-        elementMatches = elementMatchesInput.size() > 2 ? new ArrayList<>(elementMatchesInput.stream().filter(elementMatch -> !elementMatch.isPlaceHolder()).toList()) : new ArrayList<>(elementMatchesInput);
-        elementMatches.forEach(elementMatch -> elementMatch.parentPhrase = (PhraseData) this);
-        elementMatches.forEach(element -> categoryFlags.addAll(element.categoryFlags));
-        if(!elementMatches.isEmpty())
-        {
-            elementMatches.getFirst().elementTypes.add(FIRST_ELEMENT);
-            if(elementMatches.size() >= 1)
-            {
-                elementMatches.get(1).elementTypes.add(SECOND_ELEMENT);
+        elementMatches = elementMatchesInput.size() > 2
+                ? new ArrayList<>(elementMatchesInput.stream().filter(elementMatch -> !elementMatch.isPlaceHolder()).toList())
+                : new ArrayList<>(elementMatchesInput);
+
+        categoryFlags.clear();
+
+        for (int i = 0; i < elementMatches.size(); i++) {
+            ElementMatch elementMatch = elementMatches.get(i);
+
+            elementMatch.parentPhrase = (PhraseData) this;
+            categoryFlags.addAll(elementMatch.categoryFlags);
+
+            if (i == 0) {
+                elementMatch.elementTypes.add(FIRST_ELEMENT);
+            }
+
+            if (i == 1) {
+                elementMatch.elementTypes.add(SECOND_ELEMENT);
+            }
+
+            if (elementMatch.startIndex < operationIndex) {
+                elementMatch.elementTypes.add(PRECEDING_OPERATION);
+            }
+
+            if (elementMatch.startIndex > operationIndex) {
+                elementMatch.elementTypes.add(FOLLOWING_OPERATION);
             }
         }
     }
