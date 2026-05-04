@@ -3,7 +3,6 @@ package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import tools.dscode.common.domoperations.ExecutionDictionary;
-import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.preparsing.LineData;
@@ -106,9 +105,9 @@ public final class Phrase extends PhraseData {
             phraseType = PhraseType.CONDITIONAL;
         }
 
-        if (!getAssertionType().isBlank() && getAssertion().isBlank()) {
-            setAssertion("true");
-        }
+//        if (!getAssertionType().isBlank() && getAssertion().isBlank()) {
+//            setAssertion("true");
+//        }
 
 //        if (!parsedLine.executedPhrases.isEmpty() && this.shouldRepeatPhrase && (parsedLine.executedPhrases.getLast().shouldRepeatPhrase || parsedLine.executedPhrases.getLast().repeatRootPhrase)) {
 //            parsedLine.executedPhrases.removeLast();
@@ -142,8 +141,6 @@ public final class Phrase extends PhraseData {
         getElementMatches().forEach(e -> {
             if (e.elementTypes.contains(ElementType.HTML_TYPE)) e.contextWrapper = new ContextWrapper(e);
         });
-
-
 
         if (isOperationPhrase) {
             runOperation();
@@ -244,15 +241,7 @@ public final class Phrase extends PhraseData {
 
     @Override
     public PhraseData clonePhrase(PhraseData previous, Character newTermination) {
-        Phrase clone = new Phrase(text, (newTermination == null ? termination : newTermination), parsedLine, previous);
-        clone.phraseConditionalMode = phraseConditionalMode;
-        clone.result = null;
-        clone.isClone = true;
-        clone.position = position;
-        if (getNextPhrase() != null) {
-            clone.setNextPhrase(getNextPhrase().clonePhrase(clone));
-            clone.getNextPhrase().setPreviousPhrase(clone);
-        }
+        Phrase clone = copyPhraseWithModifications(this, newTermination, parsedLine, previous);
         clone.phraseParsingMap = null;
         return clone;
     }
@@ -267,6 +256,7 @@ public final class Phrase extends PhraseData {
         getResolvedPhrase().assertionChain = assertionChain;
         getResolvedPhrase().untilPhrase = untilPhrase;
         getResolvedPhrase().setNextPhrase(getNextPhrase());
+//        resolvedPhrase.operationInheritancePhrase = operationInheritancePhrase;
         return getResolvedPhrase();
     }
 
@@ -280,6 +270,35 @@ public final class Phrase extends PhraseData {
         return nextResolvedPhrase;
     }
 
+
+
+    public static Phrase copyPhraseWithModifications(Phrase phrase){
+        return copyPhraseWithModifications(phrase, null, null, null);
+    }
+    public static Phrase copyPhraseWithModifications(Phrase phrase, Character newTermination, LineData parsedLine, PhraseData previous){
+        Phrase clonePhrase = newTermination == null ?  new Phrase(phrase.text, phrase.termination, phrase.parsedLine ) :new Phrase(phrase.text, newTermination, parsedLine, previous);
+        clonePhrase.operationInheritancePhrase = phrase.operationInheritancePhrase;
+        clonePhrase.assertionChainMembership = phrase.assertionChainMembership;
+        clonePhrase.isChainedAssertion = phrase.isChainedAssertion;
+        clonePhrase.operationIndex = phrase.operationIndex;
+        clonePhrase.setInheritedOperationFromPhrase(phrase);
+        clonePhrase.setConditional(phrase.getConditional());
+        clonePhrase.setAssertionType(phrase.getAssertionType());
+        clonePhrase.untilPhrase = phrase.untilPhrase;
+        clonePhrase.phraseConditionalMode = phrase.phraseConditionalMode;
+        clonePhrase.operationInheritancePhrase = phrase.operationInheritancePhrase;
+        clonePhrase.result = null;
+        clonePhrase.isClone = true;
+        clonePhrase.position = phrase.position;
+        clonePhrase.phraseParsingMap = phrase.phraseParsingMap;
+        if (phrase.getNextPhrase() != null) {
+            clonePhrase.setNextPhrase(phrase.getNextPhrase().clonePhrase(clonePhrase));
+            clonePhrase.getNextPhrase().setPreviousPhrase(clonePhrase);
+        }
+
+        return clonePhrase;
+
+    }
 
 
 }

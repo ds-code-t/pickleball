@@ -462,6 +462,12 @@ Feature: Additiontest
   @[DEBUG]
 #    * navigate to: URL.buttons
     * , switch to the 'Checkboxes' Window
+    :  * , verify the "Apples" Checkbox is displayed, and verify the "Apples" Checkbox is displayed
+#    :  * , verify the "Apples" Checkbox is displayed, and click it
+#    :  * , if the "Apples" Checkbox is displayed, and click it
+
+
+
 #    * , from the Top Panel:
 #    : * , click the "Apples" Checkbox, the "Bananas" Checkbox, and the "Strawberries" Checkbox
 #    * , click the "Spaces" Link, the "Teacher" Link

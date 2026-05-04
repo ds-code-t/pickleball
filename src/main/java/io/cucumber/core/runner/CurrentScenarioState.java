@@ -462,17 +462,19 @@ public class CurrentScenarioState extends ScenarioMapping {
     public static void registerScenarioObject(String key, Object value) {
         key = normalizeRegistryKey(key);
         getRunningParsingMap().getPrimaryRunMap().put(key, value);
-//        GlobalState.getRunningStep().getDefaultStepNodeMap().put(key, value);
-//        GlobalRegistry.putLocal(key, value);
     }
 
 
     public static Object getScenarioObject(String key) {
         key = normalizeRegistryKey(key);
         return getRunningParsingMap().getPrimaryRunMap().get(key);
-//        Object returnObject = getRunningParsingMap().get(key);
-//        return returnObject == null ? GlobalRegistry.getLocal(key) : returnObject;
     }
+
+    public static Object removeScenarioObjectByKey(String key) {
+        key = normalizeRegistryKey(key);
+        return getRunningParsingMap().getPrimaryRunMap().getRoot().remove(key);
+    }
+
 
     public static final String normalizationPrefix = "_obj_";
 

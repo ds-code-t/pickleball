@@ -13,6 +13,7 @@ import java.time.Duration;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.variables.RunVars.resolveFromVarsOrDefault;
 import static tools.dscode.coredefinitions.ObjectRegistrationSteps.constructObjectFromParsingMap;
+import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getNewObjectFromParsingMap;
 
 public class BrowserSteps {
 
@@ -21,15 +22,19 @@ public class BrowserSteps {
     }
 
     public static RemoteWebDriver getCurrentDriver() {
-        String browserName = String.valueOf(resolveFromVarsOrDefault( "BROWSER", "CHROME"));
-        RemoteWebDriver webDriver = getDriver(browserName);
+        String browserName = String.valueOf(resolveFromVarsOrDefault("BROWSER", "CHROME"));
+        RemoteWebDriver webDriver =  getDriver(browserName);
+        if (webDriver == null || webDriver.getSessionId() == null)
+        {
+            webDriver = (RemoteWebDriver) getNewObjectFromParsingMap(browserName);
+        }
         getRunningStep().webDriverUsed = webDriver;
         return webDriver;
     }
 
     public static RemoteWebDriver getCurrentDriverForNonUse() {
-        String browserName = String.valueOf(resolveFromVarsOrDefault( "BROWSER", "CHROME"));
-        return getDriver(browserName);
+        String browserName = String.valueOf(resolveFromVarsOrDefault("BROWSER", "CHROME"));
+        return   getDriver(browserName);
     }
 
     public static RemoteWebDriver getDriver(String browserName) {
@@ -66,8 +71,7 @@ public class BrowserSteps {
         RemoteWebDriver driver = (RemoteWebDriver) value;
         try {
             driver.manage().window().maximize();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             System.out.println("Failed to maximize window: " + e.getMessage());
         }
         return value;

@@ -10,6 +10,7 @@ import java.util.Map;
 
 import static io.cucumber.core.runner.CurrentScenarioState.getScenarioObject;
 import static io.cucumber.core.runner.CurrentScenarioState.registerScenarioObject;
+import static io.cucumber.core.runner.CurrentScenarioState.removeScenarioObjectByKey;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.mappings.ParsingMap.configsRoot;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
@@ -32,6 +33,21 @@ public class ObjectRegistrationSteps {
     public static final String pathKeyProperty = "_pathKey";
     public static final String postActionsProperty = "postActions";
     public static final String cleanupProperty = "cleanup";
+
+    public static Object getNewObjectFromParsingMap(String pathKey) {
+        if (pathKey == null || pathKey.isBlank()) {
+            throw new IllegalArgumentException("Object construction path cannot be null or blank");
+        }
+        removeScenarioObjectByKey(pathKey);
+        return constructObjectFromParsingMap(pathKey);
+    }
+
+    public static Object removeObjectFromParsingMap(String pathKey) {
+        if (pathKey == null || pathKey.isBlank()) {
+            throw new IllegalArgumentException("Object construction path cannot be null or blank");
+        }
+        return removeScenarioObjectByKey(pathKey);
+    }
 
     @Given(objRegistration + "(.+)$")
     public static Object constructObjectFromParsingMap(String pathKey) {

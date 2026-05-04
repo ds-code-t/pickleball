@@ -104,7 +104,7 @@ public final class DefinitionContext {
         ParseNode position = new ParseNode("#\\d+");
 
 
-        ParseNode phrase = new ParseNode("^\\s*(?<separatorA>\\b[tT]hen\\b\\s*)?(?<conjunction>\\b(?:and|or)\\b\\s*)?(?<separatorB>\\b[tT]hen\\b\\s*)?\\s*(?<conditional>\\b(?:until|else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
+        ParseNode phrase = new ParseNode("^\\s*(?<separatorA>\\b[tT]hen\\b\\s*)?(?<conjunction>\\b(?:[aA]nd|[oO]r)\\b\\s*)?(?<separatorB>\\b[tT]hen\\b\\s*)?\\s*(?<conditional>\\b(?:until|else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
             @Override
             public String onCapture(MatchNode self) {
                 String separator = self.resolvedGroupText("separatorA");
@@ -116,9 +116,10 @@ public final class DefinitionContext {
                 }
 
                 String context = self.resolvedGroupText("context");
+                String conjunction = self.resolvedGroupText("conjunction");
 
 
-                boolean upperCaseContext = !context.isEmpty() && Character.isUpperCase(context.charAt(0));
+                boolean upperCaseContext = (!context.isEmpty() && Character.isUpperCase(context.charAt(0))) || (!conjunction.isEmpty() && Character.isUpperCase(conjunction.charAt(0)));
 
                 if (upperCaseContext || (!separator.isEmpty() && Character.isUpperCase(separator.charAt(0))))
                     self.putToLocalState("newStartContext", true);
@@ -130,7 +131,7 @@ public final class DefinitionContext {
                     conditional = "if";
                 }
 
-                self.putToLocalState("conjunction", self.resolvedGroupText("conjunction"));
+                self.putToLocalState("conjunction", conjunction.toLowerCase());
                 self.putToLocalState("body", self.resolvedGroupText("body"));
 //                String termination = self.resolvedGroupText("punc");
 //                if (termination == null || termination.isBlank()) termination = "";
@@ -162,7 +163,6 @@ public final class DefinitionContext {
         ParseNode predicate = new ParseNode("(?:\\b(?<predicateType>starting with|ending with|containing|equaling|of)\\s+(?<predicateVal><<valueMask>>))") {
             @Override
             public String onCapture(MatchNode self) {
-
                 String predicateType = self.resolvedGroupText("predicateType");
                 predicateType = predicateType.replaceAll("with", "").replaceAll("of", "equaling").trim();
                 self.putToLocalState("predicateType", predicateType);
@@ -170,7 +170,6 @@ public final class DefinitionContext {
                 return self.originalText();
             }
         };
-
 
         ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any|none\\s+of|none|no)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\b\\s*)?(?:(?<state>(?:un|non-?)?(?:checked|selected|enabled|disabled|expanded|collapsed|required|empty|blank))\\b\\s*)?(?<text><<valueMask>>)?\\s*\\b(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>(?:(?:\\band\\s*)?\\bwith\\s+[a-z]+\\s+(?:<<predicate>>|(?:no)?attribute)\\s*))*") {
             @Override

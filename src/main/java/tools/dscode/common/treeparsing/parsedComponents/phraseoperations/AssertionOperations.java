@@ -12,6 +12,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETURNS_VALUE;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
 
 public enum AssertionOperations implements OperationsInterface {
@@ -22,17 +23,18 @@ public enum AssertionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
 
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.FIRST_ELEMENT),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.SECOND_ELEMENT)
-            );
-
-
-            ElementMatch firstElement = phraseData.resultElements.getFirst();
-            ElementMatch secondElement = phraseData.resultElements.get(1);
-
+//            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
+//                    new ElementMatcher()
+//                            .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.FIRST_ELEMENT),
+//                    new ElementMatcher()
+//                            .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.SECOND_ELEMENT)
+//            );
+//
+//
+//            ElementMatch firstElement = phraseData.resultElements.getFirst();
+//            ElementMatch secondElement = phraseData.resultElements.get(1);
+            ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
+            ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
 
             phraseData.result = Attempt.run(() -> {
                 return ValueWrapperCompareReducer.eval(
@@ -49,15 +51,19 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.FIRST_ELEMENT),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.SECOND_ELEMENT)
-            );
+//            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
+//                    new ElementMatcher()
+//                            .mustMatchAll(RETURNS_VALUE, ElementType.FIRST_ELEMENT),
+//                    new ElementMatcher()
+//                            .mustMatchAll(RETURNS_VALUE, ElementType.SECOND_ELEMENT)
+//            );
+//
+//            ElementMatch firstElement = phraseData.resultElements.getFirst();
+//            ElementMatch secondElement = phraseData.resultElements.get(1);
+            ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
+            ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
 
-            ElementMatch firstElement = phraseData.resultElements.getFirst();
-            ElementMatch secondElement = phraseData.resultElements.get(1);
+
             phraseData.result = Attempt.run(() -> {
                 return ValueWrapperCompareReducer.eval(
                         ValueWrapperComparisons::startsWith,
@@ -73,15 +79,19 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.FIRST_ELEMENT),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.SECOND_ELEMENT)
-            );
+//            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
+//                    new ElementMatcher()
+//                            .mustMatchAll(RETURNS_VALUE, ElementType.FIRST_ELEMENT),
+//                    new ElementMatcher()
+//                            .mustMatchAll(RETURNS_VALUE, ElementType.SECOND_ELEMENT)
+//            );
+//
+//            ElementMatch firstElement = phraseData.resultElements.getFirst();
+//            ElementMatch secondElement = phraseData.resultElements.get(1);
 
-            ElementMatch firstElement = phraseData.resultElements.getFirst();
-            ElementMatch secondElement = phraseData.resultElements.get(1);
+            ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
+            ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
+
             phraseData.result = Attempt.run(() -> {
                 return ValueWrapperCompareReducer.eval(
                         ValueWrapperComparisons::endsWith,
@@ -96,16 +106,18 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.FIRST_ELEMENT),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.SECOND_ELEMENT)
-            );
+//            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
+//                    new ElementMatcher()
+//                            .mustMatchAll(RETURNS_VALUE, ElementType.FIRST_ELEMENT),
+//                    new ElementMatcher()
+//                            .mustMatchAll(RETURNS_VALUE, ElementType.SECOND_ELEMENT)
+//            );
+//
+//            ElementMatch firstElement = phraseData.resultElements.getFirst();
+//            ElementMatch secondElement = phraseData.resultElements.get(1);
 
-            ElementMatch firstElement = phraseData.resultElements.getFirst();
-            ElementMatch secondElement = phraseData.resultElements.get(1);
-
+            ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
+            ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
 
             phraseData.result = Attempt.run(() -> {
                 return ValueWrapperCompareReducer.eval(
@@ -122,12 +134,15 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesPrecedingOperation(),
-                    new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE)
-            );
+//            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesPrecedingOperation(),
+//                    new ElementMatcher()
+//                            .mustMatchAll(RETURNS_VALUE)
+//            );
+//
+//            ElementMatch firstElement = phraseData.resultElements.getFirst();
 
-            ElementMatch firstElement = phraseData.resultElements.getFirst();
+            ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
+
             phraseData.result = Attempt.run(() -> {
                 return ValueWrapperCompareReducer.evalValues(
                         ValueWrapper::hasValue,
@@ -143,7 +158,7 @@ public enum AssertionOperations implements OperationsInterface {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesPrecedingOperation(),
                     new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE)
+                            .mustMatchAll(RETURNS_VALUE)
             );
             ElementMatch firstElement = phraseData.resultElements.getFirst();
             phraseData.result = Attempt.run(() -> {
@@ -320,7 +335,7 @@ public enum AssertionOperations implements OperationsInterface {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatches(),
                     new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE)
+                            .mustMatchAll(RETURNS_VALUE)
             );
 
             ElementMatch firstElement = phraseData.resultElements.getFirst();
@@ -340,7 +355,7 @@ public enum AssertionOperations implements OperationsInterface {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatches(),
                     new ElementMatcher()
-                            .mustMatchAll(ElementType.RETURNS_VALUE)
+                            .mustMatchAll(RETURNS_VALUE)
             );
 
             ElementMatch firstElement = phraseData.resultElements.getFirst();

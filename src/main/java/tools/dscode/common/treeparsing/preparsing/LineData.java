@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-
 import static io.cucumber.core.runner.StepBase.getInheritancePhrase;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
@@ -24,8 +23,8 @@ public abstract class LineData implements Cloneable {
     public int lineConditionalMode = 1;
     public int startPhraseIndex = 0;
     //    public LineData inheritedLineData;
-//    public List<PhraseData> contextPhrases = new ArrayList<>();
-//    public List<List<PhraseData>> inheritedContextPhrases = new ArrayList<>();
+    //    public List<PhraseData> contextPhrases = new ArrayList<>();
+    //    public List<List<PhraseData>> inheritedContextPhrases = new ArrayList<>();
     private final String original;
     public String runningText = ", ";
     private final QuoteParser qp;
@@ -89,6 +88,8 @@ public abstract class LineData implements Cloneable {
             }
         }
 
+        input = wrapLooseConditionalExpression(input);
+
         this.original = input;
 
         // 1) Mask quotes first
@@ -96,7 +97,7 @@ public abstract class LineData implements Cloneable {
         String afterQuotes = qp.masked();
 
         // 2) Mask brackets second
-        this.bm = new BracketMasker(afterQuotes);
+        this.bm = getBracketMasker(afterQuotes);
         this.fullyMasked = bm.masked();
 
         if (!original.startsWith(",")) return;
@@ -140,6 +141,32 @@ public abstract class LineData implements Cloneable {
         }
     }
 
+    private static String wrapLooseConditionalExpression(String input) {
+        QuoteParser qp = new QuoteParser(input);
+        BracketMasker bm = getBracketMasker(qp.masked());
+
+        String masked = bm.masked().trim();
+
+        if (!containsConditionalOperator(masked)) return input;
+        if (masked.startsWith("IF:") || masked.startsWith("ELSE")) return input;
+
+        String replaced = masked.replaceAll(
+                "([.,:?!;]\\s*(?:(?:else\\s+)?if\\s+)?)([^.,:?!;]*(?:==|!=|&&|\\|\\||>|<)[^.,:?!;]*)(?=[.,:?!;]|$)",
+                "$1 \"{ $2 }\" "
+        );
+
+        String restored = qp.restoreFrom(bm.restoreFrom(replaced));
+        return restored;
+    }
+
+    private static boolean containsConditionalOperator(String masked) {
+        return masked.contains("==")
+                || masked.contains("!=")
+                || masked.contains("&&")
+                || masked.contains("||")
+                || masked.contains(">")
+                || masked.contains("<");
+    }
 
     public void addPhrase(String phraseText, char termination, int lineComponentIndex) {
         String phraseString = phraseText.replace(BOOK_END, "") + termination;
@@ -150,11 +177,13 @@ public abstract class LineData implements Cloneable {
             if (lineComponents.size() < lineComponentIndex) {
                 lineComponents.add(", " + phraseString);
             } else {
-                lineComponents.set(lineComponentIndex - 1, lineComponents.get(lineComponentIndex - 1).concat(phraseText + " " + termination));
+                lineComponents.set(
+                        lineComponentIndex - 1,
+                        lineComponents.get(lineComponentIndex - 1).concat(phraseText + " " + termination)
+                );
             }
         }
     }
-
 
     /**
      * Original, unmodified input.
@@ -177,11 +206,9 @@ public abstract class LineData implements Cloneable {
         return delimiters;
     }
 
-
     public PhraseData get(int index) {
         return phrases.get(index);
     }
-
 
     /**
      * Expose the QuoteParser used (useful if callers need placeholder map,
@@ -213,6 +240,9 @@ public abstract class LineData implements Cloneable {
         }
     }
 
+    public static BracketMasker getBracketMasker(String input) {
+        return new BracketMasker(input);
+    }
 
     public abstract void runPhrases();
 }

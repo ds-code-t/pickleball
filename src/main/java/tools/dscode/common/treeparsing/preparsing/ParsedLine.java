@@ -13,6 +13,7 @@ import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.assertions.AssertionChain.isAssertionChainBorder;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
+import static tools.dscode.common.treeparsing.parsedComponents.PassedData.isNewBoundary;
 
 
 public final class ParsedLine extends LineData {
@@ -43,12 +44,19 @@ public final class ParsedLine extends LineData {
         runPhraseFromLine(phrase.resolvePhrase());
     }
 
+//    public static boolean isNewBoundary(PhraseData phrase1, PhraseData phrase2) {
+//        if(phrase1  == null || phrase2 == null) return true;
+//        if(phrase1.isContextTermination() || phrase2.isNewContext() || !phrase2.getAssertionType().isBlank()) return true;
+//        if(!phrase1.getOperation().isBlank() && !phrase2.getOperation().isBlank()) return true;
+//        return false;
+//    }
+
 
     @Override
     public PhraseData runPhraseFromLine(PhraseData phrase) {
+        phrase.setOperationInheritanceIfNeeded();
+
         if (!phrase.getAssertion().isBlank() && phrase.assertionChainMembership == null && phrase.assertionChain == null) {
-            if (phrase.getAssertionType().isBlank())
-                phrase.setConditional("if");
             phrase.assertionChain = new AssertionChain(phrase);
             PhraseData currentPhrase = phrase;
             while (true) {
@@ -73,10 +81,6 @@ public final class ParsedLine extends LineData {
         }
 
 
-        if (phrase.phraseType == PhraseData.PhraseType.ELEMENT_ONLY && phrase.getAction().isBlank() && phrase.getPreviousPhrase() != null && !phrase.getPreviousPhrase().getAction().isBlank()) {
-            phrase.setAction(phrase.getPreviousPhrase().getAction());
-        }
-
 
         StepExtension currentStep = getRunningStep();
         Entry stepEntry = currentStep == null ? null : currentStep.stepEntry;
@@ -93,7 +97,6 @@ public final class ParsedLine extends LineData {
         getCurrentScenarioState().currentPhrase = null;
 
         if (phrase.assertionChainMembership != null) {
-            ;
             phrase.assertionChainMembership.setPhraseIndex(phrase);
             if (phrase.isChainedAssertion)
                 return phrase;

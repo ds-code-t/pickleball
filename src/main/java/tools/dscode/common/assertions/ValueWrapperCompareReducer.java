@@ -225,7 +225,7 @@ public final class ValueWrapperCompareReducer {
     ValueWrapper v :values)
 
     {
-        boolean r = predicate.test(v);
+        boolean r = v != null && predicate.test(v);
 
         if (invertEach) r = !r;
 

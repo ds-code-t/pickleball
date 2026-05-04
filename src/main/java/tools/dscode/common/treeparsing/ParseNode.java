@@ -144,11 +144,8 @@ public class ParseNode {
         MatchNode top = createMatchNode(0, input.length(), this, null, input, null, 0, LinkedListMultimap.create());
 
         String transformed = onCapture(top);
-
         top.setModifiedText(transformed);
-
         top.setMaskedText(transformed);
-
 
         // Children run sequentially over top.maskedText
         applyChildrenOverMasked(this, top);

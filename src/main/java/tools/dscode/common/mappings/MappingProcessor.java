@@ -284,7 +284,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return keyOrder;
     }
 
-    private static final Pattern ANGLE = Pattern.compile("<([^<>{}]+)>");
+    private static final Pattern ANGLE = Pattern.compile("<(?![\\s=])([^<>{}]*[^\\s<>{}])>");
     private static final Pattern CURLY = Pattern.compile("\\{([^{}]+)\\}");
 
     // public void put(int index, Object key, Object value) {
@@ -326,7 +326,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 } while (!input.equals(prev));
                 input = input.replaceAll("<\\?[^<>{}]+>", "");
             } while (!input.equals(originalInput));
-            return decodeBackToText(input.replaceAll(MATCH_BREAK,""));
+            return decodeBackToText(input.replaceAll(MATCH_BREAK, ""));
         } catch (Throwable t) {
             t.printStackTrace();
             throw new RuntimeException("Could not resolve '" + input + "' due to '" + t.getMessage() + "'", t);
@@ -342,7 +342,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
             while (m.find()) {
                 key = m.group(1);
-                if(key.contains(MATCH_BREAK)) {
+                if (key.contains(MATCH_BREAK) || key.contains("&&") || key.contains("||")) {
                     replacement = "<" + key + ">";
                     break;
                 }
@@ -358,8 +358,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
             if (stringReplacement.isEmpty() && key != null && !key.isBlank()) {
                 stringReplacement = key.startsWith("?") ? "<" + key + ">" : "<?" + key + ">";
             }
-            if(stringReplacement.contains("<") && !key.contains(MATCH_BREAK) && stringReplacement.contains("<" + key + ">"))
-            {
+            if (stringReplacement.contains("<") && !key.contains(MATCH_BREAK) && stringReplacement.contains("<" + key + ">")) {
                 stringReplacement = stringReplacement.replaceAll("<" + key + ">", "<" + MATCH_BREAK + key + ">");
             }
             m.appendReplacement(sb, Matcher.quoteReplacement(stringReplacement));

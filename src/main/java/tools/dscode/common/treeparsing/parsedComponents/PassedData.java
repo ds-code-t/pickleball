@@ -12,23 +12,25 @@ import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Attempt
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHolderMatch;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.BROWSER;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.DATA_TYPE;
-import static tools.dscode.common.treeparsing.parsedComponents.ElementType.FIRST_ELEMENT;
-import static tools.dscode.common.treeparsing.parsedComponents.ElementType.FOLLOWING_OPERATION;
+//import static tools.dscode.common.treeparsing.parsedComponents.ElementType.FIRST_ELEMENT;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.HTML_ELEMENT;
-import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PRECEDING_OPERATION;
-import static tools.dscode.common.treeparsing.parsedComponents.ElementType.SECOND_ELEMENT;
+//import static tools.dscode.common.treeparsing.parsedComponents.ElementType.SECOND_ELEMENT;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE;
+import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.CONTEXT;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
 import static tools.dscode.coredefinitions.BrowserSteps.getCurrentDriver;
 
 
 public abstract class PassedData {
+    public PhraseData operationInheritancePhrase;
+
     public boolean wasPhraseSkipped = false;
     ParsingMap phraseParsingMap;
 
@@ -83,6 +85,16 @@ public abstract class PassedData {
         return prevPhrase.getResolvedPhrase();
     }
 
+    public PhraseData getPreviousInheritedOrPreviousPhrase() {
+        if(operationInheritancePhrase == null || operationIndex > 0) return getPreviousPhrase();
+        return operationInheritancePhrase;
+    }
+
+    public PhraseData getNextInheritedOrNextPhrase() {
+        if(operationInheritancePhrase == null || operationIndex ==0) return getNextPhrase();
+        return operationInheritancePhrase;
+    }
+
     public PhraseData getResolvedPhrase() {
         return resolvedPhrase;
     }
@@ -109,18 +121,20 @@ public abstract class PassedData {
         return matches;
     }
 
-    public List<ElementMatch> getElementMatchesPrecedingOperation() {
-        List<ElementMatch> matches = new ArrayList<>(elementMatches.stream().filter(e -> e.elementTypes.contains(PRECEDING_OPERATION)).toList());
-        if (matches.isEmpty() && getPreviousPhrase() != null) {
-            return getPreviousPhrase().getValueTypeEntryElementMatches();
+    public List<ElementMatch> getElementMatchesPrecedingOperation(ElementType ... elementTypes)  {
+        List<ElementMatch> matches = new ArrayList<>(elementMatches.stream().filter(e -> e.startIndex < operationIndex && e.elementTypes.containsAll(Arrays.asList(elementTypes))).toList());
+        PhraseData previous;
+        if (matches.isEmpty() &&  (previous = getPreviousInheritedOrPreviousPhrase()) != null) {
+            return previous.getElementMatchesPrecedingOperation(elementTypes);
         }
         return matches;
     }
 
-    public List<ElementMatch> getElementMatchesFollowingOperation() {
-        List<ElementMatch> matches = new ArrayList<>(elementMatches.stream().filter(e -> e.elementTypes.contains(FOLLOWING_OPERATION)).toList());
-        if (matches.isEmpty() && getPreviousPhrase() != null) {
-            return getPreviousPhrase().getValueTypeEntryElementMatches();
+    public List<ElementMatch> getElementMatchesFollowingOperation(ElementType ... elementTypes) {
+        List<ElementMatch> matches = new ArrayList<>(elementMatches.stream().filter(e -> e.startIndex > operationIndex && e.elementTypes.containsAll(Arrays.asList(elementTypes))).toList());
+        PhraseData next;
+        if (matches.isEmpty() && (next = getNextInheritedOrNextPhrase()) != null) {
+            return next.getElementMatchesFollowingOperation(elementTypes);
         }
         return matches;
     }
@@ -142,6 +156,13 @@ public abstract class PassedData {
         ElementMatch elementMatch1 = getElementMatchesPrecedingOperation().stream().findFirst().orElse(new PlaceHolderMatch((PhraseData) this));
         ElementMatch elementMatch2 = getElementMatchesFollowingOperation().stream().findFirst().orElse(new PlaceHolderMatch((PhraseData) this));
         return List.of(elementMatch1, elementMatch2);
+    }
+
+    public ElementMatch getElementMatchBeforeOperation(ElementType ... elementTypes) {
+        return  getElementMatchesPrecedingOperation(elementTypes).stream().findFirst().orElse(new PlaceHolderMatch((PhraseData) this));
+    }
+    public ElementMatch getElementMatchAfterOperation(ElementType ... elementTypes) {
+        return getElementMatchesFollowingOperation(elementTypes).stream().findFirst().orElse(new PlaceHolderMatch((PhraseData) this));
     }
 
 
@@ -178,21 +199,21 @@ public abstract class PassedData {
             elementMatch.parentPhrase = (PhraseData) this;
             categoryFlags.addAll(elementMatch.categoryFlags);
 
-            if (i == 0) {
-                elementMatch.elementTypes.add(FIRST_ELEMENT);
-            }
+//            if (i == 0) {
+//                elementMatch.elementTypes.add(FIRST_ELEMENT);
+//            }
+//
+//            if (i == 1) {
+//                elementMatch.elementTypes.add(SECOND_ELEMENT);
+//            }
 
-            if (i == 1) {
-                elementMatch.elementTypes.add(SECOND_ELEMENT);
-            }
-
-            if (elementMatch.startIndex < operationIndex) {
-                elementMatch.elementTypes.add(PRECEDING_OPERATION);
-            }
-
-            if (elementMatch.startIndex > operationIndex) {
-                elementMatch.elementTypes.add(FOLLOWING_OPERATION);
-            }
+//            if (elementMatch.startIndex < operationIndex) {
+//                elementMatch.elementTypes.add(PRECEDING_OPERATION);
+//            }
+//
+//            if (elementMatch.startIndex > operationIndex) {
+//                elementMatch.elementTypes.add(FOLLOWING_OPERATION);
+//            }
         }
     }
 
@@ -234,6 +255,75 @@ public abstract class PassedData {
         isOperationPhrase = true;
         this.assertion = assertion;
         return true;
+    }
+
+    public String getOperation() {
+        return action.isBlank() ? assertion : action;
+    }
+
+    public boolean setInheritedOperationFromPhrase(PhraseData sourcePhraseData) {
+        if (!sourcePhraseData.getAction().isBlank()) {
+            setAction(sourcePhraseData.getAction());
+            return true;
+        }
+        if (!sourcePhraseData.getAssertion().isBlank()) {
+            setAssertion(sourcePhraseData.getAssertion());
+            return true;
+        }
+        return false;
+    }
+
+    public static boolean isNewBoundary(PhraseData phrase1, PhraseData phrase2) {
+        if (phrase1 == null || phrase2 == null) return true;
+        if (phrase1.isContextTermination() || phrase2.isNewContext() || !phrase2.getAssertionType().isBlank())
+            return true;
+        return false;
+    }
+
+    public boolean isStartBoundary() {
+        PhraseData phrase1 = getPreviousPhrase();
+        PhraseData phrase2 = (PhraseData) this;
+        return isNewBoundary(phrase1, phrase2);
+    }
+
+    public boolean isEndBoundary() {
+        PhraseData phrase1 = (PhraseData) this;
+        PhraseData phrase2 = getNextPhrase();
+        return isNewBoundary(phrase1, phrase2);
+    }
+
+
+    public PhraseData getNextOperationPhrase() {
+        PhraseData currentPhrase = (PhraseData) this;
+        while (!currentPhrase.isEndBoundary() && (currentPhrase = currentPhrase.getNextPhrase()) != null) {
+            if (currentPhrase.operationInheritancePhrase == null && !currentPhrase.getOperation().isBlank())
+                return currentPhrase;
+        }
+        return null;
+    }
+
+    public PhraseData getLastOperationPhrase() {
+        PhraseData currentPhrase = (PhraseData) this;
+        while (!currentPhrase.isStartBoundary() && (currentPhrase = currentPhrase.getPreviousPhrase()) != null) {
+            if (currentPhrase.operationInheritancePhrase == null && !currentPhrase.getOperation().isBlank())
+                return currentPhrase;
+        }
+        return null;
+    }
+
+    public void setOperationInheritanceIfNeeded() {
+        if (phraseType != CONTEXT && operationInheritancePhrase == null && getOperation().isBlank() && !elementMatches.isEmpty()) {
+            if ((operationInheritancePhrase = getLastOperationPhrase()) != null) {
+                operationIndex = 0;
+                setInheritedOperationFromPhrase(operationInheritancePhrase);
+            } else if ((operationInheritancePhrase = getNextOperationPhrase()) != null) {
+                operationIndex = 10000;
+                setInheritedOperationFromPhrase(operationInheritancePhrase);
+            }
+            else {
+                setAssertion("true");
+            }
+        }
     }
 
 

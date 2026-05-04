@@ -7,6 +7,8 @@ import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Attempt
 import java.util.ArrayList;
 import java.util.List;
 
+import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
+import static tools.dscode.common.treeparsing.parsedComponents.Phrase.copyPhraseWithModifications;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ACTION;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.CONTEXT;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
@@ -41,7 +43,7 @@ public class AssertionChain {
 //            parentPhrase.termination = phrase.termination;
 //            phrase.termination = ',';
 //        }
-        phrase.setConditional(parentPhrase.getConditional());
+//        phrase.setConditional(parentPhrase.getConditional());
         phrase.assertionChainMembership = this;
         if(phrase.phraseType != CONTEXT)
             phrase.isChainedAssertion = true;
@@ -57,6 +59,11 @@ public class AssertionChain {
 
         cloneExecutionChain = phraseChain.stream().map(AssertionChain::cloneAssertionPhrase).toList();
 
+//        String assertionType =  cloneExecutionChain.getFirst().getAssertionType().isBlank() ? "if" :  cloneExecutionChain.getFirst().getAssertionType();
+
+
+
+
         PhraseData lastPhrase = null;
         for(PhraseData phraseData: cloneExecutionChain)
         {
@@ -66,9 +73,12 @@ public class AssertionChain {
                 lastPhrase.setNextPhrase(phraseData);
             }
             lastPhrase = phraseData;
+//            phraseData.setAssertionType(assertionType);
         }
 
         runChainPhrases();
+        phraseInfo("Assertion chain " + this + " evaluates to: " + chainStatus);
+
         parentPhrase.result = new Attempt.Result(chainStatus, exception);
 
     }
@@ -117,10 +127,7 @@ public class AssertionChain {
     }
 
     public static PhraseData cloneAssertionPhrase(PhraseData phrase)  {
-        PhraseData clonePhrase = new Phrase( phrase.text, phrase.termination, phrase.parsedLine);
-        clonePhrase.assertionChainMembership = phrase.assertionChainMembership;
-        clonePhrase.isChainedAssertion = phrase.isChainedAssertion;
-        clonePhrase.setConditional(phrase.getConditional());
+        PhraseData clonePhrase = copyPhraseWithModifications((Phrase) phrase);
         clonePhrase.untilPhrase = false;
         return clonePhrase;
     }

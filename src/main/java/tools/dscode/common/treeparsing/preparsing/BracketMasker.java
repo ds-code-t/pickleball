@@ -31,6 +31,8 @@ public final class BracketMasker extends HashMap<String, String> {
                                                                    // "{}",
                                                                    // "[]", "<>"
 
+
+
     public BracketMasker(String input) {
         Objects.requireNonNull(input, "input");
         this.original = input;

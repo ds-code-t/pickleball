@@ -1,6 +1,210 @@
 Feature: Addition
 
+  Scenario: testifsdg3
+#  * , if   "{ 1 == 1   }":  , save "1"
+#  * , if   "{ 1 == {1 + 1} }":
+  * , if   2 == {1 + 2} :
+   :  * , save "1"
+
+
+  Scenario: testif
+#    * , save "AA" as "QQ"
+    * IF: 2 == {1 + 1} THEN: , save "1"
+
+
+  Scenario: Extended comma separated assertion phrase combinationss CORRECTED
+
+    When , if 1,2,3, or 4 is 5?
+  : * , save "NO!!"
+
+    When , if 1,2,3, or 4 is 3?
+  : * , save "YES!!"
+
+    When , if 1,2,3, and 4 is 5?
+  : * , save "NO!!"
+
+    When , if 1,2,3, and 4 is 3?
+  : * , save "NO!!"
+
+    When , if 0,1,2, or 3 is 9?
+  : * , save "NO!!"
+
+    When , if 0,0,0, or 7 is 7?
+  : * , save "YES!!"
+
+    When , if 0,0,0, or 7 is 8?
+  : * , save "NO!!"
+
+    When , if 1 is 1,0,2, and 3?
+  : * , save "NO!!"
+
+    When , if 1 is 1,5 is 5,2, and 3 is 3?
+  : * , save "NO!!"
+
+    When , if 1 is 2,5,6 is 6, or 0?
+  : * , save "YES!!"
+
+    When , if 1 is 2,0,6 is 7, or 0?
+  : * , save "NO!!"
+
+    When , if 9,8 is 8,7, and 6 is 6?
+  : * , save "NO!!"
+
+    When , if 9,8 is 7,7, and 6 is 6?
+  : * , save "NO!!"
+
+    When , if 4 is 4,0,2 is 2, or 0?
+  : * , save "YES!!"
+
+    When , if 4 is 5,0,2 is 3, or 0?
+  : * , save "NO!!"
+
+    When , if 0,3 is 3,0, and 8?
+  : * , save "NO!!"
+
+    When , if 5,3 is 3,0, or 8?
+  : * , save "YES!!"
+
+    When , if 0,1 is 1,2 is 2, and 3?
+  : * , save "NO!!"
+
+    When , if 0,1 is 1,2 is 2, or 3?
+  : * , save "YES!!"
+
+    When , if 6 is 6,7 is 8,9, or 0?
+  : * , save "YES!!"
+
+    When , if 6 is 7,7 is 8,0, or 0?
+  : * , save "NO!!"
+
+    When , if 10,20 is 20,30 is 31, and 40?
+  : * , save "NO!!"
+
+    When , if 10,20 is 20,30 is 31, or 40?
+  : * , save "YES!!"
+
+    When , if 0,0 is 0,1 is 1, and 2 is 2?
+  : * , save "YES!!"
+
+    When , if 0,0 is 0,1 is 1, or 2 is 2?
+  : * , save "YES!!"
+
+    When , if 3 is 3,2,1, and 0 is 1?
+  : * , save "NO!!"
+
+    When , if 3 is 3,2,1, or 0 is 1?
+  : * , save "YES!!"
+
+    When , if 8,7 is 7,6 is 6, and 5?
+  : * , save "NO!!"
+
+    When , if 8,7 is 0,6 is 6, and 5?
+  : * , save "NO!!"
+
+    When , if 0,4 is 4,0, or 9 is 10?
+  : * , save "YES!!"
+
+    When , if 0,4 is 5,0, or 9 is 10?
+  : * , save "NO!!"
+
+    When , if 12 is 12,0,13 is 13, and 14 is 14?
+  : * , save "NO!!"
+
+    When , if 12 is 12,15,13 is 13, and 14 is 14?
+  : * , save "NO!!"
+
+    When , if 2 is 3,4 is 4,0, or 6?
+  : * , save "YES!!"
+
+    When , if 2 is 3,4 is 5,0, or 0?
+  : * , save "NO!!"
+
+    When , if 1,2 is 2,0 is 0, and 3?
+  : * , save "NO!!"
+
+    When , if 1,2 is 2,0 is 0, or 3?
+  : * , save "YES!!"
+
+    When , if 0,11,12 is 12, and 13 is 13?
+  : * , save "NO!!"
+
+    When , if 0,11,12 is 12, or 13 is 13?
+  : * , save "YES!!"
+
+    When , if 5 is 5,6 is 6,7 is 7, and 8 is 8?
+  : * , save "YES!!"
+
+    When , if 5 is 5,6 is 0,7 is 7, and 8 is 8?
+  : * , save "NO!!"
+
+    When , if 5 is 6,6 is 0,7 is 8, or 8 is 8?
+  : * , save "YES!!"
+
+    When , if 5 is 6,6 is 0,7 is 8, or 8 is 9?
+  : * , save "NO!!"
+
+
+
+
+
+
+
   Scenario: rfere
+    When ,  1 is 4 , 2 is 4 , "true" , or  3 is 4?
+  : * , save "YES!!"
+    When ,  1 is 4 , 2 is 4 , or  3 is 4?
+  : * , save "YES!!"
+
+  Scenario: Chain testing sing passed forwardsf
+    When , if 1,2,3, or 4 is 5?
+  : * , save "YES!!"
+
+    When , if 1,2,3, or 4 is 3?
+  : * , save "YES!!"
+
+    When , if 1,2,3, and 4 is 5?
+  : * , save "NO!!"
+
+    When , if 1,2,3, and 4 is 3?
+  : * , save "NO!!"
+
+
+  Scenario: Chain testing
+    When ,  1 is 1 , 2 is 2 ,  and 3 is 2?
+  : * , save "NO!!"
+
+    When ,  1 is 1 , 2 is 2 ,  3 is 3 , and "true"?
+  : * , save "YES!!"
+
+    When ,  1 is 2 , 2 is 2 , or 3 is 3?
+  : * , save "YES!!1"
+
+    When ,  if 1 is 1 , and 2 is 2:
+  : * , save "YES!!!"
+
+    When ,  if 1 is 2 , or 2 is 2:
+  : * , save "YES!!!!"
+
+    When ,  1 is 1 , 2 is 3 , 3 is 3 , and 4 is 4?
+  : * , save "NO!!!!"
+
+    When ,  if 1 is 2 , 2 is 3 , or 3 is 3:
+  : * , save "YES"
+
+    When ,  1 is 1 , and 2 is 3?
+  : * , save "NO!!!!"
+
+    When ,  if 1 is 1 , 2 is 2 , 3 is 3 , or 4 is 5:
+  : * , save "YES"
+
+    When ,  1 is 2 , 2 is 2 , 3 is 3 , or 4 is 5?
+  : * , save "YES!!!!"
+
+    When ,  if 1 is 1 , 2 is 3 , and 3 is 3:
+  : * , save "NO!!!!"
+
+
+
 
   Scenario: ssif test1sdads
     * , if "111" is "111", and "3222" is "222":
@@ -98,39 +302,7 @@ Feature: Addition
 
 
 
-  Scenario: Chain testing
-    When ,  1 is 1 , 2 is 2 ,  and 3 is 2?
-  : * , save "NO!!"
 
-    When ,  1 is 1 , 2 is 2 ,  and 3 is 3?
-  : * , save "YES!!"
-
-    When ,  1 is 2 , 2 is 2 , or 3 is 3?
-  : * , save "YES!!1"
-
-    When ,  if 1 is 1 , and 2 is 2:
-  : * , save "YES!!!"
-
-    When ,  if 1 is 2 , or 2 is 2:
-  : * , save "YES!!!!"
-
-    When ,  1 is 1 , 2 is 3 , 3 is 3 , and 4 is 4?
-  : * , save "NO!!!!"
-
-    When ,  if 1 is 2 , 2 is 3 , or 3 is 3:
-  : * , save "YES"
-
-    When ,  1 is 1 , and 2 is 3?
-  : * , save "NO!!!!"
-
-    When ,  if 1 is 1 , 2 is 2 , 3 is 3 , or 4 is 5:
-  : * , save "YES"
-
-    When ,  1 is 2 , 2 is 2 , 3 is 3 , or 4 is 5?
-  : * , save "YES!!!!"
-
-    When ,  if 1 is 1 , 2 is 3 , and 3 is 3:
-  : * , save "NO!!!!"
 
 
   Scenario: condtion nesting testing1

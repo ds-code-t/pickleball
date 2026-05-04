@@ -182,6 +182,7 @@ public abstract class PhraseData extends PassedData {
         hasResolvedText = !text.trim().equalsIgnoreCase(resolvedText.trim());
         hasTextToResolve = hasResolvedText || text.matches(".*<.*>.*");
         termination = delimiter;
+
         MatchNode returnMatchNode = getNodeDictionary().parse(resolvedText);
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
@@ -372,6 +373,13 @@ public abstract class PhraseData extends PassedData {
         }
         if (operation instanceof AssertionOperations && assertionChain != null) {
             assertionChain.executeAssertionChain();
+//            if (untilPhrase) {
+//                if (phraseConditionalMode <= 0) {
+//                    phraseConditionalMode = 1;
+//                } else {
+//                    phraseConditionalMode = 0;
+//                }
+//            }
         } else {
             operation.execute(this);
         }
@@ -404,10 +412,13 @@ public abstract class PhraseData extends PassedData {
 
         previouslyResolvedBoolean = (result == null || result.value() == null) ? null : (boolean) result.value();
 
-
-        String assertionMessage = "Assertion chain evaluates to: " + previouslyResolvedBoolean;
-
-        phraseInfo(assertionMessage);
+        String assertionMessage = "Assertion evaluates to: " + previouslyResolvedBoolean;
+        if(assertionChain == null)
+        {
+            phraseConditionalMode = previouslyResolvedBoolean ? 1 : -1;
+            return previouslyResolvedBoolean;
+        }
+//        phraseInfo(assertionMessage);
         if (!resultElements.isEmpty())
             assertionMessage += " , elements:" + resultElements.stream()
                     .map(Object::toString)
