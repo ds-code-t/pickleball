@@ -574,6 +574,7 @@ public final class DefinitionContext {
 
             category(BASE_CATEGORY).and(
                     (category, v, op) -> {
+                        System.out.println("@@disableBaseElement: " + disableBaseElement);
                         if (disableBaseElement)
                             return null;
                         XPathy selfInvisible = any.byCondition(invisible());

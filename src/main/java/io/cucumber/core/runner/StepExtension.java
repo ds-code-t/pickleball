@@ -100,6 +100,7 @@ public class StepExtension extends StepData {
             stepTags.add(matcher.group(1));
         }
         stepTags.stream().filter(t -> t.startsWith("REF:")).forEach(t -> bookmarks.add(t.replaceFirst("REF:", "")));
+        System.out.println("@@stepTags: " + stepTags);
         debugStartStep = parseDebugString(stepTags);
         setNestingLevel((int) matcher.replaceAll("").chars().filter(ch -> ch == ':').count());
 

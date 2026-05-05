@@ -26,6 +26,7 @@ public final class DebugUtils {
 
 
     public static boolean parseDebugString(List<String> tags) {
+        System.out.println("@@parseDebugString: " + tags);
         debugFlags =
                 tags.stream()
                         .filter(t -> t.startsWith("DEBUG"))
