@@ -12,6 +12,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static tools.dscode.common.GlobalConstants.BOOK_END;
+
 /**
  * A concise quoted-text extractor that IS the map: placeholder -> inner
  * (unescaped) value - Parses ' " ` and ''' quoted segments (unescaped, matching
@@ -145,6 +147,11 @@ public final class QuoteParser extends LinkedHashMap<String, String> {
      */
     public String restore() {
         return restoreFrom(masked);
+    }
+
+
+    public String restoreAndStripBookEnds(String textWithPlaceholders) {
+        return restoreFrom(textWithPlaceholders).replaceAll(BOOK_END, "");
     }
 
     /**

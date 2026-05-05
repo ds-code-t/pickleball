@@ -2,6 +2,7 @@ package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.xpathy.XPathy;
 import org.openqa.selenium.WebDriver;
+import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
@@ -30,7 +31,7 @@ import static tools.dscode.coredefinitions.BrowserSteps.getCurrentDriver;
 
 public abstract class PassedData {
     public PhraseData operationInheritancePhrase;
-
+    public List<ValueWrapper> booleanValues;
     public boolean wasPhraseSkipped = false;
     ParsingMap phraseParsingMap;
 

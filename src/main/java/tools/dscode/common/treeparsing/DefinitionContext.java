@@ -160,6 +160,7 @@ public final class DefinitionContext {
             }
         };
 
+
         ParseNode predicate = new ParseNode("(?:\\b(?<predicateType>starting with|ending with|containing|equaling|of)\\s+(?<predicateVal><<valueMask>>))") {
             @Override
             public String onCapture(MatchNode self) {
@@ -279,16 +280,28 @@ public final class DefinitionContext {
 
                 MatchNode parentNode = self.parent();
                 if (!parentNode.localStateBoolean("context", "action", "assertion")) {
-
                     parentNode.putToLocalState("assertion", "equal");
                     parentNode.putToLocalState("operationIndex", self.groups().start("defaultAssertion"));
-
-
                 }
                 return self.originalText();
             }
         };
 
+        ParseNode booleanValue = new ParseNode("\\b(?:true|false)\\b") {
+            public String onSubstitute(MatchNode self) {
+                MatchNode parentNode = self.parent();
+                System.out.println(parentNode.localStateBoolean("context"));
+                System.out.println(parentNode.localStateBoolean( "action"));
+                System.out.println(parentNode.localStateBoolean("hasElements"));
+                if (!parentNode.localStateBoolean("context", "action", "hasElements")) {
+                    if (!parentNode.localStateBoolean("assertion")) {
+                        parentNode.putToLocalState("assertion", "true");
+                        parentNode.putToLocalState("operationIndex", 0);
+                    }
+                }
+                return self.originalText();
+            }
+        };
 
         ParseNode itPlaceholder = new ParseNode("\\bit\\b") {
             @Override
@@ -300,7 +313,7 @@ public final class DefinitionContext {
         ParseNode reindex = new ParseNode("<<elementMatch>>") {
             @Override
             public String onSubstitute(MatchNode self) {
-
+                self.parent().localState().put("hasElements", "true");
                 MatchNode elementMatchNode = self.getMatchNode(self.originalText());
                 elementMatchNode.start = self.start;
 
@@ -327,6 +340,7 @@ public final class DefinitionContext {
                     - action
                     - assertion
                     - defaultAssertion
+                    - booleanValue
                 """);
 
 

@@ -16,6 +16,7 @@ import java.util.Set;
 
 import static io.cucumber.core.runner.StepBase.getInheritancePhrase;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
+import static tools.dscode.common.GlobalConstants.SUBSTITUTE_MARKER;
 import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
 
@@ -146,13 +147,12 @@ public abstract class LineData implements Cloneable {
         BracketMasker bm = getBracketMasker(qp.masked());
 
         String masked = bm.masked().trim();
-
         if (!containsConditionalOperator(masked)) return input;
         if (masked.startsWith("IF:") || masked.startsWith("ELSE")) return input;
 
         String replaced = masked.replaceAll(
-                "([.,:?!;]\\s*(?:(?:else\\s+)?if\\s+)?)([^.,:?!;]*(?:==|!=|&&|\\|\\||>|<)[^.,:?!;]*)(?=[.,:?!;]|$)",
-                "$1 \"{ $2 }\" "
+                "([.,:?!;][^.,:?!;]*?\\s(?:(?:(?:else\\s+)?if\\s+)|until\\s+)?)([^.,:?!;]*(?:==|!=|&&|\\|\\||>|<)[^.,:?!;]*)(?=[.,:?!;]|$)",
+                "$1  { $2 } "
         );
 
         String restored = qp.restoreFrom(bm.restoreFrom(replaced));

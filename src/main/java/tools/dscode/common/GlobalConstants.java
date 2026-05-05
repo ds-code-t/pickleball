@@ -46,7 +46,7 @@ public class GlobalConstants {
     public static final String INFO_STEP = STEP_PREFIX + "INFO: ";
     public static final String HARD_ERROR_STEP = STEP_PREFIX + "FAIL ERROR: ";
     public static final String SOFT_ERROR_STEP = STEP_PREFIX + "ERROR: ";
-
+    public static final String SUBSTITUTE_MARKER = "\u241A";
 
     // visible characters
 //    public static final String SYMBOL_FOR_NULL = "\u2400";

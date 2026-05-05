@@ -1,16 +1,73 @@
 Feature: Addition
 
-  Scenario: testifsdg3
-#  * , if   "{ 1 == 1   }":  , save "1"
-#  * , if   "{ 1 == {1 + 1} }":
-  * , if   2 == {1 + 2} :
-   :  * , save "1"
+  Scenario: testdfdfdfd
+    * , if   { 1 == 2   }:  , save "1"
 
+  Scenario: testifsdg3
+    @[DEBUG,##]
+    * , if    "true" :
+  :  * , save "YES"
+
+    * , if    true :
+  :  * , save "YES"
+
+    * , if    "A" == "A" :
+  :  * , save "YES"
+  * , if   { 1 == 2   }:  , save "1"
+  * , if   { "1" == "2"   } :  , save "2"
+##  * , if   "{ 1 == {1 + 1} }":
+#  * , if   2 == {1 + 2} || 3 == 1 || 2 == 1 || 3 == {2 * 4}  :
+#   :  * , save "NO"
+#
+#
+#    * , if   2 == {1 + 2} || 3 == 1 || 2 == 1 || 3 == {2 * 4}  :
+#  :  * , save "YES"
+
+    * , if    "A" == "B" :
+  :  * , save "YES"
+
+    * , if    3 == {1 + 2} || (3 == 3 && ( 2 == 1 || 8 == {2 * 4}))  :
+  :  * , save "YES"
+
+
+    Scenario: dfsdfd55
+      * IF:  1  THEN: , save "1"
+      * IF: 2 == {1 + 2} || 3 == 1 || 2 == 1 || 8 == {2 * 4} THEN: , save "2"
+      * IF: 3 == {1 + 2} && 3 == 3 && ( 2 == 1 || 8 == {2 * 4}) THEN: , save "3"
+
+
+  Scenario: testif33
+#    * , save "AA" as "QQ"
+    * IF:  3 == 3 THEN: , save "6"
+    * IF:  2 == 2  THEN: , save "1"
+    * IF: 2 == 2THEN: , save "2"
+    * IF: 3 ==  5 THEN: , save "3"
+    * IF: 3 == 3 THEN: , save "4"
+    * IF: 3 == 3 THEN: , save "5"
+    * IF:  3 ==  3 THEN: , save "5"
+    * IF:  3 == 3  THEN: , save "6"
 
   Scenario: testif
 #    * , save "AA" as "QQ"
-    * IF: 2 == {1 + 1} THEN: , save "1"
+    * IF:  3 == {1 + 2} || (3 == 3 && ( 2 == 1 || 8 == {2 * 4})) THEN: , save "6"
+    * IF:  2 == {1 + 2} || 3 == 1 || 2 == 1 || 8 == {2 * 4}  THEN: , save "1"
+    * IF: 2 == {1 + 2} || 3 == 1 || 2 == 1 || 8 == {2 * 4} THEN: , save "2"
+    * IF: 3 == {1 + 2} && 3 == 3 && ( 2 == 1 || 8 == {2 * 4}) THEN: , save "3"
+    * IF: 3 == {1 + 2} && 3 == 3 && ( 2 == 1 || 3 == {2 * 4}) THEN: , save "4"
+    * IF: 3 == {1 + 2} || 3 == 3 && ( 2 == 1 || 3 == {2 * 4}) THEN: , save "5"
+    * IF:  3 == {1 + 2} || (3 == 3 && ( 2 == 1 || 2 == {2 * 4})) THEN: , save "5"
+    * IF:  3 == {1 + 2} || (3 == 3 && ( 2 == 1 || 8 == {2 * 4})) THEN: , save "6"
 
+
+  Scenario: until test1
+    * , save "1" as "X"
+    * , save "<X>" as "A"
+    * , if "<A>" == "111":
+    : * , save "<q>" as "A"
+    * , until "<A>" == "111":
+  :   * , save "<A><X>" as "A"
+    * , save "qqq" as "A"
+    * , save "qqq" as "A"
 
   Scenario: Extended comma separated assertion phrase combinationss CORRECTED
 
@@ -228,11 +285,7 @@ Feature: Addition
     * , if "222" is "111", or "2s22" is "222":
   :   * , save "<A><X>" as "A"
 
-  Scenario: until test1
-    * , save "1" as "X"
-    * , save "<X>" as "A"
-    * , until "<A>" is "111":
-  :   * , save "<A><X>" as "A"
+
 
   Scenario: if until test2
     * , save "2" as "X"

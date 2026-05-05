@@ -388,6 +388,10 @@ public final class DynamicSuiteBootstrap {
 
     private static final class DefaultDynamicSuite extends PickleballRunner {
         @Override
+        public void globalTestDefaults() {
+            // Intentionally empty.
+        }
+        @Override
         public void globalTestProperties() {
             // Intentionally empty.
         }

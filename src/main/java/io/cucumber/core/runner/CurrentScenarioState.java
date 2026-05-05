@@ -352,11 +352,15 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
 
         if (stepExtension.lineData.lineConditionalMode < 1 && stepExtension.definitionFlags.contains(IGNORE_CHILDREN_IF_FALSE)) {
+            if (stepExtension.nextSibling != null) {
+                runStep((StepExtension) stepExtension.nextSibling);
+            }
             return;
         }
 
-        if(stepExtension.lineData.stepExtension.overridePhrase != null && stepExtension.lineData.stepExtension.overridePhrase.result != null && (boolean) stepExtension.lineData.stepExtension.overridePhrase.result.value())
+        if(stepExtension.lineData.stepExtension.overridePhrase != null && stepExtension.lineData.stepExtension.overridePhrase.result != null && (boolean) stepExtension.lineData.stepExtension.overridePhrase.result.value()){
             return;
+            }
 
         if (!stepExtension.definitionFlags.contains(IGNORE_CHILDREN)) {
             if (stepExtension.lineData.inheritancePhrases.isEmpty())

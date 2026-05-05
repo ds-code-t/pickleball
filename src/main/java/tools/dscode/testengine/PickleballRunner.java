@@ -46,8 +46,11 @@ public abstract class PickleballRunner {
 
         EngineFilterBootstrap.ensureEngineFilterApplied("PickleballRunner.<init>");
 
-
         INSTANCE = this;
+
+        globalTestDefaults();
+
+        debug("Values after globalTestDefaults(): " + values);
 
         mergeResourcePropertiesIfMissing("pickleball.properties");
         mergeResourcePropertiesOverwriting("pickleball_local.properties");
@@ -128,8 +131,13 @@ public abstract class PickleballRunner {
                         || key.startsWith("junit.jupiter.");
     }
 
+    public void globalTestDefaults() {
+    }
+
     public void globalTestProperties() {
     }
+
+
 
     public final Map<String, String> values() {
         return readOnlyValues;

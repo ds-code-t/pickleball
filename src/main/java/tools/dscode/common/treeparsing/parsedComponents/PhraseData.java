@@ -8,6 +8,7 @@ import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.assertions.AssertionChain;
+import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 
 import tools.dscode.common.mappings.MapConfigurations;
@@ -31,6 +32,7 @@ import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
+import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
@@ -186,7 +188,7 @@ public abstract class PhraseData extends PassedData {
         MatchNode returnMatchNode = getNodeDictionary().parse(resolvedText);
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
-
+        booleanValues = phraseNode.getOrderedChildren("booleanValue").stream().map(ValueWrapper::createValueWrapper).toList();
         String conditional = phraseNode.getStringFromLocalState("conditional");
         if (conditional.equalsIgnoreCase("until")) {
             conditional = "if";
@@ -370,6 +372,10 @@ public abstract class PhraseData extends PassedData {
         OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
         if (operation instanceof ActionOperations) {
             waitMilliseconds(300);
+        }
+        if (operation == null && (resolvedText.toLowerCase().contains("false") || resolvedText.toLowerCase().contains("true"))) {
+            setAssertion("true");
+            operation = assertionOperation;
         }
         if (operation instanceof AssertionOperations && assertionChain != null) {
             assertionChain.executeAssertionChain();

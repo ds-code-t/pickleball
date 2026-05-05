@@ -8,7 +8,9 @@ import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
@@ -333,16 +335,23 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
-            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatches(),
-                    new ElementMatcher()
-                            .mustMatchAll(RETURNS_VALUE)
-            );
-
-            ElementMatch firstElement = phraseData.resultElements.getFirst();
+            List<ValueWrapper> values;
+            if(phraseData.getElementMatches().isEmpty() && phraseData.booleanValues !=null && !phraseData.booleanValues.isEmpty())
+            {
+                values = phraseData.booleanValues;
+            }else {
+                phraseData.getElementMatches().forEach(e -> System.out.println("\n" + e + "\n" + e.elementTypes));
+                phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatches(),
+                        new ElementMatcher()
+                                .mustMatchAll(RETURNS_VALUE)
+                );
+                ElementMatch firstElement = phraseData.resultElements.getFirst();
+                values = firstElement.getValues();
+            }
             phraseData.result = Attempt.run(() -> {
                 return ValueWrapperCompareReducer.evalValues(
                         ValueWrapper::isTruthy,
-                        firstElement.getValues(),
+                        values,
                         getModeSet(phraseData)
                 );
             });

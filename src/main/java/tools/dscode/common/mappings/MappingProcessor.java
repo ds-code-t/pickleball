@@ -294,9 +294,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
     public String resolveWholeText(String input) {
         QuoteParser parsedObj = new QuoteParser(input);
         try {
-            parsedObj.setMasked(resolveAll(parsedObj.masked()));
+            parsedObj.setMasked(resolveAll(parsedObj.masked(),parsedObj));
             for (var e : parsedObj.entrySetWithoutTripleSingle()) {
-                parsedObj.put(e.getKey(), resolveAll(e.getValue()));
+                parsedObj.put(e.getKey(), resolveAll(e.getValue(),parsedObj));
             }
             System.out.println("");
             String resolvedText = parsedObj.restore();
@@ -309,7 +309,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
         }
     }
 
-    public String resolveAll(String input) {
+    private String resolveAll(String input, QuoteParser parsedObj) {
         try {
             String originalInput;
             do {
@@ -321,7 +321,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
                         input = resolveByMap(input);
                     }
                     if (input.contains("{")) {
-                        input = resolveCurly(input);
+                        input = resolveCurly(input, parsedObj);
                     }
                 } while (!input.equals(prev));
                 input = input.replaceAll("<\\?[^<>{}]+>", "");
@@ -369,13 +369,13 @@ public abstract class MappingProcessor implements Map<String, Object> {
         }
     }
 
-    private String resolveCurly(String s) {
+    private String resolveCurly(String s, QuoteParser parsedObj) {
         try {
             Matcher m = CURLY.matcher(s);
             StringBuffer sb = new StringBuffer();
             while (m.find()) {
                 String key = m.group(1).trim();
-                key = decodeBackToText(key);
+                key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
                 String repl = key.endsWith("?")
                         ? String.valueOf(evalToBoolean(key.substring(0, key.length() - 1), this))
                         : String.valueOf(eval(key, this));
