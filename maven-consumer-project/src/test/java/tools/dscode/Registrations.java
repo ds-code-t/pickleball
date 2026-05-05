@@ -225,7 +225,7 @@ public class Registrations {
 
 
 
-    public static void main(String[] args) {
+    public static void maidsfn(String[] args) {
         runNodeMapTest(
                 "01-normal-single-token-appends-array",
                 """
@@ -657,6 +657,42 @@ public class Registrations {
                     nodeMap.put("key30#1.A", "firstAgain");
                 }
         );
+    }
+
+
+
+    public static void main(String[] args) {
+        String nullString = null;
+        runNodeMapTest(
+                "null",
+                """
+            
+                """,
+                nodeMap -> {
+                    nodeMap.put(nullString, "nullString Value");
+                }
+        );
+
+        runNodeMapTest(
+                "empty",
+                """
+            
+                """,
+                nodeMap -> {
+                    nodeMap.put("", "empty Value");
+                }
+        );
+
+        runNodeMapTest(
+                " blank ",
+                """
+            
+                """,
+                nodeMap -> {
+                    nodeMap.put(" ", "blank Value");
+                }
+        );
+
     }
 
     @FunctionalInterface
