@@ -70,22 +70,41 @@ public final class Tokenized {
         m.matches();
         String q = m.group(1).strip();
         suffix = m.group(2);
+
+        if (q.startsWith("[")) {
+            throw new IllegalArgumentException(
+                    "Leading array path is not supported for NodeMap/ObjectNode root: " + inputQuery
+                            + ". Use a named root property such as 'key[0].A' instead."
+            );
+        }
+
+        isSingletonKey = q.startsWith("-");
+        if (isSingletonKey)
+            q = q.substring(1);
+
         prefix = !Character.isLetter(q.charAt(0)) && q.charAt(0) != '_' ? q.replaceFirst("^([^A-Za-z_]+).*", "$1")
                 : null;
         if (prefix != null)
             q = q.substring(prefix.length());
         int idx = q.indexOf("::");
         if (idx >= 0) {
-            q = q.substring(idx + 2);
             String mapNameString = q.substring(0, idx);
-            mapNames = Arrays.stream(mapNameString.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+            q = q.substring(idx + 2);
+
+            mapNames = Arrays.stream(mapNameString.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .toList();
+
             List<String> invalid = new ArrayList<>();
             List<MapConfigurations.MapType> result = new ArrayList<>();
+
             for (String n : mapNames)
                 if (allowedMapNames.contains(n))
                     result.add(MapConfigurations.MapType.valueOf(n));
                 else
                     invalid.add(n);
+
             if (!invalid.isEmpty())
                 throw new IllegalArgumentException("Invalid: " + invalid + ", allowed: " + allowedMapNames);
         }
@@ -93,9 +112,7 @@ public final class Tokenized {
         if (q.contains("#"))
             q = rewrite(q);
         q = q.strip().replaceAll("^\\$\\.", "").replaceAll("\\s*([\\(\\){}\\[\\].#:,-])\\s*", "$1");
-        isSingletonKey = q.startsWith("-");
-        if (isSingletonKey)
-            q = q.substring(1);
+
 
         q = q.replaceAll("(^[A-Za-z0-9_`]+)(\\..*|$)", "$1." + topArrayFlag + "$2");
 
@@ -194,72 +211,100 @@ public final class Tokenized {
     }
 
     public JsonNode setWithPath(JsonNode root, Object value) {
-        boolean isRootNode = root.has(MapTypeKey);
-        boolean containsTopArrayFlag = tokenCount > 1 && tokens.get(1).equals(topArrayFlag);
-        boolean processTopArrayFlag = (isRootNode && tokenCount == 2 && containsTopArrayFlag);
-        if (containsTopArrayFlag) {
-            tokens.set(1, "[-1]");
+        boolean singleton = isSingletonKey || "-".equals(prefix);
+
+        List<String> tokenList = new ArrayList<>(tokens);
+
+        boolean containsWildcard = tokenList.stream().anyMatch(t -> t.equals("*") || t.equals("[*]"));
+
+        if (singleton && tokenList.size() > 1 && tokenList.get(1).equals(topArrayFlag)) {
+            tokenList.remove(1);
+        } else {
+            boolean containsTopArrayFlag = tokenList.size() > 1 && tokenList.get(1).equals(topArrayFlag);
+            if (containsTopArrayFlag) {
+                tokenList.set(1, containsWildcard ? "[*]" : "[]");
+            }
         }
+
+        if (containsWildcard) {
+            setExistingWildcardPath(root, tokenList, 0, value);
+            return root;
+        }
+
+        if (singleton && root instanceof ObjectNode objectNode && !tokenList.isEmpty()) {
+            String rootField = tokenList.getFirst();
+            if (rootField.startsWith("`") && rootField.endsWith("`")) {
+                rootField = rootField.substring(1, rootField.length() - 1);
+            }
+            if (!rootField.startsWith("[")) {
+                objectNode.remove(rootField);
+            }
+        }
+
         if (directPath) {
-
             JsonNode currentNode = root;
-            // List<String> tokenList = processTopArrayFlag ? tokens :
-            // tokens.stream().filter(s -> !s.equals(topArrayFlag)).toList();
-            // int tokenSize = tokenList.size();
+            int tokenSize = tokenList.size();
 
-            for (int i = 0; i < tokenCount; i++) {
-                String token = tokens.get(i);
-                String nextToken = i + 1 < tokenCount ? tokens.get(i + 1) : null;
-                Object valueToSet = nextToken == null ? toSafeJsonNode(value)
-                        : processTopArrayFlag || nextToken.startsWith("[") ? ArrayNode.class : ObjectNode.class;
+            for (int i = 0; i < tokenSize; i++) {
+                String token = tokenList.get(i);
+                String nextToken = i + 1 < tokenSize ? tokenList.get(i + 1) : null;
+
+                Object valueToSet = nextToken == null
+                        ? toSafeJsonNode(value)
+                        : nextToken.startsWith("[") ? ArrayNode.class : ObjectNode.class;
 
                 if (currentNode instanceof ArrayNode arrayNode) {
-                    if (i == 1 && processTopArrayFlag)
-                        arrayNode.add(NullNode.instance);
+                    Integer index = token.startsWith("[")
+                            ? token.equals("[]")
+                            ? null
+                            : Integer.parseInt(token.substring(1, token.length() - 1))
+                            : null;
 
-                    Integer index = token.startsWith("[") ? token.equals("[]") ? arrayNode.size()
-                            : Integer.parseInt(token.substring(1, token.length() - 1)) : null;
-
-                    if (index < 0) {
+                    if (index != null && index < 0) {
                         ensureIndex(arrayNode, Math.abs(index));
                         index = arrayNode.size() + index;
                     }
+
                     currentNode = setArrayNode(arrayNode, index, valueToSet);
+
                 } else if (currentNode instanceof ObjectNode objectNode) {
                     currentNode = setProperty(objectNode, token, valueToSet);
+
                 } else {
                     throw new RuntimeException(
                             "Cannot set '" + currentNode + "'. JsonNode needs to be ArrayNode or ObjectNode");
                 }
             }
-        } else {
-            String lastToken = tokens.getLast();
 
-            List<JsonNode> parentNodes = getList(root, query.replaceAll("\\.?" + Pattern.quote(lastToken) + "$", ""));
+        } else {
+            String lastToken = tokenList.getLast();
+
+            String effectiveQuery = String.join(".", tokenList);
+            List<JsonNode> parentNodes = getList(root, effectiveQuery.replaceAll("\\.?" + Pattern.quote(lastToken) + "$", ""));
+
             for (JsonNode parent : parentNodes) {
                 if (parent instanceof ArrayNode arrayNode) {
                     if (lastToken.startsWith("[")) {
                         if (lastToken.equals("[*]")) {
+                            JsonNode valueNode = toSafeJsonNode(value);
                             IntStream.range(0, arrayNode.size())
-                                    .forEach(i -> arrayNode.set(i, toSafeJsonNode(value)));
+                                    .forEach(i -> arrayNode.set(i, valueNode.deepCopy()));
                         } else if (lastToken.equals("[]")) {
                             arrayNode.add(toSafeJsonNode(value));
-                        } else if (lastToken.startsWith("[")) {
+                        } else {
                             arrayNode.set(arrayNode.size() - 1, toSafeJsonNode(value));
                         }
                     }
                 } else if (parent instanceof ObjectNode objectNode) {
-                    if (!lastToken.startsWith("[")) {
-                        if (objectNode.has(lastToken)) {
-                            objectNode.set(lastToken, toSafeJsonNode(value));
-                        }
+                    if (!lastToken.startsWith("[") && objectNode.has(lastToken)) {
+                        objectNode.set(lastToken, toSafeJsonNode(value));
                     }
                 }
             }
         }
+
         return root;
     }
-
     private static JsonNode setProperty(ObjectNode objectNode, String fieldName, Object value) {
         if (fieldName.startsWith("`") && fieldName.endsWith("`")) {
             fieldName = fieldName.substring(1, fieldName.length() - 1);
@@ -288,34 +333,166 @@ public final class Tokenized {
 
     public static JsonNode setArrayNode(ArrayNode arrayNode, Integer index, Object value) {
         if (index == null) {
-            JsonNode valueToSet = value instanceof JsonNode valueNode ? valueNode
+            JsonNode valueToSet = value instanceof JsonNode valueNode
+                    ? valueNode
                     : value.equals(ArrayNode.class) ? MAPPER.createArrayNode() : MAPPER.createObjectNode();
+
             arrayNode.add(valueToSet);
             return valueToSet;
         }
 
         JsonNode currentlySet = ensureIndex(arrayNode, index);
+
         if (value instanceof JsonNode valueNode) {
             arrayNode.set(index, valueNode);
             return valueNode;
         }
-        if (currentlySet != null)
-            return currentlySet;
 
-        JsonNode defaultValue = value.equals(ArrayNode.class) ? MAPPER.createArrayNode() : MAPPER.createObjectNode();
+        boolean wantsArray = value.equals(ArrayNode.class);
+
+        if (wantsArray && currentlySet instanceof ArrayNode) {
+            return currentlySet;
+        }
+
+        if (!wantsArray && currentlySet instanceof ObjectNode) {
+            return currentlySet;
+        }
+
+        JsonNode defaultValue = wantsArray ? MAPPER.createArrayNode() : MAPPER.createObjectNode();
         arrayNode.set(index, defaultValue);
         return defaultValue;
     }
 
     public static JsonNode ensureIndex(ArrayNode array, int index) {
-
         if (array == null || index < 0) {
             throw new IllegalArgumentException("ArrayNode is null or index < 0");
         }
-        while (array.size() < index) {
+
+        while (array.size() <= index) {
             array.add(NullNode.instance);
         }
+
         return array.get(index);
     }
+
+
+
+    private static void setExistingWildcardPath(JsonNode currentNode, List<String> tokenList, int tokenIndex, Object value) {
+        if (currentNode == null || currentNode.isNull() || tokenIndex >= tokenList.size()) {
+            return;
+        }
+
+        String token = tokenList.get(tokenIndex);
+        boolean lastToken = tokenIndex == tokenList.size() - 1;
+
+        if (token.equals("[*]")) {
+            if (!(currentNode instanceof ArrayNode arrayNode)) {
+                return;
+            }
+
+            if (lastToken) {
+                JsonNode valueNode = toSafeJsonNode(value);
+                for (int i = 0; i < arrayNode.size(); i++) {
+                    arrayNode.set(i, valueNode.deepCopy());
+                }
+                return;
+            }
+
+            for (JsonNode child : arrayNode) {
+                setExistingWildcardPath(child, tokenList, tokenIndex + 1, value);
+            }
+            return;
+        }
+
+        if (token.equals("*")) {
+            if (currentNode instanceof ObjectNode objectNode) {
+                if (lastToken) {
+                    JsonNode valueNode = toSafeJsonNode(value);
+                    List<String> fieldNames = new ArrayList<>();
+                    objectNode.fieldNames().forEachRemaining(fieldNames::add);
+
+                    for (String fieldName : fieldNames) {
+                        objectNode.set(fieldName, valueNode.deepCopy());
+                    }
+                    return;
+                }
+
+                List<JsonNode> children = new ArrayList<>();
+                objectNode.elements().forEachRemaining(children::add);
+
+                for (JsonNode child : children) {
+                    setExistingWildcardPath(child, tokenList, tokenIndex + 1, value);
+                }
+                return;
+            }
+
+            if (currentNode instanceof ArrayNode arrayNode) {
+                if (lastToken) {
+                    JsonNode valueNode = toSafeJsonNode(value);
+                    for (int i = 0; i < arrayNode.size(); i++) {
+                        arrayNode.set(i, valueNode.deepCopy());
+                    }
+                    return;
+                }
+
+                for (JsonNode child : arrayNode) {
+                    setExistingWildcardPath(child, tokenList, tokenIndex + 1, value);
+                }
+            }
+
+            return;
+        }
+
+        if (token.startsWith("[")) {
+            if (!(currentNode instanceof ArrayNode arrayNode)) {
+                return;
+            }
+
+            if (token.equals("[]")) {
+                return;
+            }
+
+            int index = Integer.parseInt(token.substring(1, token.length() - 1));
+
+            if (index < 0) {
+                index = arrayNode.size() + index;
+            }
+
+            if (index < 0 || index >= arrayNode.size()) {
+                return;
+            }
+
+            if (lastToken) {
+                arrayNode.set(index, toSafeJsonNode(value));
+            } else {
+                setExistingWildcardPath(arrayNode.get(index), tokenList, tokenIndex + 1, value);
+            }
+
+            return;
+        }
+
+        if (!(currentNode instanceof ObjectNode objectNode)) {
+            return;
+        }
+
+        String fieldName = token;
+        if (fieldName.startsWith("`") && fieldName.endsWith("`")) {
+            fieldName = fieldName.substring(1, fieldName.length() - 1);
+        }
+
+        if (lastToken) {
+            objectNode.set(fieldName, toSafeJsonNode(value));
+            return;
+        }
+
+        JsonNode child = objectNode.get(fieldName);
+        setExistingWildcardPath(child, tokenList, tokenIndex + 1, value);
+    }
+
+
+
+
+
+
 
 }
