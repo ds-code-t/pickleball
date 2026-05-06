@@ -70,7 +70,6 @@ public final class DefinitionContext {
         ParseNode keyTransform = new ParseNode("\\bas\\s+(?<keyName><<quoteMask>>)(?!\\s*[A-Z])") {
             public String onSubstitute(MatchNode self) {
                 String keyName = self.groups().get("keyName");
-
                 return keyName + " " + VALUE_TYPE_MATCH + KEY_NAME;
             }
         };
@@ -291,7 +290,7 @@ public final class DefinitionContext {
             public String onSubstitute(MatchNode self) {
                 MatchNode parentNode = self.parent();
                 System.out.println(parentNode.localStateBoolean("context"));
-                System.out.println(parentNode.localStateBoolean( "action"));
+                System.out.println(parentNode.localStateBoolean("action"));
                 System.out.println(parentNode.localStateBoolean("hasElements"));
                 if (!parentNode.localStateBoolean("context", "action", "hasElements")) {
                     if (!parentNode.localStateBoolean("assertion")) {
@@ -403,7 +402,7 @@ public final class DefinitionContext {
                     .addBase("//div")
                     .and(
                             (category, v, op) -> {
-                                if (v == null || v.isNull())
+                                if (v == null || v.isNullOrBlank())
                                     return null;
                                 String xpath1 = XPathy.from("//div" + descendantDeepNormalizedVisibleText(v, op) +
                                         "[self::div[" +
@@ -425,7 +424,7 @@ public final class DefinitionContext {
                     .addBase("//li[contains(@class, 'menu-item')]")
                     .and(
                             (category, v, op) -> {
-                                if (v == null || v.isNull())
+                                if (v == null || v.isNullOrBlank())
                                     return null;
                                 return XPathy.from("//li[a[1]" + descendantDeepNormalizedVisibleText(v, op) + "]");
                             }
@@ -559,19 +558,19 @@ public final class DefinitionContext {
                     .addBase("//option");
 
 
-            category("Table").children("Tables").inheritsFrom("forLabel")
+            category("Table").children("Tables").andAnyCategories("forLabel", "precedingText")
                     .and((category, v, op) ->
-                            XPathy.from("//*[self::table or @role='table' or self::*" + customElementSuffixPredicate("table") + "][not(descendant::table)]")
+                            XPathy.from("//*[self::table or @role='table' or self::*" + customElementSuffixPredicate("table") + "][not(descendant::table)][descendant::text()[normalize-space()]]")
                     );
 
             category("Row").children("Rows").inheritsFrom(CONTAINS_TEXT)
                     .and((category, v, op) ->
-                            XPathy.from("//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + " ][not(descendant::table)]")
+                            XPathy.from("//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + " ][not(descendant::table)][descendant::text()[normalize-space()]]")
                     );
 
             category("Header Row").children("Headers").inheritsFrom(CONTAINS_TEXT)
                     .and((category, v, op) ->
-                            XPathy.from("//*[self::thead or self::tr[th] or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)]")
+                            XPathy.from("//*[self::thead or self::tr[th] or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)][descendant::text()[normalize-space()]]")
                     );
 
             category("Header").children("Headers", "Column Header", "Column Headers").inheritsFrom(CONTAINS_TEXT)
@@ -692,6 +691,18 @@ public final class DefinitionContext {
                     .or(
                             htmlMatchBuilder
                     );
+
+            category("precedingText").and(
+                    (category, v, op) -> {
+                        if (v == null || v.isNullOrBlank()) {
+                            return null;
+                        }
+                        String label = descendantDeepNormalizedVisibleText(v, op);
+                        String xpath = "//*[(preceding::text()[normalize-space()])[last()]/ancestor-or-self::*" + label + "]";
+                        return XPathy.from(xpath);
+                    }
+            );
+
 
             //
             // "*" fallback OR builders

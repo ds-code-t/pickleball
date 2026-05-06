@@ -359,7 +359,7 @@ public abstract class PassedData {
     public PhraseData getNextOperationPhrase() {
         PhraseData currentPhrase = (PhraseData) this;
 
-        while (!currentPhrase.isEndBoundary() && (currentPhrase = currentPhrase.getNextPhrase()) != null) {
+        while ((currentPhrase = currentPhrase.getNextPhraseWithinBoundary()) != null) {
             if (currentPhrase.operationInheritancePhrase == null && !currentPhrase.getOperation().isBlank()) {
                 return currentPhrase;
             }
@@ -371,7 +371,7 @@ public abstract class PassedData {
     public PhraseData getLastOperationPhrase() {
         PhraseData currentPhrase = (PhraseData) this;
 
-        while (!currentPhrase.isStartBoundary() && (currentPhrase = currentPhrase.getPreviousPhrase()) != null) {
+        while ( (currentPhrase = currentPhrase.getPreviousPhraseWithinBoundary()) != null) {
             if (currentPhrase.operationInheritancePhrase == null && !currentPhrase.getOperation().isBlank()) {
                 return currentPhrase;
             }
@@ -438,18 +438,17 @@ public abstract class PassedData {
 
 
     public PhraseData getPreviousPhraseWithinBoundary() {
-        PhraseData previous = getPreviousPhrase();
-        if (isNewBoundary(previous, (PhraseData) this)) {
+//        PhraseData previous = getPreviousPhrase();
+        if (isNewBoundary(previousPhrase, (PhraseData) this)) {
             return null;
         }
-        return previous;
+        return previousPhrase;
     }
 
     public PhraseData getNextPhraseWithinBoundary() {
-        PhraseData next = getNextPhrase();
-        if (isNewBoundary((PhraseData) this, next)) {
+        if (isNewBoundary((PhraseData) this, nextPhrase)) {
             return null;
         }
-        return next;
+        return nextPhrase;
     }
 }
