@@ -565,22 +565,22 @@ public final class DefinitionContext {
 
             category("Row").children("Rows").inheritsFrom(CONTAINS_TEXT)
                     .and((category, v, op) ->
-                            XPathy.from("//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + " ][not(descendant::table or descendant::th)][descendant::text()[normalize-space()]]")
+                            XPathy.from("//*[self::tr or @role='row' or self::*" + customElementSuffixPredicate("row") + " ][not(descendant::table or descendant::th or descendant::td[@role='columnheader' or @role='rowheader'])][descendant::text()[normalize-space()]]")
                     );
 
             category("Header Row").children("Headers").inheritsFrom(CONTAINS_TEXT)
                     .and((category, v, op) ->
-                            XPathy.from("//*[self::thead or self::tr[th] or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)][descendant::text()[normalize-space()]]")
+                            XPathy.from("//*[self::thead or self::tr[th or td[@role='columnheader' or @role='rowheader']] or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)][descendant::text()[normalize-space()]]")
                     );
 
             category("Header").children("Headers", "Column Header", "Column Headers").inheritsFrom(CONTAINS_TEXT)
                     .and((category, v, op) ->
-                            XPathy.from("//*[self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)]")
+                            XPathy.from("//*[self::th or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)]")
                     );
 
             category("Cell").children("Cells").inheritsFrom("cellLabel")
                     .and((category, v, op) ->
-                            XPathy.from("//*[self::td or self::th or @role='cell' or @role='gridcell' or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("cell") + " ][not(descendant::table)][not(self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + ")]")
+                            XPathy.from("//*[self::td or @role='cell' or @role='gridcell' or self::*" + customElementSuffixPredicate("cell") + " ][not(descendant::table)][not(self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + ")][not(self::th or @role='columnheader' or @role='rowheader') ]")
                     );
 
             category("Column").children("Columns").inheritsFrom("cellLabel");
