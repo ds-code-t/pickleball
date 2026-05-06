@@ -25,16 +25,6 @@ public enum AssertionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
 
-//            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesBeforeAndAfterOperation(),
-//                    new ElementMatcher()
-//                            .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.FIRST_ELEMENT),
-//                    new ElementMatcher()
-//                            .mustMatchAll(ElementType.RETURNS_VALUE, ElementType.SECOND_ELEMENT)
-//            );
-//
-//
-//            ElementMatch firstElement = phraseData.resultElements.getFirst();
-//            ElementMatch secondElement = phraseData.resultElements.get(1);
             ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
             ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
 
@@ -46,6 +36,8 @@ public enum AssertionOperations implements OperationsInterface {
                         getModeSet(phraseData)
                 );
             });
+            closestEntryToPhrase().info(firstElement + " :  " + firstElement.getValues());
+            closestEntryToPhrase().info(secondElement + " :  " + secondElement.getValues());
         }
     },
 
