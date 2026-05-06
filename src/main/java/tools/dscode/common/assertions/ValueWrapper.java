@@ -260,7 +260,12 @@ public class ValueWrapper {
     }
 
     public boolean isBlank() {
-        return (value == null || asNormalizedText().isBlank());
+        return isNullOrBlank();
+    }
+
+    public boolean hasResolvedValue() {
+        if(isNullOrBlank()) return false;
+        return !(asNormalizedText().startsWith("<") && asNormalizedText().endsWith(">"));
     }
 
     public boolean hasValue() {
@@ -272,7 +277,7 @@ public class ValueWrapper {
     }
 
     public boolean isNullOrBlank() {
-        return value == null || value.toString().isBlank();
+        return normalizedText == null || normalizedText.isBlank();
     }
 
 

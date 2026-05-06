@@ -128,18 +128,12 @@ public enum AssertionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
-//            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesPrecedingOperation(),
-//                    new ElementMatcher()
-//                            .mustMatchAll(RETURNS_VALUE)
-//            );
-//
-//            ElementMatch firstElement = phraseData.resultElements.getFirst();
 
             ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
 
             phraseData.result = Attempt.run(() -> {
                 return ValueWrapperCompareReducer.evalValues(
-                        ValueWrapper::hasValue,
+                        ValueWrapper::hasResolvedValue,
                         firstElement.getValues(),
                         getModeSet(phraseData)
                 );

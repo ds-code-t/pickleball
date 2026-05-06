@@ -1,4 +1,3 @@
-// file: tools/dscode/common/reporting/logging/Entry.java
 package tools.dscode.common.reporting.logging;
 
 import org.openqa.selenium.OutputType;
@@ -35,33 +34,25 @@ import static tools.dscode.coredefinitions.BrowserSteps.getCurrentDriver;
  */
 public class Entry {
 
-    // inside tools.dscode.common.reporting.logging.Entry
-
-    // 1) add this field near other flags
-    private volatile boolean includeInPassFailSummary = true;
+    /**
+     * Defaults that this Entry contributes to DESCENDANT entries only.
+     * These are not applied to this Entry itself.
+     *
+     * Descendant fields may override these by setting their own field with the same key.
+     */
+    private final Map<String, Object> defaultDescendantFields = new LinkedHashMap<>();
+    private final List<String> defaultDescendantTags = new ArrayList<>();
 
     /**
-     * Marks THIS Entry (typically a top-level root scope) as included/excluded from
-     * the composite pass/fail percentage in report converters that support it.
-     *
+     * Prevents repeatedly copying inherited defaults into the same emitted entry.
+     */
+    private volatile boolean inheritedDefaultsApplied;
+
+    /**
+     * Marks whether this Entry, typically a root scope, is included in pass/fail summary metrics.
      * Default is TRUE to preserve existing behavior.
      */
-    public Entry includeInSummary(boolean include) {
-        return guarded(() -> {
-            this.includeInPassFailSummary = include;
-            return this;
-        });
-    }
-
-    /** Convenience: exclude this scope from pass/fail composite metrics. */
-    public Entry excludeFromSummary() {
-        return includeInSummary(false);
-    }
-
-    /** Read-only: converters can use this on the scope/root. */
-    public boolean isIncludedInSummary() {
-        return includeInPassFailSummary;
-    }
+    private volatile boolean includeInPassFailSummary = true;
 
     /**
      * Global lock used when threadSafe is enabled.
@@ -152,6 +143,127 @@ public class Entry {
             return this;
         });
     }
+
+    // ---------------------------------------------------------
+    // SUMMARY INCLUSION
+    // ---------------------------------------------------------
+
+    /**
+     * Marks THIS Entry (typically a top-level root scope) as included/excluded from
+     * the composite pass/fail percentage in report converters that support it.
+     *
+     * Default is TRUE to preserve existing behavior.
+     */
+    public Entry includeInSummary(boolean include) {
+        return guarded(() -> {
+            this.includeInPassFailSummary = include;
+            return this;
+        });
+    }
+
+    /** Convenience: exclude this scope from pass/fail composite metrics. */
+    public Entry excludeFromSummary() {
+        return includeInSummary(false);
+    }
+
+    /** Read-only: converters can use this on the scope/root. */
+    public boolean isIncludedInSummary() {
+        return includeInPassFailSummary;
+    }
+
+    // ---------------------------------------------------------
+    // DESCENDANT DEFAULT METADATA
+    // ---------------------------------------------------------
+
+    public Entry defaultDescendantFields(String... keyValuePairs) {
+        return guarded(() -> {
+            if (keyValuePairs != null) {
+                for (String pair : keyValuePairs) {
+                    if (pair == null || pair.isBlank()) continue;
+
+                    int colon = pair.indexOf(':');
+                    if (colon <= 0 || colon == pair.length() - 1) {
+                        throw new IllegalArgumentException(
+                                "defaultDescendantFields entries must use 'key:value' format: " + pair
+                        );
+                    }
+
+                    String key = pair.substring(0, colon).trim();
+                    String value = pair.substring(colon + 1).trim();
+
+                    if (key.isBlank()) {
+                        throw new IllegalArgumentException(
+                                "defaultDescendantFields key must not be blank: " + pair
+                        );
+                    }
+
+                    if (key.indexOf(':') >= 0) {
+                        throw new IllegalArgumentException(
+                                "defaultDescendantFields key must not contain ':': " + key
+                        );
+                    }
+
+                    defaultDescendantFields.put(key, value);
+                }
+            }
+            return this;
+        });
+    }
+
+    public Entry defaultDescendantTags(String... tags) {
+        return guarded(() -> {
+            if (tags != null) {
+                for (String tag : tags) {
+                    if (tag != null && !tag.isBlank()) {
+                        defaultDescendantTags.add(tag.trim());
+                    }
+                }
+            }
+            return this;
+        });
+    }
+
+    /**
+     * Applies all ancestor defaultDescendantFields/defaultDescendantTags to THIS entry.
+     *
+     * Important:
+     * - Only walks ancestors, so the entry's own defaults are not applied to itself.
+     * - Oldest ancestor is applied first, nearest ancestor later, so nearer defaults win.
+     * - This entry's own fields still win over all inherited defaults via putIfAbsent.
+     */
+    private void applyInheritedDefaultsToThisEntry() {
+        if (inheritedDefaultsApplied) return;
+
+        LinkedHashMap<String, Object> inheritedFields = new LinkedHashMap<>();
+        LinkedHashSet<String> inheritedTags = new LinkedHashSet<>();
+
+        List<Entry> ancestors = new ArrayList<>();
+        for (Entry n = this.parent; n != null; n = n.parent) {
+            ancestors.add(n);
+        }
+
+        Collections.reverse(ancestors);
+
+        for (Entry ancestor : ancestors) {
+            inheritedFields.putAll(ancestor.defaultDescendantFields);
+            inheritedTags.addAll(ancestor.defaultDescendantTags);
+        }
+
+        // Descendant's own fields win over inherited defaults.
+        for (Map.Entry<String, Object> e : inheritedFields.entrySet()) {
+            this.fields.putIfAbsent(e.getKey(), e.getValue());
+        }
+
+        // Tags are additive. Avoid duplicates.
+        for (String tag : inheritedTags) {
+            if (!this.tags.contains(tag)) {
+                this.tags.add(tag);
+            }
+        }
+
+        inheritedDefaultsApplied = true;
+    }
+
     // ---------------------------------------------------------
     // HIERARCHY
     // ---------------------------------------------------------
@@ -184,7 +296,6 @@ public class Entry {
      * Example: STEP 1: click link
      */
     public Entry logWithType(String type, String message) {
-
         if (type == null || type.isBlank()) {
             throw new IllegalArgumentException("type must not be null or blank");
         }
@@ -200,7 +311,6 @@ public class Entry {
             return info(formatted);
         });
     }
-
 
     // ---------------------------------------------------------
     // LOGGING (timestamped + emitted)
@@ -308,9 +418,31 @@ public class Entry {
         });
     }
 
-    public Entry field(String key, Object value) {
+    public Entry field(String... keyValuePairs) {
         return guarded(() -> {
-            fields.put(key, value);
+            if (keyValuePairs != null) {
+                for (String pair : keyValuePairs) {
+                    if (pair == null || pair.isBlank()) continue;
+
+                    int colon = pair.indexOf(':');
+                    if (colon <= 0 || colon == pair.length() - 1) {
+                        throw new IllegalArgumentException(
+                                "field entries must use 'key:value' format: " + pair
+                        );
+                    }
+
+                    String key = pair.substring(0, colon).trim();
+                    String value = pair.substring(colon + 1).trim();
+
+                    if (key.isBlank()) {
+                        throw new IllegalArgumentException(
+                                "field key must not be blank: " + pair
+                        );
+                    }
+
+                    fields.put(key, value);
+                }
+            }
             return this;
         });
     }
@@ -346,7 +478,7 @@ public class Entry {
     }
 
     // ---------------------------------------------------------
-    // SCREENSHOT (creates a normal timestamped cild with attachment)
+    // SCREENSHOT (creates a normal timestamped child with attachment)
     // ---------------------------------------------------------
 
     public Entry screenshot() {
@@ -373,6 +505,14 @@ public class Entry {
                 createChild(label)
                         .level(Level.INFO)
                         .status(Status.INFO)
+                        .field(
+                                "html.fontSize:12px",
+                                "html.headerFontSize:14px",
+                                "html.borderColor:#0ea5e9",
+                                "html.borderWidth:2px",
+                                "html.headerBackgroundColor:#e0f2fe",
+                                "html.headerColor:#075985"
+                        )
                         .attach(filename, "image/png;base64", base64)
                         .timestamp();
 
@@ -469,7 +609,11 @@ public class Entry {
     /** Closes converters of the given type attached to THIS entry. */
     public Entry close(Class<? extends BaseConverter> type) {
         return guarded(() -> {
-            for (BaseConverter c : converters) if (type.isInstance(c)) c.close();
+            for (BaseConverter c : converters) {
+                if (type.isInstance(c)) {
+                    c.close();
+                }
+            }
             return this;
         });
     }
@@ -479,12 +623,13 @@ public class Entry {
     // ---------------------------------------------------------
 
     private void emit(EmitCall call) {
-        // If threadSafe is enabled, ensure converter callbacks do not run concurrently.
         if (threadSafe) {
             synchronized (THREAD_SAFE_LOCK) {
+                applyInheritedDefaultsToThisEntry();
                 emitUnsafe(call);
             }
         } else {
+            applyInheritedDefaultsToThisEntry();
             emitUnsafe(call);
         }
     }
@@ -572,6 +717,15 @@ public class Entry {
                             .append('\n'));
         }
 
+        if (!entry.tags.isEmpty()) {
+            sb.append(indent).append("tags:").append('\n');
+            for (String tag : entry.tags) {
+                sb.append(indent)
+                        .append("- ")
+                        .append(tag == null ? "" : tag)
+                        .append('\n');
+            }
+        }
 
         for (Entry child : entry.children) {
             sb.append('\n');
@@ -583,15 +737,6 @@ public class Entry {
     // INTERNAL GUARD HELPERS
     // ---------------------------------------------------------
 
-    private void guarded(Runnable r) {
-        if (threadSafe) {
-            synchronized (THREAD_SAFE_LOCK) {
-                r.run();
-            }
-        } else {
-            r.run();
-        }
-    }
 
     private <T> T guarded(Supplier<T> s) {
         if (threadSafe) {

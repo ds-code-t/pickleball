@@ -1,5 +1,41 @@
 Feature: Additiontest
-  
+
+  Scenario:  eq test6
+#    * , if "<Test>" has no value , print "!="
+#    * , save "x" as "Test"
+#    * , if "<Test>" has no value  , print "!="
+    * , if "<Test>" has value  , print "!="
+    * , save "Test" as "x"
+    * , if "<Test>" has value  , print "!="
+
+
+  Scenario:  eq test5
+    * , if "<Test>" has no value , save "1!="
+    * , if "<Test>" has value , save "2!="
+    * IF: "<Test>" has no value THEN:  , save "3!="
+    * IF: "<Test>" has  value THEN:  , save "!4="
+    * , save "x" as "Test"
+
+    * , if "<Test>" has no value , save "5!="
+    * , if "<Test>" has  value , save "6!="
+    * IF: "<Test>" has no value THEN: , save "7!="
+    * IF: "<Test>" has value THEN: , save "8!="
+
+  Scenario: click testsdas
+  @[DEBUG]
+    * , click the "Apples" Checkbox, the "Bananas" Checkbox, and the "Strawberries" Checkbox
+    * , click the "Apples" Checkbox
+    * , save "AA" as "x"
+    * print :::parse { "<x>" == "AA"  }
+    * , click the "Bananas" Checkbox
+    * IF: "<Test>" has no value THEN: , print "!="
+
+    * , save "Test" as "x"
+    * IF: "<Test>" has no value THEN: , print "!="
+
+
+
+
   Scenario:  a sdfsdfd
     * , save "AA" as "x"
     * print :::parse { "<x>" == "AA"  }
@@ -17,7 +53,7 @@ Feature: Additiontest
     * Scenario Log: exlog2 a= '<A>' , c= '<C>'
     Examples:
       | Scenario Tags | A   | C   |
-      | %aztag99        | xxx | zzz |
+      | %aztag99      | xxx | zzz |
 
 
   Scenario: data test C
@@ -468,7 +504,7 @@ Feature: Additiontest
   @[DEBUG]
 #    * navigate to: URL.buttons
     * , switch to the 'Checkboxes' Window
-    :  * , verify the "Apples" Checkbox is displayed, and verify the "Apples" Checkbox is displayed
+  :  * , verify the "Apples" Checkbox is displayed, and verify the "Apples" Checkbox is displayed
 #    :  * , verify the "Apples" Checkbox is displayed, and click it
 #    :  * , if the "Apples" Checkbox is displayed, and click it
 

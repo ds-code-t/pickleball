@@ -54,6 +54,24 @@ public class GlobalState {
         pickleballLog =
                 Entry.of(entryName).excludeFromSummary()
                         .tag("RUNLOG")
+
+                        .field("html.fontSize:15px",
+                                "html.headerFontSize:22px",
+                                "html.borderColor:#2563eb",
+                                "html.borderWidth:4px",
+                                "html.headerBackgroundColor:#dbeafe",
+                                "html.headerColor:#1e3a8a"
+                        )
+
+                        .defaultDescendantFields(
+                                "html.fontSize:12px",
+                                "html.headerFontSize:13px",
+                                "html.borderColor:#e5e7eb",
+                                "html.borderWidth:1px",
+                                "html.headerBackgroundColor:#f9fafb",
+                                "html.headerColor:#374151"
+                        )
+
                         .on(new SimpleHtmlReportConverter(
                                 Path.of("reports/tests", safeFileName(entryName + ".html"))
                         )).threadSafe().start();
@@ -88,15 +106,15 @@ public class GlobalState {
     private static volatile Locale globalLocale = null;
 
     public static Locale getLocale() {
-        if(globalLocale != null) return globalLocale;
+        if (globalLocale != null) return globalLocale;
         return Locale.getDefault();
     }
 
     public static Locale getOrSetGlobalLocale(Pickle pickle) {
-        if(globalLocale != null) return globalLocale;
-        if(pickle == null) return null;
+        if (globalLocale != null) return globalLocale;
+        if (pickle == null) return null;
         synchronized (GlobalState.class) {
-            globalLocale = (Locale) invokeAnyMethod(getGlobalRunner(),"localeForPickle", pickle);
+            globalLocale = (Locale) invokeAnyMethod(getGlobalRunner(), "localeForPickle", pickle);
         }
         return globalLocale;
     }
@@ -124,9 +142,9 @@ public class GlobalState {
     }
 
     public static CachingGlue getGlobalCachingGlue() {
-        if(gluePrepared) return globalCachingGlue;
+        if (gluePrepared) return globalCachingGlue;
         synchronized (GlobalState.class) {
-            if(!gluePrepared) {
+            if (!gluePrepared) {
                 globalCachingGlue.prepareGlue(getOrSetGlobalLocale(getGherkinMessagesPickle()));
                 gluePrepared = true;
             }

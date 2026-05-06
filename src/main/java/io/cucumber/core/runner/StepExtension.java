@@ -60,8 +60,6 @@ public class StepExtension extends StepData {
     private static final Pattern pattern = Pattern.compile("@\\[([^\\[\\]]*)\\]");
 
 
-
-
     public StepExtension(io.cucumber.core.runner.TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
         super(testCase, pickleStepTestStep);
 
@@ -172,7 +170,7 @@ public class StepExtension extends StepData {
             executingPickleStepTestStep = pickleStepTestStep;
             executionMode = ExecutionMode.SKIP;
         } else if (isDynamicStep) {
-            if(!lineData.runningText.startsWith("-"))
+            if (!lineData.runningText.startsWith("-"))
                 overrideLoggingText = lineData.runningText;
             executingPickleStepTestStep = pickleStepTestStep;
         } else {
@@ -181,7 +179,21 @@ public class StepExtension extends StepData {
         executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
         executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
         if (!definitionFlags.contains(DefinitionFlag.NO_LOGGING)) {
-            stepEntry = getScenarioLogRoot().logWithType("STEP", executingPickleStepTestStep.getStepText()).start();
+            stepEntry = getScenarioLogRoot().logWithType("STEP", executingPickleStepTestStep.getStepText()).start()
+                    .defaultDescendantFields(
+                            "html.fontSize:12px",
+                            "html.headerFontSize:14px",
+                            "html.borderColor:#e5e7eb",
+                            "html.borderWidth:1px"
+                    )
+                    .field(
+                            "html.fontSize:13px",
+                            "html.headerFontSize:16px",
+                            "html.borderColor:#f59e0b",
+                            "html.borderWidth:2px",
+                            "html.headerBackgroundColor:#fffbeb",
+                            "html.headerColor:#78350f"
+                    );
         }
         lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
         io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep, executionMode);
@@ -189,10 +201,10 @@ public class StepExtension extends StepData {
         if (result.getError() != null) {
 //            stepEntry.error("Exception: " + result.getError().getClass().getName())
             stepEntry.error(stackTraceToString(result.getError()))
-                    .field("message", result.getError().getMessage())
-                    .field("trace", Arrays.stream(result.getError().getStackTrace())
-                            .map(StackTraceElement::toString)
-                            .toList())
+//                    .field("message:" + result.getError().getMessage())
+//                    .field("trace:" + Arrays.stream(result.getError().getStackTrace())
+//                            .map(StackTraceElement::toString)
+//                            .toList())
                     .timestamp();
         }
         if (webDriverUsed != null) {
@@ -341,8 +353,7 @@ public class StepExtension extends StepData {
         PickleStepTestStep clonePickleStepTestStep;
         try {
             clonePickleStepTestStep = resolvePickleStepTestStep(pickleStepTestStep, parsingMap);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             clonePickleStepTestStep = getCustomStep(HARD_ERROR_STEP + e.getMessage()).pickleStepTestStep;
             return clonePickleStepTestStep;
         }
@@ -370,9 +381,6 @@ public class StepExtension extends StepData {
         modifiedStep.setStepParsingMap(getStepParsingMap());
         return modifiedStep;
     }
-
-
-
 
 
 }

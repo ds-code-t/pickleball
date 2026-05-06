@@ -811,20 +811,43 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     private static void renderNode(StringBuilder out, HtmlNode node, int depth) {
         String indentClass = "d" + Math.min(depth, 6);
 
-        out.append("<div class=\"node ").append(indentClass).append("\">");
+        String nodeStyle = nodeStyleFromFields(node);
+        String headerStyle = headerStyleFromFields(node);
+        String titleStyle = titleStyleFromFields(node);
+        String detailsStyle = detailsStyleFromFields(node);
+
+        out.append("<div class=\"node ")
+                .append(indentClass)
+                .append("\">");
 
         boolean hasDetails = !node.children.isEmpty()
-                || (node.tags != null && !node.tags.isEmpty())
-                || (node.fields != null && !node.fields.isEmpty())
                 || !node.attachments.isEmpty()
                 || !node.logs.isEmpty();
 
-        if (hasDetails) out.append("<details open>");
-        out.append("<summary class=\"nodeHeader ").append(headerBgClass(node)).append("\">");
+        if (hasDetails) {
+            out.append("<details open")
+                    .append(styleAttr(nodeStyle))
+                    .append(">");
+        }
+
+        out.append("<summary class=\"nodeHeader ")
+                .append(headerBgClass(node))
+                .append("\"")
+                .append(styleAttr(headerStyle))
+                .append(">");
 
         out.append("<div class=\"hdrLeft\">");
-        out.append("<div class=\"hdrTitle\">").append(node.title).append("</div>");
-        out.append("<div class=\"hdrMeta\">").append(escapeHtml(headerMeta(node))).append("</div>");
+
+        out.append("<div class=\"hdrTitle\"")
+                .append(styleAttr(titleStyle))
+                .append(">")
+                .append(node.title)
+                .append("</div>");
+
+        out.append("<div class=\"hdrMeta\">")
+                .append(escapeHtml(headerMeta(node)))
+                .append("</div>");
+
         out.append("</div>");
 
         out.append("<div class=\"hdrRight\">");
@@ -834,13 +857,17 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                         node.status == Status.INFO;
 
         if (node.level != null) {
-            out.append("<span class=\"badge ").append(mapLevelCss(node.level)).append("\">")
+            out.append("<span class=\"badge ")
+                    .append(mapLevelCss(node.level))
+                    .append("\">")
                     .append(escapeHtml(node.level.name()))
                     .append("</span>");
         }
 
         if (node.status != null && !sameLevelAndStatusInfo) {
-            out.append("<span class=\"badge ").append(mapStatusCss(node.status)).append("\">")
+            out.append("<span class=\"badge ")
+                    .append(mapStatusCss(node.status))
+                    .append("\">")
                     .append(escapeHtml(labelForStatus(node.status)))
                     .append("</span>");
         }
@@ -850,31 +877,20 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("</summary>");
 
         if (hasDetails) {
-            out.append("<div class=\"details\">");
+            out.append("<div class=\"details\"")
+                    .append(styleAttr(detailsStyle))
+                    .append(">");
 
-            if (node.tags != null && !node.tags.isEmpty()) {
-                out.append("<div class=\"row\"><span class=\"v\">");
-                for (String t : node.tags) out.append("<span class=\"pill\">").append(t).append("</span>");
-                out.append("</span></div>");
-            }
-
-            if (node.fields != null && !node.fields.isEmpty()) {
-                out.append("<div class=\"row\"><span class=\"v\">");
-                out.append("<table class=\"fields\"><tbody>");
-                for (Map.Entry<String, String> e : node.fields.entrySet()) {
-                    out.append("<tr><td class=\"fk\">").append(e.getKey())
-                            .append("</td><td class=\"fv\">").append(e.getValue())
-                            .append("</td></tr>");
-                }
-                out.append("</tbody></table>");
-                out.append("</span></div>");
-            }
+            // Fields and tags are intentionally NOT rendered visibly.
+            // They remain available internally through node.fields/node.tags.
 
             renderTimeline(out, node);
 
             if (!node.children.isEmpty()) {
                 out.append("<div class=\"kids\">");
-                for (HtmlNode child : node.children) renderNode(out, child, depth + 1);
+                for (HtmlNode child : node.children) {
+                    renderNode(out, child, depth + 1);
+                }
                 out.append("</div>");
             }
 
@@ -884,7 +900,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
         out.append("</div>\n");
     }
-
     private static String headerMeta(HtmlNode node) {
         // Prefer span timing if present; otherwise show timestamp if present.
         if (node.startedAt != null) {
@@ -1900,8 +1915,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
             if (isRedundantEchoChild(parent, child)) {
                 mergeEchoChildIntoParent(parent, child);
-            } else if (isScreenshotOnlyChild(child)) {
-                mergeScreenshotChildIntoParent(parent, child);
             } else {
                 kept.add(child);
             }
@@ -1911,25 +1924,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         parent.children.addAll(kept);
     }
 
-    private static boolean isScreenshotOnlyChild(HtmlNode child) {
-        if (child == null) return false;
-        if (child.startedAt != null || child.stoppedAt != null) return false;
-        if (!child.children.isEmpty()) return false;
-        if (child.attachments.isEmpty()) return false;
-        if (child.tags != null && !child.tags.isEmpty()) return false;
-        if (child.fields != null && !child.fields.isEmpty()) return false;
 
-        // All attachments must be images
-        for (InlineImage att : child.attachments) {
-            if (!att.isImage) return false;
-        }
-
-        return true;
-    }
-
-    private static void mergeScreenshotChildIntoParent(HtmlNode parent, HtmlNode child) {
-        parent.attachments.addAll(child.attachments);
-    }
 
     private static boolean isRedundantEchoChild(HtmlNode parent, HtmlNode child) {
         if (parent == null || child == null) return false;
@@ -1972,5 +1967,151 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
         return name + "|" + mime + "|" + payloadKey;
     }
+
+    private static String nodeStyleFromFields(HtmlNode node) {
+        if (node == null || node.fields == null || node.fields.isEmpty()) return "";
+
+        StringBuilder css = new StringBuilder();
+
+        appendCss(css, "font-size", cssSize(fieldValue(node, "html.fontSize", "fontSize")));
+        appendCss(css, "color", cssColor(fieldValue(node, "html.color", "color")));
+        appendCss(css, "background", cssColor(fieldValue(node, "html.backgroundColor", "backgroundColor")));
+
+        appendCss(css, "border-color", cssColor(fieldValue(node, "html.borderColor", "borderColor")));
+        appendCss(css, "border-width", cssSize(fieldValue(node, "html.borderWidth", "borderWidth")));
+        appendCss(css, "border-style", cssBorderStyle(fieldValue(node, "html.borderStyle", "borderStyle")));
+
+        return css.toString();
+    }
+
+    private static String headerStyleFromFields(HtmlNode node) {
+        if (node == null || node.fields == null || node.fields.isEmpty()) return "";
+
+        StringBuilder css = new StringBuilder();
+
+        appendCss(css, "font-size", cssSize(fieldValue(
+                node,
+                "html.headerFontSize",
+                "headerFontSize",
+                "html.headerSize",
+                "headerSize"
+        )));
+
+        appendCss(css, "color", cssColor(fieldValue(node, "html.headerColor", "headerColor")));
+        appendCss(css, "background", cssColor(fieldValue(node, "html.headerBackgroundColor", "headerBackgroundColor")));
+
+        appendCss(css, "border-color", cssColor(fieldValue(node, "html.headerBorderColor", "headerBorderColor")));
+        appendCss(css, "border-width", cssSize(fieldValue(node, "html.headerBorderWidth", "headerBorderWidth")));
+        appendCss(css, "border-style", cssBorderStyle(fieldValue(node, "html.headerBorderStyle", "headerBorderStyle")));
+
+        return css.toString();
+    }
+
+    private static String titleStyleFromFields(HtmlNode node) {
+        if (node == null || node.fields == null || node.fields.isEmpty()) return "";
+
+        StringBuilder css = new StringBuilder();
+
+        appendCss(css, "font-size", cssSize(fieldValue(
+                node,
+                "html.titleFontSize",
+                "titleFontSize",
+                "html.headerFontSize",
+                "headerFontSize"
+        )));
+
+        appendCss(css, "color", cssColor(fieldValue(
+                node,
+                "html.titleColor",
+                "titleColor",
+                "html.headerColor",
+                "headerColor"
+        )));
+
+        return css.toString();
+    }
+
+    private static String detailsStyleFromFields(HtmlNode node) {
+        if (node == null || node.fields == null || node.fields.isEmpty()) return "";
+
+        StringBuilder css = new StringBuilder();
+
+        appendCss(css, "font-size", cssSize(fieldValue(node, "html.detailsFontSize", "detailsFontSize")));
+        appendCss(css, "color", cssColor(fieldValue(node, "html.detailsColor", "detailsColor")));
+        appendCss(css, "background", cssColor(fieldValue(node, "html.detailsBackgroundColor", "detailsBackgroundColor")));
+
+        return css.toString();
+    }
+
+    private static String fieldValue(HtmlNode node, String... keys) {
+        if (node == null || node.fields == null || node.fields.isEmpty() || keys == null) return null;
+
+        for (String wanted : keys) {
+            if (wanted == null) continue;
+
+            for (Map.Entry<String, String> e : node.fields.entrySet()) {
+                if (e.getKey() != null && e.getKey().equalsIgnoreCase(wanted)) {
+                    return e.getValue();
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static void appendCss(StringBuilder css, String property, String value) {
+        if (css == null || property == null || property.isBlank() || value == null || value.isBlank()) return;
+        css.append(property).append(":").append(value).append(";");
+    }
+
+    private static String styleAttr(String css) {
+        if (css == null || css.isBlank()) return "";
+        return " style=\"" + escapeHtml(css) + "\"";
+    }
+
+    private static String cssSize(String raw) {
+        if (raw == null) return null;
+
+        String s = raw.trim().toLowerCase(Locale.ROOT);
+        if (s.isBlank()) return null;
+
+        if (s.equals("0")) return "0";
+
+        if (s.matches("\\d{1,3}(\\.\\d{1,3})?(px|em|rem|%)")) {
+            return s;
+        }
+
+        return null;
+    }
+
+    private static String cssColor(String raw) {
+        if (raw == null) return null;
+
+        String s = raw.trim().toLowerCase(Locale.ROOT);
+        if (s.isBlank()) return null;
+
+        if (s.matches("#[0-9a-f]{3}([0-9a-f]{3})?")) {
+            return s;
+        }
+
+        return switch (s) {
+            case "black", "white", "red", "green", "blue", "yellow",
+                 "orange", "purple", "pink", "gray", "grey",
+                 "brown", "transparent" -> s;
+            default -> null;
+        };
+    }
+
+    private static String cssBorderStyle(String raw) {
+        if (raw == null) return "solid";
+
+        String s = raw.trim().toLowerCase(Locale.ROOT);
+
+        return switch (s) {
+            case "none", "solid", "dashed", "dotted", "double" -> s;
+            default -> "solid";
+        };
+    }
+
 
 }
