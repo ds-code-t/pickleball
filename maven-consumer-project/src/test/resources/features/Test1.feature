@@ -1,7 +1,13 @@
 Feature: Additiontest
   
   Scenario:  a sdfsdfd
-    * test2 %aztag99
+    * , save "AA" as "x"
+    * print :::parse { "<x>" == "AA"  }
+
+#    * , if "<SS>":
+#    : * , save "A"
+
+#    * test2 %aztag99
 #  * RUN SCENARIOS: %aztag99
 
 

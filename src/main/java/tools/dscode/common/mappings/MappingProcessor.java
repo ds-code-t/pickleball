@@ -294,10 +294,16 @@ public abstract class MappingProcessor implements Map<String, Object> {
     public String resolveWholeText(String input) {
         QuoteParser parsedObj = new QuoteParser(input);
         try {
-            parsedObj.setMasked(resolveAll(parsedObj.masked(),parsedObj));
+            // Resolve quoted substring values first.
+            // This lets curly expressions restore already-resolved quoted values.
             for (var e : parsedObj.entrySetWithoutTripleSingle()) {
-                parsedObj.put(e.getKey(), resolveAll(e.getValue(),parsedObj));
+                parsedObj.put(e.getKey(), resolveAll(e.getValue(), parsedObj));
             }
+
+            // Now resolve the outer/masked text.
+            // If resolveCurly restores quoted placeholders, they are already resolved.
+            parsedObj.setMasked(resolveAll(parsedObj.masked(), parsedObj));
+
             System.out.println("");
             String resolvedText = parsedObj.restore();
             System.out.println("Resolved: '" + input + "' -> '" + resolvedText + "'");
