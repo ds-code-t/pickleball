@@ -20,14 +20,11 @@ import java.util.Set;
 
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.BROWSER;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.DATA_TYPE;
-//import static tools.dscode.common.treeparsing.parsedComponents.ElementType.FIRST_ELEMENT;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.HTML_ELEMENT;
-//import static tools.dscode.common.treeparsing.parsedComponents.ElementType.SECOND_ELEMENT;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.CONTEXT;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
 import static tools.dscode.coredefinitions.BrowserSteps.getCurrentDriver;
-
 
 public abstract class PassedData {
     public PhraseData operationInheritancePhrase;
@@ -63,11 +60,9 @@ public abstract class PassedData {
     public boolean isTopContext;
     public boolean isPageContext;
 
-
     private String action = "";
     private String assertion = "";
     public String conjunction = "";
-
 
     private String assertionType = "";
     public Set<ExecutionDictionary.CategoryFlags> categoryFlags = new HashSet<>();
@@ -78,21 +73,25 @@ public abstract class PassedData {
 
     public int operationIndex = 0;
 
-
     public PhraseData getPreviousPhrase() {
         PhraseData prevPhrase = previousPhrase == null ? ((PhraseData) this).parsedLine.inheritedPhrase : previousPhrase;
-        if (prevPhrase == null || prevPhrase.getResolvedPhrase() == null)
+        if (prevPhrase == null || prevPhrase.getResolvedPhrase() == null) {
             return prevPhrase;
+        }
         return prevPhrase.getResolvedPhrase();
     }
 
     public PhraseData getPreviousInheritedOrPreviousPhrase() {
-        if(operationInheritancePhrase == null || operationIndex > 0) return getPreviousPhrase();
+        if (operationInheritancePhrase == null || operationIndex > 0) {
+            return getPreviousPhraseWithinBoundary();
+        }
         return operationInheritancePhrase;
     }
 
     public PhraseData getNextInheritedOrNextPhrase() {
-        if(operationInheritancePhrase == null || operationIndex ==0) return getNextPhrase();
+        if (operationInheritancePhrase == null || operationIndex == 0) {
+            return getNextPhraseWithinBoundary();
+        }
         return operationInheritancePhrase;
     }
 
@@ -101,11 +100,7 @@ public abstract class PassedData {
     }
 
     public List<ElementMatch> getValueTypeEntryElementMatches() {
-        List<ElementMatch> matches = new ArrayList<>(elementMatches.stream().filter(e -> e.elementTypes.contains(VALUE_TYPE)).toList());
-        if (matches.isEmpty() && getPreviousPhrase() != null) {
-            return getPreviousPhrase().getValueTypeEntryElementMatches();
-        }
-        return matches;
+        return getAllElementMatchesPreviousFallback(VALUE_TYPE);
     }
 
     public void setResolvedPhrase(PhraseData resolvedPhrase) {
@@ -114,34 +109,99 @@ public abstract class PassedData {
         resolvedPhrase.templatePhrase = (PhraseData) this;
     }
 
-    public List<ElementMatch> getClosestWebElementMatches() {
-        List<ElementMatch> matches = new ArrayList<>(elementMatches.stream().filter(e -> e.elementTypes.contains(HTML_ELEMENT)).toList());
-        if (matches.isEmpty() && getPreviousPhrase() != null) {
-            return getPreviousPhrase().getValueTypeEntryElementMatches();
-        }
-        return matches;
+    private List<ElementMatch> getLocalElementMatches(ElementType... elementTypes) {
+        List<ElementType> types = Arrays.asList(elementTypes);
+        return new ArrayList<>(elementMatches.stream()
+                .filter(e -> e.elementTypes.containsAll(types))
+                .toList());
     }
 
-    public List<ElementMatch> getElementMatchesPrecedingOperation(ElementType ... elementTypes)  {
-        List<ElementMatch> matches = new ArrayList<>(elementMatches.stream().filter(e -> e.startIndex < operationIndex && e.elementTypes.containsAll(Arrays.asList(elementTypes))).toList());
+    private List<ElementMatch> getLocalElementMatchesPrecedingOperation(ElementType... elementTypes) {
+        List<ElementType> types = Arrays.asList(elementTypes);
+        return new ArrayList<>(elementMatches.stream()
+                .filter(e -> e.startIndex < operationIndex && e.elementTypes.containsAll(types))
+                .toList());
+    }
+
+    private List<ElementMatch> getLocalElementMatchesFollowingOperation(ElementType... elementTypes) {
+        List<ElementType> types = Arrays.asList(elementTypes);
+        return new ArrayList<>(elementMatches.stream()
+                .filter(e -> e.startIndex > operationIndex && e.elementTypes.containsAll(types))
+                .toList());
+    }
+
+
+
+    public List<ElementMatch> getClosestWebElementMatches() {
+        return getAllElementMatchesPreviousFallback(HTML_ELEMENT);
+    }
+
+    public List<ElementMatch> getElementMatchesPrecedingOperation(ElementType... elementTypes) {
+        List<ElementMatch> matches = getLocalElementMatchesPrecedingOperation(elementTypes);
+
         PhraseData previous;
-        if (matches.isEmpty() &&  (previous = getPreviousInheritedOrPreviousPhrase()) != null) {
+        if (matches.isEmpty() && (previous = getPreviousInheritedOrPreviousPhrase()) != null) {
             return previous.getElementMatchesPrecedingOperation(elementTypes);
         }
+
         return matches;
     }
 
-    public List<ElementMatch> getElementMatchesFollowingOperation(ElementType ... elementTypes) {
-        List<ElementMatch> matches = new ArrayList<>(elementMatches.stream().filter(e -> e.startIndex > operationIndex && e.elementTypes.containsAll(Arrays.asList(elementTypes))).toList());
+    public List<ElementMatch> getElementMatchesFollowingOperation(ElementType... elementTypes) {
+        List<ElementMatch> matches = getLocalElementMatchesFollowingOperation(elementTypes);
+
         PhraseData next;
         if (matches.isEmpty() && (next = getNextInheritedOrNextPhrase()) != null) {
             return next.getElementMatchesFollowingOperation(elementTypes);
         }
+
         return matches;
     }
 
+    public List<ElementMatch> getAllElementMatchesPreviousFallback(ElementType... elementTypes) {
+        List<ElementMatch> matches = getLocalElementMatches(elementTypes);
+
+        PhraseData previous;
+        if (matches.isEmpty() && (previous = getPreviousInheritedOrPreviousPhrase()) != null) {
+            return previous.getAllElementMatchesPreviousFallback(elementTypes);
+        }
+
+        return matches;
+    }
+
+    public List<ElementMatch> getAllElementMatchesNextFallback(ElementType... elementTypes) {
+        List<ElementMatch> matches = getLocalElementMatches(elementTypes);
+
+        PhraseData next;
+        if (matches.isEmpty() && (next = getNextInheritedOrNextPhrase()) != null) {
+            return next.getAllElementMatchesNextFallback(elementTypes);
+        }
+
+        return matches;
+    }
+
+    public ElementMatch getElementMatchPreviousFallback(ElementType... elementTypes) {
+        return getAllElementMatchesPreviousFallback(elementTypes).stream()
+                .findFirst()
+                .orElse(new PlaceHolderMatch((PhraseData) this));
+    }
+
+    public ElementMatch getElementMatchNextFallback(ElementType... elementTypes) {
+        return getAllElementMatchesNextFallback(elementTypes).stream()
+                .findFirst()
+                .orElse(new PlaceHolderMatch((PhraseData) this));
+    }
+
     public ElementMatch getBrowserElement() {
-        return elementMatches.stream().filter(e -> e.elementTypes.contains(BROWSER)).findFirst().orElse(null);
+        return elementMatches.stream()
+                .filter(e -> e.elementTypes.contains(BROWSER))
+                .findFirst().orElse(null);
+    }
+
+    public ElementMatch getDataElement() {
+        return elementMatches.stream()
+                .filter(e -> e.elementTypes.contains(DATA_TYPE))
+                .findFirst().orElse(null);
     }
 
     public ElementMatch getFirstElement() {
@@ -152,28 +212,38 @@ public abstract class PassedData {
         return elementMatches.size() < 2 ? null : elementMatches.get(1);
     }
 
-
     public List<ElementMatch> getElementMatchesBeforeAndAfterOperation() {
-        ElementMatch elementMatch1 = getElementMatchesPrecedingOperation().stream().findFirst().orElse(new PlaceHolderMatch((PhraseData) this));
-        ElementMatch elementMatch2 = getElementMatchesFollowingOperation().stream().findFirst().orElse(new PlaceHolderMatch((PhraseData) this));
+        ElementMatch elementMatch1 = getElementMatchesPrecedingOperation().stream()
+                .findFirst()
+                .orElse(new PlaceHolderMatch((PhraseData) this));
+
+        ElementMatch elementMatch2 = getElementMatchesFollowingOperation().stream()
+                .findFirst()
+                .orElse(new PlaceHolderMatch((PhraseData) this));
+
         return List.of(elementMatch1, elementMatch2);
     }
 
-    public ElementMatch getElementMatchBeforeOperation(ElementType ... elementTypes) {
-        return  getElementMatchesPrecedingOperation(elementTypes).stream().findFirst().orElse(new PlaceHolderMatch((PhraseData) this));
-    }
-    public ElementMatch getElementMatchAfterOperation(ElementType ... elementTypes) {
-        return getElementMatchesFollowingOperation(elementTypes).stream().findFirst().orElse(new PlaceHolderMatch((PhraseData) this));
+    public ElementMatch getElementMatchBeforeOperation(ElementType... elementTypes) {
+        return getElementMatchesPrecedingOperation(elementTypes).stream()
+                .findFirst()
+                .orElse(new PlaceHolderMatch((PhraseData) this));
     }
 
+    public ElementMatch getElementMatchAfterOperation(ElementType... elementTypes) {
+        return getElementMatchesFollowingOperation(elementTypes).stream()
+                .findFirst()
+                .orElse(new PlaceHolderMatch((PhraseData) this));
+    }
 
     public void setPreviousPhrase(PhraseData previousPhrase) {
         this.previousPhrase = previousPhrase;
     }
 
     public PhraseData getNextPhrase() {
-        if (nextPhrase == null || nextPhrase.getResolvedPhrase() == null)
+        if (nextPhrase == null || nextPhrase.getResolvedPhrase() == null) {
             return nextPhrase;
+        }
         return nextPhrase.getResolvedPhrase();
     }
 
@@ -181,47 +251,28 @@ public abstract class PassedData {
         this.nextPhrase = nextPhrase;
     }
 
-
     public List<ElementMatch> getElementMatches() {
         return elementMatches;
     }
 
-
     public void setElementMatches(List<ElementMatch> elementMatchesInput) {
         elementMatches = elementMatchesInput.size() > 2
-                ? new ArrayList<>(elementMatchesInput.stream().filter(elementMatch -> !elementMatch.isPlaceHolder()).toList())
+                ? new ArrayList<>(elementMatchesInput.stream()
+                .filter(elementMatch -> !elementMatch.isPlaceHolder())
+                .toList())
                 : new ArrayList<>(elementMatchesInput);
 
         categoryFlags.clear();
 
-        for (int i = 0; i < elementMatches.size(); i++) {
-            ElementMatch elementMatch = elementMatches.get(i);
-
+        for (ElementMatch elementMatch : elementMatches) {
             elementMatch.parentPhrase = (PhraseData) this;
             categoryFlags.addAll(elementMatch.categoryFlags);
-
-//            if (i == 0) {
-//                elementMatch.elementTypes.add(FIRST_ELEMENT);
-//            }
-//
-//            if (i == 1) {
-//                elementMatch.elementTypes.add(SECOND_ELEMENT);
-//            }
-
-//            if (elementMatch.startIndex < operationIndex) {
-//                elementMatch.elementTypes.add(PRECEDING_OPERATION);
-//            }
-//
-//            if (elementMatch.startIndex > operationIndex) {
-//                elementMatch.elementTypes.add(FOLLOWING_OPERATION);
-//            }
         }
     }
 
     public String getConditional() {
         return conditional;
     }
-
 
     public void setConditional(String conditional) {
         if (conditional.contains("if")) {
@@ -230,13 +281,15 @@ public abstract class PassedData {
         this.conditional = conditional;
     }
 
-
     public String getAction() {
         return action;
     }
 
     public boolean setAction(String action) {
-        if (action == null || action.isBlank()) return false;
+        if (action == null || action.isBlank()) {
+            return false;
+        }
+
         actionOperation = ActionOperations.fromString(action);
         phraseType = PhraseData.PhraseType.ACTION;
         isOperationPhrase = true;
@@ -249,10 +302,15 @@ public abstract class PassedData {
     }
 
     public boolean setAssertion(String assertion) {
-        if (assertion == null || assertion.isBlank()) return false;
+        if (assertion == null || assertion.isBlank()) {
+            return false;
+        }
+
         assertionOperation = AssertionOperations.fromString(assertion);
-        if (phraseType == null || phraseType == ELEMENT_ONLY)
+        if (phraseType == null || phraseType == ELEMENT_ONLY) {
             phraseType = PhraseData.PhraseType.ASSERTION;
+        }
+
         isOperationPhrase = true;
         this.assertion = assertion;
         return true;
@@ -267,18 +325,23 @@ public abstract class PassedData {
             setAction(sourcePhraseData.getAction());
             return true;
         }
+
         if (!sourcePhraseData.getAssertion().isBlank()) {
             setAssertion(sourcePhraseData.getAssertion());
             return true;
         }
+
         return false;
     }
 
     public static boolean isNewBoundary(PhraseData phrase1, PhraseData phrase2) {
-        if (phrase1 == null || phrase2 == null) return true;
-        if (phrase1.isContextTermination() || phrase2.isNewContext() || !phrase2.getAssertionType().isBlank())
+        if (phrase1 == null || phrase2 == null) {
             return true;
-        return false;
+        }
+
+        return phrase1.isContextTermination()
+                || phrase2.isNewContext()
+                || !phrase2.getAssertionType().isBlank();
     }
 
     public boolean isStartBoundary() {
@@ -293,56 +356,64 @@ public abstract class PassedData {
         return isNewBoundary(phrase1, phrase2);
     }
 
-
     public PhraseData getNextOperationPhrase() {
         PhraseData currentPhrase = (PhraseData) this;
+
         while (!currentPhrase.isEndBoundary() && (currentPhrase = currentPhrase.getNextPhrase()) != null) {
-            if (currentPhrase.operationInheritancePhrase == null && !currentPhrase.getOperation().isBlank())
+            if (currentPhrase.operationInheritancePhrase == null && !currentPhrase.getOperation().isBlank()) {
                 return currentPhrase;
+            }
         }
+
         return null;
     }
 
     public PhraseData getLastOperationPhrase() {
         PhraseData currentPhrase = (PhraseData) this;
+
         while (!currentPhrase.isStartBoundary() && (currentPhrase = currentPhrase.getPreviousPhrase()) != null) {
-            if (currentPhrase.operationInheritancePhrase == null && !currentPhrase.getOperation().isBlank())
+            if (currentPhrase.operationInheritancePhrase == null && !currentPhrase.getOperation().isBlank()) {
                 return currentPhrase;
+            }
         }
+
         return null;
     }
 
     public void setOperationInheritanceIfNeeded() {
-        if (phraseType != CONTEXT && operationInheritancePhrase == null && getOperation().isBlank() && !elementMatches.isEmpty()) {
+        if (phraseType != CONTEXT
+                && operationInheritancePhrase == null
+                && getOperation().isBlank()
+                && !elementMatches.isEmpty()) {
+
             if ((operationInheritancePhrase = getLastOperationPhrase()) != null) {
                 operationIndex = 0;
                 setInheritedOperationFromPhrase(operationInheritancePhrase);
             } else if ((operationInheritancePhrase = getNextOperationPhrase()) != null) {
                 operationIndex = 10000;
                 setInheritedOperationFromPhrase(operationInheritancePhrase);
-            }
-            else {
+            } else {
                 setAssertion("true");
             }
         }
     }
-
 
     public String getAssertionType() {
         return assertionType;
     }
 
     public boolean setAssertionType(String assertionType) {
-        if (assertionType == null || assertionType.isBlank()) return false;
+        if (assertionType == null || assertionType.isBlank()) {
+            return false;
+        }
+
         this.assertionType = assertionType;
         isOperationPhrase = true;
-        phraseType = assertionType.equalsIgnoreCase("conditional") ? PhraseData.PhraseType.CONDITIONAL : PhraseData.PhraseType.ASSERTION;
+        phraseType = assertionType.equalsIgnoreCase("conditional")
+                ? PhraseData.PhraseType.CONDITIONAL
+                : PhraseData.PhraseType.ASSERTION;
+
         return true;
-    }
-
-
-    public ElementMatch getDataElement() {
-        return elementMatches.stream().filter(e -> e.elementTypes.contains(DATA_TYPE)).findFirst().orElse(null);
     }
 
     public boolean isNewContext() {
@@ -353,15 +424,32 @@ public abstract class PassedData {
         this.newContext = newContext;
     }
 
-
     public WebDriver getDriver() {
-
-        if (driver == null)
+        if (driver == null) {
             driver = getCurrentDriver();
+        }
+
         return driver;
     }
 
     public void setDriver(WebDriver driver) {
         this.driver = driver;
+    }
+
+
+    public PhraseData getPreviousPhraseWithinBoundary() {
+        PhraseData previous = getPreviousPhrase();
+        if (isNewBoundary(previous, (PhraseData) this)) {
+            return null;
+        }
+        return previous;
+    }
+
+    public PhraseData getNextPhraseWithinBoundary() {
+        PhraseData next = getNextPhrase();
+        if (isNewBoundary((PhraseData) this, next)) {
+            return null;
+        }
+        return next;
     }
 }
