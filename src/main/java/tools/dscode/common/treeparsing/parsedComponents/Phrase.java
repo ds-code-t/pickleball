@@ -291,6 +291,10 @@ public final class Phrase extends PhraseData {
         clonePhrase.isClone = true;
         clonePhrase.position = phrase.position;
         clonePhrase.phraseParsingMap = phrase.phraseParsingMap;
+        if(previous==null)
+        {
+            clonePhrase.setPreviousPhrase(phrase.getPreviousPhrase());
+        }
         if (phrase.getNextPhrase() != null) {
             clonePhrase.setNextPhrase(phrase.getNextPhrase().clonePhrase(clonePhrase));
             clonePhrase.getNextPhrase().setPreviousPhrase(clonePhrase);

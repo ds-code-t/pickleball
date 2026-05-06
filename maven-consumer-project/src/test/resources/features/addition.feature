@@ -1,10 +1,14 @@
 Feature: Addition
 
+  Scenario: context testifsdg3
+  @[DEBUG,##]
+    * , from "Search" Table, verify 1st Row equals "A"
+
   Scenario: testdfdfdfd
     * , if   { 1 == 2   }:  , save "1"
 
   Scenario: testifsdg3
-    @[DEBUG,##]
+  @[DEBUG,##]
     * , if    "true" :
   :  * , save "YES"
 
@@ -13,8 +17,8 @@ Feature: Addition
 
     * , if    "A" == "A" :
   :  * , save "YES"
-  * , if   { 1 == 2   }:  , save "1"
-  * , if   { "1" == "2"   } :  , save "2"
+    * , if   { 1 == 2   }:  , save "1"
+    * , if   { "1" == "2"   } :  , save "2"
 ##  * , if   "{ 1 == {1 + 1} }":
 #  * , if   2 == {1 + 2} || 3 == 1 || 2 == 1 || 3 == {2 * 4}  :
 #   :  * , save "NO"
@@ -30,10 +34,10 @@ Feature: Addition
   :  * , save "YES"
 
 
-    Scenario: dfsdfd55
-      * IF:  1  THEN: , save "1"
-      * IF: 2 == {1 + 2} || 3 == 1 || 2 == 1 || 8 == {2 * 4} THEN: , save "2"
-      * IF: 3 == {1 + 2} && 3 == 3 && ( 2 == 1 || 8 == {2 * 4}) THEN: , save "3"
+  Scenario: dfsdfd55
+    * IF:  1  THEN: , save "1"
+    * IF: 2 == {1 + 2} || 3 == 1 || 2 == 1 || 8 == {2 * 4} THEN: , save "2"
+    * IF: 3 == {1 + 2} && 3 == 3 && ( 2 == 1 || 8 == {2 * 4}) THEN: , save "3"
 
 
   Scenario: testif33
@@ -63,7 +67,7 @@ Feature: Addition
     * , save "1" as "X"
     * , save "<X>" as "A"
     * , if "<A>" == "111":
-    : * , save "<q>" as "A"
+  : * , save "<q>" as "A"
     * , until "<A>" == "111":
   :   * , save "<A><X>" as "A"
     * , save "qqq" as "A"
@@ -201,11 +205,6 @@ Feature: Addition
   : * , save "NO!!"
 
 
-
-
-
-
-
   Scenario: rfere
     When ,  1 is 4 , 2 is 4 , "true" , or  3 is 4?
   : * , save "YES!!"
@@ -261,8 +260,6 @@ Feature: Addition
   : * , save "NO!!!!"
 
 
-
-
   Scenario: ssif test1sdads
     * , if "111" is "111", and "3222" is "222":
   :   * , save "<A><X>" as "A"
@@ -284,7 +281,6 @@ Feature: Addition
   Scenario: if test1
     * , if "222" is "111", or "2s22" is "222":
   :   * , save "<A><X>" as "A"
-
 
 
   Scenario: if until test2
@@ -316,7 +312,7 @@ Feature: Addition
 
   Scenario: Chain testingw
     When ,  1 is 1 , 2 is 2 ,  and 3 is 2?
-     : * , save "NO!!"
+  : * , save "NO!!"
 
 
   Scenario: Chain testing sing
@@ -352,10 +348,6 @@ Feature: Addition
 
     When ,  if  2 is 3 :
   : * , save "NO!!!!"
-
-
-
-
 
 
   Scenario: condtion nesting testing1

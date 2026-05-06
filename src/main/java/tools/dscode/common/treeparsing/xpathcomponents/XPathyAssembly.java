@@ -375,7 +375,7 @@ public final class XPathyAssembly {
         if (xpath == null) return null;
 
         if (stripPseudoTags == null) stripPseudoTags = !substrings.contains("pseudotags");
-        if (normalizeWhiteSpace == null) normalizeWhiteSpace = !substrings.contains("normalizexpaths");
+        if (normalizeWhiteSpace == null) normalizeWhiteSpace = !substrings.contains("rawxpaths");
 
         final int threshold = 20;
         final String indentUnit = " ";
