@@ -59,12 +59,6 @@ public final class ValueWrapperComparisons {
 
     public static boolean equals(ValueWrapper a, ValueWrapper b) {
         if (a == null || b == null) return a == b;
-
-        System.out.println("@@a: " + a);
-        System.out.println("@@a type: " + a.type);
-        System.out.println("@@b: " + b);
-        System.out.println("@@b type: " + b.type);
-        System.out.println("@@eitherNumeric(a, b): " + eitherNumeric(a, b));
         if (eitherNumeric(a, b)) return numericEquals(a, b);
 
         String left = stringValue(a, b);

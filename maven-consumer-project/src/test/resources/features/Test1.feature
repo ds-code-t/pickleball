@@ -1,5 +1,15 @@
 Feature: Additiontest
 
+  Scenario Outline:  Conditionals:
+    When IF: 3 <= <A>:
+    : * print "<A>"
+
+    Examples:
+      | A |
+      | 2 |
+      | 3 |
+      | 4 |
+
   Scenario:  calling SCENARIO a sdfsdfd
 
     * RUN SCENARIOS

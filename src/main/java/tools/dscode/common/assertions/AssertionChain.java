@@ -23,6 +23,8 @@ public class AssertionChain {
     PhraseData parentPhrase;
 
     public AssertionChain(PhraseData phrase) {
+        if(phrase.getAssertionType().isBlank())
+            phrase.setConditional("if");
         parentPhrase = phrase;
     }
 
