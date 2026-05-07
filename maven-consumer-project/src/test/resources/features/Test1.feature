@@ -1,5 +1,17 @@
 Feature: Additiontest
 
+  Scenario: click testsdas
+  @[DEBUG]
+    * , click the "Apples" Checkbox, the "Bananas" Checkbox, and the "Strawberries" Checkbox
+    * , click the "Apples" Checkbox
+    * , save "AA" as "x"
+    * print :::parse { "<x>" == "AA"  }
+    * , click the "Bananas" Checkbox
+    * IF: "<Test>" has no value THEN: , print "!="
+
+    * , save "Test" as "x"
+    * IF: "<Test>" has no value THEN: , print "!="
+
   Scenario:  calling SCENARIO a sdfsdfd
 
     * RUN SCENARIOS
@@ -71,17 +83,7 @@ Feature: Additiontest
     * "<Test>" has no value THEN: , save "7!="
     * "<Test>" has value THEN: , save "8!="
 
-  Scenario: click testsdas
-  @[DEBUG]
-    * , click the "Apples" Checkbox, the "Bananas" Checkbox, and the "Strawberries" Checkbox
-    * , click the "Apples" Checkbox
-    * , save "AA" as "x"
-    * print :::parse { "<x>" == "AA"  }
-    * , click the "Bananas" Checkbox
-    * "<Test>" has no value THEN: , print "!="
 
-    * , save "Test" as "x"
-    * "<Test>" has no value THEN: , print "!="
 
 
 

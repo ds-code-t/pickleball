@@ -54,8 +54,10 @@ import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.treeparsing.preparsing.ParsedLine.createParsedLine;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
+import static tools.dscode.common.variables.PlatformSnapshot.toHumanReadableString;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
 import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
+import static tools.dscode.testengine.PickleballRunner.getOptionsString;
 
 public class CurrentScenarioState extends ScenarioMapping {
     public boolean endCurrentScenario;
@@ -182,8 +184,8 @@ public class CurrentScenarioState extends ScenarioMapping {
 //            scenarioLog.on(new ReportPortalBridgeConverter());
 
         scenarioLog.start();
-
-
+        scenarioLog.info(toHumanReadableString());
+        scenarioLog.info(getOptionsString());
         lifecycle.fire(Phase.BEFORE_SCENARIO_RUN);
 
         ReportingSteps.setRow(null, null, List.of(

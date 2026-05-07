@@ -28,7 +28,7 @@ public class RunTests extends PickleballRunner {
     @Override
     public void globalTestProperties() {
         PKB_props.glue("tools.dscode.steps");
-        PKB_props.profile("classpath:features");
+        PKB_props.features("classpath:features");
         PKB_props.plugins("pretty");
     }
 

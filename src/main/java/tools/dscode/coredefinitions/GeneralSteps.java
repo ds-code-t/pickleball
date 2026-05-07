@@ -25,6 +25,8 @@ import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.GlobalConstants.SOFT_ERROR_STEP;
 import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
+import static tools.dscode.common.variables.PlatformSnapshot.toHumanReadableString;
+import static tools.dscode.testengine.PickleballRunner.getOptionsString;
 
 
 public class GeneralSteps extends CoreSteps {
@@ -54,10 +56,8 @@ public class GeneralSteps extends CoreSteps {
     }
 
 
-
     @BeforeAll
     public static void beforeAll() {
-
         lifecycle.fire(Phase.BEFORE_CUCUMBER_RUN);
     }
 
@@ -69,17 +69,17 @@ public class GeneralSteps extends CoreSteps {
     }
 
 
-    @Given("^"+INFO_STEP+ "(.*)$")
+    @Given("^" + INFO_STEP + "(.*)$")
     public static void infoStep(String message) {
         stepInfo(message);
     }
 
-    @Given("^"+ HARD_ERROR_STEP+ "(.*)$")
+    @Given("^" + HARD_ERROR_STEP + "(.*)$")
     public static void hardFailStep(String message) {
         throw new RuntimeException(message);
     }
 
-    @Given("^"+SOFT_ERROR_STEP+ "(.*)$")
+    @Given("^" + SOFT_ERROR_STEP + "(.*)$")
     public static void softFailStep(String message) {
         throw new SoftRuntimeException(message);
     }
@@ -103,14 +103,12 @@ public class GeneralSteps extends CoreSteps {
     }
 
     @Given("(?i)^ScenarioName$")
-    public static String getScenarioName()
-    {
+    public static String getScenarioName() {
         return getCurrentScenarioState().scenarioName;
     }
 
     @Given("(?i)^ScenarioNameAndLine$")
-    public static String getScenarionNameAndLine()
-    {
+    public static String getScenarionNameAndLine() {
         return getCurrentScenarioState().scenarioNameAndLine;
     }
 }

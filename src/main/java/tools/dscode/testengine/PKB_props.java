@@ -13,6 +13,7 @@ public final class PKB_props {
     public static final String PKB_PROFILE  = PREFIX + "profile";
     public static final String PKB_PLUGINS  = PREFIX + "plugins";
     public static final String PKB_PARALLEL = PREFIX + "parallel";
+    public static final String PKB_ENVIRONMENT = PREFIX + "environment";
     public static final String PKB_DEBUG_BROWSER = PREFIX + "debugBrowser";
 
     private PKB_props() {}
@@ -28,6 +29,15 @@ public final class PKB_props {
 
     public static void put(String key, String value) {
         values().put(key, value);
+    }
+
+
+    public static String environment() {
+        return get(PKB_ENVIRONMENT);
+    }
+
+    public static void environment(String environment) {
+        put(PKB_ENVIRONMENT, environment);
     }
 
     // -- glue --

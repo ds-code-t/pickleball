@@ -30,6 +30,7 @@ public aspect RunnerAfterCreateTestCaseAspect {
         CachingGlue glue = runner.__ajc_getGlue();
         if (testCase.currentScenarioState.scenarioRunner == null)
             testCase.currentScenarioState.scenarioRunner = runner;
+
         if (testCase.currentScenarioState.cachingGlue == null)
             testCase.currentScenarioState.cachingGlue = glue;
         System.out.printf(

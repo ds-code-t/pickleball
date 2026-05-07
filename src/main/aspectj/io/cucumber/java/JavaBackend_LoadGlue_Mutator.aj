@@ -74,12 +74,12 @@ public aspect JavaBackend_LoadGlue_Mutator {
             throw new RuntimeException(e);
         }
 
-        stepDebug(
-                "Runner=" + runner.getClass().getName() +
-                        ", backend=" + backend.getClass().getName() +
-                        ", glue paths set: " +
-                        modified.stream().map(URI::toString).collect(java.util.stream.Collectors.joining(","))
-        );
+//        stepDebug(
+//                "Runner=" + runner.getClass().getName() +
+//                        ", backend=" + backend.getClass().getName() +
+//                        ", glue paths set: " +
+//                        modified.stream().map(URI::toString).collect(java.util.stream.Collectors.joining(","))
+//        );
         proceed(runner, backend, glue, modified);
 
         setGlobalRunner(runner);

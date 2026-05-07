@@ -29,8 +29,10 @@ import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
 //import static tools.dscode.pickleruntime.CucumberOptionResolver.tags;
+import static tools.dscode.common.variables.PlatformSnapshot.toHumanReadableString;
 import static tools.dscode.registry.GlobalRegistry.localOrGlobalOf;
 import static tools.dscode.testengine.DynamicSuiteConfigUtils.getPkbValues;
+import static tools.dscode.testengine.PickleballRunner.getOptionsString;
 
 
 public class GlobalState {
@@ -45,12 +47,7 @@ public class GlobalState {
 
 
     static {
-        String entryName = "Pickleball Run";
-        try {
-            entryName = entryName + " " + getPkbValues();
-        } catch (Exception ignored) {
-            // Options intermittently load at a later time
-        }
+        String entryName = "Pickleball Run: " + getOptionsString();
         pickleballLog =
                 Entry.of(entryName).excludeFromSummary()
                         .tag("RUNLOG")
@@ -76,6 +73,7 @@ public class GlobalState {
                                 Path.of("reports/tests", safeFileName(entryName + ".html"))
                         )).threadSafe().start();
 
+        pickleballLog.info(toHumanReadableString());
 
         BaseConverter.setRowDataProvider(rowKey ->
                 getReport()

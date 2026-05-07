@@ -12,6 +12,8 @@ import static io.cucumber.core.options.Constants.FEATURES_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.FILTER_NAME_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.FILTER_TAGS_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
+import static io.cucumber.core.runner.GlobalState.pickleballLog;
+import static tools.dscode.common.variables.PlatformSnapshot.toHumanReadableString;
 
 
 public abstract class PickleballRunner {
@@ -40,6 +42,8 @@ public abstract class PickleballRunner {
 
     protected final LinkedHashMap<String, String> values = new LinkedHashMap<>();
     private final Map<String, String> readOnlyValues = Collections.unmodifiableMap(values);
+
+    private static final String PKB_OPTIONS = PKB_PREFIX + "options";
 
     protected PickleballRunner() {
         debug("Constructing suite subclass: " + getClass().getName());
@@ -82,6 +86,8 @@ public abstract class PickleballRunner {
 
         syncCanonicalAndAliasKeys();
 
+        refreshPkbOptions();
+
         debug("Final values after defaults + alias sync: " + values);
 
         publishToSystemProperties();
@@ -90,7 +96,14 @@ public abstract class PickleballRunner {
 
         INSTANCE = this;
         debug("Registered singleton instance: " + getClass().getName());
+
+
     }
+
+    public static String getOptionsString() {
+        return INSTANCE.values.get(PKB_OPTIONS);
+    }
+
 
     private void applyDebugBrowserFlag() {
         String raw = values.get(PKB_DEBUG_BROWSER);
@@ -230,13 +243,20 @@ public abstract class PickleballRunner {
     private void mergeAllSystemProperties() {
         Properties sys = System.getProperties();
         int count = 0;
+        int skipped = 0;
 
         for (String key : sys.stringPropertyNames()) {
+            if (isDerivedInternalKey(key)) {
+                skipped++;
+                continue;
+            }
+
             values.put(key, sys.getProperty(key));
             count++;
         }
 
-        debug("Applied " + count + " system property override(s)");
+        debug("Applied " + count + " system property override(s), skipped "
+                + skipped + " derived internal key(s)");
     }
 
 
@@ -281,7 +301,60 @@ public abstract class PickleballRunner {
         }
     }
 
+    private String formatPkbOptions() {
+        StringBuilder out = new StringBuilder();
+
+        for (Map.Entry<String, String> entry : values.entrySet()) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+
+            if (key == null
+                    || value == null
+                    || key.equals(PKB_OPTIONS)
+                    || !key.startsWith(PKB_PREFIX)
+                    || value.isBlank()) {
+                continue;
+            }
+
+            if (!out.isEmpty()) {
+                out.append(", ");
+            }
+
+            out.append(formatPkbOptionName(key))
+                    .append("=")
+                    .append(value.trim());
+        }
+
+        return out.toString();
+    }
+
+    private static String formatPkbOptionName(String key) {
+        String name = key.substring(PKB_PREFIX.length());
+
+        if (name.isBlank()) {
+            return key;
+        }
+
+        return name;
+    }
+
     private static void debug(String message) {
         System.err.println("[DynamicSuiteBase] " + message);
     }
+
+
+    private void refreshPkbOptions() {
+        values.remove(PKB_OPTIONS);
+
+        String formatted = formatPkbOptions();
+
+        if (formatted != null && !formatted.isBlank()) {
+            values.put(PKB_OPTIONS, formatted);
+        }
+    }
+
+    private static boolean isDerivedInternalKey(String key) {
+        return PKB_OPTIONS.equals(key);
+    }
+
 }
