@@ -36,8 +36,85 @@ public enum AssertionOperations implements OperationsInterface {
                         getModeSet(phraseData)
                 );
             });
-            closestEntryToPhrase().info(firstElement + " :  " + firstElement.getValues());
-            closestEntryToPhrase().info(secondElement + " :  " + secondElement.getValues());
+
+        }
+    },
+
+    GREATER_THAN {
+        @Override
+        public void execute(PhraseData phraseData) {
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
+
+            ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
+            ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
+
+            phraseData.result = Attempt.run(() -> {
+                return ValueWrapperCompareReducer.eval(
+                        ValueWrapperComparisons::numericGreaterThan,
+                        firstElement.getValues(),
+                        secondElement.getValues(),
+                        getModeSet(phraseData)
+                );
+            });
+
+        }
+    },
+
+    LESS_THAN {
+        @Override
+        public void execute(PhraseData phraseData) {
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
+
+            ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
+            ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
+
+            phraseData.result = Attempt.run(() -> {
+                return ValueWrapperCompareReducer.eval(
+                        ValueWrapperComparisons::numericLessThan,
+                        firstElement.getValues(),
+                        secondElement.getValues(),
+                        getModeSet(phraseData)
+                );
+            });
+
+        }
+    },
+    GREATER_THAN_OR_EQUAL {
+        @Override
+        public void execute(PhraseData phraseData) {
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
+
+            ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
+            ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
+
+            phraseData.result = Attempt.run(() -> {
+                return ValueWrapperCompareReducer.eval(
+                        ValueWrapperComparisons::numericGreaterThanOrEqualTo,
+                        firstElement.getValues(),
+                        secondElement.getValues(),
+                        getModeSet(phraseData)
+                );
+            });
+
+        }
+    },
+
+    LESS_THAN_OR_EQUAL {
+        @Override
+        public void execute(PhraseData phraseData) {
+            closestEntryToPhrase().info(phraseData + " : Executing Assertion " + this.name());
+
+            ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
+            ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
+
+            phraseData.result = Attempt.run(() -> {
+                return ValueWrapperCompareReducer.eval(
+                        ValueWrapperComparisons::numericLessThanOrEqualTo,
+                        firstElement.getValues(),
+                        secondElement.getValues(),
+                        getModeSet(phraseData)
+                );
+            });
         }
     },
 

@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
 
 /**
  * Boolean comparison utilities for ValueWrapper.
- *
+ * <p>
  * Rules:
  * - String comparisons normally use asNormalizedText()
  * - If either arg is SINGLE_QUOTED → case-insensitive comparison
@@ -16,9 +16,16 @@ import java.util.regex.Pattern;
  */
 public final class ValueWrapperComparisons {
 
-    private ValueWrapperComparisons() {}
+    private ValueWrapperComparisons() {
+    }
 
     /* ---------------- helpers ---------------- */
+
+    private static boolean eitherNumeric(ValueWrapper a, ValueWrapper b) {
+        return a.type == ValueWrapper.ValueTypes.NUMERIC
+                || b.type == ValueWrapper.ValueTypes.NUMERIC;
+    }
+
 
     private static boolean eitherSingleQuoted(ValueWrapper a, ValueWrapper b) {
         return a.type == ValueWrapper.ValueTypes.SINGLE_QUOTED
@@ -47,27 +54,21 @@ public final class ValueWrapperComparisons {
     /* ---------------- string comparisons ---------------- */
 
     public static boolean notEquals(ValueWrapper a, ValueWrapper b) {
-        if (a == null || b == null) return a == b;
-
-        String left = stringValue(a, b);
-        String right = stringValueOther(a, b);
-
-        return eitherSingleQuoted(a, b)
-                ? !StringUtils.equalsIgnoreCase(left, right)
-                : !StringUtils.equals(left, right);
+        return !equals(a, b);
     }
 
     public static boolean equals(ValueWrapper a, ValueWrapper b) {
         if (a == null || b == null) return a == b;
 
+        System.out.println("@@a: " + a);
+        System.out.println("@@a type: " + a.type);
+        System.out.println("@@b: " + b);
+        System.out.println("@@b type: " + b.type);
+        System.out.println("@@eitherNumeric(a, b): " + eitherNumeric(a, b));
+        if (eitherNumeric(a, b)) return numericEquals(a, b);
+
         String left = stringValue(a, b);
         String right = stringValueOther(a, b);
-
-
-        boolean returnBool = eitherSingleQuoted(a, b)
-                ? StringUtils.equalsIgnoreCase(left, right)
-                : StringUtils.equals(left, right);
-
 
         return eitherSingleQuoted(a, b)
                 ? StringUtils.equalsIgnoreCase(left, right)
@@ -129,17 +130,27 @@ public final class ValueWrapperComparisons {
 
     public static boolean numericEquals(ValueWrapper a, ValueWrapper b) {
         if (a == null || b == null) return a == b;
-        return a.asBigInteger().compareTo(b.asBigInteger()) == 0;
+        return a.asBigDecimal().compareTo(b.asBigDecimal()) == 0;
     }
 
     public static boolean numericGreaterThan(ValueWrapper a, ValueWrapper b) {
         if (a == null || b == null) return false;
-        return a.asBigInteger().compareTo(b.asBigInteger()) > 0;
+        return a.asBigDecimal().compareTo(b.asBigDecimal()) > 0;
     }
 
     public static boolean numericLessThan(ValueWrapper a, ValueWrapper b) {
         if (a == null || b == null) return false;
-        return a.asBigInteger().compareTo(b.asBigInteger()) < 0;
+        return a.asBigDecimal().compareTo(b.asBigDecimal()) < 0;
+    }
+
+    public static boolean numericGreaterThanOrEqualTo(ValueWrapper a, ValueWrapper b) {
+        if (a == null || b == null) return a == b;
+        return a.asBigDecimal().compareTo(b.asBigDecimal()) >= 0;
+    }
+
+    public static boolean numericLessThanOrEqualTo(ValueWrapper a, ValueWrapper b) {
+        if (a == null || b == null) return a == b;
+        return a.asBigDecimal().compareTo(b.asBigDecimal()) <= 0;
     }
 
 //    /* ---------------- Single Argument ---------------- */

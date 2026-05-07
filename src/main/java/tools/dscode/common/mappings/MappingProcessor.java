@@ -356,17 +356,15 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 if (replacement != null)
                     break;
             }
-
             if (replacement == null)
                 return s;
 
             String stringReplacement = getStringValue(replacement);
-            if (stringReplacement.isEmpty() && key != null && !key.isBlank()) {
-                stringReplacement = key.startsWith("?") ? "<" + key + ">" : "<?" + key + ">";
-            }
+
             if (stringReplacement.contains("<") && !key.contains(MATCH_BREAK) && stringReplacement.contains("<" + key + ">")) {
                 stringReplacement = stringReplacement.replaceAll("<" + key + ">", "<" + MATCH_BREAK + key + ">");
             }
+
             m.appendReplacement(sb, Matcher.quoteReplacement(stringReplacement));
             m.appendTail(sb);
             return sb.toString();
@@ -479,7 +477,15 @@ public abstract class MappingProcessor implements Map<String, Object> {
             if (map == null)
                 continue;
             Object replacement = directGet ? map.directGet(key) : map.get(tokenized);
+
             if (replacement != null) {
+                if(replacement instanceof String replacementString && replacementString.isEmpty() && !key.startsWith("?"))
+                {
+                    key =  "?" + key ;
+                    tokenized = new Tokenized(key);
+                    directGet = true;
+                    continue;
+                }
                 return replacement;
             }
         }

@@ -36,9 +36,15 @@ public class ModularScenarios extends CoreSteps {
 
 
 
-    public static void populateRunScenariosStep(StepExtension topStep, String inlineTags, DataTable dataTable) {
-        List<Map<String, String>> maps = dataTable == null ? new ArrayList<>() : dataTable.asMaps().stream()
-                .map(HashMap::new) // copy each to a mutable map
+    public static void populateRunScenariosStep(StepExtension topStep, String inlineTags, io.cucumber.datatable.DataTable dataTable) {
+        List<Map<String, String>> maps = dataTable == null
+                ? new ArrayList<>()
+                : dataTable.asMaps().stream()
+                .map(row -> {
+                    Map<String, String> copy = new HashMap<>();
+                    row.forEach((k, v) -> copy.put(k, v == null ? "" : v));
+                    return copy;
+                })
                 .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
         if (inlineTags != null && !inlineTags.isBlank()) {
             final String scenarioTags = inlineTags;

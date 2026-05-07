@@ -87,7 +87,7 @@ public final class XPathyBuilder {
             }
 
             String lhs = "number(normalize-space(.))";
-            String rhs = effective.asBigInteger().toString();
+            String rhs = effective.asForcedSimpleNumber().toString();
             String sym = switch (o) {
                 case GT -> ">";
                 case GTE -> ">=";
@@ -102,7 +102,7 @@ public final class XPathyBuilder {
         // Numeric equality on text when wrapper is NUMERIC and op is DEFAULT/EQUALS
         if (attrName == null && (o == Op.DEFAULT || o == Op.EQUALS) && effective.type == ValueWrapper.ValueTypes.NUMERIC) {
             String lhs = "number(normalize-space(.))";
-            String rhs = effective.asBigInteger().toString();
+            String rhs = effective.asForcedSimpleNumber().toString();
             return XPathy.from("//" + t + "[" + lhs + " = " + rhs + "]");
         }
 

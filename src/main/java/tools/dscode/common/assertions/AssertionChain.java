@@ -7,6 +7,7 @@ import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Attempt
 import java.util.ArrayList;
 import java.util.List;
 
+import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
 import static tools.dscode.common.treeparsing.parsedComponents.Phrase.copyPhraseWithModifications;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ACTION;
@@ -101,6 +102,7 @@ public class AssertionChain {
                 throw exception;
             }
             boolean result = (boolean) currentPhrase.result.value();
+            closestEntryToPhrase().info("Phrase '" + currentPhrase.resolvedText + "' evaluated to: " + result);
             if(result && !conjunctionAnd) {
                 chainStatus = true;
                 return;

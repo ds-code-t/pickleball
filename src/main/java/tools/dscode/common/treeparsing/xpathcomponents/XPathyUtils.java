@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 
 import static com.xpathy.Tag.any;
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.noDisplay;
@@ -353,7 +352,7 @@ public final class XPathyUtils {
 
     private static String buildNumericPredicate(String lhsNumberExpr, ValueWrapper value, ExecutionDictionary.Op op) {
         // Uses your ValueWrapper numeric parsing (BigInteger-style); consistent with your semantics.
-        String rhs = value.asBigInteger().toString();
+        String rhs = value.asForcedSimpleNumber().toString();
 
         return switch (op) {
             case EQUALS -> lhsNumberExpr + " = " + rhs;

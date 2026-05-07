@@ -1,5 +1,80 @@
 Feature: Additiontest
 
+  Scenario:  calling SCENARIO a sdfsdfd
+
+    * RUN SCENARIOS
+      | Run Tags   | A | B   |
+      | %Comp_MsMs | qqq | 111 |
+      | %Comp_MsMs |   | 222 |
+#    * print :::parse { "<x>" == "AA"  }
+
+  Scenario Outline: called component scenario 1 <A>
+#    * , save "Aq" as "x"
+#    * print <Run Tags>
+#    * print { "<Run Tags>" == "%Comp_MsMs" }
+#    * IF: "<Run Tags>" == "%Comp_MsMsz" THEN: , save "A" ELSE:  , save "ZZ"
+#    * , save "11"
+#    * , save "<A><B>"
+    * , save "<A>"
+#    * IF: "<Run Tags>" == "%Comp_MsMsz":
+#  :  * , save "C"
+#    * ELSE-IF: "<Run Tags>" == "%Comp_MsMs":
+#  :  * , save "D"
+#
+#    * , if "<Run Tags>" == "%Comp_MsMsz":
+#  :  * , save "E"
+#    * , else if "<Run Tags>" == "%Comp_MsMs":
+#  :  *  , save "F"
+
+    Examples:
+      | Scenario Tags | ?A |
+      | %Comp_MsMs    | zz |
+
+
+  Scenario: eq14
+
+    * , verify "1" less than 1
+    * , verify "1" less than "1"
+    * , verify "1" less than or equal 1
+    * , verify 1 less than or equal "1"
+    * , verify 1 less than or equal "1.0"
+    * , verify "1" less than or equal 1.0
+    * , verify "1" less than 1.0
+    * , verify 1 less than "1.0"
+    * , verify "1" greater than 1.0
+    * , verify 1 greater than "1.0"
+
+    * , verify "1" greater than or equal 1.0
+    * , verify 1 greater than or equal "1.0"
+
+    * , verify "1.1" less than 1.0
+    * , verify 1.1 less than "1.0"
+
+    * , verify "1.1" less than 1
+    * , verify 1.1 less than "1"
+
+    * , verify "1" equals 1.0
+    * , verify 1 equals "1.0"
+
+    * , verify "1" equals "1.0"
+
+  Scenario: eq check 12
+    * , verify 1 less than 1
+    * , verify 1 less than or equal 1
+    * , verify 1 less than or equal 1.0
+    * , verify 1 less than 1.0
+    * , verify "1" less than 1.0
+#    * , verify {1 == "1"}
+#    * , verify `1` == `1.0`
+    * , verify 1 greater than 1.0
+    * , verify 1 greater than or equal 1.0
+    * , verify 1.1 less than 1.0
+    * , verify 1.1 less than 1
+    * , verify "1" equals 1.0
+    * , verify "1" equals 1.0
+    * , verify "1" equals "1.0"
+
+
   Scenario: click testsdas
   @[DEBUG]
     * , click the "Apples" Checkbox, the "Bananas" Checkbox, and the "Strawberries" Checkbox
@@ -12,32 +87,7 @@ Feature: Additiontest
     * , save "Test" as "x"
     * IF: "<Test>" has no value THEN: , print "!="
 
-  Scenario:  calling SCENARIO a sdfsdfd
 
-    * RUN SCENARIOS
-      | Run Tags   |
-      | %Comp_MsMs |
-#    * print :::parse { "<x>" == "AA"  }
-
-  Scenario Outline: called component scenario 1
-#    * , save "Aq" as "x"
-#    * print <Run Tags>
-#    * print { "<Run Tags>" == "%Comp_MsMs" }
-#    * IF: "<Run Tags>" == "%Comp_MsMsz" THEN: , save "A" ELSE:  , save "ZZ"
-
-    * IF: "<Run Tags>" == "%Comp_MsMsz":
-    :  * , save "C"
-    * ELSE-IF: "<Run Tags>" == "%Comp_MsMs":
-    :  * , save "D"
-
-    * , if "<Run Tags>" == "%Comp_MsMsz":
-  :  * , save "E"
-    * , else if "<Run Tags>" == "%Comp_MsMs":
-  :  *  , save "F"
-
-    Examples:
-      | Scenario Tags |
-      | %Comp_MsMs    |
 
 
 

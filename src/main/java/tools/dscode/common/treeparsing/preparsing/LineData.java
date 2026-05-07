@@ -7,16 +7,12 @@ import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
 import static io.cucumber.core.runner.StepBase.getInheritancePhrase;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
-import static tools.dscode.common.GlobalConstants.SUBSTITUTE_MARKER;
 import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
 
@@ -33,7 +29,7 @@ public abstract class LineData implements Cloneable {
     private final String fullyMasked;
     public final List<PhraseData> phrases = new ArrayList<>();
     public final List<PhraseData> executedPhrases = new ArrayList<>();
-    private final Set<Character> delimiters; // characters that cause a split
+    private static final Set<Character> DELIMITERS = Set.of(',', ';', ':', '.', '!', '?');
     //    public final List<PhraseData> contextPhrases = new ArrayList<>();
     public List<PhraseData> inheritancePhrases = new ArrayList<>();
     public PhraseData inheritedPhrase;
@@ -68,20 +64,14 @@ public abstract class LineData implements Cloneable {
 
     public abstract PhraseData runPhraseFromLine(PhraseData phrase);
 
-    public LineData(String input, Collection<Character> phraseSeparators) {
+    public LineData(String input) {
         input = stripObscureNonText(Objects.requireNonNull(input, "input"));
-        Objects.requireNonNull(phraseSeparators, "phraseSeparators");
-
-        // Build our own delimiter set (no side effects on caller)
-        LinkedHashSet<Character> delims = new LinkedHashSet<>(phraseSeparators);
-        delims.add('.'); // always allow '.' as a delimiter
-        this.delimiters = Collections.unmodifiableSet(delims);
 
         // Ensure non-blank input ends with a delimiter
         if (!input.isBlank()) {
             String t = input.stripTrailing();
             char last = t.charAt(t.length() - 1);
-            if (!this.delimiters.contains(last)) {
+            if (!DELIMITERS.contains(last)) {
                 input = t + "."; // note: uses stripped version so you don't keep trailing whitespace
             } else {
                 input = t; // optional: normalize away trailing whitespace consistently
@@ -118,7 +108,7 @@ public abstract class LineData implements Cloneable {
         int sentenceCount = 0;
         for (int i = 0; i < preParsedNormalized.length(); i++) {
             char c = preParsedNormalized.charAt(i);
-            if (this.delimiters.contains(c)) {
+            if (isDelimiterAt(preParsedNormalized, i)) {
                 String chunk = buf.toString();
                 String unmasked = qp.restoreFromWithOuterBookend(bm.restoreFrom(chunk), BOOK_END);
                 if (!unmasked.isBlank()) {
@@ -139,6 +129,23 @@ public abstract class LineData implements Cloneable {
             }
             lastPhrase = phrase;
         }
+    }
+
+    private static boolean isDelimiterAt(String s, int index) {
+        char c = s.charAt(index);
+
+        if (!DELIMITERS.contains(c)) {
+            return false;
+        }
+
+        if (c != '.') {
+            return true;
+        }
+
+        boolean previousIsDigit = index > 0 && Character.isDigit(s.charAt(index - 1));
+        boolean nextIsDigit = index + 1 < s.length() && Character.isDigit(s.charAt(index + 1));
+
+        return !(previousIsDigit && nextIsDigit);
     }
 
     private static String wrapLooseConditionalExpression(String input) {
@@ -199,10 +206,10 @@ public abstract class LineData implements Cloneable {
     }
 
     /**
-     * Delimiters used for splitting (unmodifiable).
+     * Delimiters used for splitting.
      */
-    public Set<Character> delimiters() {
-        return delimiters;
+    public static Set<Character> delimiters() {
+        return DELIMITERS;
     }
 
     public PhraseData get(int index) {

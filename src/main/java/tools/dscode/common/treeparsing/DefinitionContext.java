@@ -243,7 +243,7 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode assertion = new ParseNode("\\b(?:starts?\\s+with|ends?\\s+with|contains?|match(?:es)?|required|(non-?)?required|displayed|present|collapsed|expanded|(?:un)?selected|(?:un)?checked|enabled|disabled|equals?|less\\s+than|greater\\s+than|(?:has|is)\\s+(?:<<no>>\\s+)?(?:values?|blank|on|off))\\b") {
+        ParseNode assertion = new ParseNode("\\b(?:starts?\\s+with|ends?\\s+with|contains?|match(?:es)?|required|(non-?)?required|displayed|present|collapsed|expanded|(?:un)?selected|(?:un)?checked|enabled|disabled|less\\s+than\\s+or\\s+equals?|greater\\s+than\\s+or\\s+equals?|equals?|less\\s+than|greater\\s+than|(?:has|is)\\s+(?:<<no>>\\s+)?(?:values?|blank|on|off))\\b") {
             @Override
             public String onCapture(MatchNode self) {
                 String assertion = self.originalText().trim()

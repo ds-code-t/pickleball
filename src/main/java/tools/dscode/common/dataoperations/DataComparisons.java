@@ -149,8 +149,8 @@ public final class DataComparisons {
     }
 
     private static int compareNumbers(ValueWrapper left, ValueWrapper right) {
-        BigInteger a = left.asBigInteger();
-        BigInteger b = right.asBigInteger();
+        BigInteger a = left.asForcedSimpleNumber();
+        BigInteger b = right.asForcedSimpleNumber();
         return a.compareTo(b);
     }
 

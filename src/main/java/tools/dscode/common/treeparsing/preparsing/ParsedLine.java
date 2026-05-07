@@ -27,11 +27,7 @@ public final class ParsedLine extends LineData {
 
 
     private ParsedLine(String input) {
-        this(input, List.of(',', ';', ':', '.', '!', '?'));
-    }
-
-    private ParsedLine(String input, Collection<Character> delimiters) {
-        super(input, delimiters);
+        super(input);
     }
 
     @Override

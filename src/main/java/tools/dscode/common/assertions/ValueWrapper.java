@@ -1,10 +1,10 @@
 package tools.dscode.common.assertions;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.LinkedListMultimap;
 import com.google.common.collect.ListMultimap;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Duration;
 import java.util.*;
@@ -28,8 +28,12 @@ public class ValueWrapper {
         if (value == null || o == null) return false;
         if (value.equals(o))
             return true;
-        if (Boolean.TRUE.equals(isNumeric) || o instanceof Number) {
-            return asBigInteger().equals(convertToInteger(normalizeText(o.toString())));
+        ValueWrapper other = o instanceof ValueWrapper vw ? vw : createValueWrapper(o);
+
+        if (isNumeric() || other.isNumeric()) {
+            return isNumeric()
+                    && other.isNumeric()
+                    && asBigDecimal().compareTo(other.asBigDecimal()) == 0;
         }
         String normalizedInput = normalizeText(o.toString());
         return (value.equals(o) || normalizedText.equals(normalizedInput));
@@ -97,7 +101,7 @@ public class ValueWrapper {
             if (node.isTextual()) return new ValueWrapper(node.textValue());
             if (node.isBoolean()) return new ValueWrapper(node.booleanValue(), ValueTypes.BOOLEAN);
             if (node.isNumber()) {
-                return new ValueWrapper(node.bigIntegerValue(), ValueTypes.NUMERIC);
+                return new ValueWrapper(node.decimalValue(), ValueTypes.NUMERIC);
             }
             return new ValueWrapper(node.textValue());
         }
@@ -162,37 +166,88 @@ public class ValueWrapper {
         }
     }
 
-    private BigInteger bigIntegerValue;
+    public BigInteger asForcedSimpleNumber() {
+        String s = asNormalizedText();
+        if (s == null) return BigInteger.ZERO;
 
-    public BigInteger asBigInteger() {
-        if (bigIntegerValue != null) return bigIntegerValue;
+        s = s.replaceAll("\\D", "");
+        if (s.isEmpty()) return BigInteger.ZERO;
 
-        if (type == ValueTypes.NUMERIC) {
-            String s = asNormalizedText();
-            if (s.contains(".")) s = s.replaceFirst("\\.", "").replace(".", "");
-            bigIntegerValue = new BigInteger(s);
-            return bigIntegerValue;
-        }
-        bigIntegerValue = convertToInteger(normalizedText);
-        return bigIntegerValue;
+        return new BigInteger(s);
     }
 
+    public BigDecimal asBigDecimal() {
+        String s = asNormalizedText();
+        if (s == null || s.isBlank()) return BigDecimal.ZERO;
+
+        // Fast path: already clean numeric text.
+        if (isNumeric()) {
+            return new BigDecimal(s);
+        }
+
+        StringBuilder cleaned = new StringBuilder(s.length());
+
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+
+            if (Character.isDigit(c) || c == '.') {
+                cleaned.append(c);
+            } else if ((c == '+' || c == '-') && cleaned.isEmpty()) {
+                cleaned.append(c);
+            }
+        }
+
+        s = cleaned.toString();
+
+        int lastDot = s.lastIndexOf('.');
+        if (lastDot >= 0) {
+            String before = s.substring(0, lastDot).replace(".", "");
+            String after = s.substring(lastDot + 1).replace(".", "");
+            s = before + "." + after;
+        }
+
+        boolean hasDigit = s.chars().anyMatch(Character::isDigit);
+        if (!hasDigit || s.equals("+") || s.equals("-") || s.equals(".") || s.equals("+.") || s.equals("-.")) {
+            return BigDecimal.ZERO;
+        }
+
+        return new BigDecimal(s);
+    }
+
+
     public static BigInteger convertToInteger(String inputString) {
-        String s = inputString
-                .replaceAll("[^0-9.\\-]", " ")
-                .replaceAll("\\.(?=.*\\.)", "");
+        if (inputString == null || inputString.isBlank()) return BigInteger.ZERO;
 
-        String[] parts = s.trim().split("\\s+");
-        String last = parts.length == 0 ? "" : parts[parts.length - 1];
+        String s = inputString.trim();
 
-        if (last.isEmpty() || last.equals(".") || last.equals("-")) return BigInteger.ZERO;
+        boolean negative = s.startsWith("-");
 
-        return new BigInteger(last.replace(".", ""));
+        // Keep only digits and decimal points.
+        s = s.replaceAll("[^0-9.]", "");
+
+        // If there is more than one decimal point, remove all but the last one.
+        int lastDot = s.lastIndexOf('.');
+        if (lastDot >= 0) {
+            String before = s.substring(0, lastDot).replace(".", "");
+            String after = s.substring(lastDot + 1).replace(".", "");
+            s = before + after; // BigInteger cannot contain decimals, so strip the remaining dot too.
+        }
+
+        if (s.isEmpty()) return BigInteger.ZERO;
+
+        if (negative) s = "-" + s;
+
+        return new BigInteger(s);
     }
 
     public Integer asInteger() {
-        return asBigInteger().intValueExact();
+        return asBigDecimal().intValue();
     }
+
+    public BigInteger asBigInteger() {
+        return asBigDecimal().toBigInteger();
+    }
+
 
     public String asNormalizedText() {
         return normalizedText;
@@ -205,7 +260,7 @@ public class ValueWrapper {
             throw new IllegalArgumentException("Time unit must not be null or blank");
         }
 
-        BigInteger value = asBigInteger();
+        BigInteger value = asBigInteger() ;
         String u = unit.trim().toLowerCase();
 
         return switch (u) {
@@ -233,11 +288,22 @@ public class ValueWrapper {
         if (isNumeric != null) return isNumeric;
         if (type == ValueTypes.NUMERIC) {
             isNumeric = true;
-            return isNumeric;
+            return true;
         }
+        if (s == null || s.isBlank()) {
+            isNumeric = false;
+            return false;
+        }
+
         String t = s.strip();
-        if (t.startsWith("-")) t = t.substring(1);
+        if (t.equals(".") || t.equals("-") || t.equals("+") || t.equals("-.") || t.equals("+.")) {
+            isNumeric = false;
+            return false;
+        }
+
+        if (t.startsWith("-") || t.startsWith("+")) t = t.substring(1);
         t = t.replaceFirst("\\.", "").replaceAll("[0-9]", "");
+
         isNumeric = t.isEmpty();
         return isNumeric;
     }
@@ -254,7 +320,7 @@ public class ValueWrapper {
         if (type.toString().endsWith("QUOTED"))
             return isStringTruthy(asNormalizedText());
         if (isNumeric()) {
-            return asBigInteger().signum() != 0;
+            return asForcedSimpleNumber().signum() != 0;
         }
         return isStringTruthy(asNormalizedText());
     }
@@ -388,4 +454,10 @@ public class ValueWrapper {
         return createValueWrapper("~" + normalizedText + "~");
     }
 
+    @Override
+    public int hashCode() {
+        if (value == null) return 0;
+        if (isNumeric()) return asBigDecimal().stripTrailingZeros().hashCode();
+        return normalizedText == null ? 0 : normalizedText.hashCode();
+    }
 }
