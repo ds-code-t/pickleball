@@ -10,6 +10,7 @@ import tools.dscode.common.treeparsing.preparsing.LineData;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseDebug;
@@ -38,6 +39,7 @@ public final class Phrase extends PhraseData {
 
 
     boolean shouldRun() {
+
         if(assertionChainMembership != null)
             return true;
         if (getConditional().startsWith("else")) {

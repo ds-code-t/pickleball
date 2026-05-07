@@ -259,7 +259,6 @@ public class StepExtension extends StepData {
 
     @Override
     public void addDefinitionFlag(DefinitionFlag... flags) {
-
         for (DefinitionFlag flag : flags) {
             if (flag == DefinitionFlag.NO_LOGGING)
                 pickleStepTestStep.setNoLogging(true);

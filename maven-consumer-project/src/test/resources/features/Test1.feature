@@ -1,5 +1,55 @@
 Feature: Additiontest
 
+  Scenario:  calling SCENARIO a sdfsdfd
+
+    * RUN SCENARIOS
+      | Run Tags   |
+      | %Comp_MsMs |
+#    * print :::parse { "<x>" == "AA"  }
+
+  Scenario Outline: called component scenario 1
+#    * , save "Aq" as "x"
+#    * print <Run Tags>
+#    * print { "<Run Tags>" == "%Comp_MsMs" }
+#    * IF: "<Run Tags>" == "%Comp_MsMsz" THEN: , save "A" ELSE:  , save "ZZ"
+
+    * IF: "<Run Tags>" == "%Comp_MsMsz":
+    :  * , save "C"
+    * ELSE-IF: "<Run Tags>" == "%Comp_MsMs":
+    :  * , save "D"
+
+    * , if "<Run Tags>" == "%Comp_MsMsz":
+  :  * , save "E"
+    * , else if "<Run Tags>" == "%Comp_MsMs":
+  :  *  , save "F"
+
+    Examples:
+      | Scenario Tags |
+      | %Comp_MsMs    |
+
+
+
+
+
+#  Scenario Outline: called component scenario 1
+##    * , save "Aq" as "x"
+#    * print <Run Tags>
+#    * print { "<Run Tags>" == "%Comp_MsMs" }
+#    * IF: "<Run Tags>" == "%Comp_MsMs" THEN: , save "A" ELSE:  , save "ZZ"
+#    * , if "<Run Tags>" == "%Comp_MsMs" , save "B"
+#
+#    * IF: "<Run Tags>" == "%Comp_MsMs":
+#  :  * , save "C"
+#    * , if "<Run Tags>" == "%Comp_MsMs":
+#  :  * , save "D"
+#
+#    Examples:
+#      | Scenario Tags |
+#      | %Comp_MsMs    |
+
+
+
+
   Scenario:  eq test6
 #    * , if "<Test>" has no value , print "!="
 #    * , save "x" as "Test"
@@ -13,13 +63,13 @@ Feature: Additiontest
     * , if "<Test>" has no value , save "1!="
     * , if "<Test>" has value , save "2!="
     * IF: "<Test>" has no value THEN:  , save "3!="
-    * IF: "<Test>" has  value THEN:  , save "!4="
+    * "<Test>" has  value THEN:  , save "!4="
     * , save "x" as "Test"
 
     * , if "<Test>" has no value , save "5!="
     * , if "<Test>" has  value , save "6!="
-    * IF: "<Test>" has no value THEN: , save "7!="
-    * IF: "<Test>" has value THEN: , save "8!="
+    * "<Test>" has no value THEN: , save "7!="
+    * "<Test>" has value THEN: , save "8!="
 
   Scenario: click testsdas
   @[DEBUG]
@@ -28,17 +78,15 @@ Feature: Additiontest
     * , save "AA" as "x"
     * print :::parse { "<x>" == "AA"  }
     * , click the "Bananas" Checkbox
-    * IF: "<Test>" has no value THEN: , print "!="
+    * "<Test>" has no value THEN: , print "!="
 
     * , save "Test" as "x"
-    * IF: "<Test>" has no value THEN: , print "!="
+    * "<Test>" has no value THEN: , print "!="
 
 
 
 
-  Scenario:  a sdfsdfd
-    * , save "AA" as "x"
-    * print :::parse { "<x>" == "AA"  }
+
 
 #    * , if "<SS>":
 #    : * , save "A"
@@ -75,11 +123,11 @@ Feature: Additiontest
   Scenario: adfsdfdsf
   @[DEBUG]
 #    * , if "Example Domain" Window is displayed, save "A" as "v"
-    * IF: "Examplse Domain" Window is displayed THEN: , save "A1" as "v"  ELSE:  , save "C1" as "v"
-#    * IF: "Example Domain" Window is displayed THEN: , save "A1" as "v" , ELSE-IF: "Google" Window is displayed THEN: , save "B1" as "v"
-#    * IF: "Example Domain" Window is displayed THEN: , save "A1" as "v" , ELSE-IF: "Google" Window is displayed THEN: , save "B1" as "v" ELSE:  , save "C1" as "v"
-#    * IF: "Google" Window is displayed THEN: , save "A2" as "v" , ELSE-IF: "Example Domain" Window is displayed THEN: , save "B2" as "v" ELSE:  , save "C2" as "v"
-#    * IF: "aa" Window is displayed THEN: , save "A3" as "v" , ELSE-IF: "Examplaae Domain" Window is displayed THEN: , save "B3" as "v" ELSE:  , save "C3" as "v"
+    * "Examplse Domain" Window is displayed THEN: , save "A1" as "v"  ELSE:  , save "C1" as "v"
+#    * "Example Domain" Window is displayed THEN: , save "A1" as "v" , ELSE-IF: "Google" Window is displayed THEN: , save "B1" as "v"
+#    * "Example Domain" Window is displayed THEN: , save "A1" as "v" , ELSE-IF: "Google" Window is displayed THEN: , save "B1" as "v" ELSE:  , save "C1" as "v"
+#    * "Google" Window is displayed THEN: , save "A2" as "v" , ELSE-IF: "Example Domain" Window is displayed THEN: , save "B2" as "v" ELSE:  , save "C2" as "v"
+#    * "aa" Window is displayed THEN: , save "A3" as "v" , ELSE-IF: "Examplaae Domain" Window is displayed THEN: , save "B3" as "v" ELSE:  , save "C3" as "v"
 #    * , if "Google" Window is displayed, save "A" as "v"
 
   Scenario: test dd match1
@@ -158,7 +206,7 @@ Feature: Additiontest
 #  @[DEBUG,##]
     * navigate to: URL.textbox
 #    * , from the Top Panel:
-#  : * IF: "aa" THEN: , click "Get your own website" Link
+#  : * "aa" THEN: , click "Get your own website" Link
 
 #    : * , click the "Run ❯" Button, and the "Get your website" Link, and wait 2 seconds
 #    * , switch Window

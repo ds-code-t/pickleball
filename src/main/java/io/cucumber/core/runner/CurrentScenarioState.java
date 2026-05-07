@@ -51,6 +51,7 @@ import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
 import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
+import static tools.dscode.common.treeparsing.preparsing.ParsedLine.createParsedLine;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
@@ -280,7 +281,7 @@ public class CurrentScenarioState extends ScenarioMapping {
             return;
         currentStep = stepExtension;
         int lineConditionalMode = stepExtension.lineData == null ?  1 :  stepExtension.lineData.lineConditionalMode;
-        stepExtension.lineData = new ParsedLine(stepExtension.getUnmodifiedText());
+        stepExtension.lineData = createParsedLine(stepExtension);
         stepExtension.lineData.lineConditionalMode = lineConditionalMode;
         stepExtension.lineData.setInheritance(stepExtension);
         currentPhrase = (Phrase) stepExtension.lineData.inheritedPhrase;

@@ -11,6 +11,9 @@ import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_FALSE;
+import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
+import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.assertions.AssertionChain.isAssertionChainBorder;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 import static tools.dscode.common.treeparsing.parsedComponents.PassedData.isNewBoundary;
@@ -18,15 +21,16 @@ import static tools.dscode.common.treeparsing.parsedComponents.PassedData.isNewB
 
 public final class ParsedLine extends LineData {
 
-    public ParsedLine() {
-        this("", new ArrayList<>());
+    public static ParsedLine createParsedLine(StepExtension stepExtension) {
+        return new ParsedLine(normalizeConditionalText(stepExtension));
     }
 
-    public ParsedLine(String input) {
+
+    private ParsedLine(String input) {
         this(input, List.of(',', ';', ':', '.', '!', '?'));
     }
 
-    public ParsedLine(String input, Collection<Character> delimiters) {
+    private ParsedLine(String input, Collection<Character> delimiters) {
         super(input, delimiters);
     }
 
@@ -35,21 +39,25 @@ public final class ParsedLine extends LineData {
         if (stepExtension.overridePhrase != null) {
             runPhraseFromLine(stepExtension.overridePhrase);
             return;
-//            phrases.clear();
-//            phrases.add(stepExtension.overridePhrase);
-//            startPhraseIndex = 0;
-//            runPhraseFromLine(stepExtension.overridePhrase);
         }
         PhraseData phrase = phrases.get(startPhraseIndex);
         runPhraseFromLine(phrase.resolvePhrase());
     }
 
-//    public static boolean isNewBoundary(PhraseData phrase1, PhraseData phrase2) {
-//        if(phrase1  == null || phrase2 == null) return true;
-//        if(phrase1.isContextTermination() || phrase2.isNewContext() || !phrase2.getAssertionType().isBlank()) return true;
-//        if(!phrase1.getOperation().isBlank() && !phrase2.getOperation().isBlank()) return true;
-//        return false;
-//    }
+    public static String normalizeConditionalText(StepExtension stepExtension) {
+        String input = stepExtension.getUnmodifiedText();
+        if (input == null || !input.matches("^(?:IF:|ELSE:|ELSE-IF:).*$")) {
+            return input;
+        }
+
+        stepExtension.addDefinitionFlag(NO_LOGGING, _NO_LOGGING, IGNORE_CHILDREN_IF_FALSE);
+
+        return input
+                .replace("ELSE-IF:", " , else if ")
+                .replace("ELSE:", " , else ")
+                .replace("IF:", " , if ")
+                .replace("THEN:", " , ");
+    }
 
 
     @Override

@@ -110,7 +110,6 @@ public final class PlatformSnapshot {
 
         DATA = Collections.unmodifiableMap(m);
 
-
         System.out.println("Platform Data: " + DATA);
     }
 
@@ -249,5 +248,107 @@ public final class PlatformSnapshot {
         if (os.contains("mac")) return "macOS";
         if (os.contains("linux")) return "Linux";
         return "Other";
+    }
+
+    public static String toHumanReadableString() {
+        return String.join(" | ", nonBlankParts(
+                kv("System", joinNonBlank(" ",
+                        str("os.family"),
+                        str("os.name"),
+                        str("os.version"),
+                        "(" + str("os.arch") + ")")),
+                kv("Machine", joinNonBlank(" / ",
+                        str("hostname"),
+                        str("domain.name"),
+                        str("machine.class"))),
+                kv("User", joinNonBlank(" / ",
+                        str("user.name"),
+                        str("interactive.user"))),
+                kv("Java", joinNonBlank(" ",
+                        str("java.version"),
+                        str("jvm.vendor"))),
+                kv("CPU", joinNonBlank(", ",
+                        DATA.get("processors") + " cores",
+                        clean(str("cpu.model")))),
+                kv("Memory", bytes(DATA.get("memory.total.physical"))),
+                kv("Runtime", joinNonBlank(", ",
+                        "pid " + DATA.get("pid"),
+                        "headless=" + DATA.get("headless"),
+                        "nonInteractive=" + DATA.get("service.nonInteractive"))),
+                kv("Environment", joinNonBlank(", ",
+                        named("CI", str("ci.type")),
+                        named("Cloud", str("cloud.provider")),
+                        named("Container", DATA.get("container")),
+                        named("Orchestrator", str("container.orchestrator")))),
+                kv("Locale", joinNonBlank(", ",
+                        str("locale"),
+                        str("timezone"),
+                        str("utc.offset")))
+        ));
+    }
+
+    public static String toHumanReadableStringMultiline() {
+        return toHumanReadableString().replace(" | ", System.lineSeparator());
+    }
+
+    private static String str(String key) {
+        Object value = DATA.get(key);
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private static String kv(String name, String value) {
+        value = clean(value);
+        return value == null ? null : name + ": " + value;
+    }
+
+    private static String named(String name, Object value) {
+        value = clean(value == null ? null : String.valueOf(value));
+        return value == null ? null : name + "=" + value;
+    }
+
+    private static List<String> nonBlankParts(String... values) {
+        List<String> out = new ArrayList<>();
+        for (String value : values) {
+            value = clean(value);
+            if (value != null) out.add(value);
+        }
+        return out;
+    }
+
+    private static String joinNonBlank(String delimiter, String... values) {
+        return String.join(delimiter, nonBlankParts(values));
+    }
+
+    private static String clean(String value) {
+        if (value == null) return null;
+
+        value = value.trim();
+        if (value.isEmpty()) return null;
+
+        String lower = value.toLowerCase(Locale.ROOT);
+        if (lower.equals("null")
+                || lower.equals("none")
+                || lower.equals("unknown")
+                || lower.equals("n/a")
+                || lower.equals("ci=none")
+                || lower.equals("cloud=unknown")
+                || lower.equals("orchestrator=none")) {
+            return null;
+        }
+
+        return value;
+    }
+
+    private static String bytes(Object value) {
+        if (!(value instanceof Number n)) return null;
+
+        long bytes = n.longValue();
+        if (bytes <= 0) return null;
+
+        double gib = bytes / 1024d / 1024d / 1024d;
+        if (gib >= 1) return String.format(Locale.ROOT, "%.1f GiB", gib);
+
+        double mib = bytes / 1024d / 1024d;
+        return String.format(Locale.ROOT, "%.0f MiB", mib);
     }
 }
