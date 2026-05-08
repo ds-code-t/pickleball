@@ -479,6 +479,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
         Tokenized tokenized = new Tokenized(key);
         Object returnReplacement = null;
+
         while (true) {
             for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
                 if (map == null)
@@ -489,6 +490,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     if (replacement instanceof String replacementString && replacementString.isEmpty() && !key.startsWith("?")) {
                         key = "?" + key;
                         directGet = true;
+                        returnReplacement = replacement;
                         continue;
                     }
                     returnReplacement = replacement;
