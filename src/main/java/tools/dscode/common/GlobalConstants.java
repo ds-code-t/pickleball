@@ -46,11 +46,16 @@ public class GlobalConstants {
     public static final String INFO_STEP = STEP_PREFIX + "INFO: ";
     public static final String HARD_ERROR_STEP = STEP_PREFIX + "FAIL ERROR: ";
     public static final String SOFT_ERROR_STEP = STEP_PREFIX + "ERROR: ";
+
+
     public static final String OPEN_BRACKET_SUB_A = "-o\u241Ab-";
     public static final String CLOSE_BRACKET_SUB_A = "-c\u241Ab-";
     public static final String OPEN_BRACKET_SUB_B = "-o\u240Bb-";
     public static final String CLOSE_BRACKET_SUB_B = "-c\u240B-b";
-
+    public static final String OPEN_ANGLE_REPLACEMENT_SUB = "-oa\u241Ar-";
+    public static final String CLOSE_ANGLE_REPLACEMENT_SUB = "-ca\u241Ar-";
+    public static final String OPEN_CURLY_REPLACEMENT_SUB = "-oc\u240Br-";
+    public static final String CLOSE_CURLY_REPLACEMENT_SUB = "-cc\u240Br-";
 
     public static final String SUBSTITUTE_MARKER_A = "\u241A";
     public static final String SUBSTITUTE_MARKER_B = "\u240B";

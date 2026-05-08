@@ -30,11 +30,15 @@ import static io.cucumber.core.runner.util.TableUtils.HEADER_KEY;
 import static io.cucumber.core.runner.util.TableUtils.ENTRY_KEY;
 import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
+import static tools.dscode.common.GlobalConstants.CLOSE_ANGLE_REPLACEMENT_SUB;
 import static tools.dscode.common.GlobalConstants.CLOSE_BRACKET_SUB_A;
 import static tools.dscode.common.GlobalConstants.CLOSE_BRACKET_SUB_B;
+import static tools.dscode.common.GlobalConstants.CLOSE_CURLY_REPLACEMENT_SUB;
 import static tools.dscode.common.GlobalConstants.MATCH_BREAK;
+import static tools.dscode.common.GlobalConstants.OPEN_ANGLE_REPLACEMENT_SUB;
 import static tools.dscode.common.GlobalConstants.OPEN_BRACKET_SUB_A;
 import static tools.dscode.common.GlobalConstants.OPEN_BRACKET_SUB_B;
+import static tools.dscode.common.GlobalConstants.OPEN_CURLY_REPLACEMENT_SUB;
 import static tools.dscode.common.dataoperations.DataComparisons.filterGroupedValues;
 
 import static tools.dscode.common.dataoperations.TableQueries.findCells;
@@ -717,6 +721,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
 
+
     public String resolveWholeTextWithAlternateBookends(
             String input,
             String openAngleReplacement,
@@ -735,7 +740,22 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
         String prepared = input;
 
-        // Only protect the corresponding real delimiter if its alternate syntax is enabled.
+        // 1. Protect the alternate bookend strings first.
+        // This allows replacements like "[<" and ">]" to work.
+        if (replaceOpenAngle) {
+            prepared = prepared.replace(openAngleReplacement, OPEN_ANGLE_REPLACEMENT_SUB);
+        }
+        if (replaceCloseAngle) {
+            prepared = prepared.replace(closeAngleReplacement, CLOSE_ANGLE_REPLACEMENT_SUB);
+        }
+        if (replaceOpenCurly) {
+            prepared = prepared.replace(openCurlyReplacement, OPEN_CURLY_REPLACEMENT_SUB);
+        }
+        if (replaceCloseCurly) {
+            prepared = prepared.replace(closeCurlyReplacement, CLOSE_CURLY_REPLACEMENT_SUB);
+        }
+
+        // 2. Protect literal real delimiters.
         if (replaceOpenAngle) {
             prepared = prepared.replace("<", OPEN_BRACKET_SUB_A);
         }
@@ -749,23 +769,39 @@ public abstract class MappingProcessor implements Map<String, Object> {
             prepared = prepared.replace("}", CLOSE_BRACKET_SUB_B);
         }
 
-        // Only convert enabled alternate delimiters into real template delimiters.
+        // 3. Turn alternate-bookend placeholders into real delimiters.
         if (replaceOpenAngle) {
-            prepared = prepared.replace(openAngleReplacement, "<");
+            prepared = prepared.replace(OPEN_ANGLE_REPLACEMENT_SUB, "<");
         }
         if (replaceCloseAngle) {
-            prepared = prepared.replace(closeAngleReplacement, ">");
+            prepared = prepared.replace(CLOSE_ANGLE_REPLACEMENT_SUB, ">");
         }
         if (replaceOpenCurly) {
-            prepared = prepared.replace(openCurlyReplacement, "{");
+            prepared = prepared.replace(OPEN_CURLY_REPLACEMENT_SUB, "{");
         }
         if (replaceCloseCurly) {
-            prepared = prepared.replace(closeCurlyReplacement, "}");
+            prepared = prepared.replace(CLOSE_CURLY_REPLACEMENT_SUB, "}");
         }
 
+        // 4. Resolve normally.
         String resolved = resolveWholeText(prepared);
 
-        // Only restore placeholders that were actually used.
+        // 5. Restore any unresolved alternate placeholders back to their original syntax.
+        // This matters if something survives resolution unchanged.
+        if (replaceOpenAngle) {
+            resolved = resolved.replace(OPEN_ANGLE_REPLACEMENT_SUB, openAngleReplacement);
+        }
+        if (replaceCloseAngle) {
+            resolved = resolved.replace(CLOSE_ANGLE_REPLACEMENT_SUB, closeAngleReplacement);
+        }
+        if (replaceOpenCurly) {
+            resolved = resolved.replace(OPEN_CURLY_REPLACEMENT_SUB, openCurlyReplacement);
+        }
+        if (replaceCloseCurly) {
+            resolved = resolved.replace(CLOSE_CURLY_REPLACEMENT_SUB, closeCurlyReplacement);
+        }
+
+        // 6. Restore protected literal delimiters.
         if (replaceOpenAngle) {
             resolved = resolved.replace(OPEN_BRACKET_SUB_A, "<");
         }
