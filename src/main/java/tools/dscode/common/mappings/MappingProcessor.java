@@ -484,7 +484,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 if (replacement != null) {
                     if (replacement instanceof String replacementString && replacementString.isEmpty() && !key.startsWith("?")) {
                         key = "?" + key;
-                        tokenized = new Tokenized(key);
                         directGet = true;
                         continue;
                     }
@@ -492,9 +491,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     break;
                 }
             }
-            if (key.startsWith("?"))
+            if (returnReplacement != null || key.startsWith("?"))
                 break;
             key = "?" + key;
+            directGet = true;
         }
         return returnReplacement;
     }
