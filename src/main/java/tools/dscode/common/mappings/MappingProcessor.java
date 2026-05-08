@@ -30,7 +30,11 @@ import static io.cucumber.core.runner.util.TableUtils.HEADER_KEY;
 import static io.cucumber.core.runner.util.TableUtils.ENTRY_KEY;
 import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
+import static tools.dscode.common.GlobalConstants.CLOSE_BRACKET_SUB_A;
+import static tools.dscode.common.GlobalConstants.CLOSE_BRACKET_SUB_B;
 import static tools.dscode.common.GlobalConstants.MATCH_BREAK;
+import static tools.dscode.common.GlobalConstants.OPEN_BRACKET_SUB_A;
+import static tools.dscode.common.GlobalConstants.OPEN_BRACKET_SUB_B;
 import static tools.dscode.common.dataoperations.DataComparisons.filterGroupedValues;
 
 import static tools.dscode.common.dataoperations.TableQueries.findCells;
@@ -287,9 +291,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
     private static final Pattern ANGLE = Pattern.compile("<(?![\\s=])([^<>{}]*[^\\s<>{}])>");
     private static final Pattern CURLY = Pattern.compile("\\{([^{}]+)\\}");
 
-    // public void put(int index, Object key, Object value) {
-    // maps.get(index).put(key, value);
-    // }
 
     public String resolveWholeText(String input) {
         QuoteParser parsedObj = new QuoteParser(input);
@@ -708,5 +709,79 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 .collect(Collectors.joining(System.lineSeparator()))
                 + "\n---\n";
     }
+
+
+
+
+    public String resolveWholeTextWithAlternateBookends(
+            String input,
+            String openAngleReplacement,
+            String closeAngleReplacement,
+            String openCurlyReplacement,
+            String closeCurlyReplacement
+    ) {
+        if (input == null) {
+            return null;
+        }
+
+        boolean replaceOpenAngle = hasText(openAngleReplacement);
+        boolean replaceCloseAngle = hasText(closeAngleReplacement);
+        boolean replaceOpenCurly = hasText(openCurlyReplacement);
+        boolean replaceCloseCurly = hasText(closeCurlyReplacement);
+
+        String prepared = input;
+
+        // Only protect the corresponding real delimiter if its alternate syntax is enabled.
+        if (replaceOpenAngle) {
+            prepared = prepared.replace("<", OPEN_BRACKET_SUB_A);
+        }
+        if (replaceCloseAngle) {
+            prepared = prepared.replace(">", CLOSE_BRACKET_SUB_A);
+        }
+        if (replaceOpenCurly) {
+            prepared = prepared.replace("{", OPEN_BRACKET_SUB_B);
+        }
+        if (replaceCloseCurly) {
+            prepared = prepared.replace("}", CLOSE_BRACKET_SUB_B);
+        }
+
+        // Only convert enabled alternate delimiters into real template delimiters.
+        if (replaceOpenAngle) {
+            prepared = prepared.replace(openAngleReplacement, "<");
+        }
+        if (replaceCloseAngle) {
+            prepared = prepared.replace(closeAngleReplacement, ">");
+        }
+        if (replaceOpenCurly) {
+            prepared = prepared.replace(openCurlyReplacement, "{");
+        }
+        if (replaceCloseCurly) {
+            prepared = prepared.replace(closeCurlyReplacement, "}");
+        }
+
+        String resolved = resolveWholeText(prepared);
+
+        // Only restore placeholders that were actually used.
+        if (replaceOpenAngle) {
+            resolved = resolved.replace(OPEN_BRACKET_SUB_A, "<");
+        }
+        if (replaceCloseAngle) {
+            resolved = resolved.replace(CLOSE_BRACKET_SUB_A, ">");
+        }
+        if (replaceOpenCurly) {
+            resolved = resolved.replace(OPEN_BRACKET_SUB_B, "{");
+        }
+        if (replaceCloseCurly) {
+            resolved = resolved.replace(CLOSE_BRACKET_SUB_B, "}");
+        }
+
+        return resolved;
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isEmpty();
+    }
+
+
 
 }
