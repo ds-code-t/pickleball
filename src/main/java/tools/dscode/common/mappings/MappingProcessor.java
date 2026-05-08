@@ -474,23 +474,29 @@ public abstract class MappingProcessor implements Map<String, Object> {
         }
 
         Tokenized tokenized = new Tokenized(key);
-        for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
-            if (map == null)
-                continue;
-            Object replacement = directGet ? map.directGet(key) : map.get(tokenized);
-
-            if (replacement != null) {
-                if(replacement instanceof String replacementString && replacementString.isEmpty() && !key.startsWith("?"))
-                {
-                    key =  "?" + key ;
-                    tokenized = new Tokenized(key);
-                    directGet = true;
+        Object returnReplacement = null;
+        while (true) {
+            for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
+                if (map == null)
                     continue;
+                Object replacement = directGet ? map.directGet(key) : map.get(tokenized);
+
+                if (replacement != null) {
+                    if (replacement instanceof String replacementString && replacementString.isEmpty() && !key.startsWith("?")) {
+                        key = "?" + key;
+                        tokenized = new Tokenized(key);
+                        directGet = true;
+                        continue;
+                    }
+                    returnReplacement = replacement;
+                    break;
                 }
-                return replacement;
             }
+            if (key.startsWith("?"))
+                break;
+            key = "?" + key;
         }
-        return null;
+        return returnReplacement;
     }
 
     public List<?> get(ElementMatch element) {
@@ -711,8 +717,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
 
-
-
     public String resolveWholeTextWithAlternateBookends(
             String input,
             String openAngleReplacement,
@@ -781,7 +785,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
     private static boolean hasText(String value) {
         return value != null && !value.isEmpty();
     }
-
 
 
 }

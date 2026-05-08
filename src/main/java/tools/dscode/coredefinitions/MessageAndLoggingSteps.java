@@ -19,7 +19,7 @@ public class MessageAndLoggingSteps {
         getCurrentScenarioState().endCurrentScenario = true;
     }
 
-    @Given("^END Test")
+    @Given("^END TEST")
     public void manuallyEndTest() {
         stepInfo("Manually ending Test");
         endTest();
