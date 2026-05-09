@@ -23,6 +23,7 @@ import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.driver.DriverConstruction;
 import tools.dscode.common.reporting.logging.Entry;
+import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.common.reporting.logging.Status;
 import tools.dscode.common.servicecalls.JacksonUtils;
 import tools.dscode.common.servicecalls.ToJsonNode;
@@ -103,8 +104,8 @@ public class CalculatorSteps {
 
     }
 
-    @Given("^test3(?: (.*))?$")
-    public static void test3(String value) {
+    @Given("^test3b(?: (.*))?$")
+    public static void test3b(String value) {
         String x1 = "//div";
         String x2 = "//*[@role]";
         System.out.println("@@combineAnd: " + combineAnd(x1, x2));
@@ -116,8 +117,306 @@ public class CalculatorSteps {
         runScenarioFromTag(scenarioTag);
     }
 
-    @Given("^test2(?: (.*))?$")
-    public static void test2(String value) {
+
+    @Given("^test1(?: (.*))?$")
+    public static void test1(String value) {
+        Entry root = getRunningStep().stepEntry;
+
+        root.child("UI Style Test Matrix")
+                .tag("Global")
+                .start()
+
+                .child("Scenario - PASS / INFO")
+                .tag("Scenario")
+                .level(Level.INFO)
+                .status(Status.PASS)
+                .timestamp()
+                .up()
+
+                .child("Scenario - FAIL / ERROR")
+                .tag("Scenario")
+                .level(Level.ERROR)
+                .status(Status.FAIL)
+                .timestamp()
+                .up()
+
+                .child("Step - PASS / DEBUG")
+                .tag("Step")
+                .level(Level.DEBUG)
+                .status(Status.PASS)
+                .timestamp()
+                .up()
+
+                .child("Step - WARN / WARN")
+                .tag("Step")
+                .level(Level.WARN)
+                .status(Status.WARN)
+                .timestamp()
+                .up()
+
+                .child("Step - FAIL / INFO")
+                .tag("Step")
+                .level(Level.INFO)
+                .status(Status.FAIL)
+                .timestamp()
+                .up()
+
+                .child("Phrase - INFO / TRACE")
+                .tag("Phrase")
+                .level(Level.TRACE)
+                .status(Status.INFO)
+                .timestamp()
+                .up()
+
+                .child("Phrase - SKIP / DEBUG")
+                .tag("Phrase")
+                .level(Level.DEBUG)
+                .status(Status.SKIP)
+                .timestamp()
+                .up()
+
+                .child("Screenshot - PASS / INFO")
+                .tag("Screenshot")
+                .level(Level.INFO)
+                .status(Status.PASS)
+                .timestamp()
+                .up()
+
+                .child("Screenshot - FAIL / ERROR")
+                .tag("Screenshot")
+                .level(Level.ERROR)
+                .status(Status.FAIL)
+                .timestamp()
+                .up()
+
+                .child("Default - no tag - UNKNOWN / TRACE")
+                .level(Level.TRACE)
+                .status(Status.UNKNOWN)
+                .timestamp()
+                .up()
+
+                .stop(Status.PASS);
+    }
+
+
+
+        @Given("^EntryTest1(?: (.*))?$")
+        public static void entryTest1(String value) {
+            getRunningStep().stepEntry.level(Level.INFO).status(Status.PASS);
+        }
+
+        @Given("^EntryTest2(?: (.*))?$")
+        public static void entryTest2(String value) {
+            getRunningStep().stepEntry.level(Level.INFO).status(Status.FAIL);
+        }
+
+        @Given("^EntryTest3(?: (.*))?$")
+        public static void entryTest3(String value) {
+            getRunningStep().stepEntry.level(Level.INFO).status(Status.WARN);
+        }
+
+        @Given("^EntryTest4(?: (.*))?$")
+        public static void entryTest4(String value) {
+            getRunningStep().stepEntry.level(Level.INFO).status(Status.SKIP);
+        }
+
+        @Given("^EntryTest5(?: (.*))?$")
+        public static void entryTest5(String value) {
+            getRunningStep().stepEntry.level(Level.INFO).status(Status.UNKNOWN);
+        }
+
+        @Given("^EntryTest6(?: (.*))?$")
+        public static void entryTest6(String value) {
+            getRunningStep().stepEntry.level(Level.ERROR).status(Status.FAIL);
+        }
+
+        @Given("^EntryTest7(?: (.*))?$")
+        public static void entryTest7(String value) {
+            getRunningStep().stepEntry.level(Level.ERROR).status(Status.PASS);
+        }
+
+        @Given("^EntryTest8(?: (.*))?$")
+        public static void entryTest8(String value) {
+            getRunningStep().stepEntry.level(Level.ERROR).status(Status.WARN);
+        }
+
+        @Given("^EntryTest9(?: (.*))?$")
+        public static void entryTest9(String value) {
+            getRunningStep().stepEntry.level(Level.WARN).status(Status.WARN);
+        }
+
+        @Given("^EntryTest10(?: (.*))?$")
+        public static void entryTest10(String value) {
+            getRunningStep().stepEntry.level(Level.WARN).status(Status.PASS);
+        }
+
+        @Given("^EntryTest11(?: (.*))?$")
+        public static void entryTest11(String value) {
+            getRunningStep().stepEntry.level(Level.WARN).status(Status.FAIL);
+        }
+
+        @Given("^EntryTest12(?: (.*))?$")
+        public static void entryTest12(String value) {
+            getRunningStep().stepEntry.level(Level.DEBUG).status(Status.PASS);
+        }
+
+        @Given("^EntryTest13(?: (.*))?$")
+        public static void entryTest13(String value) {
+            getRunningStep().stepEntry.level(Level.DEBUG).status(Status.FAIL);
+        }
+
+        @Given("^EntryTest14(?: (.*))?$")
+        public static void entryTest14(String value) {
+            getRunningStep().stepEntry.level(Level.DEBUG).status(Status.UNKNOWN);
+        }
+
+        @Given("^EntryTest15(?: (.*))?$")
+        public static void entryTest15(String value) {
+            getRunningStep().stepEntry.level(Level.TRACE).status(Status.PASS);
+        }
+
+        @Given("^EntryTest16(?: (.*))?$")
+        public static void entryTest16(String value) {
+            getRunningStep().stepEntry.level(Level.TRACE).status(Status.SKIP);
+        }
+
+        @Given("^EntryTest17(?: (.*))?$")
+        public static void entryTest17(String value) {
+            getRunningStep().stepEntry.level(Level.TRACE).status(Status.UNKNOWN);
+        }
+
+    @Given("^ProfileTest1(?: (.*))?$")
+    public static void profileTest1(String value) {
+        getRunningStep().stepEntry
+                .tag("Scenario")
+                .tag("Compact")
+                .level(Level.INFO)
+                .status(Status.PASS);
+    }
+
+    @Given("^ProfileTest2(?: (.*))?$")
+    public static void profileTest2(String value) {
+        getRunningStep().stepEntry
+                .tag("Scenario")
+                .tag("Spacious")
+                .level(Level.ERROR)
+                .status(Status.FAIL);
+    }
+
+    @Given("^ProfileTest3(?: (.*))?$")
+    public static void profileTest3(String value) {
+        getRunningStep().stepEntry
+                .tag("Step")
+                .tag("Rounded")
+                .level(Level.WARN)
+                .status(Status.WARN);
+    }
+
+    @Given("^ProfileTest4(?: (.*))?$")
+    public static void profileTest4(String value) {
+        getRunningStep().stepEntry
+                .tag("Step")
+                .tag("Sharp")
+                .level(Level.DEBUG)
+                .status(Status.PASS);
+    }
+
+    @Given("^ProfileTest5(?: (.*))?$")
+    public static void profileTest5(String value) {
+        getRunningStep().stepEntry
+                .tag("Phrase")
+                .tag("Elevated")
+                .level(Level.TRACE)
+                .status(Status.INFO);
+    }
+
+    @Given("^ProfileTest6(?: (.*))?$")
+    public static void profileTest6(String value) {
+        getRunningStep().stepEntry
+                .tag("Phrase")
+                .tag("Flat")
+                .level(Level.INFO)
+                .status(Status.SKIP);
+    }
+
+    @Given("^ProfileTest7(?: (.*))?$")
+    public static void profileTest7(String value) {
+        getRunningStep().stepEntry
+                .tag("Screenshot")
+                .tag("Bold Title")
+                .level(Level.ERROR)
+                .status(Status.FAIL);
+    }
+
+    @Given("^ProfileTest8(?: (.*))?$")
+    public static void profileTest8(String value) {
+        getRunningStep().stepEntry
+                .tag("Screenshot")
+                .tag("Wide Title")
+                .level(Level.WARN)
+                .status(Status.WARN);
+    }
+
+    @Given("^ProfileTest9(?: (.*))?$")
+    public static void profileTest9(String value) {
+        getRunningStep().stepEntry
+                .tag("Scenario")
+                .tag("Uppercase Title")
+                .level(Level.INFO)
+                .status(Status.UNKNOWN);
+    }
+
+    @Given("^ProfileTest10(?: (.*))?$")
+    public static void profileTest10(String value) {
+        getRunningStep().stepEntry
+                .tag("Step")
+                .tag("Monospace Title")
+                .level(Level.DEBUG)
+                .status(Status.PASS);
+    }
+
+    @Given("^ProfileTest11(?: (.*))?$")
+    public static void profileTest11(String value) {
+        getRunningStep().stepEntry
+                .tag("Phrase")
+                .tag("Center Title")
+                .level(Level.TRACE)
+                .status(Status.INFO);
+    }
+
+    @Given("^ProfileTest12(?: (.*))?$")
+    public static void profileTest12(String value) {
+        getRunningStep().stepEntry
+                .tag("Scenario")
+                .tag("Muted Visual")
+                .level(Level.WARN)
+                .status(Status.WARN);
+    }
+
+    @Given("^ProfileTest13(?: (.*))?$")
+    public static void profileTest13(String value) {
+        getRunningStep().stepEntry
+                .tag("Step")
+                .tag("Rounded")
+                .tag("Elevated")
+                .tag("Bold Title")
+                .level(Level.ERROR)
+                .status(Status.FAIL);
+    }
+
+    @Given("^ProfileTest14(?: (.*))?$")
+    public static void profileTest14(String value) {
+        getRunningStep().stepEntry
+                .tag("Phrase")
+                .tag("Compact")
+                .tag("Monospace Title")
+                .tag("Wide Title")
+                .level(Level.DEBUG)
+                .status(Status.UNKNOWN);
+    }
+
+    @Given("^test2b(?: (.*))?$")
+    public static void test2b(String value) {
         System.out.println("@@test: " + value);
         runScenarioFromTag("%zer1");
 //        System.out.println(Thread.currentThread().getContextClassLoader().getResource("runconfigs"));

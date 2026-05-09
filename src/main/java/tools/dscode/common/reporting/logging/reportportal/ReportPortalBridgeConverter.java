@@ -16,7 +16,9 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -274,13 +276,34 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
             sb.append("\nduration: ").append(formatDuration(d));
         }
 
-        if (!entry.fields.isEmpty()) {
+        Map<String, Object> reportFields = nonPresentationFields(entry.fields);
+
+        if (!reportFields.isEmpty()) {
             sb.append("\nfields:");
-            entry.fields.forEach((k, v) ->
+            reportFields.forEach((k, v) ->
                     sb.append("\n- ").append(k).append(": ").append(v == null ? "" : v));
         }
 
         return sb.toString();
+    }
+
+    private static Map<String, Object> nonPresentationFields(Map<String, Object> fields) {
+        if (fields == null || fields.isEmpty()) return Map.of();
+
+        Map<String, Object> out = new LinkedHashMap<>();
+
+        fields.forEach((k, v) -> {
+            if (k == null) return;
+
+            String key = k.trim();
+            if (key.regionMatches(true, 0, "html.", 0, "html.".length())) {
+                return;
+            }
+
+            out.put(k, v);
+        });
+
+        return out;
     }
 
     private static String formatDuration(Duration d) {

@@ -25,8 +25,6 @@ import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.GlobalConstants.SOFT_ERROR_STEP;
 import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
-import static tools.dscode.common.variables.PlatformSnapshot.toHumanReadableString;
-import static tools.dscode.testengine.PickleballRunner.getOptionsString;
 
 
 public class GeneralSteps extends CoreSteps {

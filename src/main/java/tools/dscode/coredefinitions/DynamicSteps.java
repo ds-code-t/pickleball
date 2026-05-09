@@ -13,7 +13,13 @@ import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionar
 
 
 public class DynamicSteps  extends CoreSteps {
+
+
     @Given("^((?:IF:|ELSE:|ELSE-IF:).*)$")
+    public void executeDynamicStepBlockConditionals(String stepText) {
+        executeDynamicStep(stepText);
+    }
+
     @Given("^,(.*)$")
     public void executeDynamicStep(String stepText) {
         StepExtension currentStep = getRunningStep();

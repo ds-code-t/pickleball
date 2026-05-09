@@ -50,25 +50,7 @@ public class GlobalState {
         String entryName = "Pickleball Run: " + getOptionsString();
         pickleballLog =
                 Entry.of(entryName).excludeFromSummary()
-                        .tag("RUNLOG")
-
-                        .field("html.fontSize:15px",
-                                "html.headerFontSize:22px",
-                                "html.borderColor:#2563eb",
-                                "html.borderWidth:4px",
-                                "html.headerBackgroundColor:#dbeafe",
-                                "html.headerColor:#1e3a8a"
-                        )
-
-                        .defaultDescendantFields(
-                                "html.fontSize:12px",
-                                "html.headerFontSize:13px",
-                                "html.borderColor:#e5e7eb",
-                                "html.borderWidth:1px",
-                                "html.headerBackgroundColor:#f9fafb",
-                                "html.headerColor:#374151"
-                        )
-
+                        .tag("Global")
                         .on(new SimpleHtmlReportConverter(
                                 Path.of("reports/tests", safeFileName(entryName + ".html"))
                         )).threadSafe().start();

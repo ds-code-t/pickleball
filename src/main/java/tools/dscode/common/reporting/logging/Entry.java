@@ -418,6 +418,47 @@ public class Entry {
         });
     }
 
+    public boolean hasAnyTag(String... wantedTags) {
+        return guarded(() -> hasAnyTagIn(this.tags, wantedTags));
+    }
+
+    /**
+     * True if THIS entry has any ancestor with any of the supplied tags.
+     * Does not check this entry itself.
+     */
+    public boolean hasAncestorWithAnyTag(String... wantedTags) {
+        return guarded(() -> {
+            if (wantedTags == null || wantedTags.length == 0) return false;
+
+            for (Entry n = this.parent; n != null; n = n.parent) {
+                if (hasAnyTagIn(n.tags, wantedTags)) {
+                    return true;
+                }
+            }
+
+            return false;
+        });
+    }
+
+    private static boolean hasAnyTagIn(List<String> actualTags, String... wantedTags) {
+        if (actualTags == null || actualTags.isEmpty()) return false;
+        if (wantedTags == null || wantedTags.length == 0) return false;
+
+        for (String wanted : wantedTags) {
+            if (wanted == null || wanted.isBlank()) continue;
+
+            String w = wanted.trim();
+
+            for (String actual : actualTags) {
+                if (actual != null && w.equals(actual.trim())) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     public Entry field(String... keyValuePairs) {
         return guarded(() -> {
             if (keyValuePairs != null) {
@@ -505,15 +546,8 @@ public class Entry {
                 createChild(label)
                         .level(Level.INFO)
                         .status(Status.INFO)
-                        .field(
-                                "html.fontSize:12px",
-                                "html.headerFontSize:14px",
-                                "html.borderColor:#0ea5e9",
-                                "html.borderWidth:2px",
-                                "html.headerBackgroundColor:#e0f2fe",
-                                "html.headerColor:#075985"
-                        )
                         .attach(filename, "image/png;base64", base64)
+                        .tags("Screenshot")
                         .timestamp();
 
                 printInfo("Screenshot attached");

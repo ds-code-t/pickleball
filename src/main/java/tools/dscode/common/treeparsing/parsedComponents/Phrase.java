@@ -40,7 +40,7 @@ public final class Phrase extends PhraseData {
 
     boolean shouldRun() {
 
-        if(assertionChainMembership != null)
+        if (assertionChainMembership != null)
             return true;
         if (getConditional().startsWith("else")) {
             if (getPreviousPhrase() == null) {
@@ -158,7 +158,16 @@ public final class Phrase extends PhraseData {
             categoryFlags.add(ExecutionDictionary.CategoryFlags.DATA_CONTEXT);
 //            String categoryName = firstElement.category.replaceFirst("(?i:s)$", "");
             String key = null;
-            List obj = getPhraseParsingMap().get(firstElement);
+            List obj;
+            try {
+                obj = getPhraseParsingMap().get(firstElement);
+            }
+            catch (NullPointerException e) {
+                obj = null;
+            }
+            if (obj == null)
+                throw new RuntimeException("Failed to find Data element for: " + firstElement);
+
             if (firstElement.selectionType.isEmpty()) {
                 if (obj == null || obj.isEmpty())
                     phraseConditionalMode = 0;
@@ -240,7 +249,6 @@ public final class Phrase extends PhraseData {
     }
 
 
-
     @Override
     public PhraseData clonePhrase(PhraseData previous, Character newTermination) {
         Phrase clone = copyPhraseWithModifications(this, newTermination, parsedLine, previous);
@@ -249,7 +257,7 @@ public final class Phrase extends PhraseData {
     }
 
     public PhraseData resolvePhrase() {
-        PhraseData resolvedPhrase = new Phrase( text, termination, parsedLine, getPreviousPhrase());
+        PhraseData resolvedPhrase = new Phrase(text, termination, parsedLine, getPreviousPhrase());
         if (resolvedPhrase.getAction().endsWith("attach") && !resolvedPhrase.getElementMatches().stream().anyMatch(e -> e.elementTypes.contains(ElementType.HTML_TYPE))) {
             resolvedPhrase = new Phrase(resolvedPhrase.resolvedText.replaceFirst("\\battach(?:es|ed)?\\b", "attach " + FILE_INPUT + " "), termination, parsedLine);
         }
@@ -273,12 +281,12 @@ public final class Phrase extends PhraseData {
     }
 
 
-
-    public static Phrase copyPhraseWithModifications(Phrase phrase){
+    public static Phrase copyPhraseWithModifications(Phrase phrase) {
         return copyPhraseWithModifications(phrase, null, null, null);
     }
-    public static Phrase copyPhraseWithModifications(Phrase phrase, Character newTermination, LineData parsedLine, PhraseData previous){
-        Phrase clonePhrase = newTermination == null ?  new Phrase(phrase.text, phrase.termination, phrase.parsedLine ) :new Phrase(phrase.text, newTermination, parsedLine, previous);
+
+    public static Phrase copyPhraseWithModifications(Phrase phrase, Character newTermination, LineData parsedLine, PhraseData previous) {
+        Phrase clonePhrase = newTermination == null ? new Phrase(phrase.text, phrase.termination, phrase.parsedLine) : new Phrase(phrase.text, newTermination, parsedLine, previous);
         clonePhrase.operationInheritancePhrase = phrase.operationInheritancePhrase;
         clonePhrase.assertionChainMembership = phrase.assertionChainMembership;
         clonePhrase.isChainedAssertion = phrase.isChainedAssertion;
@@ -293,8 +301,7 @@ public final class Phrase extends PhraseData {
         clonePhrase.isClone = true;
         clonePhrase.position = phrase.position;
         clonePhrase.phraseParsingMap = phrase.phraseParsingMap;
-        if(previous==null)
-        {
+        if (previous == null) {
             clonePhrase.setPreviousPhrase(phrase.getPreviousPhrase());
         }
         if (phrase.getNextPhrase() != null) {

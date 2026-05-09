@@ -75,7 +75,7 @@ public class StepExtension extends StepData {
 
 
         this.methodName = this.method == null ? "" : this.method.getName();
-        this.isDynamicStep = isCoreStep && methodName.equals("executeDynamicStep");
+        this.isDynamicStep = isCoreStep && methodName.startsWith("executeDynamicStep");
         this.isCoreConditionalStep = isCoreStep && methodName.equals("runConditional");
 
         if (definitionFlags.contains(DefinitionFlag.NO_LOGGING))
@@ -179,21 +179,8 @@ public class StepExtension extends StepData {
         executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
         executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
         if (!definitionFlags.contains(DefinitionFlag.NO_LOGGING)) {
-            stepEntry = getScenarioLogRoot().logWithType("STEP", executingPickleStepTestStep.getStepText()).start()
-                    .defaultDescendantFields(
-                            "html.fontSize:12px",
-                            "html.headerFontSize:14px",
-                            "html.borderColor:#e5e7eb",
-                            "html.borderWidth:1px"
-                    )
-                    .field(
-                            "html.fontSize:13px",
-                            "html.headerFontSize:16px",
-                            "html.borderColor:#f59e0b",
-                            "html.borderWidth:2px",
-                            "html.headerBackgroundColor:#fffbeb",
-                            "html.headerColor:#78350f"
-                    );
+            stepEntry = getScenarioLogRoot().logWithType("STEP", executingPickleStepTestStep.getStepText()).tags("Step").start();
+
         }
         lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
         io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep, executionMode);

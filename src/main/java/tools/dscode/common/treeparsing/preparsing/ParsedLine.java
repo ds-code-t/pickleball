@@ -90,21 +90,7 @@ public final class ParsedLine extends LineData {
         getCurrentScenarioState().currentPhrase = (tools.dscode.common.treeparsing.parsedComponents.Phrase) phrase;
 
         if (stepEntry != null) {
-            phrase.phraseEntry = getRunningStep().stepEntry.logWithType("PHRASE", phrase.toString()).start()
-                    .defaultDescendantFields(
-                            "html.fontSize:12px",
-                            "html.headerFontSize:13px",
-                            "html.borderColor:#e5e7eb",
-                            "html.borderWidth:1px"
-                    )
-                    .field(
-                            "html.fontSize:12px",
-                            "html.headerFontSize:14px",
-                            "html.borderColor:#10b981",
-                            "html.borderWidth:1px",
-                            "html.headerBackgroundColor:#ecfdf5",
-                            "html.headerColor:#064e3b"
-                    );
+            phrase.phraseEntry = getRunningStep().stepEntry.logWithType("PHRASE", phrase.toString()).tags("phrase").start();
         }
         PhraseData nextResolvedPhrase = phrase.runPhrase();
 

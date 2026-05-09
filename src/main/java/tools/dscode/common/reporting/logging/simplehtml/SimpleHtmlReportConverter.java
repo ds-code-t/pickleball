@@ -808,16 +808,40 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                 .replace("&amp;", "&");
     }
 
+    private static String tagCssClasses(HtmlNode node) {
+        if (node == null || node.tags == null || node.tags.isEmpty()) return "";
+
+        StringBuilder out = new StringBuilder();
+
+        for (String tag : node.tags) {
+            String cls = cssClassForTag(tag);
+            if (!cls.isBlank()) {
+                out.append(" tag-").append(cls);
+            }
+        }
+
+        return out.toString();
+    }
+
+    private static String cssClassForTag(String tag) {
+        if (tag == null || tag.isBlank()) return "";
+
+        String s = stripTagsForSort(tag)
+                .trim()
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9_-]+", "-")
+                .replaceAll("^-+|-+$", "");
+
+        return s.length() > 80 ? s.substring(0, 80) : s;
+    }
+
     private static void renderNode(StringBuilder out, HtmlNode node, int depth) {
         String indentClass = "d" + Math.min(depth, 6);
-
-        String nodeStyle = nodeStyleFromFields(node);
-        String headerStyle = headerStyleFromFields(node);
-        String titleStyle = titleStyleFromFields(node);
-        String detailsStyle = detailsStyleFromFields(node);
+        String tagClasses = tagCssClasses(node);
 
         out.append("<div class=\"node ")
                 .append(indentClass)
+                .append(tagClasses)
                 .append("\">");
 
         boolean hasDetails = !node.children.isEmpty()
@@ -825,22 +849,20 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                 || !node.logs.isEmpty();
 
         if (hasDetails) {
-            out.append("<details open")
-                    .append(styleAttr(nodeStyle))
-                    .append(">");
+            out.append("<details open>");
         }
 
         out.append("<summary class=\"nodeHeader ")
                 .append(headerBgClass(node))
-                .append("\"")
-                .append(styleAttr(headerStyle))
-                .append(">");
+                .append(' ')
+                .append(statusHeaderCss(node.status))
+                .append(' ')
+                .append(levelHeaderCss(node.level))
+                .append("\">");
 
         out.append("<div class=\"hdrLeft\">");
 
-        out.append("<div class=\"hdrTitle\"")
-                .append(styleAttr(titleStyle))
-                .append(">")
+        out.append("<div class=\"hdrTitle\">")
                 .append(node.title)
                 .append("</div>");
 
@@ -852,23 +874,21 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
         out.append("<div class=\"hdrRight\">");
 
-        boolean sameLevelAndStatusInfo =
-                node.level == Level.INFO &&
-                        node.status == Status.INFO;
-
-        if (node.level != null) {
-            out.append("<span class=\"badge ")
-                    .append(mapLevelCss(node.level))
-                    .append("\">")
-                    .append(escapeHtml(node.level.name()))
-                    .append("</span>");
-        }
-
-        if (node.status != null && !sameLevelAndStatusInfo) {
-            out.append("<span class=\"badge ")
+        // Badge order intentionally matches the header gradient layout:
+        // Status is represented on the LEFT side of the header, Level on the RIGHT side.
+        if (node.status != null) {
+            out.append("<span class=\"badge statusBadge ")
                     .append(mapStatusCss(node.status))
                     .append("\">")
                     .append(escapeHtml(labelForStatus(node.status)))
+                    .append("</span>");
+        }
+
+        if (node.level != null) {
+            out.append("<span class=\"badge levelBadge ")
+                    .append(mapLevelCss(node.level))
+                    .append("\">")
+                    .append(escapeHtml(node.level.name()))
                     .append("</span>");
         }
 
@@ -877,9 +897,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("</summary>");
 
         if (hasDetails) {
-            out.append("<div class=\"details\"")
-                    .append(styleAttr(detailsStyle))
-                    .append(">");
+            out.append("<div class=\"details\">");
 
             // Fields and tags are intentionally NOT rendered visibly.
             // They remain available internally through node.fields/node.tags.
@@ -929,12 +947,30 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     }
 
     private static String headerBgClass(HtmlNode node) {
-        // Mild shading: failures/errors get attention
-        if (node.status == Status.FAIL) return "bgFail";
-        if (node.level == Level.ERROR) return "bgFail";
-        if (node.status == Status.WARN || node.level == Level.WARN) return "bgWarn";
-        if (node.status == Status.SKIP) return "bgSkip";
         return "bgNormal";
+    }
+
+    private static String statusHeaderCss(Status status) {
+        if (status == null) return "status-unknown";
+        return switch (status) {
+            case PASS -> "status-pass";
+            case FAIL -> "status-fail";
+            case SKIP -> "status-skip";
+            case WARN -> "status-warn";
+            case INFO -> "status-info";
+            case UNKNOWN -> "status-unknown";
+        };
+    }
+
+    private static String levelHeaderCss(Level level) {
+        if (level == null) return "level-none";
+        return switch (level) {
+            case ERROR -> "level-error";
+            case WARN -> "level-warn";
+            case INFO -> "level-info";
+            case DEBUG -> "level-debug";
+            case TRACE -> "level-trace";
+        };
     }
 
     private static String labelForStatus(Status s) {
@@ -959,10 +995,11 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
     private static String mapLevelCss(Level l) {
         return switch (l) {
-            case ERROR -> "fail";
-            case WARN -> "warn";
-            case INFO -> "info";
-            case DEBUG, TRACE -> "muted";
+            case ERROR -> "level-error-badge";
+            case WARN -> "level-warn-badge";
+            case INFO -> "level-info-badge";
+            case DEBUG -> "level-debug-badge";
+            case TRACE -> "level-trace-badge";
         };
     }
 
@@ -1317,17 +1354,43 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
               --card: #f9fafb;
               --line: #e5e7eb;
               --pill: #eef2ff;
-              --pass: #065f46;
-              --fail: #991b1b;
-              --warn: #92400e;
-              --info: #1f2937;
-              --skip: #374151;
+              --pass: #047857;
+              --fail: #b91c1c;
+              --warn: #ca8a04;
+              --info: #2563eb;
+              --skip: #64748b;
+              --unknown: #7c3aed;
+              --debug: #9333ea;
+              --trace: #0f766e;
               --main: #1d4ed8;
-            
-              --hdrFail: #F26144;
-              --hdrWarn: #fffbeb;
-              --hdrSkip: #f3f4f6;
-              --hdrNormal: #89D18B;
+
+              --status-pass: #22c55e;
+              --status-fail: #ef4444;
+              --status-warn: #facc15;
+              --status-info: #3b82f6;
+              --status-skip: #94a3b8;
+              --status-unknown: #a855f7;
+
+              --level-error: #7f1d1d;
+              --level-warn: #eab308;
+              --level-info: #2563eb;
+              --level-debug: #9333ea;
+              --level-trace: #0f766e;
+
+              --status-pass-wash: rgba(34, 197, 94, 0.28);
+              --status-fail-wash: rgba(239, 68, 68, 0.34);
+              --status-warn-wash: rgba(250, 204, 21, 0.42);
+              --status-info-wash: rgba(59, 130, 246, 0.25);
+              --status-skip-wash: rgba(148, 163, 184, 0.28);
+              --status-unknown-wash: rgba(168, 85, 247, 0.25);
+
+              --level-error-wash: rgba(127, 29, 29, 0.22);
+              --level-warn-wash: rgba(234, 179, 8, 0.28);
+              --level-info-wash: rgba(37, 99, 235, 0.20);
+              --level-debug-wash: rgba(147, 51, 234, 0.21);
+              --level-trace-wash: rgba(15, 118, 110, 0.21);
+
+              --hdrNormal: #f9fafb;
             }
             
             * { box-sizing: border-box; }
@@ -1447,43 +1510,170 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             
             /* ---------------- Tree / nodes ---------------- */
             .tree { padding: 10px; }
-            .node { margin: 10px 0; }
+            .node {
+              margin: var(--node-margin-y, 10px) 0;
+              font-size: var(--node-font-size, 12px);
+              opacity: var(--node-opacity, 1);
+            }
             
             .node details {
-              border: 2px solid var(--line);          /* stronger outlines */
-              border-radius: 12px;
+              border: var(--node-border-width, 1px) solid var(--node-border-color, var(--line));
+              border-radius: var(--node-radius, 12px);
               background: #fff;
               overflow: hidden;
+              box-shadow: var(--node-shadow, none);
             }
             
             /* Reset summary defaults cleanly */
             .node summary {
               list-style: none;
               cursor: pointer;
-            //  padding: 0;
             }
             .node summary::-webkit-details-marker { display: none; }
             
             .nodeHeader {
+              position: relative;
               display: flex;
               align-items: flex-start;
               justify-content: space-between;
               gap: 12px;
-              padding: 10px 12px;
+              padding: var(--header-padding-y, 10px) var(--header-padding-x, 12px);
               border-bottom: 1px solid var(--line);
+              border-left: 10px solid var(--status-accent, #cbd5e1);
+              border-right: 10px solid var(--level-accent, #cbd5e1);
+              background:
+                linear-gradient(90deg,
+                  var(--status-wash, transparent) 0%,
+                  rgba(255,255,255,0.04) 48%,
+                  rgba(255,255,255,0.04) 52%,
+                  var(--level-wash, transparent) 100%),
+                var(--tag-header-bg, var(--hdrNormal));
+              color: var(--tag-header-color, #374151);
             }
-            .nodeHeader.bgFail { background: var(--hdrFail); }
-            .nodeHeader.bgWarn { background: var(--hdrWarn); }
-            .nodeHeader.bgSkip { background: var(--hdrSkip); }
-            .nodeHeader.bgNormal { background: var(--hdrNormal); }
+            .nodeHeader.bgNormal {
+              background:
+                linear-gradient(90deg,
+                  var(--status-wash, transparent) 0%,
+                  rgba(255,255,255,0.04) 48%,
+                  rgba(255,255,255,0.04) 52%,
+                  var(--level-wash, transparent) 100%),
+                var(--tag-header-bg, var(--hdrNormal));
+            }
+            
+            /* Status is the left-side accent and left wash. */
+            .nodeHeader.status-pass { --status-accent: var(--status-pass); --status-wash: var(--status-pass-wash); }
+            .nodeHeader.status-fail { --status-accent: var(--status-fail); --status-wash: var(--status-fail-wash); }
+            .nodeHeader.status-warn { --status-accent: var(--status-warn); --status-wash: var(--status-warn-wash); }
+            .nodeHeader.status-info { --status-accent: var(--status-info); --status-wash: var(--status-info-wash); }
+            .nodeHeader.status-skip { --status-accent: var(--status-skip); --status-wash: var(--status-skip-wash); }
+            .nodeHeader.status-unknown { --status-accent: var(--status-unknown); --status-wash: var(--status-unknown-wash); }
+            
+            /* Level is the right-side accent and right wash. */
+            .nodeHeader.level-error { --level-accent: var(--level-error); --level-wash: var(--level-error-wash); }
+            .nodeHeader.level-warn { --level-accent: var(--level-warn); --level-wash: var(--level-warn-wash); }
+            .nodeHeader.level-info { --level-accent: var(--level-info); --level-wash: var(--level-info-wash); }
+            .nodeHeader.level-debug { --level-accent: var(--level-debug); --level-wash: var(--level-debug-wash); }
+            .nodeHeader.level-trace { --level-accent: var(--level-trace); --level-wash: var(--level-trace-wash); }
+            .nodeHeader.level-none { --level-accent: #cbd5e1; --level-wash: transparent; }
+            
+            .nodeHeader.status-fail { box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.55); }
+            .nodeHeader.level-error { outline: 1px solid rgba(127, 29, 29, 0.28); outline-offset: -2px; }
             
             .hdrLeft { min-width: 0; }
-            .hdrTitle { font-weight: 700; word-break: break-word; }
+            .hdrTitle {
+              font-weight: var(--title-weight, 700);
+              font-size: var(--header-font-size, 13px);
+              word-break: break-word;
+              letter-spacing: var(--title-letter-spacing, normal);
+              text-transform: var(--title-transform, none);
+              font-family: var(--title-font-family, inherit);
+              text-align: var(--title-align, left);
+            }
             .hdrMeta { margin-top: 4px; font-size: 12px; color: var(--muted); }
             
             .hdrRight { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
             
-            .details { padding: 10px 12px 12px 12px; background: #fff; }
+            .details {
+              padding: var(--details-padding-y, 10px) var(--details-padding-x, 12px) var(--details-padding-bottom, 12px) var(--details-padding-x, 12px);
+              background: #fff;
+            }
+            
+            /* ---------------- Tag-driven base category presentation ---------------- */
+            .node.tag-global,
+            .node.tag-runlog {
+              --node-font-size: 15px;
+              --header-font-size: 22px;
+              --node-border-color: #2563eb;
+              --node-border-width: 4px;
+              --tag-header-bg: #dbeafe;
+              --tag-header-color: #1e3a8a;
+            }
+            
+            .node.tag-scenario {
+              --node-font-size: 14px;
+              --header-font-size: 19px;
+              --node-border-color: #7c3aed;
+              --node-border-width: 3px;
+              --tag-header-bg: #ede9fe;
+              --tag-header-color: #4c1d95;
+            }
+            
+            .node.tag-step {
+              --node-font-size: 13px;
+              --header-font-size: 16px;
+              --node-border-color: #f59e0b;
+              --node-border-width: 2px;
+              --tag-header-bg: #fffbeb;
+              --tag-header-color: #78350f;
+            }
+            
+            .node.tag-phrase {
+              --node-font-size: 12px;
+              --header-font-size: 14px;
+              --node-border-color: #10b981;
+              --node-border-width: 1px;
+              --tag-header-bg: #ecfdf5;
+              --tag-header-color: #064e3b;
+            }
+            
+            .node.tag-screenshot {
+              --node-font-size: 12px;
+              --header-font-size: 14px;
+              --node-border-color: #0ea5e9;
+              --node-border-width: 2px;
+              --tag-header-bg: #e0f2fe;
+              --tag-header-color: #075985;
+            }
+            
+            /* ---------------- Additive general-purpose visual profile tags ----------------
+               These are named after visual effects, not entry meaning.
+               They adjust properties that the category tags above do not own, so they compose cleanly. */
+            .node.tag-compact {
+              --node-margin-y: 5px;
+              --header-padding-y: 6px;
+              --header-padding-x: 8px;
+              --details-padding-y: 6px;
+              --details-padding-x: 8px;
+              --details-padding-bottom: 8px;
+            }
+            .node.tag-spacious {
+              --node-margin-y: 16px;
+              --header-padding-y: 14px;
+              --header-padding-x: 16px;
+              --details-padding-y: 14px;
+              --details-padding-x: 16px;
+              --details-padding-bottom: 16px;
+            }
+            .node.tag-rounded { --node-radius: 18px; }
+            .node.tag-sharp { --node-radius: 4px; }
+            .node.tag-elevated { --node-shadow: 0 8px 22px rgba(15, 23, 42, 0.12); }
+            .node.tag-flat { --node-shadow: none; }
+            .node.tag-bold-title { --title-weight: 850; }
+            .node.tag-wide-title { --title-letter-spacing: 0.04em; }
+            .node.tag-uppercase-title { --title-transform: uppercase; }
+            .node.tag-monospace-title { --title-font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+            .node.tag-center-title { --title-align: center; }
+            .node.tag-muted-visual { --node-opacity: 0.78; }
             
             .badge {
               font-size: 11px;
@@ -1496,10 +1686,17 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             }
             .badge.pass { color: var(--pass); border-color: #bbf7d0; background: #ecfdf5; }
             .badge.fail { color: var(--fail); border-color: #fecaca; background: #fef2f2; }
-            .badge.warn { color: var(--warn); border-color: #fde68a; background: #fffbeb; }
-            .badge.skip { color: var(--skip); border-color: #e5e7eb; background: #f9fafb; }
-            .badge.info { color: var(--info); border-color: #e5e7eb; background: #f9fafb; }
+            .badge.warn { color: #854d0e; border-color: #fde047; background: #fef9c3; }
+            .badge.skip { color: var(--skip); border-color: #cbd5e1; background: #f8fafc; }
+            .badge.info { color: var(--info); border-color: #bfdbfe; background: #eff6ff; }
             .badge.muted { color: var(--muted); border-color: #e5e7eb; background: #fff; }
+            .badge.statusBadge { border-left: 5px solid var(--status-accent, #cbd5e1); }
+            .badge.levelBadge { border-right: 5px solid var(--level-accent, #cbd5e1); }
+            .badge.level-error-badge { color: var(--level-error); border-color: #fecaca; background: #fff1f2; }
+            .badge.level-warn-badge { color: #713f12; border-color: #facc15; background: #fefce8; }
+            .badge.level-info-badge { color: var(--level-info); border-color: #bfdbfe; background: #eff6ff; }
+            .badge.level-debug-badge { color: var(--level-debug); border-color: #e9d5ff; background: #faf5ff; }
+            .badge.level-trace-badge { color: var(--level-trace); border-color: #99f6e4; background: #f0fdfa; }
             
             .row { margin-top: 10px; }
             .v { display: block; min-width: 0; }
@@ -1966,151 +2163,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         }
 
         return name + "|" + mime + "|" + payloadKey;
-    }
-
-    private static String nodeStyleFromFields(HtmlNode node) {
-        if (node == null || node.fields == null || node.fields.isEmpty()) return "";
-
-        StringBuilder css = new StringBuilder();
-
-        appendCss(css, "font-size", cssSize(fieldValue(node, "html.fontSize", "fontSize")));
-        appendCss(css, "color", cssColor(fieldValue(node, "html.color", "color")));
-        appendCss(css, "background", cssColor(fieldValue(node, "html.backgroundColor", "backgroundColor")));
-
-        appendCss(css, "border-color", cssColor(fieldValue(node, "html.borderColor", "borderColor")));
-        appendCss(css, "border-width", cssSize(fieldValue(node, "html.borderWidth", "borderWidth")));
-        appendCss(css, "border-style", cssBorderStyle(fieldValue(node, "html.borderStyle", "borderStyle")));
-
-        return css.toString();
-    }
-
-    private static String headerStyleFromFields(HtmlNode node) {
-        if (node == null || node.fields == null || node.fields.isEmpty()) return "";
-
-        StringBuilder css = new StringBuilder();
-
-        appendCss(css, "font-size", cssSize(fieldValue(
-                node,
-                "html.headerFontSize",
-                "headerFontSize",
-                "html.headerSize",
-                "headerSize"
-        )));
-
-        appendCss(css, "color", cssColor(fieldValue(node, "html.headerColor", "headerColor")));
-        appendCss(css, "background", cssColor(fieldValue(node, "html.headerBackgroundColor", "headerBackgroundColor")));
-
-        appendCss(css, "border-color", cssColor(fieldValue(node, "html.headerBorderColor", "headerBorderColor")));
-        appendCss(css, "border-width", cssSize(fieldValue(node, "html.headerBorderWidth", "headerBorderWidth")));
-        appendCss(css, "border-style", cssBorderStyle(fieldValue(node, "html.headerBorderStyle", "headerBorderStyle")));
-
-        return css.toString();
-    }
-
-    private static String titleStyleFromFields(HtmlNode node) {
-        if (node == null || node.fields == null || node.fields.isEmpty()) return "";
-
-        StringBuilder css = new StringBuilder();
-
-        appendCss(css, "font-size", cssSize(fieldValue(
-                node,
-                "html.titleFontSize",
-                "titleFontSize",
-                "html.headerFontSize",
-                "headerFontSize"
-        )));
-
-        appendCss(css, "color", cssColor(fieldValue(
-                node,
-                "html.titleColor",
-                "titleColor",
-                "html.headerColor",
-                "headerColor"
-        )));
-
-        return css.toString();
-    }
-
-    private static String detailsStyleFromFields(HtmlNode node) {
-        if (node == null || node.fields == null || node.fields.isEmpty()) return "";
-
-        StringBuilder css = new StringBuilder();
-
-        appendCss(css, "font-size", cssSize(fieldValue(node, "html.detailsFontSize", "detailsFontSize")));
-        appendCss(css, "color", cssColor(fieldValue(node, "html.detailsColor", "detailsColor")));
-        appendCss(css, "background", cssColor(fieldValue(node, "html.detailsBackgroundColor", "detailsBackgroundColor")));
-
-        return css.toString();
-    }
-
-    private static String fieldValue(HtmlNode node, String... keys) {
-        if (node == null || node.fields == null || node.fields.isEmpty() || keys == null) return null;
-
-        for (String wanted : keys) {
-            if (wanted == null) continue;
-
-            for (Map.Entry<String, String> e : node.fields.entrySet()) {
-                if (e.getKey() != null && e.getKey().equalsIgnoreCase(wanted)) {
-                    return e.getValue();
-                }
-            }
-        }
-
-        return null;
-    }
-
-    private static void appendCss(StringBuilder css, String property, String value) {
-        if (css == null || property == null || property.isBlank() || value == null || value.isBlank()) return;
-        css.append(property).append(":").append(value).append(";");
-    }
-
-    private static String styleAttr(String css) {
-        if (css == null || css.isBlank()) return "";
-        return " style=\"" + escapeHtml(css) + "\"";
-    }
-
-    private static String cssSize(String raw) {
-        if (raw == null) return null;
-
-        String s = raw.trim().toLowerCase(Locale.ROOT);
-        if (s.isBlank()) return null;
-
-        if (s.equals("0")) return "0";
-
-        if (s.matches("\\d{1,3}(\\.\\d{1,3})?(px|em|rem|%)")) {
-            return s;
-        }
-
-        return null;
-    }
-
-    private static String cssColor(String raw) {
-        if (raw == null) return null;
-
-        String s = raw.trim().toLowerCase(Locale.ROOT);
-        if (s.isBlank()) return null;
-
-        if (s.matches("#[0-9a-f]{3}([0-9a-f]{3})?")) {
-            return s;
-        }
-
-        return switch (s) {
-            case "black", "white", "red", "green", "blue", "yellow",
-                 "orange", "purple", "pink", "gray", "grey",
-                 "brown", "transparent" -> s;
-            default -> null;
-        };
-    }
-
-    private static String cssBorderStyle(String raw) {
-        if (raw == null) return "solid";
-
-        String s = raw.trim().toLowerCase(Locale.ROOT);
-
-        return switch (s) {
-            case "none", "solid", "dashed", "dotted", "double" -> s;
-            default -> "solid";
-        };
     }
 
 

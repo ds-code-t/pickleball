@@ -1,6 +1,46 @@
 Feature: Additiontest
 
 
+Feature: Entry UI style test
+
+  Scenario: Render different Entry level and status combinations
+
+    Given ProfileTest1 Compact Scenario PASS INFO
+    And ProfileTest2 Spacious Scenario FAIL ERROR
+    And ProfileTest3 Rounded Step WARN WARN
+    And ProfileTest4 Sharp Step PASS DEBUG
+    And ProfileTest5 Elevated Phrase INFO TRACE
+    And ProfileTest6 Flat Phrase SKIP INFO
+    And ProfileTest7 Bold Title Screenshot FAIL ERROR
+    And ProfileTest8 Wide Title Screenshot WARN WARN
+    And ProfileTest9 Uppercase Title Scenario UNKNOWN INFO
+    And ProfileTest10 Monospace Title Step PASS DEBUG
+    And ProfileTest11 Center Title Phrase INFO TRACE
+    And ProfileTest12 Muted Visual Scenario WARN WARN
+    And ProfileTest13 Rounded Elevated Bold Title Step FAIL ERROR
+    And ProfileTest14 Compact Monospace Wide Title Phrase UNKNOWN DEBUG
+
+
+    Given EntryTest1 INFO PASS
+    And EntryTest2 INFO FAIL
+    And EntryTest3 INFO WARN
+    And EntryTest4 INFO SKIP
+    And EntryTest5 INFO UNKNOWN
+    And EntryTest6 ERROR FAIL
+    And EntryTest7 ERROR PASS
+    And EntryTest8 ERROR WARN
+    And EntryTest9 WARN WARN
+    And EntryTest10 WARN PASS
+    And EntryTest11 WARN FAIL
+    And EntryTest12 DEBUG PASS
+    And EntryTest13 DEBUG FAIL
+    And EntryTest14 DEBUG UNKNOWN
+    And EntryTest15 TRACE PASS
+    And EntryTest16 TRACE SKIP
+    And EntryTest17 TRACE UNKNOWN
+
+    Then test1 nested test
+
 
   Scenario Outline:  Conditionals:
     * print "<A>"
@@ -10,38 +50,41 @@ Feature: Additiontest
     Examples:
       | A |
       | 2 |
-      |  |
+      |   |
       | 4 |
 
   Scenario:  calling SCENARIO a sdfsdfd
+    * test2 A
 
+      * , save "ssss" as "TableName"
     * RUN SCENARIOS
-      | Run Tags   | A | B   |
-      | %Comp_MsMs | qqq | 111 |
-      | %Comp_MsMs |   | 222 |
-#    * print :::parse { "<x>" == "AA"  }
+      | Run Tags   | A    | B      |
+      | %Comp_MsMs | <TableName> | tablea |
+
+    * FOR EVERY DATA ROW IN THE "<TableName>" DATA TABLE:
+      : * , save "<C1>  <C2>  <C3>"
+
 
   Scenario Outline: called component scenario 1 <A>
-#    * , save "Aq" as "x"
-#    * print <Run Tags>
-#    * print { "<Run Tags>" == "%Comp_MsMs" }
-#    * IF: "<Run Tags>" == "%Comp_MsMsz" THEN: , save "A" ELSE:  , save "ZZ"
-#    * , save "11"
-#    * , save "<A><B>"
-    * , save "<A>"
-#    * IF: "<Run Tags>" == "%Comp_MsMsz":
-#  :  * , save "C"
-#    * ELSE-IF: "<Run Tags>" == "%Comp_MsMs":
-#  :  * , save "D"
-#
-#    * , if "<Run Tags>" == "%Comp_MsMsz":
-#  :  * , save "E"
-#    * , else if "<Run Tags>" == "%Comp_MsMs":
-#  :  *  , save "F"
+
+    * IF: "<A>" is "ssss":
+  : * SET "<A>" DATA TABLE
+      | C1 | C2 | C3|
+      | A-row1c1 | A-row1c2 | A-row1c3|
+      | A-row2c1 | A-row2c2 | A-row2c3|
+      | A-row3c1 | A-row3c2 | A-row3c3|
+
+    * ELSE-IF: "<A>" is "bbb":
+  : * SET "<A>" DATA TABLE
+    | C1 | C2 | C3|
+    | B-row1c1 | B-row1c2 | B-row1c3|
+    | B-row2c1 | B-row2c2 | B-row2c3|
+    | B-row3c1 | B-row3c2 | B-row3c3|
+
 
     Examples:
-      | Scenario Tags | ?A |
-      | %Comp_MsMs    | zz |
+      | Scenario Tags | bdf |
+      | %Comp_MsMs    | zz  |
 
 
   Scenario: eq14

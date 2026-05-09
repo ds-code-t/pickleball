@@ -159,22 +159,8 @@ public class CurrentScenarioState extends ScenarioMapping {
         pickleballLog.info("Starting scenario: '" + scenarioName + "'");
         scenarioLog =
                 Entry.of(scenarioName)
-                        .tag("SCENARIO")
+                        .tag("Scenario")
                         .tag("RP_SUITE:Root")
-                        .defaultDescendantFields(
-                                "html.fontSize:13px",
-                                "html.headerFontSize:15px",
-                                "html.borderColor:#cbd5e1",
-                                "html.borderWidth:1px"
-                        )
-                        .field(
-                                "html.fontSize:14px",
-                                "html.headerFontSize:19px",
-                                "html.borderColor:#7c3aed",
-                                "html.borderWidth:3px",
-                                "html.headerBackgroundColor:#ede9fe",
-                                "html.headerColor:#4c1d95"
-                        )
                         .on(new SimpleHtmlReportConverter(
                                 Path.of("reports/tests", safeFileName(scenarioName + ".html"))
                         ))
