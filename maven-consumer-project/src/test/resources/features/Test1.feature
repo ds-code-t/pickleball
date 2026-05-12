@@ -1,8 +1,61 @@
 Feature: Additiontest
 
+  Scenario: data  on top
+    * , in "YYY" Data Table, for every "y1" Data Row:
+  :  * , for the every Textbox,   save "<B>" as "Z"  ,  save value of Textbox as "Z"
+#  :  * , for the every Textbox:
+#  :: * ,  verify "<B>"  equals value of Textbox
+#  :: * ,  save "<B>" as "Z"
+#  :: * ,  save value of Textbox as "Z"
+
+#    :   * , save "<A>-<B>" as "WW"
+    * "YYY" DATA TABLE
+      | A  | B    | C  |
+      | y1 | a2q  | a3 |
+      | y2 | b2-1 | b3 |
+      | y2 | b2-2 | b3 |
+      | y2 | b2-3 | b3 |
+      | y2 | b2-4 | b3 |
+      | y1 | b2   | b3 |
+      | y3 | b2   | b3 |
+
+  Scenario:  table on top
+    * , for the every Textbox:
+  :  * ,  in "YYY" Data Table, for every "y1" Data Row ,   save "<B>" as "Z"  ,  save value of Textbox as "Z"
+#  :   * , in "YYY" Data Table, for every "y1" Data Row:
+#  :: * ,  verify "<B>"  equals value of Textbox
+#  :: * ,  save "<B>" as "Z"
+#  :: * ,  save value of Textbox as "Z"
+
+#    :   * , save "<A>-<B>" as "WW"
+    * "YYY" DATA TABLE
+      | A  | B    | C  |
+      | y1 | a2q  | a3 |
+      | y2 | b2-1 | b3 |
+      | y2 | b2-2 | b3 |
+      | y2 | b2-3 | b3 |
+      | y2 | b2-4 | b3 |
+      | y1 | b2   | b3 |
+      | y3 | b2   | b3 |
+
+  Scenario: data context test 345454
+    * , in "YYY" Data Table, for every "y1z" Data Row:
+  : * , for the every Textbox:
+  ::  * , if "<A>" == "y1z":
+  :::  * , save "<B>" as "Z"
+  :::  * ,  enter "<A><B><C>" in it
 
 
-Feature: Entry UI style test
+#    :   * , save "<A>-<B>" as "WW"
+    * "YYY" DATA TABLE
+      | A   | B    | C  |
+      | y1z | a2q  | a3 |
+      | y2  | b2-1 | b3 |
+      | y2  | b2-2 | b3 |
+      | y2  | b2-3 | b3 |
+      | y2  | b2-4 | b3 |
+      | y1  | b2   | b3 |
+      | y3  | b2   | b3 |
 
   Scenario: data cont5
 #    * , verify 2nd "zzzz" Text is displayed
@@ -19,20 +72,19 @@ Feature: Entry UI style test
   :  * ,  click the "Bananas" Checkbox
 #  :  * , enter "rr"
   :  * , in "YYY" Data Table, for every "y1z" Data Row:
-  ::  * ,  click the "Bananas" Checkbox
+  ::  * ,  click the 2nd "Bananas" Checkbox
 #  ::  * , if "<A>" == "y1z":
 #  :::  * , save "<B>" as "Z"
 #  :::  * ,  enter "<A><B><C>"
     * "YYY" DATA TABLE
-      | A  | B    | C  |
-      | y1z | a2q   | a3 |
-      | y2 | b2-1 | b3 |
-      | y2 | b2-2 | b3 |
-      | y2 | b2-3 | b3 |
-      | y2 | b2-4 | b3 |
-      | y1 | b2   | b3 |
-      | y3 | b2   | b3 |
-
+      | A   | B    | C  |
+      | y1z | a2q  | a3 |
+      | y2  | b2-1 | b3 |
+      | y2  | b2-2 | b3 |
+      | y2  | b2-3 | b3 |
+      | y2  | b2-4 | b3 |
+      | y1  | b2   | b3 |
+      | y3  | b2   | b3 |
 
 
   Scenario: data context test 34
@@ -60,19 +112,19 @@ Feature: Entry UI style test
   :  * , in "YYY" Data Table, for every "y1z" Data Row:
   ::  * , if "<A>" == "y1z":
   :::  * , save "<B>" as "Z"
-  :::  * ,  enter "<A><B><C>"
+  :::  * ,  enter "<A><B><C>" in it
 
 
 #    :   * , save "<A>-<B>" as "WW"
     * "YYY" DATA TABLE
-      | A  | B    | C  |
-      | y1z | a2q   | a3 |
-      | y2 | b2-1 | b3 |
-      | y2 | b2-2 | b3 |
-      | y2 | b2-3 | b3 |
-      | y2 | b2-4 | b3 |
-      | y1 | b2   | b3 |
-      | y3 | b2   | b3 |
+      | A   | B    | C  |
+      | y1z | a2q  | a3 |
+      | y2  | b2-1 | b3 |
+      | y2  | b2-2 | b3 |
+      | y2  | b2-3 | b3 |
+      | y2  | b2-4 | b3 |
+      | y1  | b2   | b3 |
+      | y3  | b2   | b3 |
 
 
   Scenario: data context test 2
@@ -87,14 +139,14 @@ Feature: Entry UI style test
 
 #    :   * , save "<A>-<B>" as "WW"
     * "YYY" DATA TABLE
-      | A  | B    | C  |
-      | y1z | a2q   | a3 |
-      | y2 | b2-1 | b3 |
-      | y2 | b2-2 | b3 |
-      | y2 | b2-3 | b3 |
-      | y2 | b2-4 | b3 |
-      | y1 | b2   | b3 |
-      | y3 | b2   | b3 |
+      | A   | B    | C  |
+      | y1z | a2q  | a3 |
+      | y2  | b2-1 | b3 |
+      | y2  | b2-2 | b3 |
+      | y2  | b2-3 | b3 |
+      | y2  | b2-4 | b3 |
+      | y1  | b2   | b3 |
+      | y3  | b2   | b3 |
 
 
   Scenario: data context test 1
@@ -104,8 +156,8 @@ Feature: Entry UI style test
 
 
     * , in "YYY" Data Table, for every "y2" Data Row:
-    :  * , if "<A>" == "y2":
-    : * , save "<B>" as "Z"
+  :  * , if "<A>" == "y2":
+  : * , save "<B>" as "Z"
 #    :   * , save "<A>-<B>" as "WW"
     * "YYY" DATA TABLE
       | A  | B    | C  |
@@ -116,8 +168,6 @@ Feature: Entry UI style test
       | y2 | b2-4 | b3 |
       | y1 | b2   | b3 |
       | y3 | b2   | b3 |
-
-
 
 
   Scenario: short test 1
@@ -175,11 +225,11 @@ Feature: Entry UI style test
 #     * , save "!"
 
     *  , 1 ==1:
-    : *  , 1 ==3:
-    ::   * , save "a1"
+  : *  , 1 ==3:
+  ::   * , save "a1"
     *  , else if 1 ==1:
-    : *  , else if 1 ==1:
-    ::   * , save "a2"
+  : *  , else if 1 ==1:
+  ::   * , save "a2"
 
   Scenario: Render different Entry level and status combinations
 
@@ -234,31 +284,31 @@ Feature: Entry UI style test
   Scenario:  calling SCENARIO a sdfsdfd
 #    * test2 A
 
-      * , save "bbb" as "TableName"
+    * , save "bbb" as "TableName"
     * RUN SCENARIOS
-      | Run Tags   | A    | B      |
+      | Run Tags   | A           | B      |
       | %Comp_MsMs | <TableName> | tablea |
 
 #    * FOR EVERY DATA ROW IN THE "<TableName>" DATA TABLE:
     * , in the "<TableName>" Data Table, for every Data Row:
-      : * , save "<C1>  <C2>  <C3>"
+  : * , save "<C1>  <C2>  <C3>"
 
 
   Scenario Outline: called component scenario 1 <A>
 
     * IF: "<A>" is "ssss":
   : * SET "<A>" DATA TABLE
-      | C1 | C2 | C3|
-      | A-row1c1 | A-row1c2 | A-row1c3|
-      | A-row2c1 | A-row2c2 | A-row2c3|
-      | A-row3c1 | A-row3c2 | A-row3c3|
+    | C1       | C2       | C3       |
+    | A-row1c1 | A-row1c2 | A-row1c3 |
+    | A-row2c1 | A-row2c2 | A-row2c3 |
+    | A-row3c1 | A-row3c2 | A-row3c3 |
 
     * ELSE-IF: "<A>" is "bbb":
   : * SET "<A>" DATA TABLE
-    | C1 | C2 | C3|
-    | B-row1c1 | B-row1c2 | B-row1c3|
-    | B-row2c1 | B-row2c2 | B-row2c3|
-    | B-row3c1 | B-row3c2 | B-row3c3|
+    | C1       | C2       | C3       |
+    | B-row1c1 | B-row1c2 | B-row1c3 |
+    | B-row2c1 | B-row2c2 | B-row2c3 |
+    | B-row3c1 | B-row3c2 | B-row3c3 |
 
 
     Examples:
