@@ -13,6 +13,7 @@ import java.util.Set;
 
 import static io.cucumber.core.runner.StepBase.getInheritancePhrase;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
+import static tools.dscode.common.treeparsing.DefinitionContext.preParseDynamicStepString;
 import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
 
@@ -92,16 +93,7 @@ public abstract class LineData implements Cloneable {
 
         if (!original.startsWith(",")) return;
 
-        String preParsedNormalized = normalizeWhitespace(fullyMasked)
-                .replaceAll("\\bno\\s+attribute\\b", "noattribute")
-                .replaceAll("\\b(?:the|a)\\b", "")
-                .replaceAll("\\bare\\b", "is")
-                .replaceAll("\\bhave\\b", "has")
-                .replaceAll("(\\d+)(?:\\s*(?:st|nd|rd|th)\\b)", "#$1")
-                .replaceAll("\\bverifies\\b", "verify")
-                .replaceAll("\\bensures\\b", "ensure")
-                .replaceAll("\\bnot\\b|n't\\b", " no ")
-                .replaceAll("\\s+", " ");
+        String preParsedNormalized = preParseDynamicStepString(fullyMasked);
 
         StringBuilder buf = new StringBuilder();
 

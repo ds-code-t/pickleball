@@ -27,6 +27,7 @@ import static tools.dscode.common.domoperations.elementstates.VisibilityConditio
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.invisible;
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.visible;
 import static tools.dscode.common.treeparsing.RegexUtil.betweenWithEscapes;
+import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.KEY_NAME;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
@@ -51,6 +52,20 @@ public final class DefinitionContext {
 
     private DefinitionContext() {
         // utility class
+    }
+
+
+    public static String preParseDynamicStepString(String input) {
+        return normalizeWhitespace(input)
+                .replaceAll("\\bno\\s+attribute\\b", "noattribute")
+                .replaceAll("\\b(?:the|a)\\b", "")
+                .replaceAll("\\bare\\b", "is")
+                .replaceAll("\\bhave\\b", "has")
+                .replaceAll("(\\d+)(?:\\s*(?:st|nd|rd|th)\\b)", "#$1")
+                .replaceAll("\\bverifies\\b", "verify")
+                .replaceAll("\\bensures\\b", "ensure")
+                .replaceAll("\\bnot\\b|n't\\b", " no ")
+                .replaceAll("\\s+", " ");
     }
 
 
@@ -80,6 +95,12 @@ public final class DefinitionContext {
             @Override
             public String onCapture(String s) {
                 return s.substring(1, s.length() - 1);
+            }
+        };
+
+        ParseNode preparseKeywords = new ParseNode("^.*$") {
+            public String onSubstitute(MatchNode self) {
+                return " " + preParseDynamicStepString(self.originalText())  + " ";
             }
         };
 
@@ -323,6 +344,7 @@ public final class DefinitionContext {
         ParseNode root = buildFromYaml("""
                 line:
                   - quoteMask
+                  - preparseKeywords
                   - position
                   - numericMask
                   - keyTransform

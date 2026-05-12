@@ -1,5 +1,13 @@
 Feature: Additiontest
 
+  Scenario: data  on topsasd
+    * , save "not equals" as "A"
+    * , verify "1" <A> 2
+    * , verify 1 not equals 2
+#    * , verify "XDFRSD" Text <A> displayed
+#    * , verify "XDFRSD" Text is not displayed
+
+
   Scenario: data  on top
     * , in "YYY" Data Table, for every "y1" Data Row:
   :  * , for the every Textbox,   save "<B>" as "Z"  ,  save value of Textbox as "Z"
