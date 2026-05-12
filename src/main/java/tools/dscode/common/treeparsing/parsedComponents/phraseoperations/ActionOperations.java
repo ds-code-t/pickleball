@@ -23,6 +23,7 @@ import static tools.dscode.common.domoperations.HumanInteractions.clear;
 import static tools.dscode.common.domoperations.HumanInteractions.click;
 import static tools.dscode.common.domoperations.HumanInteractions.contextClick;
 import static tools.dscode.common.domoperations.HumanInteractions.doubleClick;
+import static tools.dscode.common.domoperations.HumanInteractions.hover;
 import static tools.dscode.common.domoperations.HumanInteractions.selectDropdownByIndex;
 import static tools.dscode.common.domoperations.HumanInteractions.selectDropdownByVisibleText;
 import static tools.dscode.common.domoperations.HumanInteractions.sendKeys;
@@ -243,6 +244,31 @@ public enum ActionOperations implements OperationsInterface {
 
                 return true;
             });
+        }
+    },
+
+    MOVE {
+        @Override
+        public void execute(PhraseData phraseData) {
+            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
+                    new ElementMatcher()
+                            .mustMatchAll(ElementType.HTML_ELEMENT)
+            );
+            ElementMatch element = phraseData.resultElements.getFirst();
+
+            phraseData.result = Attempt.run(() -> {
+                int count = 0;
+                for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
+                    if (count > 0) {
+                        safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
+                    }
+                    hover(getCurrentDriver(), elementWrapper.getElement());
+                    count++;
+                }
+                return true;
+            });
+
         }
     },
 
