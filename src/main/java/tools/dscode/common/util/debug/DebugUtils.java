@@ -26,12 +26,13 @@ public final class DebugUtils {
 
 
     public static boolean parseDebugString(List<String> tags) {
-        debugFlags =
+        if(debugFlags == null) debugFlags = new ArrayList<>();
+        debugFlags.addAll(
                 tags.stream()
                         .filter(t -> t.startsWith("DEBUG"))
                         .flatMap(s -> Arrays.stream(s.split(",")))
                         .filter(str -> !str.isBlank()).map(s -> s.trim().toLowerCase())
-                        .toList();
+                        .toList());
         if(debugFlags.isEmpty())
             return false;
         disableBaseElement = debugFlags.contains("nobase");

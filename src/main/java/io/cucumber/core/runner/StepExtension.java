@@ -252,8 +252,14 @@ public class StepExtension extends StepData {
             if (!flag.toString().startsWith("_"))
                 this.definitionFlags.add(flag);
         }
+    }
 
-
+    public void setToLogAll() {
+        pickleStepTestStep.setNoLogging(false);
+        this.definitionFlags.remove(DefinitionFlag.NO_LOGGING);
+        this.definitionFlags.remove(DefinitionFlag._NO_LOGGING);
+        this.definitionFlags.remove(DefinitionFlag.IGNORE_CHILDREN);
+        this.definitionFlags.remove(DefinitionFlag.IGNORE_CHILDREN_IF_FALSE);
     }
 
     @Override

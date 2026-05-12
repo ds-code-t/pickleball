@@ -87,7 +87,6 @@ public class PlaceHolderMatch extends ElementMatch {
                     return;
                 }
                 currentPhrase = currentPhrase.getPreviousPhrase();
-
             }
         }
 

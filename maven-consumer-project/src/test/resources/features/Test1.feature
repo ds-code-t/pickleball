@@ -1,7 +1,185 @@
 Feature: Additiontest
 
 
+
 Feature: Entry UI style test
+
+  Scenario: data cont5
+#    * , verify 2nd "zzzz" Text is displayed
+
+#  * , click the "Bananas" Checkbox
+#  * , click the 3rd Checkbox
+
+    * , after the 3rd Checkbox ,  click the 2nd "Bananas" Checkbox
+#    * , after the 3rd Checkbox ,  click the "Bananas" Checkbox
+
+  Scenario: data context test 5
+#    @[DEBUG,##]
+    * , after the 2nd "zzzz" Text:
+  :  * ,  click the "Bananas" Checkbox
+#  :  * , enter "rr"
+  :  * , in "YYY" Data Table, for every "y1z" Data Row:
+  ::  * ,  click the "Bananas" Checkbox
+#  ::  * , if "<A>" == "y1z":
+#  :::  * , save "<B>" as "Z"
+#  :::  * ,  enter "<A><B><C>"
+    * "YYY" DATA TABLE
+      | A  | B    | C  |
+      | y1z | a2q   | a3 |
+      | y2 | b2-1 | b3 |
+      | y2 | b2-2 | b3 |
+      | y2 | b2-3 | b3 |
+      | y2 | b2-4 | b3 |
+      | y1 | b2   | b3 |
+      | y3 | b2   | b3 |
+
+
+
+  Scenario: data context test 34
+#    * , for every Textbox, enter "AA"
+#    * , for every Checkbox, click it
+#    * , if Checkbox is displayed , click it
+    * , for the every Textbox, enter "AA"
+
+
+  Scenario: data context test 3b
+#    @[DEBUG,##]
+    * , for the every Textbox:
+  :  * ,  enter "bb" in it
+##  :  * , enter "rr"
+#  :  * , in "YYY" Data Table, for every "y1z" Data Row:
+#  ::  * , if "<A>" == "y1z":
+#  :::  * , save "<B>" as "Z"
+#  :::  * ,  enter "<A><B><C>"
+
+
+  Scenario: data context test 3
+#    @[DEBUG,##]
+    * , for the every Textbox:
+#  :  * , enter "rr"
+  :  * , in "YYY" Data Table, for every "y1z" Data Row:
+  ::  * , if "<A>" == "y1z":
+  :::  * , save "<B>" as "Z"
+  :::  * ,  enter "<A><B><C>"
+
+
+#    :   * , save "<A>-<B>" as "WW"
+    * "YYY" DATA TABLE
+      | A  | B    | C  |
+      | y1z | a2q   | a3 |
+      | y2 | b2-1 | b3 |
+      | y2 | b2-2 | b3 |
+      | y2 | b2-3 | b3 |
+      | y2 | b2-4 | b3 |
+      | y1 | b2   | b3 |
+      | y3 | b2   | b3 |
+
+
+  Scenario: data context test 2
+    * , after "BBBB" Text:
+
+  :  * , in "YYY" Data Table, for every "y1z" Data Row:
+  ::  * , if "<A>" == "y1z":
+  ::  * , save "<B>" as "Z"
+  ::  * ,  enter "<A><B><C>" in the Textbox
+#  ::  * ,  click the "Bananas" Checkbox
+
+
+#    :   * , save "<A>-<B>" as "WW"
+    * "YYY" DATA TABLE
+      | A  | B    | C  |
+      | y1z | a2q   | a3 |
+      | y2 | b2-1 | b3 |
+      | y2 | b2-2 | b3 |
+      | y2 | b2-3 | b3 |
+      | y2 | b2-4 | b3 |
+      | y1 | b2   | b3 |
+      | y3 | b2   | b3 |
+
+
+  Scenario: data context test 1
+
+#    * , in "YYY" Data Table,  for every "B" Data Cell:
+
+
+
+    * , in "YYY" Data Table, for every "y2" Data Row:
+    :  * , if "<A>" == "y2":
+    : * , save "<B>" as "Z"
+#    :   * , save "<A>-<B>" as "WW"
+    * "YYY" DATA TABLE
+      | A  | B    | C  |
+      | y1 | a2   | a3 |
+      | y2 | b2-1 | b3 |
+      | y2 | b2-2 | b3 |
+      | y2 | b2-3 | b3 |
+      | y2 | b2-4 | b3 |
+      | y1 | b2   | b3 |
+      | y3 | b2   | b3 |
+
+
+
+
+  Scenario: short test 1
+
+
+# Test 1: Wrap two When-Else Statements in an outer When
+    When ,  1 == 1:
+  : When , 1 ==2 :
+  : : Then , print "Inner 1, If"
+  : When , else:
+  : : Then , print "Inner 1, Else"
+
+
+  Scenario: test conditionasd 3
+
+# Setup
+    Then , I save "T" as "Outer"
+    Then , I save "F" as "Inner1"
+    Then , I save "F" as "Inner2"
+
+# Test 1: Wrap two When-Else Statements in an outer When
+    When , "<Outer>" is equal to "T":
+  : When , "<Inner1>" is equal to "T":
+  : : Then , print "Inner 1, If"
+  : When , else:
+  : : Then , print "Inner 1, Else"
+  : When , if "<Inner2>" is equal to "T":
+  : : Then , print "Inner 2, If"
+  : When , else:
+  : : Then , print "Inner 2, Else"
+
+# Test 2: Two When-Else statements back to back
+    When , "<Inner1>" is equal to "T":
+  : Then , print "Inner 1, If"
+    When , else:
+  : Then , print "Inner 1, Else"
+    When , "<Inner2>" is equal to "T":
+  : Then , print "Inner 2, If"
+    When , else:
+  : Then , print "Inner 2, Else"
+
+# Test 3: Wrap two IF-ELSE Chained Conditionals in an outer When
+    When , "<Outer>" is equal to "T":
+  : * IF: "<Inner1>" is equal to "T":
+  : : Then , print "Inner 1, If"
+  : * ELSE:
+  : : Then , print "Inner 1, Else"
+  : * IF: "<Inner2>" is equal to "T":
+  : : Then , print "Inner 2, If"
+  : * ELSE:
+  : : Then , print "Inner 2, Else"
+
+  Scenario: test logallsteps`
+#    * IF: "A" == "B":
+#     * , save "!"
+
+    *  , 1 ==1:
+    : *  , 1 ==3:
+    ::   * , save "a1"
+    *  , else if 1 ==1:
+    : *  , else if 1 ==1:
+    ::   * , save "a2"
 
   Scenario: Render different Entry level and status combinations
 
@@ -54,14 +232,15 @@ Feature: Entry UI style test
       | 4 |
 
   Scenario:  calling SCENARIO a sdfsdfd
-    * test2 A
+#    * test2 A
 
-      * , save "ssss" as "TableName"
+      * , save "bbb" as "TableName"
     * RUN SCENARIOS
       | Run Tags   | A    | B      |
       | %Comp_MsMs | <TableName> | tablea |
 
-    * FOR EVERY DATA ROW IN THE "<TableName>" DATA TABLE:
+#    * FOR EVERY DATA ROW IN THE "<TableName>" DATA TABLE:
+    * , in the "<TableName>" Data Table, for every Data Row:
       : * , save "<C1>  <C2>  <C3>"
 
 

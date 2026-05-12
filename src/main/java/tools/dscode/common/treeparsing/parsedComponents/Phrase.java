@@ -43,15 +43,18 @@ public final class Phrase extends PhraseData {
         if (assertionChainMembership != null)
             return true;
         if (getConditional().startsWith("else")) {
-            if (getPreviousPhrase() == null) {
+            if (this.position == 0)
+            {
                 if (parsedLine.previousSiblingConditionalState > -1) {
                     phraseConditionalMode = 0;
                     previouslyResolvedBoolean = false;
                 }
-            } else if (this.position == 0 && parsedLine.previousSiblingConditionalState > -1) {
-                phraseConditionalMode = 0;
-                previouslyResolvedBoolean = false;
-            } else if (getPreviousPhrase().phraseConditionalMode > -1) {
+            } else if (getPreviousPhrase() == null) {
+                if (parsedLine.previousSiblingConditionalState > -1) {
+                    phraseConditionalMode = 0;
+                    previouslyResolvedBoolean = false;
+                }
+            }  else if (getPreviousPhrase().phraseConditionalMode > -1) {
                 phraseConditionalMode = 0;
             } else {
                 phraseConditionalMode = 1;
@@ -68,9 +71,6 @@ public final class Phrase extends PhraseData {
         executePhrase();
         resolveResults();
         PhraseData nextResolvedPhrase = getNextResolvedPhrase();
-//        if (!branchedPhrases.isEmpty()) {
-//            resolveResults();
-//        }
 
 
         if (isContextTermination()) {

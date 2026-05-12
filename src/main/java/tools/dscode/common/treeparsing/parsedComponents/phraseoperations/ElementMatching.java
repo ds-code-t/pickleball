@@ -5,6 +5,7 @@ import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 

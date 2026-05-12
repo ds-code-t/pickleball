@@ -149,7 +149,6 @@ public abstract class PassedData {
 
     public List<ElementMatch> getElementMatchesFollowingOperation(ElementType... elementTypes) {
         List<ElementMatch> matches = getLocalElementMatchesFollowingOperation(elementTypes);
-
         PhraseData next;
         if (matches.isEmpty() && (next = getNextInheritedOrNextPhrase()) != null) {
             return next.getElementMatchesFollowingOperation(elementTypes);

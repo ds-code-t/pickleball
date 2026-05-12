@@ -1,7 +1,11 @@
 package tools.dscode.testengine;
 
+import io.cucumber.core.runner.CurrentScenarioState;
+
 import java.io.InputStream;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
@@ -12,8 +16,7 @@ import static io.cucumber.core.options.Constants.FEATURES_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.FILTER_NAME_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.FILTER_TAGS_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
-import static io.cucumber.core.runner.GlobalState.pickleballLog;
-import static tools.dscode.common.variables.PlatformSnapshot.toHumanReadableString;
+import static tools.dscode.common.util.debug.DebugUtils.debugFlags;
 
 
 public abstract class PickleballRunner {
@@ -31,9 +34,10 @@ public abstract class PickleballRunner {
     static final String CUCUMBER_GLUE = "cucumber.glue";
     static final String CUCUMBER_FEATURES = "cucumber.features";
     static final String CUCUMBER_TAGS = "cucumber.filter.tags";
-    private static final String PKB_NAME =  PKB_PREFIX +"name";
-    private static final String PKB_PARALLEL =  PKB_PREFIX + "parallel";
-    private static final String PKB_DEBUG_BROWSER =  PKB_PREFIX + "debugBrowser";
+    private static final String PKB_NAME = PKB_PREFIX + "name";
+    private static final String PKB_PARALLEL = PKB_PREFIX + "parallel";
+    private static final String PKB_DEBUG_BROWSER = PKB_PREFIX + "debugBrowser";
+    private static final String PKB_DEBUG_ARGS = PKB_PREFIX + "debugArgs";
 
     private static final String CUCUMBER_PARALLEL_ENABLED = "cucumber.execution.parallel.enabled";
     private static final String CUCUMBER_PARALLEL_STRATEGY = "cucumber.execution.parallel.config.strategy";
@@ -92,7 +96,7 @@ public abstract class PickleballRunner {
 
         publishToSystemProperties();
 
-        applyDebugBrowserFlag();
+        applyDebugFlags();
 
         INSTANCE = this;
         debug("Registered singleton instance: " + getClass().getName());
@@ -105,7 +109,22 @@ public abstract class PickleballRunner {
     }
 
 
-    private void applyDebugBrowserFlag() {
+    private void applyDebugFlags() {
+        String debugArgs = values.get(PKB_DEBUG_ARGS);
+        if (debugArgs != null && !debugArgs.isBlank()) {
+            if (debugFlags == null) debugFlags = new ArrayList<>();
+            debugFlags.addAll(
+                    Arrays.stream(debugArgs.split(","))
+                            .filter(s -> !s.isBlank())
+                            .map(s -> s.trim().toLowerCase())
+                            .toList());
+        }
+        if (debugFlags != null) {
+            if (debugFlags.contains("logallsteps"))
+                CurrentScenarioState.logAllSteps = true;
+
+        }
+
         String raw = values.get(PKB_DEBUG_BROWSER);
         if (raw == null || !"true".equalsIgnoreCase(raw.trim())) {
             return;
@@ -124,8 +143,7 @@ public abstract class PickleballRunner {
                 continue;
             }
 
-            if(isForeignEngineDiscoveryKey(key))
-            {
+            if (isForeignEngineDiscoveryKey(key)) {
                 skipped++;
                 continue;
             }
@@ -140,8 +158,8 @@ public abstract class PickleballRunner {
 
     private static boolean isForeignEngineDiscoveryKey(String key) {
         return key.startsWith("cucumber.")
-                        || key.startsWith("junit.platform.")
-                        || key.startsWith("junit.jupiter.");
+                || key.startsWith("junit.platform.")
+                || key.startsWith("junit.jupiter.");
     }
 
     public void globalTestDefaults() {
@@ -149,7 +167,6 @@ public abstract class PickleballRunner {
 
     public void globalTestProperties() {
     }
-
 
 
     public final Map<String, String> values() {

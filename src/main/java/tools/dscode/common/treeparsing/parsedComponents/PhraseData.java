@@ -291,7 +291,6 @@ public abstract class PhraseData extends PassedData {
 
             currentPhrase = currentPhrase.getPreviousPhrase();
         }
-
         return contextList;
     }
 
@@ -320,6 +319,7 @@ public abstract class PhraseData extends PassedData {
             return insideOf(first);
         }
         if (context.startsWith("after")) {
+            System.out.println( afterOf(first));
             return afterOf(first);
         }
         if (context.startsWith("before")) {

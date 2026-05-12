@@ -36,6 +36,8 @@ public class ElementWrapper {
 
 
     public static List<ElementWrapper> getWrappedElements(ElementMatch elementMatch) {
+        if(elementMatch.contextWrapper == null && elementMatch.parentPhrase.contextElement != null)
+            return Collections.singletonList(elementMatch.parentPhrase.contextElement);
         List<ElementWrapper> elementWrappers = new ArrayList<>();
         List<WebElement> elements = elementMatch.contextWrapper.getElements();
         boolean singleElement = elementMatch.selectionType.isBlank();

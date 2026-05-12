@@ -82,6 +82,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     private StepExtension currentStep;
     public Phrase currentPhrase;
 
+    public static boolean logAllSteps = false;
     public static boolean globalDebugBrowser = false;
     public boolean debugBrowser = false;
 
@@ -282,6 +283,10 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
     public void runningStep(StepExtension stepExtension) {
+        if(logAllSteps){
+            stepExtension.setToLogAll();
+        }
+
         if (!shouldRun(stepExtension)) {
             stepExtension.skipped = true;
             if (stepExtension.nextSibling != null) {

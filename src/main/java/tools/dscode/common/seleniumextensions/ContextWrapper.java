@@ -32,16 +32,13 @@ public class ContextWrapper {
     }
 
 
-
-
     public List<WebElement> getElements() {
         printDebug("\n##ContextWrapper- getElements: " + elementMatch);
         SearchContext searchContext = getFinalSearchContext();
         if (searchContext == null) return new ArrayList<>();
         printDebug("####ContextWrapper-searchContext: " + searchContext.getClass().getSimpleName());
         printDebug("####ContextWrapper-elementMatch.parentPhrase: " + elementMatch.parentPhrase);
-        printDebug("####ContextWrapper-elementTerminalXPath ");
-        prettyPrintXPath(elementTerminalXPath);
+        printDebug("####ContextWrapper-elementTerminalXPath " + prettyPrintXPath(elementTerminalXPath));
         printDebug("\n\n##ContextWrapper-end##");
         return getElementListFromSearchContext(searchContext, elementTerminalXPath, elementMatch);
 //        return searchContext.findElements(elementTerminalXPath.getLocator());
@@ -49,10 +46,12 @@ public class ContextWrapper {
 
 
     public SearchContext getFinalSearchContext() {
+
         printDebug("\n##ContextWrapper-getFinalSearchContext11");
         printDebug("\n##ContextWrapper-getFinalSearchContext: " + elementMatch.category + " , " + elementMatch.parentPhrase);
         printDebug("\n##ContextWrapper-elementMatch.parentPhrase.contextElement: " + elementMatch.parentPhrase.contextElement);
         SearchContext searchContext = elementMatch.parentPhrase.getSearchContext();
+        PhraseData searchContextPhrase = elementMatch.parentPhrase;
         List<PhraseData> contextList = elementMatch.parentPhrase.getPhraseContextList();
         printDebug("##ContextWrapper-contextList.size(): " + contextList.size());
         printDebug("##ContextWrapper-contextList::::: " + contextList);
@@ -67,8 +66,9 @@ public class ContextWrapper {
             printDebug("##ContextWrapper-phraseData--phraseData.categoryFlag : " + phraseData.categoryFlags);
 
             if (phraseData.contextElement != null) {
-                printDebug("#ContextWrapper-#psearchContext1: " + searchContext);
+                printDebug("##ContextWrapper-#psearchContext1: " + searchContext);
                 searchContext = phraseData.getSearchContext();
+                searchContextPhrase = phraseData;
                 printDebug("##ContextWrapper-psearchContext2: " + searchContext);
                 printDebug("##ContextWrapper-phraseData.getSearchContext()222: " + phraseData.getSearchContext());
             } else if (phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
@@ -78,7 +78,7 @@ public class ContextWrapper {
                 if (!xPathyList.isEmpty()) {
                     XPathy combinedXPathy = combineAnd(xPathyList);
                     searchContext = getElementFromSearchContext(searchContext, combinedXPathy, elementMatch);
-//                    searchContext = searchContext.findElement(combinedXPathy.getLocator());
+
                     xPathyList.clear();
                 }
 
@@ -95,6 +95,7 @@ public class ContextWrapper {
             }
         }
         xPathyList.add(elementMatch.xPathy);
+
         printDebug("##ContextWrapper-xPathyList: " + xPathyList);
         initializeElementXPaths(xPathyList);
         return searchContext;
@@ -103,11 +104,25 @@ public class ContextWrapper {
     public static List<WebElement> getElementListFromSearchContext(SearchContext searchContext, XPathy xPathy, ElementMatch elementMatch) {
         String xpath = xPathy.getXpath();
 
-        if (searchContext instanceof WebElement) {
-            if (xpath.strip().replaceAll("\\(", "").startsWith("//"))
-                xpath = xpath.replaceFirst("//", "descendant-or-self::");
-        }
+        if (searchContext instanceof WebElement element) {
+            System.out.println();
+            PhraseData currentPhrase = elementMatch.parentPhrase.getPreviousPhrase();
+            String relationToContextElement = "descendant-or-self::";
+            while (currentPhrase != null) {
+                if (currentPhrase.contextElement != null) {
+                    if (currentPhrase.context.equals("after"))
+                        relationToContextElement = "following::";
+                    else if (currentPhrase.context.equals("before"))
+                        relationToContextElement = "preceding::";
+                    break;
+                }
+                currentPhrase = currentPhrase.getPreviousPhrase();
+            }
 
+
+            if (xpath.strip().replaceAll("\\(", "").startsWith("//"))
+                xpath = xpath.replaceFirst("//", relationToContextElement);
+        }
         printDebug("##XPath: getElementListFromSearchContext\n" + prettyPrintXPath(xpath) + "\n----------------");
         return findWithRetry(searchContext, new By.ByXPath(xpath), elementMatch);
 //        return searchContext.findElements(new By.ByXPath(xpath));
@@ -125,32 +140,10 @@ public class ContextWrapper {
 
     public void initializeElementXPaths(List<XPathy> xPathyList) {
         if (elementTerminalXPath != null) return;
-//        XPathy xPathy = combineAnd(xPathyList);
-//        elementPath = XPathy.from(XPathyUtils.maybeDeepestMatches(xPathy.getXpath()));
         elementPath = combineAnd(xPathyList);
         elementTerminalXPath = elementPath;
-
-        if(!elementMatch.elementPosition.equalsIgnoreCase("last"))
+        if (!elementMatch.elementPosition.equalsIgnoreCase("last"))
             elementMatch.elementIndex = elementMatch.elementPosition.isEmpty() ? 1 : Integer.parseInt(elementMatch.elementPosition);
-//        if (elementMatch.elementPosition.isEmpty() && elementMatch.selectionType.isEmpty())
-//            elementTerminalXPath = elementPath.nth(1);
-////        else if (elementMatch.elementPosition.isEmpty())
-////            elementTerminalXPath = elementPath;
-//        else if (elementMatch.elementPosition.equals("last")) {
-//            elementTerminalXPath = elementPath.last();
-//        } else {
-//            elementMatch.elementIndex = Integer.parseInt(elementMatch.elementPosition);
-//            if (elementMatch.selectionType.isEmpty()) {
-//                elementTerminalXPath = elementPath.nth(elementMatch.elementIndex);
-//            } else {
-//                if (elementMatch.elementIndex == 1) {
-//                    elementTerminalXPath = elementPath;
-//                } else {
-//                    elementTerminalXPath = everyNth(elementPath, elementMatch.elementIndex);
-//                }
-//            }
-//        }
-
 
     }
 

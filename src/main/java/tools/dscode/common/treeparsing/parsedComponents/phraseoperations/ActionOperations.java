@@ -96,7 +96,6 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch keyElement = phraseData.getElementMatches().stream().filter(e -> e.elementTypes.contains(ElementType.KEY_VALUE)).findFirst().orElse(null);
 
 
-
 //            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
 //                    new ElementMatcher()
 //                            .mustMatchAll(ElementType.RETURNS_VALUE).mustNotMatchAny(ElementType.KEY_VALUE),
@@ -108,11 +107,10 @@ public enum ActionOperations implements OperationsInterface {
             boolean regexMatchWithReference = regexMatchSave && regexMatchElement.defaultText.type != ValueWrapper.ValueTypes.BACK_TICKED;
             String regexReference = regexMatchWithReference ? regexMatchElement.defaultText.toString() : "";
             Pattern tempPattern = null;
-            if(regexMatchSave)
-            {
+            if (regexMatchSave) {
                 String regexString = regexMatchWithReference ? String.valueOf(getFromRunningParsingMapCaseInsensitive(configsRoot + ".REGEX." + regexReference)) : regexMatchElement.defaultText.toString();
                 tempPattern = Pattern.compile(regexString);
-                if(regexMatchElement.defaultText.type == ValueWrapper.ValueTypes.SINGLE_QUOTED)
+                if (regexMatchElement.defaultText.type == ValueWrapper.ValueTypes.SINGLE_QUOTED)
                     tempPattern = Pattern.compile(
                             tempPattern.pattern(),
                             tempPattern.flags() | Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
@@ -120,38 +118,33 @@ public enum ActionOperations implements OperationsInterface {
             }
             final Pattern pattern = tempPattern;
 
-            String keyName = keyElement == null ? (regexMatchWithReference? regexReference : "saved") : keyElement.getValue().toString();
+            String keyName = keyElement == null ? (regexMatchWithReference ? regexReference : "saved") : keyElement.getValue().toString();
             phraseData.result = Attempt.run(() -> {
                 for (ValueWrapper valueWrapper : valueElement.getValues()) {
                     Object value = valueWrapper.getValue();
-                    if(pattern != null){
+                    if (pattern != null) {
                         List<String> matches = pattern.matcher(String.valueOf(value))
                                 .results()
                                 .map(MatchResult::group)
                                 .toList();
-                        if(matches.isEmpty() && !regexMatchElement.selectionType.equalsIgnoreCase("any"))
-                            throw new RuntimeException("No matches found for regex: " + pattern  + " in value: " + value);
+                        if (matches.isEmpty() && !regexMatchElement.selectionType.equalsIgnoreCase("any"))
+                            throw new RuntimeException("No matches found for regex: " + pattern + " in value: " + value);
 
-                        if(regexMatchElement.elementPosition.equalsIgnoreCase("first"))
+                        if (regexMatchElement.elementPosition.equalsIgnoreCase("first"))
                             value = matches.getFirst();
-                        else if(regexMatchElement.elementPosition.equalsIgnoreCase("last"))
+                        else if (regexMatchElement.elementPosition.equalsIgnoreCase("last"))
                             value = matches.getLast();
-                        else
-                        {
-                            int matchIndex = regexMatchElement.elementPosition.isBlank() ? matches.size() -1 : Integer.parseInt(regexMatchElement.elementPosition) -1;
+                        else {
+                            int matchIndex = regexMatchElement.elementPosition.isBlank() ? matches.size() - 1 : Integer.parseInt(regexMatchElement.elementPosition) - 1;
                             int repeatCount = matchIndex + 1;
-                            if(regexMatchElement.selectionType.isBlank())
-                            {
+                            if (regexMatchElement.selectionType.isBlank()) {
                                 value = matches.get(matchIndex);
-                            }
-                            else
-                            {
-                                if(regexMatchElement.elementPosition.isBlank())
+                            } else {
+                                if (regexMatchElement.elementPosition.isBlank())
                                     value = String.join("", matches);
-                                else
-                                {
+                                else {
                                     List<String> result = new ArrayList<>();
-                                    for (int i = matchIndex ; i < matches.size(); i += repeatCount) {
+                                    for (int i = matchIndex; i < matches.size(); i += repeatCount) {
                                         result.add(matches.get(i));
                                     }
                                     value = String.join("", result);
@@ -198,7 +191,7 @@ public enum ActionOperations implements OperationsInterface {
                         } else if (!waitingOnLoading) {
                             return true;
                         }
-                        System.out.println("Waiting on " +(waitingOnLoading? "LOADING" : waitElementMatch ));
+                        System.out.println("Waiting on " + (waitingOnLoading ? "LOADING" : waitElementMatch));
                         waitMilliseconds(3000);
                     }
                 } else {
@@ -262,7 +255,6 @@ public enum ActionOperations implements OperationsInterface {
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
             ElementMatch element = phraseData.resultElements.getFirst();
-
 
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
@@ -436,11 +428,11 @@ public enum ActionOperations implements OperationsInterface {
             closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
             phraseData.result = Attempt.runVoid(() -> {
                 try {
-                    if(!phraseData.getFirstElement().category.startsWith("Alert"))
+                    if (!phraseData.getFirstElement().category.startsWith("Alert"))
                         throw new RuntimeException("Accept only works on Alerts");
                     accept(getCurrentDriver());
                 } catch (NoAlertPresentException e) {
-                    if(!phraseData.getFirstElement().selectionType.equals("any"))
+                    if (!phraseData.getFirstElement().selectionType.equals("any"))
                         throw e;
                 }
             });
@@ -486,11 +478,20 @@ public enum ActionOperations implements OperationsInterface {
         phraseData.result = Attempt.run(() -> {
             int count = 0;
 
-            // If no matches, do the operation once with null (no looping hacks).
             if (elementMatches == null || elementMatches.isEmpty()) {
-                applyTextOps(null, valuesToEnter, shouldClear, shouldEnterText, enterKeys);
-                return true;
+                if (phraseData.getElementMatches().size() > 1 && phraseData.getElementMatches().get(1) instanceof PlaceHolderMatch placeHolderMatch) {
+                    placeHolderMatch.elementMatcher = new ElementMatcher().mustMatchAll(ElementType.HTML_ELEMENT);
+                    elementMatches.add(placeHolderMatch);
+                }
+                else
+                {
+                    // If no matches, do the operation once with null (no looping hacks).
+                    applyTextOps(null, valuesToEnter, shouldClear, shouldEnterText, enterKeys);
+                    return true;
+                }
             }
+
+
 
             for (ElementMatch inputMatch : elementMatches) {
                 // If match is null, do the operation once with null and continue.
@@ -548,10 +549,6 @@ public enum ActionOperations implements OperationsInterface {
             waitMilliseconds(300);
         }
     }
-
-
-
-
 
 
 }
