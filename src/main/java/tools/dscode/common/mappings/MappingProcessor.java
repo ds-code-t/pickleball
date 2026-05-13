@@ -512,13 +512,15 @@ public abstract class MappingProcessor implements Map<String, Object> {
             if (noQuotedText) {
                 return element.parentPhrase.getPhraseParsingMap().getPhraseMap().getAsList(TABLE_KEY);
             } else {
-                java.util.LinkedHashMap<String, JsonNode> tableList = (java.util.LinkedHashMap) getDataTableMap().get(TABLE_KEY);
+                List<JsonNode> tableList = getDataTableMap().getAsList(TABLE_KEY);
                 List<String> tableNames = new ArrayList<>();
                 List<JsonNode> tableNodes = new ArrayList<>();
-//                for (Map.Entry<String, JsonNode> entry : tableList.entrySet())
-                for (Map.Entry<String, JsonNode> entry : tableList.entrySet()) {
-                    tableNames.add(entry.getKey());
-                    tableNodes.add(MAPPER.valueToTree(entry.getValue()));
+                for (JsonNode jsonNode : tableList) {
+                    if (jsonNode instanceof ObjectNode objectNode) {
+                        String tableName = objectNode.fieldNames().next();
+                        tableNames.add(tableName);
+                        tableNodes.add(MAPPER.valueToTree(objectNode.get(tableName)));
+                    }
                 }
                 return filterGroupedValues(tableNames, tableNodes, element, false);
             }

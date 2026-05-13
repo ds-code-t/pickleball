@@ -114,7 +114,7 @@ public final class Tokenized {
         q = q.strip().replaceAll("^\\$\\.", "").replaceAll("\\s*([\\(\\){}\\[\\].#:,-])\\s*", "$1");
 
 
-        q = q.replaceAll("(^[A-Za-z0-9_`]+)(\\..*|$)", "$1." + topArrayFlag + "$2");
+        q = q.replaceAll("(^[A-Za-z0-9_\\s`]+)(\\..*|$)", "$1." + topArrayFlag + "$2");
 
         isValueAssignmentKey = q.endsWith("=");
         if (isValueAssignmentKey)

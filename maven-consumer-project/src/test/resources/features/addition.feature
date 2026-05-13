@@ -1,5 +1,19 @@
 Feature: Addition
 
+
+
+  Scenario Outline:
+    * SET "ngd" DATA TABLE
+      | A |
+      | 1 |
+      | 2 |
+      | 3 |
+
+    Examples:
+      | Scenario Tags |
+      | %compT3       |
+
+
   Scenario: context testifsdg3
   @[DEBUG,##]
     * , from "Search" Table, verify 1st Row equals "A"

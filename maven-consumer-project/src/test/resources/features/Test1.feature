@@ -1,5 +1,44 @@
 Feature: Additiontest
 
+  Scenario: ffdsf
+
+  Scenario: test save
+   * , save "A111" as "Data Table"
+   * , save "B111" as "Data Table"
+   * , save "<Data Table>"
+   * , save "<Data Table #1>"
+   * , save "<Data Table #2>"
+
+
+
+  Scenario: Data table set test
+    * RUN SCENARIOS
+      | Run Tags |
+      | %compT2  |
+
+    Then , in the "Name Change" Data Table, for every Data Row:
+    : * , save "<A>"
+
+
+  Scenario Outline:
+    * SET "Name Change" DATA TABLE
+      | A |
+      | 1 |
+      | 2 |
+      | 3 |
+
+    * SET "eee" DATA TABLE
+      | A |
+      | 1 |
+      | 2 |
+      | 3 |
+
+
+    Examples:
+      | Scenario Tags |
+      | %compT2       |
+
+
   Scenario: data  on topsasd
     * , save "not equals" as "A"
     * , verify "1" <A> 2

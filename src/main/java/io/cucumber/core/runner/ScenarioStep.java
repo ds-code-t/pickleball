@@ -37,7 +37,10 @@ public class ScenarioStep extends StepExtension {
 
     public static ScenarioStep createScenarioStep(Pickle pickle, ParsingMap parsingMap) {
         io.cucumber.core.runner.TestCase topLevel  =   GlobalState.getTestCase();
-        String scenarioName =  SCENARIO_STEP + (parsingMap == null ? pickle.getName() : parsingMap.resolveWholeText(pickle.getName()));
+        String pickleName = (parsingMap == null ? pickle.getName() : parsingMap.resolveWholeText(pickle.getName()));
+        if(pickleName == null || pickleName.isBlank())
+            pickleName = "UNNAMED SCENARIO";
+        String scenarioName =  SCENARIO_STEP + pickleName;
         io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = getPickleStepTestStepFromStrings(pickle, getGivenKeyword() ,   scenarioName, null);
         ScenarioStep scenarioStep = new ScenarioStep(topLevel, scenarioPickleStepTestStep);
         if(parsingMap!= null) {
