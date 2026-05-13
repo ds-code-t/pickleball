@@ -102,7 +102,7 @@ public final class HumanInteractions {
 
     /**
      * Move, hover briefly, and click. JS-dispatch fallback if Actions fails.
-     *
+     * <p>
      * IMPORTANT: Use element-targeted click(el) to avoid "active element" ambiguity.
      */
     public static void click(WebDriver driver, WebElement el) {
@@ -116,7 +116,12 @@ public final class HumanInteractions {
                     .pause(SHORT)
                     .build().perform();
         } catch (RuntimeException e) {
-            jsClick(driver, el);
+            try {
+                centerScroll(driver, el);
+                el.click();
+            } catch (RuntimeException e2) {
+                jsClick(driver, el);
+            }
         }
     }
 
@@ -133,7 +138,11 @@ public final class HumanInteractions {
                     .pause(SHORT)
                     .build().perform();
         } catch (RuntimeException e) {
-            jsDispatchMouse(driver, el, "dblclick");
+            try {
+                new Actions(driver).doubleClick(el).perform();
+            } catch (RuntimeException e2) {
+                jsDispatchMouse(driver, el, "dblclick");
+            }
         }
     }
 
@@ -150,7 +159,11 @@ public final class HumanInteractions {
                     .pause(SHORT)
                     .build().perform();
         } catch (RuntimeException e) {
-            jsDispatchMouse(driver, el, "contextmenu");
+            try {
+                new Actions(driver).contextClick(el).perform();
+            } catch (RuntimeException e2) {
+                jsDispatchMouse(driver, el, "contextmenu");
+            }
         }
     }
 
@@ -237,7 +250,7 @@ public final class HumanInteractions {
     /**
      * Focus element, clear (Ctrl/Cmd+A + Delete), then type text.
      * JS fallback sets value + events.
-     *
+     * <p>
      * IMPORTANT: Use element-targeted sendKeys via WebElement to avoid "active element" bleed.
      */
     public static void clearAndType(WebDriver driver, WebElement el, CharSequence text) {
@@ -260,23 +273,22 @@ public final class HumanInteractions {
 
     public static void clear(WebDriver driver, WebElement el) {
         Objects.requireNonNull(el);
-            focus(driver, el);
-            el.sendKeys(Keys.chord(osControlKey(), "a"));
-            el.sendKeys(Keys.DELETE);
+        focus(driver, el);
+        el.sendKeys(Keys.chord(osControlKey(), "a"));
+        el.sendKeys(Keys.DELETE);
     }
 
     /**
      * Focus element and type text as-is.
      * JS fallback APPENDS (kept as-is); consider changing callers to use clearAndType if needed.
-     *
+     * <p>
      * IMPORTANT: Use element-targeted sendKeys via WebElement to avoid "active element" bleed.
      */
     public static void typeText(WebDriver driver, WebElement el, CharSequence text) {
-       if(el == null)
-       {
-           typeText(driver, text);
-           return;
-       }
+        if (el == null) {
+            typeText(driver, text);
+            return;
+        }
         final String s = text == null ? "" : text.toString();
         try {
             focus(driver, el);
@@ -303,17 +315,16 @@ public final class HumanInteractions {
         if (text == null || text.isEmpty()) return;
         ((JavascriptExecutor) driver).executeScript(
                 """
-                const el = document.activeElement;
-                if (el && 'value' in el) {
-                    el.value += arguments[0];
-                    el.dispatchEvent(new Event('input', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-                """,
+                        const el = document.activeElement;
+                        if (el && 'value' in el) {
+                            el.value += arguments[0];
+                            el.dispatchEvent(new Event('input', { bubbles: true }));
+                            el.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                        """,
                 text
         );
     }
-
 
 
     /**
@@ -333,7 +344,7 @@ public final class HumanInteractions {
 
     /**
      * Press ENTER on an element (focus first).
-     *
+     * <p>
      * IMPORTANT: Use element-targeted sendKeys via WebElement to avoid "active element" bleed.
      */
     public static void pressEnter(WebDriver driver, WebElement el) {
@@ -552,11 +563,11 @@ public final class HumanInteractions {
                         const sel = arguments[0];
                         const targetText = arguments[1];
                         if (!sel) return;
-
+                        
                         const norm = s => String(s ?? '').replace(/\\s+/g, ' ').trim();
                         const wanted = norm(targetText);
                         let found = null;
-
+                        
                         const options = sel.options || [];
                         for (let i = 0; i < options.length; i++) {
                           const opt = options[i];
@@ -567,9 +578,9 @@ public final class HumanInteractions {
                             break;
                           }
                         }
-
+                        
                         if (!found) return;
-
+                        
                         // Fire events as a user-like change
                         sel.dispatchEvent(new Event('input',  {bubbles:true}));
                         sel.dispatchEvent(new Event('change', {bubbles:true}));
