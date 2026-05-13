@@ -322,11 +322,13 @@ public abstract class PassedData {
     public boolean setInheritedOperationFromPhrase(PhraseData sourcePhraseData) {
         if (!sourcePhraseData.getAction().isBlank()) {
             setAction(sourcePhraseData.getAction());
+            hasNo = sourcePhraseData.hasNo ^ hasNo;
             return true;
         }
 
         if (!sourcePhraseData.getAssertion().isBlank()) {
             setAssertion(sourcePhraseData.getAssertion());
+            hasNo = sourcePhraseData.hasNo ^ hasNo;
             return true;
         }
 

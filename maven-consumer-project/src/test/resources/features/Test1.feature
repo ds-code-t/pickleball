@@ -1,6 +1,7 @@
 Feature: Additiontest
 
-  Scenario: ffdsf
+  Scenario: ffdsfdfgrt4
+    * , verify "WWQ3" Text, and  "QWERGJH" Text are not displayed
 
   Scenario: test save
    * , save "A111" as "Data Table"
