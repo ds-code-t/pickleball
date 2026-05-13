@@ -1,5 +1,30 @@
 Feature: Additiontest
 
+
+  Scenario: inline IF A
+    * , save "A" as "z"
+    * , if "<z>" == "A" , save "22"
+    * IF: "<z>" == "A" THEN: , save "22"
+    * IF: "<z>" == "A" THEN: , print "22"
+
+  Scenario: inline IF B
+    * , save "A" as "z"
+    * , if "<z>" is equal to "A"  , save "11"
+#    * IF: "<z>" is equal to "A" THEN:   , save "11"
+    * IF: "<z>" is equal to "A" THEN:   tprint "11"
+
+  Scenario: cod1
+    * , if "AA"=="AA":
+  : * print "AAAAA"
+    * , else:
+  : * print "BBBBB"
+
+  Scenario: cod
+    * IF: "AA"=="AsA":
+    : * print "AAAAA"
+    * ELSE:
+    : * print "BBBBB"
+
   Scenario: ffdsfdfgrt4
     * , verify "WWQ3" Text, and  "QWERGJH" Text are not displayed
 

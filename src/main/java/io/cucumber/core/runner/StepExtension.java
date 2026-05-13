@@ -256,10 +256,11 @@ public class StepExtension extends StepData {
 
     public void setToLogAll() {
         pickleStepTestStep.setNoLogging(false);
-        this.definitionFlags.remove(DefinitionFlag.NO_LOGGING);
-        this.definitionFlags.remove(DefinitionFlag._NO_LOGGING);
-        this.definitionFlags.remove(DefinitionFlag.IGNORE_CHILDREN);
-        this.definitionFlags.remove(DefinitionFlag.IGNORE_CHILDREN_IF_FALSE);
+        new ArrayList<>(this.definitionFlags).forEach(f -> {
+            String flagString = f.toString().toLowerCase();
+            if (flagString.contains("ignore") || flagString.contains("logging"))
+                this.definitionFlags.remove(f);
+        });
     }
 
     @Override

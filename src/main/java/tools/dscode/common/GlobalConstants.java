@@ -57,11 +57,8 @@ public class GlobalConstants {
     public static final String OPEN_CURLY_REPLACEMENT_SUB = "-oc\u240Br-";
     public static final String CLOSE_CURLY_REPLACEMENT_SUB = "-cc\u240Br-";
 
-    public static final String SUBSTITUTE_MARKER_A = "\u241A";
-    public static final String SUBSTITUTE_MARKER_B = "\u240B";
-    public static final String SUBSTITUTE_MARKER_C = "\u240C";
-    public static final String SUBSTITUTE_MARKER_D = "\u240D";
-    public static final String SUBSTITUTE_MARKER_E = "\u240E";
+    public static final String GROUP_SEPARATOR = "\u241D";
+
 
     // visible characters
 //    public static final String SYMBOL_FOR_NULL = "\u2400";

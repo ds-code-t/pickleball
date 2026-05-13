@@ -26,7 +26,7 @@ public interface OperationsInterface<E extends Enum<E> & OperationsInterface<E>>
         }
 
         String normalized = input.trim()
-                .replaceFirst("non|un", "")
+                .replaceFirst("\\b(?:non|un)", "")
                 .replaceFirst("disabled", "enabled")
                 .toUpperCase(Locale.ROOT)
                 .replaceAll("\\s+", "_");

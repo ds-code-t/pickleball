@@ -125,7 +125,7 @@ public final class XPathyUtils {
 
     public static String colocatedDeepNormalizedVisibleText(ValueWrapper value, ExecutionDictionary.Op mode) {
         return  "[ancestor-or-self::*[" +
-                "count(.//text()" + noDisplayPredicate + "[normalize-space() and not(ancestor::script|ancestor::style)]) = 1][1]" + deepNormalizedText(value, mode) + "]";
+                "count(.//text()[normalize-space() and not(ancestor::script|ancestor::style)]) = 1][1]" + deepNormalizedText(value, mode) + "]";
     }
 
     /**

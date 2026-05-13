@@ -341,6 +341,7 @@ public abstract class PassedData {
         }
 
         return phrase1.isContextTermination()
+                || phrase2.separator
                 || phrase2.isNewContext()
                 || !phrase2.getAssertionType().isBlank();
     }

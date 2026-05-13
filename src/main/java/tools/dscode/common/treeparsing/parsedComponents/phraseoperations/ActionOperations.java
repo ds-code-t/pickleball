@@ -1,5 +1,6 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
+import io.cucumber.core.runner.StepExtension;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.NoAlertPresentException;
 import org.openqa.selenium.WebElement;
@@ -17,6 +18,7 @@ import java.util.List;
 import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
 
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.browseroperations.BrowserAlerts.accept;
 import static tools.dscode.common.browseroperations.BrowserAlerts.dismiss;
 import static tools.dscode.common.domoperations.HumanInteractions.clear;
@@ -38,6 +40,8 @@ import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCa
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETURNS_VALUE;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
 import static tools.dscode.coredefinitions.BrowserSteps.getCurrentDriver;
 
@@ -471,6 +475,17 @@ public enum ActionOperations implements OperationsInterface {
             phraseData.result = Attempt.runVoid(() ->
                     dismiss(getCurrentDriver())
             );
+        }
+    },
+    RUN_STEP {
+        @Override
+        public void execute(PhraseData phraseData) {
+            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            phraseData.result = Attempt.runVoid(() -> {
+                ElementMatch firstElement = phraseData.getElementMatchAfterOperation(VALUE_TYPE);
+                StepExtension newStepExtension = getRunningStep().createNewStepExtension(firstElement.getValue().toString());
+                newStepExtension.runAndGetReturnValue();
+            });
         }
     };
 

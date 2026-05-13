@@ -60,6 +60,7 @@ import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
 import static tools.dscode.common.mappings.FileAndDataParsing.readResourceFile;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMap;
+import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 import static tools.dscode.common.servicecalls.ToJsonNode.sjson;
 import static tools.dscode.common.treeparsing.DefinitionContext.DEFAULT_EXECUTION_DICTIONARY;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
@@ -109,6 +110,12 @@ public class CalculatorSteps {
         String x1 = "//div";
         String x2 = "//*[@role]";
         System.out.println("@@combineAnd: " + combineAnd(x1, x2));
+    }
+
+
+    @Given("^tprint (.*)$")
+    public static void printVal(String message) {
+        stepInfo("PRINT#$@#$@#$: " + message);
     }
 
 

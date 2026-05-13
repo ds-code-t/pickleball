@@ -6,11 +6,15 @@ import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static tools.dscode.common.GlobalConstants.GROUP_SEPARATOR;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_FALSE;
 import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
 import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
@@ -41,19 +45,82 @@ public final class ParsedLine extends LineData {
     }
 
     public static String normalizeConditionalText(StepExtension stepExtension) {
-        String input = stepExtension.getUnmodifiedText();
-        if (input == null || !input.matches("^(?:IF:|ELSE:|ELSE-IF:).*$")) {
+        String input = stepExtension.getUnmodifiedText().trim();
+        if (!input.matches("^(?:IF:|ELSE:|ELSE-IF:).*$")) {
             return input;
         }
 
         stepExtension.addDefinitionFlag(NO_LOGGING, _NO_LOGGING, IGNORE_CHILDREN_IF_FALSE);
 
-        return input
-                .replace("ELSE-IF:", " , else if ")
-                .replace("ELSE:", " , else ")
-                .replace("IF:", " , if ")
-                .replace("THEN:", " , ");
+        String returnText = "";
+
+        for (StringPair stringPair : splitKeepingTokens(input)) {
+            String remainder = stringPair.value();
+
+            if(!remainder.isBlank() && (stringPair.token.equals("ELSE:") || stringPair.token.equals("THEN:")))
+            {
+                if(remainder.startsWith(",")) {
+                    remainder = remainder.substring(1).trim();
+                } else {
+                    remainder = " run step `" + remainder + "`";
+                }
+            }
+                returnText +=  " , " + stringPair.normalizedToken() + " " + remainder;
+        }
+        if (input.endsWith(":") && !returnText.endsWith(":"))
+            return returnText + " :";
+        return returnText;
     }
+
+    private static final Pattern TOKEN_PATTERN =
+            Pattern.compile("\\b(?:ELSE-IF:|ELSE:|IF:|THEN:)");
+
+
+    public record StringPair(String token, String value) {
+
+        public StringPair {
+            token = token == null ? "" : token;
+            value = value == null ? "" : value;
+        }
+
+        public String normalizedToken() {
+            return token
+                    .toLowerCase()
+                    .replace(':', ' ')
+                    .replace('-', ' ')
+                    .trim();
+        }
+    }
+
+    public static List<StringPair> splitKeepingTokens(String input) {
+        if (input == null || input.isBlank()) {
+            return List.of();
+        }
+
+        List<StringPair> result = new ArrayList<>();
+        Matcher matcher = TOKEN_PATTERN.matcher(input);
+
+        while (matcher.find()) {
+            String token = matcher.group();
+
+            int valueStart = matcher.end();
+
+            int valueEnd;
+            if (matcher.find()) {
+                valueEnd = matcher.start();
+                matcher.region(matcher.start(), input.length());
+            } else {
+                valueEnd = input.length();
+            }
+
+            String value = input.substring(valueStart, valueEnd).trim();
+
+            result.add(new StringPair(token, value));
+        }
+
+        return result;
+    }
+
 
 
     @Override
