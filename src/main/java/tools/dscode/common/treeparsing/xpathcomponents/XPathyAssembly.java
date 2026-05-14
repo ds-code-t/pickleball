@@ -357,6 +357,7 @@ public final class XPathyAssembly {
 
 
     public static String prettyPrintXPath(XPathy xpathy) {
+        if(xpathy == null) return null;
         return prettyPrintXPath(xpathy.getXpath());
     }
 

@@ -32,9 +32,8 @@ public class ContextWrapper {
     }
 
 
-    public List<WebElement> getElements() {
+    List<WebElement> getElements(SearchContext searchContext) {
         printDebug("\n##ContextWrapper- getElements: " + elementMatch);
-        SearchContext searchContext = getFinalSearchContext();
         if (searchContext == null) return new ArrayList<>();
         printDebug("####ContextWrapper-searchContext: " + searchContext.getClass().getSimpleName());
         printDebug("####ContextWrapper-elementMatch.parentPhrase: " + elementMatch.parentPhrase);

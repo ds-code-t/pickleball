@@ -38,8 +38,11 @@ public class ElementWrapper {
     public static List<ElementWrapper> getWrappedElements(ElementMatch elementMatch) {
         if(elementMatch.parentPhrase.contextElement != null)
             return Collections.singletonList(elementMatch.parentPhrase.contextElement);
+        SearchContext searchContext = elementMatch.contextWrapper.getFinalSearchContext();
+        if(elementMatch.parentPhrase.contextElement != null)
+            return Collections.singletonList(elementMatch.parentPhrase.contextElement);
         List<ElementWrapper> elementWrappers = new ArrayList<>();
-        List<WebElement> elements = elementMatch.contextWrapper.getElements();
+        List<WebElement> elements = elementMatch.contextWrapper.getElements(searchContext);
         boolean singleElement = elementMatch.selectionType.isBlank();
         printDebug("##elements-getWrappedElements-elements: " + elements.size());
         int index = 0;
