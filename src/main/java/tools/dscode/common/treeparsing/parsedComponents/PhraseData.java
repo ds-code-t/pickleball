@@ -282,10 +282,18 @@ public abstract class PhraseData extends PassedData {
 
                 if (currentPhrase.phraseType == PhraseType.CONTEXT) {
                     contextList.addFirst(currentPhrase);
+                    if (currentPhrase.isTopContext || currentPhrase.contextElement != null) {
+                        return contextList;
+                    }
+                }
+            }
+            else {
+                if (currentPhrase.isTopContext || currentPhrase.contextElement != null) {
+                    return contextList;
                 }
             }
 
-            if (currentPhrase.isTopContext || currentPhrase.isNewContext() || currentPhrase.contextElement != null) {
+            if (currentPhrase.isNewContext()) {
                 return contextList;
             }
 
