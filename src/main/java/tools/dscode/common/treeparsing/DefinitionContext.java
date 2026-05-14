@@ -502,7 +502,7 @@ public final class DefinitionContext {
 
             category("Close Button").children("Close Buttons")
                     .and(
-               "//[self::button or @role='button' or self::a or self::img or self::i]"
+               "//*[self::button or @role='button' or self::a or self::img or self::i]"
                     )
                     .or(
                             (category, v, op) -> XPathyBuilder.build(any, id, ValueWrapper.createValueWrapper("'close'"), Op.STARTS_WITH),
