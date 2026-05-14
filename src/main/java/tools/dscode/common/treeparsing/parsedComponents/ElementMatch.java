@@ -17,6 +17,7 @@ import tools.dscode.common.util.debug.DebugUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -57,7 +58,7 @@ public class ElementMatch {
     public String state;
     public List<Attribute> attributes = new ArrayList<>();
     public XPathy xPathy;
-//    public XPathy xPathyWithIndex;
+    //    public XPathy xPathyWithIndex;
     public Set<ElementType> elementTypes;
     public ElementMatcher elementMatcher;
     public ContextWrapper contextWrapper;
@@ -302,17 +303,16 @@ public class ElementMatch {
         }
 
 
-
     }
 
 
     public String getMatchElementStringValue() {
-        List<ValueWrapper> values =  getValues();
+        List<ValueWrapper> values = getValues();
         Object currentValue = values;
 //        String currentStringValue = values.stream().map(ValueWrapper::toNonNullString).collect(Collectors.joining());
 
         for (String valueType : valueTypes) {
-            if(valueType.endsWith("-attribute")){
+            if (valueType.endsWith("-attribute")) {
 
             }
 
@@ -324,7 +324,8 @@ public class ElementMatch {
                         currentValue = String.valueOf(currentValue).length();
                     break;
                 case "length":
-                    currentValue =  String.valueOf(currentValue).length();;
+                    currentValue = String.valueOf(currentValue).length();
+                    ;
                     break;
                 case "lowercase":
                     currentValue = String.valueOf(currentValue).toLowerCase();
@@ -411,9 +412,10 @@ public class ElementMatch {
             System.out.println("##getElementWrappers- wrappedElements: " + wrappedElements);
         });
 
-
         if (wrappedElements == null) {
-            if (parentPhrase.getPreviousTerminator().equals(";"))
+            if (parentPhrase.contextElement != null)
+                wrappedElements = Collections.singletonList(parentPhrase.contextElement);
+            else if (parentPhrase.getPreviousTerminator().equals(";"))
                 findWrappedElements();
             else
                 parentPhrase.syncWithDOM();

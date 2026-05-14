@@ -82,9 +82,16 @@ public class ContextWrapper {
                     xPathyList.clear();
                 }
 
+                ElementMatch contextElementMatch = phraseData.getElementMatches().stream().filter(em -> em.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)).findFirst().orElse(null);
+
                 printDebug("##ContextWrapper-searchContext-1 " + searchContext);
-                searchContext = getExecutionDictionary().applyContextBuilder(phraseData.getFirstElement().category, phraseData.getFirstElement().defaultText, phraseData.getFirstElement().defaultTextOp, elementMatch.parentPhrase.getDriver(), searchContext);
+                searchContext = getExecutionDictionary().applyContextBuilder(contextElementMatch.category, contextElementMatch.defaultText, contextElementMatch.defaultTextOp, elementMatch.parentPhrase.getDriver(), searchContext);
                 printDebug("##ContextWrapper-searchContext-2 " + searchContext);
+
+                if(searchContext instanceof WebElement webElement){
+                    phraseData.contextElement = new ElementWrapper(webElement, contextElementMatch, 1);
+                }
+
                 if (searchContext == null)
                     break;
 
@@ -94,6 +101,20 @@ public class ContextWrapper {
                 xPathyList.add(phraseData.contextXPathy);
             }
         }
+
+        if(elementMatch.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)){
+            if(!xPathyList.isEmpty()) {
+                XPathy combinedXPathy = combineAnd(xPathyList);
+                searchContext = getElementFromSearchContext(searchContext, combinedXPathy, elementMatch);
+                xPathyList.clear();
+            }
+            searchContext = getExecutionDictionary().applyContextBuilder(elementMatch.category, elementMatch.defaultText, elementMatch.defaultTextOp, elementMatch.parentPhrase.getDriver(), searchContext);
+            if(searchContext instanceof WebElement webElement){
+                elementMatch.parentPhrase.contextElement = new ElementWrapper(webElement, elementMatch, 1);
+            }
+            return searchContext;
+        }
+
         xPathyList.add(elementMatch.xPathy);
 
         printDebug("##ContextWrapper-xPathyList: " + xPathyList);

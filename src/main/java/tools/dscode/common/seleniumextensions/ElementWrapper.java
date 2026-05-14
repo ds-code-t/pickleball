@@ -36,7 +36,7 @@ public class ElementWrapper {
 
 
     public static List<ElementWrapper> getWrappedElements(ElementMatch elementMatch) {
-        if(elementMatch.contextWrapper == null && elementMatch.parentPhrase.contextElement != null)
+        if(elementMatch.parentPhrase.contextElement != null)
             return Collections.singletonList(elementMatch.parentPhrase.contextElement);
         List<ElementWrapper> elementWrappers = new ArrayList<>();
         List<WebElement> elements = elementMatch.contextWrapper.getElements();
@@ -54,7 +54,7 @@ public class ElementWrapper {
 
 
 
-    private ElementWrapper(WebElement element, ElementMatch elementMatch, Integer matchIndex) {
+    ElementWrapper(WebElement element, ElementMatch elementMatch, Integer matchIndex) {
         this.driver = elementMatch.parentPhrase.getDriver();
         this.matchIndex = matchIndex;
         this.elementMatch = elementMatch;
