@@ -2,12 +2,10 @@ package tools.dscode.coredefinitions;
 
 
 import io.cucumber.core.runner.StepExtension;
-import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
-import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.mappings.NodeMap;
 
@@ -15,15 +13,36 @@ import java.util.Map;
 
 import static io.cucumber.core.runner.GlobalState.*;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
-import static io.cucumber.core.runner.util.TableUtils.toFlatMultimap;
-import static io.cucumber.core.runner.util.TableUtils.toRowsMultimap;
+import static io.cucumber.core.runner.util.TableUtils.toFlatStringMultimap;
+import static io.cucumber.core.runner.util.TableUtils.toRowsStringMultimap;
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
 import static tools.dscode.common.mappings.MappingProcessor.getDataTableMap;
+import static tools.dscode.common.mappings.MappingProcessor.getRunMap;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 import static tools.dscode.common.variables.RunVars.resolveFromVars;
 
 
 public class MappingSteps extends CoreSteps {
+
+
+
+    @Given("^CLEAR SAVED VALUES(:.*)?$")
+    public static void clearRunMap(String keys) {
+        String[] keyArray = keys == null || keys.trim().length() == 1
+                ? new String[0]
+                : java.util.Arrays.stream(keys.substring(1).split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toArray(String[]::new);
+
+        getRunMap().clearValues(keyArray);
+
+        if (keyArray.length == 0) {
+            stepInfo("Clearing Scenario Run Map");
+        } else {
+            stepInfo("Clearing Scenario Run Map values: " + String.join(", ", keyArray));
+        }
+    }
 
     @Given("^(:?\"(.*)\"\\s+)?DOC STRING$")
     public static void docString(String docStringName, DocString docString) {
@@ -39,7 +58,7 @@ public class MappingSteps extends CoreSteps {
 
     @Given("^SET \"(.*)\" DATA TABLE$")
     public static void setDataTable(String tableName, DataTable dataTable) {
-        getDataTableMap().put(TABLE_KEY, Map.of(tableName.trim(), toRowsMultimap(dataTable)));
+        getDataTableMap().put(TABLE_KEY, Map.of(tableName.trim(), toRowsStringMultimap(dataTable)));
         stepInfo("Setting Data Table" + tableName + ":" + dataTable);
     }
 
@@ -61,9 +80,9 @@ public class MappingSteps extends CoreSteps {
             case "DEFAULT" -> MappingProcessor.getDefaultsMap();
             case "OVERRIDE" -> MappingProcessor.getOverridesMap();
             case "SINGLETON" -> MappingProcessor.getSingletonMap();
-            case null, default -> MappingProcessor.getRunMap();
+            case null, default -> getRunMap();
         };
-        nodeMap.merge(toFlatMultimap(dataTable.asLists()));
+        nodeMap.merge(toFlatStringMultimap(dataTable.asLists()));
     }
 
     @Given("^save \"(.*)\" as \"(.*)\"$")

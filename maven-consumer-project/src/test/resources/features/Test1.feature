@@ -50,7 +50,7 @@ Feature: Additiontest
     * SET "Name Change" DATA TABLE
       | A |
       | 1 |
-      | 2 |
+      |  |
       | 3 |
 
     * SET "eee" DATA TABLE

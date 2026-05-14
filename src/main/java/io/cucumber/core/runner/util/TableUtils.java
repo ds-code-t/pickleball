@@ -52,7 +52,7 @@ public class TableUtils {
             List<String> rowStrings = lists.get(r);
             @SuppressWarnings("unchecked")
             List<? extends V> row = (List<? extends V>) rowStrings;
-            out.add(toMultimap(header, row)); // your existing generic helper
+            out.add(toMultimap(header, row)); // existing generic helper
         }
         return out;
     }
@@ -71,7 +71,7 @@ public class TableUtils {
             List<?> row = table.get(r);
             if (row.size() != header.size()) {
                 throw new IllegalArgumentException(
-                    "Row " + r + " size " + row.size() + " does not match header size " + header.size());
+                        "Row " + r + " size " + row.size() + " does not match header size " + header.size());
             }
             for (int c = 0; c < header.size(); c++) {
                 @SuppressWarnings("unchecked")
@@ -135,4 +135,126 @@ public class TableUtils {
         return toMultimap(headers, values);
     }
 
+    /*
+     * String convenience methods:
+     *
+     * These are opt-in versions of the existing conversion methods.
+     * They normalize both keys and values so null, empty, and blank cells become "".
+     * They intentionally do not change the existing generic methods.
+     */
+
+    public static LinkedListMultimap<String, LinkedListMultimap<String, String>> toRowsStringMultimap(DataTable dataTable) {
+        List<LinkedListMultimap<String, String>> rowList = toListOfStringMultimap(dataTable);
+        LinkedListMultimap<String, LinkedListMultimap<String, String>> returnMap = LinkedListMultimap.create();
+        assert rowList != null;
+        rowList.forEach(r -> returnMap.put(ROW_KEY, r));
+        return returnMap;
+    }
+
+    public static List<LinkedListMultimap<String, String>> toListOfStringMultimap(DataTable dataTable) {
+        List<List<String>> lists = dataTable.asLists();
+        if (lists == null || lists.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> header = normalizeStringList(lists.get(0));
+        if (header == null) {
+            return null; // mirrors original toListOfMultimap behavior
+        }
+
+        List<LinkedListMultimap<String, String>> out = new ArrayList<>();
+        for (int r = 1; r < lists.size(); r++) {
+            List<String> row = normalizeStringList(lists.get(r));
+            out.add(toStringMultimap(header, row));
+        }
+        return out;
+    }
+
+    public static LinkedListMultimap<String, String> toFlatStringMultimap(DataTable dataTable) {
+        return toFlatStringMultimap(dataTable.asLists());
+    }
+
+    public static LinkedListMultimap<String, String> toFlatStringMultimap(List<? extends List<?>> table) {
+        return toFlatMultimap(normalizeStringTable(table));
+    }
+
+    public static LinkedListMultimap<String, String> toStringMultimap(List<?> keys, List<?> values) {
+        return toMultimap(normalizeStringList(keys), normalizeStringList(values));
+    }
+
+    public static LinkedListMultimap<String, String> exampleHeaderValueStringMap(io.cucumber.core.gherkin.Pickle pickle) {
+        if (pickle == null)
+            return null;
+
+        // unwrap to the private GherkinMessagesPickle
+        Object gmPickle = pickle; // in runtime it *is* a GherkinMessagesPickle
+        Optional<Examples> exOpt = examplesOf(gmPickle);
+        if (exOpt.isEmpty())
+            return null;
+
+        Examples ex = exOpt.get();
+        Optional<TableRow> headerOpt = ex.getTableHeader();
+        if (headerOpt.isEmpty())
+            return null;
+
+        // Find the matching row by last AST node id
+        io.cucumber.messages.types.Pickle mp = messagePickle(gmPickle);
+        String lastAstId = mp.getAstNodeIds().isEmpty() ? null
+                : mp.getAstNodeIds().get(mp.getAstNodeIds().size() - 1);
+
+        TableRow row = null;
+        if (lastAstId != null) {
+            row = ex.getTableBody().stream()
+                    .filter(r -> Objects.equals(r.getId(), lastAstId))
+                    .findFirst().orElse(null);
+        }
+
+        if (row == null)
+            return null;
+
+        List<String> headers = headerOpt.get().getCells().stream()
+                .map(TableCell::getValue)
+                .map(TableUtils::blankToEmpty)
+                .toList();
+
+        List<String> values = row.getCells().stream()
+                .map(TableCell::getValue)
+                .map(TableUtils::blankToEmpty)
+                .toList();
+
+        return toStringMultimap(headers, values);
+    }
+
+    private static List<List<String>> normalizeStringTable(List<? extends List<?>> table) {
+        if (table == null) {
+            return null;
+        }
+
+        List<List<String>> normalized = new ArrayList<>();
+        for (List<?> row : table) {
+            normalized.add(normalizeStringList(row));
+        }
+        return normalized;
+    }
+
+    private static List<String> normalizeStringList(List<?> values) {
+        if (values == null) {
+            return null;
+        }
+
+        List<String> normalized = new ArrayList<>();
+        for (Object value : values) {
+            normalized.add(blankToEmpty(value));
+        }
+        return normalized;
+    }
+
+    private static String blankToEmpty(Object value) {
+        if (value == null) {
+            return "";
+        }
+
+        String stringValue = String.valueOf(value);
+        return stringValue.isBlank() ? "" : stringValue;
+    }
 }

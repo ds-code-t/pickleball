@@ -22,6 +22,19 @@ import static tools.dscode.common.GlobalConstants.META_FLAG;
 
 public class NodeMap  extends ValueFormatting{
 
+    public void clearValues(String... keys) {
+        if (keys == null || keys.length == 0) {
+            root.removeAll();
+            return;
+        }
+
+        for (String key : keys) {
+            if (key != null) {
+                root.remove(key);
+            }
+        }
+    }
+
     public ObjectNode getRoot() {
         return root;
     }

@@ -40,7 +40,7 @@ import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTe
 import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleStepTestStep;
 import static io.cucumber.core.runner.util.TableUtils.DOCSTRING_KEY;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
-import static io.cucumber.core.runner.util.TableUtils.toRowsMultimap;
+import static io.cucumber.core.runner.util.TableUtils.toRowsStringMultimap;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
@@ -117,11 +117,11 @@ public class StepExtension extends StepData {
             String tableName = (String) arguments.getFirst().getValue();
             dataTable = (DataTable) arguments.getLast().getValue();
             if (tableName != null && !tableName.isBlank()) {
-                getDataTableMap().put(TABLE_KEY, Map.of(tableName.trim(), toRowsMultimap(dataTable)));
+                getDataTableMap().put(TABLE_KEY, Map.of(tableName.trim(), toRowsStringMultimap(dataTable)));
             }
             dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP);
             dataContextStepNodeMap.setDataSource(MapConfigurations.DataSource.DATA_TABLE);
-            dataContextStepNodeMap.put(TABLE_KEY, toRowsMultimap(dataTable));
+            dataContextStepNodeMap.put(TABLE_KEY, toRowsStringMultimap(dataTable));
         }
     }
 
