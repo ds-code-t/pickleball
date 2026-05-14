@@ -1,6 +1,10 @@
 Feature: Additiontest
 
 
+  Scenario: tezsts
+    * , save "<A>" as  "B"
+    * , if "<A>" has value , save "AAA"
+
   Scenario: inline IF A
     * , save "A" as "z"
     * , if "<z>" == "A" , save "22"
