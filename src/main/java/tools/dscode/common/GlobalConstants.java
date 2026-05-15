@@ -58,6 +58,7 @@ public class GlobalConstants {
     public static final String CLOSE_CURLY_REPLACEMENT_SUB = "-cc\u240Br-";
 
     public static final String GROUP_SEPARATOR = "\u241D";
+    public static final String META_TEXT_SEPARATOR = "\u241E";
 
 
     // visible characters

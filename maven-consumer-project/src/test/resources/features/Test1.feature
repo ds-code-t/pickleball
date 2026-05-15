@@ -1,5 +1,39 @@
 Feature: Additiontest
 
+Scenario: fgdfereg
+  * , ,if 1==3, then save "A" , else if 1==1:
+  : * , save "QQ"
+
+Scenario: fgdfg
+  * , save 1 as "n"
+  * , if <n>==1  , then  save "A" , else if <n>==2   , then  save "B"  , else if <n>==3    , then save "C" , else save "D"
+  * , save 2 as "n"
+  * , if <n>==1  , then  save "A" , else if <n>==2   , then  save "B"  , else if <n>==3    , then save "C" , else save "D"
+
+
+  Scenario: tezstfgsds inline conditionals
+    * , save 1 as "n"
+    * IF: <n>==1 THEN: , save "A" ELSE-IF: <n>==2   THEN: , save "B"   ELSE-IF: <n>==3   THEN:  , save "C"  ELSE: , save "D"
+    * , save 2 as "n"
+    * IF: <n>==12 THEN: , save "A" ELSE-IF: <n>==2   THEN: , save "B"   ELSE-IF: <n>==3   THEN:  , save "C"  ELSE: , save "D"
+    * , save 3 as "n"
+    * IF: <n>==13 THEN: , save "A" ELSE-IF: <n>==2   THEN: , save "B"   ELSE-IF: <n>==3   THEN:  , save "C"  ELSE: , save "D"
+    * , save 4 as "n"
+    * IF: <n>==14 THEN: , save "A" ELSE-IF: <n>==2   THEN: , save "B"   ELSE-IF: <n>==3   THEN:  , save "C"  ELSE: , save "D"
+
+  Scenario: ss tezstfgsds inline conditionals
+    * , save 1 as "n"
+    * IF: <n>==1 THEN: , save "A" ELSE-IF: <n>==2   THEN: , save "B"   ELSE-IF: <n>==3   THEN:  , save "C"  ELSE: ,  if 1==6:"
+  : * , save "Q111"
+    * , save 2 as "n"
+    * IF: <n>==1 THEN: , save "A" ELSE-IF: <n>==2   THEN: , save "B"   ELSE-IF: <n>==3   THEN:  , save "C"  ELSE: ,  if 1==6:"
+  : * , save "Q222"
+    * , save 3 as "n"
+    * IF: <n>==1 THEN: , save "A" ELSE-IF: <n>==2   THEN: , save "B"   ELSE-IF: <n>==3   THEN:  , save "C"  ELSE: , if 1==6:"
+  : * , save "Q333"
+    * , save 77 as "n"
+    * IF: <n>==1 THEN: , save "A" ELSE-IF: <n>==2   THEN: , save "B"   ELSE-IF: <n>==3   THEN:  , save "C"  ELSE: , if 1==1:"
+  : * , save "Q444"
 
   Scenario: tezsts
     * , save "<A>" as  "B"
@@ -722,7 +756,7 @@ Feature: Additiontest
   :    Then , save "Q4" as "W"
 
 
-    * IF: "N" equals "A":
+    * IF: "A" equals "A" THEN: , save "Azzz" ELSE:
   :    Then , save "Q1" as "W"
     * ELSE-IF: "A" equals "A":
   :    Then , save "Q2" as "W"

@@ -14,10 +14,10 @@ import java.util.Set;
 import static io.cucumber.core.runner.StepBase.getInheritancePhrase;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.treeparsing.DefinitionContext.preParseDynamicStepString;
-import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
 
 public abstract class LineData implements Cloneable {
+    public boolean isBlockConditionalStep;
     public int lineConditionalMode = 1;
     public int startPhraseIndex = 0;
     //    public LineData inheritedLineData;
@@ -149,9 +149,10 @@ public abstract class LineData implements Cloneable {
         if (masked.startsWith("IF:") || masked.startsWith("ELSE")) return input;
 
         String replaced = masked.replaceAll(
-                "([.,:?!;][^.,:?!;]*?\\s(?:(?:(?:else\\s+)?if\\s+)|until\\s+)?)([^.,:?!;]*(?:==|!=|&&|\\|\\||>|<)[^.,:?!;]*)(?=[.,:?!;]|$)",
+                "([.,:?!;][^.,:?!;{]*\\s(?:(?:(?:else\\s+)?if\\s+)|until\\s+)?)([^.,:?!;]*(?:==|!=|&&|\\|\\||>|<)[^.,:?!;]*)(?=[.,:?!;]|$)",
                 "$1  { $2 } "
         );
+
 
         String restored = qp.restoreFrom(bm.restoreFrom(replaced));
         return restored;

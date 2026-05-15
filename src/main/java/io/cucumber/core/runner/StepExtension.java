@@ -1,5 +1,6 @@
 package io.cucumber.core.runner;
 
+import io.cucumber.core.eventbus.EventBus;
 import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.core.stepexpression.DataTableArgument;
 import io.cucumber.core.stepexpression.DocStringArgument;
@@ -23,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -31,6 +33,7 @@ import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherki
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
 import static io.cucumber.core.runner.CurrentScenarioState.getScenarioLogRoot;
 
+import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getGlobalEventBus;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.getTestCase;
@@ -52,6 +55,7 @@ import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToS
 import static tools.dscode.common.reporting.logging.LogForwarder.stepDebug;
 import static tools.dscode.common.util.GeneralUtils.stackTraceToString;
 import static tools.dscode.common.util.Reflect.getProperty;
+import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
 import static tools.dscode.common.util.debug.DebugUtils.parseDebugString;
 import static tools.dscode.coredefinitions.GeneralSteps.rootStep;
@@ -179,8 +183,7 @@ public class StepExtension extends StepData {
         executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
         executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
         if (!definitionFlags.contains(DefinitionFlag.NO_LOGGING)) {
-            stepEntry = getScenarioLogRoot().logWithType("STEP", executingPickleStepTestStep.getStepText()).tags("Step").start();
-
+            initializeStepEntryLogging();
         }
         lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
         io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep, executionMode);
@@ -199,7 +202,20 @@ public class StepExtension extends StepData {
         }
         lifecycle.fire(Phase.AFTER_SCENARIO_STEP);
 
-        if (!definitionFlags.contains(DefinitionFlag.NO_LOGGING)) {
+        finalizeStepEntryLogging();
+
+        return result;
+    }
+
+
+    public void initializeStepEntryLogging() {
+        if (stepEntry == null || !stepEntry.tags.contains("Step")) {
+            stepEntry = getScenarioLogRoot().logWithType("STEP", executingPickleStepTestStep.getStepText()).tags("Step").start();
+        }
+    }
+
+    public void finalizeStepEntryLogging() {
+        if (stepEntry.tags.contains("Step")) {
             if (webDriverUsed != null && webDriverUsed.getSessionId() != null) {
                 if (isPresent(webDriverUsed)) {
                     stepEntry.info("Browser Alert is present, cannot take screenshot.");
@@ -210,11 +226,8 @@ public class StepExtension extends StepData {
             } else {
                 stepEntry.stop();
             }
+            stepEntry = closestEntryToScenario();
         }
-
-
-        return result;
-
     }
 
     public Result execute(io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep, ExecutionMode executionMode) {
@@ -374,6 +387,41 @@ public class StepExtension extends StepData {
         modifiedStep.setStepParsingMap(getStepParsingMap());
         return modifiedStep;
     }
+
+
+    public boolean emittedStepStartManually = false;
+
+    public void emitStepStart(String emitText){
+        if(emittedStepStartManually) return;
+        emittedStepStartManually = true;
+        PickleStepTestStep emitPickleStep = emitText == null || emitText.isBlank()  ? pickleStepTestStep : createNewStepExtension(emitText).pickleStepTestStep;
+        emitPickleStep.setNoLogging(false);
+        initializeStepEntryLogging();
+        emitPickleStep.setNoLogging(false);
+        pickleStepTestStep.substituteStep = emitPickleStep;
+        try {
+            invokeAnyMethodOrThrow(pickleStepTestStep, "emitTestStepStarted", testCase, getCurrentScenarioState().scenarioRunner.getBus(), getTestCaseState().getTestExecutionId(), getCurrentScenarioState().scenarioRunner.getBus().getInstant());
+        } catch (Throwable e) {
+            throw new RuntimeException(e);
+        }
+        System.out.println("@@emitStepStart2: " + this);
+
+    }
+
+//    public void emitStepEnd() {
+//        invokeAnyMethod(pickleStepTestStep, "emitTestStepStarted", testCase, getCurrentScenarioState().scenarioRunner.getBus(), getTestCaseState().getTestExecutionId(), Instant.now());
+//        Instant startTime = stepEntry.startedAt;
+//        Instant stopTime = getCurrentScenarioState().scenarioRunner.getBus().getInstant();
+//        Duration duration = Duration.between(startTime, stopTime);
+//        Result result = mapStatusToResult(status, error, duration);
+//        pickleStepTestStep.emitTestStepFinished(
+//                testCase, getCurrentScenarioState().scenarioRunner.getBus() ,getTestCaseState() , Instant.now() , Duration duration, Result result
+//        )
+//        finalizeStepEntryLogging();
+//
+//
+////        pickleStepTestStep.setNoLogging(false);
+//    }
 
 
 }

@@ -6,21 +6,20 @@ import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static tools.dscode.common.GlobalConstants.GROUP_SEPARATOR;
+import static tools.dscode.common.GlobalConstants.META_TEXT_SEPARATOR;
+import static tools.dscode.common.annotations.DefinitionFlag.CONDITIONAL_BLOCK;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_FALSE;
 import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
 import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.assertions.AssertionChain.isAssertionChainBorder;
+import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToScenario;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
-import static tools.dscode.common.treeparsing.parsedComponents.PassedData.isNewBoundary;
 
 
 public final class ParsedLine extends LineData {
@@ -34,8 +33,10 @@ public final class ParsedLine extends LineData {
         super(input);
     }
 
+
     @Override
     public void runPhrases() {
+        isBlockConditionalStep = getRunningStep().definitionFlags.contains(CONDITIONAL_BLOCK);
         if (stepExtension.overridePhrase != null) {
             runPhraseFromLine(stepExtension.overridePhrase);
             return;
@@ -50,22 +51,23 @@ public final class ParsedLine extends LineData {
             return input;
         }
 
-        stepExtension.addDefinitionFlag(NO_LOGGING, _NO_LOGGING, IGNORE_CHILDREN_IF_FALSE);
+        stepExtension.addDefinitionFlag(CONDITIONAL_BLOCK, NO_LOGGING, _NO_LOGGING, IGNORE_CHILDREN_IF_FALSE);
 
         String returnText = "";
 
+        String metaText = input.endsWith(":") ? "" : META_TEXT_SEPARATOR + " BLOCK_CONDITIONAL " + META_TEXT_SEPARATOR;
+
         for (StringPair stringPair : splitKeepingTokens(input)) {
             String remainder = stringPair.value();
-
-            if(!remainder.isBlank() && (stringPair.token.equals("ELSE:") || stringPair.token.equals("THEN:")))
-            {
-                if(remainder.startsWith(",")) {
+            if (!remainder.isBlank() && (stringPair.token.equals("ELSE:") || stringPair.token.equals("THEN:"))) {
+                if (remainder.startsWith(",")) {
                     remainder = remainder.substring(1).trim();
                 } else {
                     remainder = " run step `" + remainder + "`";
                 }
             }
-                returnText +=  " , " + stringPair.normalizedToken() + " " + remainder;
+
+            returnText +=    " , "  + metaText +" " + stringPair.normalizedToken() + " " +  remainder;
         }
         if (input.endsWith(":") && !returnText.endsWith(":"))
             return returnText + " :";
@@ -84,7 +86,7 @@ public final class ParsedLine extends LineData {
         }
 
         public String normalizedToken() {
-            return token
+            return   token
                     .toLowerCase()
                     .replace(':', ' ')
                     .replace('-', ' ')
@@ -120,7 +122,6 @@ public final class ParsedLine extends LineData {
 
         return result;
     }
-
 
 
     @Override

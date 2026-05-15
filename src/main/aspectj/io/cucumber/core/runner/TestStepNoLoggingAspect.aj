@@ -17,6 +17,8 @@ public privileged aspect TestStepNoLoggingAspect {
     /* ======================================================
      * Introduced property
      * ====================================================== */
+    public io.cucumber.core.runner.TestStep io.cucumber.core.runner.TestStep.substituteStep  = null;
+
     public boolean io.cucumber.core.runner.TestStep.noLogging = false;
 
     public boolean io.cucumber.core.runner.TestStep.isNoLogging() {
@@ -68,6 +70,8 @@ public privileged aspect TestStepNoLoggingAspect {
                 Instant start)
             : emitStartedExec(step, tc, bus, execId, start)
             {
+                if (step.substituteStep != null)
+                    step = step.substituteStep;
                 if (step.noLogging) {
                     return; // suppressed
                 }
@@ -83,7 +87,8 @@ public privileged aspect TestStepNoLoggingAspect {
                 io.cucumber.plugin.event.Result result)
             : emitFinishedExec(step, tc, bus, execId, stop, duration, result)
             {
-
+                if (step.substituteStep != null)
+                    step = step.substituteStep;
                 if (step.noLogging && !(result.getStatus().equals(Status.FAILED) || result.getStatus().equals(Status.UNDEFINED))) {
                     return; // suppressed
                 }

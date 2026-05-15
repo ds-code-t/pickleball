@@ -2,7 +2,9 @@ package tools.dscode.common.treeparsing.parsedComponents;
 
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.cucumber.core.runner.StepExtension;
 import tools.dscode.common.domoperations.ExecutionDictionary;
+import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.preparsing.LineData;
@@ -11,8 +13,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static tools.dscode.common.annotations.DefinitionFlag.CONDITIONAL_BLOCK;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToScenario;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseDebug;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
 import static tools.dscode.common.treeparsing.DefinitionContext.FILE_INPUT;
@@ -59,9 +63,34 @@ public final class Phrase extends PhraseData {
             } else {
                 phraseConditionalMode = 1;
             }
+
+
+            if(getConditional().trim().equals("else")) {
+
+            if(!getRunningStep().emittedStepStartManually && metaTextPrefix.contains("BLOCK_CONDITIONAL")) {
+            if(phraseConditionalMode > 0){
+                    PhraseData phraseData = this;
+                    String emitText = " , " + phraseData.text.replaceFirst("else", "") + phraseData.termination;
+                    while((phraseData = phraseData.getNextPhrase())!= null ) {
+                        if (phraseData.metaTextPrefix.contains("BLOCK_CONDITIONAL"))
+                        {
+                            phraseData.setNextPhrase(null);
+                            break;
+                        }
+                        emitText += phraseData.text + phraseData.termination;
+                        phraseData = phraseData.getPreviousPhrase();
+                    }
+                    getRunningStep().emitStepStart(emitText);
+                }
+            }
+
+            }
+
+
         } else {
             phraseConditionalMode = getPreviousPhrase() == null ? 1 : getPreviousPhrase().phraseConditionalMode;
         }
+
         return phraseConditionalMode > 0;
     }
 
@@ -123,9 +152,15 @@ public final class Phrase extends PhraseData {
             phraseDebug("Resolving `" + text + "` to `" + resolvedText + "`");
         }
 
+        StepExtension currentStep = getRunningStep();
+
         if (shouldRun()) {
+            Entry parentEntry = currentStep == null ||  currentStep.stepEntry ==null || parsedLine.isBlockConditionalStep ? closestEntryToScenario() : currentStep.stepEntry;
+            phraseEntry = parentEntry.logWithType("PHRASE", toString()).tags("phrase").start();
             phraseInfo("Running Phrase: " + this);
         } else {
+            Entry parentEntry = currentStep == null ||  currentStep.stepEntry ==null || parsedLine.isBlockConditionalStep ? closestEntryToScenario() : currentStep.stepEntry;
+            phraseEntry = parentEntry.logWithType("PHRASE", toString()).tags("phrase").start();
             phraseInfo("Skipping Phrase: " + this);
             wasPhraseSkipped = true;
             assertionChain = null;
@@ -257,10 +292,7 @@ public final class Phrase extends PhraseData {
     }
 
     public PhraseData resolvePhrase() {
-        PhraseData resolvedPhrase = new Phrase(text, termination, parsedLine, getPreviousPhrase());
-        if (resolvedPhrase.getAction().endsWith("attach") && !resolvedPhrase.getElementMatches().stream().anyMatch(e -> e.elementTypes.contains(ElementType.HTML_TYPE))) {
-            resolvedPhrase = new Phrase(resolvedPhrase.resolvedText.replaceFirst("\\battach(?:es|ed)?\\b", "attach " + FILE_INPUT + " "), termination, parsedLine);
-        }
+        PhraseData resolvedPhrase = new Phrase(originalText, termination, parsedLine, getPreviousPhrase());
         setResolvedPhrase(resolvedPhrase);
         getResolvedPhrase().position = position;
         getResolvedPhrase().assertionChain = assertionChain;
@@ -286,7 +318,7 @@ public final class Phrase extends PhraseData {
     }
 
     public static Phrase copyPhraseWithModifications(Phrase phrase, Character newTermination, LineData parsedLine, PhraseData previous) {
-        Phrase clonePhrase = newTermination == null ? new Phrase(phrase.text, phrase.termination, phrase.parsedLine) : new Phrase(phrase.text, newTermination, parsedLine, previous);
+        Phrase clonePhrase = newTermination == null ? new Phrase(phrase.originalText, phrase.termination, phrase.parsedLine) : new Phrase(phrase.originalText, newTermination, parsedLine, previous);
         clonePhrase.operationInheritancePhrase = phrase.operationInheritancePhrase;
         clonePhrase.assertionChainMembership = phrase.assertionChainMembership;
         clonePhrase.isChainedAssertion = phrase.isChainedAssertion;

@@ -55,7 +55,7 @@ public abstract class StepBase implements Cloneable {
     public boolean isCoreStep;
     protected List<String> stepFlags = new ArrayList<>();
     protected List<DefinitionFlag> inheritableDefinitionFlags = new ArrayList<>();
-    protected List<DefinitionFlag> definitionFlags;
+    public List<DefinitionFlag> definitionFlags;
     protected List<DefinitionFlag> nextSiblingDefinitionFlags;
     public List<String> stepTags = new ArrayList<>();
     public List<String> bookmarks = new ArrayList<>();

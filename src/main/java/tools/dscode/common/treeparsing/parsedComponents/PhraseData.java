@@ -26,13 +26,14 @@ import tools.dscode.common.treeparsing.preparsing.LineData;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
-import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
+import static tools.dscode.common.GlobalConstants.META_TEXT_SEPARATOR;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
@@ -40,7 +41,6 @@ import static tools.dscode.common.mappings.StepMapping.copytoNewParsingMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseError;
-import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
@@ -55,6 +55,8 @@ public abstract class PhraseData extends PassedData {
     public boolean isChainedAssertion = false;
     public Entry phraseEntry;
     //    boolean isStartingContext;
+    public String originalText;
+    public String metaTextPrefix;
     public final String text;
     public final String resolvedText;
     public Character termination; // nullable
@@ -173,7 +175,14 @@ public abstract class PhraseData extends PassedData {
         return (termination.equals('.') || termination.equals('?') || termination.equals(':'));
     }
 
+
     public PhraseData(String inputText, Character delimiter, LineData lineData, PhraseData previousPhrase) {
+        originalText = inputText;
+        var m = Pattern.compile( META_TEXT_SEPARATOR +"\\s*(.*?)\\s*"+ META_TEXT_SEPARATOR ).matcher(inputText);
+        boolean found = m.find();
+        metaTextPrefix = found ? m.group(1) : "";
+        inputText = found ? m.replaceFirst("") : inputText;
+
         defaultContextPhrase = inputText.equals(STARTING_CONTEXT);
         if (defaultContextPhrase)
             inputText = "From " + inputText;
