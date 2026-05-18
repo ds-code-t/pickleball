@@ -100,7 +100,7 @@ public final class DefinitionContext {
 
         ParseNode preparseKeywords = new ParseNode("^.*$") {
             public String onSubstitute(MatchNode self) {
-                return " " + preParseDynamicStepString(self.originalText())  + " ";
+                return " " + preParseDynamicStepString(self.originalText()) + " ";
             }
         };
 
@@ -420,24 +420,25 @@ public final class DefinitionContext {
                     .addBase("//*[self::button or @role='button']");
 
 
-            category("Section").children("Sections")
+            categories("Section", "Sections", "Parent Section", "Parent Sections", "Grandparent Section", "Grandparent Sections")
                     .addBase("//div")
                     .and(
-                            (category, v, op) -> {
+                            (String category, ValueWrapper v, Op op) -> {
                                 if (v == null || v.isNullOrBlank())
                                     return null;
-                                String xpath1 = XPathy.from("//div" + descendantDeepNormalizedVisibleText(v, op) +
-                                        "[self::div[" +
-                                        "    descendant::*[self::select or self::input or self::textarea or self::textarea]" +
-                                        "    or" +
-                                        "    self::div[" +
-                                        "    descendant::div" +
-                                        "    and not(contains( translate(@class, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'header' ))" +
-                                        "    and count(child::*[.//text()]) >= 2" +
-                                        "    ]" +
-                                        "]]").getXpath();
+                                String contentNodes = "[self::text() and self::select or self::input or self::textarea or self::button or self::a or self::*[@role='button' or @role='link' or @role='radio' or @role='checkbox' or @role='tab' or @role='textbox' or @role='combobox']]";
+                                String textMatch = "deepNormalizedVisibleText(v, op);";
+                                String xpath1 = XPathy.from("//div"
+                                        + "[descendant::*[normalize-space(text())][1]" + textMatch
+                                        + " and not(preceding-sibling::*" + contentNodes + ")]"
+                                        + " and not(preceding-sibling::*/descendant::*" + contentNodes + ")]"
+                                        + "]"
+                                        + "]"
+                                        + "[descendant::*" + contentNodes + "]"
+                                        +  "[not(descendant::*[normalize-space(text())][1]" + textMatch + " and descendant::*" + contentNodes + "])]" //noMatch
 
-                                return XPathy.from(deepestOnlyXPath(xpath1));
+                                ).getXpath();
+                                return xpath1;
                             }
                     );
 
@@ -502,7 +503,7 @@ public final class DefinitionContext {
 
             category("Close Button").children("Close Buttons")
                     .and(
-               "//*[self::button or @role='button' or self::a or self::img or self::i]"
+                            "//*[self::button or @role='button' or self::a or self::img or self::i]"
                     )
                     .or(
                             (category, v, op) -> XPathyBuilder.build(any, id, ValueWrapper.createValueWrapper("'close'"), Op.STARTS_WITH),
