@@ -427,7 +427,8 @@ public final class DefinitionContext {
                                 if (v == null || v.isNullOrBlank())
                                     return null;
                                 String contentNodes = "[self::*[text()] and self::select or self::input or self::textarea or self::button or self::a or self::*[@role='button' or @role='link' or @role='radio' or @role='checkbox' or @role='tab' or @role='textbox' or @role='combobox']]";
-                                String textMatch = deepNormalizedVisibleText(v, op);;
+                                String textMatch = deepNormalizedVisibleText(v, op);
+                                ;
                                 String xpath1 = XPathy.from("//div"
                                         + "[descendant::*[normalize-space(text())][1]" + textMatch
                                         + "[not(preceding-sibling::*" + contentNodes + ")"
@@ -435,10 +436,21 @@ public final class DefinitionContext {
                                         + "]"
                                         + "]"
                                         + "[descendant::*" + contentNodes + "]"
-                                        +  "[not(descendant::*[descendant::*[normalize-space(text())][1]" + textMatch + " and descendant::*" + contentNodes + "])]" //noMatch
-
+                                        + "[not(descendant::*[descendant::*[normalize-space(text())][1]" + textMatch + " and descendant::*" + contentNodes + "])]" //noMatch
                                 ).getXpath();
-                                return xpath1;
+                                if (category.startsWith("Section"))
+                                    return xpath1;
+
+                                String parentSectionXpath = "//div" +
+                                        "[count(*[descendant::*" + contentNodes + "]) > 1]" +
+                                        "[descendant::*[" + xpath1.substring(2) + "]]";
+                                if (category.startsWith("Parent")) {
+                                    return parentSectionXpath;
+                                }
+
+                                return "//div" +
+                                        "[count(*[descendant::*" + contentNodes + "]) > 1]" +
+                                        "[descendant::*[" + parentSectionXpath.substring(2) + "]]";
                             }
                     );
 
