@@ -5,6 +5,11 @@ import tools.dscode.common.seleniumextensions.ElementWrapper;
 
 import java.util.regex.Pattern;
 
+import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
+
+// Adjust this import to wherever closestEntryToPhrase() lives in your project.
+// import static your.package.YourLoggerClass.closestEntryToPhrase;
+
 /**
  * Boolean comparison utilities for ValueWrapper.
  * <p>
@@ -19,13 +24,38 @@ public final class ValueWrapperComparisons {
     private ValueWrapperComparisons() {
     }
 
+    /* ---------------- logging helpers ---------------- */
+
+    private static void logComparison(String comparisonType, Object left, Object right) {
+        closestEntryToPhrase().info(
+                "checking " + comparisonType + " between: '" + left + "' and '" + right + "'"
+        );
+    }
+
+    private static void logStringComparison(String comparisonType, ValueWrapper a, ValueWrapper b) {
+        if (a == null || b == null) {
+            logComparison(comparisonType, a, b);
+            return;
+        }
+
+        logComparison(comparisonType, stringValue(a, b), stringValueOther(a, b));
+    }
+
+    private static void logNumericComparison(String comparisonType, ValueWrapper a, ValueWrapper b) {
+        if (a == null || b == null) {
+            logComparison(comparisonType, a, b);
+            return;
+        }
+
+        logComparison(comparisonType, a.asBigDecimal(), b.asBigDecimal());
+    }
+
     /* ---------------- helpers ---------------- */
 
     private static boolean eitherNumeric(ValueWrapper a, ValueWrapper b) {
         return a.type == ValueWrapper.ValueTypes.NUMERIC
                 || b.type == ValueWrapper.ValueTypes.NUMERIC;
     }
-
 
     private static boolean eitherSingleQuoted(ValueWrapper a, ValueWrapper b) {
         return a.type == ValueWrapper.ValueTypes.SINGLE_QUOTED
@@ -51,15 +81,9 @@ public final class ValueWrapperComparisons {
         return b.asNormalizedText();
     }
 
-    /* ---------------- string comparisons ---------------- */
-
-    public static boolean notEquals(ValueWrapper a, ValueWrapper b) {
-        return !equals(a, b);
-    }
-
-    public static boolean equals(ValueWrapper a, ValueWrapper b) {
+    private static boolean equalsInternal(ValueWrapper a, ValueWrapper b) {
         if (a == null || b == null) return a == b;
-        if (eitherNumeric(a, b)) return numericEquals(a, b);
+        if (eitherNumeric(a, b)) return numericEqualsInternal(a, b);
 
         String left = stringValue(a, b);
         String right = stringValueOther(a, b);
@@ -69,7 +93,31 @@ public final class ValueWrapperComparisons {
                 : StringUtils.equals(left, right);
     }
 
+    private static boolean numericEqualsInternal(ValueWrapper a, ValueWrapper b) {
+        if (a == null || b == null) return a == b;
+        return a.asBigDecimal().compareTo(b.asBigDecimal()) == 0;
+    }
+
+    /* ---------------- string comparisons ---------------- */
+
+    public static boolean notEquals(ValueWrapper a, ValueWrapper b) {
+        logStringComparison("non-equality", a, b);
+        return !equalsInternal(a, b);
+    }
+
+    public static boolean equals(ValueWrapper a, ValueWrapper b) {
+        if (a != null && b != null && eitherNumeric(a, b)) {
+            logNumericComparison("numeric equality", a, b);
+        } else {
+            logStringComparison("equality", a, b);
+        }
+
+        return equalsInternal(a, b);
+    }
+
     public static boolean contains(ValueWrapper a, ValueWrapper b) {
+        logStringComparison("contains", a, b);
+
         if (a == null || b == null) return false;
 
         String left = stringValue(a, b);
@@ -81,6 +129,8 @@ public final class ValueWrapperComparisons {
     }
 
     public static boolean startsWith(ValueWrapper a, ValueWrapper b) {
+        logStringComparison("starts-with", a, b);
+
         if (a == null || b == null) return false;
 
         String left = stringValue(a, b);
@@ -92,6 +142,8 @@ public final class ValueWrapperComparisons {
     }
 
     public static boolean endsWith(ValueWrapper a, ValueWrapper b) {
+        logStringComparison("ends-with", a, b);
+
         if (a == null || b == null) return false;
 
         String left = stringValue(a, b);
@@ -103,13 +155,13 @@ public final class ValueWrapperComparisons {
     }
 
     public static boolean matchesRegex(ValueWrapper a, ValueWrapper regex) {
+        logStringComparison("regex match", a, regex);
 
         if (a == null || regex == null) return false;
 
         String value = stringValue(a, regex);
 
         String pattern = stringValueOther(a, regex);
-
 
         if (value == null || pattern == null) return false;
 
@@ -123,31 +175,37 @@ public final class ValueWrapperComparisons {
     /* ---------------- numeric comparisons ---------------- */
 
     public static boolean numericEquals(ValueWrapper a, ValueWrapper b) {
-        if (a == null || b == null) return a == b;
-        return a.asBigDecimal().compareTo(b.asBigDecimal()) == 0;
+        logNumericComparison("numeric equality", a, b);
+        return numericEqualsInternal(a, b);
     }
 
     public static boolean numericGreaterThan(ValueWrapper a, ValueWrapper b) {
+        logNumericComparison("numeric greater-than", a, b);
+
         if (a == null || b == null) return false;
         return a.asBigDecimal().compareTo(b.asBigDecimal()) > 0;
     }
 
     public static boolean numericLessThan(ValueWrapper a, ValueWrapper b) {
+        logNumericComparison("numeric less-than", a, b);
+
         if (a == null || b == null) return false;
         return a.asBigDecimal().compareTo(b.asBigDecimal()) < 0;
     }
 
     public static boolean numericGreaterThanOrEqualTo(ValueWrapper a, ValueWrapper b) {
+        logNumericComparison("numeric greater-than-or-equal-to", a, b);
+
         if (a == null || b == null) return a == b;
         return a.asBigDecimal().compareTo(b.asBigDecimal()) >= 0;
     }
 
     public static boolean numericLessThanOrEqualTo(ValueWrapper a, ValueWrapper b) {
+        logNumericComparison("numeric less-than-or-equal-to", a, b);
+
         if (a == null || b == null) return a == b;
         return a.asBigDecimal().compareTo(b.asBigDecimal()) <= 0;
     }
-
-//    /* ---------------- Single Argument ---------------- */
 
 
 }
