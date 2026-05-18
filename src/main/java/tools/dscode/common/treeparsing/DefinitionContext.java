@@ -426,12 +426,12 @@ public final class DefinitionContext {
                             (String category, ValueWrapper v, Op op) -> {
                                 if (v == null || v.isNullOrBlank())
                                     return null;
-                                String contentNodes = "[self::text() and self::select or self::input or self::textarea or self::button or self::a or self::*[@role='button' or @role='link' or @role='radio' or @role='checkbox' or @role='tab' or @role='textbox' or @role='combobox']]";
-                                String textMatch = "deepNormalizedVisibleText(v, op);";
+                                String contentNodes = "[self::*[text()] and self::select or self::input or self::textarea or self::button or self::a or self::*[@role='button' or @role='link' or @role='radio' or @role='checkbox' or @role='tab' or @role='textbox' or @role='combobox']]";
+                                String textMatch = deepNormalizedVisibleText(v, op);;
                                 String xpath1 = XPathy.from("//div"
                                         + "[descendant::*[normalize-space(text())][1]" + textMatch
-                                        + " and not(preceding-sibling::*" + contentNodes + ")]"
-                                        + " and not(preceding-sibling::*/descendant::*" + contentNodes + ")]"
+                                        + "[not(preceding-sibling::*" + contentNodes + ")"
+                                        + " and not(preceding-sibling::*/descendant::*" + contentNodes + ")"
                                         + "]"
                                         + "]"
                                         + "[descendant::*" + contentNodes + "]"
