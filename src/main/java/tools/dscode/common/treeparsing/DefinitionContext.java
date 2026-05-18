@@ -435,7 +435,7 @@ public final class DefinitionContext {
                                         + "]"
                                         + "]"
                                         + "[descendant::*" + contentNodes + "]"
-                                        +  "[not(descendant::*[normalize-space(text())][1]" + textMatch + " and descendant::*" + contentNodes + "])]" //noMatch
+                                        +  "[not(descendant::*[descendant::*[normalize-space(text())][1]" + textMatch + " and descendant::*" + contentNodes + "])]" //noMatch
 
                                 ).getXpath();
                                 return xpath1;
