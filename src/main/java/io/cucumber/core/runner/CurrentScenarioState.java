@@ -307,7 +307,6 @@ public class CurrentScenarioState extends ScenarioMapping {
         if (!stepExtension.lineData.inheritancePhrases.isEmpty())
             stepExtension.inheritancePhrase = stepExtension.lineData.inheritancePhrases.getFirst();
 
-
         Status status = result.getStatus();
         Throwable throwable = result.getError();
 

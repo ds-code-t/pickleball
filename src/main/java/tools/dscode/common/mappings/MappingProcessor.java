@@ -298,7 +298,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     public String resolveWholeText(String input) {
         QuoteParser parsedObj = new QuoteParser(input);
-        try {
+//        try {
             // Resolve quoted substring values first.
             // This lets curly expressions restore already-resolved quoted values.
             for (var e : parsedObj.entrySetWithoutTripleSingle()) {
@@ -313,11 +313,11 @@ public abstract class MappingProcessor implements Map<String, Object> {
             String resolvedText = parsedObj.restore();
             System.out.println("Resolved: '" + input + "' -> '" + resolvedText + "'");
             return resolvedText;
-        } catch (Throwable t) {
-            String resolvedText = parsedObj.restore();
-            System.out.println("Handled exception '" + t.getMessage() + "' when attempting to resolve: '" + input + "' -> '" + resolvedText + "'");
-            return resolvedText;
-        }
+//        } catch (Throwable t) {
+//            String resolvedText = parsedObj.restore();
+//            System.out.println("Handled exception '" + t.getMessage() + "' when attempting to resolve: '" + input + "' -> '" + resolvedText + "'");
+//            return resolvedText;
+//        }
     }
 
     private String resolveAll(String input, QuoteParser parsedObj) {
@@ -391,9 +391,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
             }
             m.appendTail(sb);
             return sb.toString();
-//        } catch (Throwable t) {
-//            throw new RuntimeException("Could not resolve by curly bracket expression '" + s + "'", t);
-//        }
     }
 
 

@@ -225,16 +225,12 @@ public class StepExtension extends StepData {
         Instant start = Instant.now();
         try {
             Object r = invokeAnyMethodOrThrow(executionPickleStepTestStep, "run", getTestCase(), getGlobalEventBus(), getTestCaseState(), executionMode);
-
         } catch (Throwable t) {
-
             Throwable cause = t instanceof InvocationTargetException ? t.getCause() : t;
-
             Duration duration = Duration.between(start, Instant.now());
 
             return new Result(Status.FAILED, duration, cause);
         }
-
         return executionPickleStepTestStep.getLastResult();
     }
 
