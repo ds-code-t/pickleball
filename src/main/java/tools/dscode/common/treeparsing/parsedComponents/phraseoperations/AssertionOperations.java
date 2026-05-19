@@ -27,12 +27,11 @@ public enum AssertionOperations implements OperationsInterface {
 
             ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
             ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
-
             phraseData.result = Attempt.run(() -> {
                 return ValueWrapperCompareReducer.eval(
                         ValueWrapperComparisons::equals,
-                        firstElement.getValues(),
-                        secondElement.getValues(),
+                        firstElement.getComparisonValues(),
+                        secondElement.getComparisonValues(),
                         getModeSet(phraseData)
                 );
             });
@@ -247,8 +246,6 @@ public enum AssertionOperations implements OperationsInterface {
 
             Set<ValueWrapperCompareReducer.Mode> modeSet = getModeSet(phraseData);
             ElementMatch firstElement = phraseData.resultElements.getFirst();
-
-
             if (firstElement.elementTypes.contains(ElementType.ALERT) || firstElement.elementTypes.contains(ElementType.BROWSER_WINDOW)) {
                 phraseData.result = Attempt.run(() ->
                         (modeSet.contains(ValueWrapperCompareReducer.Mode.NOT) ^ !firstElement.getValues().isEmpty())

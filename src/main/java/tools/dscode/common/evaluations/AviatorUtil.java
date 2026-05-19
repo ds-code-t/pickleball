@@ -101,24 +101,27 @@ public final class AviatorUtil {
      * Aviator.
      */
     public static Object eval(Object expr, Map<String, Object> map) {
-
-
         if (expr == null)
             return null;
         String processedExpression = preprocessExpression(expr.toString());
-
-
-
-        if (map == null)
-            return AviatorEvaluator.execute(processedExpression);
-        return AviatorEvaluator.execute(processedExpression, map);
+        try {
+            if (map == null)
+                return AviatorEvaluator.execute(processedExpression);
+            return AviatorEvaluator.execute(processedExpression, map);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to evaluate expression: '" + expr + "'", e);
+        }
     }
 
     /**
      * Evaluates an object to boolean, using Aviator's final-result coercion.
      */
     public static boolean evalToBoolean(Object expr, Map<String, Object> map) {
-        return expr != null && (boolean) AviatorEvaluator.execute(preprocessExpression(expr.toString()), map, true);
+        try {
+            return expr != null && (boolean) AviatorEvaluator.execute(preprocessExpression(expr.toString()), map, true);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to evaluate expression to boolean: '" + expr + "'", e);
+        }
     }
 
     public static String preprocessExpression(String expression) {
@@ -146,7 +149,7 @@ public final class AviatorUtil {
     }
 
     private static final Set<String> FALSE_VALUES = new HashSet<>(Arrays.asList(
-        "null", "false", "no"));
+            "null", "false", "no"));
 
     public static boolean isStringTruthy(String v) {
         v = v.replaceAll("\"'`\\s", "").strip().toLowerCase();

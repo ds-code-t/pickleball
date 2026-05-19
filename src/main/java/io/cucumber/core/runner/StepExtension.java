@@ -394,8 +394,6 @@ public class StepExtension extends StepData {
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
-        System.out.println("@@emitStepStart2: " + this);
-
     }
 
 //    public void emitStepEnd() {

@@ -173,6 +173,7 @@ public final class DefinitionContext {
                 }
 
                 String returnString = separator.isEmpty() ? self.originalText() : self.originalText().replaceFirst(separator, "");
+
                 if (upperCaseContext)
                     return returnString.replaceFirst(context, context.toLowerCase());
 
@@ -197,7 +198,7 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any|none\\s+of|none|no)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\b\\s*)?(?:(?<state>(?:un|non-?)?(?:checked|selected|enabled|disabled|expanded|collapsed|required|empty|blank))\\b\\s*)?(?<text><<valueMask>>)?\\s*\\b(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>(?:(?:\\band\\s*)?\\bwith\\s+[a-z]+\\s+(?:<<predicate>>|(?:no)?attribute)\\s*))*") {
+        ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any|none\\s+of|none)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\b\\s*)?(?:(?<state>(?:un|non-?)?(?:checked|selected|enabled|disabled|expanded|collapsed|required|empty|blank))\\b\\s*)?(?<text><<valueMask>>)?\\s*\\b(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>(?:(?:\\band\\s*)?\\bwith\\s+[a-z]+\\s+(?:<<predicate>>|(?:no)?attribute)\\s*))*") {
             @Override
             public String onSubstitute(MatchNode self) {
                 printDebug("##parsedefinition-elementMatch: " + self.originalText());
@@ -262,7 +263,7 @@ public final class DefinitionContext {
 
         ParseNode no = new ParseNode("\\bno\\b") {
             @Override
-            public String onCapture(MatchNode self) {
+            public String onSubstitute(MatchNode self) {
                 self.parent().putToLocalState(self.originalText(), self.originalText());
 //                return self.originalText();
                 return " ";
@@ -302,7 +303,6 @@ public final class DefinitionContext {
         ParseNode defaultAssertion = new ParseNode("<<elementMatch>>\\s*(?<defaultAssertion>is)\\s*<<elementMatch>>") {
             @Override
             public String onSubstitute(MatchNode self) {
-
                 MatchNode parentNode = self.parent();
                 if (!parentNode.localStateBoolean("context", "action", "assertion")) {
                     parentNode.putToLocalState("assertion", "equal");

@@ -66,7 +66,6 @@ public abstract class LineData implements Cloneable {
 
     public LineData(String input) {
         input = stripObscureNonText(Objects.requireNonNull(input, "input"));
-
         // Ensure non-blank input ends with a delimiter
         if (!input.isBlank()) {
             String t = input.stripTrailing();
@@ -77,7 +76,6 @@ public abstract class LineData implements Cloneable {
                 input = t; // optional: normalize away trailing whitespace consistently
             }
         }
-
         input = wrapLooseConditionalExpression(input);
 
         this.original = input;
@@ -149,10 +147,9 @@ public abstract class LineData implements Cloneable {
         if (masked.startsWith("IF:") || masked.startsWith("ELSE")) return input;
 
         String replaced = masked.replaceAll(
-                "([.,:?!;][^.,:?!;{]*\\s(?:(?:(?:else\\s+)?if\\s+)|until\\s+)?)([^.,:?!;]*(?:==|!=|&&|\\|\\||>|<)[^.,:?!;]*)(?=[.,:?!;]|$)",
-                "$1  { $2 } "
+                "([.,:?!;]\\s*(?:(?:(?:else\\s+)?if\\s+)|until\\s+)?)([^.,:?!;{}]*(?:==|!=|&&|\\|\\||>=|<=|>|<)[^.,:?!;{}]*)(?=\\s*[.,:?!;]|$)",
+                "$1{ $2 } "
         );
-
 
         String restored = qp.restoreFrom(bm.restoreFrom(replaced));
         return restored;

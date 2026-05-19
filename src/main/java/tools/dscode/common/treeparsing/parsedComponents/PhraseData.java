@@ -209,8 +209,6 @@ public abstract class PhraseData extends PassedData {
         operationIndex = opIndex == null ? 0 : opIndex;
 
         hasNo = phraseNode.localStateBoolean("no");
-
-
         body = phraseNode.getStringFromLocalState("body");
         separator = phraseNode.localStateBoolean("separator");
         setElementMatches(phraseNode.getOrderedChildren("elementMatch").stream().map(this::getElementMatch).collect(Collectors.toList()));
@@ -462,7 +460,6 @@ public abstract class PhraseData extends PassedData {
             }
             case "conditional" -> {
                 phraseConditionalMode = previouslyResolvedBoolean ? 1 : -1;
-
                 if (untilPhrase) {
                     if (phraseConditionalMode <= 0) {
                         phraseConditionalMode = 1;
@@ -470,7 +467,6 @@ public abstract class PhraseData extends PassedData {
                         phraseConditionalMode = 0;
                     }
                 }
-
             }
         }
         return previouslyResolvedBoolean;

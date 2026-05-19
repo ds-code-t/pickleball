@@ -375,7 +375,6 @@ public class CurrentScenarioState extends ScenarioMapping {
             if (stepExtension.lineData.inheritancePhrases.isEmpty())
                 stepExtension.lineData.inheritancePhrases.add(null);
             for (PhraseData inheritancePhrase : new ArrayList<>(stepExtension.lineData.inheritancePhrases)) {
-
                 if (inheritancePhrase != null && inheritancePhrase.untilPhrase) {
                     long timeoutSeconds = (long) resolveFromVarsOrDefault("stepRepeatMaxTime", 3600L);     // 0 = no time limit
                     int maxIterations = (int) resolveFromVarsOrDefault("stepRepeatMaxCount", 100);
@@ -406,10 +405,9 @@ public class CurrentScenarioState extends ScenarioMapping {
                         }
                         clonedStep.overridePhrase = clonedPhrase;
                         clonedStep.nextSibling = null;
-
                         waitMilliseconds(400);
                         runStep(clonedStep);
-                        if ((boolean) clonedPhrase.result.value())
+                        if (clonedPhrase.phraseConditionalMode> 0)
                             break;
 
 

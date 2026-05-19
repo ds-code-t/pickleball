@@ -379,7 +379,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     private String resolveCurly(String s, QuoteParser parsedObj) {
-        try {
             Matcher m = CURLY.matcher(s);
             StringBuffer sb = new StringBuffer();
             while (m.find()) {
@@ -392,9 +391,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
             }
             m.appendTail(sb);
             return sb.toString();
-        } catch (Throwable t) {
-            throw new RuntimeException("Could not resolve by curly bracket expression '" + s + "'", t);
-        }
+//        } catch (Throwable t) {
+//            throw new RuntimeException("Could not resolve by curly bracket expression '" + s + "'", t);
+//        }
     }
 
 

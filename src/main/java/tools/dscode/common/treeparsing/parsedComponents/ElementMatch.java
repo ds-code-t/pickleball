@@ -1,6 +1,7 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.xpathy.XPathy;
+import io.cucumber.plugin.event.Node;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.browseroperations.WindowSwitch;
@@ -360,12 +361,17 @@ public class ElementMatch {
 
     private List<ValueWrapper> previouslyReturnedValues = null;
 
+    public List<ValueWrapper> getComparisonValues() {
+        List<ValueWrapper> values = getValues();
+        if (values.isEmpty()) return Collections.singletonList(createValueWrapper(null));
+        return values;
+    }
+
+
     public List<ValueWrapper> getValues() {
         List<ValueWrapper> returnList = new ArrayList<>();
         if (elementTypes.contains(ElementType.HTML_TYPE)) {
             getElementWrappers().forEach(e -> returnList.add(e.getElementReturnValue()));
-            if(returnList.isEmpty())
-                returnList.add(createValueWrapper(NOT_DISPLAYED));
         } else if (elementTypes.contains(ElementType.BROWSER_WINDOW)) {
             String normalized = category.toUpperCase().replaceAll("WINDOWS?", "").trim();
             if (normalized.isBlank()) {

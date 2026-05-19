@@ -199,7 +199,7 @@ public class ExecutionDictionary {
         String textPred = descendantDeepNormalizedVisibleText(v, op);
         String textInner = textPred.substring(1, textPred.length() - 1);
 
-        StringBuilder combined = new StringBuilder("[").append(textInner).append(")");
+        StringBuilder combined = new StringBuilder("[(").append(textInner).append(")");
         for (String attr : new String[]{"aria-label", "title", "data-label", "data-column-name", "data-field"}) {
             combined.append(" or (").append(attributePredicate(attr, v, op)).append(")");
         }

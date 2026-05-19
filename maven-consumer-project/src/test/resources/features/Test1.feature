@@ -1,5 +1,45 @@
 Feature: Additiontest
 
+  Scenario: test23
+  * , save 3 as "ABcasdsdf_NdsfsOfOsdfsd"
+    * IF: 3 <= q <ABcasdsdf_NdsfsOfOsdfsd>:
+    : * , save "A"
+    * , if 3 <= <ABcasdsdf_NdsfsOfOsdfsd>:
+   : * , save "A"
+
+
+    Scenario: untilt test 5sds
+
+#      * , verify 'ZZZZ' Text is "zzzz"
+#      * , verify 'ZZZZ' Text is not "zzzz"
+
+#      * , verify "zzzz" Text is displayed
+#      * , verify "zzzz" Text is not displayed
+#
+#      * , verify "zzzz" Text is "zzzz"
+#      * , verify "zzzz" Text not equals "zzzz"
+#      * , verify "zzzz" Text not is "zzzz"
+#      * , verify "zzzz" Text is not "zzzz"
+
+      * , verify "zzxxzz" Text is "zzzz"
+      * , verify "zzxxzz" Text is not "zzzz"
+
+
+#      * , verify 'ZZZZ' Text is displayed
+#      * , verify 'ZZZZ' Text is not displayed
+#
+#      * , verify "zzzz" Text is displayed
+#      * , verify "zzzz" Text is not displayed
+
+#      * , until "ZZzZZ" Text is not displayed:
+#      : * , save "bbbb"
+#
+#      * , verify "ZZZZ" Text is displayed
+#      * , verify "ZZZZ" Text is not displayed
+#
+#      * , until "ZZZZ" Text is not displayed:
+#    : * , save "aaaaa"
+
 
   Scenario: textdfs bdebug test
     * , save "A"
