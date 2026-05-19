@@ -27,12 +27,13 @@ public final class DebugUtils {
 
     public static boolean parseDebugString(List<String> tags) {
         if(debugFlags == null) debugFlags = new ArrayList<>();
-        debugFlags.addAll(
-                tags.stream()
-                        .filter(t -> t.startsWith("DEBUG"))
-                        .flatMap(s -> Arrays.stream(s.split(",")))
-                        .filter(str -> !str.isBlank()).map(s -> s.trim().toLowerCase())
-                        .toList());
+        List<String> flags = tags.stream()
+                .filter(t -> t.startsWith("DEBUG"))
+                .flatMap(s -> Arrays.stream(s.split(",")))
+                .filter(str -> !str.isBlank()).map(s -> s.trim().toLowerCase())
+                .toList();
+        boolean startStep = flags.contains("debug");
+        debugFlags.addAll(flags);
         if(debugFlags.isEmpty())
             return false;
         disableBaseElement = debugFlags.contains("nobase");
@@ -40,7 +41,7 @@ public final class DebugUtils {
             if(flag.startsWith("##"))
                 substrings.add(flag);
         });
-        return true;
+        return startStep;
     }
 
     private DebugUtils() {

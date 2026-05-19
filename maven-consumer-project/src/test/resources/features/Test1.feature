@@ -1,13 +1,21 @@
 Feature: Additiontest
 
 
-  Scenario: textdfs bws
+  Scenario: textdfs bdebug test
+    * , save "A"
+    * , save "B"
   @[DEBUG]
+    * , save "C"
+    * , save "D"
+
+
+  Scenario: textdfs bws
+
     * , from the Top Panel:
-    : * , verify "First Value:" Textbox is displayed
-    : * , verify "wFirst Value:" Textbox is displayed
-    : * , verify "First Value:" Textbox is not displayed
-    : * , verify "wFirst Value:" Textbox is not displayed
+  : * , verify "First Value:" Textbox is displayed
+  : * , verify "wFirst Value:" Textbox is displayed
+  : * , verify "First Value:" Textbox is not displayed
+  : * , verify "wFirst Value:" Textbox is not displayed
 
 #    : * , verify "wFirst Value:" Textbox is "A"
 #    : * , verify value of "wFirst Value:" Textbox is "A"
@@ -27,23 +35,23 @@ Feature: Additiontest
   Scenario: click testsdas 344
   @[DEBUG]
     * , from the Top Panel:
-    : * , verify "Apples" Checkbox is displayed
-    : * , verify "Apples" Checkbox is not displayed
-    : * , verify "Applesss" Checkbox is displayed
-    : * , verify "Applesss" Checkbox is not displayed
+  : * , verify "Apples" Checkbox is displayed
+  : * , verify "Apples" Checkbox is not displayed
+  : * , verify "Applesss" Checkbox is displayed
+  : * , verify "Applesss" Checkbox is not displayed
 #  : * , click "aaa" Link, ensure  "Get your own website" Link is displayed
 #  : * , ensure  "Get your own website" Link is displayed
 #  : * , ensure  "Get your own website" Link is displayed
 
-Scenario: fgdfereg
-  * , ,if 1==3, then save "A" , else if 1==1:
+  Scenario: fgdfereg
+    * , ,if 1==3, then save "A" , else if 1==1:
   : * , save "QQ"
 
-Scenario: fgdfg
-  * , save 1 as "n"
-  * , if <n>==1  , then  save "A" , else if <n>==2   , then  save "B"  , else if <n>==3    , then save "C" , else save "D"
-  * , save 2 as "n"
-  * , if <n>==1  , then  save "A" , else if <n>==2   , then  save "B"  , else if <n>==3    , then save "C" , else save "D"
+  Scenario: fgdfg
+    * , save 1 as "n"
+    * , if <n>==1  , then  save "A" , else if <n>==2   , then  save "B"  , else if <n>==3    , then save "C" , else save "D"
+    * , save 2 as "n"
+    * , if <n>==1  , then  save "A" , else if <n>==2   , then  save "B"  , else if <n>==3    , then save "C" , else save "D"
 
 
   Scenario: tezstfgsds inline conditionals
@@ -94,20 +102,19 @@ Scenario: fgdfg
 
   Scenario: cod
     * IF: "AA"=="AsA":
-    : * print "AAAAA"
+  : * print "AAAAA"
     * ELSE:
-    : * print "BBBBB"
+  : * print "BBBBB"
 
   Scenario: ffdsfdfgrt4
     * , verify "WWQ3" Text, and  "QWERGJH" Text are not displayed
 
   Scenario: test save
-   * , save "A111" as "Data Table"
-   * , save "B111" as "Data Table"
-   * , save "<Data Table>"
-   * , save "<Data Table #1>"
-   * , save "<Data Table #2>"
-
+    * , save "A111" as "Data Table"
+    * , save "B111" as "Data Table"
+    * , save "<Data Table>"
+    * , save "<Data Table #1>"
+    * , save "<Data Table #2>"
 
 
   Scenario: Data table set test
@@ -116,14 +123,14 @@ Scenario: fgdfg
       | %compT2  |
 
     Then , in the "Name Change" Data Table, for every Data Row:
-    : * , save "<A>"
+  : * , save "<A>"
 
 
   Scenario Outline:
     * SET "Name Change" DATA TABLE
       | A |
       | 1 |
-      |  |
+      |   |
       | 3 |
 
     * SET "eee" DATA TABLE
