@@ -6,6 +6,8 @@ import com.xpathy.XPathy;
 import org.intellij.lang.annotations.Language;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.domoperations.ExecutionDictionary;
+import tools.dscode.common.mappings.QuoteParser;
+import tools.dscode.common.treeparsing.preparsing.BracketMasker;
 import tools.dscode.common.treeparsing.xpathcomponents.XPathyBuilder;
 
 import static com.xpathy.Attribute.aria_label;
@@ -31,6 +33,7 @@ import static tools.dscode.common.treeparsing.RegexUtil.normalizeWhitespace;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.KEY_NAME;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
+import static tools.dscode.common.treeparsing.preparsing.LineData.getBracketMasker;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.colocatedDeepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.customElementSuffixPredicate;
@@ -56,7 +59,8 @@ public final class DefinitionContext {
 
 
     public static String preParseDynamicStepString(String input) {
-        return normalizeWhitespace(input)
+        BracketMasker bm = getBracketMasker(input);
+        String parsedText = normalizeWhitespace(bm.masked())
                 .replaceAll("\\bno\\s+attribute\\b", "noattribute")
                 .replaceAll("\\b(?:the|a)\\b", "")
                 .replaceAll("\\bare\\b", "is")
@@ -66,6 +70,7 @@ public final class DefinitionContext {
                 .replaceAll("\\bensures\\b", "ensure")
                 .replaceAll("\\bnot\\b|n't\\b", " no ")
                 .replaceAll("\\s+", " ");
+        return bm.restoreFrom(parsedText);
     }
 
 
@@ -686,7 +691,7 @@ public final class DefinitionContext {
                                 if (v == null || v.isNullOrBlank()) {
                                     return null; // no label text to match, skip this builder
                                 }
-                                return cellsInColumnByHeaderText(v, op, customElementSuffixPredicate("row"), customElementSuffixPredicate("cell"), customElementSuffixPredicate("header"));
+                                return cellsInColumnByHeaderText(v, op);
                             }
                     );
 

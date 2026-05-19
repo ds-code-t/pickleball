@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static tools.dscode.common.GlobalConstants.NOT_DISPLAYED;
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.browseroperations.BrowserAlerts.getText;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
@@ -363,6 +364,8 @@ public class ElementMatch {
         List<ValueWrapper> returnList = new ArrayList<>();
         if (elementTypes.contains(ElementType.HTML_TYPE)) {
             getElementWrappers().forEach(e -> returnList.add(e.getElementReturnValue()));
+            if(returnList.isEmpty())
+                returnList.add(createValueWrapper(NOT_DISPLAYED));
         } else if (elementTypes.contains(ElementType.BROWSER_WINDOW)) {
             String normalized = category.toUpperCase().replaceAll("WINDOWS?", "").trim();
             if (normalized.isBlank()) {

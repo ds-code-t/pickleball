@@ -30,8 +30,10 @@ import static tools.dscode.common.reporting.logging.LogForwarder.stepError;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.xpathSpecificityScore;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.attributePredicate;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.colocatedDeepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.combineXPathParts;
+import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.customElementSuffixPredicate;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.descendantDeepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.tryConvertToXPathy;
@@ -193,28 +195,25 @@ public class ExecutionDictionary {
         });
     }
 
-    public XPathy cellsInColumnByHeaderText(
-            ValueWrapper v,
-            ExecutionDictionary.Op op,
-            String customRowSuffixPredicate,
-            String customCellSuffixPredicate,
-            String customHeaderSuffixPredicate
-    ) {
-        if (v == null) throw new IllegalArgumentException("ValueWrapper v must not be null");
-        if (op == null) throw new IllegalArgumentException("Op op must not be null");
+    public static XPathy cellsInColumnByHeaderText(ValueWrapper v, ExecutionDictionary.Op op) {
+        String textPred = descendantDeepNormalizedVisibleText(v, op);
+        String textInner = textPred.substring(1, textPred.length() - 1);
 
-        // Assumes your framework returns a BRACKETED predicate like:
-        //   "[normalize-space(.)='Status']"
-        // or similar XPath 1.0-compatible predicate.
-        final String headerTextPred = deepNormalizedVisibleText(v, op);
+        StringBuilder combined = new StringBuilder("[").append(textInner).append(")");
+        for (String attr : new String[]{"aria-label", "title", "data-label", "data-column-name", "data-field"}) {
+            combined.append(" or (").append(attributePredicate(attr, v, op)).append(")");
+        }
+        combined.append("]");
 
         return matchCellsByHeader(
-                headerTextPred,
-                customRowSuffixPredicate,
-                customCellSuffixPredicate,
-                customHeaderSuffixPredicate
+                combined.toString(),
+                customElementSuffixPredicate("row"),
+                customElementSuffixPredicate("cell"),
+                customElementSuffixPredicate("header")
         );
     }
+
+
     //========================================================
     // Inheritance configuration
     //========================================================

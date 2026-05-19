@@ -1,5 +1,40 @@
 Feature: Additiontest
 
+
+  Scenario: textdfs bws
+  @[DEBUG]
+    * , from the Top Panel:
+    : * , verify "First Value:" Textbox is displayed
+    : * , verify "wFirst Value:" Textbox is displayed
+    : * , verify "First Value:" Textbox is not displayed
+    : * , verify "wFirst Value:" Textbox is not displayed
+
+#    : * , verify "wFirst Value:" Textbox is "A"
+#    : * , verify value of "wFirst Value:" Textbox is "A"
+
+
+#    : * , verify "First Value:" Textbox is displayed
+#    : * , verify "Second Value:" Textbox is not displayed
+#    : * , verify "Third Value:" Textbox is not displayed
+#
+#    : * , verify "First Value:" Textbox is displayed
+#    : * , verify "Second Value:" Textbox is not displayed
+#    : * , verify "Third Value:" Textbox is not displayed
+
+
+
+
+  Scenario: click testsdas 344
+  @[DEBUG]
+    * , from the Top Panel:
+    : * , verify "Apples" Checkbox is displayed
+    : * , verify "Apples" Checkbox is not displayed
+    : * , verify "Applesss" Checkbox is displayed
+    : * , verify "Applesss" Checkbox is not displayed
+#  : * , click "aaa" Link, ensure  "Get your own website" Link is displayed
+#  : * , ensure  "Get your own website" Link is displayed
+#  : * , ensure  "Get your own website" Link is displayed
+
 Scenario: fgdfereg
   * , ,if 1==3, then save "A" , else if 1==1:
   : * , save "QQ"

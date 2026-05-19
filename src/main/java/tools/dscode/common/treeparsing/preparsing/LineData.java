@@ -13,7 +13,6 @@ import java.util.Set;
 
 import static io.cucumber.core.runner.StepBase.getInheritancePhrase;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
-import static tools.dscode.common.treeparsing.DefinitionContext.preParseDynamicStepString;
 import static tools.dscode.common.treeparsing.RegexUtil.stripObscureNonText;
 
 public abstract class LineData implements Cloneable {
@@ -93,7 +92,8 @@ public abstract class LineData implements Cloneable {
 
         if (!original.startsWith(",")) return;
 
-        String preParsedNormalized = preParseDynamicStepString(fullyMasked);
+//        String preParsedNormalized = preParseDynamicStepString(fullyMasked);
+        String preParsedNormalized = fullyMasked;
 
         StringBuilder buf = new StringBuilder();
 

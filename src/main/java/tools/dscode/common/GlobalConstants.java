@@ -133,4 +133,49 @@ public class GlobalConstants {
 
     public static final String SCENARIO_TAGS = "SCENARIO TAGS";
     public static final String COMPONENT_TAGS = "COMPONENT TAGS";
+
+
+
+
+
+
+
+
+
+        public static final String YES = "\u2705";              // ✅
+        public static final String NO = "\u274C";               // ❌
+        public static final String TRUE = "\u2714";             // ✔
+        public static final String FALSE = "\u2716";            // ✖
+        public static final String WARNING = "\u26A0";          // ⚠
+        public static final String INFO = "\u2139";             // ℹ
+        public static final String UNKNOWN = "\u2753";          // ❓
+
+        public static final String VISIBLE = "\uD83D\uDC41";    // 👁
+        public static final String DISPLAYED = "\uD83D\uDC40";  // 👀
+        public static final String HIDDEN = "\uD83D\uDE48";     // 🙈
+        public static final String INVISIBLE = "\uD83D\uDC7B";  // 👻
+
+        public static final String PRESENT = "\uD83D\uDCCC";    // 📌
+        public static final String FOUND = "\uD83D\uDD0E";      // 🔎
+        public static final String MISSING = "\uD83D\uDEAB";    // 🚫
+        public static final String EMPTY = "\u2205";            // ∅
+        public static final String NULL = "\u2400";             // ␀
+        public static final String BLANK = "\u2420";            // ␠
+        public static final String WHITESPACE = "\u2423";       // ␣
+
+        public static final String EQUAL = "\u2261";            // ≡
+        public static final String NOT_EQUAL = "\u2260";        // ≠
+        public static final String APPROX_EQUAL = "\u2248";     // ≈
+        public static final String COMPARE = "\u2194";          // ↔
+        public static final String GREATER_EQUAL = "\u2265";    // ≥
+        public static final String LESS_EQUAL = "\u2264";       // ≤
+
+        public static final String TEXT = "\uD83D\uDD24";       // 🔤
+        public static final String NUMBER = "\uD83D\uDD22";     // 🔢
+        public static final String NOTE = "\uD83D\uDCDD";       // 📝
+
+
+    public static final String NOT_FOUND =  FOUND + "-NOT-";
+    public static final String NOT_DISPLAYED =  NOT_FOUND + "DISPLAYED-";
+
 }

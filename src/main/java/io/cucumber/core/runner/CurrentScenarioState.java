@@ -55,6 +55,7 @@ import static tools.dscode.common.treeparsing.preparsing.ParsedLine.createParsed
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
 import static tools.dscode.common.variables.PlatformSnapshot.toHumanReadableString;
+import static tools.dscode.common.variables.RunVars.resolveFromVarsOrDefault;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
 import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
 import static tools.dscode.testengine.PickleballRunner.getOptionsString;
@@ -374,8 +375,26 @@ public class CurrentScenarioState extends ScenarioMapping {
             if (stepExtension.lineData.inheritancePhrases.isEmpty())
                 stepExtension.lineData.inheritancePhrases.add(null);
             for (PhraseData inheritancePhrase : new ArrayList<>(stepExtension.lineData.inheritancePhrases)) {
+
                 if (inheritancePhrase != null && inheritancePhrase.untilPhrase) {
+                    long timeoutSeconds = (long) resolveFromVarsOrDefault("stepRepeatMaxTime", 3600L);     // 0 = no time limit
+                    int maxIterations = (int) resolveFromVarsOrDefault("stepRepeatMaxCount", 100);
+
+                    long deadline = timeoutSeconds > 0
+                            ? System.nanoTime() + Duration.ofSeconds(timeoutSeconds).toNanos()
+                            : Long.MAX_VALUE;
+
+                    int iteration = 0;
+
                     while (true) {
+                        if (maxIterations > 0 && iteration >= maxIterations) {
+                            break;
+                        }
+
+                        if (timeoutSeconds > 0 && System.nanoTime() >= deadline) {
+                            break;
+                        }
+                        iteration++;
 
                         StepExtension clonedStep = stepCloner(inheritancePhrase, stepExtension,NO_LOGGING, _NO_LOGGING, IGNORE_CHILDREN_IF_FALSE).getFirst();
                         PhraseData clonedPhrase = inheritancePhrase.clonePhrase(inheritancePhrase.getPreviousPhrase());
