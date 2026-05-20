@@ -1,5 +1,8 @@
 Feature: Additiontest
 
+  Scenario: ssda
+    Given DateTime:05/02/2026 format: MM/dd/yyyy
+
   Scenario: test23
   * , save 3 as "ABcasdsdf_NdsfsOfOsdfsd"
     * IF: 3 <= q <ABcasdsdf_NdsfsOfOsdfsd>:
@@ -157,13 +160,29 @@ Feature: Additiontest
     * , save "<Data Table #2>"
 
 
-  Scenario: Data table set test
-    * RUN SCENARIOS
+  Scenario Outline: Data table set test
+    * IF: 4 == <Z>:
+    : * test1 <any>
+    : * RUN SCENARIOS
       | Run Tags |
-      | %compT2  |
+      | %compT3  |
+    * IF: 4 < <X>:
+  : * RUN SCENARIOS
+    | Run Tags |
+    | %compT3  |
 
     Then , in the "Name Change" Data Table, for every Data Row:
   : * , save "<A>"
+    * IF: "A" is "A":
+  : * , save "22"
+    : * RUN SCENARIOS
+      | Run Tags |
+      | %compT2  |
+
+    Examples:
+      | Z | X |
+      | 5 | 5 |
+      | 4 | 4 |
 
 
   Scenario Outline:

@@ -54,12 +54,15 @@ import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static org.assertj.core.api.Assertions.assertThat;
 
 
+import static tools.dscode.common.GlobalConstants.META_FLAG;
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.noDisplay;
 import static tools.dscode.common.gherkinoperations.DynamicExecution.runScenarioFromTag;
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
 import static tools.dscode.common.mappings.FileAndDataParsing.readResourceFile;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMap;
+import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
+import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToScenario;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
 import static tools.dscode.common.servicecalls.ToJsonNode.sjson;
 import static tools.dscode.common.treeparsing.DefinitionContext.DEFAULT_EXECUTION_DICTIONARY;
@@ -127,6 +130,13 @@ public class CalculatorSteps {
 
     @Given("^test1(?: (.*))?$")
     public static void test1(String value) {
+        String q = "DSFFFf gsdgfdgfgdfgdfgdfgfgdf\n \n " + META_FLAG + "DSFFFf gsdgfdgfgdfgdfgdfgfgdf\n \n " + META_FLAG;
+        for (int i = 0; i < 10; i++) {
+            q +="dofsihg9 6bye45t @QQ " + i + " " + q;
+            System.out.println( q);
+            closestEntryToPhrase().info(q);
+            closestEntryToPhrase().debug(q);
+        }
         Entry root = getRunningStep().stepEntry;
 
         root.child("UI Style Test Matrix")

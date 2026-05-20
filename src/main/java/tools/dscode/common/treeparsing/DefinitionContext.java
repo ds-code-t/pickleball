@@ -593,10 +593,19 @@ public final class DefinitionContext {
                     .addBase("//option");
 
 
-            category("Table").children("Tables").andAnyCategories("forLabel", "precedingText")
-                    .and((category, v, op) ->
-                            XPathy.from("//*[self::table or @role='table' or self::*" + customElementSuffixPredicate("table") + "][not(descendant::table)][descendant::text()[normalize-space()]]")
+            category("Table").children("Tables")
+                    .and((category, v, op) -> {
+                                String tableLikePredicate = "[self::table or @role='table' or self::*"
+                                        + customElementSuffixPredicate("table") + "]"
+                                        + "[not(descendant::table)[descendant::text()[normalize-space()]]"
+                                        + "[count(descendant::*[self::tr or self::th]) != 1]];";
+
+                               return combineOr(elementPathBasedOnPrecedingText(tableLikePredicate, v, op)
+                                       ,elementPathBasedVariousLabels(tableLikePredicate, category, v, op)
+                               );
+                            }
                     );
+
 
             category("Row").children("Rows").inheritsFrom(CONTAINS_TEXT)
                     .and((category, v, op) ->
@@ -726,17 +735,6 @@ public final class DefinitionContext {
                     .or(
                             htmlMatchBuilder
                     );
-
-            category("precedingText").and(
-                    (category, v, op) -> {
-                        if (v == null || v.isNullOrBlank()) {
-                            return null;
-                        }
-                        String label = descendantDeepNormalizedVisibleText(v, op);
-                        String xpath = "//*[(preceding::text()[normalize-space()])[last()]/ancestor-or-self::*[5]" + label + "]";
-                        return XPathy.from(xpath);
-                    }
-            );
 
 
             //

@@ -1,7 +1,9 @@
 package tools.dscode.common.util.datetime;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.cucumber.core.runner.StepExtension;
+import tools.dscode.common.mappings.ValueFormatting;
 
 import java.util.Iterator;
 import java.util.Map;
@@ -43,7 +45,14 @@ public final class CalendarRegistry {
     private static void initOnce() {
         System.out.println("Initializing calendar registry...");
         StepExtension currentStep = getRunningStep();
-        String json = (String) currentStep.getStepParsingMap().getAndResolve(configsRoot + ".CALENDARS");
+//        String json = (String) currentStep.getStepParsingMap().getAndResolve(configsRoot + ".CALENDARS");
+        Object raw = currentStep.getStepParsingMap().getAndResolve(configsRoot + ".CALENDARS");
+        String json = null;
+        try {
+            json = (raw instanceof String) ? (String) raw : ValueFormatting.MAPPER.writeValueAsString(raw);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
         registerJson(json);
     }
 

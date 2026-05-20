@@ -24,7 +24,10 @@ import static tools.dscode.common.util.Reflect.setProperty;
 
 public class ScenarioStep extends StepExtension {
     public static ScenarioStep createRootScenarioStep(io.cucumber.core.runner.TestCase testCase) {
-        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = getPickleStepTestStepFromStrings((Pickle) getProperty(testCase, "pickle"),getGivenKeyword() ,  SCENARIO_STEP + testCase.getName(), null);
+        String pickleName = testCase.getName();
+        if(pickleName == null || pickleName.isBlank())
+            pickleName = "UNNAMED SCENARIO";
+        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = getPickleStepTestStepFromStrings((Pickle) getProperty(testCase, "pickle"),getGivenKeyword() ,  SCENARIO_STEP + pickleName, null);
         ScenarioStep scenarioStep = new ScenarioStep(testCase, scenarioPickleStepTestStep);
         setProperty(testCase, "rootScenarioStep", scenarioStep);
         scenarioStep.initializeScenarioSteps((List<StepExtension>) getProperty(testCase, "stepExtensions"));

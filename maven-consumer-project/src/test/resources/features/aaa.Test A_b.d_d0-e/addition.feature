@@ -3,11 +3,18 @@ Feature: Addition
 
 
   Scenario Outline:
-    * SET "ngd" DATA TABLE
+    * , IF: 3 == 4:
+    : * SET "ngd" DATA TABLE
       | A |
       | 1 |
       | 2 |
       | 3 |
+    * , ELSE:
+  : * SET "ngd" DATA TABLE
+    | A |
+    | 1 |
+    | 2 |
+    | 3 |
 
     Examples:
       | Scenario Tags |

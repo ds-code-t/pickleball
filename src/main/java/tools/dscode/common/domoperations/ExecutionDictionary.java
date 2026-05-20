@@ -69,26 +69,26 @@ public class ExecutionDictionary {
     public static final String VISIBILITY_FILTER = "VisibilityFilterInternalUSE";
 
 
-    public static final Builder htmlMatchBuilder  =  (category, v, op) -> {
+    public static final Builder htmlMatchBuilder = (category, v, op) -> {
         if (v == null)
             return null;
         ValueWrapper strippedValueWrapper = v.stripAllNonLetters();
         return combineAnd(
                 XPathy.from("//*[@id or @title or @name or @node_name or @data-node-id]"),
                 combineOr(
-                XPathyBuilder.build(any, id, strippedValueWrapper, op),
-                XPathyBuilder.build(any, title, strippedValueWrapper, op),
-                XPathyBuilder.build(any, name, strippedValueWrapper, op),
-                XPathyBuilder.build(any, Attribute.custom("node_name"), strippedValueWrapper, op),
-                XPathyBuilder.build(any, Attribute.custom("data-node-id"), strippedValueWrapper, op)
-        ));
+                        XPathyBuilder.build(any, id, strippedValueWrapper, op),
+                        XPathyBuilder.build(any, title, strippedValueWrapper, op),
+                        XPathyBuilder.build(any, name, strippedValueWrapper, op),
+                        XPathyBuilder.build(any, Attribute.custom("node_name"), strippedValueWrapper, op),
+                        XPathyBuilder.build(any, Attribute.custom("data-node-id"), strippedValueWrapper, op)
+                ));
     };
 
-    public static final Builder SrcHrfMatchBuilder =  (category, v, op) -> {
+    public static final Builder SrcHrfMatchBuilder = (category, v, op) -> {
         ValueWrapper strippedValue = v == null ? null : v.normalizeLowerCaseAndStripAllWhiteSpace();
         if (strippedValue == null)
             return null;
-        return combineXPathParts("//*[@src or @href]",XPathyBuilder.build(any, src, strippedValue, op) , XPathyBuilder.build(any, href, strippedValue, op));
+        return combineXPathParts("//*[@src or @href]", XPathyBuilder.build(any, src, strippedValue, op), XPathyBuilder.build(any, href, strippedValue, op));
     };
 
 
@@ -151,7 +151,6 @@ public class ExecutionDictionary {
     private void defaultRegistrations() {
 
 
-
         category("Text").children("Texts").inheritsFrom(CONTAINS_TEXT).
                 and(
                         (category, v, op) ->
@@ -177,14 +176,14 @@ public class ExecutionDictionary {
 
         category(TEXT_CONTENT_OR_ATTRIBUTE).or(
                 (category, v, op) -> {
-            if (v == null || v.isNull())
-                return null;
-            return XPathy.from("//*" + descendantDeepNormalizedVisibleText(v, op));
-        },
+                    if (v == null || v.isNull())
+                        return null;
+                    return XPathy.from("//*" + descendantDeepNormalizedVisibleText(v, op));
+                },
                 (category, v, op) -> {
                     if (v == null || v.isNull())
                         return null;
-                    return  getXPathFromBuilder(htmlMatchBuilder, category, v, op) + "[normalize-space(.) = '']";
+                    return getXPathFromBuilder(htmlMatchBuilder, category, v, op) + "[normalize-space(.) = '']";
                 }
         );
 
@@ -376,7 +375,6 @@ public class ExecutionDictionary {
     //========================================================
     // Expansion with inheritance
     //========================================================
-
 
 
     private List<XPathy> expandInternal(
@@ -823,12 +821,6 @@ public class ExecutionDictionary {
         }
 
 
-
-
-
-
-
-
         // --- inheritance (single canonical method; alias kept) ---
         public CategorySpec inheritsFrom(String... parents) {
             for (String cat : categories) dict.registerCategoryInheritance(cat, parents);
@@ -1084,7 +1076,70 @@ public class ExecutionDictionary {
     public static String getXPathFromBuilder(Builder builder, String category, ValueWrapper value, Op op) {
         Object xpath = builder.build(category, value, op);
         if (xpath == null) return null;
-        if (xpath instanceof XPathy) return ((XPathy)xpath).getXpath();
+        if (xpath instanceof XPathy) return ((XPathy) xpath).getXpath();
         return xpath.toString();
     }
+
+
+    public static String elementPathBasedOnPrecedingText(String elementPath, ValueWrapper v, Op op) {
+
+        String returnXpath = elementPath.startsWith("[") ? "//*" + elementPath : elementPath;
+
+        if (v == null || v.isNullOrBlank())
+            return returnXpath;
+
+        String label = deepNormalizedVisibleText(v, op);
+        String labelPredicate =
+                "[preceding::*[text()[normalize-space()]]" +
+                        "[not(ancestor-or-self::*[contains(@style,'display') and contains(@style,'none')])]]" +
+                        "[position() < 20]" +
+                        label +
+                        "]" +
+                        "[not(preceding::*" + elementPath +
+                        "[preceding::*[text()[normalize-space()]]" +
+                        "[not(ancestor-or-self::*[contains(@style,'display') and contains(@style,'none')])]]" +
+                        label +
+                        ")]" +
+                        ";";
+
+        returnXpath += labelPredicate;
+
+        return returnXpath;
+    }
+
+    public static String elementPathBasedVariousLabels(String elementPath, String category, ValueWrapper v, Op op) {
+        String returnXpath = elementPath.startsWith("[") ? "//*" + elementPath : elementPath;
+        if (v == null || v.isNullOrBlank())
+            return returnXpath;
+        return combineOr(
+                returnXpath + getXPathFromBuilder(forLabelBuilder, category, v, op)
+        );
+    }
+
+
+    public static final Builder forLabelBuilder = (category, v, op) -> {
+
+        if (v == null || v.isNullOrBlank()) {
+            return null; // no label text to match, skip this builder
+        }
+
+        String deepNormalizedVisibleText = deepNormalizedVisibleText(v, op);
+
+        XPathy returnXpath = combineOr(
+                new XPathy("//*[@id and string-length(normalize-space(@id)) > 0 and @id = (ancestor::div[3]/descendant::*" + deepNormalizedVisibleText + "[@for and string-length(normalize-space(@for)) > 0][1]/@for)]"),
+                new XPathy("//*[@aria-labelledby and string-length(normalize-space(@aria-labelledby)) > 0 and @aria-labelledby = (ancestor::div[3]/descendant::*" + deepNormalizedVisibleText + "[@id and string-length(normalize-space(@id)) > 0][1]/@id)]"),
+                new XPathy("//*[ @headers and string-length(normalize-space(@headers)) > 0 and contains(concat(' ', @headers, ' '), concat(' ', (ancestor::div[3]/descendant::*" + deepNormalizedVisibleText + "[@id and string-length(normalize-space(@id)) > 0][1]/@id), ' ')) ]"),
+                new XPathy("//*[ancestor-or-self::*[position() <= 7]" +
+                        "  [preceding-sibling::*[1]        " +
+                        descendantDeepNormalizedVisibleText(v, op) +
+                        "         [not(descendant::button or descendant::input or descendant::textarea or descendant::select or descendant::a)]" +
+                        "  ]" +
+                        "]"),
+                XPathy.from("//*" + colocatedDeepNormalizedVisibleText(v, op))
+        );
+        return returnXpath;
+    };
+
+
+
 }
