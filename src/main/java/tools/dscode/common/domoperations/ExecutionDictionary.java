@@ -1091,16 +1091,16 @@ public class ExecutionDictionary {
         String label = deepNormalizedVisibleText(v, op);
         String labelPredicate =
                 "[preceding::*[text()[normalize-space()]]" +
-                        "[not(ancestor-or-self::*[contains(@style,'display') and contains(@style,'none')])]]" +
+                        "[not(ancestor-or-self::*[contains(@style,'display') and contains(@style,'none')])]" +
                         "[position() < 20]" +
                         label +
                         "]" +
                         "[not(preceding::*" + elementPath +
                         "[preceding::*[text()[normalize-space()]]" +
-                        "[not(ancestor-or-self::*[contains(@style,'display') and contains(@style,'none')])]]" +
+                        "[not(ancestor-or-self::*[contains(@style,'display') and contains(@style,'none')])]" +
                         label +
-                        ")]" +
-                        ";";
+                        "]" +
+                        ")]";
 
         returnXpath += labelPredicate;
 

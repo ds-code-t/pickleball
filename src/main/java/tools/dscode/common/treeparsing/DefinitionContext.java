@@ -425,7 +425,7 @@ public final class DefinitionContext {
                     .addBase("//*[self::button or @role='button']");
 
 
-            categories("Section", "Sections", "Parent Section", "Parent Sections", "Grandparent Section", "Grandparent Sections")
+            categories("Section", "Sections", "Question", "Questions",  "Parent Section", "Parent Sections", "Grandparent Section", "Grandparent Sections")
                     .addBase("//div")
                     .and(
                             (String category, ValueWrapper v, Op op) -> {
@@ -443,7 +443,7 @@ public final class DefinitionContext {
                                         + "[descendant::*" + contentNodes + "]"
                                         + "[not(descendant::*[descendant::*[normalize-space(text())][1]" + textMatch + " and descendant::*" + contentNodes + "])]" //noMatch
                                 ).getXpath();
-                                if (category.startsWith("Section"))
+                                if (category.startsWith("Section") || category.startsWith("Question"))
                                     return xpath1;
 
                                 String parentSectionXpath = "//div" +
@@ -597,8 +597,8 @@ public final class DefinitionContext {
                     .and((category, v, op) -> {
                                 String tableLikePredicate = "[self::table or @role='table' or self::*"
                                         + customElementSuffixPredicate("table") + "]"
-                                        + "[not(descendant::table)[descendant::text()[normalize-space()]]"
-                                        + "[count(descendant::*[self::tr or self::th]) != 1]];";
+                                        + "[not(descendant::table)][descendant::text()[normalize-space()]]"
+                                        + "[count(descendant::*[self::tr or self::th]) != 1]";
 
                                return combineOr(elementPathBasedOnPrecedingText(tableLikePredicate, v, op)
                                        ,elementPathBasedVariousLabels(tableLikePredicate, category, v, op)
