@@ -183,10 +183,11 @@ public enum ActionOperations implements OperationsInterface {
                     new ElementMatcher().mustMatchAtLeastOne(ElementType.TIME_VALUE, ElementType.HTML_ELEMENT)
             );
             ElementMatch waitElementMatch = phraseData.resultElements.getFirst();
-
+            boolean waitOnPageLoad = !phraseData.previousSemicolon();
             phraseData.result = Attempt.run(() -> {
                 if (waitElementMatch.elementTypes.contains(ElementType.HTML_ELEMENT)) {
-                    safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
+                    if(waitOnPageLoad)
+                        safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     boolean waitingOnLoading = waitElementMatch.elementTypes.contains(ElementType.HTML_LOADING);
                     while (true) {
                         List<ElementWrapper> wrappers = getWrappedElements(waitElementMatch);
@@ -223,10 +224,12 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch selection = phraseData.resultElements.getFirst();
             ElementMatch dropDowns = phraseData.resultElements.get(1);
 
+            boolean waitOnPageLoad = !phraseData.nextSemicolon();
+
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper dropDownWrapper : dropDowns.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if (count > 0) {
+                    if (waitOnPageLoad && count > 0) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
 
@@ -260,11 +263,12 @@ public enum ActionOperations implements OperationsInterface {
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
             ElementMatch element = phraseData.resultElements.getFirst();
+            boolean waitOnPageLoad = !phraseData.nextSemicolon();
 
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if (count > 0) {
+                    if (waitOnPageLoad && count > 0) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
                     hover(getCurrentDriver(), elementWrapper.getElement());
@@ -285,11 +289,12 @@ public enum ActionOperations implements OperationsInterface {
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
             ElementMatch element = phraseData.resultElements.getFirst();
+            boolean waitOnPageLoad = !phraseData.nextSemicolon();
 
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if (count > 0) {
+                    if (waitOnPageLoad &&  count > 0) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
                     click(getCurrentDriver(), elementWrapper.getElement());
@@ -311,10 +316,13 @@ public enum ActionOperations implements OperationsInterface {
             );
 
             ElementMatch element = phraseData.resultElements.getFirst();
+
+            boolean waitOnPageLoad = !phraseData.nextSemicolon();
+
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if (count > 0) {
+                    if (waitOnPageLoad && count > 0) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
                     doubleClick(getCurrentDriver(), elementWrapper.getElement());
@@ -333,12 +341,12 @@ public enum ActionOperations implements OperationsInterface {
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
-
             ElementMatch element = phraseData.resultElements.getFirst();
+            boolean waitOnPageLoad = !phraseData.nextSemicolon();
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if (count > 0) {
+                    if (waitOnPageLoad &&  count > 0) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
                     contextClick(getCurrentDriver(), elementWrapper.getElement());
@@ -386,10 +394,11 @@ public enum ActionOperations implements OperationsInterface {
             );
 
             ElementMatch element = phraseData.resultElements.getFirst();
+            boolean waitOnPageLoad = !phraseData.nextSemicolon();
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if (count > 0) {
+                    if (waitOnPageLoad && count > 0) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
                     wheelScrollBy(getCurrentDriver(), elementWrapper.getElement());
@@ -437,11 +446,11 @@ public enum ActionOperations implements OperationsInterface {
 
 
             ElementMatch element = phraseData.resultElements.getFirst();
-
+            boolean waitOnPageLoad = !phraseData.nextSemicolon();
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if (count > 0) {
+                    if (waitOnPageLoad && count > 0) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
                     elementWrapper.close();
@@ -455,6 +464,7 @@ public enum ActionOperations implements OperationsInterface {
     ACCEPT {
         @Override
         public void execute(PhraseData phraseData) {
+            waitMilliseconds(2000);
             closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
             phraseData.result = Attempt.runVoid(() -> {
                 try {
@@ -504,6 +514,8 @@ public enum ActionOperations implements OperationsInterface {
                               boolean shouldEnterText,
                               boolean enterKeys) {
 
+        boolean waitOnPageLoad = !phraseData.nextSemicolon();
+
         // Keep your original semantics:
         // - if browserElement != null -> act once with null element
         // - else -> use htmlElementMatches; if empty -> act once with null element
@@ -528,6 +540,9 @@ public enum ActionOperations implements OperationsInterface {
                 {
                     // If no matches, do the operation once with null (no looping hacks).
                     applyTextOps(null, valuesToEnter, shouldClear, shouldEnterText, enterKeys);
+                    if (waitOnPageLoad ) {
+                        safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
+                    }
                     return true;
                 }
             }
@@ -538,6 +553,9 @@ public enum ActionOperations implements OperationsInterface {
                 // If match is null, do the operation once with null and continue.
                 if (inputMatch == null) {
                     applyTextOps(null, valuesToEnter, shouldClear, shouldEnterText, enterKeys);
+                    if (waitOnPageLoad ) {
+                        safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
+                    }
                     continue;
                 }
 
@@ -546,13 +564,16 @@ public enum ActionOperations implements OperationsInterface {
                 // If wrappers empty, do the operation once with null (matches your prior behavior).
                 if (wrappers == null || wrappers.isEmpty()) {
                     applyTextOps(null, valuesToEnter, shouldClear, shouldEnterText, enterKeys);
+                    if (waitOnPageLoad ) {
+                        safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
+                    }
                     continue;
                 }
 
                 for (ElementWrapper wrapper : wrappers) {
                     WebElement webElement = (wrapper == null) ? null : wrapper.getElement();
 
-                    if (count > 0) {
+                    if (waitOnPageLoad && count > 0) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
 

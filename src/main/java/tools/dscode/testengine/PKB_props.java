@@ -14,6 +14,7 @@ public final class PKB_props {
     public static final String PKB_PLUGINS  = PREFIX + "plugins";
     public static final String PKB_PARALLEL = PREFIX + "parallel";
     public static final String PKB_ENVIRONMENT = PREFIX + "environment";
+    public static final String PKB_BROWSER = PREFIX + "browser";
     public static final String PKB_DEBUG_BROWSER = PREFIX + "debugBrowser";
 
     private PKB_props() {}
@@ -31,6 +32,13 @@ public final class PKB_props {
         values().put(key, value);
     }
 
+    public static String browser() {
+        return get(PKB_BROWSER);
+    }
+
+    public static void browser(String browser) {
+        put(PKB_BROWSER, browser);
+    }
 
     public static String environment() {
         return get(PKB_ENVIRONMENT);

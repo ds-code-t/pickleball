@@ -154,10 +154,15 @@ public final class Phrase extends PhraseData {
 
         StepExtension currentStep = getRunningStep();
 
+
         if (shouldRun()) {
             Entry parentEntry = currentStep == null ||  currentStep.stepEntry ==null || parsedLine.isBlockConditionalStep ? closestEntryToScenario() : currentStep.stepEntry;
             phraseEntry = parentEntry.logWithType("PHRASE", toString()).tags("phrase").start();
             phraseInfo("Running Phrase: " + this);
+            if(currentStep !=null && nextSemicolon())
+            {
+                currentStep.waitForPageReady = false;
+            }
         } else {
             Entry parentEntry = currentStep == null ||  currentStep.stepEntry ==null || parsedLine.isBlockConditionalStep ? closestEntryToScenario() : currentStep.stepEntry;
             phraseEntry = parentEntry.logWithType("PHRASE", toString()).tags("phrase").start();
@@ -166,6 +171,7 @@ public final class Phrase extends PhraseData {
             assertionChain = null;
             return;
         }
+
 
 //        getCurrentScenarioState().currentPhrase = this;
 

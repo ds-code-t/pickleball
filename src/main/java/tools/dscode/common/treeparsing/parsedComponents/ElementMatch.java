@@ -424,7 +424,7 @@ public class ElementMatch {
         if (wrappedElements == null) {
             if (parentPhrase.contextElement != null)
                 wrappedElements = Collections.singletonList(parentPhrase.contextElement);
-            else if (parentPhrase.getPreviousTerminator().equals(";"))
+            else if (parentPhrase.previousSemicolon())
                 findWrappedElements();
             else
                 parentPhrase.syncWithDOM();

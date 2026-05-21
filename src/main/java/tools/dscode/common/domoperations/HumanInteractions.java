@@ -27,7 +27,6 @@ public final class HumanInteractions {
         ((JavascriptExecutor) driver).executeScript(
                 "if (document.activeElement) { document.activeElement.blur(); }"
         );
-
     }
 
 

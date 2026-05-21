@@ -83,6 +83,13 @@ public abstract class PhraseData extends PassedData {
         return getPreviousPhrase() == null ? "" : getPreviousPhrase().termination.toString();
     }
 
+    public boolean previousSemicolon() {
+        return getPreviousPhrase() != null && getPreviousPhrase().termination == ';';
+    }
+
+    public boolean nextSemicolon() {
+        return termination == ';';
+    }
 
     public SearchContext getSearchContext() {
 
@@ -460,13 +467,6 @@ public abstract class PhraseData extends PassedData {
             }
             case "conditional" -> {
                 phraseConditionalMode = previouslyResolvedBoolean ? 1 : -1;
-                if (untilPhrase) {
-                    if (phraseConditionalMode <= 0) {
-                        phraseConditionalMode = 1;
-                    } else {
-                        phraseConditionalMode = 0;
-                    }
-                }
             }
         }
         return previouslyResolvedBoolean;

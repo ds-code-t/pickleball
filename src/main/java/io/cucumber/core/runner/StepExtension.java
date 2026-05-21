@@ -53,6 +53,7 @@ import static tools.dscode.common.util.debug.DebugUtils.parseDebugString;
 public class StepExtension extends StepData {
     private static final Pattern pattern = Pattern.compile("@\\[([^\\[\\]]*)\\]");
 
+    public boolean waitForPageReady = true;
 
     public StepExtension(io.cucumber.core.runner.TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
         super(testCase, pickleStepTestStep);
@@ -187,7 +188,8 @@ public class StepExtension extends StepData {
 //                            .toList())
                     .timestamp();
         }
-        if (webDriverUsed != null) {
+
+        if (waitForPageReady && webDriverUsed != null) {
             safeWaitForPageReady(webDriverUsed, Duration.ofSeconds(5), 200);
         }
         lifecycle.fire(Phase.AFTER_SCENARIO_STEP);
