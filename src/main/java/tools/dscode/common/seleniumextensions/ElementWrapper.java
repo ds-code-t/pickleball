@@ -3,6 +3,7 @@ package tools.dscode.common.seleniumextensions;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.openqa.selenium.*;
 import org.openqa.selenium.NoSuchElementException;
+import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.assertions.ValueWrapper;
 
@@ -632,6 +633,8 @@ public class ElementWrapper {
     }
 
     public boolean isDisplayed() {
+        if (elementMatch.categoryFlags.contains(ExecutionDictionary.CategoryFlags.NON_DISPLAY_ELEMENT))
+            return true;
         return getElement().isDisplayed();
     }
 

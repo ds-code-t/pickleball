@@ -25,6 +25,7 @@ import static com.xpathy.Tag.div;
 import static com.xpathy.Tag.input;
 
 import static tools.dscode.common.GlobalConstants.BOOK_END;
+import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.extractPredicate;
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.invisible;
 import static tools.dscode.common.domoperations.elementstates.VisibilityConditions.visible;
@@ -425,7 +426,7 @@ public final class DefinitionContext {
                     .addBase("//*[self::button or @role='button']");
 
 
-            categories("Section", "Sections", "Question", "Questions",  "Parent Section", "Parent Sections", "Grandparent Section", "Grandparent Sections")
+            categories("Section", "Sections", "Question", "Questions", "Parent Section", "Parent Sections", "Grandparent Section", "Grandparent Sections")
                     .addBase("//div")
                     .and(
                             (String category, ValueWrapper v, Op op) -> {
@@ -523,10 +524,10 @@ public final class DefinitionContext {
                             "//*[self::button or @role='button' or self::a or self::img or self::i]"
                     )
                     .or(
-                            (category, v, op) -> XPathyBuilder.build(any, id, ValueWrapper.createValueWrapper("'close'"), Op.STARTS_WITH),
-                            (category, v, op) -> XPathyBuilder.build(any, title, ValueWrapper.createValueWrapper("'close'"), Op.STARTS_WITH),
-                            (category, v, op) -> XPathyBuilder.build(any, name, ValueWrapper.createValueWrapper("'close'"), Op.STARTS_WITH),
-                            (category, v, op) -> XPathyBuilder.build(any, aria_label, ValueWrapper.createValueWrapper("'close'"), Op.STARTS_WITH)
+                            (category, v, op) -> XPathyBuilder.build(any, id, createValueWrapper("'close'"), Op.STARTS_WITH),
+                            (category, v, op) -> XPathyBuilder.build(any, title, createValueWrapper("'close'"), Op.STARTS_WITH),
+                            (category, v, op) -> XPathyBuilder.build(any, name, createValueWrapper("'close'"), Op.STARTS_WITH),
+                            (category, v, op) -> XPathyBuilder.build(any, aria_label, createValueWrapper("'close'"), Op.STARTS_WITH)
                     );
 
 
@@ -580,7 +581,8 @@ public final class DefinitionContext {
                             )
                     );
 
-            category("Toggle").children("Toggles").andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, "genericLabel")
+            category("Toggle").children("Toggles").flags(CategoryFlags.NON_DISPLAY_ELEMENT)
+                    .andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, "genericLabel")
                     .and((category, v, op) ->
                             "//*[self::input[@type='checkbox' or @checked or @aria-checked] or self::mat-slide-toggle]"
                     );
@@ -596,9 +598,9 @@ public final class DefinitionContext {
                                         + "[not(descendant::table)][descendant::text()[normalize-space()]]"
                                         + "[count(descendant::*[self::tr or self::th]) != 1]";
 
-                               return combineOr(elementPathBasedOnPrecedingText(tableLikePredicate, v, op)
-                                       ,elementPathBasedVariousLabels(tableLikePredicate, category, v, op)
-                               );
+                                return combineOr(elementPathBasedOnPrecedingText(tableLikePredicate, v, op)
+                                        , elementPathBasedVariousLabels(tableLikePredicate, category, v, op)
+                                );
                             }
                     );
 
@@ -739,21 +741,19 @@ public final class DefinitionContext {
 
             category("*")
                     .or(
-                            (category, v, op) ->
-                                    XPathy.from(any).byAttribute(role).withCase(LOWER).withNormalizeSpace().equals(category.toLowerCase()),
-
-                            (category, v, op) ->
-                                    XPathy.from(any).byAttribute(title).withCase(LOWER).withNormalizeSpace().equals(category.toLowerCase()),
-
-                            (category, v, op) ->
-                                    XPathy.from(any).byAttribute(id).withCase(LOWER).withNormalizeSpace().equals(category.toLowerCase()),
-
-                            (category, v, op) ->
-                                    XPathy.from(any).byAttribute(name).withCase(LOWER).withNormalizeSpace().equals(category.toLowerCase()),
-
-                            (category, v, op) ->
-                                    XPathy.from(any).byAttribute(aria_label).withCase(LOWER).withNormalizeSpace().equals(category.toLowerCase())
+                            (category, v, op) -> {
+                                ValueWrapper val = createValueWrapper(category);
+                                return getXPathFromBuilder(htmlMatchBuilder, category, val, Op.STARTS_WITH);
+                            }
+                    )
+                    .and(
+                            (category, v, op) -> {
+                                if (v == null || v.isNullOrBlank())
+                                    return null;
+                                return XPathy.from("//*" + descendantDeepNormalizedVisibleText(v, op));
+                            }
                     );
+
 
         }
     };

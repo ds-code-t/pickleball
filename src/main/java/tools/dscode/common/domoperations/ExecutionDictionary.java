@@ -25,6 +25,7 @@ import static com.xpathy.Attribute.name;
 import static com.xpathy.Attribute.src;
 import static com.xpathy.Attribute.title;
 import static com.xpathy.Tag.any;
+import static com.xpathy.Tag.div;
 import static tools.dscode.common.domoperations.TableColumnByHeaderXPath.matchCellsByHeader;
 import static tools.dscode.common.reporting.logging.LogForwarder.stepError;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
@@ -70,17 +71,22 @@ public class ExecutionDictionary {
 
 
     public static final Builder htmlMatchBuilder = (category, v, op) -> {
-        if (v == null)
+        System.out.println("@@htmlMatchBuilder: " + category + " " + v + " " + op);
+        if (v == null || v.isNullOrBlank())
             return null;
         ValueWrapper strippedValueWrapper = v.stripAllNonLetters();
+        ValueWrapper pyStrippedValueWrapper = ValueWrapper.createValueWrapper("py"+ v.normalizeLowerCaseAndStripAllWhiteSpace());
+        System.out.println("@@strippedValueWrapper: " + strippedValueWrapper);
         return combineAnd(
                 XPathy.from("//*[@id or @title or @name or @node_name or @data-node-id]"),
                 combineOr(
                         XPathyBuilder.build(any, id, strippedValueWrapper, op),
                         XPathyBuilder.build(any, title, strippedValueWrapper, op),
                         XPathyBuilder.build(any, name, strippedValueWrapper, op),
-                        XPathyBuilder.build(any, Attribute.custom("node_name"), strippedValueWrapper, op),
-                        XPathyBuilder.build(any, Attribute.custom("data-node-id"), strippedValueWrapper, op)
+                        XPathyBuilder.build(div, Attribute.custom("node_name"), strippedValueWrapper, op),
+                        XPathyBuilder.build(div, Attribute.custom("data-node-id"), strippedValueWrapper, op),
+                        XPathyBuilder.build(div, Attribute.custom("node_name"), pyStrippedValueWrapper, op),
+                        XPathyBuilder.build(div, Attribute.custom("data-node-id"), strippedValueWrapper, op)
                 ));
     };
 

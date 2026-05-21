@@ -1,4 +1,4 @@
 Feature: root test
 
   Scenario: scenaruio 1
-    * test1 AAAA
+    * , verify Wefsdf Werr equals "A"
