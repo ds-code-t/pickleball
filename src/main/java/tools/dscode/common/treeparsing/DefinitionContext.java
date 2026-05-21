@@ -582,11 +582,7 @@ public final class DefinitionContext {
 
             category("Toggle").children("Toggles").andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, "genericLabel")
                     .and((category, v, op) ->
-                            combineOr(
-                                    Tag.input.byAttribute(checked).haveIt(),
-                                    Tag.input.byAttribute(Attribute.custom("aria-checked")).haveIt(),
-                                    XPathy.from(Tag.custom("mat-slide-toggle"))
-                            )
+                            "//*[self::input[@type='checkbox' or @checked or @aria-checked] or self::mat-slide-toggle]"
                     );
 
             category("Option").children("Options").inheritsFrom(CONTAINS_TEXT)

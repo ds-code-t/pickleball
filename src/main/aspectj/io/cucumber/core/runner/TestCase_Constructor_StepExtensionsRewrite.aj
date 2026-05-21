@@ -69,10 +69,8 @@ public privileged aspect TestCase_Constructor_StepExtensionsRewrite {
         // Build extension list
         List<StepExtension> extensions = new ArrayList<>(original.size());
         for (Object o : original) {
-            PickleStepTestStep step = (o instanceof PickleStepTestStep)
-                    ? (PickleStepTestStep) o : null;
-            if (step != null) {
-                extensions.add(new StepExtension(tc, step));
+            if (o instanceof PickleStepTestStep pickleStepTestStep) {
+                extensions.add(new StepExtension(tc, pickleStepTestStep));
             }
         }
 

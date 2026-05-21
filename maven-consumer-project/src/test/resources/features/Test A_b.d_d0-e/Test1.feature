@@ -1,4 +1,8 @@
-Feature: Additiontest
+Feature: nested Feature File
+
+  Scenario: scenario 2
+    * test1 BBBB
+
 
   Scenario: ssda
     Given DateTime:05/02/2026 format: MM/dd/yyyy

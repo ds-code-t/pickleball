@@ -88,7 +88,12 @@ public class ExecutionDictionary {
         ValueWrapper strippedValue = v == null ? null : v.normalizeLowerCaseAndStripAllWhiteSpace();
         if (strippedValue == null)
             return null;
-        return combineXPathParts("//*[@src or @href]", XPathyBuilder.build(any, src, strippedValue, op), XPathyBuilder.build(any, href, strippedValue, op));
+//        return combineXPathParts("//*[@src or @href]", XPathyBuilder.build(any, src, strippedValue, op), XPathyBuilder.build(any, href, strippedValue, op));
+        return "//*[@src or @href][self::" +
+                XPathyBuilder.build(any, src, strippedValue, op).getXpath().substring(2) +
+                " or self::" +
+                XPathyBuilder.build(any, href, strippedValue, op).getXpath().substring(2) +
+                "]";
     };
 
 
