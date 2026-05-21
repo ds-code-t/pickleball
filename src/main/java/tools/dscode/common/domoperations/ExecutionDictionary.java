@@ -71,12 +71,10 @@ public class ExecutionDictionary {
 
 
     public static final Builder htmlMatchBuilder = (category, v, op) -> {
-        System.out.println("@@htmlMatchBuilder: " + category + " " + v + " " + op);
         if (v == null || v.isNullOrBlank())
             return null;
         ValueWrapper strippedValueWrapper = v.stripAllNonLetters();
-        ValueWrapper pyStrippedValueWrapper = ValueWrapper.createValueWrapper("py"+ v.normalizeLowerCaseAndStripAllWhiteSpace());
-        System.out.println("@@strippedValueWrapper: " + strippedValueWrapper);
+        ValueWrapper pyStrippedValueWrapper = ValueWrapper.createValueWrapper("py"+ v.normalizeLowerCaseAndStripAllWhiteSpace()).stripAllNonLetters();
         return combineAnd(
                 XPathy.from("//*[@id or @title or @name or @node_name or @data-node-id]"),
                 combineOr(
@@ -86,7 +84,7 @@ public class ExecutionDictionary {
                         XPathyBuilder.build(div, Attribute.custom("node_name"), strippedValueWrapper, op),
                         XPathyBuilder.build(div, Attribute.custom("data-node-id"), strippedValueWrapper, op),
                         XPathyBuilder.build(div, Attribute.custom("node_name"), pyStrippedValueWrapper, op),
-                        XPathyBuilder.build(div, Attribute.custom("data-node-id"), strippedValueWrapper, op)
+                        XPathyBuilder.build(div, Attribute.custom("data-node-id"), pyStrippedValueWrapper, op)
                 ));
     };
 
