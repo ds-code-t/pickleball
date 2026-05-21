@@ -74,6 +74,8 @@ public class ExecutionDictionary {
         if (v == null || v.isNullOrBlank())
             return null;
         ValueWrapper strippedValueWrapper = v.stripAllNonLetters();
+        if(!v.hasLetters())
+            return null;
         ValueWrapper pyStrippedValueWrapper = ValueWrapper.createValueWrapper("py"+ v.normalizeLowerCaseAndStripAllWhiteSpace()).stripAllNonLetters();
         return combineAnd(
                 XPathy.from("//*[@id or @title or @name or @node_name or @data-node-id]"),

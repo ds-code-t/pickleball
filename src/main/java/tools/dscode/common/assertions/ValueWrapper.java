@@ -460,4 +460,10 @@ public class ValueWrapper {
         if (isNumeric()) return asBigDecimal().stripTrailingZeros().hashCode();
         return normalizedText == null ? 0 : normalizedText.hashCode();
     }
+
+    public boolean hasLetters() {
+        if (normalizedText == null) return false;
+        return normalizedText.chars().anyMatch(Character::isLetter);
+    }
+
 }

@@ -1,7 +1,9 @@
 Feature: nested Feature File
 
   Scenario: scenario 2
-    * test1 BBBB
+    * , verify if "Bananas" Checkbox is selected
+#    * , verify if 2nd Checkbox is selected
+#    * , verify if 3rd Checkbox is selected
 
 
   Scenario: ssda
