@@ -615,7 +615,7 @@ public final class DefinitionContext {
                             XPathy.from("//*[self::thead or self::tr[th or td[@role='columnheader' or @role='rowheader']] or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)][descendant::text()[normalize-space()]]")
                     );
 
-            category("Header").children("Headers", "Column Header", "Column Headers").inheritsFrom(CONTAINS_TEXT)
+            category("Header").children( "Headers", "Table Header", "Table Headers", "Column Header", "Column Headers").inheritsFrom(CONTAINS_TEXT)
                     .and((category, v, op) ->
                             XPathy.from("//*[self::th or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)]")
                     );

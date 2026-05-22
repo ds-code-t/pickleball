@@ -2,7 +2,9 @@ Feature: nested Feature File
 
 
   Scenario: dfsfd
-    * , save "A" from "B"
+    Then , I save "1" as "Var"
+    Then , until "<Var>" is not equal to "1":
+    : * , I wait 1 second, then I save "Test" as "Var"
 
   Scenario: scenario 2
     * , verify if "Bananas" Checkbox is selected

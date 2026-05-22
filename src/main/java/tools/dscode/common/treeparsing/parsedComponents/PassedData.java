@@ -37,11 +37,11 @@ public abstract class PassedData {
 
     protected List<ElementMatch> elementMatches = new ArrayList<>();
     public boolean hasNo;
-    private String conditional = "";
+    String conditional = "";
     public String body;
     public int phraseConditionalMode = 1;
     public boolean isOperationPhrase;
-    public boolean separator;
+    boolean separator;
     private PhraseData resolvedPhrase;
     protected PhraseData templatePhrase;
     public Attempt.Result result;
@@ -60,11 +60,11 @@ public abstract class PassedData {
     public boolean isTopContext;
     public boolean isPageContext;
 
-    private String action = "";
-    private String assertion = "";
+    String action = "";
+    String assertion = "";
     public String conjunction = "";
 
-    private String assertionType = "";
+    String assertionType = "";
     public Set<ExecutionDictionary.CategoryFlags> categoryFlags = new HashSet<>();
     public PhraseData.PhraseType phraseType;
 

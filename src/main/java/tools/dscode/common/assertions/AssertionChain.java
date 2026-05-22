@@ -121,6 +121,8 @@ public class AssertionChain {
 
         }
 
+        parentPhrase.phraseConditionalMode = chainStatus ? 1 : -1;
+
         if (parentPhrase.metaTextPrefix.contains("BLOCK_CONDITIONAL")) {
             StepExtension runningStep = getRunningStep();
             if (runningStep == null) return;

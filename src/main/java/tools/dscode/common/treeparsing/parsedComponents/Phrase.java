@@ -304,7 +304,6 @@ public final class Phrase extends PhraseData {
         getResolvedPhrase().assertionChain = assertionChain;
         getResolvedPhrase().untilPhrase = untilPhrase;
         getResolvedPhrase().setNextPhrase(getNextPhrase());
-//        resolvedPhrase.operationInheritancePhrase = operationInheritancePhrase;
         return getResolvedPhrase();
     }
 
@@ -326,15 +325,20 @@ public final class Phrase extends PhraseData {
     public static Phrase copyPhraseWithModifications(Phrase phrase, Character newTermination, LineData parsedLine, PhraseData previous) {
         Phrase clonePhrase = newTermination == null ? new Phrase(phrase.originalText, phrase.termination, phrase.parsedLine) : new Phrase(phrase.originalText, newTermination, parsedLine, previous);
         clonePhrase.operationInheritancePhrase = phrase.operationInheritancePhrase;
+        clonePhrase.hasNo = phrase.hasNo;
         clonePhrase.assertionChainMembership = phrase.assertionChainMembership;
         clonePhrase.isChainedAssertion = phrase.isChainedAssertion;
         clonePhrase.operationIndex = phrase.operationIndex;
-        clonePhrase.setInheritedOperationFromPhrase(phrase);
-        clonePhrase.setConditional(phrase.getConditional());
-        clonePhrase.setAssertionType(phrase.getAssertionType());
+        clonePhrase.conjunction = phrase.conjunction;
+        clonePhrase.conditional = phrase.conditional;
+        clonePhrase.assertionType = phrase.assertionType;
+        clonePhrase.action = phrase.action;
+        clonePhrase.actionOperation = phrase.actionOperation;
+        clonePhrase.assertionOperation = phrase.assertionOperation;
+        clonePhrase.isOperationPhrase = phrase.isOperationPhrase;
+        clonePhrase.phraseType =  phrase.phraseType;
         clonePhrase.untilPhrase = phrase.untilPhrase;
         clonePhrase.phraseConditionalMode = phrase.phraseConditionalMode;
-        clonePhrase.operationInheritancePhrase = phrase.operationInheritancePhrase;
         clonePhrase.result = null;
         clonePhrase.isClone = true;
         clonePhrase.position = phrase.position;
