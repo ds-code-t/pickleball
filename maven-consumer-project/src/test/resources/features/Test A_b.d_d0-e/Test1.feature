@@ -1,5 +1,9 @@
 Feature: nested Feature File
 
+
+  Scenario: dfsfd
+    * , save "A" from "B"
+
   Scenario: scenario 2
     * , verify if "Bananas" Checkbox is selected
 #    * , verify if 2nd Checkbox is selected

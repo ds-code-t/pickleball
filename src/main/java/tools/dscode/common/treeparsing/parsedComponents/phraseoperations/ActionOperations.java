@@ -97,16 +97,16 @@ public enum ActionOperations implements OperationsInterface {
             closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
 
             ElementMatch regexMatchElement = phraseData.getElementMatches().stream().filter(e -> e.elementTypes.contains(ElementType.REGEX_MATCH)).findFirst().orElse(null);
-            ElementMatch valueElement = phraseData.getElementMatches().stream().filter(e -> e.elementTypes.contains(ElementType.RETURNS_VALUE) && !e.elementTypes.contains(ElementType.KEY_VALUE)).findFirst().orElse(null);
+            List<ElementMatch> valueElements = phraseData.getElementMatches().stream().filter(e -> e.elementTypes.contains(ElementType.RETURNS_VALUE) && !e.elementTypes.contains(ElementType.KEY_VALUE)).toList();
+            ElementMatch firstValueElement = valueElements.isEmpty() ? null : valueElements.getFirst();
             ElementMatch keyElement = phraseData.getElementMatches().stream().filter(e -> e.elementTypes.contains(ElementType.KEY_VALUE)).findFirst().orElse(null);
 
+            if (keyElement == null && regexMatchElement == null && valueElements.size() == 2) {
+                firstValueElement = valueElements.get(1);
+                keyElement = valueElements.get(0);
+            }
 
-//            phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
-//                    new ElementMatcher()
-//                            .mustMatchAll(ElementType.RETURNS_VALUE).mustNotMatchAny(ElementType.KEY_VALUE),
-//                    new ElementMatcher()
-//                            .mustMatchAll(ElementType.KEY_VALUE)
-//            );
+            final ElementMatch valueElement = firstValueElement;
 
             boolean regexMatchSave = regexMatchElement != null;
             boolean regexMatchWithReference = regexMatchSave && regexMatchElement.defaultText.type != ValueWrapper.ValueTypes.BACK_TICKED;
@@ -186,7 +186,7 @@ public enum ActionOperations implements OperationsInterface {
             boolean waitOnPageLoad = !phraseData.previousSemicolon();
             phraseData.result = Attempt.run(() -> {
                 if (waitElementMatch.elementTypes.contains(ElementType.HTML_ELEMENT)) {
-                    if(waitOnPageLoad)
+                    if (waitOnPageLoad)
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     boolean waitingOnLoading = waitElementMatch.elementTypes.contains(ElementType.HTML_LOADING);
                     while (true) {
@@ -294,7 +294,7 @@ public enum ActionOperations implements OperationsInterface {
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if (waitOnPageLoad &&  count > 0) {
+                    if (waitOnPageLoad && count > 0) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
                     click(getCurrentDriver(), elementWrapper.getElement());
@@ -346,7 +346,7 @@ public enum ActionOperations implements OperationsInterface {
             phraseData.result = Attempt.run(() -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
-                    if (waitOnPageLoad &&  count > 0) {
+                    if (waitOnPageLoad && count > 0) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
                     contextClick(getCurrentDriver(), elementWrapper.getElement());
@@ -535,12 +535,10 @@ public enum ActionOperations implements OperationsInterface {
                 if (phraseData.getElementMatches().size() > 1 && phraseData.getElementMatches().get(1) instanceof PlaceHolderMatch placeHolderMatch) {
                     placeHolderMatch.elementMatcher = new ElementMatcher().mustMatchAll(ElementType.HTML_ELEMENT);
                     elementMatches.add(placeHolderMatch);
-                }
-                else
-                {
+                } else {
                     // If no matches, do the operation once with null (no looping hacks).
                     applyTextOps(null, valuesToEnter, shouldClear, shouldEnterText, enterKeys);
-                    if (waitOnPageLoad ) {
+                    if (waitOnPageLoad) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
                     return true;
@@ -548,12 +546,11 @@ public enum ActionOperations implements OperationsInterface {
             }
 
 
-
             for (ElementMatch inputMatch : elementMatches) {
                 // If match is null, do the operation once with null and continue.
                 if (inputMatch == null) {
                     applyTextOps(null, valuesToEnter, shouldClear, shouldEnterText, enterKeys);
-                    if (waitOnPageLoad ) {
+                    if (waitOnPageLoad) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
                     continue;
@@ -564,7 +561,7 @@ public enum ActionOperations implements OperationsInterface {
                 // If wrappers empty, do the operation once with null (matches your prior behavior).
                 if (wrappers == null || wrappers.isEmpty()) {
                     applyTextOps(null, valuesToEnter, shouldClear, shouldEnterText, enterKeys);
-                    if (waitOnPageLoad ) {
+                    if (waitOnPageLoad) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
                     continue;
