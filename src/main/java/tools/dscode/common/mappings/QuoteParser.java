@@ -35,7 +35,7 @@ public final class QuoteParser extends LinkedHashMap<String, String> {
 
     // “Untypable” control pictures for placeholders
     private static final char MASK_CONTENT = '\u2404'; // ␄
-    private static final char MASK_BOUNDARY = '\u2405'; // ␅
+    public static final char MASK_BOUNDARY = '\u2405'; // ␅
 
     public static final char SINGLE = '\'';
     public static final char DOUBLE = '"';

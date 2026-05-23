@@ -1,6 +1,9 @@
 Feature: Addition
 
 
+  Scenario: untils;dfwer34
+    * , until 3==3:
+    : * , save "A"
 
   Scenario Outline:
     * , IF: 3 == 4:
@@ -61,16 +64,28 @@ Feature: Addition
     * IF: 3 == {1 + 2} && 3 == 3 && ( 2 == 1 || 8 == {2 * 4}) THEN: , save "3"
 
 
+  Scenario: testif3sds3 d
+#    * , save "AA" as "QQ"
+    * , if 3 == 3  , save "6"
+    * IF:  3 == 3 THEN: , save "6"
+
   Scenario: testif33
 #    * , save "AA" as "QQ"
     * IF:  3 == 3 THEN: , save "6"
-    * IF:  2 == 2  THEN: , save "1"
-    * IF: 2 == 2THEN: , save "2"
+    * IF:  12 == 2  THEN: , save "1"
+    * IF: 2 == 2 THEN: , save "2"
     * IF: 3 ==  5 THEN: , save "3"
     * IF: 3 == 3 THEN: , save "4"
     * IF: 3 == 3 THEN: , save "5"
     * IF:  3 ==  3 THEN: , save "5"
+
     * IF:  3 == 3  THEN: , save "6"
+
+
+  Scenario: testif dsf emit test
+#    * , save "AA" as "QQ"
+    * IF:  3 == {1 + 2} || (3 == 3 && ( 2 == 1 || 8 == {2 * 4})) THEN: , save "6"
+
 
   Scenario: testif
 #    * , save "AA" as "QQ"
@@ -244,6 +259,10 @@ Feature: Addition
 
     When , if 1,2,3, and 4 is 3?
   : * , save "NO!!"
+
+Scenario: chainasfd aw
+  When ,  1 is 1 , 2 is 2 ,  3 is 3 , and {"true"} ?
+: * , save "YES!!"
 
 
   Scenario: Chain testing
@@ -916,7 +935,7 @@ Feature: Addition
 
   @test1 @sc1 @smoke @%fg
   Scenario Outline: conditionals2
-    * IF: 1 + 1 < 0
+    * IF: 1 + 1 < 0:
   : Then print A
     * ELSE-IF: 1 + 1 > 0
   : Then print B<B>

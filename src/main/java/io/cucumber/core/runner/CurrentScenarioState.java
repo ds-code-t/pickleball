@@ -49,6 +49,7 @@ import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN;
 import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
 import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
+import static tools.dscode.common.assertions.AssertionChain.copyAssertionChainToNewPhrase;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.treeparsing.preparsing.ParsedLine.createParsedLine;
@@ -394,19 +395,14 @@ public class CurrentScenarioState extends ScenarioMapping {
                         }
                         iteration++;
 
-                        StepExtension clonedStep = stepCloner(inheritancePhrase, stepExtension,NO_LOGGING, _NO_LOGGING, IGNORE_CHILDREN_IF_FALSE).getFirst();
-                        PhraseData clonedPhrase = inheritancePhrase.clonePhrase(inheritancePhrase.getPreviousPhrase());
-                        clonedPhrase.untilPhrase = true;
-                        clonedPhrase.assertionChain = new AssertionChain(clonedPhrase);
-                        for(PhraseData phraseData : inheritancePhrase.assertionChain.phraseChain)
-                        {
-                            clonedPhrase.assertionChain.addAssertionPhrase(phraseData);
-                        }
-                        clonedStep.overridePhrase = clonedPhrase;
+                        StepExtension clonedStep = stepCloner(inheritancePhrase , stepExtension, IGNORE_CHILDREN_IF_FALSE).getFirst();
+                        clonedStep.overridePhrase = inheritancePhrase.clonePhrase(inheritancePhrase.getPreviousPhrase());;
+                        copyAssertionChainToNewPhrase(inheritancePhrase,  clonedStep.overridePhrase);
                         clonedStep.nextSibling = null;
+                        clonedStep.pickleStepTestStep.substituteStep =  clonedStep.createNewStepExtension(", ---" + clonedStep.overridePhrase.assertionChain).pickleStepTestStep;
                         waitMilliseconds(400);
                         runStep(clonedStep);
-                        if (clonedPhrase.phraseConditionalMode> 0)
+                        if (clonedStep.overridePhrase.phraseConditionalMode> 0)
                             break;
 
 

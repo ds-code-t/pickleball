@@ -25,12 +25,13 @@ public final class EngineFilterBootstrap {
         String existing = System.getProperty(INCLUDE_ENGINES_KEY);
         if (existing == null || existing.isBlank()) {
             System.setProperty(INCLUDE_ENGINES_KEY, PICKLEBALL_ENGINE_ID);
-            System.err.println("[Pickleball] Set " + INCLUDE_ENGINES_KEY + "="
-                    + PICKLEBALL_ENGINE_ID + " (origin: " + origin + ")");
-        } else {
-            System.err.println("[Pickleball] Honoring existing " + INCLUDE_ENGINES_KEY
-                    + " = " + existing + " (origin: " + origin + ")");
+//            System.err.println("[Pickleball] Set " + INCLUDE_ENGINES_KEY + "="
+//                    + PICKLEBALL_ENGINE_ID + " (origin: " + origin + ")");
         }
+//        else {
+//            System.err.println("[Pickleball] Honoring existing " + INCLUDE_ENGINES_KEY
+//                    + " = " + existing + " (origin: " + origin + ")");
+//        }
 
         applied = true;
     }

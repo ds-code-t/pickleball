@@ -59,8 +59,7 @@ public class GlobalConstants {
 
     public static final String GROUP_SEPARATOR = "\u241D";
     public static final String META_TEXT_SEPARATOR = "\u241E";
-
-
+    public static final String CONDITIONAL_SEPARATOR = "\u241C";
     // visible characters
 //    public static final String SYMBOL_FOR_NULL = "\u2400";
 //    public static final String SYMBOL_FOR_START_OF_HEADING = "\u2401";

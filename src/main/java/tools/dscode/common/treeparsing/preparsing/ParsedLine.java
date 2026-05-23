@@ -38,7 +38,7 @@ public final class ParsedLine extends LineData {
     public void runPhrases() {
         isBlockConditionalStep = getRunningStep().definitionFlags.contains(CONDITIONAL_BLOCK);
         if (stepExtension.overridePhrase != null) {
-            runPhraseFromLine(stepExtension.overridePhrase);
+            stepExtension.overridePhrase.assertionChain.executeAssertionChain();
             return;
         }
         PhraseData phrase = phrases.get(startPhraseIndex);

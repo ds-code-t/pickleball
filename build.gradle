@@ -7,7 +7,7 @@ plugins {
 }
 
 group = 'tools.dscode'
-version = '2.0.32'
+version = '2.0.33'
 
 
 repositories {
@@ -175,19 +175,28 @@ tasks.named('classes') { dependsOn 'ajcMain' }
 def wovenDir = layout.buildDirectory.dir('woven')
 def wovenExpanded = layout.buildDirectory.dir('woven-expanded')
 
+def wovenJar = wovenDir.map { it.file("all-woven.jar") }
+
 tasks.register('weaveTargets', JavaExec) {
     group = 'build'
     description = 'Weaves ALL target jars with compiled aspects in one AJC run'
     dependsOn 'ajcMain'
-    outputs.dir(wovenDir)
 
-    doFirst { wovenDir.get().asFile.mkdirs() }
+    outputs.file(wovenJar)
+
+    doFirst {
+        wovenDir.get().asFile.mkdirs()
+    }
 
     def inpathFiles = provider {
         def artifacts = configurations.weaveLibs
                 .resolvedConfiguration
                 .resolvedArtifacts
-        def wanted = toWeave.collect { "${it.group}:${it.name}:${it.version}" } as Set
+
+        def wanted = toWeave.collect {
+            "${it.group}:${it.name}:${it.version}"
+        } as Set
+
         artifacts.findAll { ra ->
             "${ra.moduleVersion.id.group}:${ra.name}:${ra.moduleVersion.id.version}" in wanted
         }.collect { it.file }
@@ -196,10 +205,8 @@ tasks.register('weaveTargets', JavaExec) {
     mainClass.set('org.aspectj.tools.ajc.Main')
     classpath = configurations.ajcTools
 
-    def outJar = wovenDir.map { it.file("all-woven.jar") }.get().asFile
     def classesDir = sourceSets.main.java.destinationDirectory.get().asFile
 
-    // Resolution CP includes your compiled classes (types used by aspects)
     def weaverClasspath = files(
             configurations.weaveLibs,
             configurations.ajcRuntime,
@@ -213,30 +220,38 @@ tasks.register('weaveTargets', JavaExec) {
 
             '-inpath', files(inpathFiles).asPath,
 
-            // aspects bytecode: your compiled classes contain the aspects now
             '-aspectpath', files(classesDir).asPath,
 
-            // resolution classpath
             '-classpath', weaverClasspath,
 
-            '-outjar', outJar.absolutePath
+            '-outjar', wovenJar.get().asFile.absolutePath
     ]
 }
 
-// Expand the woven jars before shadowJar runs (same as before)
-tasks.register('expandWoven', Sync) {
+tasks.register('expandWoven') {
     group = 'build'
     description = 'Expands woven jar into a staging directory for shading'
     dependsOn 'weaveTargets'
-    into(wovenExpanded)
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
-    from({
-        def jar = new File(wovenDir.get().asFile, 'all-woven.jar')
-        zipTree(jar)
-    }) {
-        exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
-        exclude 'META-INF/MANIFEST.MF'
+    inputs.file(wovenJar)
+    outputs.dir(wovenExpanded)
+
+    doLast {
+        def jar = wovenJar.get().asFile
+
+        if (!jar.exists()) {
+            throw new GradleException("Expected woven jar was not created: ${jar}")
+        }
+
+        copy {
+            into(wovenExpanded)
+            duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+            from(zipTree(jar)) {
+                exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
+                exclude 'META-INF/MANIFEST.MF'
+            }
+        }
     }
 }
 

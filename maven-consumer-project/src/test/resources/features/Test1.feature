@@ -1,5 +1,71 @@
 Feature: nested Feature File
 
+  Scenario: fsdfd hrfgh 3
+    * , save "a" as "A"
+    * , until "<A>" equals "aaa", or 3 == 3:
+  :  * , save "<A>a" as "A" , wait 1 second
+
+
+
+  Scenario:  ss sd fgg
+#    * , save "AA" as "QQ"
+    * IF: 13 == (1 + 2) || (3 == 3 && ( 2 == 1 || 8 == (2 * 4))) THEN: , save "6"
+    * IF: 12 == (1 + 2) || 3 == 1 || 2 == 1 || 8 == (2 * 4)  THEN: , save "1"
+    * IF: 12 == (1 + 2) || 3 == 1 || 2 == 1 || 8 == (2 * 4) THEN: , save "2"
+    * IF: 13 == (1 + 2) && 3 == 3 && ( 2 == 1 || 8 == (2 * 4)) THEN: , save "3"
+    * IF: 13 == (1 + 2) && 3 == 3 && ( 2 == 1 || 3 == (2 * 4)) THEN: , save "4"
+    * IF: 13 == (1 + 2) || 3 == 3 && ( 2 == 1 || 3 == (2 * 4)) THEN: , save "5"
+    * IF: 13 == (1 + 2) || (3 == 3 && ( 2 == 1 || 2 == (2 * 4))) THEN: , save "5"
+    * IF: 13 == (1 + 2) || (3 == 3 && ( 2 == 1 || 8 == (2 * 4))) THEN: , save "6"
+
+  Scenario:  ss sd fgg
+#    * , save "AA" as "QQ"
+    * IF:  3 == {1 + 2} || (3 == 3 && ( 2 == 1 || 8 == {2 * 4})) THEN: , save "6"
+    * IF:  2 == {1 + 2} || 3 == 1 || 2 == 1 || 8 == {2 * 4}  THEN: , save "1"
+    * IF: 2 == {1 + 2} || 3 == 1 || 2 == 1 || 8 == {2 * 4} THEN: , save "2"
+    * IF: 3 == {1 + 2} && 3 == 3 && ( 2 == 1 || 8 == {2 * 4}) THEN: , save "3"
+    * IF: 3 == {1 + 2} && 3 == 3 && ( 2 == 1 || 3 == {2 * 4}) THEN: , save "4"
+    * IF: 3 == {1 + 2} || 3 == 3 && ( 2 == 1 || 3 == {2 * 4}) THEN: , save "5"
+    * IF:  3 == {1 + 2} || (3 == 3 && ( 2 == 1 || 2 == {2 * 4})) THEN: , save "5"
+    * IF:  3 == {1 + 2} || (3 == 3 && ( 2 == 1 || 8 == {2 * 4})) THEN: , save "6"
+
+  Scenario: Chain testingz
+    When ,  1 is 1 , 2 is 2 ,  3 is 3 , and true, then save "G"
+
+  Scenario: Chain testinggrh
+    When ,  1 is 1 , 2 is 2 ,  and 3 is 2?
+  : * , save "NO!!"
+
+    When ,  1 is 1 , 2 is 2 ,  3 is 3 , and "true"?
+  : * , save "YES!!"
+
+    When ,  1 is 2 , 2 is 2 , or 3 is 3?
+  : * , save "YES!!1"
+
+    When ,  if 1 is 1 , and 2 is 2:
+  : * , save "YES!!!"
+
+    When ,  if 1 is 2 , or 2 is 2:
+  : * , save "YES!!!!"
+
+    When ,  1 is 1 , 2 is 3 , 3 is 3 , and 4 is 4?
+  : * , save "NO!!!!"
+
+    When ,  if 1 is 2 , 2 is 3 , or 3 is 3:
+  : * , save "YES"
+
+    When ,  1 is 1 , and 2 is 3?
+  : * , save "NO!!!!"
+
+    When ,  if 1 is 1 , 2 is 2 , 3 is 3 , or 4 is 5:
+  : * , save "YES"
+
+    When ,  1 is 2 , 2 is 2 , 3 is 3 , or 4 is 5?
+  : * , save "YES!!!!"
+
+    When ,  if 1 is 1 , 2 is 3 , and 3 is 3:
+  : * , save "NO!!!!"
+
 
   Scenario: dfsfd
     Then , I save "1" as "Var"
@@ -108,6 +174,9 @@ Feature: nested Feature File
     * , save 2 as "n"
     * , if <n>==1  , then  save "A" , else if <n>==2   , then  save "B"  , else if <n>==3    , then save "C" , else save "D"
 
+
+    Scenario: else if 8
+      * IF: <n>==12 THEN: , save "A" ELSE-IF: <n>==2   THEN: , save "B"   ELSE-IF: <n>==3   THEN:  , save "C"  ELSE: , save "D"
 
   Scenario: tezstfgsds inline conditionals
     * , save 1 as "n"

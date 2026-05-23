@@ -356,7 +356,7 @@ public abstract class PickleballRunner {
     }
 
     private static void debug(String message) {
-        System.err.println("[DynamicSuiteBase] " + message);
+//        System.err.println("[DynamicSuiteBase] " + message);
     }
 
 

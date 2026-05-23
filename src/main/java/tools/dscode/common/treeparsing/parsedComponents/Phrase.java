@@ -14,6 +14,7 @@ import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.annotations.DefinitionFlag.CONDITIONAL_BLOCK;
+import static tools.dscode.common.assertions.AssertionChain.copyAssertionChainToNewPhrase;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToScenario;
@@ -301,7 +302,8 @@ public final class Phrase extends PhraseData {
         PhraseData resolvedPhrase = new Phrase(originalText, termination, parsedLine, getPreviousPhrase());
         setResolvedPhrase(resolvedPhrase);
         getResolvedPhrase().position = position;
-        getResolvedPhrase().assertionChain = assertionChain;
+        if(assertionChain != null)
+            copyAssertionChainToNewPhrase(this,  getResolvedPhrase());
         getResolvedPhrase().untilPhrase = untilPhrase;
         getResolvedPhrase().setNextPhrase(getNextPhrase());
         return getResolvedPhrase();

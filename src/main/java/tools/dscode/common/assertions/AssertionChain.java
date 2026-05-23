@@ -10,10 +10,12 @@ import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Attempt
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
+import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
 import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToScenario;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
@@ -26,7 +28,9 @@ import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 public class AssertionChain {
 
     public String toString() {
-        return "AssertionChain: " + phraseChain.size() + " , " + phraseChain;
+        return ("Assertions: " +  phraseChain.stream()
+                .map(p -> p.toString())
+                .collect(Collectors.joining(" ")));
     }
 
     PhraseData parentPhrase;
@@ -35,6 +39,11 @@ public class AssertionChain {
         if (phrase.getAssertionType().isBlank())
             phrase.setConditional("if");
         parentPhrase = phrase;
+    }
+
+    public static void copyAssertionChainToNewPhrase(PhraseData oldPhrase, PhraseData newPhrase) {
+        newPhrase.assertionChain = new AssertionChain(newPhrase);
+        oldPhrase.assertionChain.phraseChain.forEach(newPhrase.assertionChain::addAssertionPhrase);
     }
 
     public boolean conjunctionAnd = true;

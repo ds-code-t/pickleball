@@ -44,6 +44,7 @@ import static tools.dscode.common.reporting.logging.LogForwarder.phraseError;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
+import static tools.dscode.common.treeparsing.preparsing.LineData.wrapLooseConditionalExpression;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.beforeOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inBetweenOf;
@@ -122,7 +123,7 @@ public abstract class PhraseData extends PassedData {
     //    public XPathChainResult contextMatch;
     @Override
     public String toString() {
-        return (resolvedText == null ? text : resolvedText).replaceAll(BOOK_END, "") + termination;
+        return (resolvedText == null ? text.replaceAll(BOOK_END, "") : resolvedText).replaceAll(BOOK_END, "") + termination;
     }
 
 
@@ -190,6 +191,7 @@ public abstract class PhraseData extends PassedData {
         metaTextPrefix = found ? m.group(1) : "";
         inputText = found ? m.replaceFirst("") : inputText;
 
+        inputText = wrapLooseConditionalExpression(inputText);
         defaultContextPhrase = inputText.equals(STARTING_CONTEXT);
         if (defaultContextPhrase)
             inputText = "From " + inputText;

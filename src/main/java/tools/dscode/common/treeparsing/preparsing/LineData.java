@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import static io.cucumber.core.runner.StepBase.getInheritancePhrase;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
@@ -76,7 +77,7 @@ public abstract class LineData implements Cloneable {
                 input = t; // optional: normalize away trailing whitespace consistently
             }
         }
-        input = wrapLooseConditionalExpression(input);
+//        input = wrapLooseConditionalExpression(input);
 
         this.original = input;
 
@@ -138,21 +139,19 @@ public abstract class LineData implements Cloneable {
         return !(previousIsDigit && nextIsDigit);
     }
 
-    private static String wrapLooseConditionalExpression(String input) {
+    public static String wrapLooseConditionalExpression(String input) {
         QuoteParser qp = new QuoteParser(input);
         BracketMasker bm = getBracketMasker(qp.masked());
 
         String masked = bm.masked().trim();
         if (!containsConditionalOperator(masked)) return input;
-        if (masked.startsWith("IF:") || masked.startsWith("ELSE")) return input;
 
-        String replaced = masked.replaceAll(
-                "([.,:?!;]\\s*(?:(?:(?:else\\s+)?if\\s+)|until\\s+)?)([^.,:?!;{}]*(?:==|!=|&&|\\|\\||>=|<=|>|<)[^.,:?!;{}]*)(?=\\s*[.,:?!;]|$)",
-                "$1{ $2 } "
+        String replaced = masked.trim().replaceAll(
+                "^((?:(?:and|or|the|then)\\b)*\\s*(?:(?:else\\b\\s*)?if\\b|until\\b)?(?:\\s+the)?)(.*)$",
+                "$1 { $2 } "
         );
 
-        String restored = qp.restoreFrom(bm.restoreFrom(replaced));
-        return restored;
+        return qp.restoreFrom(bm.restoreFrom(replaced));
     }
 
     private static boolean containsConditionalOperator(String masked) {
