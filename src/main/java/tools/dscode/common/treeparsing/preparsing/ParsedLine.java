@@ -2,7 +2,6 @@ package tools.dscode.common.treeparsing.preparsing;
 
 import io.cucumber.core.runner.StepExtension;
 import tools.dscode.common.assertions.AssertionChain;
-import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
 import java.util.ArrayList;
@@ -13,13 +12,12 @@ import java.util.regex.Pattern;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.GlobalConstants.META_TEXT_SEPARATOR;
-import static tools.dscode.common.annotations.DefinitionFlag.CONDITIONAL_BLOCK;
+import static tools.dscode.common.annotations.DefinitionFlag.BLOCK_CONDITIONAL;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_FALSE;
 import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
 import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.assertions.AssertionChain.isAssertionChainBorder;
-import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToScenario;
-import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
 
 
 public final class ParsedLine extends LineData {
@@ -36,7 +34,7 @@ public final class ParsedLine extends LineData {
 
     @Override
     public void runPhrases() {
-        isBlockConditionalStep = getRunningStep().definitionFlags.contains(CONDITIONAL_BLOCK);
+        isBlockConditionalStep = getRunningStep().definitionFlags.contains(BLOCK_CONDITIONAL);
         if (stepExtension.overridePhrase != null) {
             stepExtension.overridePhrase.assertionChain.executeAssertionChain();
             return;
@@ -51,7 +49,7 @@ public final class ParsedLine extends LineData {
             return input;
         }
 
-        stepExtension.addDefinitionFlag(CONDITIONAL_BLOCK, NO_LOGGING, _NO_LOGGING, IGNORE_CHILDREN_IF_FALSE);
+        stepExtension.addDefinitionFlag(BLOCK_CONDITIONAL, NO_LOGGING, _NO_LOGGING, IGNORE_CHILDREN_IF_FALSE);
 
         String returnText = "";
 
@@ -67,7 +65,7 @@ public final class ParsedLine extends LineData {
                 }
             }
 
-            returnText +=    " , "  + metaText +" " + stringPair.normalizedToken() + " " +  remainder;
+            returnText += " , " + metaText + " " + stringPair.normalizedToken() + " " + remainder;
         }
         if (input.endsWith(":") && !returnText.endsWith(":"))
             return returnText + " :";
@@ -86,7 +84,7 @@ public final class ParsedLine extends LineData {
         }
 
         public String normalizedToken() {
-            return   token
+            return token
                     .toLowerCase()
                     .replace(':', ' ')
                     .replace('-', ' ')
@@ -154,16 +152,14 @@ public final class ParsedLine extends LineData {
 
 
         StepExtension currentStep = getRunningStep();
-        Entry stepEntry = currentStep == null ? null : currentStep.stepEntry;
         getCurrentScenarioState().currentPhrase = (tools.dscode.common.treeparsing.parsedComponents.Phrase) phrase;
 
-        if (stepEntry != null) {
-            phrase.phraseEntry = getRunningStep().stepEntry.logWithType("PHRASE", phrase.toString()).tags("phrase").start();
-        }
+//        if (stepEntry != null) {
+//            phrase.phraseEntry = getRunningStep().stepEntry.logWithType("PHRASE", phrase.toString()).tags("phrase").start();
+//        }
         PhraseData nextResolvedPhrase = phrase.runPhrase();
 
-        if (phrase.phraseEntry != null)
-            phrase.phraseEntry.stop();
+        phrase.phraseEntry.stop();
 
         getCurrentScenarioState().currentPhrase = null;
 
@@ -174,7 +170,7 @@ public final class ParsedLine extends LineData {
         }
 
         if (nextResolvedPhrase == null) {
-            stepInfo("Step completed: " + executedPhrases);
+            logDebug("Step completed: " + executedPhrases);
             return phrase;
         }
 

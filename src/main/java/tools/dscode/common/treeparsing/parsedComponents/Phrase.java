@@ -4,7 +4,7 @@ package tools.dscode.common.treeparsing.parsedComponents;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.cucumber.core.runner.StepExtension;
 import tools.dscode.common.domoperations.ExecutionDictionary;
-import tools.dscode.common.reporting.logging.Entry;
+import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.preparsing.LineData;
@@ -13,14 +13,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static tools.dscode.common.annotations.DefinitionFlag.CONDITIONAL_BLOCK;
+import static tools.dscode.common.annotations.DefinitionFlag.BLOCK_CONDITIONAL;
 import static tools.dscode.common.assertions.AssertionChain.copyAssertionChainToNewPhrase;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
-import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToScenario;
-import static tools.dscode.common.reporting.logging.LogForwarder.phraseDebug;
-import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
-import static tools.dscode.common.treeparsing.DefinitionContext.FILE_INPUT;
+import static tools.dscode.common.reporting.logging.LogForwarder.getDefaultLoggingLevel;
+import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
+import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLevel;
+import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry;
+import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultLoggingLevel;
 
 
 public final class Phrase extends PhraseData {
@@ -100,6 +101,7 @@ public final class Phrase extends PhraseData {
     public PhraseData runPhrase() {
         executePhrase();
         resolveResults();
+        setDefaultEntry(getRunningStep().stepEntry);
         PhraseData nextResolvedPhrase = getNextResolvedPhrase();
 
 
@@ -137,36 +139,33 @@ public final class Phrase extends PhraseData {
             phraseType = PhraseType.CONDITIONAL;
         }
 
-//        if (!getAssertionType().isBlank() && getAssertion().isBlank()) {
-//            setAssertion("true");
-//        }
-
-//        if (!parsedLine.executedPhrases.isEmpty() && this.shouldRepeatPhrase && (parsedLine.executedPhrases.getLast().shouldRepeatPhrase || parsedLine.executedPhrases.getLast().repeatRootPhrase)) {
-//            parsedLine.executedPhrases.removeLast();
-//        }
 
 
         if (assertionChain == null)
             parsedLine.executedPhrases.add(this);
 
         if (!text.equals(resolvedText)) {
-            phraseDebug("Resolving `" + text + "` to `" + resolvedText + "`");
+            logDebug("Resolving `" + text + "` to `" + resolvedText + "`");
         }
 
         StepExtension currentStep = getRunningStep();
 
         if (shouldRun()) {
-            Entry parentEntry = currentStep == null ||  currentStep.stepEntry ==null || parsedLine.isBlockConditionalStep ? closestEntryToScenario() : currentStep.stepEntry;
-            phraseEntry = parentEntry.logWithType("PHRASE", toString()).tags("phrase").start();
-            phraseInfo("Running Phrase: " + this);
+            if(parsedLine.isBlockConditionalStep && !metaTextPrefix.contains("BLOCK_CONDITIONAL"))
+                setDefaultLoggingLevel(Level.INFO);
+            logToDefaultLevel("Running Phrase: " + this);
+            phraseEntry = currentStep.stepEntry.logWithType("PHRASE", toString()).tags("phrase").start();
+            setDefaultEntry(phraseEntry);
             if(currentStep !=null && nextSemicolon())
             {
                 currentStep.waitForPageReady = false;
             }
         } else {
-            Entry parentEntry = currentStep == null ||  currentStep.stepEntry ==null || parsedLine.isBlockConditionalStep ? closestEntryToScenario() : currentStep.stepEntry;
-            phraseEntry = parentEntry.logWithType("PHRASE", toString()).tags("phrase").start();
-            phraseInfo("Skipping Phrase: " + this);
+            if(parsedLine.isBlockConditionalStep && metaTextPrefix.contains("BLOCK_CONDITIONAL"))
+                setDefaultLoggingLevel(Level.DEBUG);
+            logToDefaultLevel("Skipping Phrase: " + this);
+//            phraseEntry = currentStep.stepEntry.logWithType("PHRASE", toString()).tags("phrase").start();
+//            setDefaultEntry(phraseEntry);
             wasPhraseSkipped = true;
             assertionChain = null;
             return;
@@ -176,7 +175,7 @@ public final class Phrase extends PhraseData {
 //        getCurrentScenarioState().currentPhrase = this;
 
         if (noExecution) {
-            phraseDebug("Context branch set");
+            logDebug("Context branch set");
             return;
         }
 

@@ -22,7 +22,9 @@ import java.util.stream.Collectors;
 
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch.TextOp;
 
-import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
+import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
+
 
 /**
  * Window/tab utilities (filtering + switching are decoupled).
@@ -134,7 +136,7 @@ public final class WindowSwitch {
      * @throws NoSuchWindowException with a descriptive message if handle is not present.
      */
     public static String switchToHandleOrThrow(WebDriver driver, String handle) {
-        phraseInfo("Attempting to switch to Window/Tab: " + handle);
+        logDebug("Attempting to switch to Window/Tab: " + handle);
         Objects.requireNonNull(driver, "driver");
         if (handle == null || handle.isBlank()) {
             throw new NoSuchWindowException("Cannot switch window: handle was null/blank.");
@@ -153,6 +155,7 @@ public final class WindowSwitch {
 
         pushHistory(driver, current);
         driver.switchTo().window(handle);
+        logInfo("Switched from Window/Tab '" + current + ", to '"+ handle+"'");
         return handle;
     }
 
@@ -182,8 +185,10 @@ public final class WindowSwitch {
         }
 
         String original = safeCurrentHandle(driver);
+        logDebug("Current Window: " + original);
+
         List<String> matches = new ArrayList<>();
-        phraseInfo("Checking open Windows for a matching " + textOps);
+        logDebug("Checking open Windows for a matching " + textOps);
         try {
             for (String h : handles) {
                 driver.switchTo().window(h);
@@ -197,10 +202,10 @@ public final class WindowSwitch {
                     continue;
                 }
 
-                phraseInfo("Window " + property + ": " + actual);
+                logDebug("Window " + property + ": " + actual);
 
                 if (matchesAll(actual, textOps)) {
-                    phraseInfo("Matched");
+                    logDebug("Matched");
                     matches.add(h);
                 }
             }

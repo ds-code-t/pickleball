@@ -30,7 +30,7 @@ import java.util.Set;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static tools.dscode.common.domoperations.SeleniumUtils.isDevToolsListening;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
-import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
+import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 
 public final class DriverConstruction {
 
@@ -455,10 +455,10 @@ public final class DriverConstruction {
         Integer debugPort = resolveDebugPort(fullConfiguration);
 
         if (isDevToolsListening("127.0.0.1", debugPort)) {
-            closestEntryToPhrase().info("Attaching to existing " + browserName + " browser on debugging port: " + debugPort);
+            logInfo("Attaching to existing " + browserName + " browser on debugging port: " + debugPort);
             options.setExperimentalOption("debuggerAddress", "127.0.0.1:" + debugPort);
         } else {
-            closestEntryToPhrase().info("Starting new " + browserName + " browser on debugging port: " + debugPort);
+            logInfo("Starting new " + browserName + " browser on debugging port: " + debugPort);
             options.addArguments("--remote-debugging-port=" + debugPort);
         }
     }

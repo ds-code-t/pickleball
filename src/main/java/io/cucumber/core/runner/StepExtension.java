@@ -44,8 +44,7 @@ import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.gherkinoperations.DynamicExecution.getCustomStep;
 import static tools.dscode.common.mappings.MappingProcessor.getDataTableMap;
 import static tools.dscode.common.mappings.MappingProcessor.getDocStringMap;
-import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToScenario;
-import static tools.dscode.common.reporting.logging.LogForwarder.stepDebug;
+import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
 import static tools.dscode.common.util.GeneralUtils.stackTraceToString;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
 import static tools.dscode.common.util.debug.DebugUtils.parseDebugString;
@@ -152,13 +151,7 @@ public class StepExtension extends StepData {
 
     public Result run() {
 
-//        if(isRootStep){
-//            rootStep();
-//            return null;
-//        }
-        if (stepEntry == null) {
-            stepEntry = closestEntryToScenario();
-        }
+
         ExecutionMode executionMode = ExecutionMode.RUN;
 
         if (logAndIgnore) {
@@ -173,9 +166,7 @@ public class StepExtension extends StepData {
         }
         executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
         executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
-        if (!definitionFlags.contains(DefinitionFlag.NO_LOGGING)) {
-            initializeStepEntryLogging();
-        }
+        stepEntry = getScenarioLogRoot().logWithType("STEP", executingPickleStepTestStep.getStepText()).tags("Step").start();
         lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
         io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep, executionMode);
 
@@ -200,26 +191,18 @@ public class StepExtension extends StepData {
     }
 
 
-    public void initializeStepEntryLogging() {
-        if (stepEntry == null || !stepEntry.tags.contains("Step")) {
-            stepEntry = getScenarioLogRoot().logWithType("STEP", executingPickleStepTestStep.getStepText()).tags("Step").start();
-        }
-    }
-
     public void finalizeStepEntryLogging() {
-        if (stepEntry.tags.contains("Step")) {
-            if (webDriverUsed != null && webDriverUsed.getSessionId() != null) {
-                if (isPresent(webDriverUsed)) {
-                    stepEntry.info("Browser Alert is present, cannot take screenshot.");
-                    stepEntry.stop();
-                } else {
-                    stepEntry.screenshot("After Step").stop();
-                }
-            } else {
+        if (webDriverUsed != null && webDriverUsed.getSessionId() != null) {
+            if (isPresent(webDriverUsed)) {
+                stepEntry.info("Browser Alert is present, cannot take screenshot.");
                 stepEntry.stop();
+            } else {
+                stepEntry.screenshot("After Step").stop();
             }
-            stepEntry = closestEntryToScenario();
+        } else {
+            stepEntry.stop();
         }
+
     }
 
     public Result execute(io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep, ExecutionMode executionMode) {
@@ -337,7 +320,7 @@ public class StepExtension extends StepData {
     public String resolveStepFromString(String stepText) {
         StepExtension newStepExtension = createNewStepExtension(stepText);
         Object obj = newStepExtension.runAndGetReturnValue();
-        stepDebug("Return step '" + stepText + "' resolved to: " + obj + "");
+        logDebug("Return step '" + stepText + "' resolved to: " + obj + "");
         if (obj == null) return null;
         return obj.toString();
     }
@@ -379,12 +362,10 @@ public class StepExtension extends StepData {
 
     public boolean emittedStepStartManually = false;
 
-    public void emitStepStart(String emitText){
-        if(emittedStepStartManually) return;
+    public void emitStepStart(String emitText) {
+        if (emittedStepStartManually) return;
         emittedStepStartManually = true;
-        PickleStepTestStep emitPickleStep = emitText == null || emitText.isBlank()  ? pickleStepTestStep : createNewStepExtension(emitText).pickleStepTestStep;
-        emitPickleStep.setNoLogging(false);
-        initializeStepEntryLogging();
+        PickleStepTestStep emitPickleStep = emitText == null || emitText.isBlank() ? pickleStepTestStep : createNewStepExtension(emitText).pickleStepTestStep;
         emitPickleStep.setNoLogging(false);
         pickleStepTestStep.substituteStep = emitPickleStep;
         try {

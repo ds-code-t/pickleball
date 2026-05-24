@@ -8,5 +8,5 @@ public enum DefinitionFlag {
     _RUN_METHOD_DIRECTLY,
     IGNORE_CHILDREN,
     _IGNORE_CHILDREN,
-    CONDITIONAL_BLOCK
+    BLOCK_CONDITIONAL
 }

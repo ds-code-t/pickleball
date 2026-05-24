@@ -5,7 +5,7 @@ import org.openqa.selenium.WebDriver;
 
 import static tools.dscode.common.mappings.ParsingMap.configsRoot;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
-import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 
 public class NavigationSteps {
 
@@ -14,7 +14,7 @@ public class NavigationSteps {
     public void i_navigate_to(String text) {
         Object obj = getFromRunningParsingMapCaseInsensitive(configsRoot + "." + text);
         if(obj instanceof String address) {
-            stepInfo("Attempting to navigate to: " + address + "");
+            logInfo("Attempting to navigate to: " + address + "");
             WebDriver driver = BrowserSteps.getCurrentDriver();
             driver.get(address);
         }

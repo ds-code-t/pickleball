@@ -18,7 +18,7 @@ import static io.cucumber.core.runner.util.TableUtils.toRowsStringMultimap;
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
 import static tools.dscode.common.mappings.MappingProcessor.getDataTableMap;
 import static tools.dscode.common.mappings.MappingProcessor.getRunMap;
-import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.variables.RunVars.resolveFromVars;
 
 
@@ -38,32 +38,32 @@ public class MappingSteps extends CoreSteps {
         getRunMap().clearValues(keyArray);
 
         if (keyArray.length == 0) {
-            stepInfo("Clearing Scenario Run Map");
+            logInfo("Clearing Scenario Run Map");
         } else {
-            stepInfo("Clearing Scenario Run Map values: " + String.join(", ", keyArray));
+            logInfo("Clearing Scenario Run Map values: " + String.join(", ", keyArray));
         }
     }
 
     @Given("^(:?\"(.*)\"\\s+)?DOC STRING$")
     public static void docString(String docStringName, DocString docString) {
         String docStringNameText = (docStringName == null || docStringName.isBlank()) ? "" : " " + docStringName;
-        stepInfo("Setting Doc String" + docStringNameText + ":" + docString);
+        logInfo("Setting Doc String" + docStringNameText + ":" + docString);
     }
 
     @Given("^(:?\"(.*)\"\\s+)?DATA TABLE$")
     public static void dataTable(String tableName, DataTable dataTable) {
         String tableNameText = (tableName == null || tableName.isBlank()) ? "" : " " + tableName;
-        stepInfo("Setting Data Table" + tableNameText + ":" + dataTable);
+        logInfo("Setting Data Table" + tableNameText + ":" + dataTable);
     }
 
     @Given("^SET \"(.*)\" DATA TABLE$")
     public static void setDataTable(String tableName, DataTable dataTable) {
         getDataTableMap().put(TABLE_KEY, Map.of(tableName.trim(), toRowsStringMultimap(dataTable)));
-        stepInfo("Setting Data Table" + tableName + ":" + dataTable);
+        logInfo("Setting Data Table" + tableName + ":" + dataTable);
     }
 
 
-    //    @DefinitionFlags(_NO_LOGGING)
+    // TODO convert to comma steps
     @Given("^FOR EVERY (\".*\" )?DATA ROW IN THE (\".*\" )?DATA TABLE:$")
     public static void forEveryRow(String rowName, String tableName) {
         tableName = tableName == null || tableName.isBlank() ? "" : tableName;
@@ -85,16 +85,7 @@ public class MappingSteps extends CoreSteps {
         nodeMap.merge(toFlatStringMultimap(dataTable.asLists()));
     }
 
-    @Given("^save \"(.*)\" as \"(.*)\"$")
-    public static void saveValues(String value, String key) {
-        stepInfo("SAve values");
-        try {
-            Thread.sleep(100L);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-        getCurrentScenarioState().put(key, value);
-    }
+
 
     @Given("(?i)^resolveVar:(.+)$")
     public static Object resolveToVarStepDef(String varName) {

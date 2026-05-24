@@ -15,7 +15,6 @@ import java.util.List;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.GlobalState.setGlobalCachingGlue;
 import static io.cucumber.core.runner.GlobalState.setGlobalRunner;
-import static tools.dscode.common.reporting.logging.LogForwarder.stepDebug;
 import static tools.dscode.testengine.DynamicSuiteConfigUtils.getGluePaths;
 //import static tools.dscode.pickleruntime.CucumberOptionResolver.glueDistinct;
 

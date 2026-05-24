@@ -12,18 +12,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static io.cucumber.core.runner.GlobalState.getTestCaseState;
-import static tools.dscode.common.GlobalConstants.BOOK_END;
-import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
-import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToScenario;
-import static tools.dscode.common.reporting.logging.LogForwarder.phraseInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLevel;
 import static tools.dscode.common.treeparsing.parsedComponents.Phrase.copyPhraseWithModifications;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ACTION;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.CONTEXT;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
-import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 
 public class AssertionChain {
 
@@ -94,7 +88,7 @@ public class AssertionChain {
         }
 
         runChainPhrases();
-        phraseInfo("Assertion chain " + this + " evaluates to: " + chainStatus);
+        logToDefaultLevel("Assertion chain " + this + " evaluates to: " + chainStatus);
 
         parentPhrase.result = new Attempt.Result(chainStatus, exception);
 
@@ -117,7 +111,7 @@ public class AssertionChain {
                 throw exception;
             }
             boolean result = (boolean) currentPhrase.result.value();
-            closestEntryToPhrase().info("Phrase '" + currentPhrase.resolvedText + "' evaluated to: " + result);
+            logToDefaultLevel("Phrase '" + currentPhrase.resolvedText + "' evaluated to: " + result);
             if (result && !conjunctionAnd) {
                 chainStatus = true;
                 break;

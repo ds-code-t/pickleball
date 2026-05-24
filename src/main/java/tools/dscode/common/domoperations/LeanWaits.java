@@ -20,7 +20,7 @@ import java.util.function.Function;
 import static tools.dscode.common.domoperations.HumanInteractions.blur;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.domoperations.SeleniumUtils.windowsChanged;
-import static tools.dscode.common.reporting.logging.LogForwarder.phraseWarn;
+import static tools.dscode.common.reporting.logging.LogForwarder.logWarn;
 
 public final class LeanWaits {
 
@@ -53,7 +53,7 @@ public final class LeanWaits {
             waitForElementPresent(driver, element, timeout);
 
         } catch (Exception e) {
-            phraseWarn("[WARN] Element did NOT become present: " + element +" , Cause: " + e);
+            logWarn("[WARN] Element did NOT become present: " + element +" , Cause: " + e);
         }
     }
 
@@ -77,7 +77,7 @@ public final class LeanWaits {
         try {
             waitForPageReady(driver, timeout);
         } catch (Exception e) {
-            phraseWarn("[WARN] Page did NOT reach ready state in time: " + e);
+            logWarn("[WARN] Page did NOT reach ready state in time: " + e);
         }
     }
 

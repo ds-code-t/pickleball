@@ -1,14 +1,10 @@
 package tools.dscode.common.assertions;
 
 import org.apache.commons.lang3.StringUtils;
-import tools.dscode.common.seleniumextensions.ElementWrapper;
-
 import java.util.regex.Pattern;
 
-import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
+import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLevel;
 
-// Adjust this import to wherever closestEntryToPhrase() lives in your project.
-// import static your.package.YourLoggerClass.closestEntryToPhrase;
 
 /**
  * Boolean comparison utilities for ValueWrapper.
@@ -27,7 +23,7 @@ public final class ValueWrapperComparisons {
     /* ---------------- logging helpers ---------------- */
 
     private static void logComparison(String comparisonType, Object left, Object right) {
-        closestEntryToPhrase().info(
+        logToDefaultLevel(
                 "checking " + comparisonType + " between: '" + left + "' and '" + right + "'"
         );
     }

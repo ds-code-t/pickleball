@@ -38,11 +38,11 @@ import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.ParsingMap.configsRoot;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
-import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
+import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
-import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETURNS_VALUE;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
+import static tools.dscode.common.util.StringUtilities.limitText;
 import static tools.dscode.coredefinitions.BrowserSteps.getCurrentDriver;
 
 
@@ -50,7 +50,7 @@ public enum ActionOperations implements OperationsInterface {
     CREATE_AND_ATTACH {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT),
@@ -72,7 +72,7 @@ public enum ActionOperations implements OperationsInterface {
     ATTACH {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT),
@@ -94,7 +94,7 @@ public enum ActionOperations implements OperationsInterface {
     SAVE {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
 
             ElementMatch regexMatchElement = phraseData.getElementMatches().stream().filter(e -> e.elementTypes.contains(ElementType.REGEX_MATCH)).findFirst().orElse(null);
             List<ElementMatch> valueElements = phraseData.getElementMatches().stream().filter(e -> e.elementTypes.contains(ElementType.RETURNS_VALUE) && !e.elementTypes.contains(ElementType.KEY_VALUE)).toList();
@@ -157,8 +157,8 @@ public enum ActionOperations implements OperationsInterface {
                             }
                         }
                     }
-                    closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
-                    System.out.println("Action: " + this.name() + " : '" + value + "' to key: '" + keyName + "'");
+                    logInfo(phraseData + " : Executing Action " + this.name());
+                    logInfo(phraseData + "Saving '" + limitText(value, 10000) + "' to key: '" + keyName + "'");
                     getRunningParsingMap().put(keyName, value);
                 }
                 return true;
@@ -169,7 +169,7 @@ public enum ActionOperations implements OperationsInterface {
     TAB {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
             sendKeys(getCurrentDriver(), Keys.chord(Keys.CONTROL, Keys.SHIFT));
         }
     },
@@ -178,7 +178,7 @@ public enum ActionOperations implements OperationsInterface {
     WAIT {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher().mustMatchAtLeastOne(ElementType.TIME_VALUE, ElementType.HTML_ELEMENT)
             );
@@ -212,7 +212,7 @@ public enum ActionOperations implements OperationsInterface {
     SELECT {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
 
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
@@ -257,7 +257,7 @@ public enum ActionOperations implements OperationsInterface {
     MOVE {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
@@ -283,7 +283,7 @@ public enum ActionOperations implements OperationsInterface {
     CLICK {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
@@ -309,7 +309,7 @@ public enum ActionOperations implements OperationsInterface {
     DOUBLE_CLICK {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
@@ -336,7 +336,7 @@ public enum ActionOperations implements OperationsInterface {
     RIGHT_CLICK {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
@@ -359,35 +359,35 @@ public enum ActionOperations implements OperationsInterface {
     PRESS {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
             textOperation(phraseData, false, true, true);
         }
     },
     ENTER {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
             textOperation(phraseData, false, true);
         }
     },
     CLEAR {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
             textOperation(phraseData, true, false);
         }
     },
     OVERWRITE {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
             textOperation(phraseData, true, true);
         }
     },
     SCROLL {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
@@ -411,7 +411,7 @@ public enum ActionOperations implements OperationsInterface {
     SWITCH {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.BROWSER_WINDOW)
@@ -436,7 +436,7 @@ public enum ActionOperations implements OperationsInterface {
     CLOSE {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
 
 
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
@@ -465,7 +465,7 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             waitMilliseconds(2000);
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
             phraseData.result = Attempt.runVoid(() -> {
                 try {
                     if (!phraseData.getFirstElement().category.startsWith("Alert"))
@@ -481,7 +481,7 @@ public enum ActionOperations implements OperationsInterface {
     DISMISS {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
             phraseData.result = Attempt.runVoid(() ->
                     dismiss(getCurrentDriver())
             );
@@ -490,7 +490,7 @@ public enum ActionOperations implements OperationsInterface {
     RUN_STEP {
         @Override
         public void execute(PhraseData phraseData) {
-            closestEntryToPhrase().info(phraseData + " : Executing " + this.name());
+            logInfo(phraseData + " : Executing Action " + this.name());
             phraseData.result = Attempt.runVoid(() -> {
                 ElementMatch firstElement = phraseData.getElementMatchAfterOperation(VALUE_TYPE);
                 StepExtension newStepExtension = getRunningStep().createNewStepExtension(firstElement.getValue().toString());

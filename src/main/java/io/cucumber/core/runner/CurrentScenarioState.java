@@ -14,6 +14,7 @@ import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
 import tools.dscode.common.reporting.logging.Entry;
+import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.common.reporting.logging.reportportal.ReportPortalBridgeConverter;
 import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
 import tools.dscode.common.exceptions.SoftExceptionInterface;
@@ -52,6 +53,7 @@ import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.assertions.AssertionChain.copyAssertionChainToNewPhrase;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
+import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultLoggingLevel;
 import static tools.dscode.common.treeparsing.preparsing.ParsedLine.createParsedLine;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
@@ -271,6 +273,10 @@ public class CurrentScenarioState extends ScenarioMapping {
         if (endCurrentScenario)
             return;
         currentStep = stepExtension;
+        if(currentStep.definitionFlags.contains(NO_LOGGING) || currentStep.definitionFlags.contains(_NO_LOGGING))
+            setDefaultLoggingLevel(Level.DEBUG);
+        else
+            setDefaultLoggingLevel(Level.INFO);
         int lineConditionalMode = stepExtension.lineData == null ?  1 :  stepExtension.lineData.lineConditionalMode;
         stepExtension.lineData = createParsedLine(stepExtension);
         stepExtension.lineData.lineConditionalMode = lineConditionalMode;

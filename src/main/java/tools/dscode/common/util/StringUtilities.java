@@ -95,6 +95,14 @@ public class StringUtilities {
         return name;
     }
 
-
+    public static String limitText(Object input, int characterLimit) {
+        String text = String.valueOf(input);
+        if (characterLimit < 0) {
+            throw new IllegalArgumentException("characterLimit must be >= 0");
+        }
+        return text.length() <= characterLimit
+                ? text
+                : text.substring(0, characterLimit);
+    }
 
 }

@@ -39,9 +39,9 @@ import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.StepMapping.copytoNewParsingMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
-import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
+import static tools.dscode.common.reporting.logging.LogForwarder.logError;
+import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLevel;
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
-import static tools.dscode.common.reporting.logging.LogForwarder.phraseError;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
@@ -124,7 +124,15 @@ public abstract class PhraseData extends PassedData {
     //    public XPathChainResult contextMatch;
     @Override
     public String toString() {
-        return (resolvedText == null ? text.replaceAll(BOOK_END, "") : resolvedText).replaceAll(BOOK_END, "") + termination;
+        return getText() + " -> " + getResolvedText();
+    }
+
+    public String getResolvedText() {
+        return (resolvedText ==null? text: resolvedText).replaceAll(BOOK_END, "") + termination;
+    }
+
+    public String getText() {
+        return text.replaceAll(BOOK_END, "") + termination;
     }
 
 
@@ -414,8 +422,9 @@ public abstract class PhraseData extends PassedData {
         if (result.failed()) {
             throw new RuntimeException("operation '" + operation + "' failed", result.error());
         }
+
         if (assertionOperation != null) {
-            closestEntryToPhrase().info(assertionOperation.name() + " assertion evaluated to: " + result.value());
+            logToDefaultLevel(assertionOperation.name() + " assertion evaluated to: " + result.value());
         }
 
     }
@@ -454,13 +463,13 @@ public abstract class PhraseData extends PassedData {
         switch (getAssertionType()) {
             case "ensure" -> {
                 if (!previouslyResolvedBoolean) {
-                    phraseError("Failed hard assertion in Phrase '" + resolvedText + "'");
+                    logError("Failed hard assertion in Phrase '" + resolvedText + "'");
                     throw new RuntimeException("FAILED  " + assertionMessage);
                 }
             }
             case "verify" -> {
                 if (!previouslyResolvedBoolean) {
-                    phraseError("Failed soft assertion in Phrase '" + resolvedText + "'");
+                    logError("Failed soft assertion in Phrase '" + resolvedText + "'");
                     throw new SoftRuntimeException("FAILED  " + assertionMessage);
                 }
             }

@@ -7,37 +7,36 @@ import static io.cucumber.core.runner.CurrentScenarioState.endTest;
 import static io.cucumber.core.runner.CurrentScenarioState.failScenario;
 import static io.cucumber.core.runner.CurrentScenarioState.softFailScenario;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
-import static tools.dscode.common.reporting.logging.LogForwarder.stepFail;
-import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 
 
 public class MessageAndLoggingSteps {
 
     @Given("^END SCENARIO$")
     public void endScenarioStep() {
-        stepInfo("Manually ending Current Scenario");
+        logInfo("Manually ending Current Scenario");
         getCurrentScenarioState().endCurrentScenario = true;
     }
 
     @Given("^END TEST")
     public void manuallyEndTest() {
-        stepInfo("Manually ending Test");
+        logInfo("Manually ending Test");
         endTest();
     }
 
     @Given("^SOFT FAIL SCENARIO( \".*\")$")
     public void softFailScenarioStep(String failMessage) {
-        stepFail("Manually soft failing Scenario");
+        logInfo("Manually soft failing Scenario");
         if(failMessage != null)
-            stepFail(failMessage);
+            logInfo(failMessage);
         softFailScenario(failMessage);
     }
 
     @Given("^FAIL SCENARIO( \".*\")$")
     public void failScenarioStep(String failMessage) {
-        stepFail("Manually hard failing Scenario");
+        logInfo("Manually hard failing Scenario");
         if(failMessage != null)
-            stepFail(failMessage);
+            logInfo(failMessage);
         failScenario(failMessage);
     }
 

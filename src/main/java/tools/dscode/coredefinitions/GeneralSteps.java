@@ -24,7 +24,7 @@ import static tools.dscode.common.GlobalConstants.ROOT_STEP;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.GlobalConstants.SOFT_ERROR_STEP;
 import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
-import static tools.dscode.common.reporting.logging.LogForwarder.stepInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 
 
 public class GeneralSteps extends CoreSteps {
@@ -69,7 +69,7 @@ public class GeneralSteps extends CoreSteps {
 
     @Given("^" + INFO_STEP + "(.*)$")
     public static void infoStep(String message) {
-        stepInfo(message);
+        logInfo(message);
     }
 
     @Given("^" + HARD_ERROR_STEP + "(.*)$")
@@ -84,13 +84,18 @@ public class GeneralSteps extends CoreSteps {
 
     @Given("^SKIPPING: (.*)$")
     public static void skippedStep(String message) {
-        stepInfo("Skipping step: " + message);
+        logInfo("Skipping step: " + message);
     }
 
 
     @Given("^print (.*)$")
     public static void printVal(String message) {
-        stepInfo("PRINT: " + message);
+        logInfo("PRINT: " + message);
+    }
+
+    @Given("^RETRY:.*$")
+    public static void retryStep() {
+// placeholder for retry
     }
 
 

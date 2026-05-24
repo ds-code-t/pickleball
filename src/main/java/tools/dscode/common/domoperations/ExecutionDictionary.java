@@ -27,13 +27,11 @@ import static com.xpathy.Attribute.title;
 import static com.xpathy.Tag.any;
 import static com.xpathy.Tag.div;
 import static tools.dscode.common.domoperations.TableColumnByHeaderXPath.matchCellsByHeader;
-import static tools.dscode.common.reporting.logging.LogForwarder.stepError;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.xpathSpecificityScore;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.attributePredicate;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.colocatedDeepNormalizedVisibleText;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.combineXPathParts;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.customElementSuffixPredicate;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.descendantDeepNormalizedVisibleText;
@@ -982,7 +980,6 @@ public class ExecutionDictionary {
         try {
             return cb.build(category, value, op, webDriver, context);
         } catch (Throwable t) {
-            stepError("Could not return SearchContext for '" + category + "'");
             throw new RuntimeException("Could not return SearchContext for '" + category + "'", t);
         }
     }
