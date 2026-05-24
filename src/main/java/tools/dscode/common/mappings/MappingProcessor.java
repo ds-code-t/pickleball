@@ -51,6 +51,7 @@ import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.mappings.queries.Tokenized.AS_LIST_SUFFIX;
+import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 import static tools.dscode.common.util.StringUtilities.decodeBackToText;
 import static tools.dscode.common.util.StringUtilities.encodeToPlaceHolders;
 
@@ -309,15 +310,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
             // If resolveCurly restores quoted placeholders, they are already resolved.
             parsedObj.setMasked(resolveAll(parsedObj.masked(), parsedObj));
 
-            System.out.println("");
             String resolvedText = parsedObj.restore();
-            System.out.println("Resolved: '" + input + "' -> '" + resolvedText + "'");
+            logTrace("Resolved: '" + input + "' -> '" + resolvedText + "'");
             return resolvedText;
-//        } catch (Throwable t) {
-//            String resolvedText = parsedObj.restore();
-//            System.out.println("Handled exception '" + t.getMessage() + "' when attempting to resolve: '" + input + "' -> '" + resolvedText + "'");
-//            return resolvedText;
-//        }
+
     }
 
     private String resolveAll(String input, QuoteParser parsedObj) {
@@ -358,8 +354,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     break;
                 }
                 replacement = get(key);
-                if (replacement != null)
+                if (replacement != null) {
+                    logTrace("'<" + key + ">' -> '" + replacement + "'");
                     break;
+                }
             }
             if (replacement == null)
                 return s;
@@ -387,6 +385,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 String repl = key.endsWith("?")
                         ? String.valueOf(evalToBoolean(key.substring(0, key.length() - 1), this))
                         : String.valueOf(eval(key, this));
+                logTrace("'{" + key + "}' -> '" + repl + "'");
                 m.appendReplacement(sb, repl == null ? m.group(0) : Matcher.quoteReplacement(repl));
             }
             m.appendTail(sb);
@@ -428,6 +427,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     private void putVar(String key, Object value) {
         key = (key.contains("_") && key.toLowerCase().startsWith(PKB_PREFIX)) ? key.toLowerCase() : PKB_PREFIX + key.toLowerCase();
+        logTrace("putVar '" + key + "' -> '" + value + "'");
         singletonMap.get().root.remove(key);
         singletonMap.get().putAsSingleton(key, value);
     }

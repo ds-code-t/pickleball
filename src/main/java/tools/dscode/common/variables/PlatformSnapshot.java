@@ -12,6 +12,8 @@ import java.util.concurrent.TimeUnit;
 
 import com.sun.management.OperatingSystemMXBean;
 
+import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
+
 public final class PlatformSnapshot {
 
     private static final Map<String, Object> DATA;
@@ -110,7 +112,7 @@ public final class PlatformSnapshot {
 
         DATA = Collections.unmodifiableMap(m);
 
-        System.out.println("Platform Data: " + DATA);
+        logDebug("Platform Data: " + DATA);
     }
 
     private PlatformSnapshot() {}

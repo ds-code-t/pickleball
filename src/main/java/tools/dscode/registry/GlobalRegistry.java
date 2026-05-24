@@ -6,13 +6,17 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static tools.dscode.common.reporting.logging.LogForwarder.logError;
+import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
+
 
 public final class GlobalRegistry {
 
     static {
         Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
-            System.err.println("### UNCAUGHT in thread " + t.getName());
             e.printStackTrace();
+            logError("### UNCAUGHT in thread " + t.getName());
+
         });
     }
 
@@ -40,7 +44,7 @@ public final class GlobalRegistry {
     public static void registerLocal(Object instance) {
         LOCAL.get().putIfAbsent(keyFor(instance.getClass()), instance);
 
-        System.out.println("[Reg][LOCAL ] " + instance.getClass().getName());
+        logTrace("[Reg][LOCAL ] " + instance.getClass().getName());
     }
 
     public static void registerBoth(Object instance) {

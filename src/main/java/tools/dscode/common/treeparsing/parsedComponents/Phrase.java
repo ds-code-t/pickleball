@@ -155,7 +155,6 @@ public final class Phrase extends PhraseData {
 
         StepExtension currentStep = getRunningStep();
 
-
         if (shouldRun()) {
             Entry parentEntry = currentStep == null ||  currentStep.stepEntry ==null || parsedLine.isBlockConditionalStep ? closestEntryToScenario() : currentStep.stepEntry;
             phraseEntry = parentEntry.logWithType("PHRASE", toString()).tags("phrase").start();

@@ -22,7 +22,7 @@ import static tools.dscode.common.domoperations.elementstates.RequiredInputCondi
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementMatch.ELEMENT_RETURN_VALUE;
-import static tools.dscode.common.util.debug.DebugUtils.printDebug;
+import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 
 
 public class ElementWrapper {
@@ -45,14 +45,14 @@ public class ElementWrapper {
         List<ElementWrapper> elementWrappers = new ArrayList<>();
         List<WebElement> elements = elementMatch.contextWrapper.getElements(searchContext);
         boolean singleElement = elementMatch.selectionType.isBlank();
-        printDebug("##elements-getWrappedElements-elements: " + elements.size());
+        logTrace("getWrappedElements-elements: " + elements.size());
         int index = 0;
         for (WebElement element : elements) {
             ElementWrapper ew = new ElementWrapper(element, elementMatch, ++index);
             elementWrappers.add(ew);
             if (singleElement) break;
         }
-        printDebug("##elements-getWrappedElements-elementWrappers: " + elementWrappers.size());
+        logTrace("getWrappedElements-elementWrappers: " + elementWrappers.size());
         return elementWrappers;
     }
 
@@ -628,7 +628,7 @@ public class ElementWrapper {
 
 
     private List<WebElement> getElementList(WebDriver driver, String xpathyWithId) {
-        printDebug("##XPath: ElementWrapper.getElementList:\n" + xpathyWithId + "\n----------------");
+        logTrace("getElementList.xpathyWithId: " + xpathyWithId);
         return withoutImplicitWait(driver, () -> elementMatch.contextWrapper.getFinalSearchContext().findElements(new By.ByXPath(xpathyWithId)));
     }
 

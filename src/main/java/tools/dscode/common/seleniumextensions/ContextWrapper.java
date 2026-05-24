@@ -5,7 +5,6 @@ import org.openqa.selenium.By;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.domoperations.ExecutionDictionary;
-import tools.dscode.common.domoperations.NestedByLocator;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
@@ -13,12 +12,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static tools.dscode.common.domoperations.NestedByLocator.findWithRetry;
+import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
+import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.prettyPrintXPath;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.everyNth;
-import static tools.dscode.common.util.debug.DebugUtils.printDebug;
-
 public class ContextWrapper {
 
     //    public List<PhraseData> contextList;
@@ -33,12 +31,9 @@ public class ContextWrapper {
 
 
     List<WebElement> getElements(SearchContext searchContext) {
-        printDebug("\n##ContextWrapper- getElements: " + elementMatch);
+        logTrace("getElements: " + elementMatch);
         if (searchContext == null) return new ArrayList<>();
-        printDebug("####ContextWrapper-searchContext: " + searchContext.getClass().getSimpleName());
-        printDebug("####ContextWrapper-elementMatch.parentPhrase: " + elementMatch.parentPhrase);
-        printDebug("####ContextWrapper-elementTerminalXPath " + prettyPrintXPath(elementTerminalXPath));
-        printDebug("\n\n##ContextWrapper-end##");
+        logTrace("ContextWrapper-elementTerminalXPath " + prettyPrintXPath(elementTerminalXPath));
         return getElementListFromSearchContext(searchContext, elementTerminalXPath, elementMatch);
 //        return searchContext.findElements(elementTerminalXPath.getLocator());
     }
@@ -46,57 +41,50 @@ public class ContextWrapper {
 
     public SearchContext getFinalSearchContext() {
 
-        printDebug("\n##ContextWrapper-getFinalSearchContext11");
-        printDebug("\n##ContextWrapper-getFinalSearchContext: " + elementMatch.category + " , " + elementMatch.parentPhrase);
-        printDebug("\n##ContextWrapper-elementMatch.parentPhrase.contextElement: " + elementMatch.parentPhrase.contextElement);
         SearchContext searchContext = elementMatch.parentPhrase.getSearchContext();
-        PhraseData searchContextPhrase = elementMatch.parentPhrase;
         List<PhraseData> contextList = elementMatch.parentPhrase.getPhraseContextList();
-        printDebug("##ContextWrapper-contextList.size(): " + contextList.size());
-        printDebug("##ContextWrapper-contextList::::: " + contextList);
-        printDebug("##ContextWrapper-searchContext1: " + searchContext.getClass().getSimpleName());
+        logTrace("getFinalSearchContext-contextList: " + contextList);
+        logTrace("starting searchContext: " + searchContext);
+
         List<XPathy> xPathyList = new ArrayList<>();
-        printDebug("\n------\n##ContextWrapper-currentPhrase: " + elementMatch.parentPhrase);
         for (int j = 0; j < contextList.size(); j++) {
             PhraseData phraseData = contextList.get(j);
 
-            printDebug("##ContextWrapper-phraseData1: " + phraseData);
-            printDebug("##ContextWrapper-phraseData--phraseData.contextElement : " + phraseData.contextElement);
-            printDebug("##ContextWrapper-phraseData--phraseData.categoryFlag : " + phraseData.categoryFlags);
+            logTrace("current-phrase: " + phraseData);
+            logTrace("current-categoryFlags: " + phraseData.categoryFlags);
+            logTrace("current-xPathyList: " + xPathyList);
 
             if (phraseData.contextElement != null) {
-                printDebug("##ContextWrapper-#psearchContext1: " + searchContext);
+                logTrace("has contextElement");
+                logTrace("current-contextElement:: " + phraseData.contextElement);
                 searchContext = phraseData.getSearchContext();
-                searchContextPhrase = phraseData;
-                printDebug("##ContextWrapper-psearchContext2: " + searchContext);
-                printDebug("##ContextWrapper-phraseData.getSearchContext()222: " + phraseData.getSearchContext());
+                logTrace("new searchContext: " + searchContext);
             } else if (phraseData.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)) {
-                printDebug("##ContextWrapper-phraseData2: " + xPathyList);
-                printDebug("##ContextWrapper-phraseData.searchContext: " + phraseData.getSearchContext());
-                printDebug("##ContextWrapper-xPathyList:= " + xPathyList);
+                logTrace("is PAGE_CONTEXT");
                 if (!xPathyList.isEmpty()) {
                     XPathy combinedXPathy = combineAnd(xPathyList);
+                    logTrace("combinedXPathy: " + searchContext);
                     searchContext = getElementFromSearchContext(searchContext, combinedXPathy, elementMatch);
-
+                    logTrace("new searchContext: " + searchContext);
                     xPathyList.clear();
                 }
 
                 ElementMatch contextElementMatch = phraseData.getElementMatches().stream().filter(em -> em.categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT)).findFirst().orElse(null);
 
-                printDebug("##ContextWrapper-searchContext-1 " + searchContext);
                 searchContext = getExecutionDictionary().applyContextBuilder(contextElementMatch.category, contextElementMatch.defaultText, contextElementMatch.defaultTextOp, elementMatch.parentPhrase.getDriver(), searchContext);
-                printDebug("##ContextWrapper-searchContext-2 " + searchContext);
+                logTrace("new searchContext: " + searchContext);
+
 
                 if(searchContext instanceof WebElement webElement){
                     phraseData.contextElement = new ElementWrapper(webElement, contextElementMatch, 1);
+                    logTrace("new contextElement: " + phraseData.contextElement);
                 }
 
                 if (searchContext == null)
                     break;
 
-                printDebug("##ContextWrapper-searchContext2: " + (searchContext == null ? "null" : searchContext.getClass().getSimpleName()));
             } else {
-                printDebug("phraseData4: " + phraseData.contextXPathy);
+                logTrace("contextXPathy: " + phraseData.contextXPathy);
                 xPathyList.add(phraseData.contextXPathy);
             }
         }
@@ -116,16 +104,16 @@ public class ContextWrapper {
 
         xPathyList.add(elementMatch.xPathy);
 
-        printDebug("##ContextWrapper-xPathyList: " + xPathyList);
+        logTrace("final-xPathyList: " + xPathyList);
         initializeElementXPaths(xPathyList);
         return searchContext;
     }
 
     public static List<WebElement> getElementListFromSearchContext(SearchContext searchContext, XPathy xPathy, ElementMatch elementMatch) {
-        String xpath = xPathy.getXpath();
+        logTrace("getElementListFromSearchContext: " + elementMatch);
 
+        String xpath = xPathy.getXpath();
         if (searchContext instanceof WebElement element) {
-            System.out.println();
             PhraseData currentPhrase = elementMatch.parentPhrase.getPreviousPhrase();
             String relationToContextElement = "descendant-or-self::";
             while (currentPhrase != null) {
@@ -143,7 +131,7 @@ public class ContextWrapper {
             if (xpath.strip().replaceAll("\\(", "").startsWith("//"))
                 xpath = xpath.replaceFirst("//", relationToContextElement);
         }
-        printDebug("##XPath: getElementListFromSearchContext\n" + prettyPrintXPath(xpath) + "\n----------------");
+        logDebug("XPATH: " + prettyPrintXPath(xpath));
         return findWithRetry(searchContext, new By.ByXPath(xpath), elementMatch);
 //        return searchContext.findElements(new By.ByXPath(xpath));
     }

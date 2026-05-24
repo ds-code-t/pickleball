@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.mappings.ParsingMap.configsRoot;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 
 public final class CalendarRegistry {
 
@@ -43,7 +44,7 @@ public final class CalendarRegistry {
      * Keep this code entirely inside the init gate so all threads block until it’s done.
      */
     private static void initOnce() {
-        System.out.println("Initializing calendar registry...");
+        logTrace("Initializing calendar registry...");
         StepExtension currentStep = getRunningStep();
 //        String json = (String) currentStep.getStepParsingMap().getAndResolve(configsRoot + ".CALENDARS");
         Object raw = currentStep.getStepParsingMap().getAndResolve(configsRoot + ".CALENDARS");

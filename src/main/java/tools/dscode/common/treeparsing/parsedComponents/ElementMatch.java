@@ -417,9 +417,6 @@ public class ElementMatch {
     }
 
     public List<ElementWrapper> getElementWrappers() {
-        DebugUtils.onMatch("##getElementWrappers", msg -> {
-            System.out.println("##getElementWrappers- wrappedElements: " + wrappedElements);
-        });
 
         if (wrappedElements == null) {
             if (parentPhrase.contextElement != null)

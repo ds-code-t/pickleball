@@ -12,6 +12,8 @@ import java.util.Map;
 import java.util.Set;
 
 
+import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 
 public final class AviatorUtil {
@@ -105,9 +107,13 @@ public final class AviatorUtil {
             return null;
         String processedExpression = preprocessExpression(expr.toString());
         try {
+            Object evalReturn;
             if (map == null)
-                return AviatorEvaluator.execute(processedExpression);
-            return AviatorEvaluator.execute(processedExpression, map);
+                evalReturn = AviatorEvaluator.execute(processedExpression);
+            else
+                evalReturn = AviatorEvaluator.execute(processedExpression, map);
+            logTrace("Evaluated: '" + expr + "' -> '" + evalReturn + "'");
+            return evalReturn;
         } catch (Exception e) {
             throw new RuntimeException("Failed to evaluate expression: '" + expr + "'", e);
         }
@@ -118,7 +124,9 @@ public final class AviatorUtil {
      */
     public static boolean evalToBoolean(Object expr, Map<String, Object> map) {
         try {
-            return expr != null && (boolean) AviatorEvaluator.execute(preprocessExpression(expr.toString()), map, true);
+            boolean evalReturn = expr != null && (boolean) AviatorEvaluator.execute(preprocessExpression(expr.toString()), map, true);
+            logInfo("Evaluated To Bool: '" + expr + "' -> '" + evalReturn + "'");
+            return evalReturn;
         } catch (Exception e) {
             throw new RuntimeException("Failed to evaluate expression to boolean: '" + expr + "'", e);
         }

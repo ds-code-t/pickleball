@@ -1,6 +1,7 @@
 package tools.dscode.testengine;
 
 import io.cucumber.core.runner.CurrentScenarioState;
+import tools.dscode.common.reporting.logging.Level;
 
 import java.io.InputStream;
 import java.net.URL;
@@ -21,12 +22,17 @@ import static tools.dscode.common.util.debug.DebugUtils.debugFlags;
 
 public abstract class PickleballRunner {
 
+    public static Level LOG_LEVEL = Level.INFO;
+
     static {
         EngineFilterBootstrap.ensureEngineFilterApplied("PickleballRunner.<clinit>");
     }
 
+
+
     private static volatile PickleballRunner INSTANCE;
     public static final String PKB_PREFIX = "pkb_";
+    static final String PKB_LOGLEVEL = PKB_PREFIX + "loglevel";
     static final String PKB_GLUE = PKB_PREFIX + "glue";
     static final String PKB_FEATURES = PKB_PREFIX + "features";
     static final String PKB_TAGS = PKB_PREFIX + "tags";
@@ -101,6 +107,8 @@ public abstract class PickleballRunner {
         INSTANCE = this;
         debug("Registered singleton instance: " + getClass().getName());
 
+        values.putIfAbsent(PKB_LOGLEVEL,"INFO");
+        LOG_LEVEL = Level.valueOf(values.get(PKB_LOGLEVEL).toUpperCase().trim());
 
     }
 

@@ -11,8 +11,37 @@ import static io.cucumber.core.runner.GlobalState.pickleballLog;
 
 public class LogForwarder {
 
+    public static final Entry defaultEntry = Entry.of("default");
+
+    public static boolean globalStateInitialized = false;
+
+    public static Entry logFail(String message) {
+        return closestEntryToPhrase().fail(message);
+    }
+
+    public static Entry logInfo(String message) {
+        return closestEntryToPhrase().info(message);
+    }
+
+    public static Entry logError(String message) {
+        return closestEntryToPhrase().error(message);
+    }
+
+    public static Entry logWarn(String message) {
+        return closestEntryToPhrase().warn(message);
+    }
+
+    public static Entry logTrace(String message) {
+        return closestEntryToPhrase().trace(message);
+    }
+
+    public static Entry logDebug(String message) {
+        return closestEntryToPhrase().debug(message);
+    }
+
 
     public static Entry closestEntryToScenario() {
+        if(!globalStateInitialized) return defaultEntry;
         CurrentScenarioState currentScenarioState = getCurrentScenarioState();
         if (currentScenarioState == null || currentScenarioState.scenarioLog == null)
             return pickleballLog;
@@ -21,6 +50,7 @@ public class LogForwarder {
 
 
     public static Entry closestEntryToStep() {
+        if(!globalStateInitialized) return defaultEntry;
         CurrentScenarioState currentScenarioState = getCurrentScenarioState();
         if (currentScenarioState == null || currentScenarioState.scenarioLog == null)
             return pickleballLog;
@@ -31,6 +61,7 @@ public class LogForwarder {
     }
 
     public static Entry closestEntryToPhrase() {
+        if(!globalStateInitialized) return defaultEntry;
         Phrase currentPhrase = getRunningPhrase();
         if (currentPhrase == null || currentPhrase.phraseEntry == null)
             return closestEntryToStep();

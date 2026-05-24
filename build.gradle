@@ -128,7 +128,7 @@ dependencies {
 
     // xpath and selenium
     implementation('org.seleniumhq.selenium:selenium-java') {
-        version { strictly('[4.0,5.0)') }
+        version { strictly('[4.44,5.0)') }
     }
 
     implementation files('libs/xpathy-3.0.0.jar')

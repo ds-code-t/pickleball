@@ -12,7 +12,7 @@ import java.util.regex.Pattern;
 import static tools.dscode.common.treeparsing.MatchNode.createMatchNode;
 import static tools.dscode.common.treeparsing.RegexUtil.TOKEN_END;
 import static tools.dscode.common.treeparsing.RegexUtil.TOKEN_START;
-import static tools.dscode.common.util.debug.DebugUtils.printDebug;
+import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 
 
 public class ParseNode {
@@ -175,9 +175,7 @@ public class ParseNode {
 
             // Keep the Pattern so we can build NamedGroupMap later
             Pattern pattern = Pattern.compile(childDef.getRegexPattern(), Pattern.DOTALL);
-            printDebug("\n##MatchNode: name: " + childDef.getName());
-            printDebug("##MatchNode: pattern: " + pattern.pattern());
-            printDebug("##MatchNode: parentSnapshot: " + parentSnapshot);
+
             Matcher m = pattern.matcher(parentSnapshot);
 
 
@@ -191,7 +189,9 @@ public class ParseNode {
                 }
 
                 String childOriginal = m.group(0);
-                printDebug("##MatchNode: matched: " + childOriginal);
+
+                logTrace("MatchNode: name: " + childDef.getName() );
+                logTrace("MatchNode: parentSnapshot: " + parentSnapshot  + "matched: " + childOriginal);
 
                 // Build token with Option A format
                 String childToken = childDef.keyBase();

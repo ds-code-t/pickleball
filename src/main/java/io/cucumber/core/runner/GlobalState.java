@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static io.cucumber.core.runner.CurrentScenarioState.currentScenarioState;
+import static tools.dscode.common.reporting.logging.LogForwarder.globalStateInitialized;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
@@ -66,6 +67,7 @@ public class GlobalState {
                                 rs.valuesByHeader()
                         ))
         );
+        globalStateInitialized = true;
     }
 
 

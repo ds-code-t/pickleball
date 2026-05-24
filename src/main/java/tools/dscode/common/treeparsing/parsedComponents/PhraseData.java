@@ -40,6 +40,7 @@ import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.StepMapping.copytoNewParsingMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.closestEntryToPhrase;
+import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 import static tools.dscode.common.reporting.logging.LogForwarder.phraseError;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
@@ -250,16 +251,13 @@ public abstract class PhraseData extends PassedData {
             }
         }
 
-        onMatch("##parsedata-newStartContext: ", (matchString) -> {
-            System.out.println(matchString + "  , for : " + text + " \n " + phraseNode.localStateBoolean("newStartContext"));
-        });
 
         setNewContext(phraseNode.localStateBoolean("newStartContext"));
 
         if (phraseType == null) {
-            System.out.println("No initial PhraseType set for '" + text + "'");
+            logTrace("No initial PhraseType set for '" + text + "'");
         } else {
-            System.out.println("PhraseType: " + phraseType + " set for '" + text + "'");
+            logTrace("PhraseType: " + phraseType + " set for '" + text + "'");
         }
 
         if (phraseType == null && !elementMatches.isEmpty()) {
@@ -343,7 +341,6 @@ public abstract class PhraseData extends PassedData {
             return insideOf(first);
         }
         if (context.startsWith("after")) {
-            System.out.println( afterOf(first));
             return afterOf(first);
         }
         if (context.startsWith("before")) {

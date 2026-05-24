@@ -11,6 +11,8 @@ import tools.dscode.common.driver.DriverConstruction;
 import java.time.Duration;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
+import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 import static tools.dscode.common.variables.RunVars.resolveFromVarsOrDefault;
 import static tools.dscode.coredefinitions.ObjectRegistrationSteps.constructObjectFromParsingMap;
 import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getNewObjectFromParsingMap;
@@ -72,7 +74,7 @@ public class BrowserSteps {
         try {
             driver.manage().window().maximize();
         } catch (Exception e) {
-            System.out.println("Failed to maximize window: " + e.getMessage());
+            logDebug("Failed to maximize window: " + e.getMessage());
         }
         return value;
     }
@@ -83,7 +85,7 @@ public class BrowserSteps {
         try {
             driver.manage().window().minimize();
         } catch (Exception e) {
-            System.out.println("Failed to minimize window: " + e.getMessage());
+            logDebug("Failed to minimize window: " + e.getMessage());
         }
         return value;
     }

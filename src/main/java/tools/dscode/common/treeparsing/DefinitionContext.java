@@ -39,11 +39,8 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.com
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.colocatedDeepNormalizedVisibleText;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.customElementSuffixPredicate;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepNormalizedVisibleText;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.deepestOnlyXPath;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.descendantDeepNormalizedVisibleText;
 import static tools.dscode.common.util.debug.DebugUtils.disableBaseElement;
-import static tools.dscode.common.util.debug.DebugUtils.onMatch;
-import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 
 public final class DefinitionContext {
 
@@ -202,10 +199,8 @@ public final class DefinitionContext {
         ParseNode elementMatch = new ParseNode("(?:(?<selectionType>every|any|none\\s+of|none)\\b\\s*)?(?:(?<elementPosition>\\bfirst|\\blast|<<position>>)\\b\\s*)?(?:(?<state>(?:un|non-?)?(?:checked|selected|enabled|disabled|expanded|collapsed|required|empty|blank))\\b\\s*)?(?<text><<valueMask>>)?\\s*\\b(?<type>(?:\\b[A-Z][a-zA-Z]+\\b\\s*)+)(?<elPredicate>(?<predicate>\\s*<<predicate>>))*\\s*(?<atrPredicate>(?:(?:\\band\\s*)?\\bwith\\s+[a-z]+\\s+(?:<<predicate>>|(?:no)?attribute)\\s*))*") {
             @Override
             public String onSubstitute(MatchNode self) {
-                printDebug("##parsedefinition-elementMatch: " + self.originalText());
                 self.putToLocalState("fullText", self.unmask(self.groups().get(0)));
 
-//            self.getAncestor("phrase").putToLocalState("elementMatch", self);
                 self.putToLocalState("selectionType", self.resolvedGroupText("selectionType")
                         .replaceAll("of", "").trim()
                         .replaceAll("no", "none"));
@@ -235,7 +230,6 @@ public final class DefinitionContext {
 
                 elementMatchNode.putToLocalState("valueTypes", valueTypes);
 
-//                return elOrValToken;
                 return " " + self.groups().get("element") + " ";
             }
 
@@ -316,9 +310,6 @@ public final class DefinitionContext {
         ParseNode booleanValue = new ParseNode("\\b(?:true|false)\\b") {
             public String onSubstitute(MatchNode self) {
                 MatchNode parentNode = self.parent();
-                System.out.println(parentNode.localStateBoolean("context"));
-                System.out.println(parentNode.localStateBoolean("action"));
-                System.out.println(parentNode.localStateBoolean("hasElements"));
                 if (!parentNode.localStateBoolean("context", "action", "hasElements")) {
                     if (!parentNode.localStateBoolean("assertion")) {
                         parentNode.putToLocalState("assertion", "true");
@@ -679,7 +670,6 @@ public final class DefinitionContext {
                                                 "       ]" +
                                                 "]"
                                 );
-                                printDebug("##returnXpathy-" + category + ": " + returnXpathy.getXpath());
                                 return returnXpathy;
 
                             }
@@ -723,7 +713,6 @@ public final class DefinitionContext {
                                                 "]"),
                                         XPathy.from("//*" + colocatedDeepNormalizedVisibleText(v, op))
                                 );
-                                printDebug("##textXpath forLabel:2 " + returnXpath);
                                 return returnXpath;
                             }
                     );

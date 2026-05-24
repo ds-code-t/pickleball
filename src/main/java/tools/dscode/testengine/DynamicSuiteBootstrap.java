@@ -21,6 +21,7 @@ import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
+import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
 
 public final class DynamicSuiteBootstrap {
 
@@ -381,7 +382,7 @@ public final class DynamicSuiteBootstrap {
     }
 
     private static void debug(String message) {
-        System.err.println("[DynamicSuiteBootstrap] " + message);
+        logDebug("[DynamicSuiteBootstrap] " + message);
     }
 
 

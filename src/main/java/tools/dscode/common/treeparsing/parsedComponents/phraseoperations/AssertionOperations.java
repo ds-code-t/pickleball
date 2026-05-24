@@ -400,7 +400,6 @@ public enum AssertionOperations implements OperationsInterface {
             {
                 values = phraseData.booleanValues;
             }else {
-                phraseData.getElementMatches().forEach(e -> System.out.println("\n" + e + "\n" + e.elementTypes));
                 phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatches(),
                         new ElementMatcher()
                                 .mustMatchAll(RETURNS_VALUE)

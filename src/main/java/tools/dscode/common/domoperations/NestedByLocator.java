@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
-import static tools.dscode.common.util.debug.DebugUtils.printDebug;
+import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 
 public final class NestedByLocator {
 
@@ -163,7 +163,7 @@ public final class NestedByLocator {
             matches = filterDisplayed(matches);
         }
 
-        printDebug("##elements-find-matches.size(): " + matches.size());
+        logTrace("elements-find-matches.size(): " + matches.size());
 
         if (mode == NestingMode.NONE || matches.size() <= 1) {
             return matches;
@@ -172,7 +172,7 @@ public final class NestedByLocator {
         // Main optimized path: do containment analysis once in the browser.
         List<WebElement> browserSide = tryBrowserSideNestingFilter(context, matches, mode);
         if (browserSide != null) {
-            printDebug("##elements-find-out.size(): " + browserSide.size());
+            logTrace("elements-find-out.size(): " + browserSide.size());
             return browserSide;
         }
 
@@ -185,7 +185,7 @@ public final class NestedByLocator {
             case NONE -> matches;
         };
 
-        printDebug("##elements-find-out.size(): " + out.size());
+        logTrace("elements-find-final-out.size(): " + out.size());
         return out;
     }
 

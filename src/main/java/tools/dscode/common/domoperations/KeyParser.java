@@ -14,7 +14,7 @@ public final class KeyParser {
     private KeyParser() {}
 
     // Flip this on/off as needed
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
 
     private static void dbg(String fmt, Object... args) {
         if (DEBUG) System.out.println("[KeyParser] " + String.format(fmt, args));

@@ -1,36 +1,41 @@
 package tools.dscode.common.reporting;
 
+import tools.dscode.common.reporting.logging.Level;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.*;
 
+import static tools.dscode.testengine.PickleballRunner.LOG_LEVEL;
+
 /**
  * Prints WorkBook contents to the console (in-memory; does NOT require writing the .xlsx).
- *
+ * <p>
  * If a "STATUS" header exists:
- *  - STATUS == "FAILED" => row printed in red
- *  - STATUS == "PASSED" => row printed in green
- *
+ * - STATUS == "FAILED" => row printed in red
+ * - STATUS == "PASSED" => row printed in green
+ * <p>
  * Also prints a highlighted summary line:
- *  "Ran N SCENARIOS, X <STATUS1>, Y <STATUS2>, ..."
+ * "Ran N SCENARIOS, X <STATUS1>, Y <STATUS2>, ..."
  */
 public final class WorkBookConsolePrinter {
 
     // ANSI styles
-    private static final String RESET  = "\u001B[0m";
-    private static final String RED    = "\u001B[31m";
-    private static final String GREEN  = "\u001B[32m";
+    private static final String RESET = "\u001B[0m";
+    private static final String RED = "\u001B[31m";
+    private static final String GREEN = "\u001B[32m";
     private static final String YELLOW = "\u001B[33m";
-    private static final String BLUE   = "\u001B[34m";
-    private static final String BOLD   = "\u001B[1m";
-    private static final String BLINK  = "\u001B[5m";
+    private static final String BLUE = "\u001B[34m";
+    private static final String BOLD = "\u001B[1m";
+    private static final String BLINK = "\u001B[5m";
 
     private static final String FRAME_LINE =
             "================================================================================";
 
     private static final String STAR_LINE = "************";
 
-    private WorkBookConsolePrinter() {}
+    private WorkBookConsolePrinter() {
+    }
 
     public static void printToConsole(WorkBook book) {
         printToConsole(book, true);
@@ -254,84 +259,118 @@ public final class WorkBookConsolePrinter {
     }
 
 
-
-
     // ---------------- level printing (simple "log-like" helpers) ----------------
+
+    public static void printByLevel(Level level, String msg) {
+        switch (level) {
+            case INFO:
+                printInfo(msg);
+                break;
+            case WARN:
+                printWarn(msg);
+                break;
+            case ERROR:
+                printError(msg);
+                break;
+            case DEBUG:
+                printDebug(msg);
+                break;
+            case TRACE:
+                printTrace(msg);
+        }
+    }
+
 
     /**
      * Convenience: INFO-styled line.
      */
     public static void printInfo(String msg) {
-        printlnStyled("INFO", msg, BLUE, false);
+        printlnStyled(Level.INFO, msg, BLUE, false);
     }
 
     /**
      * Convenience: WARN-styled line.
      */
     public static void printWarn(String msg) {
-            printlnStyled("WARN", msg, YELLOW, true);
+        printlnStyled(Level.WARN, msg, YELLOW, true);
     }
 
     /**
      * Convenience: ERROR-styled line.
      */
     public static void printError(String msg) {
-        printlnStyled("ERROR", msg, RED, true);
+        printlnStyled(Level.ERROR, msg, RED, true);
     }
 
     /**
      * Convenience: DEBUG-styled line.
      */
     public static void printDebug(String msg) {
-        printlnStyled("DEBUG", msg, BLUE, true);
+        printlnStyled(Level.DEBUG, msg, BLUE, true);
     }
 
     /**
      * Convenience: TRACE-styled line.
      */
     public static void printTrace(String msg) {
-        printlnStyled("TRACE", msg, BLUE, false);
+        printlnStyled(Level.TRACE, msg, BLUE, false);
     }
 
     /**
      * Same helpers, but caller can decide whether ANSI is enabled.
      */
-    public static void info(String msg, boolean useAnsiColors)  { printlnStyled("INFO",  msg, BLUE,  false, useAnsiColors); }
-    public static void warn(String msg, boolean useAnsiColors)  { printlnStyled("WARN",  msg, RED,   true,  useAnsiColors); }
-    public static void error(String msg, boolean useAnsiColors) { printlnStyled("ERROR", msg, RED,   true,  useAnsiColors); }
-    public static void debug(String msg, boolean useAnsiColors) { printlnStyled("DEBUG", msg, BLUE,  true,  useAnsiColors); }
-    public static void trace(String msg, boolean useAnsiColors) { printlnStyled("TRACE", msg, BLUE,  false, useAnsiColors); }
+    public static void info(String msg, boolean useAnsiColors) {
+        printlnStyled(Level.INFO, msg, BLUE, false, useAnsiColors);
+    }
+
+    public static void warn(String msg, boolean useAnsiColors) {
+        printlnStyled(Level.WARN, msg, RED, true, useAnsiColors);
+    }
+
+    public static void error(String msg, boolean useAnsiColors) {
+        printlnStyled(Level.ERROR, msg, RED, true, useAnsiColors);
+    }
+
+    public static void debug(String msg, boolean useAnsiColors) {
+        printlnStyled(Level.DEBUG, msg, BLUE, true, useAnsiColors);
+    }
+
+    public static void trace(String msg, boolean useAnsiColors) {
+        printlnStyled(Level.TRACE, msg, BLUE, false, useAnsiColors);
+    }
 
     /**
      * Optional block style if you want a framed message using the existing FRAME_LINE.
      */
     public static void errorBlock(String title, String msg, boolean useAnsiColors) {
-        printBlock("ERROR", title, msg, RED, true, useAnsiColors);
+        printBlock(Level.ERROR, title, msg, RED, true, useAnsiColors);
     }
 
     public static void warnBlock(String title, String msg, boolean useAnsiColors) {
-        printBlock("WARN", title, msg, RED, true, useAnsiColors);
+        printBlock(Level.WARN, title, msg, RED, true, useAnsiColors);
     }
 
     public static void infoBlock(String title, String msg, boolean useAnsiColors) {
-        printBlock("INFO", title, msg, BLUE, false, useAnsiColors);
+        printBlock(Level.INFO, title, msg, BLUE, false, useAnsiColors);
     }
 
     public static void debugBlock(String title, String msg, boolean useAnsiColors) {
-        printBlock("DEBUG", title, msg, BLUE, true, useAnsiColors);
+        printBlock(Level.DEBUG, title, msg, BLUE, true, useAnsiColors);
     }
 
     public static void traceBlock(String title, String msg, boolean useAnsiColors) {
-        printBlock("TRACE", title, msg, BLUE, false, useAnsiColors);
+        printBlock(Level.TRACE, title, msg, BLUE, false, useAnsiColors);
     }
 
     // ---------------- internals ----------------
 
-    private static void printlnStyled(String level, String msg, String color, boolean bold) {
+    private static void printlnStyled(Level level, String msg, String color, boolean bold) {
         printlnStyled(level, msg, color, bold, true);
     }
 
-    private static void printlnStyled(String level, String msg, String color, boolean bold, boolean useAnsiColors) {
+    private static void printlnStyled(Level level, String msg, String color, boolean bold, boolean useAnsiColors) {
+        if (level.ordinal() < LOG_LEVEL.ordinal())
+            return;
         String text = formatLevelLine(level, msg);
         if (!useAnsiColors) {
             System.out.println(text);
@@ -342,14 +381,16 @@ public final class WorkBookConsolePrinter {
     }
 
     private static void printBlock(
-            String level,
+            Level level,
             String title,
             String msg,
             String color,
             boolean bold,
             boolean useAnsiColors
     ) {
-        String header = (title == null || title.isBlank()) ? level : (level + ": " + title);
+        if (level.ordinal() < LOG_LEVEL.ordinal())
+            return;
+        String header = (title == null || title.isBlank()) ? level.toString() : (level + ": " + title);
 
         System.out.println();
         if (!useAnsiColors) {
@@ -369,16 +410,10 @@ public final class WorkBookConsolePrinter {
         System.out.println();
     }
 
-    private static String formatLevelLine(String level, String msg) {
+    private static String formatLevelLine(Level level, String msg) {
         String m = (msg == null) ? "" : msg;
         return "[" + level + "] " + m;
     }
-
-
-
-
-
-
 
 
 }

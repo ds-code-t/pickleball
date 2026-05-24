@@ -1,18 +1,21 @@
 Feature: Addition
 
 
+  Scenario: tterts
+    * , save "A", and save "B"
+
   Scenario: untils;dfwer34
     * , until 3==3:
     : * , save "A"
 
   Scenario Outline:
-    * , IF: 3 == 4:
+    *  IF:  3 == 4:
     : * SET "ngd" DATA TABLE
       | A |
       | 1 |
       | 2 |
       | 3 |
-    * , ELSE:
+    *  ELSE:
   : * SET "ngd" DATA TABLE
     | A |
     | 1 |

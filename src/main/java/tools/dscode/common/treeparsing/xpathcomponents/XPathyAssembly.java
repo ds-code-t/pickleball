@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static tools.dscode.common.util.debug.DebugUtils.debugFlags;
-import static tools.dscode.common.util.debug.DebugUtils.printDebug;
+import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 import static tools.dscode.common.util.debug.DebugUtils.substrings;
 
 public final class XPathyAssembly {
@@ -287,11 +287,9 @@ public final class XPathyAssembly {
      * Heuristic specificity scoring. Lower score = "more specific".
      */
     public static int xpathSpecificityScore(String xpath) {
-        printDebug("\n##SpecificityScore xpath: " + xpath);
         xpath = xpath.trim();
 
         int score = countChar(xpath, '*') * 10;
-        printDebug("##Xscore score1: " + score);
         if (xpath.startsWith("//*[preceding") || xpath.startsWith("//*[following") || xpath.startsWith("//*[ancestor") || xpath.startsWith("//*[descendant")) {
             score += 10_000_000;
             String firstTag = "";
@@ -312,13 +310,11 @@ public final class XPathyAssembly {
             }
         }
 
-        printDebug("##Xscore score2: " + score);
 
         if (!xpath.startsWith("//*")) {
             score -= 10_000_000;
         }
 
-        printDebug("##Xscore score3: " + score);
         String noSpace = xpath
                 .replaceAll("\\b(?:or|body)\\b|\\|", match1s)
                 .replaceAll("(?:\\b::text|count|not|descendant|ancestor|preceding|following\\b)|//", match2s)
@@ -330,19 +326,16 @@ public final class XPathyAssembly {
         score += countChar(noSpace, match2) * 500;
         score += countChar(noSpace, match3) * 100;
 
-        printDebug("##Xscore score4: " + score);
 
         if (noSpace.contains("//*[not")) {
             score += 50_000;
         }
-        printDebug("##Xscore score5: " + score);
 
         if (noSpace.contains("'opacity:0'")) {
             score += 10_000_000;
         }
 
-        printDebug("##Xscore final: " + score);
-        printDebug("##SpecificityScore score final: " + score);
+        logTrace("xpathSpecificityScore xpath: " + xpath + " , score: " + score);
 
         return Math.max(score, 0);
     }
