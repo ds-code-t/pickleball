@@ -113,7 +113,7 @@ Feature: Addition
     * , save "qqq" as "A"
     * , save "qqq" as "A"
 
-    @testr
+  @testr
   Scenario: nesting log test 12
     When , if 1 == 2 , save "BBB"
     When , if 1,2,3, or 4 is 3?
@@ -337,10 +337,10 @@ Feature: Addition
     * , save "<A>1" as "A"
 
   Scenario: ssif test1
-    * , if "222" is "111", or "3222" is "222":
+    * , until "2225" , or "3222" is "222":
   :   * , save "<A><X>" as "A"
-    * , until "222" is "111", or "3222" is "222":
-  :   * , save "<A><X>" as "A"
+  : * , until "222" is "111", or "3222" is "222":
+  ::   * , save "<A><X>" as "A"
 
   Scenario: if test1
     * , if "222" is "111", or "2s22" is "222":

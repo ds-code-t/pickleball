@@ -611,7 +611,7 @@ public final class DefinitionContext {
                             XPathy.from("//*[self::th or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)]")
                     );
 
-            category("Cell").children("Cells").inheritsFrom("cellLabel")
+            category("Cell").children("Cells").andAnyCategories("cellLabel" , CONTAINS_TEXT)
                     .and((category, v, op) ->
                             XPathy.from("//*[self::td or @role='cell' or @role='gridcell' or self::*" + customElementSuffixPredicate("cell") + " ][not(descendant::table)][not(self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + ")][not(self::th or @role='columnheader' or @role='rowheader') ]")
                     );
