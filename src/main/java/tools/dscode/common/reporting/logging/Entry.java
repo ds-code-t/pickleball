@@ -13,6 +13,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
+import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.reporting.WorkBookConsolePrinter.PrintStyle.DIM;
 import static tools.dscode.common.reporting.WorkBookConsolePrinter.PrintStyle.HEADER;
 import static tools.dscode.common.reporting.WorkBookConsolePrinter.PrintStyle.LEVEL;
@@ -57,7 +58,7 @@ public class Entry {
     private final AtomicLong seqGen;
 
     private Entry(String text, Entry parent, AtomicLong seqGen, boolean threadSafe) {
-        this.text = text;
+        this.text = text.replaceAll(BOOK_END,"");
         this.parent = parent;
         this.seqGen = seqGen;
         this.threadSafe = threadSafe;
