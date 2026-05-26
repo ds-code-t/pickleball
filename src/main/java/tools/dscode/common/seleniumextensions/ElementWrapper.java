@@ -23,6 +23,7 @@ import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementMatch.ELEMENT_RETURN_VALUE;
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
+import static tools.dscode.common.util.debug.DebugUtils.substrings;
 
 
 public class ElementWrapper {
@@ -65,7 +66,8 @@ public class ElementWrapper {
         this.element = Objects.requireNonNull(element, "element must not be null");
 
         takeSnapshot();
-
+        if(substrings.contains("elementsnapshot"))
+            System.out.println(attributeSnapshot.toPrettyString());
 
         // Build the persistent locating XPath (no JS).
         // Uses default attribute priority when varargs are omitted.
@@ -86,9 +88,18 @@ public class ElementWrapper {
         attributeSnapshot.put("tagName", tagName);
 
         // textContent (DOM text, not just visible text)
-        String textContent = (String) js.executeScript(
-                "return arguments[0].innerText;", element
-        );
+        String textContent;
+        if("textarea".equals(tagName) || "input".equals(tagName) || "select".equals(tagName)) {
+            textContent  = element.getAttribute("value");
+        }
+        else {
+            textContent = (String) js.executeScript(
+                    "return arguments[0].innerText;", element
+            );
+            if(textContent == null || textContent.isEmpty()) {
+                textContent = element.getAttribute("value");
+            }
+        }
         attributeSnapshot.put("textContent", textContent == null ? "" : textContent);
 
         List<WebElement> children = withoutImplicitWait(driver, () -> element.findElements(By.xpath("./*[@selected]")));
