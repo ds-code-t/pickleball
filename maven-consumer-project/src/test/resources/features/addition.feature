@@ -1,7 +1,15 @@
 Feature: Addition
 
 
+  Scenario: display TExt test2
+    * , verify "Second Value:" Textbox is displayed
+    * , verify "First Value:" , and "Second Value:" Textboxes are displayed
+#    * , verify "First Value:" Textbox is displayed
+#    * , verify "Second Value:" Textbox is displayed
+
+
   Scenario: tterts
+
     * , save "A", and save "B"
     * , if 1 equals 3 , save "C"
 

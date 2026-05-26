@@ -307,6 +307,127 @@ public class ElementMatch {
 
     }
 
+    public ElementMatch(PhraseData phraseData, ElementMatch elementMatch) {
+        this.fullText = elementMatch.fullText;
+
+        this.parentPhrase = phraseData;
+        this.startIndex = elementMatch.startIndex;
+        this.position = elementMatch.position;
+        this.state = elementMatch.state;
+
+        this.category = elementMatch.category;
+        this.elementTypes = new HashSet<>(elementMatch.elementTypes);
+        this.elementPosition = elementMatch.elementPosition;
+        this.selectionType = elementMatch.selectionType;
+        this.valueTypes = elementMatch.valueTypes == null
+                ? Collections.emptyList()
+                : elementMatch.valueTypes.stream().sorted(Comparator.reverseOrder()).toList();
+
+        this.textOps.addAll(elementMatch.textOps);
+
+        this.categoryFlags.addAll(getExecutionDictionary().getResolvedCategoryFlags(category));
+        this.attributes.addAll(elementMatch.attributes);
+
+        if (!textOps.isEmpty()) {
+            defaultText = textOps.getFirst().text;
+            defaultTextOp = textOps.getFirst().op;
+        }
+
+        if (elementTypes.contains(ElementType.HTML_TYPE)) {
+            if (categoryFlags.contains(ExecutionDictionary.CategoryFlags.IFRAME)) {
+                elementTypes.add(ElementType.HTML_IFRAME);
+            } else if (categoryFlags.contains(ExecutionDictionary.CategoryFlags.SHADOW_HOST)) {
+                elementTypes.add(ElementType.HTML_SHADOW_ROOT);
+            } else {
+                elementTypes.add(ElementType.HTML_ELEMENT);
+                elementTypes.add(RETURNS_VALUE);
+                if (category.matches("Options?"))
+                    elementTypes.add(HTML_OPTION);
+                else if (category.matches("Dropdowns?"))
+                    elementTypes.add(HTML_DROPDOWN);
+            }
+        } else if (elementTypes.contains(ElementType.DATA_TYPE)) {
+
+        } else if (elementTypes.contains(ElementType.VALUE_TYPE)) {
+            nonHTMLValues.add(defaultText);
+            elementTypes.add(RETURNS_VALUE);
+        }
+
+        if (!elementTypes.contains(ElementType.HTML_TYPE)) {
+            return;
+        }
+
+        ExecutionDictionary dict = getExecutionDictionary();
+        List<XPathy> elPredictXPaths = new ArrayList<>();
+
+        if (textOps.isEmpty()) {
+            ExecutionDictionary.CategoryResolution categoryResolution =
+                    dict.getFinalCategoryResolution(category, null, null);
+            elPredictXPaths.add(categoryResolution.xpath());
+        }
+
+        for (TextOp textOp : textOps) {
+            ExecutionDictionary.CategoryResolution categoryResolution =
+                    dict.getFinalCategoryResolution(category, textOp.text, textOp.op);
+            elPredictXPaths.add(categoryResolution.xpath());
+        }
+
+        if (!state.isEmpty()) {
+            boolean un = state.startsWith("un") || state.startsWith("non");
+
+            if (un) state = state.replaceAll("^(?:un|non-?)", "");
+
+            switch (state) {
+                case "checked", "selected" -> {
+                    elPredictXPaths.add(un ? offElement() : onElement());
+                }
+                case "blank", "empty" -> {
+                    elPredictXPaths.add(un ? nonBlankElement() : blankElement());
+                }
+                case "disabled" -> {
+                    elPredictXPaths.add(un
+                            ? EnabledDisabledConditions.enabledElement()
+                            : EnabledDisabledConditions.disabledElement());
+                }
+                case "enabled" -> {
+                    elPredictXPaths.add(un
+                            ? EnabledDisabledConditions.disabledElement()
+                            : EnabledDisabledConditions.enabledElement());
+                }
+                case "required" -> {
+                    elPredictXPaths.add(un
+                            ? RequiredInputConditions.notRequiredElement()
+                            : RequiredInputConditions.requiredElement());
+                }
+                case "expanded", "open" -> {
+                    elPredictXPaths.add(un
+                            ? CollapsedExpandedConditions.collapsedElement()
+                            : CollapsedExpandedConditions.expandedElement());
+                }
+                case "collapsed", "closed" -> {
+                    elPredictXPaths.add(un
+                            ? CollapsedExpandedConditions.expandedElement()
+                            : CollapsedExpandedConditions.collapsedElement());
+                }
+                default -> {
+                    throw new RuntimeException("Unknown state: " + state);
+                }
+            }
+        }
+
+        xPathy = combineAnd(elPredictXPaths);
+
+        for (Attribute attribute : attributes) {
+            xPathy = applyAttrPredicate(
+                    xPathy,
+                    attribute.attrName,
+                    attribute.predicateVal,
+                    attribute.predicateType
+            );
+        }
+    }
+
+
 
     public String getMatchElementStringValue() {
         List<ValueWrapper> values = getValues();
