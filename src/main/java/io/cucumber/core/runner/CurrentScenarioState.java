@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.GlobalState.pickleballLog;
@@ -53,6 +54,8 @@ import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.assertions.AssertionChain.copyAssertionChainToNewPhrase;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
+import static tools.dscode.common.reporting.logging.LogForwarder.logSkip;
+import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry;
 import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultLoggingLevel;
 import static tools.dscode.common.treeparsing.preparsing.ParsedLine.createParsedLine;
 import static tools.dscode.common.util.Reflect.getProperty;
@@ -173,7 +176,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 //        if(logToReportPortal)
 //            scenarioLog.on(new ReportPortalBridgeConverter());
-
+        setDefaultEntry(scenarioLog);
         scenarioLog.start();
         scenarioLog.info(toHumanReadableString());
         scenarioLog.info(getOptionsString());
@@ -300,6 +303,7 @@ public class CurrentScenarioState extends ScenarioMapping {
             if (stepExtension.nextSibling != null) {
                 runStep((StepExtension) stepExtension.nextSibling);
             }
+            logSkip("Skipping Step: " + stepExtension.pickleStepTestStep.getStepText());
             return;
         }
 
@@ -310,7 +314,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         } else {
             result = stepExtension.run();
         }
-
+        setDefaultEntry(scenarioLog);
         if (!stepExtension.lineData.inheritancePhrases.isEmpty())
             stepExtension.inheritancePhrase = stepExtension.lineData.inheritancePhrases.getFirst();
 

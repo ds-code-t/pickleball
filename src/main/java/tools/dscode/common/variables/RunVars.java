@@ -70,7 +70,7 @@ public class RunVars extends NodeMap {
             return null;
         }
         String key = varName.startsWith(PKB_PREFIX) ? varName : PKB_PREFIX + varName.toLowerCase(Locale.ROOT);
-        Object returnObj = getSingletonMap().getByNormalizedPath(key);
+        Object returnObj = getSingletonMap() == null ? null : getSingletonMap().getByNormalizedPath(key);
         if (returnObj == null) returnObj = resolveProperty(key);
         if (returnObj instanceof List list) {
             if (list.isEmpty())

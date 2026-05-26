@@ -8,6 +8,9 @@ import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningPhrase;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.pickleballLog;
+//import static tools.dscode.common.reporting.WorkBookConsolePrinter.printCrossedOut;
+//import static tools.dscode.common.reporting.WorkBookConsolePrinter.printError;
+//import static tools.dscode.common.reporting.WorkBookConsolePrinter.printInfo;
 
 public class LogForwarder {
 
@@ -18,6 +21,8 @@ public class LogForwarder {
     private static final ThreadLocal<Level> threadLocalLevel = ThreadLocal.withInitial(() -> Level.INFO);
 
     public static Entry getDefaultEntry() {
+        if (threadLocalEntry.get() == null)
+            threadLocalEntry.set(closestEntryToScenario());
         return threadLocalEntry.get();
     }
 
@@ -33,6 +38,24 @@ public class LogForwarder {
         threadLocalLevel.set(level);
     }
 
+//    static Entry logWithLevelAndStatus(String message, Entry entry, Level level, Status status) {
+//        Level logLevel = level == null ? getDefaultLoggingLevel() : level;
+//        Status logStatus = status == null ? Status.PASS : status;
+//        Entry parentEntry = entry == null ? getDefaultEntry() : entry;
+//        return parentEntry.guarded(() -> {
+//            switch (status)
+//            {
+//                case PASS -> printInfo(message);
+//                case FAIL -> printError(message);
+//                case SKIP -> printCrossedOut(message);
+//                case UNKNOWN -> printInfo(message);
+//            }
+//            printInfo(message);
+//            parentEntry.log(logLevel, logStatus, message);
+//            return parentEntry;
+//        });
+//    }
+
     public static void logToDefaultLevel(String message) {
         switch (getDefaultLoggingLevel()) {
             case TRACE -> logTrace(message);
@@ -46,29 +69,32 @@ public class LogForwarder {
     public static boolean globalStateInitialized = false;
 
     public static Entry logTrace(String message) {
-        return threadLocalEntry.get().trace(message);
+        return getDefaultEntry().trace(message);
     }
 
     public static Entry logDebug(String message) {
-        return threadLocalEntry.get().debug(message);
+        return getDefaultEntry().debug(message);
     }
 
     public static Entry logInfo(String message) {
-        return threadLocalEntry.get().info(message);
+        return getDefaultEntry().info(message);
     }
 
     public static Entry logWarn(String message) {
-        return threadLocalEntry.get().warn(message);
+        return getDefaultEntry().warn(message);
     }
 
     public static Entry logError(String message) {
-        return threadLocalEntry.get().error(message);
+        return getDefaultEntry().error(message);
     }
 
     public static Entry logFail(String message) {
-        return threadLocalEntry.get().fail(message);
+        return getDefaultEntry().fail(message);
     }
 
+    public static Entry logSkip(String message) {
+        return getDefaultEntry().logSkipped(message);
+    }
 
 
     public static Entry closestEntryToScenario() {

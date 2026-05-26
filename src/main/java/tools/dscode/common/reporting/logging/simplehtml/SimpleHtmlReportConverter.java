@@ -21,12 +21,18 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static tools.dscode.common.reporting.logging.LogForwarder.logError;
+import static tools.dscode.common.variables.RunVars.resolveFromVarsOrDefault;
+
 /**
- * Always generates a single, tabbed HTML report for the entire Cucumber run (parallel-safe):
- * - A MAIN tab with an overview spreadsheet of all scenarios (using RowData headers/values).
- * - One tab per scenario with full tree/log/attachments + scenario summary table.
+ * Generates HTML reports for the Cucumber run (parallel-safe):
+ * - compositeReport: one tabbed HTML report for the full run.
+ * - scenarioReport: one standalone HTML report per included scenario.
+ * - scenarioReport,compositeReport: writes both outputs.
  */
 public final class SimpleHtmlReportConverter extends BaseConverter {
+
+    private static final String DEBUG_VERSION = "2026-05-26-v5-compile-fix-project-root-paths";
 
     private final Object lock = new Object();
 
@@ -57,23 +63,17 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
         if (SharedSingleFile.REPORT_FILE == null) {
             SharedSingleFile.REPORT_FILE = resolveSingleFileOutput(reportFile);
+            debug("constructor initialized SharedSingleFile.REPORT_FILE=" + abs(SharedSingleFile.REPORT_FILE));
         }
     }
 
     private static Path resolveSingleFileOutput(Path perScenarioReportFile) {
-        String p = System.getProperty("pickleball.simplehtml.singleFile.path");
-        if (p == null || p.isBlank()) p = System.getenv("PICKLEBALL_SIMPLEHTML_SINGLEFILE_PATH");
-        if (p != null && !p.isBlank()) {
-            try {
-                return Path.of(p.trim());
-            } catch (Throwable ignored) {
-            }
-        }
-
         Path dir = (perScenarioReportFile != null && perScenarioReportFile.getParent() != null)
                 ? perScenarioReportFile.getParent()
                 : Path.of(".");
-        return dir.resolve("cucumber-report.html");
+        Path out = dir.resolve("cucumber-report.html").normalize();
+        debug("resolveSingleFileOutput default=" + abs(out));
+        return out;
     }
 
     @Override
@@ -83,15 +83,27 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         synchronized (lock) {
             try {
                 synchronized (SharedSingleFile.LOCK) {
+                    debug("onClose localScopeCount=" + scopes.size());
                     for (ScopeState s : scopes.values()) {
-                        String key = (s.rowKey != null && !s.rowKey.isBlank()) ? s.rowKey : s.rootId;
+                        String key = scopeAggregationKey(s);
 
-                        if (key == null) continue;
-                        SharedSingleFile.ALL_SCOPES.put(key, deepCopyScopeState(s));
+                        if (key == null) {
+                            debug("onClose skipping scope because aggregation key is null rootId=" + (s == null ? "null" : s.rootId));
+                            continue;
+                        }
+
+                        ScopeState copy = deepCopyScopeState(s);
+                        ScopeState previous = SharedSingleFile.ALL_SCOPES.put(key, copy);
+                        debug("onClose stored scope key=" + key
+                                + " replacedExisting=" + (previous != null)
+                                + " rootId=" + copy.rootId
+                                + " rowKey=" + copy.rowKey
+                                + " includeInSummary=" + copy.includeInSummary
+                                + " title='" + scenarioTitle(copy, 0) + "'");
                     }
                 }
             } catch (Throwable e) {
-                System.err.println("[SimpleHtmlReportConverter] FAILED onClose: " + e);
+                logError("[SimpleHtmlReportConverter] FAILED onClose: " + e);
             }
         }
     }
@@ -133,8 +145,20 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     }
 
     /**
-     * Writes the combined, tabbed HTML report to the default single-file output location.
-     * This must be called explicitly by external code once the entire Cucumber run is complete.
+     * Writes report output based on the global HTMLreportFormat setting.
+     *
+     * Rules:
+     * - null / blank / contains "compositeReport" => write composite tabbed report
+     * - contains "scenarioReport" => write one report per scenario
+     * - contains both => write both
+     *
+     * Optional output overrides:
+     * - HTMLcompositeReportPath
+     * - HTMLscenarioReportPathTemplate
+     *
+     * Supported template tokens:
+     * - <SCENARIO_NAME>
+     * - <TIME>
      */
     public static void writeFinalReport() {
         Path out;
@@ -146,41 +170,622 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     }
 
     /**
-     * Writes the combined, tabbed HTML report to {@code outFile}.
-     * This must be called explicitly by external code once the entire Cucumber run is complete.
+     * Writes report output based on the global HTMLreportFormat setting.
+     *
+     * Example HTMLreportFormat values:
+     * - null
+     * - ""
+     * - "compositeReport"
+     * - "scenarioReport"
+     * - "scenarioReport,compositeReport"
      */
     public static void writeFinalReport(Path outFile) {
         if (outFile == null) outFile = Path.of("cucumber-report.html");
 
+        debug("VERSION " + DEBUG_VERSION + " writeFinalReport entered outFile=" + abs(outFile));
+
+        ReportFormat format = resolveReportFormat();
+        Instant runTime = Instant.now();
+        Path compositeOutFile = resolveCompositeReportPath(outFile, runTime);
+
         synchronized (SharedSingleFile.LOCK) {
-            SharedSingleFile.REPORT_FILE = outFile;
+            SharedSingleFile.REPORT_FILE = compositeOutFile;
         }
 
+        debug("writeFinalReport requestedOutFile=" + abs(outFile));
+        debug("writeFinalReport resolvedCompositeOutFile=" + abs(compositeOutFile));
+        debug("writeFinalReport formatRaw='" + format.rawValue + "' normalized='" + format.normalizedValue
+                + "' source='" + format.source + "' composite=" + format.compositeReport + " scenario=" + format.scenarioReport);
+        debugSharedSnapshot("before writeFinalReport");
+
         try {
-            // Use a lightweight instance to reuse the existing (instance) rendering code that depends on BaseConverter.rowData(...).
-            new SimpleHtmlReportConverter(outFile).writeCombinedReport(outFile);
+            SimpleHtmlReportConverter writer = new SimpleHtmlReportConverter(compositeOutFile);
+
+            if (format.compositeReport) {
+                writer.writeCombinedReport(compositeOutFile);
+            } else {
+                debug("composite report disabled by HTMLreportFormat");
+            }
+
+            if (format.scenarioReport) {
+                writer.writeScenarioReports(outFile, runTime);
+            } else {
+                debug("scenario reports disabled by HTMLreportFormat");
+            }
+
         } catch (Throwable ex) {
-            System.err.println("[SimpleHtmlReportConverter] FAILED writing combined report: " + ex);
+            logError("[SimpleHtmlReportConverter] FAILED writing html report: " + ex);
         }
     }
 
+    private static ReportFormat resolveReportFormat() {
+        VarValue raw = readReportVariable("HTMLreportFormat",
+                "HTMLReportFormat",
+                "htmlReportFormat",
+                "htmlreportformat",
+                "HTML_REPORT_FORMAT");
+
+        String value = raw.value();
+        String source = raw.source();
+
+        if (value.isBlank()) {
+            VarValue inferred = inferHtmlReportFormatFromSharedScopes();
+            value = inferred.value();
+            source = inferred.source();
+        }
+
+        String normalized = normalizeReportFormatValue(value);
+        boolean blank = normalized.isBlank();
+        String lower = normalized.toLowerCase(Locale.ROOT);
+
+        boolean composite = blank || lower.contains("compositereport");
+        boolean scenario = lower.contains("scenarioreport");
+
+        return new ReportFormat(value, normalized, source, composite, scenario);
+    }
+
+    private record ReportFormat(String rawValue, String normalizedValue, String source, boolean compositeReport, boolean scenarioReport) {
+    }
+
+    private record VarValue(String value, String source) {
+    }
+
+    private static Path resolveCompositeReportPath(Path defaultOutFile, Instant runTime) {
+        Path fallback = normalizeReportPath(defaultOutFile == null ? Path.of("cucumber-report.html") : defaultOutFile);
+        Path projectRoot = projectRootFromDefaultOutFile(fallback);
+
+        VarValue override = readReportVariable("HTMLcompositeReportPath",
+                "HTMLCompositeReportPath",
+                "htmlCompositeReportPath",
+                "htmlcompositereportpath",
+                "HTML_COMPOSITE_REPORT_PATH");
+
+        if (override.value().isBlank()) {
+            debug("resolveCompositeReportPath no override; using fallback=" + abs(fallback)
+                    + " projectRoot=" + abs(projectRoot));
+            return fallback;
+        }
+
+        Path resolved = resolveTemplatedReportPath(projectRoot, override.value(), "composite", runTime);
+        debug("resolveCompositeReportPath override source='" + override.source() + "' template='" + override.value()
+                + "' projectRoot=" + abs(projectRoot) + " resolved=" + abs(resolved));
+        return resolved;
+    }
 
     private void writeCombinedReport(Path outFile) throws IOException {
-        Map<String, ScopeState> snapshot = new LinkedHashMap<>();
+        Map<String, ScopeState> snapshot = snapshotAllScopes();
 
-        synchronized (SharedSingleFile.LOCK) {
-            for (Map.Entry<String, ScopeState> e : SharedSingleFile.ALL_SCOPES.entrySet()) {
-                snapshot.put(e.getKey(), deepCopyScopeState(e.getValue()));
-            }
-        }
+        debug("writeCombinedReport outFile=" + outFile.toAbsolutePath() + " scopeCount=" + snapshot.size());
+        debugSnapshot("combined", snapshot);
 
         if (outFile.getParent() != null) Files.createDirectories(outFile.getParent());
 
         String html = renderHtmlDocument(snapshot, outFile);
         Files.writeString(outFile, html, StandardCharsets.UTF_8);
 
-        System.out.println("[SimpleHtmlReportConverter] wrote combined: " + outFile.toAbsolutePath());
+        debug("wrote combined: " + outFile.toAbsolutePath());
     }
+
+    private void writeScenarioReports(Path defaultOutFile, Instant runTime) throws IOException {
+        Map<String, ScopeState> snapshot = snapshotAllScopes();
+
+        Path fallback = normalizeReportPath(defaultOutFile == null ? Path.of("cucumber-report.html") : defaultOutFile);
+        Path projectRoot = projectRootFromDefaultOutFile(fallback);
+
+        VarValue rawTemplate = readReportVariable("HTMLscenarioReportPathTemplate",
+                "HTMLScenarioReportPathTemplate",
+                "htmlScenarioReportPathTemplate",
+                "htmlscenarioreportpathtemplate",
+                "HTML_SCENARIO_REPORT_PATH_TEMPLATE");
+        String template = rawTemplate.value().isBlank() ? "reports/scenario-reports/<SCENARIO_NAME>.html" : rawTemplate.value();
+
+        debug("writeScenarioReports defaultOutFile=" + abs(fallback));
+        debug("writeScenarioReports projectRoot=" + abs(projectRoot));
+        debug("writeScenarioReports template='" + template + "' source='" + rawTemplate.source() + "'");
+        debugSnapshot("scenario source", snapshot);
+
+        int written = 0;
+        Set<Path> pathsWrittenThisCall = new LinkedHashSet<>();
+
+        List<ScopeState> scenarios = new ArrayList<>(snapshot.values());
+        scenarios.sort(Comparator.comparing(SimpleHtmlReportConverter::scopeSortKey));
+
+        for (ScopeState s : scenarios) {
+            if (s == null) {
+                debug("writeScenarioReports skipping null scope");
+                continue;
+            }
+            if (!s.includeInSummary) {
+                debug("writeScenarioReports skipping excluded scope rootId=" + s.rootId + " rowKey=" + s.rowKey);
+                continue;
+            }
+
+            HtmlNode root = s.nodes.get(s.rootId);
+            if (root == null) {
+                debug("writeScenarioReports skipping scope with missing root rootId=" + s.rootId + " rowKey=" + s.rowKey);
+                continue;
+            }
+
+            String scenarioName = scenarioTitle(s, written + 1);
+            Instant scenarioTime = scenarioStartTime(s, runTime);
+
+            Path scenarioFile = resolveScenarioReportPath(projectRoot, template, scenarioName, scenarioTime);
+            debug("resolved scenario candidate: name='" + scenarioName + "' candidate=" + abs(scenarioFile));
+            scenarioFile = uniqueReportPath(scenarioFile, pathsWrittenThisCall);
+
+            if (scenarioFile.getParent() != null) Files.createDirectories(scenarioFile.getParent());
+
+            ScopeState oneScenario = deepCopyScopeState(s);
+            String html = renderScenarioHtmlDocument(oneScenario, scenarioFile);
+            Files.writeString(scenarioFile, html, StandardCharsets.UTF_8);
+
+            pathsWrittenThisCall.add(scenarioFile.toAbsolutePath().normalize());
+            written++;
+
+            debug("wrote scenario: name='" + scenarioName + "' rowKey=" + s.rowKey + " rootId=" + s.rootId + " file=" + scenarioFile.toAbsolutePath());
+        }
+
+        debug("wrote scenario reports: " + written + " file(s)");
+    }
+
+    private static Path resolveScenarioReportPath(Path baseDir, String template, String scenarioName, Instant scenarioTime) {
+        return resolveTemplatedReportPath(baseDir, template, scenarioName, scenarioTime);
+    }
+
+    /**
+     * Decoupled template resolver for all report output paths.
+     * Replaces <SCENARIO_NAME> and <TIME>, then resolves relative paths against baseDir.
+     */
+    private static Path resolveTemplatedReportPath(Path baseDir, String template, String scenarioName, Instant time) {
+        String resolved = substituteReportPathTemplate(template, scenarioName, time);
+        Path path = Path.of(resolved);
+        if (path.isAbsolute()) return path.normalize();
+
+        Path base = normalizeReportPath(baseDir == null ? Path.of(".") : baseDir);
+
+        // Prevent accidental reports/reports/cucumber-report.html when the caller passed
+        // baseDir=reports and the template/default already starts with reports/.
+        if (startsWithSameSingleDirectory(base, path)) {
+            Path parent = base.getParent();
+            Path fixed = (parent == null ? Path.of(".") : parent).resolve(path).normalize();
+            debug("resolveTemplatedReportPath avoided duplicate base directory baseDir=" + abs(base)
+                    + " template='" + template + "' resolved=" + abs(fixed));
+            return fixed;
+        }
+
+        return base.resolve(path).normalize();
+    }
+
+    /**
+     * Decoupled string-only template substitution.
+     * Keeps file/path generation separate from report rendering.
+     */
+    private static String substituteReportPathTemplate(String template, String scenarioName, Instant time) {
+        String t = template == null || template.isBlank() ? "<SCENARIO_NAME>.html" : template.trim();
+        String safeScenario = safeFilePart(scenarioName == null || scenarioName.isBlank() ? "scenario" : scenarioName);
+        String safeTime = safeFilePart(reportTimeToken(time));
+
+        String resolved = t
+                .replace("<SCENARIO_NAME>", safeScenario)
+                .replace("<TIME>", safeTime);
+
+        if (!resolved.toLowerCase(Locale.ROOT).endsWith(".html") && !resolved.toLowerCase(Locale.ROOT).endsWith(".htm")) {
+            resolved = resolved + ".html";
+        }
+
+        return resolved;
+    }
+
+    private static VarValue readReportVariable(String... names) {
+        if (names == null || names.length == 0) return new VarValue("", "missing-name");
+
+        VarValue fromRunVars = new VarValue("", "default");
+        for (String name : names) {
+            if (name == null || name.isBlank()) continue;
+            try {
+                Object raw = resolveFromVarsOrDefault(name, null);
+                String value = raw == null ? "" : String.valueOf(raw).trim();
+                debug("readReportVariable RunVars lookup name='" + name + "' value='" + value + "'");
+                if (!value.isBlank()) {
+                    fromRunVars = new VarValue(value, "RunVars:" + name);
+                    break;
+                }
+            } catch (Throwable ex) {
+                debug("readReportVariable RunVars lookup failed name='" + name + "' error=" + ex);
+            }
+        }
+
+        VarValue fromTitle = readReportVariableFromRunTitle(names);
+
+        if (!fromTitle.value().isBlank()) {
+            if (fromRunVars.value().isBlank()) return fromTitle;
+
+            String rv = normalizeReportFormatValue(fromRunVars.value());
+            String tv = normalizeReportFormatValue(fromTitle.value());
+            if (!rv.equals(tv)) {
+                debug("readReportVariable using run-title value because it differs from RunVars: runVars='"
+                        + fromRunVars.value() + "' source='" + fromRunVars.source()
+                        + "' title='" + fromTitle.value() + "' source='" + fromTitle.source() + "'");
+                return new VarValue(fromTitle.value(), fromTitle.source() + ";overrode=" + fromRunVars.source());
+            }
+        }
+
+        return fromRunVars;
+    }
+
+    private static VarValue readReportVariableFromRunTitle(String... names) {
+        synchronized (SharedSingleFile.LOCK) {
+            for (ScopeState s : SharedSingleFile.ALL_SCOPES.values()) {
+                HtmlNode root = s == null || s.nodes == null ? null : s.nodes.get(s.rootId);
+                String title = normalizeNodeTitle(root == null ? "" : root.title);
+                if (title.isBlank()) continue;
+
+                for (String name : names) {
+                    String found = extractKeyValueFromRunTitle(title, name);
+                    if (!found.isBlank()) {
+                        debug("readReportVariable found in run title name='" + name + "' value='" + found + "'");
+                        return new VarValue(found, "run-title:" + name);
+                    }
+                }
+            }
+        }
+        return new VarValue("", "default");
+    }
+
+    private static String normalizeReportFormatValue(String raw) {
+        if (raw == null) return "";
+        String s = raw.trim();
+        while ((s.startsWith("\"") && s.endsWith("\""))
+                || (s.startsWith("'") && s.endsWith("'"))) {
+            if (s.length() < 2) break;
+            s = s.substring(1, s.length() - 1).trim();
+        }
+        return s;
+    }
+
+    private static VarValue inferHtmlReportFormatFromSharedScopes() {
+        VarValue v = readReportVariableFromRunTitle("HTMLreportFormat",
+                "HTMLReportFormat",
+                "htmlReportFormat",
+                "htmlreportformat",
+                "HTML_REPORT_FORMAT");
+        return v.value().isBlank() ? new VarValue("", "default") : v;
+    }
+
+    private static String extractHtmlReportFormatFromScope(ScopeState s) {
+        if (s == null) return "";
+        HtmlNode root = s.nodes == null ? null : s.nodes.get(s.rootId);
+        String title = normalizeNodeTitle(root == null ? "" : root.title);
+        return extractKeyValueFromRunTitle(title, "HTMLreportFormat");
+    }
+
+    private static String extractKeyValueFromRunTitle(String title, String key) {
+        if (title == null || title.isBlank() || key == null || key.isBlank()) return "";
+
+        String lowerTitle = title.toLowerCase(Locale.ROOT);
+        String lowerKey = key.toLowerCase(Locale.ROOT);
+        int keyAt = lowerTitle.indexOf(lowerKey);
+
+        while (keyAt >= 0) {
+            boolean startsClean = keyAt == 0 || !Character.isLetterOrDigit(title.charAt(keyAt - 1));
+            int afterKey = keyAt + key.length();
+            boolean endsClean = afterKey >= title.length() || !Character.isLetterOrDigit(title.charAt(afterKey));
+
+            int eqAt = afterKey;
+            while (eqAt < title.length() && Character.isWhitespace(title.charAt(eqAt))) eqAt++;
+
+            if (startsClean && endsClean && eqAt < title.length() && title.charAt(eqAt) == '=') {
+                int start = eqAt + 1;
+                while (start < title.length() && Character.isWhitespace(title.charAt(start))) start++;
+                if (start >= title.length()) return "";
+
+                char quote = title.charAt(start);
+                if (quote == '\'' || quote == '"') {
+                    int endQuote = title.indexOf(quote, start + 1);
+                    if (endQuote > start) return title.substring(start + 1, endQuote).trim();
+                }
+
+                int end = findEndOfRunTitleValue(title, start);
+                return title.substring(start, end).trim();
+            }
+
+            keyAt = lowerTitle.indexOf(lowerKey, keyAt + 1);
+        }
+
+        return "";
+    }
+
+    private static int findEndOfRunTitleValue(String title, int start) {
+        int end = title.length();
+        for (int i = start; i < title.length() - 2; i++) {
+            if (title.charAt(i) != ',') continue;
+
+            int j = i + 1;
+            while (j < title.length() && Character.isWhitespace(title.charAt(j))) j++;
+            if (j >= title.length()) return i;
+
+            int k = j;
+            while (k < title.length()) {
+                char c = title.charAt(k);
+                if (Character.isLetterOrDigit(c) || c == '_' || c == '-') k++;
+                else break;
+            }
+
+            int m = k;
+            while (m < title.length() && Character.isWhitespace(title.charAt(m))) m++;
+            if (k > j && m < title.length() && title.charAt(m) == '=') {
+                end = i;
+                break;
+            }
+        }
+        return end;
+    }
+
+    private static Path projectRootFromDefaultOutFile(Path defaultOutFile) {
+        Path p = normalizeReportPath(defaultOutFile == null ? Path.of(".") : defaultOutFile);
+        Path parent = p.getParent();
+        if (parent != null && parent.getFileName() != null
+                && "reports".equalsIgnoreCase(parent.getFileName().toString())) {
+            Path root = parent.getParent();
+            if (root != null) return root.normalize();
+        }
+
+        try {
+            Path cwd = Path.of("").toAbsolutePath().normalize();
+            debug("projectRootFromDefaultOutFile using cwd=" + cwd + " for defaultOutFile=" + abs(defaultOutFile));
+            return cwd;
+        } catch (Throwable ignored) {
+            return Path.of(".");
+        }
+    }
+
+    private static Path normalizeReportPath(Path path) {
+        return (path == null ? Path.of(".") : path).normalize();
+    }
+
+    private static boolean startsWithSameSingleDirectory(Path baseDir, Path relativePath) {
+        if (baseDir == null || relativePath == null || relativePath.isAbsolute()) return false;
+        if (baseDir.getFileName() == null || relativePath.getNameCount() == 0) return false;
+        return baseDir.getFileName().toString().equals(relativePath.getName(0).toString());
+    }
+
+    private static String abs(Path path) {
+        if (path == null) return "null";
+        try {
+            return path.toAbsolutePath().normalize().toString();
+        } catch (Throwable ignored) {
+            return String.valueOf(path);
+        }
+    }
+
+    private static String reportTimeToken(Instant time) {
+        Instant t = time == null ? Instant.now() : time;
+
+        return DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")
+                .withZone(ZoneId.systemDefault())
+                .format(t);
+    }
+
+    private static Path uniqueReportPath(Path preferred, Set<Path> pathsWrittenThisCall) {
+        if (preferred == null) preferred = Path.of("scenario.html");
+
+        Path normalized = preferred.toAbsolutePath().normalize();
+        if (pathsWrittenThisCall == null || !pathsWrittenThisCall.contains(normalized)) {
+            return preferred;
+        }
+
+        Path parent = preferred.getParent() == null ? Path.of(".") : preferred.getParent();
+        String name = preferred.getFileName() == null ? "scenario.html" : preferred.getFileName().toString();
+        String base = fileBaseName(name);
+        String ext = fileExtension(name);
+
+        int duplicate = 2;
+        Path candidate;
+        do {
+            candidate = parent.resolve(base + "-" + duplicate + ext);
+            normalized = candidate.toAbsolutePath().normalize();
+            duplicate++;
+        } while (pathsWrittenThisCall != null && pathsWrittenThisCall.contains(normalized));
+
+        return candidate;
+    }
+
+    private static Map<String, ScopeState> snapshotAllScopes() {
+        Map<String, ScopeState> raw = new LinkedHashMap<>();
+
+        synchronized (SharedSingleFile.LOCK) {
+            for (Map.Entry<String, ScopeState> e : SharedSingleFile.ALL_SCOPES.entrySet()) {
+                raw.put(e.getKey(), deepCopyScopeState(e.getValue()));
+            }
+        }
+
+        Map<String, ScopeState> deduped = dedupeSnapshotScopes(raw);
+        if (raw.size() != deduped.size()) {
+            debug("snapshotAllScopes deduped scopeCount raw=" + raw.size() + " deduped=" + deduped.size());
+        }
+        return deduped;
+    }
+
+    private static String scopeAggregationKey(ScopeState s) {
+        if (s == null) return null;
+        if (s.rowKey != null && !s.rowKey.isBlank()) return s.rowKey;
+        return s.rootId;
+    }
+
+    private static Map<String, ScopeState> dedupeSnapshotScopes(Map<String, ScopeState> raw) {
+        if (raw == null || raw.size() <= 1) return raw == null ? new LinkedHashMap<>() : raw;
+
+        Map<String, ScopeState> out = new LinkedHashMap<>();
+        Map<String, String> includedIdentityToOutputKey = new LinkedHashMap<>();
+
+        for (Map.Entry<String, ScopeState> e : raw.entrySet()) {
+            ScopeState s = e.getValue();
+            String outputKey = e.getKey();
+            if (outputKey == null || outputKey.isBlank()) outputKey = scopeAggregationKey(s);
+            if (outputKey == null || outputKey.isBlank()) continue;
+
+            String identity = includedScenarioIdentity(s);
+            if (identity == null) {
+                out.put(outputKey, s);
+                continue;
+            }
+
+            String existingKey = includedIdentityToOutputKey.get(identity);
+            if (existingKey == null) {
+                includedIdentityToOutputKey.put(identity, outputKey);
+                out.put(outputKey, s);
+                continue;
+            }
+
+            ScopeState existing = out.get(existingKey);
+            ScopeState winner = betterScope(existing, s);
+            out.put(existingKey, winner);
+
+            debug("dedupeSnapshotScopes collapsed duplicate scenario identity='" + identity
+                    + "' keptKey=" + existingKey
+                    + " duplicateKey=" + outputKey
+                    + " keptRootId=" + (winner == null ? "null" : winner.rootId)
+                    + " duplicateRootId=" + (s == null ? "null" : s.rootId));
+        }
+
+        return out;
+    }
+
+    private static String includedScenarioIdentity(ScopeState s) {
+        if (s == null || !s.includeInSummary) return null;
+        String title = normalizeNodeTitle(scenarioTitle(s, 0));
+        if (title.isBlank() || title.startsWith("scenario-")) return null;
+        return title.toLowerCase(Locale.ROOT);
+    }
+
+    private static ScopeState betterScope(ScopeState a, ScopeState b) {
+        if (a == null) return b;
+        if (b == null) return a;
+
+        int an = a.nodes == null ? 0 : a.nodes.size();
+        int bn = b.nodes == null ? 0 : b.nodes.size();
+        if (bn > an) return b;
+
+        HtmlNode ar = a.nodes.get(a.rootId);
+        HtmlNode br = b.nodes.get(b.rootId);
+        boolean aStopped = ar != null && ar.stoppedAt != null;
+        boolean bStopped = br != null && br.stoppedAt != null;
+        if (bStopped && !aStopped) return b;
+
+        return a;
+    }
+
+    private static String scopeSortKey(ScopeState s) {
+        if (s == null) return "";
+        String k = (s.rowKey == null) ? "" : s.rowKey;
+        return k.isBlank() ? (s.rootId == null ? "" : s.rootId) : k;
+    }
+
+    private static String scenarioTitle(ScopeState s, int index) {
+        if (s != null) {
+            HtmlNode root = s.nodes.get(s.rootId);
+            if (root != null) {
+                String title = stripTagsForSort(root.title).replaceAll("\\s+", " ").trim();
+                if (!title.isBlank()) return title;
+            }
+        }
+        return "scenario-" + index;
+    }
+
+    private static Instant scenarioStartTime(ScopeState s, Instant fallback) {
+        if (s != null) {
+            HtmlNode root = s.nodes.get(s.rootId);
+            if (root != null) {
+                if (root.startedAt != null) return root.startedAt;
+                if (root.timestampedAt != null) return root.timestampedAt;
+                if (root.stoppedAt != null) return root.stoppedAt;
+            }
+        }
+        return fallback == null ? Instant.now() : fallback;
+    }
+
+    private static String fileBaseName(String fileName) {
+        if (fileName == null || fileName.isBlank()) return "report";
+
+        int slash = Math.max(fileName.lastIndexOf('/'), fileName.lastIndexOf('\\'));
+        String name = slash >= 0 ? fileName.substring(slash + 1) : fileName;
+
+        int dot = name.lastIndexOf('.');
+        return dot > 0 ? name.substring(0, dot) : name;
+    }
+
+    private static String fileExtension(String fileName) {
+        if (fileName == null || fileName.isBlank()) return ".html";
+        int slash = Math.max(fileName.lastIndexOf('/'), fileName.lastIndexOf('\\'));
+        String name = slash >= 0 ? fileName.substring(slash + 1) : fileName;
+        int dot = name.lastIndexOf('.');
+        return dot >= 0 ? name.substring(dot) : ".html";
+    }
+
+    private static String safeFilePart(String text) {
+        if (text == null) return "";
+
+        String s = stripTagsForSort(text)
+                .replaceAll("[^a-zA-Z0-9._-]+", "-")
+                .replaceAll("^-+|-+$", "");
+
+        if (s.length() > 120) s = s.substring(0, 120).replaceAll("-+$", "");
+        return s;
+    }
+
+    private static void debugSharedSnapshot(String label) {
+        synchronized (SharedSingleFile.LOCK) {
+            debug(label + " sharedScopeCount=" + SharedSingleFile.ALL_SCOPES.size());
+            for (Map.Entry<String, ScopeState> e : SharedSingleFile.ALL_SCOPES.entrySet()) {
+                ScopeState s = e.getValue();
+                debug("  shared key=" + e.getKey()
+                        + " rootId=" + (s == null ? "null" : s.rootId)
+                        + " rowKey=" + (s == null ? "null" : s.rowKey)
+                        + " includeInSummary=" + (s != null && s.includeInSummary)
+                        + " title='" + (s == null ? "" : scenarioTitle(s, 0)) + "'");
+            }
+        }
+    }
+
+    private static void debugSnapshot(String label, Map<String, ScopeState> snapshot) {
+        debug(label + " snapshotScopeCount=" + (snapshot == null ? 0 : snapshot.size()));
+        if (snapshot == null) return;
+        for (Map.Entry<String, ScopeState> e : snapshot.entrySet()) {
+            ScopeState s = e.getValue();
+            debug("  snapshot key=" + e.getKey()
+                    + " rootId=" + (s == null ? "null" : s.rootId)
+                    + " rowKey=" + (s == null ? "null" : s.rowKey)
+                    + " includeInSummary=" + (s != null && s.includeInSummary)
+                    + " title='" + (s == null ? "" : scenarioTitle(s, 0)) + "'");
+        }
+    }
+
+    private static void debug(String message) {
+        System.out.println("[SimpleHtmlReportConverter DEBUG] " + message);
+    }
+
+
+
 
     @Override
     public void onStart(Entry scope, Entry entry) {
@@ -216,7 +821,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
             // Only keep text log rows when they add information beyond the node title itself.
             if (phase == Phase.TIMESTAMP) {
-                Status st = (entry.status != null) ? entry.status : Status.INFO;
+                Status st = (entry.status != null) ? entry.status : Status.PASS;
 
                 String nodeTitlePlain = normalizeNodeTitle(node.title);
                 String entryTextPlain = normalizeNodeTitle(sanitizeNodeName(entry.text));
@@ -502,6 +1107,17 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("        </div>\n");
         out.append("      </div>\n");
 
+        out.append("      <div class=\"levelFilterBox\">\n");
+        out.append("        <label for=\"levelFilter\">Minimum log level</label>\n");
+        out.append("        <select id=\"levelFilter\" aria-label=\"Minimum log level filter\">\n");
+        out.append("          <option value=\"TRACE\">TRACE</option>\n");
+        out.append("          <option value=\"DEBUG\">DEBUG</option>\n");
+        out.append("          <option value=\"INFO\" selected>INFO</option>\n");
+        out.append("          <option value=\"WARN\">WARN</option>\n");
+        out.append("          <option value=\"ERROR\">ERROR</option>\n");
+        out.append("        </select>\n");
+        out.append("      </div>\n");
+
         out.append("    </div>\n"); // railHeader
 
         out.append("    <nav class=\"railTabs\">\n");
@@ -588,11 +1204,26 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("  var hdrCells = table.querySelectorAll('thead tr.hdrRow th');\n");
         out.append("  var filterInputs = table.querySelectorAll('input.colFilter');\n");
         out.append("  var statusRadios = document.querySelectorAll('input[name=\"ovStatus\"]');\n");
+        out.append("  var levelSelect = document.getElementById('levelFilter');\n");
         out.append("\n");
         out.append("  function getStatusBucket(tr){\n");
         out.append("    if (tr.classList.contains('rowPass')) return 'pass';\n");
         out.append("    if (tr.classList.contains('rowFail')) return 'fail';\n");
         out.append("    return 'all';\n");
+        out.append("  }\n");
+        out.append("\n");
+        out.append("  function levelRank(level){\n");
+        out.append("    var ranks = { TRACE: 0, DEBUG: 1, INFO: 2, WARN: 3, ERROR: 4 };\n");
+        out.append("    var rank = ranks[level];\n");
+        out.append("    return rank == null ? 2 : rank;\n");
+        out.append("  }\n");
+        out.append("\n");
+        out.append("  function applyLevelFilters(){\n");
+        out.append("    var minRank = levelRank(levelSelect ? levelSelect.value : 'INFO');\n");
+        out.append("    document.querySelectorAll('.node').forEach(function(node){\n");
+        out.append("      var nodeRank = levelRank(node.getAttribute('data-level') || 'INFO');\n");
+        out.append("      node.classList.toggle('levelHidden', nodeRank < minRank);\n");
+        out.append("    });\n");
         out.append("  }\n");
         out.append("\n");
         out.append("  function applyFilters(){\n");
@@ -624,10 +1255,12 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("      }\n");
         out.append("      tr.style.display = ok ? '' : 'none';\n");
         out.append("    });\n");
+        out.append("    applyLevelFilters();\n");
         out.append("  }\n");
         out.append("\n");
         out.append("  filterInputs.forEach(function(inp){ inp.addEventListener('input', applyFilters); });\n");
         out.append("  statusRadios.forEach(function(r){ r.addEventListener('change', applyFilters); });\n");
+        out.append("  if (levelSelect) levelSelect.addEventListener('change', applyFilters);\n");
         out.append("\n");
         out.append("  table.addEventListener('click', function(e){\n");
         out.append("    var btn = e.target.closest('.jumpBtn');\n");
@@ -673,6 +1306,67 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("  </main>\n");
         out.append("</div>\n");
 
+        out.append("</body>\n</html>\n");
+        return out.toString();
+    }
+
+
+    private String renderScenarioHtmlDocument(ScopeState scenario, Path outFile) {
+        StringBuilder out = new StringBuilder(128_000);
+        HtmlNode root = scenario == null ? null : scenario.nodes.get(scenario.rootId);
+        String title = root == null ? "Scenario Report" : stripTagsForSort(root.title);
+        if (title == null || title.isBlank()) title = "Scenario Report";
+
+        out.append("<!doctype html>\n");
+        out.append("<html lang=\"en\">\n<head>\n");
+        out.append("  <meta charset=\"utf-8\">\n");
+        out.append("  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
+        out.append("  <title>").append(escapeHtml(title)).append("</title>\n");
+        out.append("  <style>\n").append(CSS).append("\n  </style>\n");
+        out.append("</head>\n<body>\n");
+        out.append("<div class=\"singleScenarioPage\">\n");
+        out.append("<section class=\"scope singleScenarioScope\">\n");
+        out.append("  <div class=\"scopeHeader\">\n");
+        out.append("    <div class=\"scopeName\">").append(escapeHtml(title)).append("</div>\n");
+        out.append("    <div class=\"summaryMeta\">Generated ")
+                .append(escapeHtml(TS_FMT.format(Instant.now())))
+                .append("</div>\n");
+        out.append("    <div class=\"levelFilterBox singleLevelFilterBox\">\n");
+        out.append("      <label for=\"levelFilter\">Minimum log level</label>\n");
+        out.append("      <select id=\"levelFilter\" aria-label=\"Minimum log level filter\">\n");
+        out.append("        <option value=\"TRACE\">TRACE</option>\n");
+        out.append("        <option value=\"DEBUG\">DEBUG</option>\n");
+        out.append("        <option value=\"INFO\" selected>INFO</option>\n");
+        out.append("        <option value=\"WARN\">WARN</option>\n");
+        out.append("        <option value=\"ERROR\">ERROR</option>\n");
+        out.append("      </select>\n");
+        out.append("    </div>\n");
+        out.append("  </div>\n");
+
+        if (scenario != null && scenario.rowKey != null) renderScenarioSummary(out, scenario.rowKey);
+
+        if (scenario != null && root != null) {
+            rebuildChildrenLinks(scenario);
+            collapseRedundantEchoNodes(root);
+            out.append("  <div class=\"tree\">\n");
+            renderNode(out, root, 0);
+            out.append("  </div>\n");
+        } else {
+            out.append("  <div class=\"tree\"><div class=\"excludedHint\">No scenario data was available.</div></div>\n");
+        }
+
+        out.append("</section>\n");
+        out.append("</div>\n");
+        out.append("<script>\n");
+        out.append("(function(){\n");
+        out.append("  function levelRank(level){ var ranks = { TRACE: 0, DEBUG: 1, INFO: 2, WARN: 3, ERROR: 4 }; var rank = ranks[level]; return rank == null ? 2 : rank; }\n");
+        out.append("  var levelSelect = document.getElementById('levelFilter');\n");
+        out.append("  if (!levelSelect) return;\n");
+        out.append("  function applyLevelFilters(){ var minRank = levelRank(levelSelect.value || 'INFO'); document.querySelectorAll('.node').forEach(function(node){ var nodeRank = levelRank(node.getAttribute('data-level') || 'INFO'); node.classList.toggle('levelHidden', nodeRank < minRank); }); }\n");
+        out.append("  levelSelect.addEventListener('change', applyLevelFilters);\n");
+        out.append("  applyLevelFilters();\n");
+        out.append("})();\n");
+        out.append("</script>\n");
         out.append("</body>\n</html>\n");
         return out.toString();
     }
@@ -842,6 +1536,8 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("<div class=\"node ")
                 .append(indentClass)
                 .append(tagClasses)
+                .append("\" data-level=\"")
+                .append(nodeLevelValue(node.level))
                 .append("\">");
 
         boolean hasDetails = !node.children.isEmpty()
@@ -956,8 +1652,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             case PASS -> "status-pass";
             case FAIL -> "status-fail";
             case SKIP -> "status-skip";
-            case WARN -> "status-warn";
-            case INFO -> "status-info";
             case UNKNOWN -> "status-unknown";
         };
     }
@@ -973,13 +1667,16 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         };
     }
 
+    private static String nodeLevelValue(Level level) {
+        return level == null ? "INFO" : level.name();
+    }
+
     private static String labelForStatus(Status s) {
         return switch (s) {
             case PASS -> "PASS";
             case FAIL -> "FAIL";
             case SKIP -> "SKIP";
-            case WARN -> "WARN";
-            case INFO, UNKNOWN -> "INFO";
+            case UNKNOWN -> "INFO";
         };
     }
 
@@ -988,8 +1685,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             case PASS -> "pass";
             case FAIL -> "fail";
             case SKIP -> "skip";
-            case WARN -> "warn";
-            case INFO, UNKNOWN -> "info";
+            case UNKNOWN -> "info";
         };
     }
 
@@ -1451,6 +2147,28 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             .barFail { position: absolute; inset: 0; background: #d63a3a; }
             .barPass { position: absolute; inset: 0; background: #1f9d4c; }
             
+            .levelFilterBox {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 10px;
+              margin-top: 12px;
+              padding-top: 12px;
+              border-top: 1px solid var(--line);
+              font-size: 12px;
+              color: var(--muted);
+            }
+            .levelFilterBox label { font-weight: 700; color: var(--fg); }
+            .levelFilterBox select {
+              min-width: 120px;
+              padding: 6px 8px;
+              border: 1px solid var(--line);
+              border-radius: 8px;
+              background: #fff;
+              color: var(--fg);
+              font-size: 12px;
+            }
+
             .railTabs { padding: 10px; overflow: auto; flex: 1; }
             .tabButtons { display: flex; flex-direction: column; gap: 8px; }
             
@@ -1516,6 +2234,8 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
               opacity: var(--node-opacity, 1);
             }
             
+            .node.levelHidden { display: none; }
+
             .node details {
               border: var(--node-border-width, 1px) solid var(--node-border-color, var(--line));
               border-radius: var(--node-radius, 12px);
@@ -1999,6 +2719,15 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
               padding: 0;
               border: 0;
               background: transparent;
+            }
+            .singleScenarioPage {
+              min-height: 100vh;
+              overflow: auto;
+              background: #fff;
+              padding: 1px;
+            }
+            .singleScenarioScope {
+              margin: 14px;
             }
             """;
 

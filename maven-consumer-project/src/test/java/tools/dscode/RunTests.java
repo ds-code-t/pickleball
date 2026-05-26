@@ -16,9 +16,6 @@ import java.util.List;
 import static com.xpathy.Attribute.id;
 import static com.xpathy.Attribute.type;
 import static com.xpathy.Tag.input;
-import static io.cucumber.core.options.Constants.FEATURES_PROPERTY_NAME;
-import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
-import static io.cucumber.core.options.Constants.PLUGIN_PROPERTY_NAME;
 import static tools.dscode.common.domoperations.ExecutionDictionary.CONTAINS_TEXT;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
@@ -26,7 +23,7 @@ import static tools.dscode.common.util.debug.DebugUtils.printDebug;
 
 public class RunTests extends PickleballRunner {
     @Override
-    public void globalTestProperties() {
+    public void globalTestDefaults() {
         PKB_props.glue("tools.dscode.steps");
         PKB_props.features("classpath:features");
         PKB_props.plugins("pretty");

@@ -157,8 +157,7 @@ public enum ActionOperations implements OperationsInterface {
                             }
                         }
                     }
-                    logInfo(phraseData + " : Executing Action " + this.name());
-                    logInfo(phraseData + "Saving '" + limitText(value, 10000) + "' to key: '" + keyName + "'");
+                    logInfo("Saving '" + limitText(value, 10000) + "' to key: '" + keyName + "'");
                     getRunningParsingMap().put(keyName, value);
                 }
                 return true;

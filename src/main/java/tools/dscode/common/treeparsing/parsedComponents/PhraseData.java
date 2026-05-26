@@ -121,10 +121,10 @@ public abstract class PhraseData extends PassedData {
     }
 
 
-    //    public XPathChainResult contextMatch;
     @Override
     public String toString() {
-        return getText() + " -> " + getResolvedText();
+        return getText().trim();
+//        return getText() + " -> " + getResolvedText();
     }
 
     public String getResolvedText() {

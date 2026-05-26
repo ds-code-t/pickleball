@@ -7,83 +7,47 @@ import org.openqa.selenium.WebDriver;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
-import static tools.dscode.common.reporting.WorkBookConsolePrinter.printDebug;
-import static tools.dscode.common.reporting.WorkBookConsolePrinter.printError;
-import static tools.dscode.common.reporting.WorkBookConsolePrinter.printInfo;
-import static tools.dscode.common.reporting.WorkBookConsolePrinter.printTrace;
-import static tools.dscode.common.reporting.WorkBookConsolePrinter.printWarn;
+import static tools.dscode.common.reporting.WorkBookConsolePrinter.PrintStyle.DIM;
+import static tools.dscode.common.reporting.WorkBookConsolePrinter.PrintStyle.HEADER;
+import static tools.dscode.common.reporting.WorkBookConsolePrinter.PrintStyle.LEVEL;
+import static tools.dscode.common.reporting.WorkBookConsolePrinter.print;
+import static tools.dscode.common.reporting.logging.LogForwarder.getDefaultLoggingLevel;
 import static tools.dscode.coredefinitions.BrowserSteps.getCurrentDriver;
 
-/**
- * Entry is NOT inherently thread-safe by default.
- *
- * Opt-in thread-safety is provided by calling {@link #threadSafe()} on the root Entry
- * (or any Entry before concurrent use). When enabled, all public operations that mutate state
- * and/or emit to converters are serialized under a single global lock.
- *
- * IMPORTANT LIMITATION:
- * - Because fields/tags/attachments/children are public and mutable, callers can bypass locking
- *   by mutating them directly (e.g., entry.children.add(...)).
- * - If you enable threadSafe(), treat those collections as read-only and only mutate via Entry methods.
- */
 public class Entry {
-
-    /**
-     * Defaults that this Entry contributes to DESCENDANT entries only.
-     * These are not applied to this Entry itself.
-     *
-     * Descendant fields may override these by setting their own field with the same key.
-     */
+    public int count = 0;
+    public int flatCount = 0;
+    public String nestedCounts;
+    public String normalizedType;
     private final Map<String, Object> defaultDescendantFields = new LinkedHashMap<>();
     private final List<String> defaultDescendantTags = new ArrayList<>();
+    private final Map<String, AtomicInteger> typeCounts = new ConcurrentHashMap<>();
 
-    /**
-     * Prevents repeatedly copying inherited defaults into the same emitted entry.
-     */
-    private volatile boolean inheritedDefaultsApplied;
-
-    /**
-     * Marks whether this Entry, typically a root scope, is included in pass/fail summary metrics.
-     * Default is TRUE to preserve existing behavior.
-     */
-    private volatile boolean includeInPassFailSummary = true;
-
-    /**
-     * Global lock used when threadSafe is enabled.
-     *
-     * Why global?
-     * - Avoids deadlocks when emit() walks up ancestor chain.
-     * - Ensures converter callbacks are not invoked concurrently.
-     *
-     * Tradeoff: reduces parallelism while enabled (intended “safety mode”).
-     */
     private static final Object THREAD_SAFE_LOCK = new Object();
 
-    // Track counts per type for THIS Entry instance
-    private final Map<String, AtomicInteger> typeCounts = new ConcurrentHashMap<>();
+    private volatile boolean inheritedDefaultsApplied;
+    private volatile boolean includeInPassFailSummary = true;
+    private volatile boolean threadSafe;
+    private volatile boolean sharedChildren;
 
     public final String id = UUID.randomUUID().toString();
     public final Entry parent;
-
-    // These are read/written by multiple methods; in threadSafe mode we guard access under lock.
-    // volatile improves visibility for occasional reads outside guarded methods (best-effort).
-    public volatile String text;
     public final long seq;
+    public final int nestingLevel;
 
-    public volatile Instant startedAt;     // spans
-    public volatile Instant stoppedAt;     // spans
-    public volatile Instant timestampedAt; // instant events
-
+    public volatile String text;
+    public volatile Instant startedAt;
+    public volatile Instant stoppedAt;
+    public volatile Instant timestampedAt;
     public volatile Status status;
     public volatile Level level;
 
-    // NOTE: still public for minimal breakage. See class-level note.
     public final Map<String, Object> fields = new LinkedHashMap<>();
     public final List<String> tags = new ArrayList<>();
     public final List<Attachment> attachments = new ArrayList<>();
@@ -92,36 +56,26 @@ public class Entry {
     private final List<BaseConverter> converters = new CopyOnWriteArrayList<>();
     private final AtomicLong seqGen;
 
-    // When true, public ops are serialized using THREAD_SAFE_LOCK
-    private volatile boolean threadSafe;
-
-    // Existing flag: allows synchronized children-add only; preserved.
-    private volatile boolean sharedChildren;
-
     private Entry(String text, Entry parent, AtomicLong seqGen, boolean threadSafe) {
         this.text = text;
         this.parent = parent;
         this.seqGen = seqGen;
         this.threadSafe = threadSafe;
         this.seq = seqGen.incrementAndGet();
+        this.nestingLevel = parent == null
+                ? 0
+                : parent.nestingLevel + 1;
     }
 
     public static Entry of(String text) {
         return new Entry(text, null, new AtomicLong(), false);
     }
 
-    /**
-     * Enables "safety mode" on THIS entry.
-     *
-     * All descendants created from this node inherit threadSafe = true.
-     * Call this BEFORE using this Entry concurrently from multiple threads.
-     */
     public Entry threadSafe() {
         this.threadSafe = true;
         return this;
     }
 
-    /** Allows concurrent child creation under THIS node only (legacy behavior). */
     public Entry sharedChildren() {
         return guarded(() -> {
             sharedChildren = true;
@@ -129,83 +83,37 @@ public class Entry {
         });
     }
 
-    /** Register converter for this entry + descendants (also registers globally). */
     public Entry on(BaseConverter converter) {
         Objects.requireNonNull(converter, "converter");
+
         return guarded(() -> {
-            for (BaseConverter existing : converters) {
-                if (existing == converter) {
-                    return this;
-                }
+            if (!converters.contains(converter)) {
+                converters.add(converter);
+                Log.global().register(converter);
             }
-            converters.add(converter);
-            Log.global().register(converter);
+
             return this;
         });
     }
 
-    // ---------------------------------------------------------
-    // SUMMARY INCLUSION
-    // ---------------------------------------------------------
-
-    /**
-     * Marks THIS Entry (typically a top-level root scope) as included/excluded from
-     * the composite pass/fail percentage in report converters that support it.
-     *
-     * Default is TRUE to preserve existing behavior.
-     */
     public Entry includeInSummary(boolean include) {
         return guarded(() -> {
-            this.includeInPassFailSummary = include;
+            includeInPassFailSummary = include;
             return this;
         });
     }
 
-    /** Convenience: exclude this scope from pass/fail composite metrics. */
     public Entry excludeFromSummary() {
         return includeInSummary(false);
     }
 
-    /** Read-only: converters can use this on the scope/root. */
     public boolean isIncludedInSummary() {
         return includeInPassFailSummary;
     }
 
-    // ---------------------------------------------------------
-    // DESCENDANT DEFAULT METADATA
-    // ---------------------------------------------------------
-
     public Entry defaultDescendantFields(String... keyValuePairs) {
         return guarded(() -> {
-            if (keyValuePairs != null) {
-                for (String pair : keyValuePairs) {
-                    if (pair == null || pair.isBlank()) continue;
-
-                    int colon = pair.indexOf(':');
-                    if (colon <= 0 || colon == pair.length() - 1) {
-                        throw new IllegalArgumentException(
-                                "defaultDescendantFields entries must use 'key:value' format: " + pair
-                        );
-                    }
-
-                    String key = pair.substring(0, colon).trim();
-                    String value = pair.substring(colon + 1).trim();
-
-                    if (key.isBlank()) {
-                        throw new IllegalArgumentException(
-                                "defaultDescendantFields key must not be blank: " + pair
-                        );
-                    }
-
-                    if (key.indexOf(':') >= 0) {
-                        throw new IllegalArgumentException(
-                                "defaultDescendantFields key must not contain ':': " + key
-                        );
-                    }
-
-                    defaultDescendantFields.put(key, value);
-                }
-            }
+            putKeyValuePairs(defaultDescendantFields, "defaultDescendantFields", keyValuePairs);
             return this;
         });
     }
@@ -219,105 +127,49 @@ public class Entry {
                     }
                 }
             }
+
             return this;
         });
     }
 
-    /**
-     * Applies all ancestor defaultDescendantFields/defaultDescendantTags to THIS entry.
-     *
-     * Important:
-     * - Only walks ancestors, so the entry's own defaults are not applied to itself.
-     * - Oldest ancestor is applied first, nearest ancestor later, so nearer defaults win.
-     * - This entry's own fields still win over all inherited defaults via putIfAbsent.
-     */
-    private void applyInheritedDefaultsToThisEntry() {
-        if (inheritedDefaultsApplied) return;
-
-        LinkedHashMap<String, Object> inheritedFields = new LinkedHashMap<>();
-        LinkedHashSet<String> inheritedTags = new LinkedHashSet<>();
-
-        List<Entry> ancestors = new ArrayList<>();
-        for (Entry n = this.parent; n != null; n = n.parent) {
-            ancestors.add(n);
-        }
-
-        Collections.reverse(ancestors);
-
-        for (Entry ancestor : ancestors) {
-            inheritedFields.putAll(ancestor.defaultDescendantFields);
-            inheritedTags.addAll(ancestor.defaultDescendantTags);
-        }
-
-        // Descendant's own fields win over inherited defaults.
-        for (Map.Entry<String, Object> e : inheritedFields.entrySet()) {
-            this.fields.putIfAbsent(e.getKey(), e.getValue());
-        }
-
-        // Tags are additive. Avoid duplicates.
-        for (String tag : inheritedTags) {
-            if (!this.tags.contains(tag)) {
-                this.tags.add(tag);
-            }
-        }
-
-        inheritedDefaultsApplied = true;
-    }
-
-    // ---------------------------------------------------------
-    // HIERARCHY
-    // ---------------------------------------------------------
-
-    private Entry createChild(String text) {
-        // This method is called from guarded public methods.
-        // It should still be safe even if some internal call reaches it without a guard.
-        Entry e = new Entry(text, this, seqGen, this.threadSafe);
-
-        if (threadSafe || sharedChildren) {
-            synchronized (THREAD_SAFE_LOCK) {
-                children.add(e);
-            }
-        } else {
-            children.add(e);
-        }
-        return e;
-    }
-
-    /**
-     * Structural child Entry only.
-     * No timestamp, no emission.
-     */
     public Entry child(String text) {
         return guarded(() -> createChild(text));
     }
 
-    /**
-     * Convenience: emits an INFO event with an incrementing counter for the given type.
-     * Example: STEP 1: click link
-     */
     public Entry logWithType(String type, String message) {
         if (type == null || type.isBlank()) {
             throw new IllegalArgumentException("type must not be null or blank");
         }
 
-        final String normalizedType = type.trim();
-        final String msg = (message == null) ? "" : message;
-
         return guarded(() -> {
-            AtomicInteger counter = typeCounts.computeIfAbsent(normalizedType, t -> new AtomicInteger(0));
-            int count = counter.incrementAndGet();
+            normalizedType = type.trim();
+            count = typeCounts
+                    .computeIfAbsent(normalizedType, ignored -> new AtomicInteger())
+                    .incrementAndGet();
 
-            String formatted = normalizedType + " " + count + ": " + msg;
-            return info(formatted);
+            System.out.println("- - - - - - - - - - -");
+            nestedCounts =  String.valueOf(count);
+            flatCount  = count;
+            if(parent != null && parent.normalizedType != null && parent.normalizedType.equals(normalizedType)){
+                if(!nestedCounts.contains("."))
+                    flatCount = count + parent.flatCount;
+                nestedCounts = parent.nestedCounts + "." + nestedCounts;
+            }
+
+            String nestingText = nestedCounts.contains(".") ? " NESTING " + nestedCounts + "  " : "  ";
+            return logHeader(flatCount + " " + normalizedType + nestingText + "\u201C"+  safe(message) + "\u201D");
         });
     }
 
-    // ---------------------------------------------------------
-    // LOGGING (timestamped + emitted)
-    // ---------------------------------------------------------
+    private Entry logHeader(String message) {
+        return print(log(Level.INFO, Status.PASS, message), HEADER);
+    }
 
-    private Entry log(Level level, Status status, String message) {
-        // Called by guarded public methods
+    Entry logSkipped(String message) {
+        return print(log(getDefaultLoggingLevel(), Status.SKIP, message), DIM);
+    }
+
+    Entry log(Level level, Status status, String message) {
         return createChild(message)
                 .level(level)
                 .status(status)
@@ -325,84 +177,64 @@ public class Entry {
     }
 
     public Entry trace(String message) {
-        return guarded(() -> {
-            printTrace(message);
-            return log(Level.TRACE, Status.INFO, message);
-        });
+        return logAndPrint(Level.TRACE, Status.PASS, message);
     }
 
     public Entry debug(String message) {
-        return guarded(() -> {
-            printDebug(message);
-            return log(Level.DEBUG, Status.INFO, message);
-        });
+        return logAndPrint(Level.DEBUG, Status.PASS, message);
     }
 
     public Entry info(String message) {
-        return guarded(() -> {
-            printInfo(message);
-            return log(Level.INFO, Status.INFO, message);
-        });
+        return logAndPrint(Level.INFO, Status.PASS, message);
     }
 
     public Entry warn(String message) {
-        return guarded(() -> {
-            printWarn(message);
-            return log(Level.WARN, Status.WARN, message);
-        });
+        return logAndPrint(Level.WARN, Status.UNKNOWN, message);
     }
 
     public Entry error(String message) {
-        return guarded(() -> {
-            printError(message);
-            return log(Level.ERROR, Status.FAIL, message);
-        });
+        return logAndPrint(Level.ERROR, Status.FAIL, message);
     }
 
-    /**
-     * Generic instant event (no level/status implied).
-     */
+    private Entry logAndPrint(Level level, Status status, String message) {
+        return guarded(() -> print(log(level, status, message), LEVEL));
+    }
+
     public Entry event(String text) {
         return guarded(() -> createChild(text).timestamp());
     }
-
-    // ---------------------------------------------------------
-    // SPANS
-    // ---------------------------------------------------------
 
     public Entry span(String text) {
         return guarded(() -> createChild(text).start());
     }
 
-    // ---------------------------------------------------------
-    // FAIL CONVENIENCE (for spans)
-    // ---------------------------------------------------------
-
-    /**
-     * Convenience for span entries:
-     * - If message is non-blank, create an ERROR child event (FAIL).
-     * - Stop THIS entry with FAIL status.
-     * - Returns THIS entry (fluent).
-     */
     public Entry fail(String message) {
         return guarded(() -> {
-            printError("FAIL");
+            print(Entry.of("FAIL").level(Level.ERROR), LEVEL);
+
             if (message != null && !message.isBlank()) {
-                error(message); // creates child ERROR event with FAIL + timestamp + emission
+                error(message);
             }
-            stop(Status.FAIL); // sets THIS entry to FAIL and emits onStop
-            return this;
+
+            return stop(Status.FAIL);
+        });
+    }
+
+    public Entry skip(String message) {
+        return guarded(() -> {
+            print(Entry.of("SKIP"), DIM);
+
+            if (message != null && !message.isBlank()) {
+                logSkipped(message);
+            }
+
+            return stop(Status.SKIP);
         });
     }
 
     public Entry up() {
-        // Read-only; no need for locking (best-effort)
-        return parent != null ? parent : this;
+        return parent == null ? this : parent;
     }
-
-    // ---------------------------------------------------------
-    // METADATA (no emission)
-    // ---------------------------------------------------------
 
     public Entry tag(String tag) {
         return guarded(() -> {
@@ -413,77 +245,31 @@ public class Entry {
 
     public Entry tags(String... tags) {
         return guarded(() -> {
-            this.tags.addAll(List.of(tags));
+            if (tags != null) {
+                this.tags.addAll(List.of(tags));
+            }
+
             return this;
         });
     }
 
     public boolean hasAnyTag(String... wantedTags) {
-        return guarded(() -> hasAnyTagIn(this.tags, wantedTags));
+        return guarded(() -> hasAnyTagIn(tags, wantedTags));
     }
 
-    /**
-     * True if THIS entry has any ancestor with any of the supplied tags.
-     * Does not check this entry itself.
-     */
     public boolean hasAncestorWithAnyTag(String... wantedTags) {
         return guarded(() -> {
-            if (wantedTags == null || wantedTags.length == 0) return false;
-
-            for (Entry n = this.parent; n != null; n = n.parent) {
-                if (hasAnyTagIn(n.tags, wantedTags)) {
-                    return true;
-                }
+            for (Entry n = parent; n != null; n = n.parent) {
+                if (hasAnyTagIn(n.tags, wantedTags)) return true;
             }
 
             return false;
         });
     }
 
-    private static boolean hasAnyTagIn(List<String> actualTags, String... wantedTags) {
-        if (actualTags == null || actualTags.isEmpty()) return false;
-        if (wantedTags == null || wantedTags.length == 0) return false;
-
-        for (String wanted : wantedTags) {
-            if (wanted == null || wanted.isBlank()) continue;
-
-            String w = wanted.trim();
-
-            for (String actual : actualTags) {
-                if (actual != null && w.equals(actual.trim())) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
     public Entry field(String... keyValuePairs) {
         return guarded(() -> {
-            if (keyValuePairs != null) {
-                for (String pair : keyValuePairs) {
-                    if (pair == null || pair.isBlank()) continue;
-
-                    int colon = pair.indexOf(':');
-                    if (colon <= 0 || colon == pair.length() - 1) {
-                        throw new IllegalArgumentException(
-                                "field entries must use 'key:value' format: " + pair
-                        );
-                    }
-
-                    String key = pair.substring(0, colon).trim();
-                    String value = pair.substring(colon + 1).trim();
-
-                    if (key.isBlank()) {
-                        throw new IllegalArgumentException(
-                                "field key must not be blank: " + pair
-                        );
-                    }
-
-                    fields.put(key, value);
-                }
-            }
+            putKeyValuePairs(fields, "field", keyValuePairs);
             return this;
         });
     }
@@ -502,10 +288,6 @@ public class Entry {
         });
     }
 
-    // ---------------------------------------------------------
-    // ATTACHMENTS (no emission)
-    // ---------------------------------------------------------
-
     public Entry attach(String name, String mime, String data) {
         return guarded(() -> {
             attachments.add(new Attachment(name, mime, data));
@@ -513,14 +295,9 @@ public class Entry {
         });
     }
 
-    /** Matches BaseConverter.screenshot(...) behavior (base64 already provided). */
     public Entry attachScreenshot(String name, String base64) {
         return attach(name, "image/png;base64", base64);
     }
-
-    // ---------------------------------------------------------
-    // SCREENSHOT (creates a normal timestamped child with attachment)
-    // ---------------------------------------------------------
 
     public Entry screenshot() {
         return screenshot(getCurrentDriver(), null);
@@ -537,124 +314,149 @@ public class Entry {
     public Entry screenshot(WebDriver driver, String name) {
         return guarded(() -> {
             try {
-                String base64 = ((TakesScreenshot) driver).getScreenshotAs(OutputType.BASE64);
-                String label = (name == null || name.isBlank()) ? "Screenshot" : name;
-                String filename = (name == null || name.isBlank())
+                String label = name == null || name.isBlank() ? "Screenshot" : name;
+                String filename = name == null || name.isBlank()
                         ? "screenshot.png"
-                        : (name.endsWith(".png") ? name : name + ".png");
+                        : name.endsWith(".png") ? name : name + ".png";
 
                 createChild(label)
                         .level(Level.INFO)
-                        .status(Status.INFO)
-                        .attach(filename, "image/png;base64", base64)
+                        .status(Status.PASS)
+                        .attach(filename, "image/png;base64",
+                                ((TakesScreenshot) driver).getScreenshotAs(OutputType.BASE64))
                         .tags("Screenshot")
                         .timestamp();
 
-                printInfo("Screenshot attached");
+                info("Screenshot attached");
             } catch (Throwable t) {
                 error("Failed to take Screenshot due to \"" + t.getMessage() + "\"");
             }
+
             return this;
         });
     }
 
-    // ---------------------------------------------------------
-    // LIFECYCLE EMISSION
-    // ---------------------------------------------------------
-
     public Entry start() {
-        return guarded(() -> {
-            printInfo("STARTED: " + text);
-            startedAt = Instant.now();
-            emit((s, c) -> c.onStart(s, this));
-            return this;
-        });
+        return start(Instant.now());
     }
 
     public Entry start(Instant at) {
         return guarded(() -> {
-            printInfo("STARTED: " + text);
+            print(Entry.of("STARTED: " + safe(text)).level(Level.DEBUG), LEVEL);
             startedAt = at;
-            emit((s, c) -> c.onStart(s, this));
+            emit((scope, converter) -> converter.onStart(scope, this));
             return this;
         });
     }
 
     public Entry timestamp() {
-        return guarded(() -> {
-            timestampedAt = Instant.now();
-            emit((s, c) -> c.onTimestamp(s, this));
-            return this;
-        });
+        return timestamp(Instant.now());
     }
 
     public Entry timestamp(Instant at) {
         return guarded(() -> {
             timestampedAt = at;
-            emit((s, c) -> c.onTimestamp(s, this));
+            emit((scope, converter) -> converter.onTimestamp(scope, this));
             return this;
         });
     }
 
     public Entry stop() {
         return guarded(() -> {
-            printInfo("STOPPED: " + text);
+            print(Entry.of("STOPPED: " + safe(text)).level(Level.DEBUG), LEVEL);
             stoppedAt = Instant.now();
-            emit((s, c) -> c.onStop(s, this));
+            emit((scope, converter) -> converter.onStop(scope, this));
             return this;
         });
     }
 
     public Entry stop(Status status) {
         return guarded(() -> {
-            printInfo("STOPPED: " + text);
             this.status = status;
+            print(Entry.of("STOPPED: " + safe(text)).level(Level.INFO), LEVEL);
             stoppedAt = Instant.now();
-            emit((s, c) -> c.onStop(s, this));
+            emit((scope, converter) -> converter.onStop(scope, this));
             return this;
         });
     }
 
     public Entry stop(Status status, String extraText) {
         return guarded(() -> {
-            printInfo("STOPPED: " + text);
-            this.status = status;
-            stoppedAt = Instant.now();
-            emit((s, c) -> c.onStop(s, this));
+            stop(status);
+
             if (extraText != null && !extraText.isBlank()) {
                 createChild(extraText).timestamp();
             }
+
             return this;
         });
     }
 
-    // ---------------------------------------------------------
-    // CONVERTER CLOSE
-    // ---------------------------------------------------------
-
-    /** Closes converters attached to THIS entry (does not touch ancestors/descendants). */
     public Entry close() {
         return guarded(() -> {
-            for (BaseConverter c : converters) c.close();
+            converters.forEach(BaseConverter::close);
             return this;
         });
     }
 
-    /** Closes converters of the given type attached to THIS entry. */
     public Entry close(Class<? extends BaseConverter> type) {
         return guarded(() -> {
-            for (BaseConverter c : converters) {
-                if (type.isInstance(c)) {
-                    c.close();
+            for (BaseConverter converter : converters) {
+                if (type.isInstance(converter)) {
+                    converter.close();
                 }
             }
+
             return this;
         });
     }
 
-    // ---------------------------------------------------------
-    // EMISSION BUBBLING
-    // ---------------------------------------------------------
+    public Duration duration() {
+        if (startedAt == null) return Duration.ZERO;
+
+        Instant end = stoppedAt == null ? Instant.now() : stoppedAt;
+        return Duration.between(startedAt, end);
+    }
+
+    public String durationFormatted() {
+        long millis = duration().toMillis();
+        long hours = millis / 3_600_000;
+        long minutes = (millis % 3_600_000) / 60_000;
+        long seconds = (millis % 60_000) / 1_000;
+        long ms = millis % 1_000;
+
+        return String.format("%02d:%02d:%02d.%03d", hours, minutes, seconds, ms);
+    }
+
+    public String flatten() {
+        return guarded(() -> {
+            StringBuilder sb = new StringBuilder(512);
+            appendFlattened(sb, this, 0);
+            return sb.toString();
+        });
+    }
+
+    public String indentedText() {
+        return indentedSpace() + safe(text);
+    }
+
+    public String indentedSpace() {
+        return "  ".repeat(Math.max(0, nestingLevel));
+    }
+
+    private Entry createChild(String text) {
+        Entry entry = new Entry(text, this, seqGen, threadSafe);
+
+        if (threadSafe || sharedChildren) {
+            synchronized (THREAD_SAFE_LOCK) {
+                children.add(entry);
+            }
+        } else {
+            children.add(entry);
+        }
+
+        return entry;
+    }
 
     private void emit(EmitCall call) {
         if (threadSafe) {
@@ -672,68 +474,97 @@ public class Entry {
         IdentityHashMap<BaseConverter, Entry> seen = new IdentityHashMap<>();
 
         for (Entry n = this; n != null; n = n.parent) {
-            for (BaseConverter c : n.converters) {
-                if (seen.putIfAbsent(c, n) == null) {
-                    call.apply(n, c);
+            for (BaseConverter converter : n.converters) {
+                if (seen.putIfAbsent(converter, n) == null) {
+                    call.apply(n, converter);
                 }
             }
         }
     }
 
-    @FunctionalInterface
-    private interface EmitCall {
-        void apply(Entry scope, BaseConverter converter);
+    private void applyInheritedDefaultsToThisEntry() {
+        if (inheritedDefaultsApplied) return;
+
+        LinkedHashMap<String, Object> inheritedFields = new LinkedHashMap<>();
+        LinkedHashSet<String> inheritedTags = new LinkedHashSet<>();
+
+        List<Entry> ancestors = new ArrayList<>();
+        for (Entry n = parent; n != null; n = n.parent) {
+            ancestors.add(n);
+        }
+
+        Collections.reverse(ancestors);
+
+        for (Entry ancestor : ancestors) {
+            inheritedFields.putAll(ancestor.defaultDescendantFields);
+            inheritedTags.addAll(ancestor.defaultDescendantTags);
+        }
+
+        inheritedFields.forEach(fields::putIfAbsent);
+
+        for (String tag : inheritedTags) {
+            if (!tags.contains(tag)) {
+                tags.add(tag);
+            }
+        }
+
+        inheritedDefaultsApplied = true;
     }
 
-    // ---------------------------------------------------------
-    // DURATION HELPERS
-    // ---------------------------------------------------------
+    private static void putKeyValuePairs(
+            Map<String, Object> target,
+            String methodName,
+            String... keyValuePairs
+    ) {
+        if (keyValuePairs == null) return;
 
-    public Duration duration() {
-        // Read-only helper; uses volatile fields for best-effort visibility
-        if (startedAt == null) return Duration.ZERO;
-        Instant end = (stoppedAt != null) ? stoppedAt : Instant.now();
-        return Duration.between(startedAt, end);
+        for (String pair : keyValuePairs) {
+            if (pair == null || pair.isBlank()) continue;
+
+            int colon = pair.indexOf(':');
+            if (colon <= 0 || colon == pair.length() - 1) {
+                throw new IllegalArgumentException(
+                        methodName + " entries must use 'key:value' format: " + pair
+                );
+            }
+
+            String key = pair.substring(0, colon).trim();
+            String value = pair.substring(colon + 1).trim();
+
+            if (key.isBlank()) {
+                throw new IllegalArgumentException(methodName + " key must not be blank: " + pair);
+            }
+
+            target.put(key, value);
+        }
     }
 
-    public String durationFormatted() {
-        Duration d = duration();
+    private static boolean hasAnyTagIn(List<String> actualTags, String... wantedTags) {
+        if (actualTags == null || wantedTags == null) return false;
 
-        long millis = d.toMillis();
-        long hours = millis / 3_600_000;
-        long minutes = (millis % 3_600_000) / 60_000;
-        long seconds = (millis % 60_000) / 1_000;
-        long ms = millis % 1_000;
+        for (String wanted : wantedTags) {
+            if (wanted == null || wanted.isBlank()) continue;
 
-        return String.format("%02d:%02d:%02d.%03d",
-                hours, minutes, seconds, ms);
-    }
+            for (String actual : actualTags) {
+                if (wanted.trim().equals(actual == null ? "" : actual.trim())) {
+                    return true;
+                }
+            }
+        }
 
-    public String flatten() {
-        return guarded(() -> {
-            StringBuilder sb = new StringBuilder(512);
-            appendFlattened(sb, this, 0);
-            return sb.toString();
-        });
+        return false;
     }
 
     private static void appendFlattened(StringBuilder sb, Entry entry, int depth) {
         String indent = "  ".repeat(Math.max(0, depth));
 
-        sb.append(indent).append(entry.text == null ? "" : entry.text).append('\n');
+        sb.append(indent).append(safe(entry.text)).append('\n');
 
-        if (entry.status != null) {
-            sb.append(indent).append("status: ").append(entry.status).append('\n');
-        }
-        if (entry.level != null) {
-            sb.append(indent).append("level: ").append(entry.level).append('\n');
-        }
-        if (entry.startedAt != null) {
-            sb.append(indent).append("started: ").append(entry.startedAt).append('\n');
-        }
-        if (entry.stoppedAt != null) {
-            sb.append(indent).append("stopped: ").append(entry.stoppedAt).append('\n');
-        }
+        if (entry.status != null) sb.append(indent).append("status: ").append(entry.status).append('\n');
+        if (entry.level != null) sb.append(indent).append("level: ").append(entry.level).append('\n');
+        if (entry.startedAt != null) sb.append(indent).append("started: ").append(entry.startedAt).append('\n');
+        if (entry.stoppedAt != null) sb.append(indent).append("stopped: ").append(entry.stoppedAt).append('\n');
+
         if (entry.startedAt != null || entry.stoppedAt != null) {
             sb.append(indent).append("duration: ").append(entry.durationFormatted()).append('\n');
         } else if (entry.timestampedAt != null) {
@@ -743,22 +574,13 @@ public class Entry {
         if (!entry.fields.isEmpty()) {
             sb.append(indent).append("fields:").append('\n');
             entry.fields.forEach((k, v) ->
-                    sb.append(indent)
-                            .append("- ")
-                            .append(k)
-                            .append(": ")
-                            .append(v == null ? "" : v)
-                            .append('\n'));
+                    sb.append(indent).append("- ").append(k).append(": ").append(v == null ? "" : v).append('\n'));
         }
 
         if (!entry.tags.isEmpty()) {
             sb.append(indent).append("tags:").append('\n');
-            for (String tag : entry.tags) {
-                sb.append(indent)
-                        .append("- ")
-                        .append(tag == null ? "" : tag)
-                        .append('\n');
-            }
+            entry.tags.forEach(tag ->
+                    sb.append(indent).append("- ").append(safe(tag)).append('\n'));
         }
 
         for (Entry child : entry.children) {
@@ -767,17 +589,22 @@ public class Entry {
         }
     }
 
-    // ---------------------------------------------------------
-    // INTERNAL GUARD HELPERS
-    // ---------------------------------------------------------
+    private static String safe(String text) {
+        return text == null ? "" : text;
+    }
 
-
-    private <T> T guarded(Supplier<T> s) {
+    private <T> T guarded(Supplier<T> supplier) {
         if (threadSafe) {
             synchronized (THREAD_SAFE_LOCK) {
-                return s.get();
+                return supplier.get();
             }
         }
-        return s.get();
+
+        return supplier.get();
+    }
+
+    @FunctionalInterface
+    private interface EmitCall {
+        void apply(Entry scope, BaseConverter converter);
     }
 }

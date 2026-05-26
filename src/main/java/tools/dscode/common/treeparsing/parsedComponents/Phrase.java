@@ -19,6 +19,8 @@ import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CON
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.getDefaultLoggingLevel;
 import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
+import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
+import static tools.dscode.common.reporting.logging.LogForwarder.logSkip;
 import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLevel;
 import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry;
 import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultLoggingLevel;
@@ -49,8 +51,7 @@ public final class Phrase extends PhraseData {
         if (assertionChainMembership != null)
             return true;
         if (getConditional().startsWith("else")) {
-            if (this.position == 0)
-            {
+            if (this.position == 0) {
                 if (parsedLine.previousSiblingConditionalState > -1) {
                     phraseConditionalMode = 0;
                     previouslyResolvedBoolean = false;
@@ -60,31 +61,30 @@ public final class Phrase extends PhraseData {
                     phraseConditionalMode = 0;
                     previouslyResolvedBoolean = false;
                 }
-            }  else if (getPreviousPhrase().phraseConditionalMode > -1) {
+            } else if (getPreviousPhrase().phraseConditionalMode > -1) {
                 phraseConditionalMode = 0;
             } else {
                 phraseConditionalMode = 1;
             }
 
 
-            if(getConditional().trim().equals("else")) {
+            if (getConditional().trim().equals("else")) {
 
-            if(!getRunningStep().emittedStepStartManually && metaTextPrefix.contains("BLOCK_CONDITIONAL")) {
-            if(phraseConditionalMode > 0){
-                    PhraseData phraseData = this;
-                    String emitText = " , " + phraseData.text.replaceFirst("else", "") + phraseData.termination;
-                    while((phraseData = phraseData.getNextPhrase())!= null ) {
-                        if (phraseData.metaTextPrefix.contains("BLOCK_CONDITIONAL"))
-                        {
-                            phraseData.setNextPhrase(null);
-                            break;
+                if (!getRunningStep().emittedStepStartManually && metaTextPrefix.contains("BLOCK_CONDITIONAL")) {
+                    if (phraseConditionalMode > 0) {
+                        PhraseData phraseData = this;
+                        String emitText = " , " + phraseData.text.replaceFirst("else", "") + phraseData.termination;
+                        while ((phraseData = phraseData.getNextPhrase()) != null) {
+                            if (phraseData.metaTextPrefix.contains("BLOCK_CONDITIONAL")) {
+                                phraseData.setNextPhrase(null);
+                                break;
+                            }
+                            emitText += phraseData.text + phraseData.termination;
+                            phraseData = phraseData.getPreviousPhrase();
                         }
-                        emitText += phraseData.text + phraseData.termination;
-                        phraseData = phraseData.getPreviousPhrase();
+                        getRunningStep().emitStepStart(emitText);
                     }
-                    getRunningStep().emitStepStart(emitText);
                 }
-            }
 
             }
 
@@ -140,7 +140,6 @@ public final class Phrase extends PhraseData {
         }
 
 
-
         if (assertionChain == null)
             parsedLine.executedPhrases.add(this);
 
@@ -151,28 +150,28 @@ public final class Phrase extends PhraseData {
         StepExtension currentStep = getRunningStep();
 
         if (shouldRun()) {
-            if(parsedLine.isBlockConditionalStep && !metaTextPrefix.contains("BLOCK_CONDITIONAL"))
+            if (parsedLine.isBlockConditionalStep && !metaTextPrefix.contains("BLOCK_CONDITIONAL"))
                 setDefaultLoggingLevel(Level.INFO);
-            logToDefaultLevel("Running Phrase: " + this);
-            phraseEntry = currentStep.stepEntry.logWithType("PHRASE", toString()).tags("phrase").start();
+            if (assertionChain == null) {
+                phraseEntry = currentStep.stepEntry.logWithType("PHRASE", toString()).tags("phrase").start();
+                logToDefaultLevel("Running Phrase: " + this.resolvedText);
+            } else {
+                logToDefaultLevel("Initiating Assertion Chain: " + assertionChain);
+            }
             setDefaultEntry(phraseEntry);
-            if(currentStep !=null && nextSemicolon())
-            {
+            if (currentStep != null && nextSemicolon()) {
                 currentStep.waitForPageReady = false;
             }
         } else {
-            if(parsedLine.isBlockConditionalStep && metaTextPrefix.contains("BLOCK_CONDITIONAL"))
+            if (parsedLine.isBlockConditionalStep && metaTextPrefix.contains("BLOCK_CONDITIONAL"))
                 setDefaultLoggingLevel(Level.DEBUG);
-            logToDefaultLevel("Skipping Phrase: " + this);
-//            phraseEntry = currentStep.stepEntry.logWithType("PHRASE", toString()).tags("phrase").start();
-//            setDefaultEntry(phraseEntry);
+            logSkip("Skipping Phrase: " + this.resolvedText);
             wasPhraseSkipped = true;
             assertionChain = null;
             return;
         }
 
 
-//        getCurrentScenarioState().currentPhrase = this;
 
         if (noExecution) {
             logDebug("Context branch set");
@@ -201,8 +200,7 @@ public final class Phrase extends PhraseData {
             List obj;
             try {
                 obj = getPhraseParsingMap().get(firstElement);
-            }
-            catch (NullPointerException e) {
+            } catch (NullPointerException e) {
                 obj = null;
             }
             if (obj == null)
@@ -300,8 +298,8 @@ public final class Phrase extends PhraseData {
         PhraseData resolvedPhrase = new Phrase(originalText, termination, parsedLine, getPreviousPhrase());
         setResolvedPhrase(resolvedPhrase);
         getResolvedPhrase().position = position;
-        if(assertionChain != null)
-            copyAssertionChainToNewPhrase(this,  getResolvedPhrase());
+        if (assertionChain != null)
+            copyAssertionChainToNewPhrase(this, getResolvedPhrase());
         getResolvedPhrase().untilPhrase = untilPhrase;
         getResolvedPhrase().setNextPhrase(getNextPhrase());
         return getResolvedPhrase();
@@ -336,7 +334,7 @@ public final class Phrase extends PhraseData {
         clonePhrase.actionOperation = phrase.actionOperation;
         clonePhrase.assertionOperation = phrase.assertionOperation;
         clonePhrase.isOperationPhrase = phrase.isOperationPhrase;
-        clonePhrase.phraseType =  phrase.phraseType;
+        clonePhrase.phraseType = phrase.phraseType;
         clonePhrase.untilPhrase = phrase.untilPhrase;
         clonePhrase.phraseConditionalMode = phrase.phraseConditionalMode;
         clonePhrase.result = null;

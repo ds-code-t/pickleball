@@ -1,5 +1,7 @@
 package tools.dscode.testengine;
 
+import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
+
 public final class EngineFilterBootstrap {
 
     public static final String INCLUDE_ENGINES_KEY = "junit.platform.discovery.includeEngines";
@@ -17,7 +19,7 @@ public final class EngineFilterBootstrap {
         }
 
         if (Boolean.parseBoolean(System.getProperty(OPT_OUT_KEY, "false"))) {
-            System.err.println("[Pickleball] Engine filter disabled via -D" + OPT_OUT_KEY + "=true (origin: " + origin + ")");
+            logTrace("[Pickleball] Engine filter disabled via -D" + OPT_OUT_KEY + "=true (origin: " + origin + ")");
             applied = true;
             return;
         }

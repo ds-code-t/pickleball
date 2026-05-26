@@ -11,6 +11,9 @@ import org.junit.platform.engine.UniqueId;
 import java.util.Map;
 import java.util.TreeMap;
 
+import static tools.dscode.common.reporting.logging.LogForwarder.logError;
+import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
+
 public final class DynamicSuiteEngine implements TestEngine {
 
     public static final String ENGINE_ID = "pickleball-test-engine";
@@ -29,14 +32,14 @@ public final class DynamicSuiteEngine implements TestEngine {
     @Override
     public TestDescriptor discover(EngineDiscoveryRequest discoveryRequest, UniqueId uniqueId) {
         try {
-            System.err.println("[DynamicSuiteEngine] discover() called");
+            logTrace("[DynamicSuiteEngine] discover() called");
             PickleballRunner suite = DynamicSuiteBootstrap.initialize(discoveryRequest);
-            System.err.println("[DynamicSuiteEngine] Discovery succeeded using suite subclass: " + suite.getClass().getName());
+            logTrace("[DynamicSuiteEngine] Discovery succeeded using suite subclass: " + suite.getClass().getName());
 
             MergedConfigurationParameters mergedParameters =
                     new MergedConfigurationParameters(discoveryRequest.getConfigurationParameters(), suite.values());
 
-            System.err.println("[DynamicSuiteEngine] Final discovery configuration parameters: "
+            logTrace("[DynamicSuiteEngine] Final discovery configuration parameters: "
                     + new TreeMap<>(materialize(mergedParameters)));
 
             DynamicEngineDiscoveryRequest wrappedRequest =
@@ -44,7 +47,7 @@ public final class DynamicSuiteEngine implements TestEngine {
 
             return delegate.discover(wrappedRequest, uniqueId);
         } catch (RuntimeException e) {
-            System.err.println("[DynamicSuiteEngine] discover() failed: " + e.getMessage());
+            logError("[DynamicSuiteEngine] discover() failed: " + e.getMessage());
             e.printStackTrace(System.err);
             throw e;
         }
@@ -53,15 +56,15 @@ public final class DynamicSuiteEngine implements TestEngine {
     @Override
     public void execute(ExecutionRequest request) {
         try {
-            System.err.println("[DynamicSuiteEngine] execute() called");
+            logTrace("[DynamicSuiteEngine] execute() called");
 
             PickleballRunner suite = PickleballRunner.getInstance();
-            System.err.println("[DynamicSuiteEngine] Using suite singleton: " + suite.getClass().getName());
+            logTrace("[DynamicSuiteEngine] Using suite singleton: " + suite.getClass().getName());
 
             MergedConfigurationParameters mergedParameters =
                     new MergedConfigurationParameters(request.getConfigurationParameters(), suite.values());
 
-            System.err.println("[DynamicSuiteEngine] Final execution configuration parameters: "
+            logTrace("[DynamicSuiteEngine] Final execution configuration parameters: "
                     + new TreeMap<>(materialize(mergedParameters)));
 
             ExecutionRequest wrappedRequest = ExecutionRequest.create(
@@ -71,10 +74,10 @@ public final class DynamicSuiteEngine implements TestEngine {
             );
 
                 delegate.execute(wrappedRequest);
-                System.err.println("[DynamicSuiteEngine] Delegate execution completed");
+                logTrace("[DynamicSuiteEngine] Delegate execution completed");
 
         } catch (RuntimeException e) {
-            System.err.println("[DynamicSuiteEngine] execute() failed: " + e.getMessage());
+           logError("[DynamicSuiteEngine] execute() failed: " + e.getMessage());
             e.printStackTrace(System.err);
             throw e;
         }

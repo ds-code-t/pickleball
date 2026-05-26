@@ -13,6 +13,7 @@ import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
+import tools.dscode.common.reporting.logging.Entry;
 
 import java.lang.reflect.InvocationTargetException;
 import java.time.Duration;
@@ -30,6 +31,7 @@ import static io.cucumber.core.runner.CurrentScenarioState.getScenarioLogRoot;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getGlobalEventBus;
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.getTestCase;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
@@ -45,6 +47,7 @@ import static tools.dscode.common.gherkinoperations.DynamicExecution.getCustomSt
 import static tools.dscode.common.mappings.MappingProcessor.getDataTableMap;
 import static tools.dscode.common.mappings.MappingProcessor.getDocStringMap;
 import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
+import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry;
 import static tools.dscode.common.util.GeneralUtils.stackTraceToString;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
 import static tools.dscode.common.util.debug.DebugUtils.parseDebugString;
@@ -166,17 +169,15 @@ public class StepExtension extends StepData {
         }
         executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
         executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
-        stepEntry = getScenarioLogRoot().logWithType("STEP", executingPickleStepTestStep.getStepText()).tags("Step").start();
+        Entry parentEntry = parentStep == null  || ((StepExtension)parentStep).stepEntry == null ?  getScenarioLogRoot() :  ((StepExtension)parentStep).stepEntry;
+        String stepText = executingPickleStepTestStep.getStepText().replaceFirst("^([:\\s]*)", "$1 " + executingPickleStepTestStep.getStep().getKeyword()) + " ";
+        stepEntry = parentEntry.logWithType("STEP", stepText).tags("Step").start();
+        setDefaultEntry(getRunningStep().stepEntry);
         lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
         io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep, executionMode);
 
         if (result.getError() != null) {
-//            stepEntry.error("Exception: " + result.getError().getClass().getName())
             stepEntry.error(stackTraceToString(result.getError()))
-//                    .field("message:" + result.getError().getMessage())
-//                    .field("trace:" + Arrays.stream(result.getError().getStackTrace())
-//                            .map(StackTraceElement::toString)
-//                            .toList())
                     .timestamp();
         }
 

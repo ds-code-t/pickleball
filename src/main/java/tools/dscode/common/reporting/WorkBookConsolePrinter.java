@@ -1,5 +1,7 @@
 package tools.dscode.common.reporting;
 
+import org.apache.logging.log4j.core.pattern.AnsiEscape;
+import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Level;
 
 import java.lang.reflect.Field;
@@ -8,31 +10,30 @@ import java.util.*;
 
 import static tools.dscode.testengine.PickleballRunner.LOG_LEVEL;
 
-/**
- * Prints WorkBook contents to the console (in-memory; does NOT require writing the .xlsx).
- * <p>
- * If a "STATUS" header exists:
- * - STATUS == "FAILED" => row printed in red
- * - STATUS == "PASSED" => row printed in green
- * <p>
- * Also prints a highlighted summary line:
- * "Ran N SCENARIOS, X <STATUS1>, Y <STATUS2>, ..."
- */
 public final class WorkBookConsolePrinter {
 
-    // ANSI styles
     private static final String RESET = "\u001B[0m";
-    private static final String RED = "\u001B[31m";
-    private static final String GREEN = "\u001B[32m";
-    private static final String YELLOW = "\u001B[33m";
-    private static final String BLUE = "\u001B[34m";
-    private static final String BOLD = "\u001B[1m";
-    private static final String BLINK = "\u001B[5m";
+
+    private static final String RED = "RED";
+    private static final String GREEN = "GREEN";
+    private static final String YELLOW = "YELLOW";
+    private static final String BLUE = "BLUE";
+    private static final String BOLD = "BOLD";
+    private static final String BLINK = "BLINK";
+    private static final String UNDERLINE = "UNDERLINE";
+    private static final String DIM = "DIM";
+    private static final String BG_BLACK = "BG_BLACK";
 
     private static final String FRAME_LINE =
             "================================================================================";
-
     private static final String STAR_LINE = "************";
+
+    public enum PrintStyle {
+        PLAIN,
+        LEVEL,
+        HEADER,
+        DIM
+    }
 
     private WorkBookConsolePrinter() {
     }
@@ -44,7 +45,6 @@ public final class WorkBookConsolePrinter {
     public static void printToConsole(WorkBook book, boolean useAnsiColors) {
         Objects.requireNonNull(book, "book");
 
-        // ---- global spacer + frame ----
         System.out.println();
         System.out.println(FRAME_LINE);
         System.out.println("WORKBOOK REPORT");
@@ -61,6 +61,7 @@ public final class WorkBookConsolePrinter {
 
         for (Object snap : snapshots) {
             String sheetName = (String) getField(snap, "sheetName");
+
             @SuppressWarnings("unchecked")
             List<String> headers = (List<String>) getField(snap, "headers");
 
@@ -82,7 +83,6 @@ public final class WorkBookConsolePrinter {
             int statusCol = findColumn(headers, "STATUS");
             int cols = headers.size();
 
-            // Build display grid
             List<List<String>> grid = new ArrayList<>();
             grid.add(new ArrayList<>(headers));
 
@@ -104,24 +104,16 @@ public final class WorkBookConsolePrinter {
                 }
             }
 
-            // ---- blinking blue summary block ----
             String summary = buildSummaryLine(scenarioCount, statusCol, statusCounts);
 
             System.out.println();
-            if (useAnsiColors) {
-                System.out.println(BLUE + BLINK + STAR_LINE + RESET);
-                System.out.println(BLUE + BOLD + summary + RESET);
-                System.out.println(BLUE + BLINK + STAR_LINE + RESET);
-            } else {
-                System.out.println(STAR_LINE);
-                System.out.println(summary);
-                System.out.println(STAR_LINE);
-            }
+            printStyled(STAR_LINE, useAnsiColors, BLUE, BLINK);
+            printStyled(summary, useAnsiColors, BLUE, BOLD);
+            printStyled(STAR_LINE, useAnsiColors, BLUE, BLINK);
             System.out.println();
 
             int[] widths = computeWidths(grid, cols);
 
-            // ---- table ----
             for (int r = 0; r < grid.size(); r++) {
                 List<String> row = grid.get(r);
 
@@ -134,14 +126,14 @@ public final class WorkBookConsolePrinter {
 
                 String line = formatRow(row, cols, widths);
 
-                if (useAnsiColors && color != null)
-                    System.out.println(color + line + RESET);
-                else
+                if (color == null) {
                     System.out.println(line);
+                } else {
+                    printStyled(line, useAnsiColors, color);
+                }
             }
         }
 
-        // ---- bottom frame ----
         System.out.println();
         System.out.println(FRAME_LINE);
         System.out.println("END OF WORKBOOK REPORT");
@@ -149,21 +141,135 @@ public final class WorkBookConsolePrinter {
         System.out.println();
     }
 
-    // ---------------- summary ----------------
+    // ---------------------------------------------------------
+    // ENTRY PRINTING
+    // ---------------------------------------------------------
+
+    public static Entry print(Entry entry) {
+        return print(entry, PrintStyle.LEVEL, true);
+    }
+
+    public static Entry print(Entry entry, PrintStyle printStyle) {
+        return print(entry, printStyle, true);
+    }
+
+    public static Entry print(Entry entry, PrintStyle printStyle, boolean useAnsiColors) {
+        if (entry == null) return null;
+
+        Level level = entry.level;
+        if (level != null && LOG_LEVEL != null && level.ordinal() < LOG_LEVEL.ordinal()) {
+            return entry;
+        }
+
+        String text = switch (printStyle) {
+            case LEVEL -> level == null
+                    ? safe(entry.text)
+                    : "[" + level + "] " + safe(entry.text);
+            case PLAIN, HEADER, DIM -> safe(entry.text);
+        };
+
+        printLine(entry.indentedSpace(), text, useAnsiColors, stylesFor(entry, printStyle));
+        return entry;
+    }
+
+    private static String[] stylesFor(Entry entry, PrintStyle printStyle) {
+        return switch (printStyle) {
+            case PLAIN -> new String[0];
+            case HEADER -> new String[]{BG_BLACK, YELLOW, BOLD, UNDERLINE};
+            case DIM -> new String[]{YELLOW, DIM};
+            case LEVEL -> stylesForLevel(entry.level);
+        };
+    }
+
+    private static String[] stylesForLevel(Level level) {
+        if (level == null) return new String[0];
+
+        return switch (level) {
+            case INFO -> new String[]{BLUE};
+            case WARN -> new String[]{YELLOW, BOLD};
+            case ERROR -> new String[]{RED, BOLD};
+            case DEBUG -> new String[]{BLUE, BOLD};
+            case TRACE -> new String[]{BLUE};
+        };
+    }
+
+    // ---------------------------------------------------------
+    // CENTRAL ANSI PRINTING
+    // ---------------------------------------------------------
+
+    public static void printStyled(String text, String... styles) {
+        printStyled(text, true, styles);
+    }
+
+    public static void printStyled(String text, boolean useAnsiColors, String... styles) {
+        if (text == null) {
+            System.out.println();
+            return;
+        }
+
+        int split = firstNonIndentWhitespaceIndex(text);
+        printLine(text.substring(0, split), text.substring(split), useAnsiColors, styles);
+    }
+
+    private static void printLine(
+            String indent,
+            String text,
+            boolean useAnsiColors,
+            String... styles
+    ) {
+        indent = indent == null ? "" : indent;
+        text = text == null ? "" : text;
+
+        int textIndentEnd = firstNonIndentWhitespaceIndex(text);
+        if (textIndentEnd > 0) {
+            indent += text.substring(0, textIndentEnd);
+            text = text.substring(textIndentEnd);
+        }
+
+        if (!useAnsiColors || styles == null || styles.length == 0) {
+            System.out.println(indent + text);
+            return;
+        }
+
+        System.out.println(indent + AnsiEscape.createSequence(styles) + text + RESET);
+    }
+
+    private static int firstNonIndentWhitespaceIndex(String text) {
+        int i = 0;
+
+        while (i < text.length()
+                && Character.isWhitespace(text.charAt(i))
+                && text.charAt(i) != '\n'
+                && text.charAt(i) != '\r') {
+            i++;
+        }
+
+        return i;
+    }
+
+    private static String safe(String text) {
+        return text == null ? "" : text;
+    }
+
+    // ---------------------------------------------------------
+    // WORKBOOK HELPERS
+    // ---------------------------------------------------------
 
     private static String buildSummaryLine(
             int scenarioCount,
             int statusCol,
             LinkedHashMap<String, Integer> statusCounts
     ) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Ran ").append(scenarioCount).append(" SCENARIOS");
+        StringBuilder sb = new StringBuilder("Ran ")
+                .append(scenarioCount)
+                .append(" SCENARIOS");
 
         if (statusCol >= 0 && !statusCounts.isEmpty()) {
             for (Map.Entry<String, Integer> e : statusCounts.entrySet()) {
                 sb.append(", ").append(e.getValue()).append(" ").append(e.getKey());
             }
         }
+
         return sb.toString();
     }
 
@@ -177,8 +283,6 @@ public final class WorkBookConsolePrinter {
         return null;
     }
 
-    // ---------------- rendering helpers ----------------
-
     private static List<String> renderRow(
             List<String> headers,
             Object rowObj,
@@ -186,11 +290,12 @@ public final class WorkBookConsolePrinter {
             String rowKeyHeaderName
     ) {
         String rowKey = (String) getField(rowObj, "rowKey");
+
         @SuppressWarnings("unchecked")
-        Map<String, Object> values =
-                (Map<String, Object>) getField(rowObj, "values");
+        Map<String, Object> values = (Map<String, Object>) getField(rowObj, "values");
 
         List<String> out = new ArrayList<>(headers.size());
+
         for (String h : headers) {
             if (includeRowKeyColumn && Objects.equals(h, rowKeyHeaderName)) {
                 out.add(rowKey == null ? "" : rowKey);
@@ -199,6 +304,7 @@ public final class WorkBookConsolePrinter {
                 out.add(v == null ? "" : String.valueOf(v));
             }
         }
+
         return out;
     }
 
@@ -210,38 +316,51 @@ public final class WorkBookConsolePrinter {
     }
 
     private static int[] computeWidths(List<List<String>> grid, int cols) {
-        int[] w = new int[cols];
+        int[] widths = new int[cols];
+
         for (List<String> row : grid) {
             for (int c = 0; c < cols; c++) {
-                w[c] = Math.max(w[c], safeGet(row, c).length());
+                widths[c] = Math.max(widths[c], safeGet(row, c).length());
             }
         }
-        for (int c = 0; c < cols; c++) w[c] = Math.max(w[c], 3);
-        return w;
+
+        for (int c = 0; c < cols; c++) {
+            widths[c] = Math.max(widths[c], 3);
+        }
+
+        return widths;
     }
 
     private static String formatRow(List<String> row, int cols, int[] widths) {
         StringBuilder sb = new StringBuilder("|");
+
         for (int c = 0; c < cols; c++) {
             String v = safeGet(row, c);
-            sb.append(" ").append(v).append(" ".repeat(widths[c] - v.length())).append(" |");
+
+            sb.append(" ")
+                    .append(v)
+                    .append(" ".repeat(widths[c] - v.length()))
+                    .append(" |");
         }
+
         return sb.toString();
     }
 
     private static String safeGet(List<String> row, int idx) {
-        if (row == null || idx < 0 || idx >= row.size() || row.get(idx) == null) return "";
+        if (row == null || idx < 0 || idx >= row.size() || row.get(idx) == null) {
+            return "";
+        }
+
         return row.get(idx);
     }
-
-    // ---------------- reflection ----------------
 
     private static List<?> snapshotAllSheetsReflective(WorkBook book) {
         try {
             Method m = WorkBook.class.getDeclaredMethod("snapshotAllSheets");
             m.setAccessible(true);
+
             Object out = m.invoke(book);
-            return out instanceof List<?> l ? l : List.of();
+            return out instanceof List<?> list ? list : List.of();
         } catch (Exception e) {
             throw new RuntimeException("Unable to snapshot WorkBook", e);
         }
@@ -254,166 +373,8 @@ public final class WorkBookConsolePrinter {
             return f.get(target);
         } catch (Exception e) {
             throw new RuntimeException(
-                    "Unable to read field '" + fieldName + "' from " + target.getClass(), e);
+                    "Unable to read field '" + fieldName + "' from " + target.getClass(), e
+            );
         }
     }
-
-
-    // ---------------- level printing (simple "log-like" helpers) ----------------
-
-    public static void printByLevel(Level level, String msg) {
-        switch (level) {
-            case INFO:
-                printInfo(msg);
-                break;
-            case WARN:
-                printWarn(msg);
-                break;
-            case ERROR:
-                printError(msg);
-                break;
-            case DEBUG:
-                printDebug(msg);
-                break;
-            case TRACE:
-                printTrace(msg);
-        }
-    }
-
-
-    /**
-     * Convenience: INFO-styled line.
-     */
-    public static void printInfo(String msg) {
-        printlnStyled(Level.INFO, msg, BLUE, false);
-    }
-
-    /**
-     * Convenience: WARN-styled line.
-     */
-    public static void printWarn(String msg) {
-        printlnStyled(Level.WARN, msg, YELLOW, true);
-    }
-
-    /**
-     * Convenience: ERROR-styled line.
-     */
-    public static void printError(String msg) {
-        printlnStyled(Level.ERROR, msg, RED, true);
-    }
-
-    /**
-     * Convenience: DEBUG-styled line.
-     */
-    public static void printDebug(String msg) {
-        printlnStyled(Level.DEBUG, msg, BLUE, true);
-    }
-
-    /**
-     * Convenience: TRACE-styled line.
-     */
-    public static void printTrace(String msg) {
-        printlnStyled(Level.TRACE, msg, BLUE, false);
-    }
-
-    /**
-     * Same helpers, but caller can decide whether ANSI is enabled.
-     */
-    public static void info(String msg, boolean useAnsiColors) {
-        printlnStyled(Level.INFO, msg, BLUE, false, useAnsiColors);
-    }
-
-    public static void warn(String msg, boolean useAnsiColors) {
-        printlnStyled(Level.WARN, msg, RED, true, useAnsiColors);
-    }
-
-    public static void error(String msg, boolean useAnsiColors) {
-        printlnStyled(Level.ERROR, msg, RED, true, useAnsiColors);
-    }
-
-    public static void debug(String msg, boolean useAnsiColors) {
-        printlnStyled(Level.DEBUG, msg, BLUE, true, useAnsiColors);
-    }
-
-    public static void trace(String msg, boolean useAnsiColors) {
-        printlnStyled(Level.TRACE, msg, BLUE, false, useAnsiColors);
-    }
-
-    /**
-     * Optional block style if you want a framed message using the existing FRAME_LINE.
-     */
-    public static void errorBlock(String title, String msg, boolean useAnsiColors) {
-        printBlock(Level.ERROR, title, msg, RED, true, useAnsiColors);
-    }
-
-    public static void warnBlock(String title, String msg, boolean useAnsiColors) {
-        printBlock(Level.WARN, title, msg, RED, true, useAnsiColors);
-    }
-
-    public static void infoBlock(String title, String msg, boolean useAnsiColors) {
-        printBlock(Level.INFO, title, msg, BLUE, false, useAnsiColors);
-    }
-
-    public static void debugBlock(String title, String msg, boolean useAnsiColors) {
-        printBlock(Level.DEBUG, title, msg, BLUE, true, useAnsiColors);
-    }
-
-    public static void traceBlock(String title, String msg, boolean useAnsiColors) {
-        printBlock(Level.TRACE, title, msg, BLUE, false, useAnsiColors);
-    }
-
-    // ---------------- internals ----------------
-
-    private static void printlnStyled(Level level, String msg, String color, boolean bold) {
-        printlnStyled(level, msg, color, bold, true);
-    }
-
-    private static void printlnStyled(Level level, String msg, String color, boolean bold, boolean useAnsiColors) {
-        if (level.ordinal() < LOG_LEVEL.ordinal())
-            return;
-        String text = formatLevelLine(level, msg);
-        if (!useAnsiColors) {
-            System.out.println(text);
-            return;
-        }
-        String style = bold ? (color + BOLD) : color;
-        System.out.println(style + text + RESET);
-    }
-
-    private static void printBlock(
-            Level level,
-            String title,
-            String msg,
-            String color,
-            boolean bold,
-            boolean useAnsiColors
-    ) {
-        if (level.ordinal() < LOG_LEVEL.ordinal())
-            return;
-        String header = (title == null || title.isBlank()) ? level.toString() : (level + ": " + title);
-
-        System.out.println();
-        if (!useAnsiColors) {
-            System.out.println(FRAME_LINE);
-            System.out.println(header);
-            System.out.println(FRAME_LINE);
-            if (msg != null && !msg.isBlank()) System.out.println(msg);
-            System.out.println();
-            return;
-        }
-
-        String style = bold ? (color + BOLD) : color;
-        System.out.println(style + FRAME_LINE + RESET);
-        System.out.println(style + header + RESET);
-        System.out.println(style + FRAME_LINE + RESET);
-        if (msg != null && !msg.isBlank()) System.out.println(style + msg + RESET);
-        System.out.println();
-    }
-
-    private static String formatLevelLine(Level level, String msg) {
-        String m = (msg == null) ? "" : msg;
-        return "[" + level + "] " + m;
-    }
-
-
 }

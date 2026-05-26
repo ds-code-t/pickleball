@@ -17,6 +17,7 @@ import static io.cucumber.core.options.Constants.FEATURES_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.FILTER_NAME_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.FILTER_TAGS_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
+import static tools.dscode.common.reporting.logging.LogForwarder.logError;
 import static tools.dscode.common.util.debug.DebugUtils.debugFlags;
 
 
@@ -228,7 +229,7 @@ public abstract class PickleballRunner {
 
             debug("Loaded " + count + " resource(s) named " + resourceName);
         } catch (Exception e) {
-            System.err.println("[DynamicSuiteBase] Failed loading " + resourceName + ": " + e);
+            logError("[DynamicSuiteBase] Failed loading " + resourceName + ": " + e);
             throw new RuntimeException("Failed loading " + resourceName, e);
         }
     }
@@ -260,7 +261,7 @@ public abstract class PickleballRunner {
 
             debug("Loaded " + count + " resource(s) named " + resourceName);
         } catch (Exception e) {
-            System.err.println("[DynamicSuiteBase] Failed loading " + resourceName + ": " + e);
+            logError("[DynamicSuiteBase] Failed loading " + resourceName + ": " + e);
             throw new RuntimeException("Failed loading " + resourceName, e);
         }
     }
@@ -364,7 +365,7 @@ public abstract class PickleballRunner {
     }
 
     private static void debug(String message) {
-//        System.err.println("[DynamicSuiteBase] " + message);
+//        logTrace("[DynamicSuiteBase] " + message);
     }
 
 

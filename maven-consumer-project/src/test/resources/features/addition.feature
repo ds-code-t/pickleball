@@ -3,18 +3,19 @@ Feature: Addition
 
   Scenario: tterts
     * , save "A", and save "B"
+    * , if 1 equals 3 , save "C"
 
   Scenario: untils;dfwer34
     * , until 3==3:
-    : * , save "A"
+  : * , save "A"
 
   Scenario Outline:
     *  IF:  3 == 4:
-    : * SET "ngd" DATA TABLE
-      | A |
-      | 1 |
-      | 2 |
-      | 3 |
+  : * SET "ngd" DATA TABLE
+    | A |
+    | 1 |
+    | 2 |
+    | 3 |
     *  ELSE:
   : * SET "ngd" DATA TABLE
     | A |
@@ -111,6 +112,26 @@ Feature: Addition
   :   * , save "<A><X>" as "A"
     * , save "qqq" as "A"
     * , save "qqq" as "A"
+
+    @testr
+  Scenario: nesting log test 12
+    When , if 1 == 2 , save "BBB"
+    When , if 1,2,3, or 4 is 3?
+  :  When , if 5,6,7, or 8 is 5?
+  ::  * , save "A", and "B"
+
+  @testr
+  Scenario: nesting log test 13
+    When , if 1,2,3, or 4 is 1?
+  :  When , if 5,6,7, or 8 is 8?
+  ::  * , save "A", and "B"
+
+
+  @testr
+  Scenario: nesting log test 12sss
+    When , if 1,2,3, or 4 is 3?
+  :  When , if 5,6,7, or 8 is 5?
+  ::  * , save "A", and "B"
 
   Scenario: Extended comma separated assertion phrase combinationss CORRECTED
 
@@ -263,9 +284,9 @@ Feature: Addition
     When , if 1,2,3, and 4 is 3?
   : * , save "NO!!"
 
-Scenario: chainasfd aw
-  When ,  1 is 1 , 2 is 2 ,  3 is 3 , and {"true"} ?
-: * , save "YES!!"
+  Scenario: chainasfd aw
+    When ,  1 is 1 , 2 is 2 ,  3 is 3 , and {"true"} ?
+  : * , save "YES!!"
 
 
   Scenario: Chain testing

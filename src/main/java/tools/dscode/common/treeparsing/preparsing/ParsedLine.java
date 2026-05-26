@@ -18,6 +18,7 @@ import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
 import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.assertions.AssertionChain.isAssertionChainBorder;
 import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
+import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry;
 
 
 public final class ParsedLine extends LineData {
@@ -124,6 +125,7 @@ public final class ParsedLine extends LineData {
 
     @Override
     public PhraseData runPhraseFromLine(PhraseData phrase) {
+//        setDefaultEntry(getRunningStep().stepEntry);
         phrase.setOperationInheritanceIfNeeded();
 
         if (!phrase.getAssertion().isBlank() && phrase.assertionChainMembership == null && phrase.assertionChain == null) {
@@ -151,7 +153,6 @@ public final class ParsedLine extends LineData {
         }
 
 
-        StepExtension currentStep = getRunningStep();
         getCurrentScenarioState().currentPhrase = (tools.dscode.common.treeparsing.parsedComponents.Phrase) phrase;
 
 //        if (stepEntry != null) {
@@ -159,7 +160,8 @@ public final class ParsedLine extends LineData {
 //        }
         PhraseData nextResolvedPhrase = phrase.runPhrase();
 
-        phrase.phraseEntry.stop();
+        if(phrase.phraseEntry != null)
+            phrase.phraseEntry.stop();
 
         getCurrentScenarioState().currentPhrase = null;
 
