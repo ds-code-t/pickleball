@@ -38,10 +38,10 @@ public class ElementWrapper {
 
 
     public static List<ElementWrapper> getWrappedElements(ElementMatch elementMatch) {
-        if(elementMatch.parentPhrase.contextElement != null)
+        if (elementMatch.parentPhrase.contextElement != null)
             return Collections.singletonList(elementMatch.parentPhrase.contextElement);
         SearchContext searchContext = elementMatch.contextWrapper.getFinalSearchContext();
-        if(elementMatch.parentPhrase.contextElement != null)
+        if (elementMatch.parentPhrase.contextElement != null)
             return Collections.singletonList(elementMatch.parentPhrase.contextElement);
         List<ElementWrapper> elementWrappers = new ArrayList<>();
         List<WebElement> elements = elementMatch.contextWrapper.getElements(searchContext);
@@ -58,7 +58,6 @@ public class ElementWrapper {
     }
 
 
-
     ElementWrapper(WebElement element, ElementMatch elementMatch, Integer matchIndex) {
         this.driver = elementMatch.parentPhrase.getDriver();
         this.matchIndex = matchIndex;
@@ -66,7 +65,7 @@ public class ElementWrapper {
         this.element = Objects.requireNonNull(element, "element must not be null");
 
         takeSnapshot();
-        if(substrings.contains("elementsnapshot"))
+        if (substrings.contains("elementsnapshot"))
             System.out.println(attributeSnapshot.toPrettyString());
 
         // Build the persistent locating XPath (no JS).
@@ -89,14 +88,17 @@ public class ElementWrapper {
 
         // textContent (DOM text, not just visible text)
         String textContent;
-        if("textarea".equals(tagName) || "input".equals(tagName) || "select".equals(tagName)) {
-            textContent  = element.getAttribute("value");
-        }
-        else {
+        if ("textarea".equals(tagName) || "input".equals(tagName)) {
+            textContent = element.getAttribute("value");
+        } else if ("select".equals(tagName)) {
+            textContent = (String) js.executeScript(
+                    "var sel = arguments[0]; return sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';", element
+            );
+        } else {
             textContent = (String) js.executeScript(
                     "return arguments[0].innerText;", element
             );
-            if(textContent == null || textContent.isEmpty()) {
+            if (textContent == null || textContent.isEmpty()) {
                 textContent = element.getAttribute("value");
             }
         }
@@ -192,8 +194,7 @@ public class ElementWrapper {
             if (key.startsWith("attributes")) {
                 node = (ObjectNode) attributeSnapshot.get("attributes");
                 key = key.substring("attributes".length() + 1);
-            }
-            else {
+            } else {
                 node = attributeSnapshot;
             }
             if (node.has(key)) {

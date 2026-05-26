@@ -327,7 +327,7 @@ public class Entry {
                         .tags("Screenshot")
                         .timestamp();
 
-                info("Screenshot attached");
+//                info("Screenshot attached");
             } catch (Throwable t) {
                 error("Failed to take Screenshot due to \"" + t.getMessage() + "\"");
             }
