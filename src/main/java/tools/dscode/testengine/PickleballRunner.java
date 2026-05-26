@@ -131,7 +131,6 @@ public abstract class PickleballRunner {
         if (debugFlags != null) {
             if (debugFlags.contains("logallsteps"))
                 CurrentScenarioState.logAllSteps = true;
-
         }
 
         String raw = values.get(PKB_DEBUG_BROWSER);

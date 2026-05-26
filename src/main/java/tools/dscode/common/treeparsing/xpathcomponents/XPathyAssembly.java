@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 
 import static tools.dscode.common.util.debug.DebugUtils.debugFlags;
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
-import static tools.dscode.common.util.debug.DebugUtils.substrings;
+
 
 public final class XPathyAssembly {
 
@@ -368,8 +368,8 @@ public final class XPathyAssembly {
     public static String prettyPrintXPath(String xpath) {
         if (xpath == null) return null;
 
-        if (stripPseudoTags == null) stripPseudoTags = !substrings.contains("pseudotags");
-        if (normalizeWhiteSpace == null) normalizeWhiteSpace = !substrings.contains("rawxpaths");
+        if (stripPseudoTags == null) stripPseudoTags = !debugFlags.contains("pseudotags");
+        if (normalizeWhiteSpace == null) normalizeWhiteSpace = !debugFlags.contains("rawxpaths");
 
         final int threshold = 20;
         final String indentUnit = " ";

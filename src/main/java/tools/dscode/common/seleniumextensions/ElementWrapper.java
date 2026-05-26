@@ -23,7 +23,8 @@ import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementMatch.ELEMENT_RETURN_VALUE;
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
-import static tools.dscode.common.util.debug.DebugUtils.substrings;
+import static tools.dscode.common.util.debug.DebugUtils.debugFlags;
+
 
 
 public class ElementWrapper {
@@ -65,7 +66,7 @@ public class ElementWrapper {
         this.element = Objects.requireNonNull(element, "element must not be null");
 
         takeSnapshot();
-        if (substrings.contains("elementsnapshot"))
+        if (debugFlags.contains("elementsnapshot"))
             System.out.println(attributeSnapshot.toPrettyString());
 
         // Build the persistent locating XPath (no JS).
