@@ -529,6 +529,12 @@ public class ExecutionDictionary {
         return combine(expandAnd(category, value, op), "and");
     }
 
+
+    private Optional<XPathy> andAllWithoutBase(String category, ValueWrapper value, Op op) {
+        return combine(expandInternal(andReg, category, value, op , BaseExpansionMode.NORMAL) , "and");
+    }
+
+
     private Optional<XPathy> andAllForFinalXPath(String category, ValueWrapper value, Op op) {
         return combine(expandAndForFinalXPath(category, value, op), "and");
     }
@@ -541,6 +547,14 @@ public class ExecutionDictionary {
     public XPathy andThenOr(String category, ValueWrapper value, Op op) {
         return resolveToXPathy(category, value, op).orElse(null);
     }
+
+
+    public XPathy andThenOrWithoutBase(String category, ValueWrapper value, Op op) {
+        Optional<XPathy> orPart = orAll(category, value, op);
+        Optional<XPathy> andPart = andAllWithoutBase(category, value, op);
+        return resolveFromParts(andPart, orPart, null, false).orElse(null);
+    }
+
 
     public XPathy resolveFinalXPath(String category, ValueWrapper value, Op op) {
         return resolveToFinalXPathy(category, value, op).orElse(null);
@@ -753,7 +767,7 @@ public class ExecutionDictionary {
                         if (s.isBlank()) continue;
                         if (s.equals(host)) continue;
 
-                        dict.registerOrBuilder(host, (ignoredCategory, v, op) -> dict.andThenOr(s, v, op));
+                        dict.registerOrBuilder(host, (ignoredCategory, v, op) -> dict.andThenOrWithoutBase(s, v, op));
                     } else if (ref instanceof Builder b) {
                         dict.registerOrBuilder(host, b);
                     }
@@ -773,7 +787,7 @@ public class ExecutionDictionary {
                         if (s.isBlank()) continue;
                         if (s.equals(host)) continue;
 
-                        dict.registerAndBuilder(host, (ignoredCategory, v, op) -> dict.andThenOr(s, v, op));
+                        dict.registerAndBuilder(host, (ignoredCategory, v, op) -> dict.andThenOrWithoutBase(s, v, op));
                     } else if (ref instanceof Builder b) {
                         dict.registerAndBuilder(host, b);
                     }
@@ -796,7 +810,7 @@ public class ExecutionDictionary {
                             if (s.isBlank()) continue;
                             if (s.equals(host)) continue;
 
-                            XPathy x = dict.andThenOr(s, v, op);
+                            XPathy x = dict.andThenOrWithoutBase(s, v, op);
                             if (x != null) parts.add(x);
                         } else if (ref instanceof Builder b) {
                             XPathy x = tryConvertToXPathy(b.build(ignoredCategory, v, op));
@@ -824,7 +838,7 @@ public class ExecutionDictionary {
                             if (s.isBlank()) continue;
                             if (s.equals(host)) continue;
 
-                            XPathy x = dict.andThenOr(s, v, op);
+                            XPathy x = dict.andThenOrWithoutBase(s, v, op);
                             if (x != null) parts.add(x);
                         } else if (ref instanceof Builder b) {
                             XPathy x = tryConvertToXPathy(b.build(ignoredCategory, v, op));

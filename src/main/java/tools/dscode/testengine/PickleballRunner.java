@@ -27,6 +27,7 @@ public abstract class PickleballRunner {
 
     static {
         EngineFilterBootstrap.ensureEngineFilterApplied("PickleballRunner.<clinit>");
+        java.util.logging.Logger.getLogger("org.junit.platform.launcher.core").setLevel(java.util.logging.Level.SEVERE);
     }
 
 
