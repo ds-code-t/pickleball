@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 
@@ -183,7 +184,7 @@ public abstract class PickleballRunner {
     }
 
     public final String get(String key) {
-        return values.get(key);
+        return values.get(normalizePkbKey(key));
     }
 
     public static String getTestConfigurationValue(String key) {
@@ -223,7 +224,7 @@ public abstract class PickleballRunner {
                 }
 
                 for (String key : props.stringPropertyNames()) {
-                    values.putIfAbsent(key, props.getProperty(key));
+                    values.putIfAbsent(normalizePkbKey(key), props.getProperty(key));
                 }
             }
 
@@ -255,7 +256,7 @@ public abstract class PickleballRunner {
                 }
 
                 for (String key : props.stringPropertyNames()) {
-                    values.put(key, props.getProperty(key));
+                    values.put(normalizePkbKey(key), props.getProperty(key));
                 }
             }
 
@@ -277,7 +278,7 @@ public abstract class PickleballRunner {
                 continue;
             }
 
-            values.put(key, sys.getProperty(key));
+            values.put(normalizePkbKey(key), sys.getProperty(key));
             count++;
         }
 
@@ -380,7 +381,17 @@ public abstract class PickleballRunner {
     }
 
     private static boolean isDerivedInternalKey(String key) {
-        return PKB_OPTIONS.equals(key);
+        return PKB_OPTIONS.equals(normalizePkbKey(key));
     }
 
+
+    static String normalizePkbKey(String key) {
+        if (key == null) {
+            return null;
+        }
+
+        return key.regionMatches(true, 0, PKB_PREFIX, 0, PKB_PREFIX.length())
+                ? key.toLowerCase(Locale.ROOT)
+                : key;
+    }
 }

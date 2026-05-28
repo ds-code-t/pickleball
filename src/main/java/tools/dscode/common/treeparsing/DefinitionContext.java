@@ -606,15 +606,23 @@ public final class DefinitionContext {
                             XPathy.from("//*[self::thead or self::tr[th or td[@role='columnheader' or @role='rowheader']] or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)][descendant::text()[normalize-space()]]")
                     );
 
-            category("Header").children( "Headers", "Table Header", "Table Headers", "Column Header", "Column Headers").inheritsFrom(CONTAINS_TEXT)
+            category("Header").children("Headers", "Table Header", "Table Headers", "Column Header", "Column Headers").inheritsFrom(CONTAINS_TEXT)
                     .and((category, v, op) ->
                             XPathy.from("//*[self::th or @role='columnheader' or @role='rowheader' or self::*" + customElementSuffixPredicate("header") + " ][not(descendant::table)]")
                     );
 
-            category("Cell").children("Cells").andAnyCategories("cellLabel" , CONTAINS_TEXT)
+            category("Cell").children("Cells").andAnyCategories("cellLabel", CONTAINS_TEXT)
                     .and((category, v, op) ->
                             XPathy.from("//*[self::td or @role='cell' or @role='gridcell' or self::*" + customElementSuffixPredicate("cell") + " ][not(descendant::table)][not(self::th or @role='columnheader' or self::*" + customElementSuffixPredicate("header") + ")][not(self::th or @role='columnheader' or @role='rowheader') ]")
                     );
+
+            category("DataAttribute").andAnyCategories(CONTAINS_TEXT)
+                    .and((category, v, op) ->
+                            XPathy.from("//div[@string_type='field' and descendant::span[contains(@class, 'dataLabelForRead')]]"
+                            )
+                    );
+
+            category("Field").children("Fields").andAnyCategories("DataAttribute", "cellLabel");
 
             category("Column").children("Columns").inheritsFrom("cellLabel");
 

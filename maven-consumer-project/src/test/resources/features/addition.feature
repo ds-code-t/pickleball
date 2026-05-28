@@ -1,5 +1,9 @@
 Feature: Addition
 
+  Scenario: untils;dfwer34
+    * , until 3==1:
+  : * , save "A"
+
 
   Scenario: display TExt test2
     * , verify "Second Value:" Textbox is displayed
@@ -13,9 +17,6 @@ Feature: Addition
     * , save "A", and save "B"
     * , if 1 equals 3 , save "C"
 
-  Scenario: untils;dfwer34
-    * , until 3==3:
-  : * , save "A"
 
   Scenario Outline:
     *  IF:  3 == 4:

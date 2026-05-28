@@ -22,6 +22,7 @@ import tools.dscode.common.exceptions.SoftRuntimeException;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.preparsing.ParsedLine;
+import tools.dscode.common.variables.RunVars;
 import tools.dscode.coredefinitions.ReportingSteps;
 import tools.dscode.registry.GlobalRegistry;
 
@@ -54,6 +55,7 @@ import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.assertions.AssertionChain.copyAssertionChainToNewPhrase;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
+import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.reporting.logging.LogForwarder.logSkip;
 import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry;
 import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultLoggingLevel;
@@ -386,8 +388,10 @@ public class CurrentScenarioState extends ScenarioMapping {
                 stepExtension.lineData.inheritancePhrases.add(null);
             for (PhraseData inheritancePhrase : new ArrayList<>(stepExtension.lineData.inheritancePhrases)) {
                 if (inheritancePhrase != null && inheritancePhrase.untilPhrase) {
-                    long timeoutSeconds = (long) resolveFromVarsOrDefault("stepRepeatMaxTime", 3600L);     // 0 = no time limit
-                    int maxIterations = (int) resolveFromVarsOrDefault("stepRepeatMaxCount", 100);
+                    long timeoutSeconds = Long.parseLong(String.valueOf(RunVars.resolveFromVarsOrDefault("stepRepeatMaxTime", 3600)));     // 0 = no time limit
+                    int maxIterations = Integer.parseInt(String.valueOf(RunVars.resolveFromVarsOrDefault("stepRepeatMaxCount", 100)));
+
+                    logInfo("Repeating step for a maximum of " + timeoutSeconds + " seconds, or " + maxIterations + " iterations" );
 
                     long deadline = timeoutSeconds > 0
                             ? System.nanoTime() + Duration.ofSeconds(timeoutSeconds).toNanos()

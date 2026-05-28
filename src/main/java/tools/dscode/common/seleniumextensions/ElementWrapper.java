@@ -187,6 +187,17 @@ public class ElementWrapper {
                     attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
                     return createValueWrapper(returnVal);
                 }
+                if (element.getTagName().equals("td")) {
+                    String returnVal = element.getText();
+                    attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
+                    return createValueWrapper(returnVal);
+                }
+                valueElements = withoutImplicitWait(driver, () -> element.findElements(By.xpath("*[normalize-space(.)][1]/following-sibling::*[descendant-or-self::*[text()]]")));
+                if (valueElements.size() == 1) {
+                    String returnVal = valueElements.getLast().getText();
+                    attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
+                    return createValueWrapper(returnVal);
+                }
                 break;
         }
         for (String key : elementMatch.defaultValueKeys) {

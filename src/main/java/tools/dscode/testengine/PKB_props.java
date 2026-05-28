@@ -24,12 +24,12 @@ public final class PKB_props {
     }
 
     public static String get(String key) {
-        String v = values().get(key);
+        String v = values().get(PickleballRunner.normalizePkbKey(key));
         return v != null ? v : "";
     }
 
     public static void put(String key, String value) {
-        values().put(key, value);
+        values().put(PickleballRunner.normalizePkbKey(key), value);
     }
 
     public static String browser() {
