@@ -45,8 +45,8 @@ public abstract class PickleballRunner {
     static final String CUCUMBER_TAGS = "cucumber.filter.tags";
     private static final String PKB_NAME = PKB_PREFIX + "name";
     private static final String PKB_PARALLEL = PKB_PREFIX + "parallel";
-    private static final String PKB_DEBUG_BROWSER = PKB_PREFIX + "debugBrowser";
-    private static final String PKB_DEBUG_ARGS = PKB_PREFIX + "debugArgs";
+    private static final String PKB_DEBUG_BROWSER = PKB_PREFIX + "debugbrowser";
+    private static final String PKB_DEBUG_ARGS = PKB_PREFIX + "debugargs";
 
     private static final String CUCUMBER_PARALLEL_ENABLED = "cucumber.execution.parallel.enabled";
     private static final String CUCUMBER_PARALLEL_STRATEGY = "cucumber.execution.parallel.config.strategy";
