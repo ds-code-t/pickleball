@@ -113,7 +113,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         this.pickle = (Pickle) getProperty(testCase, "pickle");
         scenarioName = pickle.getName();
         scenarioNameAndLine = scenarioName + " , Line " + pickle.getLocation().getLine();
-        if(globalDebugBrowser)
+        if (globalDebugBrowser)
             debugBrowser = true;
         featureName = getFeatureName(pickle);
     }
@@ -169,12 +169,11 @@ public class CurrentScenarioState extends ScenarioMapping {
 //    public static boolean logToReportPortal = getDependencyPropertyBoolean("rp.enable");
 
     public void startScenarioRun() {
-        System.out.println("@@startScenarioRun-featureName: " + featureName);
-         String scenarioName = pickle.getName() + " , Line " + pickle.getLocation().getLine();
+        String scenarioName = pickle.getName() + " , Line " + pickle.getLocation().getLine();
         pickleballLog.info("Starting scenario: '" + scenarioName + "'");
 
 
-        ReportPortalBridgeConverter reportPortalBridgeConverter = featureName == null ? new ReportPortalBridgeConverter() : new ReportPortalBridgeConverter(featureName) ;
+        ReportPortalBridgeConverter reportPortalBridgeConverter = featureName == null ? new ReportPortalBridgeConverter() : new ReportPortalBridgeConverter(featureName);
 
         scenarioLog =
                 Entry.of(scenarioName)
@@ -285,11 +284,11 @@ public class CurrentScenarioState extends ScenarioMapping {
         if (endCurrentScenario)
             return;
         currentStep = stepExtension;
-        if(currentStep.definitionFlags.contains(NO_LOGGING) || currentStep.definitionFlags.contains(_NO_LOGGING))
+        if (currentStep.definitionFlags.contains(NO_LOGGING) || currentStep.definitionFlags.contains(_NO_LOGGING))
             setDefaultLoggingLevel(Level.DEBUG);
         else
             setDefaultLoggingLevel(Level.INFO);
-        int lineConditionalMode = stepExtension.lineData == null ?  1 :  stepExtension.lineData.lineConditionalMode;
+        int lineConditionalMode = stepExtension.lineData == null ? 1 : stepExtension.lineData.lineConditionalMode;
         stepExtension.lineData = createParsedLine(stepExtension);
         stepExtension.lineData.lineConditionalMode = lineConditionalMode;
         stepExtension.lineData.setInheritance(stepExtension);
@@ -303,7 +302,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
     public void runningStep(StepExtension stepExtension) {
-        if(logAllSteps){
+        if (logAllSteps) {
             stepExtension.setToLogAll();
         }
 
@@ -324,12 +323,10 @@ public class CurrentScenarioState extends ScenarioMapping {
         } else {
             try {
                 stepExtension.run();
-            }
-            catch (Throwable e){
-                if(stepExtension.result == null){
+            } catch (Throwable e) {
+                if (stepExtension.result == null) {
                     stepExtension.result = new Result(Status.FAILED, Duration.between(startTime, Instant.now()), e);
-                }
-                else if(stepExtension.result.getError() == null) {
+                } else if (stepExtension.result.getError() == null) {
                     stepExtension.result = new Result(stepExtension.result.getStatus(), stepExtension.result.getDuration(), e);
                 }
             }
@@ -397,9 +394,9 @@ public class CurrentScenarioState extends ScenarioMapping {
             return;
         }
 
-        if(stepExtension.lineData.stepExtension.overridePhrase != null && stepExtension.lineData.stepExtension.overridePhrase.result != null && (boolean) stepExtension.lineData.stepExtension.overridePhrase.result.value()){
+        if (stepExtension.lineData.stepExtension.overridePhrase != null && stepExtension.lineData.stepExtension.overridePhrase.result != null && (boolean) stepExtension.lineData.stepExtension.overridePhrase.result.value()) {
             return;
-            }
+        }
 
         if (!stepExtension.definitionFlags.contains(IGNORE_CHILDREN)) {
             if (stepExtension.lineData.inheritancePhrases.isEmpty())
@@ -409,7 +406,7 @@ public class CurrentScenarioState extends ScenarioMapping {
                     long timeoutSeconds = Long.parseLong(String.valueOf(RunVars.resolveFromVarsOrDefault("stepRepeatMaxTime", 3600)));     // 0 = no time limit
                     int maxIterations = Integer.parseInt(String.valueOf(RunVars.resolveFromVarsOrDefault("stepRepeatMaxCount", 100)));
 
-                    logInfo("Repeating step for a maximum of " + timeoutSeconds + " seconds, or " + maxIterations + " iterations" );
+                    logInfo("Repeating step for a maximum of " + timeoutSeconds + " seconds, or " + maxIterations + " iterations");
 
                     long deadline = timeoutSeconds > 0
                             ? System.nanoTime() + Duration.ofSeconds(timeoutSeconds).toNanos()
@@ -427,14 +424,15 @@ public class CurrentScenarioState extends ScenarioMapping {
                         }
                         iteration++;
 
-                        StepExtension clonedStep = stepCloner(inheritancePhrase , stepExtension, IGNORE_CHILDREN_IF_FALSE).getFirst();
-                        clonedStep.overridePhrase = inheritancePhrase.clonePhrase(inheritancePhrase.getPreviousPhrase());;
-                        copyAssertionChainToNewPhrase(inheritancePhrase,  clonedStep.overridePhrase);
+                        StepExtension clonedStep = stepCloner(inheritancePhrase, stepExtension, IGNORE_CHILDREN_IF_FALSE).getFirst();
+                        clonedStep.overridePhrase = inheritancePhrase.clonePhrase(inheritancePhrase.getPreviousPhrase());
+                        ;
+                        copyAssertionChainToNewPhrase(inheritancePhrase, clonedStep.overridePhrase);
                         clonedStep.nextSibling = null;
-                        clonedStep.pickleStepTestStep.substituteStep =  clonedStep.createNewStepExtension(", ---" + clonedStep.overridePhrase.assertionChain).pickleStepTestStep;
+                        clonedStep.pickleStepTestStep.substituteStep = clonedStep.createNewStepExtension(", ---" + clonedStep.overridePhrase.assertionChain).pickleStepTestStep;
                         waitMilliseconds(400);
                         runStep(clonedStep);
-                        if (clonedStep.overridePhrase.phraseConditionalMode> 0)
+                        if (clonedStep.overridePhrase.phraseConditionalMode > 0)
                             break;
 
 

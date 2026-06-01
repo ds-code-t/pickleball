@@ -23,8 +23,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class ReportPortalBridgeConverter extends BaseConverter {
 
-    private static final String RP_SUITE_PREFIX = "RP_SUITE:";
-
     private final List<String> ancestorPath;
 
     /**
@@ -42,7 +40,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         ReportPortalBridge.throwIfAsyncFailure();
 
         if (isScenarioRoot(scope, entry)) {
-            ReportPortalBridge.startTest(entry.text, suitePath(scope, ancestorPath));
+            ReportPortalBridge.startTest(entry.text, suitePath(ancestorPath));
         } else {
             ReportPortalBridge.log(level(entry.level), "STARTED: " + safe(entry.text), effectiveTime(entry.startedAt));
         }
@@ -225,19 +223,12 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         return null;
     }
 
-    private static List<String> suitePath(Entry scope, List<String> configuredAncestors) {
-        List<String> out = new ArrayList<>();
-
-        String rootSuite = suiteName(scope);
-        if (rootSuite != null && !rootSuite.isBlank()) {
-            out.add(rootSuite.trim());
+    private static List<String> suitePath(List<String> configuredAncestors) {
+        if (configuredAncestors == null || configuredAncestors.isEmpty()) {
+            return List.of();
         }
 
-        if (configuredAncestors != null) {
-            out.addAll(configuredAncestors);
-        }
-
-        return List.copyOf(out);
+        return List.copyOf(configuredAncestors);
     }
 
     private static List<String> normalizePath(String... path) {
