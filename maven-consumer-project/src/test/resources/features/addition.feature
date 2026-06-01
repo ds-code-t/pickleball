@@ -1,5 +1,9 @@
 Feature: Addition
 
+  Scenario: ss
+    * , save "</configs>"
+
+
   Scenario: Debug FileAndDataParsing NodeMap remainder syntax after resolved resource prefix
     * , save "</data_test/Alpha/Beta/Gamma/items.items.*.name as:LIST>"
     * , save "</data_test/CsvTests/people.{\"person\":name,\"job\":role} as:LIST>"

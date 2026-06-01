@@ -318,7 +318,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     private String resolveAll(String input, QuoteParser parsedObj) {
         boolean isDirectoryPath = input.startsWith("</");
-        System.out.println("@@resolveAll: " + input);
         try {
             String originalInput;
             do {
