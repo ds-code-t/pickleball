@@ -1,0 +1,11 @@
+animals:
+  - name: Flutter
+    type: unicorn
+  - name: Nori
+    type: raccoon
+  - name: Hoppy
+    type: bunny
+numbers:
+  - 10
+  - 20
+  - 30

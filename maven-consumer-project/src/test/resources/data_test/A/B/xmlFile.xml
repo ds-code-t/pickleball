@@ -1,0 +1,6 @@
+<root>
+  <title>XML Example</title>
+  <nested>
+    <value>xmlValue</value>
+  </nested>
+</root>

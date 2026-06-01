@@ -1,0 +1,6 @@
+PropA:
+  propB: valueB
+  propC:
+    - zero
+    - one
+    - two

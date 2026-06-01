@@ -7,33 +7,40 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 
+import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.StringReader;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
+import java.nio.file.FileSystemAlreadyExistsException;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
-import java.util.stream.Stream;
-
-import com.fasterxml.jackson.databind.node.NullNode;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
-
-import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+import java.util.stream.Stream;
 
 public final class FileAndDataParsing {
 
@@ -59,6 +66,8 @@ public final class FileAndDataParsing {
     private static final JsonNode NULL_SENTINEL = NullNode.getInstance();
     private static final ConcurrentHashMap<String, CacheEntry> BUILD_JSON_CACHE = new ConcurrentHashMap<>();
 
+    private static final String ROOT_PROP = "rootProp";
+
     private static final class CacheEntry {
         private final JsonNode value;
         private final long expiresAtNanos;
@@ -73,7 +82,6 @@ public final class FileAndDataParsing {
         }
     }
 
-
     private static final class ParseFailureException extends RuntimeException {
         private ParseFailureException(String message, Throwable cause) {
             super(message, cause);
@@ -82,6 +90,27 @@ public final class FileAndDataParsing {
         private ParseFailureException(String message) {
             super(message);
         }
+    }
+
+    private record PathSegment(String value, char separatorAfter) {
+        boolean directoryRequired() {
+            return separatorAfter == '/' || separatorAfter == '\\';
+        }
+    }
+
+    private record ClasspathRoot(Path path, Closeable closeable) implements AutoCloseable {
+        @Override
+        public void close() throws IOException {
+            if (closeable != null) {
+                closeable.close();
+            }
+        }
+    }
+
+    private record Candidate(Path path, boolean directory, String extension) {
+    }
+
+    private record SegmentName(String resourceName, String inlineDataPath) {
     }
 
     public static JsonNode readResourceFile(String path) throws IOException {
@@ -101,7 +130,11 @@ public final class FileAndDataParsing {
     }
 
     public static JsonNode buildJsonFromPath(String resourcePath) {
-        String key = resourcePath.replace(".", "/");
+        if (resourcePath == null || resourcePath.isBlank()) {
+            return null;
+        }
+
+        String key = resourcePath.trim();
         long now = System.nanoTime();
 
         CacheEntry entry = BUILD_JSON_CACHE.compute(key, (k, existing) -> {
@@ -110,13 +143,6 @@ public final class FileAndDataParsing {
             }
 
             JsonNode jsonNode = attemptBuildJsonFromPath(k);
-            if (jsonNode instanceof ObjectNode objectNode && objectNode.has("_unmatchedPath")) {
-                String unmatchedPath = objectNode.get("_unmatchedPath").asText();
-                jsonNode = MAPPER.valueToTree(
-                        new NodeMap(objectNode)
-                                .getByNormalizedPath("_returnedValue." + unmatchedPath.replaceFirst("/", "."))
-                );
-            }
 
             return new CacheEntry(
                     jsonNode == null ? NULL_SENTINEL : jsonNode.deepCopy(),
@@ -147,32 +173,36 @@ public final class FileAndDataParsing {
         }
     }
 
-
     public static JsonNode attemptBuildJsonFromPath(String resourcePath) {
-        JsonNode exact = buildJsonFromExactPath(resourcePath);
-        if (exact != null) {
-            return exact;
+        if (resourcePath == null || resourcePath.isBlank()) {
+            return null;
         }
 
-        String original = resourcePath.replace('\\', '/');
-        String matchedPath = original;
+        List<PathSegment> segments = tokenizePath(resourcePath.trim());
+        if (segments.isEmpty()) {
+            return null;
+        }
 
-        for (int slash = matchedPath.lastIndexOf('/'); slash >= 0; slash = matchedPath.lastIndexOf('/')) {
-            matchedPath = matchedPath.substring(0, slash);
-
-            JsonNode matched = buildJsonFromExactPath(matchedPath);
-            if (matched != null) {
-                ObjectNode result = JSON_MAPPER.createObjectNode();
-                result.set("_returnedValue", matched);
-                result.put("_matchedPath", matchedPath);
-                result.put("_unmatchedPath", original.substring(matchedPath.length() + 1));
-                return result;
+        for (ClasspathRoot root : getClasspathRoots()) {
+            try (root) {
+                JsonNode resolved = resolveFromDirectory(root.path(), segments, 0);
+                if (resolved != null) {
+                    return resolved;
+                }
+            } catch (ParseFailureException e) {
+                throw e;
+            } catch (Exception ignored) {
+                // Try the next classpath root.
             }
         }
 
         return null;
     }
 
+    /**
+     * Kept for compatibility with any internal callers that still need exact classloader lookup.
+     * buildJsonFromPath uses segment-by-segment lookup instead.
+     */
     private static JsonNode buildJsonFromExactPath(String resourcePath) {
         URL url = getResourceUrl(resourcePath);
         if (url == null) {
@@ -193,6 +223,361 @@ public final class FileAndDataParsing {
             throw e;
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    private static JsonNode resolveFromDirectory(Path directory, List<PathSegment> segments, int index) throws IOException {
+        if (directory == null || !Files.isDirectory(directory) || index >= segments.size()) {
+            return null;
+        }
+
+        PathSegment segment = segments.get(index);
+        SegmentName segmentName = splitResourceSegmentFromInlineData(segment.value());
+        if (segmentName.resourceName().isBlank()) {
+            return null;
+        }
+
+        List<Candidate> candidates = findCandidates(directory, segmentName.resourceName(), segment.directoryRequired());
+        for (Candidate candidate : candidates) {
+            if (candidate.directory()) {
+                if (index == segments.size() - 1) {
+                    return buildFromRoot(candidate.path());
+                }
+
+                JsonNode child = resolveFromDirectory(candidate.path(), segments, index + 1);
+                if (child != null) {
+                    return child;
+                }
+                continue;
+            }
+
+            if (segment.directoryRequired()) {
+                continue;
+            }
+
+            JsonNode fileValue = buildFromRoot(candidate.path());
+            if (fileValue == null) {
+                continue;
+            }
+
+            int remainderStart = index + 1;
+
+            // Allows explicit suffixes such as people.csv or c.yaml to behave the same as people or c.
+            if (remainderStart < segments.size()
+                    && segment.separatorAfter() == '.'
+                    && candidate.extension() != null
+                    && segments.get(remainderStart).value().equalsIgnoreCase(candidate.extension())) {
+                remainderStart++;
+            }
+
+            String remainder = buildRemainderPath(segmentName.inlineDataPath(), segments, remainderStart);
+            if (remainder == null || remainder.isBlank()) {
+                return fileValue;
+            }
+
+            return getFromFileValueUsingNodeMap(fileValue, remainder);
+        }
+
+        return null;
+    }
+
+    private static JsonNode getFromFileValueUsingNodeMap(JsonNode fileValue, String remainderPath) {
+        ObjectNode wrapper = JSON_MAPPER.createObjectNode();
+        wrapper.set(ROOT_PROP, fileValue);
+
+        Object value = new NodeMap(wrapper).get(ROOT_PROP + normalizeRemainderForNodeMap(remainderPath));
+        return value == null ? null : JSON_MAPPER.valueToTree(value);
+    }
+
+    private static String normalizeRemainderForNodeMap(String remainderPath) {
+        if (remainderPath == null || remainderPath.isBlank()) {
+            return "";
+        }
+
+        String trimmed = remainderPath.trim();
+        if (trimmed.startsWith("[") || trimmed.startsWith("(")) {
+            return trimmed;
+        }
+
+        if (trimmed.startsWith(".")) {
+            return trimmed;
+        }
+
+        return "." + trimmed;
+    }
+
+    private static String buildRemainderPath(String inlineDataPath, List<PathSegment> segments, int startIndex) {
+        StringBuilder out = new StringBuilder();
+
+        if (inlineDataPath != null && !inlineDataPath.isBlank()) {
+            out.append(inlineDataPath);
+        }
+
+        for (int i = startIndex; i < segments.size(); i++) {
+            if (out.length() > 0 && !endsWithPathJoiner(out)) {
+                out.append('.');
+            }
+            out.append(segments.get(i).value());
+        }
+
+        return out.toString();
+    }
+
+    private static boolean endsWithPathJoiner(StringBuilder out) {
+        if (out.isEmpty()) {
+            return false;
+        }
+        char ch = out.charAt(out.length() - 1);
+        return ch == '.' || ch == '[' || ch == '(';
+    }
+
+    private static SegmentName splitResourceSegmentFromInlineData(String rawSegment) {
+        if (rawSegment == null) {
+            return new SegmentName("", "");
+        }
+
+        String segment = rawSegment.trim();
+        if (segment.isEmpty()) {
+            return new SegmentName("", "");
+        }
+
+        int bracket = firstSpecialDataSyntaxIndex(segment);
+        if (bracket >= 0) {
+            return new SegmentName(stripAllowedExtension(segment.substring(0, bracket)), segment.substring(bracket));
+        }
+
+        return new SegmentName(stripAllowedExtension(segment), "");
+    }
+
+    private static int firstSpecialDataSyntaxIndex(String segment) {
+        int square = segment.indexOf('[');
+        int paren = segment.indexOf('(');
+
+        if (square < 0) {
+            return paren;
+        }
+        if (paren < 0) {
+            return square;
+        }
+        return Math.min(square, paren);
+    }
+
+    private static List<PathSegment> tokenizePath(String resourcePath) {
+        List<PathSegment> out = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+
+        for (int i = 0; i < resourcePath.length(); i++) {
+            char ch = resourcePath.charAt(i);
+            if (ch == '/' || ch == '\\' || ch == '.') {
+                if (!current.isEmpty()) {
+                    out.add(new PathSegment(current.toString(), ch));
+                    current.setLength(0);
+                }
+                continue;
+            }
+            current.append(ch);
+        }
+
+        if (!current.isEmpty()) {
+            out.add(new PathSegment(current.toString(), '\0'));
+        }
+
+        return out;
+    }
+
+    private static List<Candidate> findCandidates(Path directory, String requestedSegment, boolean directoryOnly) throws IOException {
+        String requestedBase = stripAllowedExtension(requestedSegment);
+
+        List<Path> children;
+        try (Stream<Path> stream = Files.list(directory)) {
+            children = stream
+                    .sorted(Comparator
+                            .comparing((Path p) -> p.getFileName().toString(), String.CASE_INSENSITIVE_ORDER)
+                            .thenComparing(p -> p.getFileName().toString()))
+                    .toList();
+        }
+
+        List<Candidate> exact = matchingCandidates(children, requestedBase, directoryOnly, true);
+        if (!exact.isEmpty()) {
+            return exact;
+        }
+
+        return matchingCandidates(children, requestedBase, directoryOnly, false);
+    }
+
+    private static List<Candidate> matchingCandidates(
+            List<Path> children,
+            String requestedBase,
+            boolean directoryOnly,
+            boolean exact
+    ) {
+        List<Candidate> matches = new ArrayList<>();
+
+        for (Path child : children) {
+            Candidate candidate = toCandidate(child);
+            if (candidate == null) {
+                continue;
+            }
+
+            if (directoryOnly && !candidate.directory()) {
+                continue;
+            }
+
+            String childBase = baseNameIgnoringAllowedExtension(child.getFileName().toString());
+            boolean nameMatches = exact
+                    ? childBase.equals(requestedBase)
+                    : childBase.equalsIgnoreCase(requestedBase);
+
+            if (nameMatches) {
+                matches.add(candidate);
+            }
+        }
+
+        // File first unless the caller explicitly required a directory.
+        matches.sort(Comparator
+                .comparing(Candidate::directory)
+                .thenComparing(c -> c.path().getFileName().toString(), String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(c -> c.path().getFileName().toString()));
+
+        return matches;
+    }
+
+    private static Candidate toCandidate(Path path) {
+        try {
+            if (Files.isDirectory(path)) {
+                return new Candidate(path, true, null);
+            }
+
+            if (!Files.isRegularFile(path)) {
+                return null;
+            }
+
+            String extension = getExtensionLower(path.getFileName().toString());
+            if (!ALLOWED_EXTENSIONS.contains(extension)) {
+                return null;
+            }
+
+            return new Candidate(path, false, extension);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String baseNameIgnoringAllowedExtension(String fileName) {
+        String normalized = fileName == null ? "" : fileName.replace('\\', '/');
+        int slash = normalized.lastIndexOf('/');
+        if (slash >= 0) {
+            normalized = normalized.substring(slash + 1);
+        }
+
+        return stripAllowedExtension(normalized);
+    }
+
+    private static String stripAllowedExtension(String text) {
+        if (text == null) {
+            return "";
+        }
+
+        int dot = text.lastIndexOf('.');
+        if (dot > 0 && dot < text.length() - 1) {
+            String ext = text.substring(dot + 1).toLowerCase(Locale.ROOT);
+            if (ALLOWED_EXTENSIONS.contains(ext)) {
+                return text.substring(0, dot);
+            }
+        }
+
+        return text;
+    }
+
+    private static List<ClasspathRoot> getClasspathRoots() {
+        List<ClasspathRoot> roots = new ArrayList<>();
+        HashSet<String> seen = new HashSet<>();
+
+        ClassLoader loader = Thread.currentThread().getContextClassLoader();
+
+        try {
+            Enumeration<URL> rootUrls = loader.getResources("");
+            while (rootUrls.hasMoreElements()) {
+                URL url = rootUrls.nextElement();
+                if (!"file".equalsIgnoreCase(url.getProtocol())) {
+                    continue;
+                }
+
+                String decoded = URLDecoder.decode(url.getPath(), StandardCharsets.UTF_8);
+                addClasspathRoot(roots, seen, Paths.get(decoded), null);
+            }
+        } catch (Exception ignored) {
+        }
+
+        String classPath = System.getProperty("java.class.path", "");
+        if (!classPath.isBlank()) {
+            for (String entry : classPath.split(File.pathSeparator)) {
+                if (entry == null || entry.isBlank()) {
+                    continue;
+                }
+
+                try {
+                    Path path = Paths.get(entry);
+                    if (Files.isDirectory(path)) {
+                        addClasspathRoot(roots, seen, path, null);
+                    } else if (Files.isRegularFile(path) && entry.toLowerCase(Locale.ROOT).endsWith(".jar")) {
+                        ClasspathRoot jarRoot = openJarClasspathRoot(path);
+                        if (jarRoot != null) {
+                            addClasspathRoot(roots, seen, jarRoot.path(), jarRoot.closeable());
+                        }
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+        }
+
+        return roots;
+    }
+
+    private static void addClasspathRoot(List<ClasspathRoot> roots, HashSet<String> seen, Path path, Closeable closeable) {
+        if (path == null) {
+            closeQuietly(closeable);
+            return;
+        }
+
+        String key = path.toAbsolutePath().normalize().toString();
+        if (seen.add(key)) {
+            roots.add(new ClasspathRoot(path, closeable));
+        } else {
+            closeQuietly(closeable);
+        }
+    }
+
+    private static ClasspathRoot openJarClasspathRoot(Path jarPath) {
+        try {
+            URI uri = URI.create("jar:" + jarPath.toUri());
+
+            FileSystem fs;
+            boolean shouldClose;
+            try {
+                fs = FileSystems.newFileSystem(uri, Map.of());
+                shouldClose = true;
+            } catch (FileSystemAlreadyExistsException alreadyExists) {
+                fs = FileSystems.getFileSystem(uri);
+                shouldClose = false;
+            }
+
+            FileSystem finalFs = fs;
+            Closeable closeable = shouldClose ? finalFs::close : null;
+            return new ClasspathRoot(fs.getPath("/"), closeable);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static void closeQuietly(Closeable closeable) {
+        if (closeable == null) {
+            return;
+        }
+
+        try {
+            closeable.close();
+        } catch (IOException ignored) {
         }
     }
 

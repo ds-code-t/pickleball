@@ -1,0 +1,3 @@
+selected: file item.yaml
+nested:
+  value: itemFileValue

@@ -1,0 +1,13 @@
+{
+  "deepProp": {
+    "answer": 42,
+    "items": [
+      {
+        "name": "first"
+      },
+      {
+        "name": "second"
+      }
+    ]
+  }
+}

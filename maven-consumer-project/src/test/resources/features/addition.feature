@@ -1,9 +1,209 @@
 Feature: Addition
 
 
+  Scenario: path testing 23
+  # CSV file lookup, suffix omitted.
+* , save "</data_test/CsvTests/people>"
+# Expected: JSON array from people.csv:
+# [
+#   {"name":"Flutter","role":"leader"},
+#   {"name":"Flydash","role":"sister"},
+#   {"name":"Pandakun","role":"ice cream fan"}
+# ]
+
+# CSV file lookup, explicit suffix included.
+* , save "</data_test/CsvTests/people.csv>"
+# Expected: same JSON array from people.csv.
+
+# CSV nested array/object lookup.
+* , save "</data_test/CsvTests/people[1].name>"
+# Expected: "Flydash"
+
+# Same CSV lookup using dots for resource path segments.
+* , save "</data_test.CsvTests.people[2].role>"
+# Expected: "ice cream fan"
+
+# YAML file lookup, suffix omitted.
+* , save "</data_test/A/B/c>"
+# Expected: contents of c.yaml:
+# {
+#   "PropA": {
+#     "propB": "valueB",
+#     "propC": ["zero", "one", "two"]
+#   }
+# }
+
+# YAML nested property lookup.
+* , save "</data_test/A/B/c.PropA.propB>"
+# Expected: "valueB"
+
+# YAML nested array lookup.
+* , save "</data_test/A/B/c.PropA.propC[1]>"
+# Expected: "one"
+
+# Same YAML file using dots for resource path segments.
+* , save "</data_test.A.B.c>"
+# Expected: contents of c.yaml, unless directory/file ambiguity causes your resolver to choose differently.
+
+# Explicit directory lookup using trailing slash.
+* , save "</data_test/A/B/c/>"
+# Expected: contents of directory c/, not file c.yaml:
+# {
+#   "D": {
+#     "deep": {
+#       "deepProp": {
+#         "answer": 42,
+#         "items": [
+#           {"name":"first"},
+#           {"name":"second"}
+#         ]
+#       }
+#     }
+#   }
+# }
+
+# Deep JSON file lookup through a directory named c.
+* , save "</data_test/A/B/c/D/deep>"
+# Expected: contents of deep.json:
+# {
+#   "deepProp": {
+#     "answer": 42,
+#     "items": [
+#       {"name":"first"},
+#       {"name":"second"}
+#     ]
+#   }
+# }
+
+# Deep JSON nested value.
+* , save "</data_test/A/B/c/D/deep.deepProp.answer>"
+# Expected: 42
+
+# Deep JSON nested array/object value.
+* , save "</data_test/A/B/c/D/deep.deepProp.items[1].name>"
+# Expected: "second"
+
+# Case-insensitive file lookup.
+* , save "</data_test/A/B/mixedCase/casefile>"
+# Expected: contents of CaseFile.YML:
+# {
+#   "Top": {
+#     "Inner": "FoundByCaseInsensitiveFileName"
+#   }
+# }
+
+# Case-insensitive file lookup plus nested property.
+* , save "</data_test/A/B/mixedCase/CASEFILE.Top.Inner>"
+# Expected: "FoundByCaseInsensitiveFileName"
+
+# YML lookup, suffix omitted.
+* , save "</data_test/Alpha/Beta/Gamma/settings>"
+# Expected: contents of settings.yml:
+# {
+#   "app": {
+#     "name": "TestApp",
+#     "flags": {
+#       "enabled": true,
+#       "mode": "demo"
+#     }
+#   }
+# }
+
+# YML nested value.
+* , save "</data_test/Alpha/Beta/Gamma/settings.app.flags.mode>"
+# Expected: "demo"
+
+# JSON lookup, suffix omitted.
+* , save "</data_test/Alpha/Beta/Gamma/items>"
+# Expected: contents of items.json:
+# {
+#   "items": [
+#     {"id":1,"name":"apple"},
+#     {"id":2,"name":"banana"}
+#   ],
+#   "metadata": {
+#     "source": "json-test"
+#   }
+# }
+
+# JSON nested array lookup.
+* , save "</data_test/Alpha/Beta/Gamma/items.items[1].name>"
+# Expected: "banana"
+
+# XML lookup, suffix omitted.
+* , save "</data_test/XmlTests/pet>"
+# Expected: parsed XML tree.
+# Likely:
+# {
+#   "name": "Brownie",
+#   "animal": "dog"
+# }
+
+# XML nested value.
+* , save "</data_test/XmlTests/pet.name>"
+# Expected: "Brownie"
+
+# TXT lookup, suffix omitted.
+* , save "</data_test/TxtTests/message>"
+# Expected: "Hello from a nested TXT resource."
+
+# TXT lookup with explicit suffix.
+* , save "</data_test/TxtTests/message.txt>"
+# Expected: "Hello from a nested TXT resource."
+
+# Ambiguous file-vs-directory case.
+* , save "</data_test/SlashOnly/dirChoice/item>"
+# Expected: contents of item.yaml, because non-trailing-slash lookup should prefer file:
+# {
+#   "selected": "file item.yaml",
+#   "nested": {
+#     "value": "itemFileValue"
+#   }
+# }
+
+# Ambiguous case, nested property from the file.
+* , save "</data_test/SlashOnly/dirChoice/item.nested.value>"
+# Expected: "itemFileValue"
+
+# Forced directory lookup using trailing slash.
+* , save "</data_test/SlashOnly/dirChoice/item/>"
+# Expected: contents of item/ directory:
+# {
+#   "nested": "This came from the item directory, not item.yaml."
+# }
+
+# Directory lookup.
+* , save "</data_test/A/B>"
+# Expected: object containing keys similar to:
+# c, duplicateName, DUPLICATENAME, plain, table, xmlFile, mixedCase
+# Note: c may be the file c.yaml or directory c depending on duplicate-key behavior when both base names exist.
+
+# Exact-case match test.
+* , save "</data_test/A/B/duplicateName>"
+# Expected: contents of duplicateName.yaml:
+# {
+#   "kind": "lower-yaml",
+#   "value": "selected-if-exact-duplicateName"
+# }
+
+# Exact uppercase match test.
+* , save "</data_test/A/B/DUPLICATENAME>"
+# Expected: contents of DUPLICATENAME.json:
+# {
+#   "kind": "upper-json",
+#   "value": "selected-only-if-case-insensitive-is-needed"
+# }
+
+# Case-insensitive duplicate-name edge case.
+* , save "</data_test/A/B/duplicatename>"
+# Expected: one of the case-insensitive matches, selected by stable sort.
+# This intentionally tests that case-insensitive duplicate names do not throw an error.
+
+
   Scenario: "untils "ssdf4"
-    * , save "</runconfigs/profiles/user1>" Data
-    * , save "</runconfigs/profiles/user1.browser>" Data
+    * , save "</data_test/CsvTests/people>"
+#    * , save "</runconfigs/profiles/user1>"
+#    * , save "</runconfigs/profiles/user1.browser>"
 #    * , until 3==1:
 #  : * , save "A"
 
