@@ -154,7 +154,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
      *
      * Optional output overrides:
      * - HTMLcompositeReportPath
-     * - HTMLscenarioReportPathTemplate
+     * - HTMLscenarioReportPath
      *
      * Supported template tokens:
      * - <SCENARIO_NAME>
@@ -219,27 +219,14 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     }
 
     private static ReportFormat resolveReportFormat() {
-        VarValue raw = readReportVariable("HTMLreportFormat",
-                "HTMLReportFormat",
-                "htmlReportFormat",
-                "htmlreportformat",
-                "HTML_REPORT_FORMAT");
-
-        String value = raw.value();
-        String source = raw.source();
-
-        if (value.isBlank()) {
-            VarValue inferred = inferHtmlReportFormatFromSharedScopes();
-            value = inferred.value();
-            source = inferred.source();
-        }
-
+        String value = Objects.toString(resolveFromVarsOrDefault("HTMLreportFormat", ""), "").trim();
         String normalized = normalizeReportFormatValue(value);
         boolean blank = normalized.isBlank();
         String lower = normalized.toLowerCase(Locale.ROOT);
 
         boolean composite = blank || lower.contains("compositereport");
         boolean scenario = lower.contains("scenarioreport");
+        String source = value.isBlank() ? "default" : "RunVars:HTMLreportFormat";
 
         return new ReportFormat(value, normalized, source, composite, scenario);
     }
@@ -247,27 +234,20 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     private record ReportFormat(String rawValue, String normalizedValue, String source, boolean compositeReport, boolean scenarioReport) {
     }
 
-    private record VarValue(String value, String source) {
-    }
-
     private static Path resolveCompositeReportPath(Path defaultOutFile, Instant runTime) {
         Path fallback = normalizeReportPath(defaultOutFile == null ? Path.of("cucumber-report.html") : defaultOutFile);
         Path projectRoot = projectRootFromDefaultOutFile(fallback);
 
-        VarValue override = readReportVariable("HTMLcompositeReportPath",
-                "HTMLCompositeReportPath",
-                "htmlCompositeReportPath",
-                "htmlcompositereportpath",
-                "HTML_COMPOSITE_REPORT_PATH");
+        String override = Objects.toString(resolveFromVarsOrDefault("HTMLcompositeReportPath", ""), "").trim();
 
-        if (override.value().isBlank()) {
+        if (override.isBlank()) {
             debug("resolveCompositeReportPath no override; using fallback=" + abs(fallback)
                     + " projectRoot=" + abs(projectRoot));
             return fallback;
         }
 
-        Path resolved = resolveTemplatedReportPath(projectRoot, override.value(), "composite", runTime);
-        debug("resolveCompositeReportPath override source='" + override.source() + "' template='" + override.value()
+        Path resolved = resolveTemplatedReportPath(projectRoot, override, "composite", runTime);
+        debug("resolveCompositeReportPath override source='RunVars:HTMLcompositeReportPath' template='" + override
                 + "' projectRoot=" + abs(projectRoot) + " resolved=" + abs(resolved));
         return resolved;
     }
@@ -292,16 +272,13 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         Path fallback = normalizeReportPath(defaultOutFile == null ? Path.of("cucumber-report.html") : defaultOutFile);
         Path projectRoot = projectRootFromDefaultOutFile(fallback);
 
-        VarValue rawTemplate = readReportVariable("HTMLscenarioReportPathTemplate",
-                "HTMLScenarioReportPathTemplate",
-                "htmlScenarioReportPathTemplate",
-                "htmlscenarioreportpathtemplate",
-                "HTML_SCENARIO_REPORT_PATH_TEMPLATE");
-        String template = rawTemplate.value().isBlank() ? "reports/scenario-reports/<SCENARIO_NAME>.html" : rawTemplate.value();
+        String rawTemplate = Objects.toString(resolveFromVarsOrDefault("HTMLscenarioReportPath", ""), "").trim();
+        String template = rawTemplate.isBlank() ? "reports/scenario-reports/<SCENARIO_NAME>.html" : rawTemplate;
 
         debug("writeScenarioReports defaultOutFile=" + abs(fallback));
         debug("writeScenarioReports projectRoot=" + abs(projectRoot));
-        debug("writeScenarioReports template='" + template + "' source='" + rawTemplate.source() + "'");
+        debug("writeScenarioReports template='" + template + "' source='"
+                + (rawTemplate.isBlank() ? "default" : "RunVars:HTMLscenarioReportPath") + "'");
         debugSnapshot("scenario source", snapshot);
 
         int written = 0;
@@ -396,62 +373,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         return resolved;
     }
 
-    private static VarValue readReportVariable(String... names) {
-        if (names == null || names.length == 0) return new VarValue("", "missing-name");
-
-        VarValue fromRunVars = new VarValue("", "default");
-        for (String name : names) {
-            if (name == null || name.isBlank()) continue;
-            try {
-                Object raw = resolveFromVarsOrDefault(name, null);
-                String value = raw == null ? "" : String.valueOf(raw).trim();
-                debug("readReportVariable RunVars lookup name='" + name + "' value='" + value + "'");
-                if (!value.isBlank()) {
-                    fromRunVars = new VarValue(value, "RunVars:" + name);
-                    break;
-                }
-            } catch (Throwable ex) {
-                debug("readReportVariable RunVars lookup failed name='" + name + "' error=" + ex);
-            }
-        }
-
-        VarValue fromTitle = readReportVariableFromRunTitle(names);
-
-        if (!fromTitle.value().isBlank()) {
-            if (fromRunVars.value().isBlank()) return fromTitle;
-
-            String rv = normalizeReportFormatValue(fromRunVars.value());
-            String tv = normalizeReportFormatValue(fromTitle.value());
-            if (!rv.equals(tv)) {
-                debug("readReportVariable using run-title value because it differs from RunVars: runVars='"
-                        + fromRunVars.value() + "' source='" + fromRunVars.source()
-                        + "' title='" + fromTitle.value() + "' source='" + fromTitle.source() + "'");
-                return new VarValue(fromTitle.value(), fromTitle.source() + ";overrode=" + fromRunVars.source());
-            }
-        }
-
-        return fromRunVars;
-    }
-
-    private static VarValue readReportVariableFromRunTitle(String... names) {
-        synchronized (SharedSingleFile.LOCK) {
-            for (ScopeState s : SharedSingleFile.ALL_SCOPES.values()) {
-                HtmlNode root = s == null || s.nodes == null ? null : s.nodes.get(s.rootId);
-                String title = normalizeNodeTitle(root == null ? "" : root.title);
-                if (title.isBlank()) continue;
-
-                for (String name : names) {
-                    String found = extractKeyValueFromRunTitle(title, name);
-                    if (!found.isBlank()) {
-                        debug("readReportVariable found in run title name='" + name + "' value='" + found + "'");
-                        return new VarValue(found, "run-title:" + name);
-                    }
-                }
-            }
-        }
-        return new VarValue("", "default");
-    }
-
     private static String normalizeReportFormatValue(String raw) {
         if (raw == null) return "";
         String s = raw.trim();
@@ -461,84 +382,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             s = s.substring(1, s.length() - 1).trim();
         }
         return s;
-    }
-
-    private static VarValue inferHtmlReportFormatFromSharedScopes() {
-        VarValue v = readReportVariableFromRunTitle("HTMLreportFormat",
-                "HTMLReportFormat",
-                "htmlReportFormat",
-                "htmlreportformat",
-                "HTML_REPORT_FORMAT");
-        return v.value().isBlank() ? new VarValue("", "default") : v;
-    }
-
-    private static String extractHtmlReportFormatFromScope(ScopeState s) {
-        if (s == null) return "";
-        HtmlNode root = s.nodes == null ? null : s.nodes.get(s.rootId);
-        String title = normalizeNodeTitle(root == null ? "" : root.title);
-        return extractKeyValueFromRunTitle(title, "HTMLreportFormat");
-    }
-
-    private static String extractKeyValueFromRunTitle(String title, String key) {
-        if (title == null || title.isBlank() || key == null || key.isBlank()) return "";
-
-        String lowerTitle = title.toLowerCase(Locale.ROOT);
-        String lowerKey = key.toLowerCase(Locale.ROOT);
-        int keyAt = lowerTitle.indexOf(lowerKey);
-
-        while (keyAt >= 0) {
-            boolean startsClean = keyAt == 0 || !Character.isLetterOrDigit(title.charAt(keyAt - 1));
-            int afterKey = keyAt + key.length();
-            boolean endsClean = afterKey >= title.length() || !Character.isLetterOrDigit(title.charAt(afterKey));
-
-            int eqAt = afterKey;
-            while (eqAt < title.length() && Character.isWhitespace(title.charAt(eqAt))) eqAt++;
-
-            if (startsClean && endsClean && eqAt < title.length() && title.charAt(eqAt) == '=') {
-                int start = eqAt + 1;
-                while (start < title.length() && Character.isWhitespace(title.charAt(start))) start++;
-                if (start >= title.length()) return "";
-
-                char quote = title.charAt(start);
-                if (quote == '\'' || quote == '"') {
-                    int endQuote = title.indexOf(quote, start + 1);
-                    if (endQuote > start) return title.substring(start + 1, endQuote).trim();
-                }
-
-                int end = findEndOfRunTitleValue(title, start);
-                return title.substring(start, end).trim();
-            }
-
-            keyAt = lowerTitle.indexOf(lowerKey, keyAt + 1);
-        }
-
-        return "";
-    }
-
-    private static int findEndOfRunTitleValue(String title, int start) {
-        int end = title.length();
-        for (int i = start; i < title.length() - 2; i++) {
-            if (title.charAt(i) != ',') continue;
-
-            int j = i + 1;
-            while (j < title.length() && Character.isWhitespace(title.charAt(j))) j++;
-            if (j >= title.length()) return i;
-
-            int k = j;
-            while (k < title.length()) {
-                char c = title.charAt(k);
-                if (Character.isLetterOrDigit(c) || c == '_' || c == '-') k++;
-                else break;
-            }
-
-            int m = k;
-            while (m < title.length() && Character.isWhitespace(title.charAt(m))) m++;
-            if (k > j && m < title.length() && title.charAt(m) == '=') {
-                end = i;
-                break;
-            }
-        }
-        return end;
     }
 
     private static Path projectRootFromDefaultOutFile(Path defaultOutFile) {
