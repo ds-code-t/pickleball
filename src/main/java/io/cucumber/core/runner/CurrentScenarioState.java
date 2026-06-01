@@ -37,6 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static io.cucumber.core.gherkin.messages.MessageUtilities.getFeatureName;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
@@ -70,6 +71,7 @@ import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
 import static tools.dscode.testengine.PickleballRunner.getOptionsString;
 
 public class CurrentScenarioState extends ScenarioMapping {
+    String featureName;
     public boolean endCurrentScenario;
 
     public List<Throwable> stepFailures = new ArrayList<>();
@@ -113,6 +115,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         scenarioNameAndLine = scenarioName + " , Line " + pickle.getLocation().getLine();
         if(globalDebugBrowser)
             debugBrowser = true;
+        featureName = getFeatureName(pickle);
     }
 
 
@@ -166,8 +169,13 @@ public class CurrentScenarioState extends ScenarioMapping {
 //    public static boolean logToReportPortal = getDependencyPropertyBoolean("rp.enable");
 
     public void startScenarioRun() {
+        System.out.println("@@startScenarioRun-featureName: " + featureName);
          String scenarioName = pickle.getName() + " , Line " + pickle.getLocation().getLine();
         pickleballLog.info("Starting scenario: '" + scenarioName + "'");
+
+
+        ReportPortalBridgeConverter reportPortalBridgeConverter = featureName == null ? new ReportPortalBridgeConverter() : new ReportPortalBridgeConverter(featureName) ;
+
         scenarioLog =
                 Entry.of(scenarioName)
                         .tag("Scenario")
@@ -175,10 +183,8 @@ public class CurrentScenarioState extends ScenarioMapping {
                         .on(new SimpleHtmlReportConverter(
                                 Path.of("reports/tests", safeFileName(scenarioName + ".html"))
                         ))
-                        .on(new ReportPortalBridgeConverter());
+                        .on(reportPortalBridgeConverter);
 
-//        if(logToReportPortal)
-//            scenarioLog.on(new ReportPortalBridgeConverter());
         setDefaultEntry(scenarioLog);
         scenarioLog.start();
         scenarioLog.info(toHumanReadableString());

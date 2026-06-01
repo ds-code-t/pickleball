@@ -9,7 +9,10 @@ import com.epam.ta.reportportal.ws.model.StartTestItemRQ;
 import com.epam.ta.reportportal.ws.model.launch.StartLaunchRQ;
 import io.reactivex.Maybe;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
@@ -24,6 +27,8 @@ public final class ReportPortalHierarchy {
     private static volatile String defaultSuiteName;
 
     private static final Object LAUNCH_LOCK = new Object();
+
+    private static final String SUITE_PATH_SEPARATOR = "\u001F";
 
     private static final Map<String, Maybe<String>> SUITES = new ConcurrentHashMap<>();
     private static final AtomicReference<Maybe<String>> LAST_CREATED_SUITE = new AtomicReference<>();
@@ -66,16 +71,45 @@ public final class ReportPortalHierarchy {
     }
 
     public static Maybe<String> getOrCreateSuite(String suiteName) {
-        return SUITES.computeIfAbsent(suiteName, name -> {
-            StartTestItemRQ rq = new StartTestItemRQ();
-            rq.setName(name);
-            rq.setType("SUITE");
-            rq.setStartTime(new Date());
+        if (suiteName == null || suiteName.isBlank()) {
+            return getDefaultOrLastSuite();
+        }
 
-            Maybe<String> suite = getLaunch().startTestItem(rq);
-            LAST_CREATED_SUITE.set(suite);
-            return suite;
-        });
+        return getOrCreateSuitePath(List.of(suiteName.trim()));
+    }
+
+    public static Maybe<String> getOrCreateSuitePath(List<String> suitePath) {
+        List<String> normalized = normalizePath(suitePath);
+
+        if (normalized.isEmpty()) {
+            return getDefaultOrLastSuite();
+        }
+
+        Maybe<String> parent = null;
+        List<String> runningPath = new ArrayList<>();
+
+        for (String part : normalized) {
+            runningPath.add(part);
+
+            String key = suiteKey(runningPath);
+            Maybe<String> parentForThisSuite = parent;
+
+            parent = SUITES.computeIfAbsent(key, ignored -> {
+                StartTestItemRQ rq = new StartTestItemRQ();
+                rq.setName(part);
+                rq.setType("SUITE");
+                rq.setStartTime(new Date());
+
+                Maybe<String> suite = parentForThisSuite == null
+                        ? getLaunch().startTestItem(rq)
+                        : getLaunch().startTestItem(parentForThisSuite, rq);
+
+                LAST_CREATED_SUITE.set(suite);
+                return suite;
+            });
+        }
+
+        return parent;
     }
 
     public static Maybe<String> getDefaultOrLastSuite() {
@@ -134,10 +168,26 @@ public final class ReportPortalHierarchy {
     }
 
     public static void finishSuite(Maybe<String> suiteId, String status) {
+        if (suiteId == null) {
+            return;
+        }
+
         FinishTestItemRQ rq = new FinishTestItemRQ();
         rq.setStatus(status);
         rq.setEndTime(new Date());
         getLaunch().finishTestItem(suiteId, rq);
+    }
+
+    public static void finishAllSuites(String status) {
+        List<Map.Entry<String, Maybe<String>>> suites = new ArrayList<>(SUITES.entrySet());
+
+        suites.sort(Comparator
+                .comparingInt((Map.Entry<String, Maybe<String>> e) -> suiteDepth(e.getKey()))
+                .reversed());
+
+        for (Map.Entry<String, Maybe<String>> entry : suites) {
+            finishSuite(entry.getValue(), status);
+        }
     }
 
     public static void finishLaunch() {
@@ -147,5 +197,42 @@ public final class ReportPortalHierarchy {
         FinishExecutionRQ rq = new FinishExecutionRQ();
         rq.setEndTime(new Date());
         launch.finish(rq);
+    }
+
+    private static List<String> normalizePath(List<String> path) {
+        if (path == null || path.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> out = new ArrayList<>();
+
+        for (String part : path) {
+            if (part == null) continue;
+
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                out.add(trimmed);
+            }
+        }
+
+        return List.copyOf(out);
+    }
+
+    private static String suiteKey(List<String> path) {
+        return String.join(SUITE_PATH_SEPARATOR, path);
+    }
+
+    private static int suiteDepth(String key) {
+        if (key == null || key.isEmpty()) {
+            return 0;
+        }
+
+        int depth = 1;
+        for (int i = 0; i < key.length(); i++) {
+            if (key.charAt(i) == SUITE_PATH_SEPARATOR.charAt(0)) {
+                depth++;
+            }
+        }
+        return depth;
     }
 }

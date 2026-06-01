@@ -1,9 +1,6 @@
 package tools.dscode.common.reporting.logging.reportportal;
 
 import io.cucumber.core.runner.GlobalState;
-import org.openqa.selenium.OutputType;
-import org.openqa.selenium.TakesScreenshot;
-import org.openqa.selenium.WebDriver;
 import tools.dscode.common.reporting.logging.Attachment;
 import tools.dscode.common.reporting.logging.BaseConverter;
 import tools.dscode.common.reporting.logging.Entry;
@@ -15,8 +12,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -26,18 +25,24 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
     private static final String RP_SUITE_PREFIX = "RP_SUITE:";
 
+    private final List<String> ancestorPath;
+
     /**
      * Tracks attachments already sent to ReportPortal so they are only flushed once.
      * Key format: entryId:indexWithinEntryAttachments
      */
     private final Set<String> sent = ConcurrentHashMap.newKeySet();
 
+    public ReportPortalBridgeConverter(String... ancestorPath) {
+        this.ancestorPath = normalizePath(ancestorPath);
+    }
+
     @Override
     public void onStart(Entry scope, Entry entry) {
         ReportPortalBridge.throwIfAsyncFailure();
 
         if (isScenarioRoot(scope, entry)) {
-            ReportPortalBridge.startTest(entry.text, suiteName(scope));
+            ReportPortalBridge.startTest(entry.text, suitePath(scope, ancestorPath));
         } else {
             ReportPortalBridge.log(level(entry.level), "STARTED: " + safe(entry.text), effectiveTime(entry.startedAt));
         }
@@ -113,7 +118,6 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
     protected void onClose() {
         ReportPortalBridge.throwIfAsyncFailure();
     }
-
 
     private boolean hasUnsentAttachments(Entry entry) {
         for (int i = 0; i < entry.attachments.size(); i++) {
@@ -219,6 +223,40 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         }
 
         return null;
+    }
+
+    private static List<String> suitePath(Entry scope, List<String> configuredAncestors) {
+        List<String> out = new ArrayList<>();
+
+        String rootSuite = suiteName(scope);
+        if (rootSuite != null && !rootSuite.isBlank()) {
+            out.add(rootSuite.trim());
+        }
+
+        if (configuredAncestors != null) {
+            out.addAll(configuredAncestors);
+        }
+
+        return List.copyOf(out);
+    }
+
+    private static List<String> normalizePath(String... path) {
+        if (path == null || path.length == 0) {
+            return List.of();
+        }
+
+        List<String> out = new ArrayList<>();
+
+        for (String part : path) {
+            if (part == null) continue;
+
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                out.add(trimmed);
+            }
+        }
+
+        return List.copyOf(out);
     }
 
     private static boolean isBase64Attachment(String mime) {

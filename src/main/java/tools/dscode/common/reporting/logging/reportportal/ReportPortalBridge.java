@@ -8,20 +8,15 @@ import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.utils.files.ByteSource;
 import com.epam.reportportal.utils.properties.PropertiesLoader;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
-import com.epam.ta.reportportal.ws.model.FinishTestItemRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
 import io.reactivex.Maybe;
 import io.reactivex.exceptions.UndeliverableException;
 import io.reactivex.plugins.RxJavaPlugins;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.URLConnection;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -125,6 +120,24 @@ public final class ReportPortalBridge {
         return ReportPortalHierarchy.getOrCreateSuite(name);
     }
 
+    public static Maybe<String> getOrCreateSuitePath(List<String> suitePath) {
+        initIfNeeded();
+        if (!enabled) return Maybe.empty();
+
+        startLaunchIfNeeded();
+
+        if (suitePath == null || suitePath.isEmpty()) {
+            return ReportPortalHierarchy.getDefaultOrLastSuite();
+        }
+
+        suitePath.stream()
+                .filter(s -> s != null && !s.isBlank())
+                .map(String::trim)
+                .forEach(KNOWN_SUITES::add);
+
+        return ReportPortalHierarchy.getOrCreateSuitePath(suitePath);
+    }
+
     public static Maybe<String> startTest(String testName, String suiteName) {
         initIfNeeded();
         if (!enabled) return Maybe.empty();
@@ -132,6 +145,21 @@ public final class ReportPortalBridge {
         startLaunchIfNeeded();
 
         Maybe<String> suite = getOrCreateSuite(suiteName);
+        Maybe<String> test = (suite == null)
+                ? ReportPortalHierarchy.startTest(fallback(testName, "Unnamed"))
+                : ReportPortalHierarchy.startTest(fallback(testName, "Unnamed"), suite);
+
+        CURRENT_TEST.set(test);
+        return test;
+    }
+
+    public static Maybe<String> startTest(String testName, List<String> suitePath) {
+        initIfNeeded();
+        if (!enabled) return Maybe.empty();
+
+        startLaunchIfNeeded();
+
+        Maybe<String> suite = getOrCreateSuitePath(suitePath);
         Maybe<String> test = (suite == null)
                 ? ReportPortalHierarchy.startTest(fallback(testName, "Unnamed"))
                 : ReportPortalHierarchy.startTest(fallback(testName, "Unnamed"), suite);
@@ -210,7 +238,6 @@ public final class ReportPortalBridge {
         byte[] data = Objects.requireNonNullElseGet(bytes, () -> new byte[0]);
         Date when = Date.from(logTime != null ? logTime : Instant.now());
 
-
         try {
             String safeName = fallback(filenameHint, "attachment.bin");
             String mimeType = URLConnection.guessContentTypeFromName(safeName);
@@ -238,9 +265,7 @@ public final class ReportPortalBridge {
 
         String finalStatus = fallback(status, "PASSED");
 
-        for (String suiteName : KNOWN_SUITES) {
-            ReportPortalHierarchy.finishSuite(ReportPortalHierarchy.getOrCreateSuite(suiteName), finalStatus);
-        }
+        ReportPortalHierarchy.finishAllSuites(finalStatus);
 
         FinishExecutionRQ rq = new FinishExecutionRQ();
         rq.setStatus(finalStatus);

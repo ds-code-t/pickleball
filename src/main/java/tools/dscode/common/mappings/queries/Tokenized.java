@@ -41,7 +41,7 @@ public final class Tokenized {
 
     private static final Pattern INDEX_PATTERN = Pattern.compile("#(?:\\.\\.|[\\d,-]+)");
     private static final Pattern INT_PATTERN = Pattern.compile("\\d+");
-    private static final Pattern SUFFIX_PATTERN = Pattern.compile("^(.*?)(?:\\s(as-[A-Z]+))?$");
+    private static final Pattern SUFFIX_PATTERN = Pattern.compile("^(.*?)(?:\\s(as:[A-Z]+))?$");
 
     public static String topArrayFlag = META_FLAG + "_topArray";
 
@@ -140,7 +140,7 @@ public final class Tokenized {
         });
     }
 
-    public static final String AS_LIST_SUFFIX = "as-LIST";
+    public static final String AS_LIST_SUFFIX = "as:LIST";
 
     public Object get(JsonNode root) {
 

@@ -68,6 +68,43 @@ public final class FileAndDataParsing {
 
     private static final String ROOT_PROP = "rootProp";
 
+    // TEMPORARY DEBUG: remove these before committing.
+    // Enabled by default in this debug build. You can disable with:
+    // -DFileAndDataParsing.debug=false
+    private static final boolean DEBUG_BUILD_JSON = Boolean.parseBoolean(
+            System.getProperty("FileAndDataParsing.debug", "true")
+    );
+
+    private static void debug(String message) {
+        if (DEBUG_BUILD_JSON) {
+            System.out.println("@@FileAndDataParsing " + message);
+        }
+    }
+
+    private static String brief(JsonNode node) {
+        if (node == null) {
+            return "null";
+        }
+        String type = node.getNodeType().toString();
+        String size = node.isContainerNode() ? ",size=" + node.size() : "";
+        String text = node.toString();
+        if (text.length() > 240) {
+            text = text.substring(0, 240) + "...";
+        }
+        return type + size + ":" + text;
+    }
+
+    private static String briefObject(Object value) {
+        if (value == null) {
+            return "null";
+        }
+        String text = String.valueOf(value);
+        if (text.length() > 240) {
+            text = text.substring(0, 240) + "...";
+        }
+        return value.getClass().getName() + ":" + text;
+    }
+
     private static final class CacheEntry {
         private final JsonNode value;
         private final long expiresAtNanos;
@@ -135,14 +172,18 @@ public final class FileAndDataParsing {
         }
 
         String key = resourcePath.trim();
+        debug("buildJsonFromPath input='" + resourcePath + "' key='" + key + "'");
         long now = System.nanoTime();
 
         CacheEntry entry = BUILD_JSON_CACHE.compute(key, (k, existing) -> {
             if (existing != null && !existing.isExpired(now)) {
+                debug("cache HIT key='" + k + "' value=" + brief(existing.value));
                 return existing;
             }
 
+            debug("cache MISS key='" + k + "'");
             JsonNode jsonNode = attemptBuildJsonFromPath(k);
+            debug("attemptBuildJsonFromPath returned key='" + k + "' value=" + brief(jsonNode));
 
             return new CacheEntry(
                     jsonNode == null ? NULL_SENTINEL : jsonNode.deepCopy(),
@@ -151,7 +192,9 @@ public final class FileAndDataParsing {
         });
 
         cleanupBuildJsonCache(now);
-        return entry.value == NULL_SENTINEL ? null : entry.value.deepCopy();
+        JsonNode returned = entry.value == NULL_SENTINEL ? null : entry.value.deepCopy();
+        debug("buildJsonFromPath final key='" + key + "' returned=" + brief(returned));
+        return returned;
     }
 
     private static void cleanupBuildJsonCache(long now) {
@@ -173,338 +216,396 @@ public final class FileAndDataParsing {
         }
     }
 
+    private record PrefixMatch(JsonNode value, String remainder) {
+    }
+
     public static JsonNode attemptBuildJsonFromPath(String resourcePath) {
         if (resourcePath == null || resourcePath.isBlank()) {
             return null;
         }
 
-        List<PathSegment> segments = tokenizePath(resourcePath.trim());
-        if (segments.isEmpty()) {
-            return null;
-        }
+        String input = resourcePath.trim();
+        debug("attemptBuildJsonFromPath input='" + input + "'");
 
-        for (ClasspathRoot root : getClasspathRoots()) {
+        List<ClasspathRoot> roots = getClasspathRoots();
+        debug("classpath roots count=" + roots.size());
+        for (ClasspathRoot root : roots) {
             try (root) {
-                JsonNode resolved = resolveFromDirectory(root.path(), segments, 0);
-                if (resolved != null) {
-                    return resolved;
+                debug("trying classpathRoot='" + root.path() + "'");
+                PrefixMatch match = resolveBestResourcePrefix(root.path(), input);
+                debug("prefix match for root='" + root.path() + "' => "
+                        + (match == null ? "null" : "value=" + brief(match.value()) + ", remainder='" + match.remainder() + "'"));
+                if (match == null || match.value() == null) {
+                    continue;
                 }
+
+                if (match.remainder() == null || match.remainder().isBlank()) {
+                    debug("returning prefix value directly: " + brief(match.value()));
+                    return match.value();
+                }
+
+                JsonNode selected = getFromValueUsingNodeMap(match.value(), match.remainder());
+                debug("NodeMap selected=" + brief(selected));
+                return selected;
             } catch (ParseFailureException e) {
                 throw e;
-            } catch (Exception ignored) {
+            } catch (Exception ex) {
+                debug("exception while trying root='" + root.path() + "': " + ex.getClass().getName() + ": " + ex.getMessage());
                 // Try the next classpath root.
             }
         }
 
+        debug("attemptBuildJsonFromPath no match input='" + input + "'");
         return null;
     }
 
     /**
-     * Kept for compatibility with any internal callers that still need exact classloader lookup.
-     * buildJsonFromPath uses segment-by-segment lookup instead.
+     * Finds the longest leading part of the input that is a real classpath directory or supported file.
+     * Anything after that prefix is treated as a NodeMap/Tokenized expression against rootProp.
      */
-    private static JsonNode buildJsonFromExactPath(String resourcePath) {
-        URL url = getResourceUrl(resourcePath);
-        if (url == null) {
+    private static PrefixMatch resolveBestResourcePrefix(Path classpathRoot, String input) throws IOException {
+        if (classpathRoot == null || !Files.isDirectory(classpathRoot) || input == null || input.isBlank()) {
             return null;
         }
 
-        try {
-            if ("jar".equals(url.getProtocol())) {
-                try (FileSystem fs = FileSystems.newFileSystem(toJarUri(url), Map.of())) {
-                    Path root = fs.getPath(resourcePath);
-                    return buildFromRoot(root);
-                }
-            } else {
-                Path root = Paths.get(url.toURI());
-                return buildFromRoot(root);
+        List<Integer> cuts = prefixCutPositions(input);
+        debug("resolveBestResourcePrefix root='" + classpathRoot + "' input='" + input + "' cuts=" + cuts);
+        for (int cut : cuts) {
+            String prefix = input.substring(0, cut);
+            String remainder = input.substring(cut);
+            if (prefix.isBlank()) {
+                continue;
             }
-        } catch (ParseFailureException e) {
-            throw e;
-        } catch (Exception e) {
-            return null;
+
+            debug("try prefix cut=" + cut + " prefix='" + prefix + "' remainder='" + remainder + "'");
+            JsonNode value = resolveResourceOnly(classpathRoot, prefix);
+            debug("prefix result prefix='" + prefix + "' => " + brief(value));
+            if (value != null) {
+                debug("selected prefix='" + prefix + "' remainder='" + remainder + "'");
+                return new PrefixMatch(value, remainder);
+            }
+        }
+
+        debug("resolveBestResourcePrefix no prefix matched input='" + input + "'");
+        return null;
+    }
+
+    /**
+     * Candidate prefix cuts, longest first. The first special Tokenized/JSONata character stops
+     * normal resource-path parsing so dots inside syntax such as [1..6] are never treated as path separators.
+     */
+    private static List<Integer> prefixCutPositions(String input) {
+        int boundary = firstSpecialSyntaxBoundary(input);
+        int scanEnd = boundary >= 0 ? boundary : input.length();
+        debug("prefixCutPositions input='" + input + "' boundary=" + boundary
+                + (boundary >= 0 ? " boundaryChar='" + input.charAt(boundary) + "'" : "")
+                + " scanEnd=" + scanEnd);
+
+        List<Integer> cuts = new ArrayList<>();
+        addCut(cuts, trimTrailingDots(input, scanEnd));
+
+        int squareDepth = 0;
+        int parenDepth = 0;
+        int braceDepth = 0;
+        boolean inBackticks = false;
+        boolean inSingleQuote = false;
+        boolean inDoubleQuote = false;
+
+        for (int i = 0; i < scanEnd; i++) {
+            char ch = input.charAt(i);
+            char prev = i > 0 ? input.charAt(i - 1) : '\0';
+
+            if (ch == '`' && !inSingleQuote && !inDoubleQuote) {
+                inBackticks = !inBackticks;
+                continue;
+            }
+            if (ch == '\'' && !inBackticks && !inDoubleQuote && prev != '\\') {
+                inSingleQuote = !inSingleQuote;
+                continue;
+            }
+            if (ch == '"' && !inBackticks && !inSingleQuote && prev != '\\') {
+                inDoubleQuote = !inDoubleQuote;
+                continue;
+            }
+            if (inBackticks || inSingleQuote || inDoubleQuote) {
+                continue;
+            }
+
+            if (ch == '[') {
+                squareDepth++;
+                continue;
+            }
+            if (ch == ']' && squareDepth > 0) {
+                squareDepth--;
+                continue;
+            }
+            if (ch == '(') {
+                parenDepth++;
+                continue;
+            }
+            if (ch == ')' && parenDepth > 0) {
+                parenDepth--;
+                continue;
+            }
+            if (ch == '{') {
+                braceDepth++;
+                continue;
+            }
+            if (ch == '}' && braceDepth > 0) {
+                braceDepth--;
+                continue;
+            }
+
+            if (squareDepth == 0 && parenDepth == 0 && braceDepth == 0
+                    && (ch == '/' || ch == '\\' || ch == '.')
+                    && !(ch == '.' && i + 1 < input.length() && input.charAt(i + 1) == '.')
+                    && !(ch == '.' && i > 0 && input.charAt(i - 1) == '.')) {
+                addCut(cuts, i);
+            }
+        }
+
+        List<Integer> result = cuts.stream()
+                .filter(i -> i > 0)
+                .distinct()
+                .sorted(Comparator.reverseOrder())
+                .toList();
+        debug("prefixCutPositions result input='" + input + "' cuts=" + result);
+        return result;
+    }
+
+    private static void addCut(List<Integer> cuts, int cut) {
+        if (cut > 0 && !cuts.contains(cut)) {
+            cuts.add(cut);
         }
     }
 
-    private static JsonNode resolveFromDirectory(Path directory, List<PathSegment> segments, int index) throws IOException {
-        if (directory == null || !Files.isDirectory(directory)) {
+    private static int trimTrailingDots(String input, int end) {
+        int cut = Math.min(end, input.length());
+        while (cut > 0 && input.charAt(cut - 1) == '.') {
+            cut--;
+        }
+        return cut;
+    }
+
+    private static int firstSpecialSyntaxBoundary(String input) {
+        int squareDepth = 0;
+        int parenDepth = 0;
+        int braceDepth = 0;
+        boolean inBackticks = false;
+        boolean inSingleQuote = false;
+        boolean inDoubleQuote = false;
+
+        for (int i = 0; i < input.length(); i++) {
+            char ch = input.charAt(i);
+            char prev = i > 0 ? input.charAt(i - 1) : '\0';
+
+            if (ch == '`' && !inSingleQuote && !inDoubleQuote) {
+                inBackticks = !inBackticks;
+                continue;
+            }
+            if (ch == '\'' && !inBackticks && !inDoubleQuote && prev != '\\') {
+                inSingleQuote = !inSingleQuote;
+                continue;
+            }
+            if (ch == '"' && !inBackticks && !inSingleQuote && prev != '\\') {
+                inDoubleQuote = !inDoubleQuote;
+                continue;
+            }
+            if (inBackticks || inSingleQuote || inDoubleQuote) {
+                continue;
+            }
+
+            if (ch == '[') {
+                debug("firstSpecialSyntaxBoundary '[' at " + i + " input='" + input + "'");
+                return i;
+            }
+            if (ch == '(' || ch == ')' || ch == '*' || ch == '#' || ch == '<' || ch == '>'
+                    || ch == '?' || ch == '{' || ch == '}' || ch == '=' || ch == '%'
+                    || ch == ':' || Character.isWhitespace(ch)) {
+                debug("firstSpecialSyntaxBoundary special '" + ch + "' at " + i + " input='" + input + "'");
+                return i;
+            }
+            if (ch == '.' && i + 1 < input.length() && input.charAt(i + 1) == '.') {
+                debug("firstSpecialSyntaxBoundary '..' at " + i + " input='" + input + "'");
+                return i;
+            }
+
+            if (ch == ']') {
+                squareDepth = Math.max(0, squareDepth - 1);
+            } else if (ch == ')') {
+                parenDepth = Math.max(0, parenDepth - 1);
+            } else if (ch == '}') {
+                braceDepth = Math.max(0, braceDepth - 1);
+            }
+        }
+
+        return -1;
+    }
+
+    private static JsonNode resolveResourceOnly(Path root, String resourcePath) throws IOException {
+        List<PathSegment> segments = tokenizeResourcePath(resourcePath);
+        debug("resolveResourceOnly root='" + root + "' resourcePath='" + resourcePath + "' segments=" + segments);
+        if (segments.isEmpty()) {
+            return null;
+        }
+        JsonNode result = resolveResourceOnly(root, segments, 0);
+        debug("resolveResourceOnly result resourcePath='" + resourcePath + "' => " + brief(result));
+        return result;
+    }
+
+    private static JsonNode resolveResourceOnly(Path directory, List<PathSegment> segments, int index) throws IOException {
+        if (directory == null || !Files.isDirectory(directory) || index >= segments.size()) {
             return null;
         }
 
-        if (index >= segments.size()) {
-            return buildFromRoot(directory);
-        }
-
         PathSegment segment = segments.get(index);
-        SegmentName segmentName = splitResourceSegmentFromInlineData(segment.value());
-
-        /*
-         * If the next segment is not a normal resource segment, stop treating the
-         * path as file-system/resource traversal. Build the JSON value for the
-         * valid directory prefix and let NodeMap parse the remainder.
-         */
-        if (segmentName.resourceName().isBlank()) {
-            JsonNode directoryValue = buildFromRoot(directory);
-            return directoryValue == null
-                    ? null
-                    : getFromFileValueUsingNodeMap(directoryValue, buildRemainderPath("", segments, index));
-        }
-
-        List<Candidate> candidates = findCandidates(directory, segmentName.resourceName(), segment.directoryRequired());
-
-        /*
-         * If no child directory/file matches this segment, the current directory is
-         * still a valid JSON prefix. Delegate the rest of the path to NodeMap. This
-         * is what allows foreign syntax / JSONata-like syntax / unsupported bracket
-         * syntax to be handled outside this class instead of making resource lookup fail.
-         */
+        debug("resolveResourceOnly recurse directory='" + directory + "' index=" + index + " segment=" + segment);
+        List<Candidate> candidates = findCandidates(directory, segment.value(), segment.directoryRequired());
+        debug("candidates for directory='" + directory + "' segment='" + segment.value() + "' directoryRequired=" + segment.directoryRequired() + " => " + candidates);
         if (candidates.isEmpty()) {
-            JsonNode directoryValue = buildFromRoot(directory);
-            return directoryValue == null
-                    ? null
-                    : getFromFileValueUsingNodeMap(directoryValue, buildRemainderPath("", segments, index));
+            return null;
         }
 
         for (Candidate candidate : candidates) {
+            debug("consider candidate=" + candidate + " for segment=" + segment + " index=" + index);
             if (candidate.directory()) {
-                JsonNode resolved = resolveDirectoryCandidate(candidate.path(), segmentName, segments, index);
-                if (resolved != null) {
-                    return resolved;
+                if (index == segments.size() - 1) {
+                    JsonNode built = buildFromRoot(candidate.path());
+                    debug("directory final candidate='" + candidate.path() + "' built=" + brief(built));
+                    return built;
+                }
+
+                JsonNode child = resolveResourceOnly(candidate.path(), segments, index + 1);
+                debug("directory child result candidate='" + candidate.path() + "' child=" + brief(child));
+                if (child != null) {
+                    return child;
                 }
                 continue;
             }
 
-            JsonNode resolved = resolveFileCandidate(candidate, segmentName, segment, segments, index);
-            if (resolved != null) {
-                return resolved;
+            if (segment.directoryRequired()) {
+                debug("skip file candidate because segment requires directory: " + candidate);
+                continue;
+            }
+
+            int consumedIndex = consumeOptionalExplicitExtension(candidate, segment, segments, index);
+            debug("file candidate='" + candidate.path() + "' consumedIndex=" + consumedIndex + " segmentsLast=" + (segments.size() - 1));
+            if (consumedIndex == segments.size() - 1) {
+                JsonNode built = buildFromRoot(candidate.path());
+                debug("file final candidate='" + candidate.path() + "' built=" + brief(built));
+                return built;
             }
         }
 
         return null;
     }
 
-    private static JsonNode resolveDirectoryCandidate(
-            Path childDirectory,
-            SegmentName segmentName,
-            List<PathSegment> segments,
-            int index
-    ) throws IOException {
-        JsonNode directoryValue = null;
-
-        if (index == segments.size() - 1) {
-            return buildFromRoot(childDirectory);
-        }
-
-        if (segmentName.inlineDataPath() != null && !segmentName.inlineDataPath().isBlank()) {
-            directoryValue = buildFromRoot(childDirectory);
-            String remainder = buildRemainderPath(segmentName.inlineDataPath(), segments, index + 1);
-            return directoryValue == null ? null : getFromFileValueUsingNodeMap(directoryValue, remainder);
-        }
-
-        JsonNode child = resolveFromDirectory(childDirectory, segments, index + 1);
-        if (child != null) {
-            return child;
-        }
-
-        /*
-         * The child directory was a valid prefix, but the following segment did not
-         * resolve as another resource. Use the built directory ObjectNode and let
-         * NodeMap try the remaining path.
-         */
-        directoryValue = buildFromRoot(childDirectory);
-        String remainder = buildRemainderPath("", segments, index + 1);
-        return directoryValue == null || remainder == null || remainder.isBlank()
-                ? directoryValue
-                : getFromFileValueUsingNodeMap(directoryValue, remainder);
-    }
-
-    private static JsonNode resolveFileCandidate(
+    private static int consumeOptionalExplicitExtension(
             Candidate candidate,
-            SegmentName segmentName,
-            PathSegment originalSegment,
+            PathSegment fileSegment,
             List<PathSegment> segments,
             int index
-    ) throws IOException {
-        if (originalSegment.directoryRequired()) {
-            return null;
+    ) {
+        int nextIndex = index + 1;
+        if (candidate.extension() == null || nextIndex >= segments.size() || fileSegment.separatorAfter() != '.') {
+            return index;
         }
 
-        JsonNode fileValue = buildFromRoot(candidate.path());
-        if (fileValue == null) {
-            return null;
-        }
-
-        int remainderStart = index + 1;
-        String inlineRemainder = segmentName.inlineDataPath();
-
-        /*
-         * Allows explicit suffixes such as people.csv, people.csv[1], c.yaml,
-         * or c.yaml.PropA to behave the same as people, people[1], c, or c.PropA.
-         */
-        if (remainderStart < segments.size()
-                && originalSegment.separatorAfter() == '.'
-                && candidate.extension() != null) {
-            SegmentName extensionSegment = splitResourceSegmentFromInlineData(segments.get(remainderStart).value());
-            if (extensionSegment.resourceName().equalsIgnoreCase(candidate.extension())) {
-                inlineRemainder = appendRemainder(inlineRemainder, extensionSegment.inlineDataPath());
-                remainderStart++;
-            }
-        }
-
-        String remainder = buildRemainderPath(inlineRemainder, segments, remainderStart);
-        if (remainder == null || remainder.isBlank()) {
-            return fileValue;
-        }
-
-        return getFromFileValueUsingNodeMap(fileValue, remainder);
+        PathSegment next = segments.get(nextIndex);
+        return next.value().equalsIgnoreCase(candidate.extension()) ? nextIndex : index;
     }
 
-    private static JsonNode getFromFileValueUsingNodeMap(JsonNode fileValue, String remainderPath) {
-        if (fileValue == null) {
-            return null;
-        }
-
-        ObjectNode wrapper = JSON_MAPPER.createObjectNode();
-        wrapper.set(ROOT_PROP, fileValue);
-
-        Object value = new NodeMap(wrapper).get(ROOT_PROP + normalizeRemainderForNodeMap(remainderPath));
-        return value == null ? null : JSON_MAPPER.valueToTree(value);
-    }
-
-    private static String normalizeRemainderForNodeMap(String remainderPath) {
-        if (remainderPath == null || remainderPath.isBlank()) {
-            return "";
-        }
-
-        String trimmed = remainderPath.trim();
-        if (trimmed.startsWith("[") || trimmed.startsWith("(")) {
-            return trimmed;
-        }
-
-        if (trimmed.startsWith(".")) {
-            return trimmed;
-        }
-
-        return "." + trimmed;
-    }
-
-    private static String buildRemainderPath(String inlineDataPath, List<PathSegment> segments, int startIndex) {
-        StringBuilder out = new StringBuilder();
-
-        if (inlineDataPath != null && !inlineDataPath.isBlank()) {
-            out.append(inlineDataPath);
-        }
-
-        for (int i = startIndex; i < segments.size(); i++) {
-            if (out.length() > 0 && !endsWithPathJoiner(out)) {
-                out.append('.');
-            }
-            out.append(segments.get(i).value());
-        }
-
-        return out.toString();
-    }
-
-    private static String appendRemainder(String left, String right) {
-        if (right == null || right.isBlank()) {
-            return left == null ? "" : left;
-        }
-        if (left == null || left.isBlank()) {
-            return right;
-        }
-        if (right.startsWith("[") || right.startsWith("(") || right.startsWith(".")) {
-            return left + right;
-        }
-        return left + "." + right;
-    }
-
-    private static boolean endsWithPathJoiner(StringBuilder out) {
-        if (out.isEmpty()) {
-            return false;
-        }
-        char ch = out.charAt(out.length() - 1);
-        return ch == '.' || ch == '[' || ch == '(';
-    }
-
-    private static SegmentName splitResourceSegmentFromInlineData(String rawSegment) {
-        if (rawSegment == null) {
-            return new SegmentName("", "");
-        }
-
-        String segment = rawSegment.trim();
-        if (segment.isEmpty()) {
-            return new SegmentName("", "");
-        }
-
-        int dataSyntax = firstDataSyntaxIndex(segment);
-        if (dataSyntax >= 0) {
-            return new SegmentName(stripAllowedExtension(segment.substring(0, dataSyntax)), segment.substring(dataSyntax));
-        }
-
-        return new SegmentName(stripAllowedExtension(segment), "");
-    }
-
-    private static int firstDataSyntaxIndex(String segment) {
-        int first = -1;
-        char[] special = {'[', '(', ')', '*', '#', '<', '>', '?'};
-
-        for (char ch : special) {
-            int idx = segment.indexOf(ch);
-            if (idx >= 0 && (first < 0 || idx < first)) {
-                first = idx;
-            }
-        }
-
-        return first;
-    }
-
-    private static List<PathSegment> tokenizePath(String resourcePath) {
+    private static List<PathSegment> tokenizeResourcePath(String resourcePath) {
         List<PathSegment> out = new ArrayList<>();
         StringBuilder current = new StringBuilder();
 
-        int squareDepth = 0;
-        int parenDepth = 0;
-
         for (int i = 0; i < resourcePath.length(); i++) {
             char ch = resourcePath.charAt(i);
-
-            if (ch == '[') {
-                squareDepth++;
-                current.append(ch);
-                continue;
-            }
-            if (ch == ']' && squareDepth > 0) {
-                squareDepth--;
-                current.append(ch);
-                continue;
-            }
-            if (ch == '(') {
-                parenDepth++;
-                current.append(ch);
-                continue;
-            }
-            if (ch == ')' && parenDepth > 0) {
-                parenDepth--;
-                current.append(ch);
-                continue;
-            }
-
-            if ((ch == '/' || ch == '\\' || ch == '.') && squareDepth == 0 && parenDepth == 0) {
+            if (ch == '/' || ch == '\\' || ch == '.') {
                 if (!current.isEmpty()) {
-                    out.add(new PathSegment(current.toString(), ch));
+                    out.add(new PathSegment(stripAllowedExtension(current.toString()), ch));
                     current.setLength(0);
                 }
                 continue;
             }
-
             current.append(ch);
         }
 
         if (!current.isEmpty()) {
-            out.add(new PathSegment(current.toString(), '\0'));
+            out.add(new PathSegment(stripAllowedExtension(current.toString()), '\0'));
         }
 
+        debug("tokenizeResourcePath resourcePath='" + resourcePath + "' => " + out);
         return out;
+    }
+
+    private static JsonNode getFromValueUsingNodeMap(JsonNode value, String remainderPath) {
+        if (value == null) {
+            return null;
+        }
+
+        ObjectNode wrapper = JSON_MAPPER.createObjectNode();
+        wrapper.set(ROOT_PROP, value);
+
+        String nodeMapQuery = joinRootPropAndRemainder(value, remainderPath);
+        debug("NodeMap wrapper.rootProp=" + brief(value));
+        debug("NodeMap remainder='" + remainderPath + "' query='" + nodeMapQuery + "'");
+        Object selected = new NodeMap(wrapper).get(nodeMapQuery);
+        debug("NodeMap raw selected=" + briefObject(selected));
+        JsonNode result = selected == null ? null : JSON_MAPPER.valueToTree(selected);
+        debug("NodeMap result JsonNode=" + brief(result));
+        return result;
+    }
+
+    private static String joinRootPropAndRemainder(JsonNode value, String remainderPath) {
+        if (remainderPath == null || remainderPath.isBlank()) {
+            debug("joinRootPropAndRemainder blank remainder => " + ROOT_PROP);
+            return ROOT_PROP;
+        }
+
+        String r = remainderPath.stripLeading();
+        debug("joinRootPropAndRemainder valueIsArray=" + (value != null && value.isArray())
+                + " originalRemainder='" + remainderPath + "' stripped='" + r + "'");
+
+        /*
+         * If the resolved resource is a root array, convert a user-friendly wildcard
+         * continuation like:
+         *
+         *     people.*.name as:LIST
+         *
+         * into a NodeMap/Tokenized array wildcard continuation:
+         *
+         *     rootProp[*].name as:LIST
+         *
+         * instead of rootProp.*.name, which is an object wildcard and does not
+         * select array elements.
+         */
+        String joined;
+        if (value.isArray() && r.startsWith(".*")) {
+            joined = ROOT_PROP + "[*]" + r.substring(2);
+            debug("joinRootPropAndRemainder array dot-wildcard => '" + joined + "'");
+            return joined;
+        }
+
+        if (value.isArray() && r.startsWith("*")) {
+            joined = ROOT_PROP + "[*]" + r.substring(1);
+            debug("joinRootPropAndRemainder array wildcard => '" + joined + "'");
+            return joined;
+        }
+
+        if (r.startsWith(".")
+                || r.startsWith("[")
+                || r.startsWith("#")
+                || r.startsWith("(")
+                || r.startsWith("{")) {
+            joined = ROOT_PROP + r;
+            debug("joinRootPropAndRemainder direct continuation => '" + joined + "'");
+            return joined;
+        }
+
+        joined = ROOT_PROP + "." + r;
+        debug("joinRootPropAndRemainder dot inserted => '" + joined + "'");
+        return joined;
     }
 
     private static List<Candidate> findCandidates(Path directory, String requestedSegment, boolean directoryOnly) throws IOException {
@@ -519,12 +620,16 @@ public final class FileAndDataParsing {
                     .toList();
         }
 
+        debug("findCandidates directory='" + directory + "' requestedSegment='" + requestedSegment + "' requestedBase='" + requestedBase + "' directoryOnly=" + directoryOnly);
         List<Candidate> exact = matchingCandidates(children, requestedBase, directoryOnly, true);
+        debug("findCandidates exact matches=" + exact);
         if (!exact.isEmpty()) {
             return exact;
         }
 
-        return matchingCandidates(children, requestedBase, directoryOnly, false);
+        List<Candidate> ci = matchingCandidates(children, requestedBase, directoryOnly, false);
+        debug("findCandidates case-insensitive matches=" + ci);
+        return ci;
     }
 
     private static List<Candidate> matchingCandidates(
@@ -807,7 +912,9 @@ public final class FileAndDataParsing {
     }
 
     private static JsonNode buildFromRoot(Path root) throws IOException {
+        debug("buildFromRoot root='" + root + "'");
         if (root == null || !Files.exists(root)) {
+            debug("buildFromRoot missing root='" + root + "'");
             return null;
         }
 
@@ -825,7 +932,9 @@ public final class FileAndDataParsing {
             }
 
             String content = Files.readString(root, StandardCharsets.UTF_8);
-            return parseSingleFile(content, fileName);
+            JsonNode parsed = parseSingleFile(content, fileName);
+            debug("buildFromRoot file='" + root + "' ext='" + ext + "' parsed=" + brief(parsed));
+            return parsed;
         }
 
         ObjectNode dir = JSON_MAPPER.createObjectNode();
@@ -874,7 +983,9 @@ public final class FileAndDataParsing {
                     });
         }
 
-        return dir.size() == 0 ? null : dir;
+        JsonNode builtDir = dir.size() == 0 ? null : dir;
+        debug("buildFromRoot directory='" + root + "' built=" + brief(builtDir));
+        return builtDir;
     }
 
     private static boolean hasMeaningfulContent(String content, String name) {

@@ -1,9 +1,248 @@
 Feature: Addition
 
+  Scenario: Debug FileAndDataParsing NodeMap remainder syntax after resolved resource prefix
+    * , save "</data_test/Alpha/Beta/Gamma/items.items.*.name as:LIST>"
+    * , save "</data_test/CsvTests/people.{\"person\":name,\"job\":role} as:LIST>"
+    * , save "</data_test.A.B.table.{\"who\":name,\"animalType\":animal} as:LIST>"
+    * , save "</data_test/CsvTests/people[0..1].name as:LIST>"
+    * , save "</data_test/CsvTests/people[0,2].name as:LIST>"
+    * , save "</data_test/CsvTests/people#1..2.name as:LIST>"
+
+
+  Scenario: Tokenuiz 2r
+    * , save "</data_test/CsvTests/people.{\"person\":name,\"job\":role} as:LIST>"
+
+  Scenario: Tokenuiz 23
+# Directory path final segment: should return the full data_test directory tree.
+* , save "</data_test>"
+# Expected: ObjectNode containing A, Alpha, Collections, CsvTests, SlashOnly, TxtTests, XmlTests, etc.
+
+# Directory path final segment: nested directory should return an ObjectNode.
+* , save "</data_test/A/B>"
+# Expected: ObjectNode containing c, duplicateName, DUPLICATENAME, mixedCase, plain, table, xmlFile.
+
+# File path final segment: should return the parsed CSV root array.
+* , save "</data_test/CsvTests/people>"
+# Expected:
+# [
+#   {"name":"Flutter","role":"leader"},
+#   {"name":"Flydash","role":"sister"},
+#   {"name":"Pandakun","role":"ice cream fan"}
+# ]
+
+# Standard bracket index after a resolved file.
+* , save "</data_test/CsvTests/people[1].name>"
+# Expected: "Flydash"
+
+# Tokenized one-based # index after a resolved file.
+# #2 rewrites to [1].
+* , save "</data_test/CsvTests/people#2.name>"
+# Expected: "Flydash"
+
+# Tokenized one-based # index using dot-separated resource path.
+# #3 rewrites to [2].
+* , save "</data_test.CsvTests.people#3.role>"
+# Expected: "ice cream fan"
+
+# Standard bracket index after a resolved directory tree.
+* , save "</data_test.A.B.table[1].animal>"
+# Expected: "raccoon"
+
+# Tokenized # index after a resolved directory tree.
+# #2 rewrites to [1].
+* , save "</data_test.A.B.table#2.animal>"
+# Expected: "raccoon"
+
+# Tokenized # index against a YAML array.
+# #3 rewrites to [2].
+* , save "</data_test/A/B/c.PropA.propC#3>"
+# Expected: "two"
+
+# JSON nested array with Tokenized # index.
+# #1 rewrites to [0].
+* , save "</data_test/Alpha/Beta/Gamma/items.items#1.name>"
+# Expected: "apple"
+
+# JSON nested array with Tokenized # index.
+# #2 rewrites to [1].
+* , save "</data_test/Alpha/Beta/Gamma/items.items#2.name>"
+# Expected: "banana"
+
+# Use $. prefix, which Tokenized strips.
+* , save "</data_test/Alpha/Beta/Gamma/items.$.items[1].name>"
+# Expected: "banana"
+
+# Use $. prefix with directory tree fallback.
+* , save "</data_test.$.Alpha.Beta.Gamma.items.items[0].name>"
+# Expected: "apple"
+
+# Wildcard over array objects after resolved file.
+* , save "</data_test/CsvTests/people.*.name as:LIST>"
+# Expected: list-like result containing:
+# ["Flutter", "Flydash", "Pandakun"]
+# Exact formatting depends on ValueFormatting/fromSafeJsonNode.
+
+# Wildcard over array objects after resolved directory tree.
+* , save "</data_test.CsvTests.people.*.role as:LIST>"
+# Expected: list-like result containing:
+# ["leader", "sister", "ice cream fan"]
+
+# Wildcard over JSON items array after resolved file.
+* , save "</data_test/Alpha/Beta/Gamma/items.items.*.name as:LIST>"
+# Expected: list-like result containing:
+# ["apple", "banana"]
+
+# JSONata-style object projection after resolved CSV file.
+* , save "</data_test/CsvTests/people.{\"person\":name,\"job\":role} as:LIST>"
+# Expected: list-like result with projected objects:
+# [{"person":"Flutter","job":"leader"}, {"person":"Flydash","job":"sister"}, {"person":"Pandakun","job":"ice cream fan"}]
+# Exact quote/format may depend on your save formatting.
+
+# JSONata-style object projection after resolved directory tree.
+* , save "</data_test.A.B.table.{\"who\":name,\"animalType\":animal} as:LIST>"
+# Expected: list-like result with projected objects using table.csv rows.
+
+# JSONata filter syntax after resolved CSV file.
+* , save "</data_test/CsvTests/people[role=\"sister\"].name>"
+# Expected: "Flydash"
+
+# JSONata filter syntax after resolved directory tree.
+* , save "</data_test.A.B.table[animal=\"raccoon\"].name>"
+# Expected: "Nori"
+
+# JSONata filter plus field selection from JSON file.
+* , save "</data_test/Alpha/Beta/Gamma/items.items[id=2].name>"
+# Expected: "banana"
+
+# Parentheses expression after resolved file.
+* , save "</data_test/Alpha/Beta/Gamma/items.(items[1].name)>"
+# Expected: "banana"
+# If this returns null, it still proves the remainder was delegated to NodeMap/jsonata4java rather than treated as resource path.
+
+# as:LIST with a single direct value.
+* , save "</data_test/A/B/c.PropA.propB as:LIST>"
+# Expected: list-like result containing:
+# ["valueB"]
+
+# Slice-style syntax through Tokenized/jsonata4java.
+* , save "</data_test/CsvTests/people[0..1].name as:LIST>"
+# Expected: depends on jsonata4java support.
+# Important: should not save the literal '</data_test/CsvTests/people[0..1].name as:LIST>'.
+
+# Comma index syntax through Tokenized/jsonata4java.
+* , save "</data_test/CsvTests/people[0,2].name as:LIST>"
+# Expected: depends on jsonata4java support.
+# Important: should not save the literal '</data_test/CsvTests/people[0,2].name as:LIST>'.
+
+# Tokenized # comma syntax: #1,3 rewrites numbers to [0,2].
+* , save "</data_test/CsvTests/people#1,3.name as:LIST>"
+# Expected: depends on jsonata4java support for [0,2].
+# Likely list-like result containing Flutter and Pandakun if supported.
+
+# Tokenized # range syntax: #1..2 rewrites to [0..1].
+* , save "</data_test/CsvTests/people#1..2.name as:LIST>"
+# Expected: depends on jsonata4java support for [0..1].
+# Likely list-like result containing Flutter and Flydash if supported.
+
+# Invalid/edge bracket syntax should be delegated to NodeMap, not treated as a resource path.
+* , save "</data_test/CsvTests/people[].name>"
+# Expected: depends on Tokenized/jsonata4java behavior.
+# Important: should not save the literal path if your FileAndDataParsing fallback is working.
+
+# Negative index syntax should be delegated to NodeMap.
+* , save "</data_test/CsvTests/people[-1].name>"
+# Expected: depends on Tokenized/jsonata4java behavior for get.
+# Important: should not save the literal path if your fallback is working.
+
+# Directory prefix plus wildcard-style remainder.
+* , save "</data_test/A/B.* as:LIST>"
+# Expected: depends on jsonata4java behavior for object wildcard.
+# Important: should not save the literal path.
+
+# Directory prefix plus JSONata projection from CSV parsed inside directory tree.
+* , save "</data_test/A/B.table.{\"name\":name,\"score\":score} as:LIST>"
+# Expected: list-like result with:
+# [{"name":"Flutter","score":"100"}, {"name":"Nori","score":"95"}, {"name":"Hoppy","score":"98"}]
+
+
+  Scenario: configs test
+    * , save "</configs>"
+
+  Scenario: path testing jsonata1
+    # Final segment is a directory directly under src/test/resources.
+# This is the regression case you mentioned with "configs", using data_test as the known test folder.
+    * , save "</data_test>"
+# Expected: ObjectNode containing top-level keys:
+# A, Alpha, Collections, CsvTests, SlashOnly, TxtTests, XmlTests
+# Exact order may vary.
+
+# Final segment is a nested directory.
+    * , save "</data_test/A>"
+# Expected: ObjectNode containing key:
+# B
+
+# Final segment is a deeper nested directory.
+    * , save "</data_test/A/B>"
+# Expected: ObjectNode containing keys similar to:
+# c, DUPLICATENAME, duplicateName, mixedCase, plain, table, xmlFile
+# Note: because c.yaml and c/ both exist, the directory build result has one "c" key.
+# In the current buildFromRoot behavior, c.yaml wins/appears as the "c" value in the logged output.
+
+# Final segment is an explicit directory using trailing slash.
+    * , save "</data_test/A/B/c/>"
+# Expected:
+# {
+#   "D": {
+#     "deep": {
+#       "deepProp": {
+#         "answer": 42,
+#         "items": [
+#           {"name":"first"},
+#           {"name":"second"}
+#         ]
+#       }
+#     }
+#   }
+# }
+
+# Final segment is a suffixless YAML file.
+    * , save "</data_test/A/B/c>"
+# Expected:
+# {
+#   "PropA": {
+#     "propB": "valueB",
+#     "propC": ["zero","one","two"]
+#   }
+# }
+
+# Final segment is a suffixless CSV file.
+    * , save "</data_test/CsvTests/people>"
+# Expected:
+# [
+#   {"name":"Flutter","role":"leader"},
+#   {"name":"Flydash","role":"sister"},
+#   {"name":"Pandakun","role":"ice cream fan"}
+# ]
+
+# Final segment is a suffixless TXT file.
+    * , save "</data_test/TxtTests/message>"
+# Expected:
+# "Hello from a nested TXT resource."
+
+# Final segment is a suffixless XML file.
+    * , save "</data_test/XmlTests/pet>"
+# Expected:
+# {
+#   "name": "Brownie",
+#   "animal": "dog"
+# }
+
+
+
 
   Scenario: path testing 23
   # CSV file lookup, suffix omitted.
-* , save "</data_test/CsvTests/people>"
+    * , save "</data_test/CsvTests/people>"
 # Expected: JSON array from people.csv:
 # [
 #   {"name":"Flutter","role":"leader"},
@@ -12,19 +251,19 @@ Feature: Addition
 # ]
 
 # CSV file lookup, explicit suffix included.
-* , save "</data_test/CsvTests/people.csv>"
+    * , save "</data_test/CsvTests/people.csv>"
 # Expected: same JSON array from people.csv.
 
 # CSV nested array/object lookup.
-* , save "</data_test/CsvTests/people[1].name>"
+    * , save "</data_test/CsvTests/people[1].name>"
 # Expected: "Flydash"
 
 # Same CSV lookup using dots for resource path segments.
-* , save "</data_test.CsvTests.people[2].role>"
+    * , save "</data_test.CsvTests.people[2].role>"
 # Expected: "ice cream fan"
 
 # YAML file lookup, suffix omitted.
-* , save "</data_test/A/B/c>"
+    * , save "</data_test/A/B/c>"
 # Expected: contents of c.yaml:
 # {
 #   "PropA": {
@@ -34,19 +273,19 @@ Feature: Addition
 # }
 
 # YAML nested property lookup.
-* , save "</data_test/A/B/c.PropA.propB>"
+    * , save "</data_test/A/B/c.PropA.propB>"
 # Expected: "valueB"
 
 # YAML nested array lookup.
-* , save "</data_test/A/B/c.PropA.propC[1]>"
+    * , save "</data_test/A/B/c.PropA.propC[1]>"
 # Expected: "one"
 
 # Same YAML file using dots for resource path segments.
-* , save "</data_test.A.B.c>"
+    * , save "</data_test.A.B.c>"
 # Expected: contents of c.yaml, unless directory/file ambiguity causes your resolver to choose differently.
 
 # Explicit directory lookup using trailing slash.
-* , save "</data_test/A/B/c/>"
+    * , save "</data_test/A/B/c/>"
 # Expected: contents of directory c/, not file c.yaml:
 # {
 #   "D": {
@@ -63,7 +302,7 @@ Feature: Addition
 # }
 
 # Deep JSON file lookup through a directory named c.
-* , save "</data_test/A/B/c/D/deep>"
+    * , save "</data_test/A/B/c/D/deep>"
 # Expected: contents of deep.json:
 # {
 #   "deepProp": {
@@ -76,15 +315,15 @@ Feature: Addition
 # }
 
 # Deep JSON nested value.
-* , save "</data_test/A/B/c/D/deep.deepProp.answer>"
+    * , save "</data_test/A/B/c/D/deep.deepProp.answer>"
 # Expected: 42
 
 # Deep JSON nested array/object value.
-* , save "</data_test/A/B/c/D/deep.deepProp.items[1].name>"
+    * , save "</data_test/A/B/c/D/deep.deepProp.items[1].name>"
 # Expected: "second"
 
 # Case-insensitive file lookup.
-* , save "</data_test/A/B/mixedCase/casefile>"
+    * , save "</data_test/A/B/mixedCase/casefile>"
 # Expected: contents of CaseFile.YML:
 # {
 #   "Top": {
@@ -93,11 +332,11 @@ Feature: Addition
 # }
 
 # Case-insensitive file lookup plus nested property.
-* , save "</data_test/A/B/mixedCase/CASEFILE.Top.Inner>"
+    * , save "</data_test/A/B/mixedCase/CASEFILE.Top.Inner>"
 # Expected: "FoundByCaseInsensitiveFileName"
 
 # YML lookup, suffix omitted.
-* , save "</data_test/Alpha/Beta/Gamma/settings>"
+    * , save "</data_test/Alpha/Beta/Gamma/settings>"
 # Expected: contents of settings.yml:
 # {
 #   "app": {
@@ -110,11 +349,11 @@ Feature: Addition
 # }
 
 # YML nested value.
-* , save "</data_test/Alpha/Beta/Gamma/settings.app.flags.mode>"
+    * , save "</data_test/Alpha/Beta/Gamma/settings.app.flags.mode>"
 # Expected: "demo"
 
 # JSON lookup, suffix omitted.
-* , save "</data_test/Alpha/Beta/Gamma/items>"
+    * , save "</data_test/Alpha/Beta/Gamma/items>"
 # Expected: contents of items.json:
 # {
 #   "items": [
@@ -127,11 +366,11 @@ Feature: Addition
 # }
 
 # JSON nested array lookup.
-* , save "</data_test/Alpha/Beta/Gamma/items.items[1].name>"
+    * , save "</data_test/Alpha/Beta/Gamma/items.items[1].name>"
 # Expected: "banana"
 
 # XML lookup, suffix omitted.
-* , save "</data_test/XmlTests/pet>"
+    * , save "</data_test/XmlTests/pet>"
 # Expected: parsed XML tree.
 # Likely:
 # {
@@ -140,19 +379,19 @@ Feature: Addition
 # }
 
 # XML nested value.
-* , save "</data_test/XmlTests/pet.name>"
+    * , save "</data_test/XmlTests/pet.name>"
 # Expected: "Brownie"
 
 # TXT lookup, suffix omitted.
-* , save "</data_test/TxtTests/message>"
+    * , save "</data_test/TxtTests/message>"
 # Expected: "Hello from a nested TXT resource."
 
 # TXT lookup with explicit suffix.
-* , save "</data_test/TxtTests/message.txt>"
+    * , save "</data_test/TxtTests/message.txt>"
 # Expected: "Hello from a nested TXT resource."
 
 # Ambiguous file-vs-directory case.
-* , save "</data_test/SlashOnly/dirChoice/item>"
+    * , save "</data_test/SlashOnly/dirChoice/item>"
 # Expected: contents of item.yaml, because non-trailing-slash lookup should prefer file:
 # {
 #   "selected": "file item.yaml",
@@ -162,24 +401,24 @@ Feature: Addition
 # }
 
 # Ambiguous case, nested property from the file.
-* , save "</data_test/SlashOnly/dirChoice/item.nested.value>"
+    * , save "</data_test/SlashOnly/dirChoice/item.nested.value>"
 # Expected: "itemFileValue"
 
 # Forced directory lookup using trailing slash.
-* , save "</data_test/SlashOnly/dirChoice/item/>"
+    * , save "</data_test/SlashOnly/dirChoice/item/>"
 # Expected: contents of item/ directory:
 # {
 #   "nested": "This came from the item directory, not item.yaml."
 # }
 
 # Directory lookup.
-* , save "</data_test/A/B>"
+    * , save "</data_test/A/B>"
 # Expected: object containing keys similar to:
 # c, duplicateName, DUPLICATENAME, plain, table, xmlFile, mixedCase
 # Note: c may be the file c.yaml or directory c depending on duplicate-key behavior when both base names exist.
 
 # Exact-case match test.
-* , save "</data_test/A/B/duplicateName>"
+    * , save "</data_test/A/B/duplicateName>"
 # Expected: contents of duplicateName.yaml:
 # {
 #   "kind": "lower-yaml",
@@ -187,7 +426,7 @@ Feature: Addition
 # }
 
 # Exact uppercase match test.
-* , save "</data_test/A/B/DUPLICATENAME>"
+    * , save "</data_test/A/B/DUPLICATENAME>"
 # Expected: contents of DUPLICATENAME.json:
 # {
 #   "kind": "upper-json",
@@ -195,7 +434,7 @@ Feature: Addition
 # }
 
 # Case-insensitive duplicate-name edge case.
-* , save "</data_test/A/B/duplicatename>"
+    * , save "</data_test/A/B/duplicatename>"
 # Expected: one of the case-insensitive matches, selected by stable sort.
 # This intentionally tests that case-insensitive duplicate names do not throw an error.
 

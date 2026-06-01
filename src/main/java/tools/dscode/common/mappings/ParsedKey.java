@@ -33,7 +33,7 @@ public class ParsedKey {
     // public final String parentPath;
 
     // matches whole string, with optional suffix at the end
-    private static final Pattern PATTERN = Pattern.compile("^(.*?)(?:\\s(as-[A-Z]+))?$");
+    private static final Pattern PATTERN = Pattern.compile("^(.*?)(?:\\s(as:[A-Z]+))?$");
 
     public ParsedKey(String key) {
         Matcher m = PATTERN.matcher(key.strip());
