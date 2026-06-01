@@ -181,19 +181,21 @@ public final class FileAndDataParsing {
                 return existing;
             }
 
-            debug("cache MISS key='" + k + "'");
             JsonNode jsonNode = attemptBuildJsonFromPath(k);
-            debug("attemptBuildJsonFromPath returned key='" + k + "' value=" + brief(jsonNode));
+            debug("resolved key='" + k + "' value=" + brief(jsonNode));
 
-            return new CacheEntry(
-                    jsonNode == null ? NULL_SENTINEL : jsonNode.deepCopy(),
-                    now + BUILD_JSON_CACHE_TTL_NANOS
-            );
+            // Do not cache nulls in this debug build. A pre-resolution pass can otherwise
+            // hide the useful split/query diagnostics during the phrase execution.
+            if (jsonNode == null) {
+                return null;
+            }
+
+            return new CacheEntry(jsonNode.deepCopy(), now + BUILD_JSON_CACHE_TTL_NANOS);
         });
 
         cleanupBuildJsonCache(now);
-        JsonNode returned = entry.value == NULL_SENTINEL ? null : entry.value.deepCopy();
-        debug("buildJsonFromPath final key='" + key + "' returned=" + brief(returned));
+        JsonNode returned = entry == null ? null : entry.value.deepCopy();
+        debug("return key='" + key + "' value=" + brief(returned));
         return returned;
     }
 
@@ -228,29 +230,22 @@ public final class FileAndDataParsing {
         debug("attemptBuildJsonFromPath input='" + input + "'");
 
         List<ClasspathRoot> roots = getClasspathRoots();
-        debug("classpath roots count=" + roots.size());
         for (ClasspathRoot root : roots) {
             try (root) {
-                debug("trying classpathRoot='" + root.path() + "'");
                 PrefixMatch match = resolveBestResourcePrefix(root.path(), input);
-                debug("prefix match for root='" + root.path() + "' => "
-                        + (match == null ? "null" : "value=" + brief(match.value()) + ", remainder='" + match.remainder() + "'"));
                 if (match == null || match.value() == null) {
                     continue;
                 }
 
                 if (match.remainder() == null || match.remainder().isBlank()) {
-                    debug("returning prefix value directly: " + brief(match.value()));
                     return match.value();
                 }
 
                 JsonNode selected = getFromValueUsingNodeMap(match.value(), match.remainder());
-                debug("NodeMap selected=" + brief(selected));
                 return selected;
             } catch (ParseFailureException e) {
                 throw e;
             } catch (Exception ex) {
-                debug("exception while trying root='" + root.path() + "': " + ex.getClass().getName() + ": " + ex.getMessage());
                 // Try the next classpath root.
             }
         }
@@ -260,8 +255,13 @@ public final class FileAndDataParsing {
     }
 
     /**
-     * Finds the longest leading part of the input that is a real classpath directory or supported file.
-     * Anything after that prefix is treated as a NodeMap/Tokenized expression against rootProp.
+     * Finds the best leading resource prefix. If a path segment contains inline
+     * Tokenized/JSONata syntax, the preferred split is before that whole segment.
+     * Example:
+     *   data_test/CsvTests/people[0..1].name as:LIST
+     * becomes:
+     *   resource prefix = data_test/CsvTests/
+     *   remainder       = people[0..1].name as:LIST
      */
     private static PrefixMatch resolveBestResourcePrefix(Path classpathRoot, String input) throws IOException {
         if (classpathRoot == null || !Files.isDirectory(classpathRoot) || input == null || input.isBlank()) {
@@ -269,7 +269,8 @@ public final class FileAndDataParsing {
         }
 
         List<Integer> cuts = prefixCutPositions(input);
-        debug("resolveBestResourcePrefix root='" + classpathRoot + "' input='" + input + "' cuts=" + cuts);
+        debug("split candidates input='" + input + "' cuts=" + describeCuts(input, cuts));
+
         for (int cut : cuts) {
             String prefix = input.substring(0, cut);
             String remainder = input.substring(cut);
@@ -277,31 +278,31 @@ public final class FileAndDataParsing {
                 continue;
             }
 
-            debug("try prefix cut=" + cut + " prefix='" + prefix + "' remainder='" + remainder + "'");
             JsonNode value = resolveResourceOnly(classpathRoot, prefix);
-            debug("prefix result prefix='" + prefix + "' => " + brief(value));
             if (value != null) {
-                debug("selected prefix='" + prefix + "' remainder='" + remainder + "'");
+                debug("selected split prefix='" + prefix + "' remainder='" + remainder + "' value=" + brief(value));
                 return new PrefixMatch(value, remainder);
             }
         }
 
-        debug("resolveBestResourcePrefix no prefix matched input='" + input + "'");
+        debug("no resource split matched input='" + input + "'");
         return null;
     }
 
     /**
-     * Candidate prefix cuts, longest first. The first special Tokenized/JSONata character stops
-     * normal resource-path parsing so dots inside syntax such as [1..6] are never treated as path separators.
+     * Candidate prefix cuts. A forced cut is tried first when syntax belongs to a
+     * path segment instead of being a real file/directory name.
      */
     private static List<Integer> prefixCutPositions(String input) {
         int boundary = firstSpecialSyntaxBoundary(input);
         int scanEnd = boundary >= 0 ? boundary : input.length();
-        debug("prefixCutPositions input='" + input + "' boundary=" + boundary
-                + (boundary >= 0 ? " boundaryChar='" + input.charAt(boundary) + "'" : "")
-                + " scanEnd=" + scanEnd);
 
         List<Integer> cuts = new ArrayList<>();
+        Integer forcedCut = forcedDirectoryPrefixCutBeforeInlineDataSegment(input, boundary);
+        if (forcedCut != null) {
+            addCut(cuts, forcedCut);
+        }
+
         addCut(cuts, trimTrailingDots(input, scanEnd));
 
         int squareDepth = 0;
@@ -360,17 +361,88 @@ public final class FileAndDataParsing {
                     && (ch == '/' || ch == '\\' || ch == '.')
                     && !(ch == '.' && i + 1 < input.length() && input.charAt(i + 1) == '.')
                     && !(ch == '.' && i > 0 && input.charAt(i - 1) == '.')) {
-                addCut(cuts, i);
+                addCut(cuts, i + ((ch == '/' || ch == '\\') && i < scanEnd ? 1 : 0));
             }
         }
 
-        List<Integer> result = cuts.stream()
+        List<Integer> forced = cuts.isEmpty() ? List.of() : List.of(cuts.getFirst());
+        List<Integer> remaining = cuts.stream()
                 .filter(i -> i > 0)
                 .distinct()
+                .filter(i -> forced.isEmpty() || !i.equals(forced.getFirst()))
                 .sorted(Comparator.reverseOrder())
                 .toList();
-        debug("prefixCutPositions result input='" + input + "' cuts=" + result);
-        return result;
+
+        List<Integer> result = new ArrayList<>();
+        if (!forced.isEmpty() && forced.getFirst() > 0) {
+            result.add(forced.getFirst());
+        }
+        result.addAll(remaining);
+        return result.stream().filter(i -> i > 0).distinct().toList();
+    }
+
+    private static Integer forcedDirectoryPrefixCutBeforeInlineDataSegment(String input, int boundary) {
+        if (input == null || boundary < 0 || boundary >= input.length()) {
+            return null;
+        }
+
+        int segmentStart = lastResourceSeparatorBefore(input, boundary) + 1;
+        if (segmentStart <= 0) {
+            return null;
+        }
+
+        String segmentRemainder = input.substring(segmentStart);
+        if (!segmentHasInlineDataSyntax(segmentRemainder)) {
+            return null;
+        }
+
+        debug("forced split before inline syntax segment='" + segmentRemainder
+                + "' prefix='" + input.substring(0, segmentStart)
+                + "' remainder='" + input.substring(segmentStart) + "'");
+        return segmentStart;
+    }
+
+    private static int lastResourceSeparatorBefore(String input, int beforeIndex) {
+        int slash = input.lastIndexOf('/', beforeIndex);
+        int backslash = input.lastIndexOf('\\', beforeIndex);
+        return Math.max(slash, backslash);
+    }
+
+    private static boolean segmentHasInlineDataSyntax(String segmentRemainder) {
+        if (segmentRemainder == null || segmentRemainder.isBlank()) {
+            return false;
+        }
+
+        // Complex bracket/index syntax should be handled by NodeMap, not resource lookup.
+        if (segmentRemainder.matches(".*\\[[^\\]]*(?:\\.\\.|,)[^\\]]*].*")) {
+            return true;
+        }
+
+        // One-based # range/comma syntax should be handled by Tokenized.rewrite.
+        if (segmentRemainder.matches(".*#\\d+(?:\\.\\.|,)\\d+.*")) {
+            return true;
+        }
+
+        // Wildcards, projections, filters, and suffixes are data-query syntax.
+        return segmentRemainder.contains(".*")
+                || segmentRemainder.contains("*")
+                || segmentRemainder.contains("{")
+                || segmentRemainder.contains("}")
+                || segmentRemainder.contains("?")
+                || segmentRemainder.contains("(")
+                || segmentRemainder.contains(")")
+                || segmentRemainder.contains(" as:")
+                || segmentRemainder.contains(" as-");
+    }
+
+    private static String describeCuts(String input, List<Integer> cuts) {
+        if (cuts == null || cuts.isEmpty()) {
+            return "[]";
+        }
+        return cuts.stream()
+                .map(cut -> cut + "=('" + input.substring(0, cut) + "' | '" + input.substring(cut) + "')")
+                .toList()
+                .toString();
     }
 
     private static void addCut(List<Integer> cuts, int cut) {
@@ -416,17 +488,14 @@ public final class FileAndDataParsing {
             }
 
             if (ch == '[') {
-                debug("firstSpecialSyntaxBoundary '[' at " + i + " input='" + input + "'");
                 return i;
             }
             if (ch == '(' || ch == ')' || ch == '*' || ch == '#' || ch == '<' || ch == '>'
                     || ch == '?' || ch == '{' || ch == '}' || ch == '=' || ch == '%'
                     || ch == ':' || Character.isWhitespace(ch)) {
-                debug("firstSpecialSyntaxBoundary special '" + ch + "' at " + i + " input='" + input + "'");
                 return i;
             }
             if (ch == '.' && i + 1 < input.length() && input.charAt(i + 1) == '.') {
-                debug("firstSpecialSyntaxBoundary '..' at " + i + " input='" + input + "'");
                 return i;
             }
 
@@ -444,12 +513,10 @@ public final class FileAndDataParsing {
 
     private static JsonNode resolveResourceOnly(Path root, String resourcePath) throws IOException {
         List<PathSegment> segments = tokenizeResourcePath(resourcePath);
-        debug("resolveResourceOnly root='" + root + "' resourcePath='" + resourcePath + "' segments=" + segments);
         if (segments.isEmpty()) {
             return null;
         }
         JsonNode result = resolveResourceOnly(root, segments, 0);
-        debug("resolveResourceOnly result resourcePath='" + resourcePath + "' => " + brief(result));
         return result;
     }
 
@@ -459,24 +526,19 @@ public final class FileAndDataParsing {
         }
 
         PathSegment segment = segments.get(index);
-        debug("resolveResourceOnly recurse directory='" + directory + "' index=" + index + " segment=" + segment);
         List<Candidate> candidates = findCandidates(directory, segment.value(), segment.directoryRequired());
-        debug("candidates for directory='" + directory + "' segment='" + segment.value() + "' directoryRequired=" + segment.directoryRequired() + " => " + candidates);
         if (candidates.isEmpty()) {
             return null;
         }
 
         for (Candidate candidate : candidates) {
-            debug("consider candidate=" + candidate + " for segment=" + segment + " index=" + index);
             if (candidate.directory()) {
                 if (index == segments.size() - 1) {
                     JsonNode built = buildFromRoot(candidate.path());
-                    debug("directory final candidate='" + candidate.path() + "' built=" + brief(built));
                     return built;
                 }
 
                 JsonNode child = resolveResourceOnly(candidate.path(), segments, index + 1);
-                debug("directory child result candidate='" + candidate.path() + "' child=" + brief(child));
                 if (child != null) {
                     return child;
                 }
@@ -484,15 +546,12 @@ public final class FileAndDataParsing {
             }
 
             if (segment.directoryRequired()) {
-                debug("skip file candidate because segment requires directory: " + candidate);
                 continue;
             }
 
             int consumedIndex = consumeOptionalExplicitExtension(candidate, segment, segments, index);
-            debug("file candidate='" + candidate.path() + "' consumedIndex=" + consumedIndex + " segmentsLast=" + (segments.size() - 1));
             if (consumedIndex == segments.size() - 1) {
                 JsonNode built = buildFromRoot(candidate.path());
-                debug("file final candidate='" + candidate.path() + "' built=" + brief(built));
                 return built;
             }
         }
@@ -535,7 +594,6 @@ public final class FileAndDataParsing {
             out.add(new PathSegment(stripAllowedExtension(current.toString()), '\0'));
         }
 
-        debug("tokenizeResourcePath resourcePath='" + resourcePath + "' => " + out);
         return out;
     }
 
@@ -548,7 +606,6 @@ public final class FileAndDataParsing {
         wrapper.set(ROOT_PROP, value);
 
         String nodeMapQuery = joinRootPropAndRemainder(value, remainderPath);
-        debug("NodeMap wrapper.rootProp=" + brief(value));
         debug("NodeMap remainder='" + remainderPath + "' query='" + nodeMapQuery + "'");
         Object selected = new NodeMap(wrapper).get(nodeMapQuery);
         debug("NodeMap raw selected=" + briefObject(selected));
@@ -559,53 +616,118 @@ public final class FileAndDataParsing {
 
     private static String joinRootPropAndRemainder(JsonNode value, String remainderPath) {
         if (remainderPath == null || remainderPath.isBlank()) {
-            debug("joinRootPropAndRemainder blank remainder => " + ROOT_PROP);
             return ROOT_PROP;
         }
 
         String r = remainderPath.stripLeading();
-        debug("joinRootPropAndRemainder valueIsArray=" + (value != null && value.isArray())
-                + " originalRemainder='" + remainderPath + "' stripped='" + r + "'");
-
-        /*
-         * If the resolved resource is a root array, convert a user-friendly wildcard
-         * continuation like:
-         *
-         *     people.*.name as:LIST
-         *
-         * into a NodeMap/Tokenized array wildcard continuation:
-         *
-         *     rootProp[*].name as:LIST
-         *
-         * instead of rootProp.*.name, which is an object wildcard and does not
-         * select array elements.
-         */
         String joined;
         if (value.isArray() && r.startsWith(".*")) {
             joined = ROOT_PROP + "[*]" + r.substring(2);
-            debug("joinRootPropAndRemainder array dot-wildcard => '" + joined + "'");
-            return joined;
-        }
-
-        if (value.isArray() && r.startsWith("*")) {
+        } else if (value.isArray() && r.startsWith("*")) {
             joined = ROOT_PROP + "[*]" + r.substring(1);
-            debug("joinRootPropAndRemainder array wildcard => '" + joined + "'");
-            return joined;
-        }
-
-        if (r.startsWith(".")
+        } else if (r.startsWith(".")
                 || r.startsWith("[")
                 || r.startsWith("#")
                 || r.startsWith("(")
                 || r.startsWith("{")) {
             joined = ROOT_PROP + r;
-            debug("joinRootPropAndRemainder direct continuation => '" + joined + "'");
-            return joined;
+        } else {
+            joined = ROOT_PROP + "." + r;
         }
 
-        joined = ROOT_PROP + "." + r;
-        debug("joinRootPropAndRemainder dot inserted => '" + joined + "'");
-        return joined;
+        String normalized = normalizeArrayDotWildcards(value, joined);
+        if (!joined.equals(normalized)) {
+            debug("normalized array wildcard query='" + joined + "' -> '" + normalized + "'");
+        }
+        return normalized;
+    }
+
+    /**
+     * Converts only dot-wildcards that follow an actual ArrayNode to [*].
+     * This keeps object wildcard queries such as rootProp.* as object wildcards,
+     * while fixing rootProp.items.*.name when rootProp.items is an array.
+     */
+    private static String normalizeArrayDotWildcards(JsonNode rootValue, String query) {
+        if (rootValue == null || query == null || query.isBlank() || !query.contains(".*")) {
+            return query;
+        }
+
+        StringBuilder out = new StringBuilder(query);
+        int searchFrom = 0;
+        while (searchFrom < out.length()) {
+            int dotStar = out.indexOf(".*", searchFrom);
+            if (dotStar < 0) {
+                break;
+            }
+
+            String pathBeforeWildcard = out.substring(0, dotStar);
+            JsonNode nodeBeforeWildcard = resolveSimpleNodePathFromRootProp(rootValue, pathBeforeWildcard);
+            if (nodeBeforeWildcard != null && nodeBeforeWildcard.isArray()) {
+                out.replace(dotStar, dotStar + 2, "[*]");
+                searchFrom = dotStar + 3;
+            } else {
+                searchFrom = dotStar + 2;
+            }
+        }
+        return out.toString();
+    }
+
+    private static JsonNode resolveSimpleNodePathFromRootProp(JsonNode rootValue, String queryPrefix) {
+        if (rootValue == null || queryPrefix == null || !queryPrefix.startsWith(ROOT_PROP)) {
+            return null;
+        }
+
+        JsonNode current = rootValue;
+        int i = ROOT_PROP.length();
+        while (i < queryPrefix.length()) {
+            char ch = queryPrefix.charAt(i);
+            if (ch == '.') {
+                int next = i + 1;
+                int end = next;
+                while (end < queryPrefix.length()) {
+                    char c = queryPrefix.charAt(end);
+                    if (c == '.' || c == '[' || c == '#') {
+                        break;
+                    }
+                    end++;
+                }
+                if (end <= next || current == null || !current.isObject()) {
+                    return null;
+                }
+                String field = queryPrefix.substring(next, end);
+                if (field.startsWith("`") && field.endsWith("`") && field.length() >= 2) {
+                    field = field.substring(1, field.length() - 1);
+                }
+                current = current.get(field);
+                i = end;
+                continue;
+            }
+
+            if (ch == '[') {
+                int end = queryPrefix.indexOf(']', i);
+                if (end < 0 || current == null || !current.isArray()) {
+                    return null;
+                }
+                String body = queryPrefix.substring(i + 1, end).trim();
+                if (body.equals("*") || body.contains(",") || body.contains("..")) {
+                    return current;
+                }
+                try {
+                    int index = Integer.parseInt(body);
+                    if (index < 0) {
+                        index = current.size() + index;
+                    }
+                    current = index >= 0 && index < current.size() ? current.get(index) : null;
+                } catch (NumberFormatException ignored) {
+                    return null;
+                }
+                i = end + 1;
+                continue;
+            }
+
+            return null;
+        }
+        return current;
     }
 
     private static List<Candidate> findCandidates(Path directory, String requestedSegment, boolean directoryOnly) throws IOException {
@@ -620,15 +742,12 @@ public final class FileAndDataParsing {
                     .toList();
         }
 
-        debug("findCandidates directory='" + directory + "' requestedSegment='" + requestedSegment + "' requestedBase='" + requestedBase + "' directoryOnly=" + directoryOnly);
         List<Candidate> exact = matchingCandidates(children, requestedBase, directoryOnly, true);
-        debug("findCandidates exact matches=" + exact);
         if (!exact.isEmpty()) {
             return exact;
         }
 
         List<Candidate> ci = matchingCandidates(children, requestedBase, directoryOnly, false);
-        debug("findCandidates case-insensitive matches=" + ci);
         return ci;
     }
 
@@ -912,9 +1031,7 @@ public final class FileAndDataParsing {
     }
 
     private static JsonNode buildFromRoot(Path root) throws IOException {
-        debug("buildFromRoot root='" + root + "'");
         if (root == null || !Files.exists(root)) {
-            debug("buildFromRoot missing root='" + root + "'");
             return null;
         }
 
@@ -933,7 +1050,6 @@ public final class FileAndDataParsing {
 
             String content = Files.readString(root, StandardCharsets.UTF_8);
             JsonNode parsed = parseSingleFile(content, fileName);
-            debug("buildFromRoot file='" + root + "' ext='" + ext + "' parsed=" + brief(parsed));
             return parsed;
         }
 
@@ -984,7 +1100,6 @@ public final class FileAndDataParsing {
         }
 
         JsonNode builtDir = dir.size() == 0 ? null : dir;
-        debug("buildFromRoot directory='" + root + "' built=" + brief(builtDir));
         return builtDir;
     }
 
