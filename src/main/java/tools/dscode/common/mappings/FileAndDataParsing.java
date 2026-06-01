@@ -227,61 +227,143 @@ public final class FileAndDataParsing {
     }
 
     private static JsonNode resolveFromDirectory(Path directory, List<PathSegment> segments, int index) throws IOException {
-        if (directory == null || !Files.isDirectory(directory) || index >= segments.size()) {
+        if (directory == null || !Files.isDirectory(directory)) {
             return null;
+        }
+
+        if (index >= segments.size()) {
+            return buildFromRoot(directory);
         }
 
         PathSegment segment = segments.get(index);
         SegmentName segmentName = splitResourceSegmentFromInlineData(segment.value());
+
+        /*
+         * If the next segment is not a normal resource segment, stop treating the
+         * path as file-system/resource traversal. Build the JSON value for the
+         * valid directory prefix and let NodeMap parse the remainder.
+         */
         if (segmentName.resourceName().isBlank()) {
-            return null;
+            JsonNode directoryValue = buildFromRoot(directory);
+            return directoryValue == null
+                    ? null
+                    : getFromFileValueUsingNodeMap(directoryValue, buildRemainderPath("", segments, index));
         }
 
         List<Candidate> candidates = findCandidates(directory, segmentName.resourceName(), segment.directoryRequired());
+
+        /*
+         * If no child directory/file matches this segment, the current directory is
+         * still a valid JSON prefix. Delegate the rest of the path to NodeMap. This
+         * is what allows foreign syntax / JSONata-like syntax / unsupported bracket
+         * syntax to be handled outside this class instead of making resource lookup fail.
+         */
+        if (candidates.isEmpty()) {
+            JsonNode directoryValue = buildFromRoot(directory);
+            return directoryValue == null
+                    ? null
+                    : getFromFileValueUsingNodeMap(directoryValue, buildRemainderPath("", segments, index));
+        }
+
         for (Candidate candidate : candidates) {
             if (candidate.directory()) {
-                if (index == segments.size() - 1) {
-                    return buildFromRoot(candidate.path());
-                }
-
-                JsonNode child = resolveFromDirectory(candidate.path(), segments, index + 1);
-                if (child != null) {
-                    return child;
+                JsonNode resolved = resolveDirectoryCandidate(candidate.path(), segmentName, segments, index);
+                if (resolved != null) {
+                    return resolved;
                 }
                 continue;
             }
 
-            if (segment.directoryRequired()) {
-                continue;
+            JsonNode resolved = resolveFileCandidate(candidate, segmentName, segment, segments, index);
+            if (resolved != null) {
+                return resolved;
             }
-
-            JsonNode fileValue = buildFromRoot(candidate.path());
-            if (fileValue == null) {
-                continue;
-            }
-
-            int remainderStart = index + 1;
-
-            // Allows explicit suffixes such as people.csv or c.yaml to behave the same as people or c.
-            if (remainderStart < segments.size()
-                    && segment.separatorAfter() == '.'
-                    && candidate.extension() != null
-                    && segments.get(remainderStart).value().equalsIgnoreCase(candidate.extension())) {
-                remainderStart++;
-            }
-
-            String remainder = buildRemainderPath(segmentName.inlineDataPath(), segments, remainderStart);
-            if (remainder == null || remainder.isBlank()) {
-                return fileValue;
-            }
-
-            return getFromFileValueUsingNodeMap(fileValue, remainder);
         }
 
         return null;
     }
 
+    private static JsonNode resolveDirectoryCandidate(
+            Path childDirectory,
+            SegmentName segmentName,
+            List<PathSegment> segments,
+            int index
+    ) throws IOException {
+        JsonNode directoryValue = null;
+
+        if (index == segments.size() - 1) {
+            return buildFromRoot(childDirectory);
+        }
+
+        if (segmentName.inlineDataPath() != null && !segmentName.inlineDataPath().isBlank()) {
+            directoryValue = buildFromRoot(childDirectory);
+            String remainder = buildRemainderPath(segmentName.inlineDataPath(), segments, index + 1);
+            return directoryValue == null ? null : getFromFileValueUsingNodeMap(directoryValue, remainder);
+        }
+
+        JsonNode child = resolveFromDirectory(childDirectory, segments, index + 1);
+        if (child != null) {
+            return child;
+        }
+
+        /*
+         * The child directory was a valid prefix, but the following segment did not
+         * resolve as another resource. Use the built directory ObjectNode and let
+         * NodeMap try the remaining path.
+         */
+        directoryValue = buildFromRoot(childDirectory);
+        String remainder = buildRemainderPath("", segments, index + 1);
+        return directoryValue == null || remainder == null || remainder.isBlank()
+                ? directoryValue
+                : getFromFileValueUsingNodeMap(directoryValue, remainder);
+    }
+
+    private static JsonNode resolveFileCandidate(
+            Candidate candidate,
+            SegmentName segmentName,
+            PathSegment originalSegment,
+            List<PathSegment> segments,
+            int index
+    ) throws IOException {
+        if (originalSegment.directoryRequired()) {
+            return null;
+        }
+
+        JsonNode fileValue = buildFromRoot(candidate.path());
+        if (fileValue == null) {
+            return null;
+        }
+
+        int remainderStart = index + 1;
+        String inlineRemainder = segmentName.inlineDataPath();
+
+        /*
+         * Allows explicit suffixes such as people.csv, people.csv[1], c.yaml,
+         * or c.yaml.PropA to behave the same as people, people[1], c, or c.PropA.
+         */
+        if (remainderStart < segments.size()
+                && originalSegment.separatorAfter() == '.'
+                && candidate.extension() != null) {
+            SegmentName extensionSegment = splitResourceSegmentFromInlineData(segments.get(remainderStart).value());
+            if (extensionSegment.resourceName().equalsIgnoreCase(candidate.extension())) {
+                inlineRemainder = appendRemainder(inlineRemainder, extensionSegment.inlineDataPath());
+                remainderStart++;
+            }
+        }
+
+        String remainder = buildRemainderPath(inlineRemainder, segments, remainderStart);
+        if (remainder == null || remainder.isBlank()) {
+            return fileValue;
+        }
+
+        return getFromFileValueUsingNodeMap(fileValue, remainder);
+    }
+
     private static JsonNode getFromFileValueUsingNodeMap(JsonNode fileValue, String remainderPath) {
+        if (fileValue == null) {
+            return null;
+        }
+
         ObjectNode wrapper = JSON_MAPPER.createObjectNode();
         wrapper.set(ROOT_PROP, fileValue);
 
@@ -323,6 +405,19 @@ public final class FileAndDataParsing {
         return out.toString();
     }
 
+    private static String appendRemainder(String left, String right) {
+        if (right == null || right.isBlank()) {
+            return left == null ? "" : left;
+        }
+        if (left == null || left.isBlank()) {
+            return right;
+        }
+        if (right.startsWith("[") || right.startsWith("(") || right.startsWith(".")) {
+            return left + right;
+        }
+        return left + "." + right;
+    }
+
     private static boolean endsWithPathJoiner(StringBuilder out) {
         if (out.isEmpty()) {
             return false;
@@ -341,40 +436,67 @@ public final class FileAndDataParsing {
             return new SegmentName("", "");
         }
 
-        int bracket = firstSpecialDataSyntaxIndex(segment);
-        if (bracket >= 0) {
-            return new SegmentName(stripAllowedExtension(segment.substring(0, bracket)), segment.substring(bracket));
+        int dataSyntax = firstDataSyntaxIndex(segment);
+        if (dataSyntax >= 0) {
+            return new SegmentName(stripAllowedExtension(segment.substring(0, dataSyntax)), segment.substring(dataSyntax));
         }
 
         return new SegmentName(stripAllowedExtension(segment), "");
     }
 
-    private static int firstSpecialDataSyntaxIndex(String segment) {
-        int square = segment.indexOf('[');
-        int paren = segment.indexOf('(');
+    private static int firstDataSyntaxIndex(String segment) {
+        int first = -1;
+        char[] special = {'[', '(', ')', '*', '#', '<', '>', '?'};
 
-        if (square < 0) {
-            return paren;
+        for (char ch : special) {
+            int idx = segment.indexOf(ch);
+            if (idx >= 0 && (first < 0 || idx < first)) {
+                first = idx;
+            }
         }
-        if (paren < 0) {
-            return square;
-        }
-        return Math.min(square, paren);
+
+        return first;
     }
 
     private static List<PathSegment> tokenizePath(String resourcePath) {
         List<PathSegment> out = new ArrayList<>();
         StringBuilder current = new StringBuilder();
 
+        int squareDepth = 0;
+        int parenDepth = 0;
+
         for (int i = 0; i < resourcePath.length(); i++) {
             char ch = resourcePath.charAt(i);
-            if (ch == '/' || ch == '\\' || ch == '.') {
+
+            if (ch == '[') {
+                squareDepth++;
+                current.append(ch);
+                continue;
+            }
+            if (ch == ']' && squareDepth > 0) {
+                squareDepth--;
+                current.append(ch);
+                continue;
+            }
+            if (ch == '(') {
+                parenDepth++;
+                current.append(ch);
+                continue;
+            }
+            if (ch == ')' && parenDepth > 0) {
+                parenDepth--;
+                current.append(ch);
+                continue;
+            }
+
+            if ((ch == '/' || ch == '\\' || ch == '.') && squareDepth == 0 && parenDepth == 0) {
                 if (!current.isEmpty()) {
                     out.add(new PathSegment(current.toString(), ch));
                     current.setLength(0);
                 }
                 continue;
             }
+
             current.append(ch);
         }
 
