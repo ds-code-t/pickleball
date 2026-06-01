@@ -1,8 +1,9 @@
 Feature: Addition
 
 
-  Scenario: "untils "ssdf4""
-    * , save "A"
+  Scenario: "untils "ssdf4"
+    * , save "</runconfigs/profiles/user1>" Data
+    * , save "</runconfigs/profiles/user1.browser>" Data
 #    * , until 3==1:
 #  : * , save "A"
 

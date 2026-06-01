@@ -1,6 +1,7 @@
 package tools.dscode.common.domoperations;
 
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chromium.ChromiumOptions;
 import org.openqa.selenium.remote.RemoteWebDriver;
@@ -56,13 +57,79 @@ public class SeleniumUtils {
         }
     }
 
+
     public static void waitForDuration(Duration duration) {
+        WebDriver driver = tools.dscode.coredefinitions.BrowserSteps.getCurrentDriverForNonUse();
+
+        if (duration == null || duration.isNegative() || duration.isZero()) {
+            System.out.print("wait completed");
+            System.out.flush();
+            return;
+        }
+
+        long totalSeconds = duration.toSeconds();
+
         try {
-            Thread.sleep(duration);
+            System.out.print("wait " + formatDuration(totalSeconds) + " left");
+            System.out.flush();
+
+            if (totalSeconds > 30) {
+                long remainder = totalSeconds % 30;
+
+                if (remainder > 0) {
+                    Thread.sleep(Duration.ofSeconds(remainder));
+                    totalSeconds -= remainder;
+
+                    System.out.print(" ... " + formatDuration(totalSeconds) + " left");
+                    System.out.flush();
+                }
+
+                while (totalSeconds > 30) {
+                    Thread.sleep(Duration.ofSeconds(30));
+                    totalSeconds -= 30;
+
+                    keepDriverSessionAlive(driver);
+
+                    System.out.print(" ... " + formatDuration(totalSeconds) + " left");
+                    System.out.flush();
+                }
+            }
+
+            Thread.sleep(Duration.ofSeconds(totalSeconds));
+
+            System.out.print(" ... wait completed");
+            System.out.flush();
+
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Sleep interrupted", e);
         }
+    }
+
+    private static void keepDriverSessionAlive(WebDriver driver) {
+        if (driver == null) {
+            return;
+        }
+
+        try {
+            driver.getCurrentUrl();
+        } catch (WebDriverException e) {
+            // Do not fail the wait just because the keepalive ping failed.
+            // The real Selenium command later should report the real browser/session problem.
+            System.out.print(" ... browser keepalive failed");
+            System.out.flush();
+        }
+    }
+
+    private static String formatDuration(long seconds) {
+        long minutes = seconds / 60;
+        long remainingSeconds = seconds % 60;
+
+        if (minutes > 0) {
+            return "%d:%02d minutes".formatted(minutes, remainingSeconds);
+        }
+
+        return seconds + " seconds";
     }
 
 
