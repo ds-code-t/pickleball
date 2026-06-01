@@ -207,21 +207,6 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
         return scope == entry && entry != null && entry.parent == null;
     }
 
-    private static String suiteName(Entry scope) {
-        if (scope == null) return null;
-
-        for (String tag : scope.tags) {
-            if (tag == null) continue;
-
-            String t = tag.trim();
-            if (t.regionMatches(true, 0, RP_SUITE_PREFIX, 0, RP_SUITE_PREFIX.length())) {
-                String suite = t.substring(RP_SUITE_PREFIX.length()).trim();
-                return suite.isEmpty() ? null : suite;
-            }
-        }
-
-        return null;
-    }
 
     private static List<String> suitePath(List<String> configuredAncestors) {
         if (configuredAncestors == null || configuredAncestors.isEmpty()) {
