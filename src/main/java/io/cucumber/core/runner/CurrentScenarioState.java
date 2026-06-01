@@ -28,6 +28,7 @@ import tools.dscode.registry.GlobalRegistry;
 
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -309,21 +310,32 @@ public class CurrentScenarioState extends ScenarioMapping {
             return;
         }
 
-        Result result;
+
+        Instant startTime = Instant.now();
         if (stepExtension.runMethodDirectly) {
             stepExtension.runPickleStepDefinitionMatch();
-            result = new Result(Status.PASSED, Duration.ZERO, null);
+            stepExtension.result = new Result(Status.PASSED, Duration.between(startTime, Instant.now()), null);
         } else {
-            result = stepExtension.run();
+            try {
+                stepExtension.run();
+            }
+            catch (Throwable e){
+                if(stepExtension.result == null){
+                    stepExtension.result = new Result(Status.FAILED, Duration.between(startTime, Instant.now()), e);
+                }
+                else if(stepExtension.result.getError() == null) {
+                    stepExtension.result = new Result(stepExtension.result.getStatus(), stepExtension.result.getDuration(), e);
+                }
+            }
         }
         setDefaultEntry(scenarioLog);
         if (!stepExtension.lineData.inheritancePhrases.isEmpty())
             stepExtension.inheritancePhrase = stepExtension.lineData.inheritancePhrases.getFirst();
 
-        Status status = result.getStatus();
-        Throwable throwable = result.getError();
+        Status status = stepExtension.result.getStatus();
+        Throwable throwable = stepExtension.result.getError();
 
-        if (!result.getStatus().equals(Status.PASSED) && !result.getStatus().equals(Status.SKIPPED) && throwable == null) {
+        if (!stepExtension.result.getStatus().equals(Status.PASSED) && !stepExtension.result.getStatus().equals(Status.SKIPPED) && throwable == null) {
 
             if (status.equals(Status.UNDEFINED))
                 throwable = new RuntimeException("'" + stepExtension.pickleStepTestStep.getStep().getText() + "' step is undefined");

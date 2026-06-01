@@ -53,6 +53,7 @@ import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
 import static tools.dscode.common.util.debug.DebugUtils.parseDebugString;
 
 public class StepExtension extends StepData {
+    public io.cucumber.plugin.event.Result result = null;
     private static final Pattern pattern = Pattern.compile("@\\[([^\\[\\]]*)\\]");
 
     public boolean waitForPageReady = true;
@@ -153,7 +154,7 @@ public class StepExtension extends StepData {
     }
 
     public Result run() {
-
+        result = null;
 
         ExecutionMode executionMode = ExecutionMode.RUN;
 
@@ -174,7 +175,7 @@ public class StepExtension extends StepData {
         stepEntry = parentEntry.logWithType("STEP", stepText).tags("Step").start();
         setDefaultEntry(getRunningStep().stepEntry);
         lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
-        io.cucumber.plugin.event.Result result = execute(executingPickleStepTestStep, executionMode);
+        result = execute(executingPickleStepTestStep, executionMode);
 
         if (result.getError() != null) {
             stepEntry.error(stackTraceToString(result.getError()))

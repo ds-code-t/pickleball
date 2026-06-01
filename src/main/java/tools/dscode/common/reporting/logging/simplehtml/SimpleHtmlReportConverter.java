@@ -1246,19 +1246,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             Optional<RowData> od = rowData(s.rowKey);
             if (od.isEmpty()) continue;
 
-            Map<String, Object> values = new LinkedHashMap<>(od.get().valuesByHeader());
-
-            // Force the overview table STATUS to match the actual rendered scenario status.
-            // This prevents stale rowData STATUS values from showing PASSED when the node tree failed.
-            Status actualStatus = includedStatus.get(i);
-            for (String h : summaryHeaders) {
-                if ("STATUS".equalsIgnoreCase(h.trim())) {
-                    values.put(h, actualStatus == Status.FAIL ? "FAILED" : "PASSED");
-                    break;
-                }
-            }
-
-            rows.add(new Row("sc" + i, values));
+            rows.add(new Row("sc" + i, od.get().valuesByHeader()));
         }
 
         out.append("  <div class=\"overview\">\n");
