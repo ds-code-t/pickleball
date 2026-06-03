@@ -64,6 +64,14 @@ public final class ReportPortalHierarchy {
                 rq.setName(launchName);
                 rq.setStartTime(new Date());
 
+                if (parameters != null) {
+                    rq.setDescription(parameters.getDescription());
+                    rq.setAttributes(parameters.getAttributes());
+                    rq.setMode(parameters.getLaunchRunningMode());
+                    rq.setRerun(parameters.isRerun());
+                    rq.setRerunOf(parameters.getRerunOf());
+                }
+
                 launch = reportPortal.newLaunch(rq);
             }
             return launch;

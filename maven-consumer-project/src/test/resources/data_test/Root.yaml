@@ -1,0 +1,5 @@
+child:
+  message: "loaded from Root.yaml with suffix ignored"
+  list:
+    - alpha
+    - beta

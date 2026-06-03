@@ -1,7 +1,101 @@
 Feature: Addition
 
-  Scenario: ss
-    * , save "</configs>"
+
+  Scenario: data path split and query test1
+    * , save "</data_test/deep/level1/level2/level3/Leaf.branch.twig>"
+
+
+    * , save "</data_test/deep/level1/level2/level3/Leaf.branch.*>"
+
+  Scenario: data path split and query test
+    * , save "</data_test/Simple>"
+    * , save "</data_test/Simple.details.number>"
+    * , save "</data_test/Root.child.list[*]>"
+    * , save "</data_test/A.*.C>"
+    * , save "</data_test/A/B>"
+    * , save "</data_test/A/B.B.C>"
+    * , save "</data_test/A/B.B.more.enabled>"
+    * , save "</data_test/A/B/C>"
+    * , save "</data_test/A/B/C.D.E[0].F>"
+    * , save "</data_test/A/B/C.D.E[1].F>"
+    * , save "</data_test/A/B/C.D.E[*].F>"
+    * , save "</data_test/A/B/C.D.nested.value>"
+    * , save "</data_test/library>"
+    * , save "</data_test/library.books.Favorites.count>"
+    * , save "</data_test/library/books/Favorites.items[0].title>"
+    * , save "</data_test/library/books/Favorites.items #2.title>"
+    * , save "</data_test/zoo>"
+    * , save "</data_test/zoo.Animals.panda.diet>"
+    * , save "</data_test/zoo.Animals.*.diet>"
+    * , save "</data_test/zoo.Birds.duck.heads>"
+    * , save "</data_test/ambiguous/Item>"
+    * , save "</data_test/ambiguous/Item.source>"
+    * , save "</data_test/ambiguous/Item.value>"
+    * , save "</data_test/case/mixedcase>"
+    * , save "</data_test/case/mixedcase.inner.flag>"
+    * , save "</data_test/formats/settings>"
+    * , save "</data_test/formats/settings.\"app.name\">"
+    * , save "</data_test/formats/settings.\"app.mode\">"
+    * , save "</data_test/formats/table>"
+    * , save "</data_test/formats/table[0]>"
+    * , save "</data_test/formats/table[1].name>"
+    * , save "</data_test/formats/table #1>"
+    * , save "</data_test/formats/table #2.role>"
+    * , save "</data_test/formats/sample>"
+    * , save "</data_test/deep/level1/level2/level3/Leaf.branch.twig.message>"
+
+  Scenario: fails res2
+    * , save "</data_test/formats/settings.\"app.name\">"
+
+    * , save "</data_test/formats/table[0]>"
+    * , save "</data_test/formats.table[0]>"
+
+    * , save "</data_test/formats/table #1>"
+    * , save "</data_test/formats.table #1>"
+
+  Scenario: fails res
+    * , save "</data_test/A/B.B.more.enabled>"
+    * , save "</data_test/formats/settings>"
+    * , save "</data_test/formats/table>"
+#    * , save "</data_test/formats/settings.app.name>"
+#    * , save "</data_test/formats/table[*].name>"
+#    * , save "</data_test/formats/table[0].*>"
+
+  Scenario: data Test
+    * , save "</data_test/A.*.C>"
+    * , save "</data_test/A/B.*>"
+    * , save "</data_test/A/B.C>"
+    * , save "</data_test/A/B.C.more.enabled>"
+    * , save "</data_test/A/B/C.*>"
+    * , save "</data_test/A/B/C.D.*>"
+    * , save "</data_test/A/B/C.D.E[0].F>"
+    * , save "</data_test/A/B/C.D.E[*].F>"
+    * , save "</data_test/A/B/C.D.E[1]>"
+    * , save "</data_test/A/B/C.D.nested.*>"
+    * , save "</data_test/library.*>"
+    * , save "</data_test/library/books.*>"
+    * , save "</data_test/library/books/Favorites.items[*].title>"
+    * , save "</data_test/library/books/Favorites.items[0].*>"
+    * , save "</data_test/library/books/Favorites.items[1].title>"
+    * , save "</data_test/zoo.*>"
+    * , save "</data_test/zoo.Animals.*.diet>"
+    * , save "</data_test/zoo.Animals.panda.*>"
+    * , save "</data_test/zoo.Birds.duck.*>"
+    * , save "</data_test/ambiguous/Item.*>"
+    * , save "</data_test/ambiguous/Item.value>"
+    * , save "</data_test/ambiguous/Item.source>"
+    * , save "</data_test/case/mixedcase.*>"
+    * , save "</data_test/case/mixedcase.inner.*>"
+    * , save "</data_test/formats/settings.*>"
+    * , save "</data_test/formats/settings.app.name>"
+    * , save "</data_test/formats/table[*].name>"
+    * , save "</data_test/formats/table[0].*>"
+    * , save "</data_test/formats/sample.*>"
+    * , save "</data_test/deep/level1/level2/level3/Leaf.branch.twig.*>"
+    * , save "</data_test/Simple.*>"
+    * , save "</data_test/Simple.details.*>"
+    * , save "</data_test/Root.child.*>"
+    * , save "</data_test/Root.child.list[*]>"
 
 
   Scenario: Debug FileAndDataParsing NodeMap remainder syntax after resolved resource prefix

@@ -1,0 +1,4 @@
+{
+  "value": "JSON file wins before YAML if deterministic sorted file order is Item.json then Item.yaml",
+  "source": "Item.json"
+}

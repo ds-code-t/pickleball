@@ -25,6 +25,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -100,7 +102,7 @@ public final class FileAndDataParsing {
     }
 
     public static JsonNode buildJsonFromPath(String resourcePath) {
-        String key = resourcePath.replace(".", "/");
+        String key = normalizeResourcePath(resourcePath);
         long now = System.nanoTime();
 
         CacheEntry entry = BUILD_JSON_CACHE.compute(key, (k, existing) -> {
@@ -109,13 +111,6 @@ public final class FileAndDataParsing {
             }
 
             JsonNode jsonNode = attemptBuildJsonFromPath(k);
-            if (jsonNode instanceof ObjectNode objectNode && objectNode.has("_unmatchedPath")) {
-                String unmatchedPath = objectNode.get("_unmatchedPath").asText();
-                jsonNode = MAPPER.valueToTree(
-                        new NodeMap(objectNode)
-                                .getByNormalizedPath("_returnedValue." + unmatchedPath.replaceFirst("/", "."))
-                );
-            }
 
             return new CacheEntry(
                     jsonNode == null ? NULL_SENTINEL : jsonNode.deepCopy(),
@@ -148,52 +143,211 @@ public final class FileAndDataParsing {
 
 
     public static JsonNode attemptBuildJsonFromPath(String resourcePath) {
-        JsonNode exact = buildJsonFromExactPath(resourcePath);
-        if (exact != null) {
-            return exact;
-        }
-
-        String original = resourcePath.replace('\\', '/');
-        String matchedPath = original;
-
-        for (int slash = matchedPath.lastIndexOf('/'); slash >= 0; slash = matchedPath.lastIndexOf('/')) {
-            matchedPath = matchedPath.substring(0, slash);
-
-            JsonNode matched = buildJsonFromExactPath(matchedPath);
-            if (matched != null) {
-                ObjectNode result = JSON_MAPPER.createObjectNode();
-                result.set("_returnedValue", matched);
-                result.put("_matchedPath", matchedPath);
-                result.put("_unmatchedPath", original.substring(matchedPath.length() + 1));
-                return result;
-    }
-            }
-
-                return null;
-            }
-
-    private static JsonNode buildJsonFromExactPath(String resourcePath) {
-        URL url = getResourceUrl(resourcePath);
-        if (url == null) {
+        SplitResourcePath split = splitResourcePath(resourcePath);
+        if (split == null) {
             return null;
         }
 
-                try {
-            if ("jar".equals(url.getProtocol())) {
-                try (FileSystem fs = FileSystems.newFileSystem(toJarUri(url), Map.of())) {
-                    Path root = fs.getPath(resourcePath);
-                    return buildFromRoot(root);
+        JsonNode resolved = buildJsonFromSuffixAgnosticPath(split.lookupPath());
+        if (resolved == null) {
+            return null;
         }
-        } else {
-                Path root = Paths.get(url.toURI());
-                return buildFromRoot(root);
+
+        ObjectNode wrapper = JSON_MAPPER.createObjectNode();
+        wrapper.set(split.boundarySegment(), resolved);
+
+        Object value = new NodeMap(wrapper).get(split.queryPath());
+        return toJsonNodeResult(value);
     }
+
+    private record SplitResourcePath(String lookupPath, String queryPath, String boundarySegment) {
+    }
+
+    private static SplitResourcePath splitResourcePath(String resourcePath) {
+        String normalized = normalizeResourcePath(resourcePath);
+        if (normalized.isBlank()) {
+            return null;
+        }
+
+        int lastSlash = normalized.lastIndexOf('/');
+        int boundaryStart = lastSlash + 1;
+
+        if (boundaryStart >= normalized.length()) {
+            return null;
+        }
+
+        int boundaryEnd = findPlainBoundarySegmentEnd(normalized, boundaryStart);
+
+        if (boundaryEnd <= boundaryStart) {
+            return null;
+        }
+
+        String boundary = normalized.substring(boundaryStart, boundaryEnd);
+
+        String lookupPath = lastSlash >= 0
+                ? normalized.substring(0, lastSlash + 1) + boundary
+                : boundary;
+
+        String queryPath = boundary + normalized.substring(boundaryEnd);
+
+        return new SplitResourcePath(lookupPath, queryPath, boundary);
+    }
+
+    private static int findPlainBoundarySegmentEnd(String path, int start) {
+        int i = start;
+
+        while (i < path.length() && isPlainBoundarySegmentChar(path.charAt(i))) {
+            i++;
+        }
+
+        return i;
+    }
+
+    private static boolean isPlainBoundarySegmentChar(char c) {
+        return Character.isLetterOrDigit(c)
+                || c == '_'
+                || c == '-';
+    }
+
+    private static JsonNode toJsonNodeResult(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof JsonNode jsonNode) {
+            return jsonNode;
+        }
+        return MAPPER.valueToTree(value);
+    }
+
+    private static String normalizeResourcePath(String resourcePath) {
+        if (resourcePath == null) {
+            return "";
+        }
+
+        String normalized = resourcePath.trim().replace('\\', '/');
+        while (normalized.startsWith("/")) {
+            normalized = normalized.substring(1);
+        }
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
+    }
+
+    private static JsonNode buildJsonFromSuffixAgnosticPath(String resourcePath) {
+        String normalized = normalizeResourcePath(resourcePath);
+        if (normalized.isBlank()) {
+            return null;
+        }
+
+        int slash = normalized.lastIndexOf('/');
+        String parentResourcePath = slash >= 0 ? normalized.substring(0, slash) : "";
+        String requestedName = slash >= 0 ? normalized.substring(slash + 1) : normalized;
+
+        URL parentUrl = getResourceUrl(parentResourcePath);
+        if (parentUrl == null) {
+            return null;
+        }
+
+        try {
+            if ("jar".equals(parentUrl.getProtocol())) {
+                try (FileSystem fs = FileSystems.newFileSystem(toJarUri(parentUrl), Map.of())) {
+                    Path parent = parentResourcePath.isBlank()
+                            ? fs.getPath("/")
+                            : fs.getPath(parentResourcePath);
+                    Path matched = findSuffixAgnosticChild(parent, requestedName);
+                    return matched == null ? null : buildFromRoot(matched);
+                }
+            }
+
+            Path parent = Paths.get(parentUrl.toURI());
+            Path matched = findSuffixAgnosticChild(parent, requestedName);
+            return matched == null ? null : buildFromRoot(matched);
         } catch (ParseFailureException e) {
             throw e;
         } catch (Exception e) {
             return null;
         }
     }
+
+    private static Path findSuffixAgnosticChild(Path parent, String requestedName) throws IOException {
+        if (parent == null || requestedName == null || requestedName.isBlank()
+                || !Files.exists(parent) || !Files.isDirectory(parent)) {
+            return null;
+        }
+
+        List<Path> children;
+        try (Stream<Path> stream = Files.list(parent)) {
+            children = stream
+                    .sorted(FILE_NAME_COMPARATOR)
+                    .toList();
+        }
+
+        Path match = firstMatchingFile(children, requestedName, false);
+        if (match != null) {
+            return match;
+        }
+
+        match = firstMatchingDirectory(children, requestedName, false);
+        if (match != null) {
+            return match;
+        }
+
+        match = firstMatchingFile(children, requestedName, true);
+        if (match != null) {
+            return match;
+        }
+
+        return firstMatchingDirectory(children, requestedName, true);
+    }
+
+    private static Path firstMatchingFile(List<Path> children, String requestedName, boolean ignoreCase) {
+        for (Path child : children) {
+            if (Files.isDirectory(child)) {
+                continue;
+            }
+
+            String fileName = child.getFileName().toString();
+            String ext = getExtensionLower(fileName);
+            if (!ALLOWED_EXTENSIONS.contains(ext)) {
+                continue;
+            }
+
+            String baseName = getBaseFileName(fileName);
+            if (namesMatch(baseName, requestedName, ignoreCase)) {
+                return child;
+            }
+        }
+        return null;
+    }
+
+    private static Path firstMatchingDirectory(List<Path> children, String requestedName, boolean ignoreCase) {
+        for (Path child : children) {
+            if (!Files.isDirectory(child)) {
+                continue;
+            }
+
+            String directoryName = child.getFileName().toString();
+            if (namesMatch(directoryName, requestedName, ignoreCase)) {
+                return child;
+            }
+        }
+        return null;
+    }
+
+    private static boolean namesMatch(String actual, String requested, boolean ignoreCase) {
+        return ignoreCase ? actual.equalsIgnoreCase(requested) : actual.equals(requested);
+    }
+
+    private static final Comparator<Path> FILE_NAME_COMPARATOR = (a, b) -> {
+        String an = a.getFileName().toString();
+        String bn = b.getFileName().toString();
+        int ci = String.CASE_INSENSITIVE_ORDER.compare(an, bn);
+        if (ci != 0) {
+            return ci;
+        }
+        return an.compareTo(bn);
+    };
 
     public static JsonNode parseSingleFile(String content, String fileName) {
         if (fileName == null) {

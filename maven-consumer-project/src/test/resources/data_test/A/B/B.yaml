@@ -1,0 +1,3 @@
+C: "found top-level C inside A/B.yaml"
+more:
+  enabled: true

@@ -1,0 +1,7 @@
+{
+  "items": [
+    { "title": "The Hobbit", "type": "fantasy" },
+    { "title": "Charlotte's Web", "type": "classic" }
+  ],
+  "count": 2
+}

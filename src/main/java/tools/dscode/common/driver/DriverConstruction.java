@@ -91,6 +91,9 @@ public final class DriverConstruction {
             "logLevel"
     );
 
+    private static final String CHROME_OPTIONS_CAPABILITY = "goog:chromeOptions";
+    private static final String EDGE_OPTIONS_CAPABILITY = "ms:edgeOptions";
+
     public static RemoteWebDriver createDriver(ObjectNode configuration) throws Exception {
         ObjectNode config = requireConfiguration(configuration);
         String browserName = resolveBrowserName(config);
@@ -177,8 +180,17 @@ public final class DriverConstruction {
 
     public static ChromeOptions buildChromeOptions(ObjectNode driverConfig, ObjectNode fullConfiguration) {
         ChromeOptions options = new ChromeOptions();
-        applyCapabilities(options, getObject(driverConfig, "capabilities"));
-        applyChromiumOptions(options, getObject(driverConfig, "options"), "chrome");
+
+        ObjectNode capabilities = getObject(driverConfig, "capabilities");
+
+        applyCapabilitiesExcept(options, capabilities, Set.of(CHROME_OPTIONS_CAPABILITY));
+        applyChromiumOptions(
+                options,
+                getObject(capabilities, CHROME_OPTIONS_CAPABILITY),
+                "driver.capabilities." + CHROME_OPTIONS_CAPABILITY
+        );
+
+        applyChromiumOptions(options, getObject(driverConfig, "options"), "driver.options for chrome");
         applyProviderCapabilities(options, getObject(driverConfig, "providerCapabilities"));
         applyDebugPort(options, "chrome", fullConfiguration);
         return options;
@@ -186,8 +198,17 @@ public final class DriverConstruction {
 
     public static EdgeOptions buildEdgeOptions(ObjectNode driverConfig, ObjectNode fullConfiguration) {
         EdgeOptions options = new EdgeOptions();
-        applyCapabilities(options, getObject(driverConfig, "capabilities"));
-        applyChromiumOptions(options, getObject(driverConfig, "options"), "edge");
+
+        ObjectNode capabilities = getObject(driverConfig, "capabilities");
+
+        applyCapabilitiesExcept(options, capabilities, Set.of(EDGE_OPTIONS_CAPABILITY));
+        applyChromiumOptions(
+                options,
+                getObject(capabilities, EDGE_OPTIONS_CAPABILITY),
+                "driver.capabilities." + EDGE_OPTIONS_CAPABILITY
+        );
+
+        applyChromiumOptions(options, getObject(driverConfig, "options"), "driver.options for edge");
         applyProviderCapabilities(options, getObject(driverConfig, "providerCapabilities"));
         applyDebugPort(options, "edge", fullConfiguration);
         return options;
@@ -211,10 +232,10 @@ public final class DriverConstruction {
         });
     }
 
-    public static void applyChromiumOptions(ChromiumOptions<?> options, ObjectNode optionsConfig, String browserName) {
-        validateKeys(optionsConfig, COMMON_OPTIONS_KEYS, "driver.options for " + browserName);
+    public static void applyChromiumOptions(ChromiumOptions<?> options, ObjectNode optionsConfig, String sectionName) {
+        validateKeys(optionsConfig, COMMON_OPTIONS_KEYS, sectionName);
 
-        List<String> args = toStringList(optionsConfig.get("args"), "driver.options.args");
+        List<String> args = toStringList(optionsConfig.get("args"), sectionName + ".args");
         if (!args.isEmpty()) {
             options.addArguments(args);
         }
@@ -258,8 +279,25 @@ public final class DriverConstruction {
         if (experimentalOptions instanceof Map<?, ?> map) {
             map.forEach((k, v) -> options.setExperimentalOption(String.valueOf(k), v));
         } else if (experimentalOptions != null) {
-            throw new RuntimeException("driver.options.experimentalOptions must be an object");
+            throw new RuntimeException(sectionName + ".experimentalOptions must be an object");
         }
+    }
+
+    public static void applyCapabilitiesExcept(
+            MutableCapabilities target,
+            ObjectNode capabilities,
+            Set<String> excludedKeys
+    ) {
+        capabilities.fields().forEachRemaining(entry -> {
+            if (excludedKeys.contains(entry.getKey())) {
+                return;
+            }
+
+            Object value = toJavaValue(entry.getValue());
+            if (value != null) {
+                target.setCapability(entry.getKey(), value);
+            }
+        });
     }
 
     public static ChromeDriverService buildChromeService(Map<String, Object> serviceMap) {

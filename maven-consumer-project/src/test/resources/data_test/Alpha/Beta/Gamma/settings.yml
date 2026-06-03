@@ -1,5 +1,0 @@
-app:
-  name: TestApp
-  flags:
-    enabled: true
-    mode: demo
