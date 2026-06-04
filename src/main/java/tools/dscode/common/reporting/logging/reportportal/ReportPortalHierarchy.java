@@ -54,28 +54,35 @@ public final class ReportPortalHierarchy {
         if (existing != null) {
             return existing;
         }
+
         synchronized (LAUNCH_LOCK) {
             if (launch == null) {
                 reportPortal = ReportPortal.builder()
                         .withParameters(parameters)
                         .build();
 
-                StartLaunchRQ rq = new StartLaunchRQ();
-                rq.setName(launchName);
-                rq.setStartTime(new Date());
-
-                if (parameters != null) {
-                    rq.setDescription(parameters.getDescription());
-                    rq.setAttributes(parameters.getAttributes());
-                    rq.setMode(parameters.getLaunchRunningMode());
-                    rq.setRerun(parameters.isRerun());
-                    rq.setRerunOf(parameters.getRerunOf());
-                }
-
-                launch = reportPortal.newLaunch(rq);
+                launch = reportPortal.newLaunch(buildStartLaunchRequest(reportPortal.getParameters()));
             }
             return launch;
         }
+    }
+
+    private static StartLaunchRQ buildStartLaunchRequest(ListenerParameters params) {
+        StartLaunchRQ rq = new StartLaunchRQ();
+
+        rq.setName(fallback(params.getLaunchName(), launchName));
+        rq.setDescription(params.getDescription());
+        rq.setStartTime(new Date());
+        rq.setMode(params.getLaunchRunningMode());
+        rq.setAttributes(params.getAttributes());
+        rq.setRerun(params.isRerun());
+
+        String rerunOf = params.getRerunOf();
+        if (rerunOf != null && !rerunOf.isBlank()) {
+            rq.setRerunOf(rerunOf);
+        }
+
+        return rq;
     }
 
     public static Maybe<String> getOrCreateSuite(String suiteName) {
@@ -242,5 +249,9 @@ public final class ReportPortalHierarchy {
             }
         }
         return depth;
+    }
+
+    private static String fallback(String value, String defaultValue) {
+        return value == null || value.isBlank() ? defaultValue : value;
     }
 }
