@@ -24,6 +24,7 @@ import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 import tools.dscode.common.variables.RunVars;
 import tools.dscode.coredefinitions.ReportingSteps;
+import tools.dscode.parallelutilities.Stagger;
 import tools.dscode.registry.GlobalRegistry;
 
 import java.nio.file.Path;
@@ -62,9 +63,11 @@ import static tools.dscode.common.reporting.logging.LogForwarder.logSkip;
 import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry;
 import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultLoggingLevel;
 import static tools.dscode.common.treeparsing.preparsing.ParsedLine.createParsedLine;
+import static tools.dscode.common.util.GeneralUtils.toLongOrZero;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
-import static tools.dscode.common.variables.PlatformSnapshot.toHumanReadableString;
+import static tools.dscode.common.variables.PlatformSnapshot.getInitiatorSnapshot;
+import static tools.dscode.common.variables.RunVars.resolveFromVars;
 import static tools.dscode.common.variables.RunVars.resolveFromVarsOrDefault;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
 import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
@@ -166,7 +169,12 @@ public class CurrentScenarioState extends ScenarioMapping {
         return entry.timestamp();
     }
 
-//    public static boolean logToReportPortal = getDependencyPropertyBoolean("rp.enable");
+    public void staggerScenarios() throws Exception {
+            Stagger.run(
+                    Duration.ofMillis(toLongOrZero(resolveFromVarsOrDefault("pkb",1100))),
+                    () ->  startScenarioRun()
+            );
+    }
 
     public void startScenarioRun() {
         String scenarioName = pickle.getName() + " , Line " + pickle.getLocation().getLine();
@@ -186,7 +194,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
         setDefaultEntry(scenarioLog);
         scenarioLog.start();
-        scenarioLog.info(toHumanReadableString());
+        scenarioLog.info(getInitiatorSnapshot().toString());
         scenarioLog.info(getOptionsString());
         lifecycle.fire(Phase.BEFORE_SCENARIO_RUN);
 
@@ -403,8 +411,8 @@ public class CurrentScenarioState extends ScenarioMapping {
                 stepExtension.lineData.inheritancePhrases.add(null);
             for (PhraseData inheritancePhrase : new ArrayList<>(stepExtension.lineData.inheritancePhrases)) {
                 if (inheritancePhrase != null && inheritancePhrase.untilPhrase) {
-                    long timeoutSeconds = Long.parseLong(String.valueOf(RunVars.resolveFromVarsOrDefault("stepRepeatMaxTime", 3600)));     // 0 = no time limit
-                    int maxIterations = Integer.parseInt(String.valueOf(RunVars.resolveFromVarsOrDefault("stepRepeatMaxCount", 100)));
+                    long timeoutSeconds = Long.parseLong(String.valueOf(resolveFromVarsOrDefault("stepRepeatMaxTime", 3600)));     // 0 = no time limit
+                    int maxIterations = Integer.parseInt(String.valueOf(resolveFromVarsOrDefault("stepRepeatMaxCount", 100)));
 
                     logInfo("Repeating step for a maximum of " + timeoutSeconds + " seconds, or " + maxIterations + " iterations");
 

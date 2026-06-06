@@ -123,7 +123,7 @@ public final class DriverConstruction {
 
         return switch (browserName) {
             case "chrome" -> {
-                ChromeOptions options = buildChromeOptions(driverConfig, fullConfiguration);
+                ChromeOptions options = buildChromeOptions(driverConfig, fullConfiguration, true);
                 ChromeDriverService service = buildChromeService(toObjectMap(getObject(driverConfig, "service")));
 
                 yield service != null && clientConfig != null ? new ChromeDriver(service, options, clientConfig)
@@ -132,7 +132,7 @@ public final class DriverConstruction {
                         : new ChromeDriver(options);
             }
             case "edge" -> {
-                EdgeOptions options = buildEdgeOptions(driverConfig, fullConfiguration);
+                EdgeOptions options = buildEdgeOptions(driverConfig, fullConfiguration, true);
                 EdgeDriverService service = buildEdgeService(toObjectMap(getObject(driverConfig, "service")));
 
                 yield service != null && clientConfig != null ? new EdgeDriver(service, options, clientConfig)
@@ -172,13 +172,13 @@ public final class DriverConstruction {
             ObjectNode fullConfiguration
     ) {
         return switch (browserName) {
-            case "chrome" -> buildChromeOptions(driverConfig, fullConfiguration);
-            case "edge" -> buildEdgeOptions(driverConfig, fullConfiguration);
+            case "chrome" -> buildChromeOptions(driverConfig, fullConfiguration, false);
+            case "edge" -> buildEdgeOptions(driverConfig, fullConfiguration, false);
             default -> throw new RuntimeException("Unsupported remote browser: " + browserName);
         };
     }
 
-    public static ChromeOptions buildChromeOptions(ObjectNode driverConfig, ObjectNode fullConfiguration) {
+    public static ChromeOptions buildChromeOptions(ObjectNode driverConfig, ObjectNode fullConfiguration, boolean localDriver) {
         ChromeOptions options = new ChromeOptions();
 
         ObjectNode capabilities = getObject(driverConfig, "capabilities");
@@ -192,11 +192,12 @@ public final class DriverConstruction {
 
         applyChromiumOptions(options, getObject(driverConfig, "options"), "driver.options for chrome");
         applyProviderCapabilities(options, getObject(driverConfig, "providerCapabilities"));
-        applyDebugPort(options, "chrome", fullConfiguration);
+        if (localDriver)
+            applyDebugPort(options, "chrome", fullConfiguration);
         return options;
     }
 
-    public static EdgeOptions buildEdgeOptions(ObjectNode driverConfig, ObjectNode fullConfiguration) {
+    public static EdgeOptions buildEdgeOptions(ObjectNode driverConfig, ObjectNode fullConfiguration, boolean localDriver) {
         EdgeOptions options = new EdgeOptions();
 
         ObjectNode capabilities = getObject(driverConfig, "capabilities");
@@ -210,7 +211,8 @@ public final class DriverConstruction {
 
         applyChromiumOptions(options, getObject(driverConfig, "options"), "driver.options for edge");
         applyProviderCapabilities(options, getObject(driverConfig, "providerCapabilities"));
-        applyDebugPort(options, "edge", fullConfiguration);
+        if (localDriver)
+            applyDebugPort(options, "edge", fullConfiguration);
         return options;
     }
 

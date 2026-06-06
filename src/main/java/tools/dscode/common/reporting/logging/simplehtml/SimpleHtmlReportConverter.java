@@ -22,6 +22,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static tools.dscode.common.reporting.logging.LogForwarder.logError;
+import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 import static tools.dscode.common.variables.RunVars.resolveFromVarsOrDefault;
 
 /**
@@ -145,19 +146,21 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     }
 
     /**
-     * Writes report output based on the global HTMLreportFormat setting.
+     * Writes report output from the path variables only.
      *
      * Rules:
-     * - null / blank / contains "compositeReport" => write composite tabbed report
-     * - contains "scenarioReport" => write one report per scenario
-     * - contains both => write both
-     *
-     * Optional output overrides:
-     * - HTMLcompositeReportPath
-     * - HTMLscenarioReportPath
+     * - compositeReport undefined + scenarioReport disabled/undefined => write composite report to the current default path
+     * - compositeReport undefined + scenarioReport enabled => do not write composite report
+     * - compositeReport blank/false => do not write composite report
+     * - compositeReport true => write composite report to the current default path
+     * - compositeReport other non-blank value => write composite report to that path/template
+     * - scenarioReport undefined/blank/false => do not write scenario reports
+     * - scenarioReport true => write scenario reports to reports/<SCENARIO_NAME>.html
+     * - scenarioReport other non-blank value => write one report per scenario to that path/template
      *
      * Supported template tokens:
      * - <SCENARIO_NAME>
+     * - <scenarioName>
      * - <TIME>
      */
     public static void writeFinalReport() {
@@ -170,47 +173,50 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     }
 
     /**
-     * Writes report output based on the global HTMLreportFormat setting.
-     *
-     * Example HTMLreportFormat values:
-     * - null
-     * - ""
-     * - "compositeReport"
-     * - "scenarioReport"
-     * - "scenarioReport,compositeReport"
+     * Writes report output from the path variables only.
      */
     public static void writeFinalReport(Path outFile) {
         if (outFile == null) outFile = Path.of("cucumber-report.html");
 
         debug("VERSION " + DEBUG_VERSION + " writeFinalReport entered outFile=" + abs(outFile));
 
-        ReportFormat format = resolveReportFormat();
         Instant runTime = Instant.now();
-        Path compositeOutFile = resolveCompositeReportPath(outFile, runTime);
+        ReportOutputs outputs = resolveReportOutputs(outFile, runTime);
 
-        synchronized (SharedSingleFile.LOCK) {
-            SharedSingleFile.REPORT_FILE = compositeOutFile;
+        if (outputs.compositeOutFile != null) {
+            synchronized (SharedSingleFile.LOCK) {
+                SharedSingleFile.REPORT_FILE = outputs.compositeOutFile;
+            }
         }
 
         debug("writeFinalReport requestedOutFile=" + abs(outFile));
-        debug("writeFinalReport resolvedCompositeOutFile=" + abs(compositeOutFile));
-        debug("writeFinalReport formatRaw='" + format.rawValue + "' normalized='" + format.normalizedValue
-                + "' source='" + format.source + "' composite=" + format.compositeReport + " scenario=" + format.scenarioReport);
+        debug("writeFinalReport composite=" + outputs.compositeReport
+                + " compositeOutFile=" + abs(outputs.compositeOutFile)
+                + " compositeSource='" + outputs.compositeSource + "'"
+                + " scenario=" + outputs.scenarioReport
+                + " scenarioTemplate='" + outputs.scenarioTemplate + "'"
+                + " scenarioSource='" + outputs.scenarioSource + "'");
         debugSharedSnapshot("before writeFinalReport");
 
-        try {
-            SimpleHtmlReportConverter writer = new SimpleHtmlReportConverter(compositeOutFile);
+        if (!outputs.compositeReport && !outputs.scenarioReport) {
+            debug("writeFinalReport no report outputs enabled by path variables");
+            return;
+        }
 
-            if (format.compositeReport) {
-                writer.writeCombinedReport(compositeOutFile);
+        try {
+            Path writerReportFile = outputs.compositeOutFile != null ? outputs.compositeOutFile : outFile;
+            SimpleHtmlReportConverter writer = new SimpleHtmlReportConverter(writerReportFile);
+
+            if (outputs.compositeReport) {
+                writer.writeCombinedReport(outputs.compositeOutFile);
             } else {
-                debug("composite report disabled by HTMLreportFormat");
+                debug("composite report disabled by compositeReport/scenarioReport settings");
             }
 
-            if (format.scenarioReport) {
-                writer.writeScenarioReports(outFile, runTime);
+            if (outputs.scenarioReport) {
+                writer.writeScenarioReports(outFile, runTime, outputs.scenarioTemplate);
             } else {
-                debug("scenario reports disabled by HTMLreportFormat");
+                debug("scenario reports disabled by scenarioReport setting");
             }
 
         } catch (Throwable ex) {
@@ -218,38 +224,129 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         }
     }
 
-    private static ReportFormat resolveReportFormat() {
-        String value = Objects.toString(resolveFromVarsOrDefault("HTMLreportFormat", ""), "").trim();
-        String normalized = normalizeReportFormatValue(value);
-        boolean blank = normalized.isBlank();
-        String lower = normalized.toLowerCase(Locale.ROOT);
-
-        boolean composite = blank || lower.contains("compositereport");
-        boolean scenario = lower.contains("scenarioreport");
-        String source = value.isBlank() ? "default" : "RunVars:HTMLreportFormat";
-
-        return new ReportFormat(value, normalized, source, composite, scenario);
-    }
-
-    private record ReportFormat(String rawValue, String normalizedValue, String source, boolean compositeReport, boolean scenarioReport) {
-    }
-
-    private static Path resolveCompositeReportPath(Path defaultOutFile, Instant runTime) {
+    private static ReportOutputs resolveReportOutputs(Path defaultOutFile, Instant runTime) {
         Path fallback = normalizeReportPath(defaultOutFile == null ? Path.of("cucumber-report.html") : defaultOutFile);
         Path projectRoot = projectRootFromDefaultOutFile(fallback);
 
-        String override = Objects.toString(resolveFromVarsOrDefault("HTMLcompositeReportPath", ""), "").trim();
+        ReportPathSetting compositeSetting = reportPathSetting("compositeReport", fallback.toString());
+        ReportPathSetting scenarioSetting = reportPathSetting("scenarioReport", "reports/<SCENARIO_NAME>");
 
-        if (override.isBlank()) {
-            debug("resolveCompositeReportPath no override; using fallback=" + abs(fallback)
-                    + " projectRoot=" + abs(projectRoot));
-            return fallback;
+        boolean scenarioReport = scenarioSetting.enabled();
+
+        boolean compositeReport = compositeSetting.enabled();
+        if (compositeSetting.undefined()) {
+            // Default composite output is only automatic when scenario output was not explicitly enabled.
+            compositeReport = !scenarioReport;
         }
 
-        Path resolved = resolveTemplatedReportPath(projectRoot, override, "composite", runTime);
-        debug("resolveCompositeReportPath override source='RunVars:HTMLcompositeReportPath' template='" + override
-                + "' projectRoot=" + abs(projectRoot) + " resolved=" + abs(resolved));
-        return resolved;
+        Path compositeOutFile = null;
+        if (compositeReport) {
+            compositeOutFile = compositeSetting.useDefaultPath()
+                    ? fallback
+                    : resolveTemplatedReportPath(projectRoot, compositeSetting.template(), "composite", runTime);
+        }
+
+        String compositeSource;
+        if (compositeSetting.undefined()) {
+            compositeSource = compositeReport ? "default" : "default suppressed by scenarioReport";
+        } else if (compositeSetting.blank()) {
+            compositeSource = "RunVars:compositeReport(blank/false)";
+        } else if (compositeSetting.booleanTrue()) {
+            compositeSource = "RunVars:compositeReport(true default)";
+        } else {
+            compositeSource = "RunVars:compositeReport";
+        }
+
+        String scenarioTemplate = scenarioReport ? scenarioSetting.template() : null;
+        String scenarioSource;
+        if (scenarioSetting.undefined()) {
+            scenarioSource = "missing";
+        } else if (scenarioSetting.blank()) {
+            scenarioSource = "RunVars:scenarioReport(blank/false)";
+        } else if (scenarioSetting.booleanTrue()) {
+            scenarioSource = "RunVars:scenarioReport(true default)";
+        } else {
+            scenarioSource = "RunVars:scenarioReport";
+        }
+
+        debug("resolveReportOutputs fallback=" + abs(fallback) + " projectRoot=" + abs(projectRoot)
+                + " compositeValue='" + compositeSetting.rawValueForDebug() + "'"
+                + " compositeSource='" + compositeSource + "'"
+                + " compositeResolved=" + abs(compositeOutFile)
+                + " scenarioValue='" + scenarioSetting.rawValueForDebug() + "'"
+                + " scenarioSource='" + scenarioSource + "'"
+                + " scenarioTemplate='" + scenarioTemplate + "'");
+
+        return new ReportOutputs(compositeReport, compositeOutFile, compositeSource,
+                scenarioReport, scenarioTemplate, scenarioSource);
+    }
+
+    private record ReportOutputs(
+            boolean compositeReport,
+            Path compositeOutFile,
+            String compositeSource,
+            boolean scenarioReport,
+            String scenarioTemplate,
+            String scenarioSource) {
+    }
+
+    private record ReportPathSetting(
+            String name,
+            String rawValue,
+            String normalizedValue,
+            boolean undefined,
+            boolean blank,
+            boolean booleanTrue,
+            boolean booleanFalse,
+            String defaultTemplate) {
+
+        boolean enabled() {
+            return booleanTrue || (!undefined && !blank && !booleanFalse);
+        }
+
+        boolean useDefaultPath() {
+            return undefined || booleanTrue;
+        }
+
+        String template() {
+            return useDefaultPath() ? defaultTemplate : normalizedValue;
+        }
+
+        String rawValueForDebug() {
+            return undefined ? "<undefined>" : rawValue;
+        }
+    }
+
+    /**
+     * Returns a normalized setting while preserving the difference between undefined and defined blank.
+     * blank and false disable the report; true enables it with the supplied default template/path.
+     */
+    private static ReportPathSetting reportPathSetting(String name, String defaultTemplate) {
+        String sentinel = "__SIMPLE_HTML_REPORT_CONVERTER_UNDEFINED__" + name + "__";
+        Object rawObject = resolveFromVarsOrDefault(name, sentinel);
+        String raw = Objects.toString(rawObject, sentinel);
+
+        if (sentinel.equals(raw)) {
+            return new ReportPathSetting(name, null, null, true, false, false, false, defaultTemplate);
+        }
+
+        String normalized = stripWrappingQuotes(raw.trim());
+        boolean blank = normalized.isBlank();
+        boolean booleanTrue = "true".equalsIgnoreCase(normalized);
+        boolean booleanFalse = blank || "false".equalsIgnoreCase(normalized);
+
+        return new ReportPathSetting(name, raw, normalized, false, blank, booleanTrue, booleanFalse, defaultTemplate);
+    }
+
+    private static String stripWrappingQuotes(String raw) {
+        if (raw == null) return "";
+        String s = raw.trim();
+        while ((s.startsWith("\"") && s.endsWith("\""))
+                || (s.startsWith("'") && s.endsWith("'"))) {
+            if (s.length() < 2) break;
+            s = s.substring(1, s.length() - 1).trim();
+        }
+        return s;
     }
 
     private void writeCombinedReport(Path outFile) throws IOException {
@@ -260,25 +357,27 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
         if (outFile.getParent() != null) Files.createDirectories(outFile.getParent());
 
-        String html = renderHtmlDocument(snapshot, outFile);
-        Files.writeString(outFile, html, StandardCharsets.UTF_8);
+        StringBuilder html = renderHtmlDocument(snapshot, outFile);
+        writeStringBuilder(outFile, html);
+        html.setLength(0);
 
         debug("wrote combined: " + outFile.toAbsolutePath());
     }
 
-    private void writeScenarioReports(Path defaultOutFile, Instant runTime) throws IOException {
+    private void writeScenarioReports(Path defaultOutFile, Instant runTime, String template) throws IOException {
         Map<String, ScopeState> snapshot = snapshotAllScopes();
 
         Path fallback = normalizeReportPath(defaultOutFile == null ? Path.of("cucumber-report.html") : defaultOutFile);
         Path projectRoot = projectRootFromDefaultOutFile(fallback);
 
-        String rawTemplate = Objects.toString(resolveFromVarsOrDefault("HTMLscenarioReportPath", ""), "").trim();
-        String template = rawTemplate.isBlank() ? "reports/scenario-reports/<SCENARIO_NAME>.html" : rawTemplate;
+        if (template == null || template.isBlank()) {
+            debug("writeScenarioReports skipped because template is missing or blank");
+            return;
+        }
 
         debug("writeScenarioReports defaultOutFile=" + abs(fallback));
         debug("writeScenarioReports projectRoot=" + abs(projectRoot));
-        debug("writeScenarioReports template='" + template + "' source='"
-                + (rawTemplate.isBlank() ? "default" : "RunVars:HTMLscenarioReportPath") + "'");
+        debug("writeScenarioReports template='" + template + "' source='RunVars:scenarioReport'");
         debugSnapshot("scenario source", snapshot);
 
         int written = 0;
@@ -306,15 +405,16 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             String scenarioName = scenarioTitle(s, written + 1);
             Instant scenarioTime = scenarioStartTime(s, runTime);
 
-            Path scenarioFile = resolveScenarioReportPath(projectRoot, template, scenarioName, scenarioTime);
+            Path scenarioFile = resolvescenarioReport(projectRoot, template, scenarioName, scenarioTime);
             debug("resolved scenario candidate: name='" + scenarioName + "' candidate=" + abs(scenarioFile));
             scenarioFile = uniqueReportPath(scenarioFile, pathsWrittenThisCall);
 
             if (scenarioFile.getParent() != null) Files.createDirectories(scenarioFile.getParent());
 
             ScopeState oneScenario = deepCopyScopeState(s);
-            String html = renderScenarioHtmlDocument(oneScenario, scenarioFile);
-            Files.writeString(scenarioFile, html, StandardCharsets.UTF_8);
+            StringBuilder html = renderScenarioHtmlDocument(oneScenario, scenarioFile);
+            writeStringBuilder(scenarioFile, html);
+            html.setLength(0);
 
             pathsWrittenThisCall.add(scenarioFile.toAbsolutePath().normalize());
             written++;
@@ -325,7 +425,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         debug("wrote scenario reports: " + written + " file(s)");
     }
 
-    private static Path resolveScenarioReportPath(Path baseDir, String template, String scenarioName, Instant scenarioTime) {
+    private static Path resolvescenarioReport(Path baseDir, String template, String scenarioName, Instant scenarioTime) {
         return resolveTemplatedReportPath(baseDir, template, scenarioName, scenarioTime);
     }
 
@@ -364,6 +464,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
         String resolved = t
                 .replace("<SCENARIO_NAME>", safeScenario)
+                .replace("<scenarioName>", safeScenario)
                 .replace("<TIME>", safeTime);
 
         if (!resolved.toLowerCase(Locale.ROOT).endsWith(".html") && !resolved.toLowerCase(Locale.ROOT).endsWith(".htm")) {
@@ -371,17 +472,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         }
 
         return resolved;
-    }
-
-    private static String normalizeReportFormatValue(String raw) {
-        if (raw == null) return "";
-        String s = raw.trim();
-        while ((s.startsWith("\"") && s.endsWith("\""))
-                || (s.startsWith("'") && s.endsWith("'"))) {
-            if (s.length() < 2) break;
-            s = s.substring(1, s.length() - 1).trim();
-        }
-        return s;
     }
 
     private static Path projectRootFromDefaultOutFile(Path defaultOutFile) {
@@ -624,7 +714,23 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     }
 
     private static void debug(String message) {
-        System.out.println("[SimpleHtmlReportConverter DEBUG] " + message);
+        logTrace("[SimpleHtmlReportConverter TRACE] " + message);
+    }
+
+
+    /**
+     * Writes a large StringBuilder without creating an additional full-size String copy.
+     * This preserves the exact same rendered HTML while reducing peak heap usage.
+     */
+    private static void writeStringBuilder(Path file, StringBuilder sb) throws IOException {
+        try (var w = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
+            char[] buf = new char[16_384];
+            for (int i = 0, len = sb.length(); i < len; i += buf.length) {
+                int n = Math.min(buf.length, len - i);
+                sb.getChars(i, i + n, buf, 0);
+                w.write(buf, 0, n);
+            }
+        }
     }
 
 
@@ -884,7 +990,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         return Status.PASS;
     }
 
-    private String renderHtmlDocument(Map<String, ScopeState> scopesToRender, Path outFile) {
+    private StringBuilder renderHtmlDocument(Map<String, ScopeState> scopesToRender, Path outFile) {
         StringBuilder out = new StringBuilder(256_000);
         out.append("<!doctype html>\n");
         out.append("<html lang=\"en\">\n<head>\n");
@@ -1150,11 +1256,11 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("</div>\n");
 
         out.append("</body>\n</html>\n");
-        return out.toString();
+        return out;
     }
 
 
-    private String renderScenarioHtmlDocument(ScopeState scenario, Path outFile) {
+    private StringBuilder renderScenarioHtmlDocument(ScopeState scenario, Path outFile) {
         StringBuilder out = new StringBuilder(128_000);
         HtmlNode root = scenario == null ? null : scenario.nodes.get(scenario.rootId);
         String title = root == null ? "Scenario Report" : stripTagsForSort(root.title);
@@ -1211,7 +1317,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         out.append("})();\n");
         out.append("</script>\n");
         out.append("</body>\n</html>\n");
-        return out.toString();
+        return out;
     }
 
     private void renderOverviewSpreadsheet(StringBuilder out, List<ScopeState> includedScopes, List<Status> includedStatus) {

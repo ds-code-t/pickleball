@@ -28,7 +28,8 @@ public class Entry {
     public String normalizedType;
     private final Map<String, Object> defaultDescendantFields = new LinkedHashMap<>();
     private final List<String> defaultDescendantTags = new ArrayList<>();
-    private final Map<String, AtomicInteger> typeCounts = new ConcurrentHashMap<>();
+    protected Map<String, AtomicInteger> typeCounts = new ConcurrentHashMap<>();
+    protected Map<String, AtomicInteger> typeFlatCounts = new ConcurrentHashMap<>();;
 
     private static final Object THREAD_SAFE_LOCK = new Object();
 
@@ -58,7 +59,7 @@ public class Entry {
     private final AtomicLong seqGen;
 
     private Entry(String text, Entry parent, AtomicLong seqGen, boolean threadSafe) {
-        this.text = text.replaceAll(BOOK_END,"");
+        this.text = text.replaceAll(BOOK_END, "");
         this.parent = parent;
         this.seqGen = seqGen;
         this.threadSafe = threadSafe;
@@ -144,21 +145,27 @@ public class Entry {
 
         return guarded(() -> {
             normalizedType = type.trim();
+            if(parent != null){
+                typeFlatCounts = parent.typeFlatCounts;
+                if(parent.normalizedType.equals(normalizedType))
+                    typeCounts =  parent.typeCounts;
+            }
+
+
+            System.out.println("@@entry: " + text);
+            System.out.println("@@typeCounts: " + typeCounts);
             count = typeCounts
                     .computeIfAbsent(normalizedType, ignored -> new AtomicInteger())
                     .incrementAndGet();
-
+            System.out.println("@@count: " + count);
             System.out.println("- - - - - - - - - - -");
-            nestedCounts =  String.valueOf(count);
-            flatCount  = count;
-            if(parent != null && parent.normalizedType != null && parent.normalizedType.equals(normalizedType)){
-                if(!nestedCounts.contains("."))
-                    flatCount = count + parent.flatCount;
-                nestedCounts = parent.nestedCounts + "." + nestedCounts;
-            }
-
-            String nestingText = nestedCounts.contains(".") ? " NESTING " + nestedCounts + "  " : "  ";
-            return logHeader(flatCount + " " + normalizedType + nestingText + "\u201C"+  safe(message) + "\u201D");
+            flatCount = typeFlatCounts.computeIfAbsent(normalizedType, ignored -> new AtomicInteger())
+                    .incrementAndGet();
+            nestedCounts = parent == null || parent.nestedCounts == null || parent.nestedCounts.isBlank() ? String.valueOf(count) : parent.nestedCounts + "." + count;
+            System.out.println("@@flatCount: " + flatCount);
+            System.out.println("@@nestedCounts: " + nestedCounts);
+            String nestingText = nestedCounts.contains(".") ? " (" + nestedCounts + ") " : "  ";
+            return logHeader(flatCount + " " + normalizedType + nestingText + "\u201C" + safe(message) + "\u201D");
         });
     }
 
@@ -337,13 +344,16 @@ public class Entry {
         });
     }
 
-    public Entry start() {
-        return start(Instant.now());
+
+
+    public Entry start(String ... texts) {
+        return start(Instant.now(), texts);
     }
 
-    public Entry start(Instant at) {
+    public Entry start(Instant at, String ... texts) {
         return guarded(() -> {
-            print(Entry.of("STARTED: " + safe(text)).level(Level.DEBUG), LEVEL);
+            String appendedText =  texts.length == 0 ? "" : ": "+  String.join(", ", texts);
+            print(Entry.of("STARTED: " + safe(text) + appendedText).level(Level.DEBUG), LEVEL);
             startedAt = at;
             emit((scope, converter) -> converter.onStart(scope, this));
             return this;

@@ -171,7 +171,8 @@ public class StepExtension extends StepData {
         executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
         executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
         Entry parentEntry = parentStep == null  || ((StepExtension)parentStep).stepEntry == null ?  getScenarioLogRoot() :  ((StepExtension)parentStep).stepEntry;
-        String stepText = executingPickleStepTestStep.getStepText().replaceFirst("^([:\\s]*)", "$1 " + executingPickleStepTestStep.getStep().getKeyword()) + " ";
+//        String stepText = executingPickleStepTestStep.getStepText().replaceFirst("^([:\\s]*)", "$1 " + executingPickleStepTestStep.getStep().getKeyword()) + " ";
+        String stepText = executingPickleStepTestStep.getStep().getKeyword() + " " + executingPickleStepTestStep.getStepText().replaceFirst("^([:\\s]*)", "") ;
         stepEntry = parentEntry.logWithType("STEP", stepText).tags("Step").start();
         setDefaultEntry(getRunningStep().stepEntry);
         lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);

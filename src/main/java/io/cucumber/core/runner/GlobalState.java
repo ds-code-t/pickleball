@@ -29,10 +29,8 @@ import static tools.dscode.common.reporting.logging.LogForwarder.globalStateInit
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.Reflect.invokeAnyMethod;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
-//import static tools.dscode.pickleruntime.CucumberOptionResolver.tags;
-import static tools.dscode.common.variables.PlatformSnapshot.toHumanReadableString;
+import static tools.dscode.common.variables.PlatformSnapshot.getInitiatorSnapshot;
 import static tools.dscode.registry.GlobalRegistry.localOrGlobalOf;
-import static tools.dscode.testengine.DynamicSuiteConfigUtils.getPkbValues;
 import static tools.dscode.testengine.PickleballRunner.getOptionsString;
 
 
@@ -56,7 +54,7 @@ public class GlobalState {
                                 Path.of("reports/tests", safeFileName(entryName + ".html"))
                         )).threadSafe().start();
 
-        pickleballLog.info(toHumanReadableString());
+        pickleballLog.info(getInitiatorSnapshot().toString());
 
         BaseConverter.setRowDataProvider(rowKey ->
                 getReport()

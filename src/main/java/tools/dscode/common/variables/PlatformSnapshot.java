@@ -252,45 +252,99 @@ public final class PlatformSnapshot {
         return "Other";
     }
 
-    public static String toHumanReadableString() {
-        return String.join(" | ", nonBlankParts(
-                kv("System", joinNonBlank(" ",
+    private static volatile InitiatorSnapshot INITIATOR_SNAPSHOT;
+
+    public static InitiatorSnapshot getInitiatorSnapshot() {
+        InitiatorSnapshot snapshot = INITIATOR_SNAPSHOT;
+        if (snapshot == null) {
+            synchronized (PlatformSnapshot.class) {
+                snapshot = INITIATOR_SNAPSHOT;
+                if (snapshot == null) {
+                    snapshot = createInitiatorSnapshot();
+                    INITIATOR_SNAPSHOT = snapshot;
+                }
+            }
+        }
+        return snapshot;
+    }
+
+    private static InitiatorSnapshot createInitiatorSnapshot() {
+        return new InitiatorSnapshot(
+                joinNonBlank(" ",
                         str("os.family"),
                         str("os.name"),
                         str("os.version"),
-                        "(" + str("os.arch") + ")")),
-                kv("Machine", joinNonBlank(" / ",
+                        "(" + str("os.arch") + ")"),
+                joinNonBlank(" / ",
                         str("hostname"),
                         str("domain.name"),
-                        str("machine.class"))),
-                kv("User", joinNonBlank(" / ",
+                        str("machine.class")),
+                joinNonBlank(" / ",
                         str("user.name"),
-                        str("interactive.user"))),
-                kv("Java", joinNonBlank(" ",
+                        str("interactive.user")),
+                joinNonBlank(" ",
                         str("java.version"),
-                        str("jvm.vendor"))),
-                kv("CPU", joinNonBlank(", ",
+                        str("jvm.vendor")),
+                joinNonBlank(", ",
                         DATA.get("processors") + " cores",
-                        clean(str("cpu.model")))),
-                kv("Memory", bytes(DATA.get("memory.total.physical"))),
-                kv("Runtime", joinNonBlank(", ",
+                        clean(str("cpu.model"))),
+                bytes(DATA.get("memory.total.physical")),
+                joinNonBlank(", ",
                         "pid " + DATA.get("pid"),
                         "headless=" + DATA.get("headless"),
-                        "nonInteractive=" + DATA.get("service.nonInteractive"))),
-                kv("Environment", joinNonBlank(", ",
+                        "nonInteractive=" + DATA.get("service.nonInteractive")),
+                joinNonBlank(", ",
                         named("CI", str("ci.type")),
                         named("Cloud", str("cloud.provider")),
                         named("Container", DATA.get("container")),
-                        named("Orchestrator", str("container.orchestrator")))),
-                kv("Locale", joinNonBlank(", ",
+                        named("Orchestrator", str("container.orchestrator"))),
+                joinNonBlank(", ",
                         str("locale"),
                         str("timezone"),
-                        str("utc.offset")))
-        ));
+                        str("utc.offset"))
+        );
     }
 
-    public static String toHumanReadableStringMultiline() {
-        return toHumanReadableString().replace(" | ", System.lineSeparator());
+    public static record InitiatorSnapshot(
+            String system,
+            String machine,
+            String user,
+            String java,
+            String cpu,
+            String memory,
+            String runtime,
+            String environment,
+            String locale
+    ) {
+        @Override
+        public String toString () {
+            return String.join(" | ", nonBlankParts(
+                    kv("System", system),
+                    kv("Machine", machine),
+                    kv("User", user),
+                    kv("Java", java),
+                    kv("CPU", cpu),
+                    kv("Memory", memory),
+                    kv("Runtime", runtime),
+                    kv("Environment", environment),
+                    kv("Locale", locale)
+            ));
+        }
+
+        public String prettyPrintSummary() {
+            return String.join(" | ", nonBlankParts(
+                    kv("User", user),
+                    kv("Locale", locale),
+                    kv("Environment", environment),
+                    kv("System", system),
+                    kv("Machine", machine),
+                    kv("Java", java)
+            ));
+        }
+
+        public String prettyPrintMultiline() {
+            return prettyPrintSummary().replace(" | ", System.lineSeparator());
+        }
     }
 
     private static String str(String key) {

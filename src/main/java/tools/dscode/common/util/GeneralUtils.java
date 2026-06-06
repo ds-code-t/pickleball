@@ -54,4 +54,23 @@ public class GeneralUtils {
         return sw.toString();
     }
 
+
+    public static Long toLongOrZero(Object value) {
+        if (value == null) {
+            return 0L;
+        }
+
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+
+        String text = value.toString().trim();
+
+        if (text.isBlank()) {
+            return 0L;
+        }
+
+        return Long.parseLong(text);
+    }
+
 }

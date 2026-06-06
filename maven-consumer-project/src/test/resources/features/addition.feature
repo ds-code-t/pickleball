@@ -1,5 +1,14 @@
 Feature: Addition
 
+  Scenario: sd
+    * , if 88: if 11:
+  :   * , if 12:
+  ::    * , if 13:
+  :::     * , save "A"
+#    * , if 21:
+#  :   * , if 22:
+#  ::    * , if 23:
+#  :::     * , save "B"
 
   Scenario: data path split and query test1
     * , save "</data_test/deep/level1/level2/level3/Leaf.branch.twig>"
@@ -112,15 +121,15 @@ Feature: Addition
 
   Scenario: Tokenuiz 23
 # Directory path final segment: should return the full data_test directory tree.
-* , save "</data_test>"
+    * , save "</data_test>"
 # Expected: ObjectNode containing A, Alpha, Collections, CsvTests, SlashOnly, TxtTests, XmlTests, etc.
 
 # Directory path final segment: nested directory should return an ObjectNode.
-* , save "</data_test/A/B>"
+    * , save "</data_test/A/B>"
 # Expected: ObjectNode containing c, duplicateName, DUPLICATENAME, mixedCase, plain, table, xmlFile.
 
 # File path final segment: should return the parsed CSV root array.
-* , save "</data_test/CsvTests/people>"
+    * , save "</data_test/CsvTests/people>"
 # Expected:
 # [
 #   {"name":"Flutter","role":"leader"},
@@ -129,136 +138,136 @@ Feature: Addition
 # ]
 
 # Standard bracket index after a resolved file.
-* , save "</data_test/CsvTests/people[1].name>"
+    * , save "</data_test/CsvTests/people[1].name>"
 # Expected: "Flydash"
 
 # Tokenized one-based # index after a resolved file.
 # #2 rewrites to [1].
-* , save "</data_test/CsvTests/people#2.name>"
+    * , save "</data_test/CsvTests/people#2.name>"
 # Expected: "Flydash"
 
 # Tokenized one-based # index using dot-separated resource path.
 # #3 rewrites to [2].
-* , save "</data_test.CsvTests.people#3.role>"
+    * , save "</data_test.CsvTests.people#3.role>"
 # Expected: "ice cream fan"
 
 # Standard bracket index after a resolved directory tree.
-* , save "</data_test.A.B.table[1].animal>"
+    * , save "</data_test.A.B.table[1].animal>"
 # Expected: "raccoon"
 
 # Tokenized # index after a resolved directory tree.
 # #2 rewrites to [1].
-* , save "</data_test.A.B.table#2.animal>"
+    * , save "</data_test.A.B.table#2.animal>"
 # Expected: "raccoon"
 
 # Tokenized # index against a YAML array.
 # #3 rewrites to [2].
-* , save "</data_test/A/B/c.PropA.propC#3>"
+    * , save "</data_test/A/B/c.PropA.propC#3>"
 # Expected: "two"
 
 # JSON nested array with Tokenized # index.
 # #1 rewrites to [0].
-* , save "</data_test/Alpha/Beta/Gamma/items.items#1.name>"
+    * , save "</data_test/Alpha/Beta/Gamma/items.items#1.name>"
 # Expected: "apple"
 
 # JSON nested array with Tokenized # index.
 # #2 rewrites to [1].
-* , save "</data_test/Alpha/Beta/Gamma/items.items#2.name>"
+    * , save "</data_test/Alpha/Beta/Gamma/items.items#2.name>"
 # Expected: "banana"
 
 # Use $. prefix, which Tokenized strips.
-* , save "</data_test/Alpha/Beta/Gamma/items.$.items[1].name>"
+    * , save "</data_test/Alpha/Beta/Gamma/items.$.items[1].name>"
 # Expected: "banana"
 
 # Use $. prefix with directory tree fallback.
-* , save "</data_test.$.Alpha.Beta.Gamma.items.items[0].name>"
+    * , save "</data_test.$.Alpha.Beta.Gamma.items.items[0].name>"
 # Expected: "apple"
 
 # Wildcard over array objects after resolved file.
-* , save "</data_test/CsvTests/people.*.name as:LIST>"
+    * , save "</data_test/CsvTests/people.*.name as:LIST>"
 # Expected: list-like result containing:
 # ["Flutter", "Flydash", "Pandakun"]
 # Exact formatting depends on ValueFormatting/fromSafeJsonNode.
 
 # Wildcard over array objects after resolved directory tree.
-* , save "</data_test.CsvTests.people.*.role as:LIST>"
+    * , save "</data_test.CsvTests.people.*.role as:LIST>"
 # Expected: list-like result containing:
 # ["leader", "sister", "ice cream fan"]
 
 # Wildcard over JSON items array after resolved file.
-* , save "</data_test/Alpha/Beta/Gamma/items.items.*.name as:LIST>"
+    * , save "</data_test/Alpha/Beta/Gamma/items.items.*.name as:LIST>"
 # Expected: list-like result containing:
 # ["apple", "banana"]
 
 # JSONata-style object projection after resolved CSV file.
-* , save "</data_test/CsvTests/people.{\"person\":name,\"job\":role} as:LIST>"
+    * , save "</data_test/CsvTests/people.{\"person\":name,\"job\":role} as:LIST>"
 # Expected: list-like result with projected objects:
 # [{"person":"Flutter","job":"leader"}, {"person":"Flydash","job":"sister"}, {"person":"Pandakun","job":"ice cream fan"}]
 # Exact quote/format may depend on your save formatting.
 
 # JSONata-style object projection after resolved directory tree.
-* , save "</data_test.A.B.table.{\"who\":name,\"animalType\":animal} as:LIST>"
+    * , save "</data_test.A.B.table.{\"who\":name,\"animalType\":animal} as:LIST>"
 # Expected: list-like result with projected objects using table.csv rows.
 
 # JSONata filter syntax after resolved CSV file.
-* , save "</data_test/CsvTests/people[role=\"sister\"].name>"
+    * , save "</data_test/CsvTests/people[role=\"sister\"].name>"
 # Expected: "Flydash"
 
 # JSONata filter syntax after resolved directory tree.
-* , save "</data_test.A.B.table[animal=\"raccoon\"].name>"
+    * , save "</data_test.A.B.table[animal=\"raccoon\"].name>"
 # Expected: "Nori"
 
 # JSONata filter plus field selection from JSON file.
-* , save "</data_test/Alpha/Beta/Gamma/items.items[id=2].name>"
+    * , save "</data_test/Alpha/Beta/Gamma/items.items[id=2].name>"
 # Expected: "banana"
 
 # Parentheses expression after resolved file.
-* , save "</data_test/Alpha/Beta/Gamma/items.(items[1].name)>"
+    * , save "</data_test/Alpha/Beta/Gamma/items.(items[1].name)>"
 # Expected: "banana"
 # If this returns null, it still proves the remainder was delegated to NodeMap/jsonata4java rather than treated as resource path.
 
 # as:LIST with a single direct value.
-* , save "</data_test/A/B/c.PropA.propB as:LIST>"
+    * , save "</data_test/A/B/c.PropA.propB as:LIST>"
 # Expected: list-like result containing:
 # ["valueB"]
 
 # Slice-style syntax through Tokenized/jsonata4java.
-* , save "</data_test/CsvTests/people[0..1].name as:LIST>"
+    * , save "</data_test/CsvTests/people[0..1].name as:LIST>"
 # Expected: depends on jsonata4java support.
 # Important: should not save the literal '</data_test/CsvTests/people[0..1].name as:LIST>'.
 
 # Comma index syntax through Tokenized/jsonata4java.
-* , save "</data_test/CsvTests/people[0,2].name as:LIST>"
+    * , save "</data_test/CsvTests/people[0,2].name as:LIST>"
 # Expected: depends on jsonata4java support.
 # Important: should not save the literal '</data_test/CsvTests/people[0,2].name as:LIST>'.
 
 # Tokenized # comma syntax: #1,3 rewrites numbers to [0,2].
-* , save "</data_test/CsvTests/people#1,3.name as:LIST>"
+    * , save "</data_test/CsvTests/people#1,3.name as:LIST>"
 # Expected: depends on jsonata4java support for [0,2].
 # Likely list-like result containing Flutter and Pandakun if supported.
 
 # Tokenized # range syntax: #1..2 rewrites to [0..1].
-* , save "</data_test/CsvTests/people#1..2.name as:LIST>"
+    * , save "</data_test/CsvTests/people#1..2.name as:LIST>"
 # Expected: depends on jsonata4java support for [0..1].
 # Likely list-like result containing Flutter and Flydash if supported.
 
 # Invalid/edge bracket syntax should be delegated to NodeMap, not treated as a resource path.
-* , save "</data_test/CsvTests/people[].name>"
+    * , save "</data_test/CsvTests/people[].name>"
 # Expected: depends on Tokenized/jsonata4java behavior.
 # Important: should not save the literal path if your FileAndDataParsing fallback is working.
 
 # Negative index syntax should be delegated to NodeMap.
-* , save "</data_test/CsvTests/people[-1].name>"
+    * , save "</data_test/CsvTests/people[-1].name>"
 # Expected: depends on Tokenized/jsonata4java behavior for get.
 # Important: should not save the literal path if your fallback is working.
 
 # Directory prefix plus wildcard-style remainder.
-* , save "</data_test/A/B.* as:LIST>"
+    * , save "</data_test/A/B.* as:LIST>"
 # Expected: depends on jsonata4java behavior for object wildcard.
 # Important: should not save the literal path.
 
 # Directory prefix plus JSONata projection from CSV parsed inside directory tree.
-* , save "</data_test/A/B.table.{\"name\":name,\"score\":score} as:LIST>"
+    * , save "</data_test/A/B.table.{\"name\":name,\"score\":score} as:LIST>"
 # Expected: list-like result with:
 # [{"name":"Flutter","score":"100"}, {"name":"Nori","score":"95"}, {"name":"Hoppy","score":"98"}]
 
