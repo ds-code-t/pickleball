@@ -138,9 +138,12 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
             String filename = resolveFilename(a, payload, mime);
 
             try {
-                if (isBase64Attachment(mime)) {
-                    bytes = Base64.getDecoder().decode(payload);
-                } else if (isExistingPath(payload)) {
+                if (a.isFileBase64()) {
+                    String raw = Files.readString(Path.of(payload), StandardCharsets.US_ASCII);
+                    bytes = Base64.getMimeDecoder().decode(raw.trim());
+                } else if (a.isInlineBase64() || isBase64Attachment(mime)) {
+                    bytes = Base64.getMimeDecoder().decode(rawBase64(payload));
+                } else if (a.isFileBinary() || isExistingPath(payload)) {
                     Path p = Path.of(payload);
                     bytes = Files.readAllBytes(p);
 
@@ -237,6 +240,16 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
     private static boolean isBase64Attachment(String mime) {
         return mime != null && mime.toLowerCase(Locale.ROOT).contains("base64");
+    }
+
+    private static String rawBase64(String maybeDataUri) {
+        if (maybeDataUri == null) return "";
+        String s = maybeDataUri.trim();
+        int comma = s.indexOf(',');
+        if (s.regionMatches(true, 0, "data:", 0, 5) && comma >= 0 && comma + 1 < s.length()) {
+            return s.substring(comma + 1).trim();
+        }
+        return s;
     }
 
     private static boolean isExistingPath(String payload) {

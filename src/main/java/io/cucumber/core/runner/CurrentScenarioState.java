@@ -14,6 +14,7 @@ import tools.dscode.common.domoperations.SeleniumUtils;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
+import tools.dscode.common.reporting.logging.BaseConverter;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.common.reporting.logging.reportportal.ReportPortalBridgeConverter;
@@ -75,6 +76,8 @@ import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
 import static tools.dscode.testengine.PickleballRunner.getOptionsString;
 
 public class CurrentScenarioState extends ScenarioMapping {
+    public static final List<BaseConverter> converters = new ArrayList<>();
+
     String featureName;
     public boolean endCurrentScenario;
 
@@ -172,21 +175,18 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
     public void startScenarioRun() {
-        Stagger.run(() -> SeleniumUtils.waitMilliseconds(toLongOrZero(resolveFromVarsOrDefault("pkb",1100))));
+        Stagger.run(() -> SeleniumUtils.waitMilliseconds(toLongOrZero(resolveFromVarsOrDefault("pkb", 1100))));
         String scenarioName = pickle.getName() + " , Line " + pickle.getLocation().getLine();
         pickleballLog.info("Starting scenario: '" + scenarioName + "'");
 
-
-        ReportPortalBridgeConverter reportPortalBridgeConverter = featureName == null ? new ReportPortalBridgeConverter() : new ReportPortalBridgeConverter(featureName);
+        converters.add(featureName == null ? new ReportPortalBridgeConverter() : new ReportPortalBridgeConverter(featureName));
+        converters.add(new SimpleHtmlReportConverter(Path.of("reports/tests", safeFileName(scenarioName + ".html"))));
 
         scenarioLog =
                 Entry.of(scenarioName)
                         .tag("Scenario")
                         .tag("RP_SUITE:Root")
-                        .on(new SimpleHtmlReportConverter(
-                                Path.of("reports/tests", safeFileName(scenarioName + ".html"))
-                        ))
-                        .on(reportPortalBridgeConverter);
+                        .on(converters);
 
         setDefaultEntry(scenarioLog);
         scenarioLog.start();
@@ -266,13 +266,23 @@ public class CurrentScenarioState extends ScenarioMapping {
             throw new RuntimeException(throwable);
     }
 
+
+    private static final Object SCENARIO_RUN_CLEAN_UP_LOCK = new Object();
+
     public void scenarioRunCleanUp() {
-        for (WebDriver driver : getScenarioWebDrivers()) {
-            if (driver == null) continue;
-            if (!debugBrowser) {
-                try {
-                    driver.quit();
-                } catch (Exception ignored) {
+        synchronized (SCENARIO_RUN_CLEAN_UP_LOCK) {
+            converters.forEach(BaseConverter::close);
+
+            for (WebDriver driver : getScenarioWebDrivers()) {
+                if (driver == null) {
+                    continue;
+                }
+
+                if (!debugBrowser) {
+                    try {
+                        driver.quit();
+                    } catch (Exception ignored) {
+                    }
                 }
             }
         }

@@ -85,17 +85,33 @@ public class Entry {
         });
     }
 
-    public Entry on(BaseConverter converter) {
-        Objects.requireNonNull(converter, "converter");
-
+    public Entry on(BaseConverter... convertersToAdd) {
         return guarded(() -> {
-            if (!converters.contains(converter)) {
-                converters.add(converter);
-                Log.global().register(converter);
+            if (convertersToAdd == null) {
+                return this;
+            }
+
+            for (BaseConverter converter : convertersToAdd) {
+                if (converter == null) {
+                    continue;
+                }
+
+                if (!converters.contains(converter)) {
+                    converters.add(converter);
+                    Log.global().register(converter);
+                }
             }
 
             return this;
         });
+    }
+
+    public Entry on(List<BaseConverter> convertersToAdd) {
+        if (convertersToAdd == null) {
+            return on((BaseConverter[]) null);
+        }
+
+        return on(convertersToAdd.toArray(BaseConverter[]::new));
     }
 
     public Entry includeInSummary(boolean include) {
@@ -297,14 +313,23 @@ public class Entry {
     }
 
     public Entry attach(String name, String mime, String data) {
+        return attach(Attachment.of(name, mime, data));
+    }
+
+    public Entry attach(Attachment attachment) {
         return guarded(() -> {
-            attachments.add(new Attachment(name, mime, data));
+            if (attachment != null) {
+                attachments.add(attachment);
+            }
             return this;
         });
     }
 
     public Entry attachScreenshot(String name, String base64) {
-        return attach(name, "image/png;base64", base64);
+        String filename = name == null || name.isBlank()
+                ? "screenshot.png"
+                : name.endsWith(".png") ? name : name + ".png";
+        return attach(Attachment.base64File(filename, "image/png", base64));
     }
 
     public Entry screenshot() {
@@ -330,8 +355,10 @@ public class Entry {
                 createChild(label)
                         .level(Level.INFO)
                         .status(Status.PASS)
-                        .attach(filename, "image/png;base64",
-                                ((TakesScreenshot) driver).getScreenshotAs(OutputType.BASE64))
+                        .attach(Attachment.base64File(
+                                filename,
+                                "image/png",
+                                ((TakesScreenshot) driver).getScreenshotAs(OutputType.BASE64)))
                         .tags("Screenshot")
                         .timestamp();
 

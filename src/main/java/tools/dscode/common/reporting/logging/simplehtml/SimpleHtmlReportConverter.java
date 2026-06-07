@@ -40,6 +40,9 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     private final Map<String, ScopeState> scopes = new ConcurrentHashMap<>();
     private final Path reportFile;
 
+    // Serializes final report rendering so parallel callers do not build large HTML outputs at the same time.
+    private static final Object FINAL_WRITE_LOCK = new Object();
+
     // ---------------- Single-file (multi-scenario) aggregation ----------------
     private static final class SharedSingleFile {
         static final Object LOCK = new Object();
@@ -47,12 +50,17 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         // Key: scenario rowKey (preferred), else rootId
         static final Map<String, ScopeState> ALL_SCOPES = new ConcurrentHashMap<>();
 
+        // Tracks scenario report files already written during scenario close, so finalization
+        // does not rewrite them unless a scenario was missed.
+        static final Set<String> SCENARIO_REPORT_KEYS_WRITTEN = ConcurrentHashMap.newKeySet();
+        static final Set<Path> SCENARIO_REPORT_PATHS_WRITTEN = ConcurrentHashMap.newKeySet();
+
         static volatile Path REPORT_FILE = null;
     }
 
     // Guards to prevent giant/bloated emails
     private static final int MAX_TEXT_LEN = 20_000;
-    private static final int MAX_INLINE_IMAGE_BYTES = 3_000_000; // ~3MB per image (before base64)
+    private static final int MAX_INLINE_IMAGE_BYTES = intVar("simpleHtml.maxInlineImageBytes", 3_000_000); // ~3MB per image (before base64)
     private static final int MAX_LOG_LINES_PER_NODE = 5_000;
 
     private static final DateTimeFormatter TS_FMT =
@@ -79,9 +87,11 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
     @Override
     protected void onClose() {
-        // IMPORTANT: We do NOT auto-generate the final HTML here.
-        // close() only contributes this converter's in-memory scenario data to the shared run snapshot.
+        // close() contributes this converter's in-memory scenario data to the shared run snapshot.
+        // If scenarioReport is enabled, it also writes this instance's scenario report immediately.
         synchronized (lock) {
+            Map<String, ScopeState> closedSnapshot = new LinkedHashMap<>();
+
             try {
                 synchronized (SharedSingleFile.LOCK) {
                     debug("onClose localScopeCount=" + scopes.size());
@@ -93,19 +103,45 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                             continue;
                         }
 
-                        ScopeState copy = deepCopyScopeState(s);
-                        ScopeState previous = SharedSingleFile.ALL_SCOPES.put(key, copy);
+                        ScopeState sharedCopy = deepCopyScopeState(s);
+                        ScopeState previous = SharedSingleFile.ALL_SCOPES.put(key, sharedCopy);
+                        closedSnapshot.put(key, deepCopyScopeState(s));
+
                         debug("onClose stored scope key=" + key
                                 + " replacedExisting=" + (previous != null)
-                                + " rootId=" + copy.rootId
-                                + " rowKey=" + copy.rowKey
-                                + " includeInSummary=" + copy.includeInSummary
-                                + " title='" + scenarioTitle(copy, 0) + "'");
+                                + " rootId=" + sharedCopy.rootId
+                                + " rowKey=" + sharedCopy.rowKey
+                                + " includeInSummary=" + sharedCopy.includeInSummary
+                                + " title='" + scenarioTitle(sharedCopy, 0) + "'");
                     }
                 }
+
+                writeClosedScenarioReports(closedSnapshot);
+
+                // After close, the shared copy is the source of truth. Release this converter's local copy.
+                scopes.clear();
             } catch (Throwable e) {
                 logError("[SimpleHtmlReportConverter] FAILED onClose: " + e);
             }
+        }
+    }
+
+    private void writeClosedScenarioReports(Map<String, ScopeState> closedSnapshot) {
+        if (closedSnapshot == null || closedSnapshot.isEmpty()) return;
+
+        Instant runTime = Instant.now();
+        Path defaultOutFile = reportFile == null ? Path.of("cucumber-report.html") : reportFile;
+        ReportOutputs outputs = resolveReportOutputs(defaultOutFile, runTime);
+
+        if (!outputs.scenarioReport) {
+            debug("onClose scenario report disabled by scenarioReport setting");
+            return;
+        }
+
+        try {
+            writeScenarioReports(closedSnapshot, defaultOutFile, runTime, outputs.scenarioTemplate, true);
+        } catch (Throwable e) {
+            logError("[SimpleHtmlReportConverter] FAILED writing closed scenario report: " + e);
         }
     }
 
@@ -134,6 +170,8 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     public static void resetRun() {
         synchronized (SharedSingleFile.LOCK) {
             SharedSingleFile.ALL_SCOPES.clear();
+            SharedSingleFile.SCENARIO_REPORT_KEYS_WRITTEN.clear();
+            SharedSingleFile.SCENARIO_REPORT_PATHS_WRITTEN.clear();
             SharedSingleFile.REPORT_FILE = null;
         }
     }
@@ -176,6 +214,12 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
      * Writes report output from the path variables only.
      */
     public static void writeFinalReport(Path outFile) {
+        synchronized (FINAL_WRITE_LOCK) {
+            writeFinalReportLocked(outFile);
+        }
+    }
+
+    private static void writeFinalReportLocked(Path outFile) {
         if (outFile == null) outFile = Path.of("cucumber-report.html");
 
         debug("VERSION " + DEBUG_VERSION + " writeFinalReport entered outFile=" + abs(outFile));
@@ -219,6 +263,9 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                 debug("scenario reports disabled by scenarioReport setting");
             }
 
+            // At this point all enabled final outputs have been produced successfully.
+            // The HTML files are single-file/portable, so the run-specific attachment temp folder can be removed.
+            Attachment.cleanupCurrentRunTempFiles();
         } catch (Throwable ex) {
             logError("[SimpleHtmlReportConverter] FAILED writing html report: " + ex);
         }
@@ -317,6 +364,17 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         }
     }
 
+    private static int intVar(String name, int defaultValue) {
+        try {
+            Object raw = resolveFromVarsOrDefault(name, String.valueOf(defaultValue));
+            String text = Objects.toString(raw, "").trim();
+            if (text.isBlank()) return defaultValue;
+            return Math.max(0, Integer.parseInt(text));
+        } catch (Throwable ignored) {
+            return defaultValue;
+        }
+    }
+
     /**
      * Returns a normalized setting while preserving the difference between undefined and defined blank.
      * blank and false disable the report; true enables it with the supplied default template/path.
@@ -365,7 +423,17 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     }
 
     private void writeScenarioReports(Path defaultOutFile, Instant runTime, String template) throws IOException {
-        Map<String, ScopeState> snapshot = snapshotAllScopes();
+        writeScenarioReports(snapshotAllScopes(), defaultOutFile, runTime, template, true);
+    }
+
+    private void writeScenarioReports(
+            Map<String, ScopeState> snapshot,
+            Path defaultOutFile,
+            Instant runTime,
+            String template,
+            boolean skipAlreadyWritten
+    ) throws IOException {
+        if (snapshot == null) snapshot = Map.of();
 
         Path fallback = normalizeReportPath(defaultOutFile == null ? Path.of("cucumber-report.html") : defaultOutFile);
         Path projectRoot = projectRootFromDefaultOutFile(fallback);
@@ -381,18 +449,26 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         debugSnapshot("scenario source", snapshot);
 
         int written = 0;
-        Set<Path> pathsWrittenThisCall = new LinkedHashSet<>();
 
-        List<ScopeState> scenarios = new ArrayList<>(snapshot.values());
-        scenarios.sort(Comparator.comparing(SimpleHtmlReportConverter::scopeSortKey));
+        List<Map.Entry<String, ScopeState>> scenarios = new ArrayList<>(snapshot.entrySet());
+        scenarios.sort(Comparator.comparing(e -> scopeSortKey(e.getValue())));
 
-        for (ScopeState s : scenarios) {
+        for (Map.Entry<String, ScopeState> scenarioEntry : scenarios) {
+            String scenarioKey = scenarioEntry.getKey();
+            ScopeState s = scenarioEntry.getValue();
+
             if (s == null) {
                 debug("writeScenarioReports skipping null scope");
                 continue;
             }
             if (!s.includeInSummary) {
                 debug("writeScenarioReports skipping excluded scope rootId=" + s.rootId + " rowKey=" + s.rowKey);
+                continue;
+            }
+
+            String aggregationKey = (scenarioKey == null || scenarioKey.isBlank()) ? scopeAggregationKey(s) : scenarioKey;
+            if (skipAlreadyWritten && aggregationKey != null && SharedSingleFile.SCENARIO_REPORT_KEYS_WRITTEN.contains(aggregationKey)) {
+                debug("writeScenarioReports skipping already-written scenario key=" + aggregationKey);
                 continue;
             }
 
@@ -407,22 +483,31 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
             Path scenarioFile = resolvescenarioReport(projectRoot, template, scenarioName, scenarioTime);
             debug("resolved scenario candidate: name='" + scenarioName + "' candidate=" + abs(scenarioFile));
-            scenarioFile = uniqueReportPath(scenarioFile, pathsWrittenThisCall);
+            scenarioFile = reserveUniqueScenarioReportPath(scenarioFile);
 
             if (scenarioFile.getParent() != null) Files.createDirectories(scenarioFile.getParent());
 
-            ScopeState oneScenario = deepCopyScopeState(s);
-            StringBuilder html = renderScenarioHtmlDocument(oneScenario, scenarioFile);
+            StringBuilder html = renderScenarioHtmlDocument(s, scenarioFile);
             writeStringBuilder(scenarioFile, html);
             html.setLength(0);
 
-            pathsWrittenThisCall.add(scenarioFile.toAbsolutePath().normalize());
+            if (aggregationKey != null && !aggregationKey.isBlank()) {
+                SharedSingleFile.SCENARIO_REPORT_KEYS_WRITTEN.add(aggregationKey);
+            }
             written++;
 
             debug("wrote scenario: name='" + scenarioName + "' rowKey=" + s.rowKey + " rootId=" + s.rootId + " file=" + scenarioFile.toAbsolutePath());
         }
 
         debug("wrote scenario reports: " + written + " file(s)");
+    }
+
+    private static Path reserveUniqueScenarioReportPath(Path preferred) {
+        synchronized (SharedSingleFile.LOCK) {
+            Path candidate = uniqueReportPath(preferred, SharedSingleFile.SCENARIO_REPORT_PATHS_WRITTEN);
+            SharedSingleFile.SCENARIO_REPORT_PATHS_WRITTEN.add(candidate.toAbsolutePath().normalize());
+            return candidate;
+        }
     }
 
     private static Path resolvescenarioReport(Path baseDir, String template, String scenarioName, Instant scenarioTime) {
@@ -909,8 +994,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             if (image) {
                 InlineImage img = inlineImage(
                         displayName,
-                        mime,
-                        data,
+                        a,
                         attachmentTime,
                         node.nextEventOrder++
                 );
@@ -928,58 +1012,90 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         m.attachesN = attachesN;
     }
 
-    private InlineImage inlineImage(String name, String mime, String data, Instant at, int order) {
+    private InlineImage inlineImage(String name, Attachment attachment, Instant at, int order) {
         try {
-            if (mime.contains("base64")) {
+            String mime = attachment == null ? "" : Objects.toString(attachment.mime(), "");
+            String data = attachment == null ? "" : attachment.path();
+            String mediaType = attachment == null ? mediaTypeFromMime(mime) : attachment.mediaType();
+
+            if (attachment != null && attachment.isFileBase64()) {
+                Path p = Path.of(Objects.toString(data, ""));
+                if (!Files.exists(p)) {
+                    return InlineImage.textOnly(name, sanitizeLogText("Missing base64 image file: " + data), at, order);
+                }
+                return InlineImage.imageBase64File(name, mediaType, p.toString(), at, order);
+            }
+
+            if (attachment != null && attachment.isFileBinary()) {
+                return imageFromBinaryFile(name, mediaType, data, at, order);
+            }
+
+            if (attachment != null && attachment.isInlineBase64()) {
                 String raw = rawBase64(data);
                 if (raw == null || raw.isBlank()) {
                     return InlineImage.textOnly(name, sanitizeLogText("<empty base64>"), at, order);
                 }
-                String mediaType = mime.substring(0, mime.indexOf(';') >= 0 ? mime.indexOf(';') : mime.length());
-                String src = "data:" + mediaType + ";base64," + raw;
-                return InlineImage.image(name, src, at, order);
+                return InlineImage.imageDataUri(name, "data:" + mediaType + ";base64," + raw, at, order);
+            }
+
+            if (mime.toLowerCase(Locale.ROOT).contains("base64")) {
+                String raw = rawBase64(data);
+                if (raw == null || raw.isBlank()) {
+                    return InlineImage.textOnly(name, sanitizeLogText("<empty base64>"), at, order);
+                }
+                return InlineImage.imageDataUri(name, "data:" + mediaType + ";base64," + raw, at, order);
             }
 
             String trimmed = (data == null) ? "" : data.trim();
             if (trimmed.startsWith("data:image")) {
-                return InlineImage.image(name, trimmed, at, order);
+                return InlineImage.imageDataUri(name, trimmed, at, order);
             }
 
             if (trimmed.isBlank()) {
                 return InlineImage.textOnly(name, sanitizeLogText("<empty path>"), at, order);
             }
 
-            Path p = Path.of(trimmed);
-            if (!Files.exists(p)) {
-                Path maybeRel = (reportFile == null || reportFile.getParent() == null) ? p : reportFile.getParent().resolve(trimmed);
-                if (Files.exists(maybeRel)) p = maybeRel;
-            }
-
-            if (!Files.exists(p)) {
-                return InlineImage.textOnly(name, sanitizeLogText("Missing image file: " + trimmed), at, order);
-            }
-
-            long size = Files.size(p);
-            if (size > MAX_INLINE_IMAGE_BYTES) {
-                return InlineImage.textOnly(
-                        name,
-                        sanitizeLogText("Image too large to inline (" + size + " bytes). Not embedded."),
-                        at,
-                        order
-                );
-            }
-
-            String guessed = Files.probeContentType(p);
-            if (guessed == null || !guessed.startsWith("image/")) {
-                guessed = "image/png";
-            }
-
-            byte[] bytes = Files.readAllBytes(p);
-            String src = "data:" + guessed + ";base64," + Base64.getEncoder().encodeToString(bytes);
-            return InlineImage.image(name, src, at, order);
+            return imageFromBinaryFile(name, mediaType, trimmed, at, order);
         } catch (Exception ex) {
             return InlineImage.textOnly(name, sanitizeLogText("Failed to inline image: " + ex), at, order);
         }
+    }
+
+    private InlineImage imageFromBinaryFile(String name, String mime, String data, Instant at, int order) throws IOException {
+        Path p = Path.of(data == null ? "" : data.trim());
+        if (!Files.exists(p)) {
+            Path maybeRel = (reportFile == null || reportFile.getParent() == null) ? p : reportFile.getParent().resolve(data.trim());
+            if (Files.exists(maybeRel)) p = maybeRel;
+        }
+
+        if (!Files.exists(p)) {
+            return InlineImage.textOnly(name, sanitizeLogText("Missing image file: " + data), at, order);
+        }
+
+        long size = Files.size(p);
+        if (size > MAX_INLINE_IMAGE_BYTES) {
+            return InlineImage.textOnly(
+                    name,
+                    sanitizeLogText("Image too large to inline (" + size + " bytes). Not embedded."),
+                    at,
+                    order
+            );
+        }
+
+        String guessed = Files.probeContentType(p);
+        if (guessed == null || !guessed.startsWith("image/")) {
+            guessed = (mime == null || mime.isBlank() || "application/octet-stream".equalsIgnoreCase(mime)) ? "image/png" : mime;
+        }
+
+        return InlineImage.imageBinaryFile(name, guessed, p.toString(), at, order);
+    }
+
+    private static String mediaTypeFromMime(String mime) {
+        if (mime == null || mime.isBlank()) return "application/octet-stream";
+        String m = mime.trim();
+        int semi = m.indexOf(';');
+        if (semi >= 0) m = m.substring(0, semi);
+        return m.isBlank() ? "application/octet-stream" : m;
     }
 
     private Status computeOverallStatusForScope(ScopeState s) {
@@ -1746,26 +1862,78 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         final boolean isImage;
         final String src;
         final String text;
+        final String mime;
+        final String filePath;
+        final ImageStorage imageStorage;
         final String ts;
         final long sortKey;
         final int order;
 
-        private InlineImage(String name, boolean isImage, String src, String text, String ts, long sortKey, int order) {
+        private enum ImageStorage { DATA_URI, BASE64_FILE, BINARY_FILE, NONE }
+
+        private InlineImage(
+                String name,
+                boolean isImage,
+                String src,
+                String text,
+                String mime,
+                String filePath,
+                ImageStorage imageStorage,
+                String ts,
+                long sortKey,
+                int order
+        ) {
             this.name = name;
             this.isImage = isImage;
             this.src = src;
             this.text = text;
+            this.mime = mime;
+            this.filePath = filePath;
+            this.imageStorage = imageStorage == null ? ImageStorage.NONE : imageStorage;
             this.ts = ts;
             this.sortKey = sortKey;
             this.order = order;
         }
 
-        static InlineImage image(String name, String dataUri, Instant at, int order) {
+        static InlineImage imageDataUri(String name, String dataUri, Instant at, int order) {
             return new InlineImage(
                     escapeHtml(name),
                     true,
                     dataUri,
                     null,
+                    null,
+                    null,
+                    ImageStorage.DATA_URI,
+                    escapeHtml(tsOf(at)),
+                    sortKeyOf(at),
+                    order
+            );
+        }
+
+        static InlineImage imageBase64File(String name, String mime, String filePath, Instant at, int order) {
+            return new InlineImage(
+                    escapeHtml(name),
+                    true,
+                    null,
+                    null,
+                    mime,
+                    filePath,
+                    ImageStorage.BASE64_FILE,
+                    escapeHtml(tsOf(at)),
+                    sortKeyOf(at),
+                    order
+            );
+        }
+
+        static InlineImage imageBinaryFile(String name, String mime, String filePath, Instant at, int order) {
+            return new InlineImage(
+                    escapeHtml(name),
+                    true,
+                    null,
+                    null,
+                    mime,
+                    filePath,
+                    ImageStorage.BINARY_FILE,
                     escapeHtml(tsOf(at)),
                     sortKeyOf(at),
                     order
@@ -1778,6 +1946,9 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                     false,
                     null,
                     text,
+                    null,
+                    null,
+                    ImageStorage.NONE,
                     escapeHtml(tsOf(at)),
                     sortKeyOf(at),
                     order
@@ -2752,12 +2923,12 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
             out.append("<div class=\"msgLabel\">").append(a.name).append("</div>");
 
-            if (a.isImage && a.src != null && !a.src.isBlank()) {
+            if (a.isImage) {
                 out.append("<img class=\"imgThumb\" alt=\"")
                         .append(a.name)
-                        .append("\" src=\"")
-                        .append(a.src)
-                        .append("\" onclick=\"(function(s){var o=document.createElement('div');o.className='imgOverlay';o.onclick=function(){o.remove()};var i=document.createElement('img');i.src=s;o.appendChild(i);document.body.appendChild(o)})(this.src)\">");
+                        .append("\" src=\"");
+                appendImageSrc(out, a);
+                out.append("\" onclick=\"(function(s){var o=document.createElement('div');o.className='imgOverlay';o.onclick=function(){o.remove()};var i=document.createElement('img');i.src=s;o.appendChild(i);document.body.appendChild(o)})(this.src)\">");
             } else {
                 out.append("<div class=\"attText\">").append(a.text == null ? "" : a.text).append("</div>");
             }
@@ -2768,6 +2939,45 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
         out.append("</div>");
         out.append("</span></div>");
+    }
+
+    private static void appendImageSrc(StringBuilder out, InlineImage image) {
+        if (image == null) return;
+
+        try {
+            if (image.imageStorage == InlineImage.ImageStorage.DATA_URI) {
+                out.append(image.src == null ? "" : image.src);
+                return;
+            }
+
+            String mime = image.mime == null || image.mime.isBlank() ? "image/png" : image.mime;
+
+            if (image.imageStorage == InlineImage.ImageStorage.BASE64_FILE) {
+                out.append("data:").append(escapeHtml(mime)).append(";base64,");
+                appendTextFile(out, Path.of(image.filePath));
+                return;
+            }
+
+            if (image.imageStorage == InlineImage.ImageStorage.BINARY_FILE) {
+                out.append("data:").append(escapeHtml(mime)).append(";base64,");
+                byte[] bytes = Files.readAllBytes(Path.of(image.filePath));
+                out.append(Base64.getEncoder().encodeToString(bytes));
+                return;
+            }
+        } catch (Throwable e) {
+            out.append("data:text/plain;base64,")
+                    .append(Base64.getEncoder().encodeToString(("Failed to inline image: " + e).getBytes(StandardCharsets.UTF_8)));
+        }
+    }
+
+    private static void appendTextFile(StringBuilder out, Path file) throws IOException {
+        try (var r = Files.newBufferedReader(file, StandardCharsets.US_ASCII)) {
+            char[] buf = new char[16_384];
+            int n;
+            while ((n = r.read(buf)) >= 0) {
+                out.append(buf, 0, n);
+            }
+        }
     }
 
     private static long timelineSortKey(Object o) {

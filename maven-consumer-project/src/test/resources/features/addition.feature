@@ -1,5 +1,12 @@
 Feature: Addition
 
+  Scenario Outline: ol wait test <A>
+    * , wait 3 seconds
+    Examples:
+    | A|
+    |1 |
+    |2 |
+
   Scenario: sd
     * , if 88: if 11:
   :   * , if 12:
