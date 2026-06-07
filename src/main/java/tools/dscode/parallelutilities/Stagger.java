@@ -1,140 +1,68 @@
 package tools.dscode.parallelutilities;
 
-import java.time.Duration;
+import java.net.IDN;
+import java.net.URI;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.function.BiPredicate;
-import java.util.function.BooleanSupplier;
 import java.util.function.Function;
-import java.util.function.Predicate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class Stagger {
 
     private Stagger() {}
 
+    private static final Object LOCK = new Object();
+    private static final List<Entry> ACTIVE = new ArrayList<>();
+
     private enum Global {
         INSTANCE
     }
 
-    public static <R> R call(
-            Duration delay,
-            Callable<R> work
-    ) throws Exception {
-        return call(
-                Global.INSTANCE,
-                delay,
-                alwaysAgainst(),
-                work
-        );
+    public static <R> R call(Callable<R> work) {
+        return call(Global.INSTANCE, alwaysAgainst(), work);
     }
 
-    public static <R> R call(
-            Duration delay,
-            BooleanSupplier until,
-            Callable<R> work
-    ) throws Exception {
-        return call(
-                Global.INSTANCE,
-                delay,
-                alwaysAgainst(),
-                until,
-                work
-        );
-    }
-
-    public static void run(
-            Duration delay,
-            CheckedRunnable work
-    ) throws Exception {
-        call(
-                delay,
-                () -> {
-                    work.run();
-                    return null;
-                }
-        );
-    }
-
-    public static void run(
-            Duration delay,
-            BooleanSupplier until,
-            CheckedRunnable work
-    ) throws Exception {
-        call(
-                delay,
-                until,
-                () -> {
-                    work.run();
-                    return null;
-                }
-        );
-    }
-
-    private static final Object LOCK = new Object();
-    private static final List<Entry> ENTRIES = new ArrayList<>();
-    private static final List<Started> STARTED = new ArrayList<>();
-
-    private static final Duration DEFAULT_POLL_EVERY = Duration.ofMillis(250);
-    private static final Duration HISTORY_RETENTION = Duration.ofMinutes(10);
-
-    public static <T, R> R call(
-            T value,
-            Duration delay,
-            BiPredicate<T, T> against,
-            Callable<R> work
-    ) throws Exception {
-        return call(value, delay, against, DEFAULT_POLL_EVERY, (current, others) -> true, work);
+    public static void run(CheckedRunnable work) {
+        call(() -> {
+            work.run();
+            return null;
+        });
     }
 
     public static <T, R> R call(
             T value,
-            Duration delay,
             BiPredicate<T, T> against,
-            Predicate<T> until,
             Callable<R> work
-    ) throws Exception {
-        return call(value, delay, against, DEFAULT_POLL_EVERY, (current, others) -> until.test(current), work);
-    }
-
-    public static <T, R> R call(
-            T value,
-            Duration delay,
-            BiPredicate<T, T> against,
-            BooleanSupplier until,
-            Callable<R> work
-    ) throws Exception {
-        return call(value, delay, against, DEFAULT_POLL_EVERY, (current, others) -> until.getAsBoolean(), work);
-    }
-
-    public static <T, R> R call(
-            T value,
-            Duration delay,
-            BiPredicate<T, T> against,
-            Duration pollEvery,
-            ProceedPredicate<T> until,
-            Callable<R> work
-    ) throws Exception {
-        Objects.requireNonNull(delay, "delay");
+    ) {
         Objects.requireNonNull(against, "against");
-        Objects.requireNonNull(pollEvery, "pollEvery");
-        Objects.requireNonNull(until, "until");
         Objects.requireNonNull(work, "work");
 
-        Object group = groupFor(value);
-        Entry self = new Entry(group, value);
-
-        synchronized (LOCK) {
-            ENTRIES.add(self);
-        }
+        Entry self = new Entry(groupFor(value), value);
 
         try {
-            waitUntilReady(self, value, delay, against, pollEvery, until);
+            synchronized (LOCK) {
+                while (hasConflict(self, value, against)) {
+                    waitOnLock();
+                }
+
+                ACTIVE.add(self);
+            }
+
             return work.call();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new StaggerException("Staggered call was interrupted", e);
+        } catch (Exception e) {
+            throw new StaggerException("Staggered call failed", e);
         } finally {
             synchronized (LOCK) {
-                ENTRIES.remove(self);
+                ACTIVE.remove(self);
                 LOCK.notifyAll();
             }
         }
@@ -142,37 +70,66 @@ public final class Stagger {
 
     public static <T> void run(
             T value,
-            Duration delay,
             BiPredicate<T, T> against,
             CheckedRunnable work
-    ) throws Exception {
-        call(value, delay, against, () -> {
+    ) {
+        call(value, against, () -> {
             work.run();
             return null;
         });
     }
 
-    public static <T> void run(
-            T value,
-            Duration delay,
-            BiPredicate<T, T> against,
-            Predicate<T> until,
+    public static <R> R callMatching(
+            String text,
+            Pattern pattern,
+            Callable<R> work
+    ) {
+        Set<String> keys = regexKeys(text, pattern);
+
+        if (keys.isEmpty()) {
+            return callDirect(work);
+        }
+
+        return call(
+                keys,
+                Stagger::overlaps,
+                work
+        );
+    }
+
+    public static void runMatching(
+            String text,
+            Pattern pattern,
             CheckedRunnable work
-    ) throws Exception {
-        call(value, delay, against, until, () -> {
+    ) {
+        callMatching(text, pattern, () -> {
             work.run();
             return null;
         });
     }
 
-    public static <T> void run(
-            T value,
-            Duration delay,
-            BiPredicate<T, T> against,
-            BooleanSupplier until,
+    public static <R> R callUrlHost(
+            String url,
+            Callable<R> work
+    ) {
+        String key = registeredHostKey(url);
+
+        if (key == null || key.isBlank()) {
+            return callDirect(work);
+        }
+
+        return call(
+                key,
+                String::equals,
+                work
+        );
+    }
+
+    public static void runUrlHost(
+            String url,
             CheckedRunnable work
-    ) throws Exception {
-        call(value, delay, against, until, () -> {
+    ) {
+        callUrlHost(url, () -> {
             work.run();
             return null;
         });
@@ -191,63 +148,13 @@ public final class Stagger {
         return (a, b) -> true;
     }
 
-    private static <T> void waitUntilReady(
-            Entry self,
-            T value,
-            Duration delay,
-            BiPredicate<T, T> against,
-            Duration pollEvery,
-            ProceedPredicate<T> until
-    ) throws Exception {
-        long delayNanos = delay.toNanos();
-        long pollNanos = pollEvery.toNanos();
-
-        while (true) {
-            long waitNanos;
-
-            synchronized (LOCK) {
-                cleanupHistory();
-
-                List<T> matchingOthers = matchingOthers(self, value, against);
-
-                if (until.canProceed(value, List.copyOf(matchingOthers))) {
-                    long now = System.nanoTime();
-                    long latestStart = latestMatchingStart(self.group, value, against);
-
-                    long allowedAt = latestStart == Long.MIN_VALUE
-                            ? now
-                            : latestStart + delayNanos;
-
-                    if (now >= allowedAt) {
-                        self.started = true;
-                        STARTED.add(new Started(self.group, value, now));
-                        LOCK.notifyAll();
-                        return;
-                    }
-
-                    waitNanos = allowedAt - now;
-                } else {
-                    waitNanos = pollNanos;
-                }
-            }
-
-            sleepNanos(waitNanos);
-        }
-    }
-
     @SuppressWarnings("unchecked")
-    private static <T> List<T> matchingOthers(
+    private static <T> boolean hasConflict(
             Entry self,
             T value,
             BiPredicate<T, T> against
     ) {
-        List<T> matches = new ArrayList<>();
-
-        for (Entry entry : ENTRIES) {
-            if (entry == self) {
-                continue;
-            }
-
+        for (Entry entry : ACTIVE) {
             if (!Objects.equals(entry.group, self.group)) {
                 continue;
             }
@@ -255,50 +162,118 @@ public final class Stagger {
             T other = (T) entry.value;
 
             if (against.test(value, other)) {
-                matches.add(other);
+                return true;
             }
         }
 
-        return matches;
+        return false;
     }
 
-    @SuppressWarnings("unchecked")
-    private static <T> long latestMatchingStart(
-            Object group,
-            T value,
-            BiPredicate<T, T> against
-    ) {
-        long latest = Long.MIN_VALUE;
+    private static Set<String> regexKeys(String text, Pattern pattern) {
+        Objects.requireNonNull(pattern, "pattern");
 
-        for (Started started : STARTED) {
-            if (!Objects.equals(started.group, group)) {
-                continue;
-            }
+        if (pattern.matcher("").groupCount() != 1) {
+            throw new IllegalArgumentException("pattern must contain exactly one capture group");
+        }
 
-            T other = (T) started.value;
+        Set<String> keys = new LinkedHashSet<>();
 
-            if (against.test(value, other)) {
-                latest = Math.max(latest, started.startNanos);
+        if (text == null || text.isBlank()) {
+            return keys;
+        }
+
+        Matcher matcher = pattern.matcher(text);
+
+        while (matcher.find()) {
+            String key = matcher.group(1);
+
+            if (key != null && !key.isBlank()) {
+                keys.add(key.trim());
             }
         }
 
-        return latest;
+        return keys;
     }
 
-    private static void cleanupHistory() {
-        long cutoff = System.nanoTime() - HISTORY_RETENTION.toNanos();
-        STARTED.removeIf(started -> started.startNanos < cutoff);
-    }
-
-    private static void sleepNanos(long nanos) throws InterruptedException {
-        if (nanos <= 0) {
-            return;
+    private static boolean overlaps(Set<String> a, Set<String> b) {
+        for (String value : a) {
+            if (b.contains(value)) {
+                return true;
+            }
         }
 
-        long millis = nanos / 1_000_000;
-        int extraNanos = (int) (nanos % 1_000_000);
+        return false;
+    }
 
-        Thread.sleep(millis, extraNanos);
+    private static String registeredHostKey(String url) {
+        String host = extractHost(url);
+
+        if (host == null || host.isBlank()) {
+            return null;
+        }
+
+        host = host.trim().toLowerCase();
+
+        if (host.startsWith("[") && host.endsWith("]")) {
+            return host.substring(1, host.length() - 1);
+        }
+
+        if (isIpAddress(host)) {
+            return host;
+        }
+
+        host = IDN.toASCII(host);
+
+        String[] parts = host.split("\\.");
+
+        if (parts.length < 2) {
+            return host;
+        }
+
+        return parts[parts.length - 2] + "." + parts[parts.length - 1];
+    }
+
+    private static String extractHost(String url) {
+        if (url == null || url.isBlank()) {
+            return null;
+        }
+
+        try {
+            URI uri = URI.create(url.trim());
+
+            String host = uri.getHost();
+
+            if (host != null) {
+                return host;
+            }
+
+            URI fallback = URI.create("http://" + url.trim());
+            return fallback.getHost();
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private static boolean isIpAddress(String host) {
+        return host.matches("\\d{1,3}(?:\\.\\d{1,3}){3}")
+                || host.contains(":");
+    }
+
+    private static <R> R callDirect(Callable<R> work) {
+        Objects.requireNonNull(work, "work");
+
+        try {
+            return work.call();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new StaggerException("Staggered call was interrupted", e);
+        } catch (Exception e) {
+            throw new StaggerException("Staggered call failed", e);
+        }
+    }
+
+    private static void waitOnLock() throws InterruptedException {
+        LOCK.wait();
     }
 
     private static Object groupFor(Object value) {
@@ -310,7 +285,6 @@ public final class Stagger {
     private static final class Entry {
         private final Object group;
         private final Object value;
-        private boolean started;
 
         private Entry(Object group, Object value) {
             this.group = group;
@@ -318,21 +292,10 @@ public final class Stagger {
         }
     }
 
-    private static final class Started {
-        private final Object group;
-        private final Object value;
-        private final long startNanos;
-
-        private Started(Object group, Object value, long startNanos) {
-            this.group = group;
-            this.value = value;
-            this.startNanos = startNanos;
+    public static class StaggerException extends RuntimeException {
+        public StaggerException(String message, Throwable cause) {
+            super(message, cause);
         }
-    }
-
-    @FunctionalInterface
-    public interface ProceedPredicate<T> {
-        boolean canProceed(T current, List<T> matchingOthers) throws Exception;
     }
 
     @FunctionalInterface

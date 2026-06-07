@@ -10,6 +10,7 @@ import io.cucumber.plugin.event.Status;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.assertions.AssertionChain;
+import tools.dscode.common.domoperations.SeleniumUtils;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
@@ -169,14 +170,9 @@ public class CurrentScenarioState extends ScenarioMapping {
         return entry.timestamp();
     }
 
-    public void staggerScenarios() throws Exception {
-            Stagger.run(
-                    Duration.ofMillis(toLongOrZero(resolveFromVarsOrDefault("pkb",1100))),
-                    () ->  startScenarioRun()
-            );
-    }
 
     public void startScenarioRun() {
+        Stagger.run(() -> SeleniumUtils.waitMilliseconds(toLongOrZero(resolveFromVarsOrDefault("pkb",1100))));
         String scenarioName = pickle.getName() + " , Line " + pickle.getLocation().getLine();
         pickleballLog.info("Starting scenario: '" + scenarioName + "'");
 

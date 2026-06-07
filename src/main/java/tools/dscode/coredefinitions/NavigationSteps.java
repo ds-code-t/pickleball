@@ -2,10 +2,13 @@ package tools.dscode.coredefinitions;
 
 import io.cucumber.java.en.When;
 import org.openqa.selenium.WebDriver;
+import tools.dscode.parallelutilities.Stagger;
 
+import static tools.dscode.common.evaluations.AviatorUtil.isTruthy;
 import static tools.dscode.common.mappings.ParsingMap.configsRoot;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
+import static tools.dscode.common.variables.RunVars.resolveFromVarsOrDefault;
 
 public class NavigationSteps {
 
@@ -17,6 +20,14 @@ public class NavigationSteps {
             logInfo("Attempting to navigate to: " + address + "");
             WebDriver driver = BrowserSteps.getCurrentDriver();
             driver.get(address);
+            if (isTruthy(resolveFromVarsOrDefault("pkb_staggerParallelURLCalls", false))) {
+                Stagger.runUrlHost(
+                        address,
+                        () -> driver.get(address)
+                );
+            } else {
+                driver.get(address);
+            }
         }
         else {
             throw new RuntimeException("failed to navigate to: '" + text + "' , URL resolved to '" +  obj + "'"   );

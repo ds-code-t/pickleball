@@ -50,7 +50,7 @@ public class GeneralSteps extends CoreSteps {
     @DefinitionFlags(DefinitionFlag.RUN_METHOD_DIRECTLY)
     @Given(ROOT_STEP)
     public static void rootStep() throws Exception {
-        getCurrentScenarioState().staggerScenarios();
+        getCurrentScenarioState().startScenarioRun();
     }
 
 

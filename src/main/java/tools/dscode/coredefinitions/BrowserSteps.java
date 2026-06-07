@@ -6,13 +6,15 @@ import org.openqa.selenium.Dimension;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.remote.LocalFileDetector;
 import org.openqa.selenium.remote.RemoteWebDriver;
+import tools.dscode.common.domoperations.SeleniumUtils;
 import tools.dscode.common.driver.DriverConstruction;
+import tools.dscode.parallelutilities.Stagger;
 
 import java.time.Duration;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static tools.dscode.common.evaluations.AviatorUtil.isTruthy;
 import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
-import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 import static tools.dscode.common.variables.RunVars.resolveFromVarsOrDefault;
 import static tools.dscode.coredefinitions.ObjectRegistrationSteps.constructObjectFromParsingMap;
 import static tools.dscode.coredefinitions.ObjectRegistrationSteps.getNewObjectFromParsingMap;
@@ -23,11 +25,22 @@ public class BrowserSteps {
         return (JavascriptExecutor) getCurrentDriver();
     }
 
+    public static void navigateWithBlocker(RemoteWebDriver driver, String url) {
+        if (isTruthy(resolveFromVarsOrDefault("pkb_staggerParallelURLCalls", false))) {
+            Stagger.runUrlHost(
+                    url,
+                    () -> driver.navigate().to(url)
+            );
+        } else {
+            driver.navigate().to(url);
+        }
+    }
+
+
     public static RemoteWebDriver getCurrentDriver() {
         String browserName = String.valueOf(resolveFromVarsOrDefault("BROWSER", "CHROME"));
-        RemoteWebDriver webDriver =  getDriver(browserName);
-        if (webDriver == null || webDriver.getSessionId() == null)
-        {
+        RemoteWebDriver webDriver = getDriver(browserName);
+        if (webDriver == null || webDriver.getSessionId() == null) {
             webDriver = (RemoteWebDriver) getNewObjectFromParsingMap(browserName);
         }
         getRunningStep().webDriverUsed = webDriver;
@@ -36,7 +49,7 @@ public class BrowserSteps {
 
     public static RemoteWebDriver getCurrentDriverForNonUse() {
         String browserName = String.valueOf(resolveFromVarsOrDefault("BROWSER", "CHROME"));
-        return   getDriver(browserName);
+        return getDriver(browserName);
     }
 
     public static RemoteWebDriver getDriver(String browserName) {
@@ -64,7 +77,7 @@ public class BrowserSteps {
     @Given(ObjectRegistrationSteps.objAction + "NAVIGATE: (.*)$")
     public Object navigate(String address, Object value) {
         RemoteWebDriver driver = (RemoteWebDriver) value;
-        driver.navigate().to(address);
+        navigateWithBlocker(driver, address);
         return value;
     }
 
