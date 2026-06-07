@@ -134,38 +134,49 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
             String payload = a.path();
             String mime = a.mime();
 
-            byte[] bytes;
             String filename = resolveFilename(a, payload, mime);
+            String message = resolveAttachmentMessage(entry, a, defaultMessage);
 
             try {
-                if (a.isFileBase64()) {
-                    String raw = Files.readString(Path.of(payload), StandardCharsets.US_ASCII);
-                    bytes = Base64.getMimeDecoder().decode(raw.trim());
-                } else if (a.isInlineBase64() || isBase64Attachment(mime)) {
-                    bytes = Base64.getMimeDecoder().decode(rawBase64(payload));
-                } else if (a.isFileBinary() || isExistingPath(payload)) {
+                if (a.isFileBoth() || a.isFileBinary() || isExistingPath(payload)) {
+                    // Preferred ReportPortal path: pass the binary file reference through to the bridge.
+                    // The bridge serializes/offloads the EPAM client SaveLogRQ work and uses a file-backed
+                    // ByteSource when the installed client-java version exposes one.
                     Path p = Path.of(payload);
-                    bytes = Files.readAllBytes(p);
-
                     if (a.name() == null || a.name().isBlank()) {
                         filename = p.getFileName().toString();
                     }
+
+                    ReportPortalBridge.logAttachmentFile(
+                            level,
+                            message,
+                            p,
+                            filename,
+                            when
+                    );
                 } else {
-                    bytes = payload == null ? new byte[0] : payload.getBytes(StandardCharsets.UTF_8);
+                    byte[] bytes;
+
+                    if (a.isFileBase64()) {
+                        String raw = Files.readString(Path.of(payload), StandardCharsets.US_ASCII);
+                        bytes = Base64.getMimeDecoder().decode(raw.trim());
+                    } else if (a.isInlineBase64() || isBase64Attachment(mime)) {
+                        bytes = Base64.getMimeDecoder().decode(rawBase64(payload));
+                    } else {
+                        bytes = payload == null ? new byte[0] : payload.getBytes(StandardCharsets.UTF_8);
+                    }
+
+                    ReportPortalBridge.logAttachment(
+                            level,
+                            message,
+                            bytes,
+                            filename,
+                            when
+                    );
                 }
             } catch (Exception e) {
                 throw new RuntimeException("Failed to materialize attachment: " + describeAttachment(a), e);
             }
-
-            String message = resolveAttachmentMessage(entry, a, defaultMessage);
-
-            ReportPortalBridge.logAttachment(
-                    level,
-                    message,
-                    bytes,
-                    filename,
-                    when
-            );
 
             ReportPortalBridge.throwIfAsyncFailure();
         }

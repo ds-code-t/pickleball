@@ -1018,6 +1018,18 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             String data = attachment == null ? "" : attachment.path();
             String mediaType = attachment == null ? mediaTypeFromMime(mime) : attachment.mediaType();
 
+            if (attachment != null && attachment.isFileBoth()) {
+                String b64Path = Objects.toString(attachment.base64Path(), "");
+                if (!b64Path.isBlank()) {
+                    Path p = Path.of(b64Path);
+                    if (Files.exists(p)) {
+                        return InlineImage.imageBase64File(name, mediaType, p.toString(), at, order);
+                    }
+                }
+                // Fallback to the binary image if the companion .b64 file is unavailable.
+                return imageFromBinaryFile(name, mediaType, data, at, order);
+            }
+
             if (attachment != null && attachment.isFileBase64()) {
                 Path p = Path.of(Objects.toString(data, ""));
                 if (!Files.exists(p)) {

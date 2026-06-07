@@ -4,6 +4,7 @@ package tools.dscode.common.reporting.logging;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
@@ -18,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 
-public record Attachment(String name, String mime, String path, StorageKind storageKind) {
+public record Attachment(String name, String mime, String path, StorageKind storageKind, String base64Path) {
 
     private static final Duration STALE_TEMP_AGE = Duration.ofHours(12);
     private static final String TEMP_ROOT_PROPERTY = "dscode.logging.attachmentTempRoot";
@@ -33,11 +34,16 @@ public record Attachment(String name, String mime, String path, StorageKind stor
         INLINE_TEXT,
         INLINE_BASE64,
         FILE_BINARY,
-        FILE_BASE64
+        FILE_BASE64,
+        FILE_BOTH
     }
 
     public Attachment(String name, String mime, String path) {
-        this(name, mime, path, inferStorageKind(mime));
+        this(name, mime, path, inferStorageKind(mime), null);
+    }
+
+    public Attachment(String name, String mime, String path, StorageKind storageKind) {
+        this(name, mime, path, storageKind, null);
     }
 
     public Attachment {
@@ -48,13 +54,21 @@ public record Attachment(String name, String mime, String path, StorageKind stor
         if (isBase64Mime(mime)) {
             return base64File(name, baseMime(mime), payload);
         }
-        return new Attachment(name, mime, payload, StorageKind.INLINE_TEXT);
+        return new Attachment(name, mime, payload, StorageKind.INLINE_TEXT, null);
     }
 
     public static Attachment binaryFile(String name, String mime, Path file) {
-        return new Attachment(name, mime, file == null ? null : file.toString(), StorageKind.FILE_BINARY);
+        return new Attachment(name, mime, file == null ? null : file.toString(), StorageKind.FILE_BINARY, null);
     }
 
+    /**
+     * Stores base64-backed attachments in both forms for maximum converter efficiency:
+     * - binary file: efficient for ReportPortal and any byte-oriented converter
+     * - .b64 file: efficient for single-file HTML embedding without re-encoding
+     *
+     * The Attachment.path() points to the binary file when available.
+     * Attachment.base64Path() points to the .b64 file.
+     */
     public static Attachment base64File(String name, String mime, String base64) {
         try {
             Path dir = RUN_TEMP_DIR;
@@ -63,12 +77,19 @@ public record Attachment(String name, String mime, String path, StorageKind stor
             String safeName = safeFilePart(name == null || name.isBlank() ? "attachment" : name);
             if (safeName.isBlank()) safeName = "attachment";
 
+            String raw = rawBase64(base64);
             long seq = ATTACHMENT_SEQUENCE.incrementAndGet();
-            Path file = dir.resolve(String.format(Locale.ROOT, "%08d-%s.b64", seq, safeName));
-            Files.writeString(file, rawBase64(base64), StandardCharsets.US_ASCII);
-            return new Attachment(name, baseMime(mime), file.toString(), StorageKind.FILE_BASE64);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to write base64 attachment temp file", e);
+
+            Path b64File = dir.resolve(String.format(Locale.ROOT, "%08d-%s.b64", seq, safeName));
+            Files.writeString(b64File, raw, StandardCharsets.US_ASCII);
+
+            Path binaryFile = dir.resolve(String.format(Locale.ROOT, "%08d-%s", seq, safeName));
+            byte[] bytes = Base64.getMimeDecoder().decode(raw);
+            Files.write(binaryFile, bytes);
+
+            return new Attachment(name, baseMime(mime), binaryFile.toString(), StorageKind.FILE_BOTH, b64File.toString());
+        } catch (IOException | IllegalArgumentException e) {
+            throw new RuntimeException("Failed to write attachment temp files", e);
         }
     }
 
@@ -81,11 +102,15 @@ public record Attachment(String name, String mime, String path, StorageKind stor
     }
 
     public boolean isFileBinary() {
-        return storageKind == StorageKind.FILE_BINARY;
+        return storageKind == StorageKind.FILE_BINARY || storageKind == StorageKind.FILE_BOTH;
+    }
+
+    public boolean isFileBoth() {
+        return storageKind == StorageKind.FILE_BOTH;
     }
 
     public boolean isFileBacked() {
-        return isFileBase64() || isFileBinary();
+        return isFileBase64() || isFileBinary() || isFileBoth();
     }
 
     public String mediaType() {

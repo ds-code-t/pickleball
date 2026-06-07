@@ -335,7 +335,6 @@ public final class XPathyAssembly {
             score += 10_000_000;
         }
 
-        logTrace("xpathSpecificityScore xpath: " + xpath + " , score: " + score);
 
         return Math.max(score, 0);
     }
