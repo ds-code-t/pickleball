@@ -1,6 +1,7 @@
 // file: tools/dscode/common/reporting/logging/BaseConverter.java
 package tools.dscode.common.reporting.logging;
 
+import io.cucumber.core.runner.GlobalState;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
@@ -14,6 +15,14 @@ import java.util.Optional;
 
 public abstract class BaseConverter {
 
+    private String scenarioRowKey;
+
+    public String getScenarioRowKey() {
+        if (scenarioRowKey == null)
+            this.scenarioRowKey = GlobalState.getCurrentScenarioState().id.toString();
+        return scenarioRowKey;
+    }
+
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicBoolean scenarioCleanupStarted = new AtomicBoolean(false);
     private final AtomicBoolean runCompleteStarted = new AtomicBoolean(false);
@@ -21,18 +30,25 @@ public abstract class BaseConverter {
     private final CompletableFuture<Void> runCompleteFuture = new CompletableFuture<>();
 
 
-    /** Optional hook for converters that want to display XLSX row data in their output. */
+    /**
+     * Optional hook for converters that want to display XLSX row data in their output.
+     */
     @FunctionalInterface
     public interface RowDataProvider {
         Optional<RowData> get(String rowKey);
     }
 
-    /** Immutable snapshot of one scenario's row (same headers/values that will be written to XLSX). */
-    public record RowData(String sheetName, List<String> headers, Map<String, Object> valuesByHeader) { }
+    /**
+     * Immutable snapshot of one scenario's row (same headers/values that will be written to XLSX).
+     */
+    public record RowData(String sheetName, List<String> headers, Map<String, Object> valuesByHeader) {
+    }
 
     private static volatile RowDataProvider rowDataProvider = null;
 
-    /** Framework-level registration; normal callers never need this. */
+    /**
+     * Framework-level registration; normal callers never need this.
+     */
     public static void setRowDataProvider(RowDataProvider provider) {
         rowDataProvider = provider;
     }
@@ -44,31 +60,42 @@ public abstract class BaseConverter {
     }
 
 
-    public void onStart(Entry scope, Entry entry) { }
-    public void onTimestamp(Entry scope, Entry entry) { }
-    public void onStop(Entry scope, Entry entry) { }
+    public void onStart(Entry scope, Entry entry) {
+    }
+
+    public void onTimestamp(Entry scope, Entry entry) {
+    }
+
+    public void onStop(Entry scope, Entry entry) {
+    }
 
     // BaseConverter.java
 
-    /** Optional hook: called when a scenario is complete and row data is available. Default no-op. */
-    protected void onScenarioSummary(Entry scope, String rowKey, RowData data) { }
+    /**
+     * Optional hook: called when a scenario is complete and row data is available. Default no-op.
+     */
+    protected void onScenarioSummary(Entry scope, String rowKey, RowData data) {
+    }
 
-    /** Convenience: fetch row data and call onScenarioSummary(...) if present. */
+    /**
+     * Convenience: fetch row data and call onScenarioSummary(...) if present.
+     */
     protected final void renderScenarioSummary(Entry scope, String rowKey) {
         rowData(rowKey).ifPresent(d -> onScenarioSummary(scope, rowKey, d));
     }
 
     /**
      * Per-scenario close hook.
-     *
+     * <p>
      * This should finalize only this converter instance's scenario-level work.
      * Do not delete shared attachment temp files or finish an entire external medium here.
      */
-    protected void onClose() { }
+    protected void onClose() {
+    }
 
     /**
      * Per-scenario completion hook.
-     *
+     * <p>
      * Override when a converter has asynchronous scenario work that must drain before
      * scenario-level shared resources can be deleted.  Synchronous converters can
      * inherit the default completed future.
@@ -79,7 +106,7 @@ public abstract class BaseConverter {
 
     /**
      * Run-level completion hook.
-     *
+     * <p>
      * Override for work that should happen after all scenarios are closed, such as
      * writing a combined report or draining a medium before global cleanup.
      */
@@ -87,7 +114,9 @@ public abstract class BaseConverter {
         return CompletableFuture.completedFuture(null);
     }
 
-    /** Closes this converter instance (idempotent). */
+    /**
+     * Closes this converter instance (idempotent).
+     */
     public final BaseConverter close() {
         if (closed.compareAndSet(false, true)) {
             onClose();

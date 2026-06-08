@@ -944,7 +944,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         // NEW: read the flag from the root scope entry
         s.includeInSummary = scope.isIncludedInSummary();
 
-        s.rowKey = scope.scenarioRowKey().orElse(null);
+        s.rowKey = getScenarioRowKey();
 
         HtmlNode root = new HtmlNode(scope.id, sanitizeNodeName(scope.text), null);
         root.startedAt = scope.startedAt;

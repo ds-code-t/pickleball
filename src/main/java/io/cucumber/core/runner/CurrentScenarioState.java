@@ -184,7 +184,6 @@ public class CurrentScenarioState extends ScenarioMapping {
 
         scenarioLog =
                 Entry.of(scenarioName)
-                        .scenarioRowKey(id.toString())
                         .tag("Scenario")
                         .tag("RP_SUITE:Root")
                         .on(converters);

@@ -75,7 +75,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
         if (isScenarioRoot(scope, entry)) {
             if (entry.parent == null) {
-                scope.scenarioRowKey().ifPresent(rowKey -> renderScenarioSummary(scope, rowKey));
+                renderScenarioSummary(scope, getScenarioRowKey());
             }
 
             if (hasUnsentAttachments(entry)) {
