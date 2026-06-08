@@ -76,7 +76,7 @@ import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
 import static tools.dscode.testengine.PickleballRunner.getOptionsString;
 
 public class CurrentScenarioState extends ScenarioMapping {
-    public static final List<BaseConverter> converters = new ArrayList<>();
+    public final List<BaseConverter> converters = new ArrayList<>();
 
     String featureName;
     public boolean endCurrentScenario;
@@ -272,7 +272,7 @@ public class CurrentScenarioState extends ScenarioMapping {
     public void scenarioRunCleanUp() {
         synchronized (SCENARIO_RUN_CLEAN_UP_LOCK) {
             converters.forEach(BaseConverter::close);
-
+        }
             for (WebDriver driver : getScenarioWebDrivers()) {
                 if (driver == null) {
                     continue;
@@ -285,7 +285,7 @@ public class CurrentScenarioState extends ScenarioMapping {
                     }
                 }
             }
-        }
+
     }
 
     public void runStep(StepExtension stepExtension) {

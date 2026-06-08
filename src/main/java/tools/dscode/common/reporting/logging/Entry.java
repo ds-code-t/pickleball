@@ -166,20 +166,13 @@ public class Entry {
                 if(parent.normalizedType.equals(normalizedType))
                     typeCounts =  parent.typeCounts;
             }
-
-
-            System.out.println("@@entry: " + text);
-            System.out.println("@@typeCounts: " + typeCounts);
             count = typeCounts
                     .computeIfAbsent(normalizedType, ignored -> new AtomicInteger())
                     .incrementAndGet();
-            System.out.println("@@count: " + count);
             System.out.println("- - - - - - - - - - -");
             flatCount = typeFlatCounts.computeIfAbsent(normalizedType, ignored -> new AtomicInteger())
                     .incrementAndGet();
             nestedCounts = parent == null || parent.nestedCounts == null || parent.nestedCounts.isBlank() ? String.valueOf(count) : parent.nestedCounts + "." + count;
-            System.out.println("@@flatCount: " + flatCount);
-            System.out.println("@@nestedCounts: " + nestedCounts);
             String nestingText = nestedCounts.contains(".") ? " (" + nestedCounts + ") " : "  ";
             return logHeader(flatCount + " " + normalizedType + nestingText + "\u201C" + safe(message) + "\u201D");
         });
