@@ -21,6 +21,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static io.cucumber.core.runner.GlobalState.getRootLoggingRowKey;
+
 public final class ReportPortalBridgeConverter extends BaseConverter {
 
     private final List<String> ancestorPath;
@@ -75,7 +77,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
         if (isScenarioRoot(scope, entry)) {
             if (entry.parent == null) {
-                renderScenarioSummary(scope, getScenarioRowKey());
+                renderScenarioSummary(scope, getRootLoggingRowKey());
             }
 
             if (hasUnsentAttachments(entry)) {

@@ -22,6 +22,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static io.cucumber.core.runner.GlobalState.getRootLoggingRowKey;
 import static tools.dscode.common.reporting.logging.LogForwarder.logError;
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 import static tools.dscode.common.variables.RunVars.resolveFromVarsOrDefault;
@@ -944,7 +945,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         // NEW: read the flag from the root scope entry
         s.includeInSummary = scope.isIncludedInSummary();
 
-        s.rowKey = getScenarioRowKey();
+        s.rowKey = getRootLoggingRowKey();
 
         HtmlNode root = new HtmlNode(scope.id, sanitizeNodeName(scope.text), null);
         root.startedAt = scope.startedAt;

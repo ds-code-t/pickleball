@@ -7,7 +7,6 @@ import io.cucumber.gherkin.GherkinDialect;
 import io.cucumber.gherkin.GherkinDialects;
 import io.cucumber.plugin.event.PickleStepTestStep;
 import tools.dscode.common.annotations.LifecycleManager;
-import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.reporting.Report;
 import tools.dscode.common.reporting.WorkBook;
 import tools.dscode.common.reporting.logging.BaseConverter;
@@ -21,7 +20,7 @@ import java.util.Optional;
 
 
 import java.util.List;
-import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static io.cucumber.core.runner.CurrentScenarioState.currentScenarioState;
@@ -35,6 +34,8 @@ import static tools.dscode.testengine.PickleballRunner.getOptionsString;
 
 
 public class GlobalState {
+
+    public static final UUID id = UUID.randomUUID();
 
     public static WorkBook defaultReport;
 
@@ -217,6 +218,12 @@ public class GlobalState {
 
     public static io.cucumber.core.runner.CurrentScenarioState getCurrentScenarioState() {
         return currentScenarioState.get();
+    }
+
+
+    public static String getRootLoggingRowKey() {
+        if (getCurrentScenarioState() == null) return id.toString();
+        return GlobalState.getCurrentScenarioState().id.toString();
     }
 
 

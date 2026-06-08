@@ -15,13 +15,7 @@ import java.util.Optional;
 
 public abstract class BaseConverter {
 
-    private String scenarioRowKey;
 
-    public String getScenarioRowKey() {
-        if (scenarioRowKey == null)
-            this.scenarioRowKey = GlobalState.getCurrentScenarioState().id.toString();
-        return scenarioRowKey;
-    }
 
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private final AtomicBoolean scenarioCleanupStarted = new AtomicBoolean(false);
