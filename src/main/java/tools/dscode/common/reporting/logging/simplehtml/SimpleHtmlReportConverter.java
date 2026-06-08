@@ -91,10 +91,12 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         // If scenarioReport is enabled, it also writes this instance's scenario report immediately.
         synchronized (lock) {
             Map<String, ScopeState> closedSnapshot = new LinkedHashMap<>();
+            Map<String, ScopeState> sharedSnapshot = new LinkedHashMap<>();
 
             try {
                 synchronized (SharedSingleFile.LOCK) {
                     debug("onClose localScopeCount=" + scopes.size());
+
                     for (ScopeState s : scopes.values()) {
                         String key = scopeAggregationKey(s);
 
@@ -103,20 +105,36 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                             continue;
                         }
 
-                        ScopeState sharedCopy = deepCopyScopeState(s);
-                        ScopeState previous = SharedSingleFile.ALL_SCOPES.put(key, sharedCopy);
-                        closedSnapshot.put(key, deepCopyScopeState(s));
+                        // Only one deep copy per scope instead of two.
+                        ScopeState copy = deepCopyScopeState(s);
 
-                        debug("onClose stored scope key=" + key
-                                + " replacedExisting=" + (previous != null)
-                                + " rootId=" + sharedCopy.rootId
-                                + " rowKey=" + sharedCopy.rowKey
-                                + " includeInSummary=" + sharedCopy.includeInSummary
-                                + " title='" + scenarioTitle(sharedCopy, 0) + "'");
+                        closedSnapshot.put(key, copy);
+                        sharedSnapshot.put(key, copy);
+
+                        debug("onClose prepared scope key=" + key
+                                + " rootId=" + copy.rootId
+                                + " rowKey=" + copy.rowKey
+                                + " includeInSummary=" + copy.includeInSummary
+                                + " title='" + scenarioTitle(copy, 0) + "'");
                     }
                 }
 
+                // Render the just-closed scenario(s) from the copied snapshot.
+                // This may mutate render-only fields such as children links, so do it before publishing to shared map.
                 writeClosedScenarioReports(closedSnapshot);
+
+                synchronized (SharedSingleFile.LOCK) {
+                    for (Map.Entry<String, ScopeState> e : sharedSnapshot.entrySet()) {
+                        ScopeState previous = SharedSingleFile.ALL_SCOPES.put(e.getKey(), e.getValue());
+
+                        debug("onClose stored scope key=" + e.getKey()
+                                + " replacedExisting=" + (previous != null)
+                                + " rootId=" + e.getValue().rootId
+                                + " rowKey=" + e.getValue().rowKey
+                                + " includeInSummary=" + e.getValue().includeInSummary
+                                + " title='" + scenarioTitle(e.getValue(), 0) + "'");
+                    }
+                }
 
                 // After close, the shared copy is the source of truth. Release this converter's local copy.
                 scopes.clear();
