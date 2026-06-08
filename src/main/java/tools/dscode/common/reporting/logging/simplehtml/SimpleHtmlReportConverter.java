@@ -1,7 +1,6 @@
 // file: tools/dscode/common/reporting/logging/simplehtml/SimpleHtmlReportConverter.java
 package tools.dscode.common.reporting.logging.simplehtml;
 
-import io.cucumber.core.runner.GlobalState;
 import tools.dscode.common.reporting.logging.Attachment;
 import tools.dscode.common.reporting.logging.BaseConverter;
 import tools.dscode.common.reporting.logging.Entry;
@@ -19,7 +18,9 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static tools.dscode.common.reporting.logging.LogForwarder.logError;
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
@@ -42,6 +43,10 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
 
     // Serializes final report rendering so parallel callers do not build large HTML outputs at the same time.
     private static final Object FINAL_WRITE_LOCK = new Object();
+
+    // Ensures BaseConverter.completeRun() can be called on many converter instances
+    // without writing the composite report more than once.
+    private static final AtomicBoolean RUN_COMPLETE_WRITTEN = new AtomicBoolean(false);
 
     // ---------------- Single-file (multi-scenario) aggregation ----------------
     private static final class SharedSingleFile {
@@ -89,59 +94,77 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
     protected void onClose() {
         // close() contributes this converter's in-memory scenario data to the shared run snapshot.
         // If scenarioReport is enabled, it also writes this instance's scenario report immediately.
+        //
+        // IMPORTANT: this method does not delete Attachment temp files. Those files are
+        // shared by all converters and must be cleaned up by the external lifecycle only
+        // after every converter has finished its scenario/run completion work.
+
+        Map<String, ScopeState> closedSnapshot = new LinkedHashMap<>();
+        Map<String, ScopeState> sharedSnapshot = new LinkedHashMap<>();
+
         synchronized (lock) {
-            Map<String, ScopeState> closedSnapshot = new LinkedHashMap<>();
-            Map<String, ScopeState> sharedSnapshot = new LinkedHashMap<>();
-
             try {
-                synchronized (SharedSingleFile.LOCK) {
-                    debug("onClose localScopeCount=" + scopes.size());
+                debug("onClose localScopeCount=" + scopes.size());
 
-                    for (ScopeState s : scopes.values()) {
-                        String key = scopeAggregationKey(s);
+                for (ScopeState s : scopes.values()) {
+                    String key = scopeAggregationKey(s);
 
-                        if (key == null) {
-                            debug("onClose skipping scope because aggregation key is null rootId=" + (s == null ? "null" : s.rootId));
-                            continue;
-                        }
-
-                        // Only one deep copy per scope instead of two.
-                        ScopeState copy = deepCopyScopeState(s);
-
-                        closedSnapshot.put(key, copy);
-                        sharedSnapshot.put(key, copy);
-
-                        debug("onClose prepared scope key=" + key
-                                + " rootId=" + copy.rootId
-                                + " rowKey=" + copy.rowKey
-                                + " includeInSummary=" + copy.includeInSummary
-                                + " title='" + scenarioTitle(copy, 0) + "'");
+                    if (key == null) {
+                        debug("onClose skipping scope because aggregation key is null rootId="
+                                + (s == null ? "null" : s.rootId));
+                        continue;
                     }
+
+                    // Only one deep copy per scope.
+                    ScopeState copy = deepCopyScopeState(s);
+
+                    closedSnapshot.put(key, copy);
+                    sharedSnapshot.put(key, copy);
+
+                    debug("onClose prepared scope key=" + key
+                            + " rootId=" + copy.rootId
+                            + " rowKey=" + copy.rowKey
+                            + " includeInSummary=" + copy.includeInSummary
+                            + " title='" + scenarioTitle(copy, 0) + "'");
                 }
 
-                // Render the just-closed scenario(s) from the copied snapshot.
-                // This may mutate render-only fields such as children links, so do it before publishing to shared map.
-                writeClosedScenarioReports(closedSnapshot);
-
-                synchronized (SharedSingleFile.LOCK) {
-                    for (Map.Entry<String, ScopeState> e : sharedSnapshot.entrySet()) {
-                        ScopeState previous = SharedSingleFile.ALL_SCOPES.put(e.getKey(), e.getValue());
-
-                        debug("onClose stored scope key=" + e.getKey()
-                                + " replacedExisting=" + (previous != null)
-                                + " rootId=" + e.getValue().rootId
-                                + " rowKey=" + e.getValue().rowKey
-                                + " includeInSummary=" + e.getValue().includeInSummary
-                                + " title='" + scenarioTitle(e.getValue(), 0) + "'");
-                    }
-                }
-
-                // After close, the shared copy is the source of truth. Release this converter's local copy.
+                // After close, the shared copy is the source of truth. Release this
+                // converter's local copy before doing heavier rendering/file I/O.
                 scopes.clear();
             } catch (Throwable e) {
-                logError("[SimpleHtmlReportConverter] FAILED onClose: " + e);
+                logError("[SimpleHtmlReportConverter] FAILED preparing onClose snapshot: " + e);
+                return;
             }
         }
+
+        // Render the just-closed scenario(s) from the copied snapshot outside this
+        // converter's lock. Rendering may mutate render-only fields such as child links.
+        writeClosedScenarioReports(closedSnapshot);
+
+        synchronized (SharedSingleFile.LOCK) {
+            try {
+                for (Map.Entry<String, ScopeState> e : sharedSnapshot.entrySet()) {
+                    ScopeState previous = SharedSingleFile.ALL_SCOPES.put(e.getKey(), e.getValue());
+
+                    debug("onClose stored scope key=" + e.getKey()
+                            + " replacedExisting=" + (previous != null)
+                            + " rootId=" + e.getValue().rootId
+                            + " rowKey=" + e.getValue().rowKey
+                            + " includeInSummary=" + e.getValue().includeInSummary
+                            + " title='" + scenarioTitle(e.getValue(), 0) + "'");
+                }
+            } catch (Throwable e) {
+                logError("[SimpleHtmlReportConverter] FAILED publishing onClose snapshot: " + e);
+            }
+        }
+    }
+
+    @Override
+    protected CompletableFuture<Void> onRunComplete() {
+        if (RUN_COMPLETE_WRITTEN.compareAndSet(false, true)) {
+            writeFinalReport();
+        }
+        return CompletableFuture.completedFuture(null);
     }
 
     private void writeClosedScenarioReports(Map<String, ScopeState> closedSnapshot) {
@@ -191,6 +214,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
             SharedSingleFile.SCENARIO_REPORT_KEYS_WRITTEN.clear();
             SharedSingleFile.SCENARIO_REPORT_PATHS_WRITTEN.clear();
             SharedSingleFile.REPORT_FILE = null;
+            RUN_COMPLETE_WRITTEN.set(false);
         }
     }
 
@@ -281,9 +305,6 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
                 debug("scenario reports disabled by scenarioReport setting");
             }
 
-            // At this point all enabled final outputs have been produced successfully.
-            // The HTML files are single-file/portable, so the run-specific attachment temp folder can be removed.
-            Attachment.cleanupCurrentRunTempFiles();
         } catch (Throwable ex) {
             logError("[SimpleHtmlReportConverter] FAILED writing html report: " + ex);
         }
@@ -923,11 +944,7 @@ public final class SimpleHtmlReportConverter extends BaseConverter {
         // NEW: read the flag from the root scope entry
         s.includeInSummary = scope.isIncludedInSummary();
 
-        try {
-            s.rowKey = GlobalState.getCurrentScenarioState().id.toString();
-        } catch (Throwable ignored) {
-            s.rowKey = null;
-        }
+        s.rowKey = scope.scenarioRowKey().orElse(null);
 
         HtmlNode root = new HtmlNode(scope.id, sanitizeNodeName(scope.text), null);
         root.startedAt = scope.startedAt;

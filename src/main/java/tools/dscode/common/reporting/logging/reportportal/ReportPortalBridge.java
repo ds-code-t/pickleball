@@ -20,6 +20,7 @@ import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
@@ -27,9 +28,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ConcurrentHashMap;
@@ -37,7 +38,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class ReportPortalBridge {
 
     private static final Object INIT_LOCK = new Object();
-    private static final Object RP_SEND_LOCK = new Object();
 
     private static volatile boolean initialized;
     private static volatile boolean enabled;
@@ -52,15 +52,25 @@ public final class ReportPortalBridge {
     private static volatile boolean rxErrorHandlerInstalled;
 
     /**
-     * ReportPortal client-java 5.4.x can spend noticeable time in ObjectUtils.clonePojo
-     * while serializing/deserializing SaveLogRQ.  Keep that work off scenario threads and
-     * prevent many attachment-backed SaveLogRQ clones from happening in parallel.
+     * ReportPortal client-java already supports parallel logging.  This bridge keeps heavy
+     * attachment materialization off scenario threads by default, but no longer serializes
+     * all ReportPortal sends through one worker or a global send lock.
+     *
+     * Work is ordered per ReportPortal item/test so a test's finish request cannot overtake
+     * that same test's earlier logs or screenshots.  Different tests can still hand work to
+     * ReportPortal in parallel.
      */
     private static final boolean ASYNC_LOGGING = boolSetting("dscode.reportportal.asyncLogging", true);
+    private static final int WORKER_THREADS = intSetting(
+            "dscode.reportportal.workerThreads",
+            Math.max(2, Runtime.getRuntime().availableProcessors())
+    );
     private static final int MAX_PENDING_LOGS = intSetting("dscode.reportportal.maxPendingLogs", 512);
     private static final Semaphore PENDING_LOG_SLOTS = new Semaphore(Math.max(1, MAX_PENDING_LOGS));
+    private static final Object LAUNCH_WORK_KEY = new Object();
     private static final AtomicLong WORKER_ID = new AtomicLong();
-    private static final ExecutorService RP_EXECUTOR = Executors.newSingleThreadExecutor(new ThreadFactory() {
+    private static final ConcurrentHashMap<Object, CompletableFuture<Void>> WORK_CHAINS = new ConcurrentHashMap<>();
+    private static final ExecutorService RP_EXECUTOR = Executors.newFixedThreadPool(WORKER_THREADS, new ThreadFactory() {
         @Override
         public Thread newThread(Runnable r) {
             Thread t = new Thread(r, "dscode-reportportal-log-worker-" + WORKER_ID.incrementAndGet());
@@ -206,7 +216,7 @@ public final class ReportPortalBridge {
         CURRENT_TEST.remove();
         String finalStatus = fallback(status, "PASSED");
 
-        submitReportPortalWork(() -> {
+        submitReportPortalWork(test, () -> {
             if (test != null) {
                 ReportPortalHierarchy.finishTest(test, finalStatus);
             } else {
@@ -230,32 +240,30 @@ public final class ReportPortalBridge {
         String msg = safe(message);
         Date when = Date.from(logTime != null ? logTime : Instant.now());
 
-        submitReportPortalWork(() -> logNow(test, lvl, msg, when));
+        submitReportPortalWork(test, () -> logNow(test, lvl, msg, when));
     }
 
     private static void logNow(Maybe<String> test, String lvl, String msg, Date when) {
-        synchronized (RP_SEND_LOCK) {
-            if (test != null) {
-                ReportPortalHierarchy.getLaunch().log(test, itemUuid -> {
-                    SaveLogRQ rq = new SaveLogRQ();
-                    rq.setItemUuid(itemUuid);
-                    rq.setLevel(lvl);
-                    rq.setLogTime(when);
-                    rq.setMessage(msg);
-                    return rq;
-                });
-                return;
-            }
-
-            ReportPortalHierarchy.getLaunch().log(launchId -> {
+        if (test != null) {
+            ReportPortalHierarchy.getLaunch().log(test, itemUuid -> {
                 SaveLogRQ rq = new SaveLogRQ();
-                rq.setLaunchUuid(launchId);
+                rq.setItemUuid(itemUuid);
                 rq.setLevel(lvl);
                 rq.setLogTime(when);
                 rq.setMessage(msg);
                 return rq;
             });
+            return;
         }
+
+        ReportPortalHierarchy.getLaunch().log(launchId -> {
+            SaveLogRQ rq = new SaveLogRQ();
+            rq.setLaunchUuid(launchId);
+            rq.setLevel(lvl);
+            rq.setLogTime(when);
+            rq.setMessage(msg);
+            return rq;
+        });
     }
 
     public static void logAttachment(String level, String message, byte[] bytes, String filenameHint) {
@@ -279,12 +287,12 @@ public final class ReportPortalBridge {
         String safeName = fallback(filenameHint, "attachment.bin");
         Date when = Date.from(logTime != null ? logTime : Instant.now());
 
-        submitReportPortalWork(() -> logAttachmentNow(test, lvl, msg, data, null, safeName, when));
+        submitReportPortalWork(test, () -> logAttachmentNow(test, lvl, msg, data, null, safeName, when));
     }
 
     /**
-     * Preferred attachment path.  The screenshot file is materialized by the worker thread,
-     * and all EPAM client SaveLogRQ cloning work is serialized/offloaded from scenario threads.
+     * Preferred attachment path.  The screenshot file is materialized by a ReportPortal
+     * bridge worker thread so scenario threads do not have to read or clone large files.
      */
     public static void logAttachmentFile(String level,
                                          String message,
@@ -303,7 +311,7 @@ public final class ReportPortalBridge {
         Date when = Date.from(logTime != null ? logTime : Instant.now());
         Path safeFile = file == null ? null : file.toAbsolutePath().normalize();
 
-        submitReportPortalWork(() -> logAttachmentNow(test, lvl, msg, null, safeFile, safeName, when));
+        submitReportPortalWork(test, () -> logAttachmentNow(test, lvl, msg, null, safeFile, safeName, when));
     }
 
     private static void logAttachmentNow(Maybe<String> test,
@@ -313,28 +321,26 @@ public final class ReportPortalBridge {
                                          Path file,
                                          String safeName,
                                          Date when) {
-        synchronized (RP_SEND_LOCK) {
-            try {
-                String mimeType = URLConnection.guessContentTypeFromName(safeName);
-                if (mimeType == null) mimeType = "application/octet-stream";
+        try {
+            String mimeType = URLConnection.guessContentTypeFromName(safeName);
+            if (mimeType == null) mimeType = "application/octet-stream";
 
-                ByteSource byteSource = file != null
-                        ? byteSourceFromFileOrFallback(file)
-                        : ByteSource.wrap(Objects.requireNonNullElseGet(data, () -> new byte[0]));
+            ByteSource byteSource = file != null
+                    ? byteSourceFromFileOrFallback(file)
+                    : ByteSource.wrap(Objects.requireNonNullElseGet(data, () -> new byte[0]));
 
-                TypeAwareByteSource source = new TypeAwareByteSource(byteSource, mimeType);
-                ReportPortalMessage rpMessage = new ReportPortalMessage(source, msg);
+            TypeAwareByteSource source = new TypeAwareByteSource(byteSource, mimeType);
+            ReportPortalMessage rpMessage = new ReportPortalMessage(source, msg);
 
-                if (test != null) {
-                    ReportPortalHierarchy.getLaunch().log(test, itemUuid ->
-                            ReportPortal.toSaveLogRQ(null, itemUuid, lvl, when, rpMessage));
-                } else {
-                    ReportPortalHierarchy.getLaunch().log(launchId ->
-                            ReportPortal.toSaveLogRQ(launchId, null, lvl, when, rpMessage));
-                }
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to log ReportPortal attachment", e);
+            if (test != null) {
+                ReportPortalHierarchy.getLaunch().log(test, itemUuid ->
+                        ReportPortal.toSaveLogRQ(null, itemUuid, lvl, when, rpMessage));
+            } else {
+                ReportPortalHierarchy.getLaunch().log(launchId ->
+                        ReportPortal.toSaveLogRQ(launchId, null, lvl, when, rpMessage));
             }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to log ReportPortal attachment", e);
         }
     }
 
@@ -375,14 +381,12 @@ public final class ReportPortalBridge {
 
         String finalStatus = fallback(status, "PASSED");
 
-        synchronized (RP_SEND_LOCK) {
-            ReportPortalHierarchy.finishAllSuites(finalStatus);
+        ReportPortalHierarchy.finishAllSuites(finalStatus);
 
-            FinishExecutionRQ rq = new FinishExecutionRQ();
-            rq.setStatus(finalStatus);
-            rq.setEndTime(new Date());
-            ReportPortalHierarchy.getLaunch().finish(rq);
-        }
+        FinishExecutionRQ rq = new FinishExecutionRQ();
+        rq.setStatus(finalStatus);
+        rq.setEndTime(new Date());
+        ReportPortalHierarchy.getLaunch().finish(rq);
 
         CURRENT_TEST.remove();
         launchUuid = Maybe.empty();
@@ -397,27 +401,85 @@ public final class ReportPortalBridge {
         throwIfAsyncFailure();
     }
 
-    private static void submitReportPortalWork(Runnable work) {
-        if (!ASYNC_LOGGING) {
+    /**
+     * Returns a non-blocking marker future that completes after ReportPortal work
+     * submitted before this call has drained.
+     *
+     * This is useful for scenario-level cleanup orchestration: scenario close can
+     * continue, while the external lifecycle can wait for this future before deleting
+     * scenario/run attachment files.
+     */
+    public static CompletableFuture<Void> drainSubmittedWorkAsync() {
+        initIfNeeded();
+
+        if (!enabled || !ASYNC_LOGGING) {
             try {
-                work.run();
+                throwIfAsyncFailure();
+                return CompletableFuture.completedFuture(null);
             } catch (Throwable t) {
-                ASYNC_FAILURE.compareAndSet(null, t);
+                return failedFuture(t);
             }
+        }
+
+        List<CompletableFuture<Void>> snapshot = new ArrayList<>(WORK_CHAINS.values());
+        CompletableFuture<Void> marker = snapshot.isEmpty()
+                ? CompletableFuture.completedFuture(null)
+                : CompletableFuture.allOf(snapshot.toArray(CompletableFuture[]::new));
+
+        return marker.handle((ignored, throwable) -> {
+            if (throwable != null) {
+                throw new java.util.concurrent.CompletionException(unwrapCompletionFailure(throwable));
+            }
+
+            Throwable asyncFailure = ASYNC_FAILURE.get();
+            if (asyncFailure != null) {
+                throw new java.util.concurrent.CompletionException(asyncFailure);
+            }
+
+            return null;
+        });
+    }
+
+    private static CompletableFuture<Void> failedFuture(Throwable t) {
+        CompletableFuture<Void> f = new CompletableFuture<>();
+        f.completeExceptionally(t);
+        return f;
+    }
+
+    private static void submitReportPortalWork(Maybe<String> test, Runnable work) {
+        Object key = test == null ? LAUNCH_WORK_KEY : test;
+        submitReportPortalWork(key, work);
+    }
+
+    private static void submitReportPortalWork(Object orderingKey, Runnable work) {
+        if (!ASYNC_LOGGING) {
+            runReportPortalWork(work);
             throwIfAsyncFailure();
             return;
         }
 
         acquirePendingSlot();
+
+        Object key = orderingKey == null ? LAUNCH_WORK_KEY : orderingKey;
+
         try {
-            RP_EXECUTOR.execute(() -> {
-                try {
-                    work.run();
-                } catch (Throwable t) {
-                    ASYNC_FAILURE.compareAndSet(null, t);
-                } finally {
-                    PENDING_LOG_SLOTS.release();
-                }
+            WORK_CHAINS.compute(key, (k, previous) -> {
+                CompletableFuture<Void> base = previous == null
+                        ? CompletableFuture.completedFuture(null)
+                        : previous.exceptionally(t -> null);
+
+                CompletableFuture<Void> next = base.thenRunAsync(() -> runReportPortalWork(work), RP_EXECUTOR);
+                next.whenComplete((ignored, throwable) -> {
+                    try {
+                        if (throwable != null) {
+                            ASYNC_FAILURE.compareAndSet(null, unwrapCompletionFailure(throwable));
+                        }
+                    } finally {
+                        PENDING_LOG_SLOTS.release();
+                        WORK_CHAINS.remove(k, next);
+                    }
+                });
+                return next;
             });
         } catch (RuntimeException e) {
             PENDING_LOG_SLOTS.release();
@@ -425,20 +487,28 @@ public final class ReportPortalBridge {
         }
     }
 
+    private static void runReportPortalWork(Runnable work) {
+        try {
+            work.run();
+        } catch (Throwable t) {
+            ASYNC_FAILURE.compareAndSet(null, t);
+        }
+    }
+
     private static void drainReportPortalWork() {
         if (!ASYNC_LOGGING) return;
 
-        acquirePendingSlot();
-        try {
-            Future<?> f = RP_EXECUTOR.submit(() -> { });
+        while (true) {
+            List<CompletableFuture<Void>> snapshot = new ArrayList<>(WORK_CHAINS.values());
+            if (snapshot.isEmpty()) break;
+
             try {
-                f.get();
+                CompletableFuture.allOf(snapshot.toArray(CompletableFuture[]::new)).get();
             } catch (Exception e) {
-                ASYNC_FAILURE.compareAndSet(null, e);
+                ASYNC_FAILURE.compareAndSet(null, unwrapCompletionFailure(e));
             }
-        } finally {
-            PENDING_LOG_SLOTS.release();
         }
+
         throwIfAsyncFailure();
     }
 
@@ -449,6 +519,16 @@ public final class ReportPortalBridge {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Interrupted while waiting for ReportPortal log queue capacity", e);
         }
+    }
+
+    private static Throwable unwrapCompletionFailure(Throwable t) {
+        Throwable current = t;
+        while (current.getCause() != null
+                && (current instanceof java.util.concurrent.CompletionException
+                || current instanceof java.util.concurrent.ExecutionException)) {
+            current = current.getCause();
+        }
+        return current;
     }
 
     private static String safe(String s) {

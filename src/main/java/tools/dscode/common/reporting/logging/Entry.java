@@ -7,6 +7,7 @@ import org.openqa.selenium.WebDriver;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -33,6 +34,19 @@ public class Entry {
 
     private static final Object THREAD_SAFE_LOCK = new Object();
 
+    /**
+     * Framework-level scenario identity shared by all converters.
+     *
+     * Converters should read this value from the Entry instead of reaching into
+     * Cucumber/runner-specific state themselves.  The default provider uses
+     * reflection to preserve the existing Cucumber behavior when Cucumber is
+     * present, while keeping converter implementations medium/runner agnostic.
+     */
+    public static final String SCENARIO_ROW_KEY_FIELD = "dscode.scenario.rowKey";
+    public static final String SCENARIO_ID_FIELD = "dscode.scenario.id";
+
+    private static volatile Supplier<String> scenarioRowKeyProvider = Entry::defaultScenarioRowKey;
+
     private volatile boolean inheritedDefaultsApplied;
     private volatile boolean includeInPassFailSummary = true;
     private volatile boolean threadSafe;
@@ -49,6 +63,7 @@ public class Entry {
     public volatile Instant timestampedAt;
     public volatile Status status;
     public volatile Level level;
+    private volatile String scenarioRowKey;
 
     public final Map<String, Object> fields = new LinkedHashMap<>();
     public final List<String> tags = new ArrayList<>();
@@ -67,10 +82,25 @@ public class Entry {
         this.nestingLevel = parent == null
                 ? 0
                 : parent.nestingLevel + 1;
+
+        String inheritedRowKey = parent == null ? resolveScenarioRowKeyFromProvider() : parent.scenarioRowKey;
+        setScenarioRowKeyUnsafe(inheritedRowKey);
     }
 
     public static Entry of(String text) {
         return new Entry(text, null, new AtomicLong(), false);
+    }
+
+    /**
+     * Optional integration hook for the runner/framework layer.
+     * Pass null to disable automatic scenario row-key capture.
+     */
+    public static void setScenarioRowKeyProvider(Supplier<String> provider) {
+        scenarioRowKeyProvider = provider;
+    }
+
+    public static void clearScenarioRowKeyProvider() {
+        scenarioRowKeyProvider = null;
     }
 
     public Entry threadSafe() {
@@ -127,6 +157,34 @@ public class Entry {
 
     public boolean isIncludedInSummary() {
         return includeInPassFailSummary;
+    }
+
+    public Optional<String> scenarioRowKey() {
+        String key = blankToNull(scenarioRowKey);
+        if (key != null) return Optional.of(key);
+
+        Object fieldValue = fields.get(SCENARIO_ROW_KEY_FIELD);
+        key = blankToNull(fieldValue == null ? null : String.valueOf(fieldValue));
+        if (key != null) return Optional.of(key);
+
+        fieldValue = fields.get(SCENARIO_ID_FIELD);
+        key = blankToNull(fieldValue == null ? null : String.valueOf(fieldValue));
+        return key == null ? Optional.empty() : Optional.of(key);
+    }
+
+    /**
+     * Stores the scenario row key on this entry and makes it available to converters.
+     */
+    public Entry scenarioRowKey(String rowKey) {
+        return guarded(() -> {
+            setScenarioRowKeyUnsafe(rowKey);
+            return this;
+        });
+    }
+
+    /** Alias for scenarioRowKey(...) when the caller thinks of this as a scenario id. */
+    public Entry scenarioIdentity(String scenarioId) {
+        return scenarioRowKey(scenarioId);
     }
 
     public Entry defaultDescendantFields(String... keyValuePairs) {
@@ -424,22 +482,60 @@ public class Entry {
     }
 
     public Entry close() {
-        return guarded(() -> {
-            converters.forEach(BaseConverter::close);
-            return this;
-        });
+        List<BaseConverter> snapshot = convertersSnapshot();
+        snapshot.forEach(BaseConverter::close);
+        return this;
     }
 
     public Entry close(Class<? extends BaseConverter> type) {
-        return guarded(() -> {
-            for (BaseConverter converter : converters) {
-                if (type.isInstance(converter)) {
-                    converter.close();
-                }
-            }
-
+        if (type == null) {
             return this;
-        });
+        }
+
+        List<BaseConverter> snapshot = convertersSnapshot();
+
+        for (BaseConverter converter : snapshot) {
+            if (type.isInstance(converter)) {
+                converter.close();
+            }
+        }
+
+        return this;
+    }
+
+    /**
+     * Returns the converters attached to this entry as a stable snapshot.
+     *
+     * This is useful for external scenario lifecycle code that needs to call
+     * cleanupScenario() after all converter onClose() hooks have completed.
+     */
+    public List<BaseConverter> convertersSnapshot() {
+        return guarded(() -> List.copyOf(converters));
+    }
+
+    /**
+     * Starts the per-scenario cleanup/completion phase for all converters attached
+     * to this entry and returns a future that completes when all of them complete.
+     */
+    public CompletableFuture<Void> cleanupScenarioConverters() {
+        List<CompletableFuture<Void>> futures = convertersSnapshot().stream()
+                .map(BaseConverter::cleanupScenario)
+                .toList();
+
+        return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new));
+    }
+
+    /**
+     * Starts the run-level completion phase for all converters attached to this
+     * entry.  Most callers should use a global registry for run-level completion,
+     * but this is useful when a scenario/root entry owns all its converter instances.
+     */
+    public CompletableFuture<Void> completeRunConverters() {
+        List<CompletableFuture<Void>> futures = convertersSnapshot().stream()
+                .map(BaseConverter::completeRun)
+                .toList();
+
+        return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new));
     }
 
     public Duration duration() {
@@ -540,6 +636,57 @@ public class Entry {
         }
 
         inheritedDefaultsApplied = true;
+    }
+
+    private void setScenarioRowKeyUnsafe(String rowKey) {
+        String key = blankToNull(rowKey);
+        scenarioRowKey = key;
+
+        if (key == null) {
+            fields.remove(SCENARIO_ROW_KEY_FIELD);
+            fields.remove(SCENARIO_ID_FIELD);
+            return;
+        }
+
+        fields.put(SCENARIO_ROW_KEY_FIELD, key);
+        fields.put(SCENARIO_ID_FIELD, key);
+    }
+
+    private static String resolveScenarioRowKeyFromProvider() {
+        Supplier<String> provider = scenarioRowKeyProvider;
+        if (provider == null) return null;
+
+        try {
+            return blankToNull(provider.get());
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static String defaultScenarioRowKey() {
+        try {
+            Class<?> globalState = Class.forName("io.cucumber.core.runner.GlobalState");
+            Object state = globalState.getMethod("getCurrentScenarioState").invoke(null);
+            if (state == null) return null;
+
+            try {
+                Object id = state.getClass().getField("id").get(state);
+                return id == null ? null : String.valueOf(id);
+            } catch (NoSuchFieldException ignored) {
+                var field = state.getClass().getDeclaredField("id");
+                field.setAccessible(true);
+                Object id = field.get(state);
+                return id == null ? null : String.valueOf(id);
+            }
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static String blankToNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
     }
 
     private static void putKeyValuePairs(

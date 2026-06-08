@@ -184,6 +184,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
         scenarioLog =
                 Entry.of(scenarioName)
+                        .scenarioRowKey(id.toString())
                         .tag("Scenario")
                         .tag("RP_SUITE:Root")
                         .on(converters);
@@ -229,9 +230,10 @@ public class CurrentScenarioState extends ScenarioMapping {
 //        rootScenarioStep.addDefinitionFlag(DefinitionFlag.NO_LOGGING);
         testCaseState = getTestCaseState();
 //        rootScenarioStep.runMethodDirectly = true;
-        Throwable throwable = null;
-        try {
 
+        Throwable throwable = null;
+
+        try {
             runStep(rootScenarioStep);
 
             if (isScenarioFailed())
@@ -242,10 +244,21 @@ public class CurrentScenarioState extends ScenarioMapping {
         } catch (Throwable t) {
             lifecycle.fire(Phase.AFTER_SCENARIO_FAIL);
             throwable = t;
-        }
-        getScenarioLogRoot().stop().close();
 
-        lifecycle.fire(Phase.AFTER_SCENARIO_RUN);
+            // Make unexpected runner-level exceptions visible to all logging converters.
+            if (!isScenarioHardFail) {
+                isScenarioHardFail = true;
+                isScenarioSoftFail = false;
+                isScenarioComplete = true;
+            }
+            stepFailures.add(t);
+
+            try {
+                scenarioLog.fail("SCENARIO FAILED: " + Objects.toString(t.getMessage(), t.getClass().getSimpleName()));
+            } catch (Throwable ignored) {
+                // Do not let logging failure prevent scenario cleanup.
+            }
+        }
 
         String infoMessage = stepFailures.isEmpty() ? "COMPLETED" : stepFailures.stream()
                 .flatMap(t -> Stream.iterate(t, Objects::nonNull, Throwable::getCause))
@@ -254,38 +267,88 @@ public class CurrentScenarioState extends ScenarioMapping {
                 .distinct()
                 .collect(Collectors.joining(", "));
 
+        // Update final scenario row before stopping/closing logging so converters can render final status/info.
+        try {
+            ReportingSteps.setRow(null, null, List.of(
+                    List.of("STATUS", "INFO"),
+                    List.of((isScenarioFailed() ? "FAILED" : "PASSED"), infoMessage)));
+        } catch (Throwable t) {
+            throwable = rememberFailure(throwable, t);
+        }
 
-        ReportingSteps.setRow(null, null, List.of(
-                List.of("STATUS", "INFO"),
-                List.of((isScenarioFailed() ? "FAILED" : "PASSED"), infoMessage)));
+        try {
+            completeScenarioLogging();
+        } catch (Throwable t) {
+            throwable = rememberFailure(throwable, t);
+        }
 
-        scenarioRunCleanUp();
-        lifecycle.fire(Phase.AFTER_SCENARIO_CLEANUP);
+        try {
+            lifecycle.fire(Phase.AFTER_SCENARIO_RUN);
+        } catch (Throwable t) {
+            throwable = rememberFailure(throwable, t);
+        }
+
+        try {
+            scenarioRunCleanUp();
+        } catch (Throwable t) {
+            throwable = rememberFailure(throwable, t);
+        }
+
+        try {
+            lifecycle.fire(Phase.AFTER_SCENARIO_CLEANUP);
+        } catch (Throwable t) {
+            throwable = rememberFailure(throwable, t);
+        }
 
         if (throwable != null)
             throw new RuntimeException(throwable);
     }
 
+    /**
+     * Completes scenario-level logging in the intended order:
+     * 1. stop the scenario root entry,
+     * 2. close all converters attached to the scenario root,
+     * 3. wait for each converter's scenario cleanup/completion hook.
+     *
+     * The final wait is important for async mediums such as ReportPortal. It allows their
+     * scenario drain markers to complete before later scenario resource cleanup runs.
+     */
+    private void completeScenarioLogging() {
+        Entry root = getScenarioLogRoot();
+        if (root == null) {
+            return;
+        }
 
-    private static final Object SCENARIO_RUN_CLEAN_UP_LOCK = new Object();
+        root.stop().close();
+        root.cleanupScenarioConverters().join();
+    }
 
     public void scenarioRunCleanUp() {
-        synchronized (SCENARIO_RUN_CLEAN_UP_LOCK) {
-            converters.forEach(BaseConverter::close);
-        }
-            for (WebDriver driver : getScenarioWebDrivers()) {
-                if (driver == null) {
-                    continue;
-                }
-
-                if (!debugBrowser) {
-                    try {
-                        driver.quit();
-                    } catch (Exception ignored) {
-                    }
-                }
+        for (WebDriver driver : getScenarioWebDrivers()) {
+            if (driver == null) {
+                continue;
             }
 
+            if (!debugBrowser) {
+                try {
+                    driver.quit();
+                } catch (Exception ignored) {
+                }
+            }
+        }
+    }
+
+    private static Throwable rememberFailure(Throwable primary, Throwable next) {
+        if (next == null) {
+            return primary;
+        }
+        if (primary == null) {
+            return next;
+        }
+        if (primary != next) {
+            primary.addSuppressed(next);
+        }
+        return primary;
     }
 
     public void runStep(StepExtension stepExtension) {

@@ -1,6 +1,5 @@
 package tools.dscode.common.reporting.logging.reportportal;
 
-import io.cucumber.core.runner.GlobalState;
 import tools.dscode.common.reporting.logging.Attachment;
 import tools.dscode.common.reporting.logging.BaseConverter;
 import tools.dscode.common.reporting.logging.Entry;
@@ -14,6 +13,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.concurrent.CompletableFuture;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -75,8 +75,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
         if (isScenarioRoot(scope, entry)) {
             if (entry.parent == null) {
-                String rowKey = GlobalState.getCurrentScenarioState().id.toString();
-                renderScenarioSummary(scope, rowKey);
+                scope.scenarioRowKey().ifPresent(rowKey -> renderScenarioSummary(scope, rowKey));
             }
 
             if (hasUnsentAttachments(entry)) {
@@ -114,7 +113,24 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
     @Override
     protected void onClose() {
+        // Per-scenario close should stay light. The scenario cleanup phase can
+        // wait asynchronously for ReportPortal work without blocking the next
+        // converter's onClose() call.
         ReportPortalBridge.throwIfAsyncFailure();
+    }
+
+    @Override
+    protected CompletableFuture<Void> onScenarioCleanup() {
+        // Non-blocking scenario-level drain marker. External lifecycle code can
+        // wait on cleanupScenario() before deleting scenario/shared temp files.
+        return ReportPortalBridge.drainSubmittedWorkAsync();
+    }
+
+    @Override
+    protected CompletableFuture<Void> onRunComplete() {
+        // Do not finish the launch here because final launch status is owned by
+        // the outer test-run lifecycle.  Draining here is safe and idempotent.
+        return ReportPortalBridge.drainSubmittedWorkAsync();
     }
 
     private boolean hasUnsentAttachments(Entry entry) {

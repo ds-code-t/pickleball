@@ -291,13 +291,12 @@ public final class PlatformSnapshot {
                 bytes(DATA.get("memory.total.physical")),
                 joinNonBlank(", ",
                         "pid " + DATA.get("pid"),
-                        "headless=" + DATA.get("headless"),
+                        "javaGraphicsHeadless=" + DATA.get("headless"),
                         "nonInteractive=" + DATA.get("service.nonInteractive")),
                 joinNonBlank(", ",
-                        named("CI", str("ci.type")),
-                        named("Cloud", str("cloud.provider")),
-                        named("Container", DATA.get("container")),
-                        named("Orchestrator", str("container.orchestrator"))),
+                        str("ci.type"),
+                        str("cloud.provider"),
+                        str("container.orchestrator")),
                 joinNonBlank(", ",
                         str("locale"),
                         str("timezone"),
@@ -313,7 +312,7 @@ public final class PlatformSnapshot {
             String cpu,
             String memory,
             String runtime,
-            String environment,
+            String executionContext,
             String locale
     ) {
         @Override
@@ -326,7 +325,7 @@ public final class PlatformSnapshot {
                     kv("CPU", cpu),
                     kv("Memory", memory),
                     kv("Runtime", runtime),
-                    kv("Environment", environment),
+                    kv("Execution Context", executionContext),
                     kv("Locale", locale)
             ));
         }
@@ -335,7 +334,7 @@ public final class PlatformSnapshot {
             return String.join(" | ", nonBlankParts(
                     kv("User", user),
                     kv("Locale", locale),
-                    kv("Environment", environment),
+                    kv("Execution Context", executionContext),
                     kv("System", system),
                     kv("Machine", machine),
                     kv("Java", java)
