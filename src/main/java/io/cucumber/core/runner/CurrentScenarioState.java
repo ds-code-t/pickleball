@@ -337,7 +337,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
     }
 
-    private static Throwable rememberFailure(Throwable primary, Throwable next) {
+    private Throwable rememberFailure(Throwable primary, Throwable next) {
         if (next == null) {
             return primary;
         }
@@ -349,6 +349,8 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
         return primary;
     }
+
+
 
     public void runStep(StepExtension stepExtension) {
         if (runAndEndStep != null) {

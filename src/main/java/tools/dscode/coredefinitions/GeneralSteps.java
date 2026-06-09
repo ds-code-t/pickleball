@@ -1,6 +1,7 @@
 package tools.dscode.coredefinitions;
 
 
+import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.java.AfterAll;
 import io.cucumber.java.BeforeAll;
 import io.cucumber.java.en.Given;
@@ -9,8 +10,11 @@ import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.DefinitionFlags;
 import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
+import tools.dscode.common.reporting.logging.Attachment;
 import tools.dscode.common.reporting.logging.Log;
 import tools.dscode.common.exceptions.SoftRuntimeException;
+import tools.dscode.common.reporting.logging.reportportal.ReportPortalBridge;
+import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
 
 import java.lang.reflect.Method;
 
@@ -61,11 +65,62 @@ public class GeneralSteps extends CoreSteps {
 
     @AfterAll
     public static void afterAll() {
-        Log.global().closeAll();
-        lifecycle.fire(Phase.AFTER_CUCUMBER_RUN);
-        pickleballLog.stop();
+        Throwable failure = null;
+
+        try {
+            // Fire this BEFORE closing/finalizing logging,
+            // so anything listening to AFTER_CUCUMBER_RUN can still log.
+            lifecycle.fire(Phase.AFTER_CUCUMBER_RUN);
+        } catch (Throwable t) {
+            failure = rememberFailure(failure, t);
+        }
+
+        try {
+            // Close all scenario/run converters.
+            Log.global().closeAll();
+        } catch (Throwable t) {
+            failure = rememberFailure(failure, t);
+        }
+
+        try {
+            // Write final composite HTML report if needed.
+            SimpleHtmlReportConverter.writeFinalReport();
+        } catch (Throwable t) {
+            failure = rememberFailure(failure, t);
+        }
+
+        try {
+            // This is the missing ReportPortal finalization call.
+            // Use FAILED here if you have a global run-failed flag available.
+            ReportPortalBridge.finishLaunch(failure == null ? "PASSED" : "FAILED");
+        } catch (Throwable t) {
+            failure = rememberFailure(failure, t);
+        }
+
+        try {
+            // Clean up temp attachment files only after ReportPortal has drained.
+            Attachment.cleanupCurrentRunTempFiles();
+        } catch (Throwable t) {
+            failure = rememberFailure(failure, t);
+        }
+
+        try {
+            pickleballLog.stop();
+        } catch (Throwable t) {
+            failure = rememberFailure(failure, t);
+        }
+
+        if (failure != null) {
+            throw new RuntimeException(failure);
+        }
     }
 
+    private static Throwable rememberFailure(Throwable primary, Throwable next) {
+        if (next == null) return primary;
+        if (primary == null) return next;
+        if (primary != next) primary.addSuppressed(next);
+        return primary;
+    }
 
     @Given("^" + INFO_STEP + "(.*)$")
     public static void infoStep(String message) {
