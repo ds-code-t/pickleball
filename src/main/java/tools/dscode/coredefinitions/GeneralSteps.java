@@ -68,40 +68,24 @@ public class GeneralSteps extends CoreSteps {
         Throwable failure = null;
 
         try {
-            // Fire this BEFORE closing/finalizing logging,
-            // so anything listening to AFTER_CUCUMBER_RUN can still log.
             lifecycle.fire(Phase.AFTER_CUCUMBER_RUN);
         } catch (Throwable t) {
             failure = rememberFailure(failure, t);
         }
 
         try {
-            // Close all scenario/run converters.
             Log.global().closeAll();
         } catch (Throwable t) {
             failure = rememberFailure(failure, t);
         }
 
         try {
-            // Write final composite HTML report if needed.
-            SimpleHtmlReportConverter.writeFinalReport();
-        } catch (Throwable t) {
-            failure = rememberFailure(failure, t);
-        }
-
-        try {
-            // This is the missing ReportPortal finalization call.
-            // Use FAILED here if you have a global run-failed flag available.
             ReportPortalBridge.finishLaunch(failure == null ? "PASSED" : "FAILED");
         } catch (Throwable t) {
             failure = rememberFailure(failure, t);
-        }
-
-        try {
-            // Clean up temp attachment files only after ReportPortal has drained.
-            Attachment.cleanupCurrentRunTempFiles();
-        } catch (Throwable t) {
-            failure = rememberFailure(failure, t);
+        } finally {
+            // This prevents GitHub Actions from hanging on non-daemon RP worker threads.
+            ReportPortalBridge.shutdown();
         }
 
         try {
@@ -114,6 +98,7 @@ public class GeneralSteps extends CoreSteps {
             throw new RuntimeException(failure);
         }
     }
+
 
     private static Throwable rememberFailure(Throwable primary, Throwable next) {
         if (next == null) return primary;

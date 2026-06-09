@@ -29,6 +29,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
@@ -66,6 +67,7 @@ public final class ReportPortalBridge {
             Math.max(2, Runtime.getRuntime().availableProcessors())
     );
     private static final int MAX_PENDING_LOGS = intSetting("dscode.reportportal.maxPendingLogs", 512);
+    private static final int SHUTDOWN_TIMEOUT_SECONDS = intSetting("dscode.reportportal.shutdownTimeoutSeconds", 30);
     private static final Semaphore PENDING_LOG_SLOTS = new Semaphore(Math.max(1, MAX_PENDING_LOGS));
     private static final Object LAUNCH_WORK_KEY = new Object();
     private static final AtomicLong WORKER_ID = new AtomicLong();
@@ -375,31 +377,40 @@ public final class ReportPortalBridge {
 
     public static void finishLaunch(String status) {
         initIfNeeded();
-        if (!enabled || !launchStarted) return;
 
-        drainReportPortalWork();
+        try {
+            if (!enabled || !launchStarted) {
+                return;
+            }
 
-        String finalStatus = fallback(status, "PASSED");
+            drainReportPortalWork();
 
-        ReportPortalHierarchy.finishAllSuites(finalStatus);
+            String finalStatus = fallback(status, "PASSED");
 
-        FinishExecutionRQ rq = new FinishExecutionRQ();
-        rq.setStatus(finalStatus);
-        rq.setEndTime(new Date());
-        ReportPortalHierarchy.getLaunch().finish(rq);
+            ReportPortalHierarchy.finishAllSuites(finalStatus);
 
-        CURRENT_TEST.remove();
-        launchUuid = Maybe.empty();
-        launchStarted = false;
+            FinishExecutionRQ rq = new FinishExecutionRQ();
+            rq.setStatus(finalStatus);
+            rq.setEndTime(new Date());
+            ReportPortalHierarchy.getLaunch().finish(rq);
+
+            throwIfAsyncFailure();
+        } finally {
+            CURRENT_TEST.remove();
+            launchUuid = Maybe.empty();
+            launchStarted = false;
+            shutdownReportPortalExecutor();
+        }
     }
 
-    /** Waits until all previously submitted ReportPortal logs/attachments have been handed off. */
-    public static void flush() {
-        initIfNeeded();
-        if (!enabled) return;
-        drainReportPortalWork();
-        throwIfAsyncFailure();
+    /**
+     * Final JVM cleanup for the bridge worker pool. Call this from the outer
+     * @AfterAll path even when ReportPortal was disabled or no launch was started.
+     */
+    public static void shutdown() {
+        shutdownReportPortalExecutor();
     }
+
 
     /**
      * Returns a non-blocking marker future that completes after ReportPortal work
@@ -510,6 +521,24 @@ public final class ReportPortalBridge {
         }
 
         throwIfAsyncFailure();
+    }
+
+    private static void shutdownReportPortalExecutor() {
+        if (!ASYNC_LOGGING || RP_EXECUTOR.isShutdown()) {
+            return;
+        }
+
+        RP_EXECUTOR.shutdown();
+
+        try {
+            if (!RP_EXECUTOR.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                RP_EXECUTOR.shutdownNow();
+                RP_EXECUTOR.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            }
+        } catch (InterruptedException e) {
+            RP_EXECUTOR.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
     }
 
     private static void acquirePendingSlot() {
