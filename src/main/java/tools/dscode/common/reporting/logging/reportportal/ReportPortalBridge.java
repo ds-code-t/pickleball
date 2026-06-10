@@ -12,6 +12,7 @@ import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
 import io.reactivex.Maybe;
 import io.reactivex.exceptions.UndeliverableException;
 import io.reactivex.plugins.RxJavaPlugins;
+import tools.dscode.common.reporting.logging.Level;
 
 import java.io.File;
 import java.lang.reflect.Method;
@@ -36,9 +37,11 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
+import static tools.dscode.common.reporting.logging.LogForwarder.shouldLog;
 
 public final class ReportPortalBridge {
+
+    public static boolean shouldLog = shouldLog(Level.DEBUG);
 
     private static final Object INIT_LOCK = new Object();
 
@@ -85,150 +88,155 @@ public final class ReportPortalBridge {
 
     private ReportPortalBridge() { }
 
-    private static String bridgeState() {
-        return "enabled=" + enabled
-                + ", initialized=" + initialized
-                + ", launchStarted=" + launchStarted
-                + ", asyncLogging=" + ASYNC_LOGGING
-                + ", workerThreads=" + WORKER_THREADS
-                + ", pendingWorkChains=" + WORK_CHAINS.size()
-                + ", availableQueueSlots=" + PENDING_LOG_SLOTS.availablePermits();
+    private static void debug(String message) {
+        if (shouldLog) System.out.println("[ReportPortalBridge] " + message);
     }
 
-    private static String throwableSummary(Throwable t) {
-        if (t == null) return "null";
-        String message = t.getMessage();
-        return t.getClass().getSimpleName() + (message == null || message.isBlank() ? "" : ": " + message);
+    private static void debug(String message, Throwable t) {
+        if (shouldLog) System.out.println("[ReportPortalBridge] " + message + " | " + t);
     }
 
     private static void installRxErrorHandlerIfNeeded() {
         if (rxErrorHandlerInstalled) {
-            logDebug("ReportPortalBridge.installRxErrorHandlerIfNeeded: already-installed");
+            debug("installRxErrorHandlerIfNeeded skip - already installed");
             return;
         }
 
-        logDebug("ReportPortalBridge.installRxErrorHandlerIfNeeded: waiting-for-init-lock");
         synchronized (INIT_LOCK) {
-            logDebug("ReportPortalBridge.installRxErrorHandlerIfNeeded: acquired-init-lock");
             if (rxErrorHandlerInstalled) {
-                logDebug("ReportPortalBridge.installRxErrorHandlerIfNeeded: already-installed-after-lock");
+                debug("installRxErrorHandlerIfNeeded skip inside lock - already installed");
                 return;
             }
 
+            debug("installRxErrorHandlerIfNeeded installing RxJava error handler");
             RxJavaPlugins.setErrorHandler(e -> {
                 Throwable t = (e instanceof UndeliverableException ude && ude.getCause() != null)
                         ? ude.getCause()
                         : e;
                 ASYNC_FAILURE.compareAndSet(null, t);
-                logDebug("ReportPortalBridge.rxErrorHandler: captured " + throwableSummary(t));
+                debug("RxJava undeliverable/async failure captured", t);
             });
 
             rxErrorHandlerInstalled = true;
-            logDebug("ReportPortalBridge.installRxErrorHandlerIfNeeded: installed");
+            debug("installRxErrorHandlerIfNeeded complete");
         }
     }
 
     public static void throwIfAsyncFailure() {
-        logDebug("ReportPortalBridge.throwIfAsyncFailure: checking");
         Throwable t = ASYNC_FAILURE.getAndSet(null);
         if (t == null) {
-            logDebug("ReportPortalBridge.throwIfAsyncFailure: none");
+            debug("throwIfAsyncFailure no failure");
             return;
         }
-        logDebug("ReportPortalBridge.throwIfAsyncFailure: throwing " + throwableSummary(t));
+        debug("throwIfAsyncFailure throwing async failure", t);
         if (t instanceof RuntimeException re) throw re;
         if (t instanceof Error err) throw err;
         throw new RuntimeException("ReportPortal async failure", t);
     }
 
     public static void initIfNeeded() {
-        logDebug("ReportPortalBridge.initIfNeeded: starting " + bridgeState());
+        debug("initIfNeeded enter initialized=" + initialized);
         installRxErrorHandlerIfNeeded();
         if (initialized) {
-            logDebug("ReportPortalBridge.initIfNeeded: already-initialized " + bridgeState());
+            debug("initIfNeeded exit - already initialized enabled=" + enabled);
             return;
         }
 
-        logDebug("ReportPortalBridge.initIfNeeded: waiting-for-init-lock");
         synchronized (INIT_LOCK) {
-            logDebug("ReportPortalBridge.initIfNeeded: acquired-init-lock");
             if (initialized) {
-                logDebug("ReportPortalBridge.initIfNeeded: already-initialized-after-lock " + bridgeState());
+                debug("initIfNeeded exit inside lock - already initialized enabled=" + enabled);
                 return;
             }
 
-            logDebug("ReportPortalBridge.initIfNeeded: loading-properties");
+            debug("initIfNeeded loading ReportPortal properties");
             ListenerParameters params = new ListenerParameters(PropertiesLoader.load());
             enabled = Optional.ofNullable(params.getEnable()).orElse(false);
-            logDebug("ReportPortalBridge.initIfNeeded: loaded-properties enabled=" + enabled);
+            debug("initIfNeeded properties loaded enabled=" + enabled
+                    + ", launchName=" + fallback(params.getLaunchName(), "Launch")
+                    + ", asyncLogging=" + ASYNC_LOGGING
+                    + ", workerThreads=" + WORKER_THREADS
+                    + ", maxPendingLogs=" + MAX_PENDING_LOGS
+                    + ", shutdownTimeoutSeconds=" + SHUTDOWN_TIMEOUT_SECONDS);
 
             if (enabled) {
-                logDebug("ReportPortalBridge.initIfNeeded: setting-hierarchy-parameters launchName=" + fallback(params.getLaunchName(), "Launch"));
+                debug("initIfNeeded setting ReportPortal hierarchy parameters");
                 ReportPortalHierarchy.setParameters(params);
                 ReportPortalHierarchy.setLaunchName(fallback(params.getLaunchName(), "Launch"));
-                logDebug("ReportPortalBridge.initIfNeeded: set-hierarchy-parameters-complete");
+                debug("initIfNeeded ReportPortal hierarchy configured");
             }
 
             initialized = true;
-            logDebug("ReportPortalBridge.initIfNeeded: finished " + bridgeState());
+            debug("initIfNeeded complete enabled=" + enabled);
         }
     }
 
     public static boolean isEnabled() {
+        debug("isEnabled enter");
         initIfNeeded();
+        debug("isEnabled return enabled=" + enabled);
         return enabled;
     }
 
     public static Maybe<String> startLaunchIfNeeded() {
-        logDebug("ReportPortalBridge.startLaunchIfNeeded: starting " + bridgeState());
+        debug("startLaunchIfNeeded enter enabled=" + enabled + ", launchStarted=" + launchStarted);
         initIfNeeded();
         if (!enabled) {
-            logDebug("ReportPortalBridge.startLaunchIfNeeded: disabled-return-empty");
+            debug("startLaunchIfNeeded skip - ReportPortal disabled");
             return Maybe.empty();
         }
         if (launchStarted) {
-            logDebug("ReportPortalBridge.startLaunchIfNeeded: already-started");
+            debug("startLaunchIfNeeded skip - launch already started");
             return launchUuid;
         }
 
-        logDebug("ReportPortalBridge.startLaunchIfNeeded: waiting-for-init-lock");
         synchronized (INIT_LOCK) {
-            logDebug("ReportPortalBridge.startLaunchIfNeeded: acquired-init-lock");
             if (!launchStarted) {
-                logDebug("ReportPortalBridge.startLaunchIfNeeded: getting-launch");
+                debug("startLaunchIfNeeded getting launch");
                 Launch launch = ReportPortalHierarchy.getLaunch();
-                logDebug("ReportPortalBridge.startLaunchIfNeeded: starting-reportportal-launch");
+                debug("startLaunchIfNeeded starting launch");
                 launchUuid = launch.start();
                 launchStarted = true;
-                logDebug("ReportPortalBridge.startLaunchIfNeeded: reportportal-launch-started");
+                debug("startLaunchIfNeeded launch started");
+            } else {
+                debug("startLaunchIfNeeded launch already started inside lock");
             }
-            logDebug("ReportPortalBridge.startLaunchIfNeeded: finished " + bridgeState());
             return launchUuid;
         }
     }
 
     public static Maybe<String> getOrCreateSuite(String suiteName) {
+        debug("getOrCreateSuite enter suiteName=" + suiteName);
         initIfNeeded();
-        if (!enabled) return Maybe.empty();
+        if (!enabled) {
+            debug("getOrCreateSuite skip - ReportPortal disabled");
+            return Maybe.empty();
+        }
 
         startLaunchIfNeeded();
 
         String name = blankToNull(suiteName);
         if (name == null) {
+            debug("getOrCreateSuite using default/last suite");
             return ReportPortalHierarchy.getDefaultOrLastSuite();
         }
 
         KNOWN_SUITES.add(name);
+        debug("getOrCreateSuite creating/fetching suite=" + name + ", knownSuites=" + KNOWN_SUITES.size());
         return ReportPortalHierarchy.getOrCreateSuite(name);
     }
 
     public static Maybe<String> getOrCreateSuitePath(List<String> suitePath) {
+        debug("getOrCreateSuitePath enter suitePath=" + suitePath);
         initIfNeeded();
-        if (!enabled) return Maybe.empty();
+        if (!enabled) {
+            debug("getOrCreateSuitePath skip - ReportPortal disabled");
+            return Maybe.empty();
+        }
 
         startLaunchIfNeeded();
 
         if (suitePath == null || suitePath.isEmpty()) {
+            debug("getOrCreateSuitePath using default/last suite");
             return ReportPortalHierarchy.getDefaultOrLastSuite();
         }
 
@@ -237,53 +245,75 @@ public final class ReportPortalBridge {
                 .map(String::trim)
                 .forEach(KNOWN_SUITES::add);
 
+        debug("getOrCreateSuitePath creating/fetching suitePath=" + suitePath + ", knownSuites=" + KNOWN_SUITES.size());
         return ReportPortalHierarchy.getOrCreateSuitePath(suitePath);
     }
 
     public static Maybe<String> startTest(String testName, String suiteName) {
+        debug("startTest enter testName=" + testName + ", suiteName=" + suiteName);
         initIfNeeded();
-        if (!enabled) return Maybe.empty();
+        if (!enabled) {
+            debug("startTest skip - ReportPortal disabled");
+            return Maybe.empty();
+        }
 
         startLaunchIfNeeded();
 
         Maybe<String> suite = getOrCreateSuite(suiteName);
+        String safeTestName = fallback(testName, "Unnamed");
+        debug("startTest starting test=" + safeTestName + ", hasSuite=" + (suite != null));
         Maybe<String> test = (suite == null)
-                ? ReportPortalHierarchy.startTest(fallback(testName, "Unnamed"))
-                : ReportPortalHierarchy.startTest(fallback(testName, "Unnamed"), suite);
+                ? ReportPortalHierarchy.startTest(safeTestName)
+                : ReportPortalHierarchy.startTest(safeTestName, suite);
 
         CURRENT_TEST.set(test);
+        debug("startTest complete test=" + safeTestName);
         return test;
     }
 
     public static Maybe<String> startTest(String testName, List<String> suitePath) {
+        debug("startTest enter testName=" + testName + ", suitePath=" + suitePath);
         initIfNeeded();
-        if (!enabled) return Maybe.empty();
+        if (!enabled) {
+            debug("startTest skip - ReportPortal disabled");
+            return Maybe.empty();
+        }
 
         startLaunchIfNeeded();
 
         Maybe<String> suite = getOrCreateSuitePath(suitePath);
+        String safeTestName = fallback(testName, "Unnamed");
+        debug("startTest starting test=" + safeTestName + ", hasSuite=" + (suite != null));
         Maybe<String> test = (suite == null)
-                ? ReportPortalHierarchy.startTest(fallback(testName, "Unnamed"))
-                : ReportPortalHierarchy.startTest(fallback(testName, "Unnamed"), suite);
+                ? ReportPortalHierarchy.startTest(safeTestName)
+                : ReportPortalHierarchy.startTest(safeTestName, suite);
 
         CURRENT_TEST.set(test);
+        debug("startTest complete test=" + safeTestName);
         return test;
     }
 
     public static void finishCurrentTest(String status) {
+        debug("finishCurrentTest enter status=" + status);
         initIfNeeded();
-        if (!enabled) return;
+        if (!enabled) {
+            debug("finishCurrentTest skip - ReportPortal disabled");
+            return;
+        }
 
         Maybe<String> test = CURRENT_TEST.get();
         CURRENT_TEST.remove();
         String finalStatus = fallback(status, "PASSED");
+        debug("finishCurrentTest submitting finish work finalStatus=" + finalStatus + ", hasCurrentTest=" + (test != null));
 
         submitReportPortalWork(test, () -> {
+            debug("finishCurrentTest worker start finalStatus=" + finalStatus + ", hasCurrentTest=" + (test != null));
             if (test != null) {
                 ReportPortalHierarchy.finishTest(test, finalStatus);
             } else {
                 ReportPortalHierarchy.finishCurrentTest(finalStatus);
             }
+            debug("finishCurrentTest worker complete finalStatus=" + finalStatus);
         });
     }
 
@@ -292,8 +322,12 @@ public final class ReportPortalBridge {
     }
 
     public static void log(String level, String message, Instant logTime) {
+        debug("log enter level=" + level + ", messageLength=" + (message == null ? 0 : message.length()));
         initIfNeeded();
-        if (!enabled) return;
+        if (!enabled) {
+            debug("log skip - ReportPortal disabled");
+            return;
+        }
 
         startLaunchIfNeeded();
 
@@ -301,11 +335,13 @@ public final class ReportPortalBridge {
         String lvl = fallback(level, "INFO");
         String msg = safe(message);
         Date when = Date.from(logTime != null ? logTime : Instant.now());
+        debug("log submitting level=" + lvl + ", hasCurrentTest=" + (test != null) + ", messageLength=" + msg.length());
 
         submitReportPortalWork(test, () -> logNow(test, lvl, msg, when));
     }
 
     private static void logNow(Maybe<String> test, String lvl, String msg, Date when) {
+        debug("logNow worker start level=" + lvl + ", hasCurrentTest=" + (test != null) + ", messageLength=" + (msg == null ? 0 : msg.length()));
         if (test != null) {
             ReportPortalHierarchy.getLaunch().log(test, itemUuid -> {
                 SaveLogRQ rq = new SaveLogRQ();
@@ -315,6 +351,7 @@ public final class ReportPortalBridge {
                 rq.setMessage(msg);
                 return rq;
             });
+            debug("logNow worker complete - item log");
             return;
         }
 
@@ -326,6 +363,7 @@ public final class ReportPortalBridge {
             rq.setMessage(msg);
             return rq;
         });
+        debug("logNow worker complete - launch log");
     }
 
     public static void logAttachment(String level, String message, byte[] bytes, String filenameHint) {
@@ -337,8 +375,13 @@ public final class ReportPortalBridge {
                                      byte[] bytes,
                                      String filenameHint,
                                      Instant logTime) {
+        debug("logAttachment enter level=" + level + ", filenameHint=" + filenameHint
+                + ", bytes=" + (bytes == null ? 0 : bytes.length));
         initIfNeeded();
-        if (!enabled) return;
+        if (!enabled) {
+            debug("logAttachment skip - ReportPortal disabled");
+            return;
+        }
 
         startLaunchIfNeeded();
 
@@ -348,6 +391,8 @@ public final class ReportPortalBridge {
         byte[] data = Objects.requireNonNullElseGet(bytes, () -> new byte[0]);
         String safeName = fallback(filenameHint, "attachment.bin");
         Date when = Date.from(logTime != null ? logTime : Instant.now());
+        debug("logAttachment submitting level=" + lvl + ", safeName=" + safeName
+                + ", bytes=" + data.length + ", hasCurrentTest=" + (test != null));
 
         submitReportPortalWork(test, () -> logAttachmentNow(test, lvl, msg, data, null, safeName, when));
     }
@@ -361,8 +406,12 @@ public final class ReportPortalBridge {
                                          Path file,
                                          String filenameHint,
                                          Instant logTime) {
+        debug("logAttachmentFile enter level=" + level + ", file=" + file + ", filenameHint=" + filenameHint);
         initIfNeeded();
-        if (!enabled) return;
+        if (!enabled) {
+            debug("logAttachmentFile skip - ReportPortal disabled");
+            return;
+        }
 
         startLaunchIfNeeded();
 
@@ -372,6 +421,9 @@ public final class ReportPortalBridge {
         String safeName = fallback(filenameHint, file == null || file.getFileName() == null ? "attachment.bin" : file.getFileName().toString());
         Date when = Date.from(logTime != null ? logTime : Instant.now());
         Path safeFile = file == null ? null : file.toAbsolutePath().normalize();
+        debug("logAttachmentFile submitting level=" + lvl + ", safeName=" + safeName
+                + ", safeFile=" + safeFile + ", exists=" + (safeFile != null && Files.exists(safeFile))
+                + ", hasCurrentTest=" + (test != null));
 
         submitReportPortalWork(test, () -> logAttachmentNow(test, lvl, msg, null, safeFile, safeName, when));
     }
@@ -383,6 +435,9 @@ public final class ReportPortalBridge {
                                          Path file,
                                          String safeName,
                                          Date when) {
+        debug("logAttachmentNow worker start level=" + lvl + ", safeName=" + safeName
+                + ", file=" + file + ", bytes=" + (data == null ? 0 : data.length)
+                + ", hasCurrentTest=" + (test != null));
         try {
             String mimeType = URLConnection.guessContentTypeFromName(safeName);
             if (mimeType == null) mimeType = "application/octet-stream";
@@ -397,11 +452,14 @@ public final class ReportPortalBridge {
             if (test != null) {
                 ReportPortalHierarchy.getLaunch().log(test, itemUuid ->
                         ReportPortal.toSaveLogRQ(null, itemUuid, lvl, when, rpMessage));
+                debug("logAttachmentNow worker complete - item attachment safeName=" + safeName);
             } else {
                 ReportPortalHierarchy.getLaunch().log(launchId ->
                         ReportPortal.toSaveLogRQ(launchId, null, lvl, when, rpMessage));
+                debug("logAttachmentNow worker complete - launch attachment safeName=" + safeName);
             }
         } catch (Exception e) {
+            debug("logAttachmentNow failed safeName=" + safeName, e);
             throw new RuntimeException("Failed to log ReportPortal attachment", e);
         }
     }
@@ -412,8 +470,12 @@ public final class ReportPortalBridge {
      * fall back to byte[] materialization on the ReportPortal worker thread, not the scenario thread.
      */
     private static ByteSource byteSourceFromFileOrFallback(Path file) throws Exception {
-        if (file == null) return ByteSource.wrap(new byte[0]);
+        if (file == null) {
+            debug("byteSourceFromFileOrFallback using empty byte source - null file");
+            return ByteSource.wrap(new byte[0]);
+        }
 
+        debug("byteSourceFromFileOrFallback enter file=" + file + ", exists=" + Files.exists(file));
         for (Method m : ByteSource.class.getMethods()) {
             if (!Modifier.isStatic(m.getModifiers())) continue;
             if (!ByteSource.class.isAssignableFrom(m.getReturnType())) continue;
@@ -422,60 +484,60 @@ public final class ReportPortalBridge {
             Class<?> p = m.getParameterTypes()[0];
             try {
                 if (Path.class.isAssignableFrom(p)) {
+                    debug("byteSourceFromFileOrFallback using ByteSource factory method=" + m.getName() + " with Path");
                     return (ByteSource) m.invoke(null, file);
                 }
                 if (File.class.isAssignableFrom(p)) {
+                    debug("byteSourceFromFileOrFallback using ByteSource factory method=" + m.getName() + " with File");
                     return (ByteSource) m.invoke(null, file.toFile());
                 }
             } catch (ReflectiveOperationException ignored) {
+                debug("byteSourceFromFileOrFallback factory method failed method=" + m.getName());
                 // Try the next compatible factory method.
             }
         }
 
+        debug("byteSourceFromFileOrFallback falling back to Files.readAllBytes file=" + file);
         return ByteSource.wrap(Files.readAllBytes(file));
     }
 
     public static void finishLaunch(String status) {
-        logDebug("starting-finishLaunch");
-        logDebug("ReportPortalBridge.finishLaunch: starting status=" + fallback(status, "PASSED") + " " + bridgeState());
+        debug("finishLaunch enter status=" + status + ", enabled=" + enabled + ", launchStarted=" + launchStarted
+                + ", workChains=" + WORK_CHAINS.size() + ", pendingSlotsAvailable=" + PENDING_LOG_SLOTS.availablePermits());
         initIfNeeded();
-        logDebug("ReportPortalBridge.finishLaunch: init-complete " + bridgeState());
 
         try {
             if (!enabled || !launchStarted) {
-                logDebug("ReportPortalBridge.finishLaunch: skipped enabled=" + enabled + ", launchStarted=" + launchStarted);
+                debug("finishLaunch skip enabled=" + enabled + ", launchStarted=" + launchStarted);
                 return;
             }
 
-            logDebug("ReportPortalBridge.finishLaunch: before-drainReportPortalWork " + bridgeState());
+            debug("finishLaunch draining ReportPortal work");
             drainReportPortalWork();
-            logDebug("ReportPortalBridge.finishLaunch: after-drainReportPortalWork " + bridgeState());
+            debug("finishLaunch drain complete");
 
             String finalStatus = fallback(status, "PASSED");
-            logDebug("ReportPortalBridge.finishLaunch: finalStatus=" + finalStatus);
 
-            logDebug("ReportPortalBridge.finishLaunch: before-finishAllSuites knownSuites=" + KNOWN_SUITES.size());
+            debug("finishLaunch finishing all suites status=" + finalStatus + ", knownSuites=" + KNOWN_SUITES.size());
             ReportPortalHierarchy.finishAllSuites(finalStatus);
-            logDebug("ReportPortalBridge.finishLaunch: after-finishAllSuites");
+            debug("finishLaunch finished all suites");
 
             FinishExecutionRQ rq = new FinishExecutionRQ();
             rq.setStatus(finalStatus);
             rq.setEndTime(new Date());
-            logDebug("ReportPortalBridge.finishLaunch: before-getLaunch-finish");
+            debug("finishLaunch calling ReportPortal launch.finish status=" + finalStatus);
             ReportPortalHierarchy.getLaunch().finish(rq);
-            logDebug("ReportPortalBridge.finishLaunch: after-getLaunch-finish");
+            debug("finishLaunch ReportPortal launch.finish returned");
 
-            logDebug("ReportPortalBridge.finishLaunch: before-throwIfAsyncFailure");
             throwIfAsyncFailure();
-            logDebug("ReportPortalBridge.finishLaunch: after-throwIfAsyncFailure");
+            debug("finishLaunch complete");
         } finally {
-            logDebug("ReportPortalBridge.finishLaunch: finally-start " + bridgeState());
+            debug("finishLaunch cleanup start");
             CURRENT_TEST.remove();
             launchUuid = Maybe.empty();
             launchStarted = false;
-            logDebug("ReportPortalBridge.finishLaunch: before-shutdownReportPortalExecutor " + bridgeState());
             shutdownReportPortalExecutor();
-            logDebug("ReportPortalBridge.finishLaunch: finally-finished " + bridgeState());
+            debug("finishLaunch cleanup complete");
         }
     }
 
@@ -484,9 +546,9 @@ public final class ReportPortalBridge {
      * @AfterAll path even when ReportPortal was disabled or no launch was started.
      */
     public static void shutdown() {
-        logDebug("ReportPortalBridge.shutdown: starting " + bridgeState());
+        debug("shutdown enter");
         shutdownReportPortalExecutor();
-        logDebug("ReportPortalBridge.shutdown: finished " + bridgeState());
+        debug("shutdown exit");
     }
 
 
@@ -499,39 +561,38 @@ public final class ReportPortalBridge {
      * scenario/run attachment files.
      */
     public static CompletableFuture<Void> drainSubmittedWorkAsync() {
-        logDebug("ReportPortalBridge.drainSubmittedWorkAsync: starting " + bridgeState());
+        debug("drainSubmittedWorkAsync enter enabled=" + enabled + ", asyncLogging=" + ASYNC_LOGGING
+                + ", workChains=" + WORK_CHAINS.size());
         initIfNeeded();
 
         if (!enabled || !ASYNC_LOGGING) {
-            logDebug("ReportPortalBridge.drainSubmittedWorkAsync: immediate-path enabled=" + enabled + ", asyncLogging=" + ASYNC_LOGGING);
             try {
                 throwIfAsyncFailure();
+                debug("drainSubmittedWorkAsync returning completed future - disabled or sync logging");
                 return CompletableFuture.completedFuture(null);
             } catch (Throwable t) {
-                logDebug("ReportPortalBridge.drainSubmittedWorkAsync: failed-immediate-path " + throwableSummary(t));
+                debug("drainSubmittedWorkAsync returning failed future", t);
                 return failedFuture(t);
             }
         }
 
         List<CompletableFuture<Void>> snapshot = new ArrayList<>(WORK_CHAINS.values());
-        logDebug("ReportPortalBridge.drainSubmittedWorkAsync: snapshot-size=" + snapshot.size());
+        debug("drainSubmittedWorkAsync snapshot size=" + snapshot.size());
         CompletableFuture<Void> marker = snapshot.isEmpty()
                 ? CompletableFuture.completedFuture(null)
                 : CompletableFuture.allOf(snapshot.toArray(CompletableFuture[]::new));
 
         return marker.handle((ignored, throwable) -> {
-            logDebug("ReportPortalBridge.drainSubmittedWorkAsync: marker-completed throwable=" + throwableSummary(throwable));
+            debug("drainSubmittedWorkAsync marker complete throwable=" + throwable);
             if (throwable != null) {
                 throw new java.util.concurrent.CompletionException(unwrapCompletionFailure(throwable));
             }
 
             Throwable asyncFailure = ASYNC_FAILURE.get();
             if (asyncFailure != null) {
-                logDebug("ReportPortalBridge.drainSubmittedWorkAsync: async-failure-present " + throwableSummary(asyncFailure));
                 throw new java.util.concurrent.CompletionException(asyncFailure);
             }
 
-            logDebug("ReportPortalBridge.drainSubmittedWorkAsync: finished");
             return null;
         });
     }
@@ -548,136 +609,139 @@ public final class ReportPortalBridge {
     }
 
     private static void submitReportPortalWork(Object orderingKey, Runnable work) {
-        logDebug("ReportPortalBridge.submitReportPortalWork: starting asyncLogging=" + ASYNC_LOGGING + " " + bridgeState());
+        debug("submitReportPortalWork enter asyncLogging=" + ASYNC_LOGGING
+                + ", workChains=" + WORK_CHAINS.size()
+                + ", pendingSlotsAvailable=" + PENDING_LOG_SLOTS.availablePermits());
         if (!ASYNC_LOGGING) {
-            logDebug("ReportPortalBridge.submitReportPortalWork: running-synchronously");
+            debug("submitReportPortalWork running synchronously");
             runReportPortalWork(work);
-            logDebug("ReportPortalBridge.submitReportPortalWork: synchronous-work-complete");
             throwIfAsyncFailure();
+            debug("submitReportPortalWork synchronous complete");
             return;
         }
 
-        logDebug("ReportPortalBridge.submitReportPortalWork: before-acquirePendingSlot");
         acquirePendingSlot();
-        logDebug("ReportPortalBridge.submitReportPortalWork: after-acquirePendingSlot " + bridgeState());
 
         Object key = orderingKey == null ? LAUNCH_WORK_KEY : orderingKey;
+        debug("submitReportPortalWork acquired slot key=" + System.identityHashCode(key)
+                + ", pendingSlotsAvailable=" + PENDING_LOG_SLOTS.availablePermits());
 
         try {
             WORK_CHAINS.compute(key, (k, previous) -> {
-                logDebug("ReportPortalBridge.submitReportPortalWork: compute-chain previousPresent=" + (previous != null));
                 CompletableFuture<Void> base = previous == null
                         ? CompletableFuture.completedFuture(null)
                         : previous.exceptionally(t -> null);
 
                 CompletableFuture<Void> next = base.thenRunAsync(() -> {
-                    logDebug("ReportPortalBridge.submitReportPortalWork: worker-start thread=" + Thread.currentThread().getName());
+                    debug("submitReportPortalWork worker dispatch start key=" + System.identityHashCode(k));
                     runReportPortalWork(work);
-                    logDebug("ReportPortalBridge.submitReportPortalWork: worker-finished thread=" + Thread.currentThread().getName());
+                    debug("submitReportPortalWork worker dispatch complete key=" + System.identityHashCode(k));
                 }, RP_EXECUTOR);
                 next.whenComplete((ignored, throwable) -> {
-                    logDebug("ReportPortalBridge.submitReportPortalWork: whenComplete throwable=" + throwableSummary(throwable));
                     try {
                         if (throwable != null) {
+                            debug("submitReportPortalWork worker completed with throwable key=" + System.identityHashCode(k), unwrapCompletionFailure(throwable));
                             ASYNC_FAILURE.compareAndSet(null, unwrapCompletionFailure(throwable));
+                        } else {
+                            debug("submitReportPortalWork worker completed key=" + System.identityHashCode(k));
                         }
                     } finally {
                         PENDING_LOG_SLOTS.release();
                         WORK_CHAINS.remove(k, next);
-                        logDebug("ReportPortalBridge.submitReportPortalWork: released-slot-and-removed-chain " + bridgeState());
+                        debug("submitReportPortalWork released slot key=" + System.identityHashCode(k)
+                                + ", workChains=" + WORK_CHAINS.size()
+                                + ", pendingSlotsAvailable=" + PENDING_LOG_SLOTS.availablePermits());
                     }
                 });
-                logDebug("ReportPortalBridge.submitReportPortalWork: queued-work " + bridgeState());
+                debug("submitReportPortalWork chained key=" + System.identityHashCode(k) + ", hadPrevious=" + (previous != null));
                 return next;
             });
         } catch (RuntimeException e) {
+            debug("submitReportPortalWork failed while scheduling", e);
             PENDING_LOG_SLOTS.release();
-            logDebug("ReportPortalBridge.submitReportPortalWork: failed-to-queue " + throwableSummary(e));
             throw e;
         }
     }
 
     private static void runReportPortalWork(Runnable work) {
+        debug("runReportPortalWork start thread=" + Thread.currentThread().getName());
         try {
-            logDebug("ReportPortalBridge.runReportPortalWork: before-work thread=" + Thread.currentThread().getName());
             work.run();
-            logDebug("ReportPortalBridge.runReportPortalWork: after-work thread=" + Thread.currentThread().getName());
+            debug("runReportPortalWork complete thread=" + Thread.currentThread().getName());
         } catch (Throwable t) {
+            debug("runReportPortalWork caught throwable", t);
             ASYNC_FAILURE.compareAndSet(null, t);
-            logDebug("ReportPortalBridge.runReportPortalWork: captured-failure " + throwableSummary(t));
         }
     }
 
     private static void drainReportPortalWork() {
-        logDebug("ReportPortalBridge.drainReportPortalWork: starting " + bridgeState());
+        debug("drainReportPortalWork enter asyncLogging=" + ASYNC_LOGGING + ", workChains=" + WORK_CHAINS.size());
         if (!ASYNC_LOGGING) {
-            logDebug("ReportPortalBridge.drainReportPortalWork: skipped-async-logging-disabled");
+            debug("drainReportPortalWork skip - async logging disabled");
             return;
         }
 
-        long iteration = 0;
+        int iteration = 0;
         while (true) {
-            iteration++;
             List<CompletableFuture<Void>> snapshot = new ArrayList<>(WORK_CHAINS.values());
-            logDebug("ReportPortalBridge.drainReportPortalWork: iteration=" + iteration + ", snapshot-size=" + snapshot.size() + " " + bridgeState());
-            if (snapshot.isEmpty()) break;
+            if (snapshot.isEmpty()) {
+                debug("drainReportPortalWork no remaining work after iterations=" + iteration);
+                break;
+            }
 
+            iteration++;
+            debug("drainReportPortalWork waiting iteration=" + iteration + ", snapshotSize=" + snapshot.size()
+                    + ", workChains=" + WORK_CHAINS.size()
+                    + ", pendingSlotsAvailable=" + PENDING_LOG_SLOTS.availablePermits());
             try {
-                logDebug("ReportPortalBridge.drainReportPortalWork: before-wait iteration=" + iteration);
                 CompletableFuture.allOf(snapshot.toArray(CompletableFuture[]::new)).get();
-                logDebug("ReportPortalBridge.drainReportPortalWork: after-wait iteration=" + iteration);
+                debug("drainReportPortalWork wait complete iteration=" + iteration);
             } catch (Exception e) {
+                debug("drainReportPortalWork wait failed iteration=" + iteration, e);
                 ASYNC_FAILURE.compareAndSet(null, unwrapCompletionFailure(e));
-                logDebug("ReportPortalBridge.drainReportPortalWork: wait-failed iteration=" + iteration + " " + throwableSummary(e));
             }
         }
 
-        logDebug("ReportPortalBridge.drainReportPortalWork: before-throwIfAsyncFailure");
         throwIfAsyncFailure();
-        logDebug("ReportPortalBridge.drainReportPortalWork: finished " + bridgeState());
+        debug("drainReportPortalWork complete");
     }
 
     private static void shutdownReportPortalExecutor() {
-        logDebug("ReportPortalBridge.shutdownReportPortalExecutor: starting " + bridgeState()
-                + ", executorShutdown=" + RP_EXECUTOR.isShutdown()
-                + ", executorTerminated=" + RP_EXECUTOR.isTerminated());
+        debug("shutdownReportPortalExecutor enter asyncLogging=" + ASYNC_LOGGING
+                + ", isShutdown=" + RP_EXECUTOR.isShutdown()
+                + ", isTerminated=" + RP_EXECUTOR.isTerminated());
         if (!ASYNC_LOGGING || RP_EXECUTOR.isShutdown()) {
-            logDebug("ReportPortalBridge.shutdownReportPortalExecutor: skipped asyncLogging=" + ASYNC_LOGGING
-                    + ", executorShutdown=" + RP_EXECUTOR.isShutdown());
+            debug("shutdownReportPortalExecutor skip");
             return;
         }
 
-        logDebug("ReportPortalBridge.shutdownReportPortalExecutor: calling-shutdown");
+        debug("shutdownReportPortalExecutor calling shutdown");
         RP_EXECUTOR.shutdown();
 
         try {
-            logDebug("ReportPortalBridge.shutdownReportPortalExecutor: before-awaitTermination timeoutSeconds=" + SHUTDOWN_TIMEOUT_SECONDS);
+            debug("shutdownReportPortalExecutor awaiting termination seconds=" + SHUTDOWN_TIMEOUT_SECONDS);
             if (!RP_EXECUTOR.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                logDebug("ReportPortalBridge.shutdownReportPortalExecutor: await-timeout-calling-shutdownNow");
+                debug("shutdownReportPortalExecutor timed out; calling shutdownNow");
                 RP_EXECUTOR.shutdownNow();
-                logDebug("ReportPortalBridge.shutdownReportPortalExecutor: before-second-awaitTermination timeoutSeconds=" + SHUTDOWN_TIMEOUT_SECONDS);
+                debug("shutdownReportPortalExecutor awaiting termination after shutdownNow seconds=" + SHUTDOWN_TIMEOUT_SECONDS);
                 RP_EXECUTOR.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                logDebug("ReportPortalBridge.shutdownReportPortalExecutor: after-second-awaitTermination terminated=" + RP_EXECUTOR.isTerminated());
-            } else {
-                logDebug("ReportPortalBridge.shutdownReportPortalExecutor: terminated-after-first-await");
             }
+            debug("shutdownReportPortalExecutor complete isTerminated=" + RP_EXECUTOR.isTerminated());
         } catch (InterruptedException e) {
-            logDebug("ReportPortalBridge.shutdownReportPortalExecutor: interrupted " + throwableSummary(e));
+            debug("shutdownReportPortalExecutor interrupted", e);
             RP_EXECUTOR.shutdownNow();
             Thread.currentThread().interrupt();
         }
-        logDebug("ReportPortalBridge.shutdownReportPortalExecutor: finished executorShutdown=" + RP_EXECUTOR.isShutdown()
-                + ", executorTerminated=" + RP_EXECUTOR.isTerminated());
     }
 
     private static void acquirePendingSlot() {
+        debug("acquirePendingSlot enter availablePermits=" + PENDING_LOG_SLOTS.availablePermits()
+                + ", maxPendingLogs=" + MAX_PENDING_LOGS);
         try {
-            logDebug("ReportPortalBridge.acquirePendingSlot: before-acquire availableQueueSlots=" + PENDING_LOG_SLOTS.availablePermits()
-                    + ", maxPendingLogs=" + MAX_PENDING_LOGS);
             PENDING_LOG_SLOTS.acquire();
-            logDebug("ReportPortalBridge.acquirePendingSlot: after-acquire availableQueueSlots=" + PENDING_LOG_SLOTS.availablePermits());
+            debug("acquirePendingSlot acquired availablePermits=" + PENDING_LOG_SLOTS.availablePermits());
         } catch (InterruptedException e) {
-            logDebug("ReportPortalBridge.acquirePendingSlot: interrupted " + throwableSummary(e));
+            debug("acquirePendingSlot interrupted", e);
             Thread.currentThread().interrupt();
             throw new RuntimeException("Interrupted while waiting for ReportPortal log queue capacity", e);
         }

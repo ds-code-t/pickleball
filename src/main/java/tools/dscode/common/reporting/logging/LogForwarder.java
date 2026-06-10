@@ -63,7 +63,7 @@ public class LogForwarder {
         return level == null ? Level.INFO : level;
     }
 
-    private static boolean shouldLog(Level messageLevel) {
+    public static boolean shouldLog(Level messageLevel) {
         return messageLevel.ordinal() >= getGlobalLogLevel().ordinal();
     }
 
