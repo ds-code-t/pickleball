@@ -76,7 +76,7 @@ public final class ReportPortalBridge {
         @Override
         public Thread newThread(Runnable r) {
             Thread t = new Thread(r, "dscode-reportportal-log-worker-" + WORKER_ID.incrementAndGet());
-            t.setDaemon(false);
+            t.setDaemon(true);
             return t;
         }
     });
