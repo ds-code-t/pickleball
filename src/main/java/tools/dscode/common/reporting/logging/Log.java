@@ -14,6 +14,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import static io.cucumber.core.runner.GlobalState.getReport;
 import static io.cucumber.core.runner.GlobalState.workBookMap;
 import static tools.dscode.common.reporting.WorkBookConsolePrinter.printToConsole;
+import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
+import static tools.dscode.common.reporting.logging.LogForwarder.logWarn;
 
 
 public final class Log {
@@ -41,8 +43,9 @@ public final class Log {
         for (WorkBook report : workBookMap.values()) {
             try {
                 report.write();
+                logDebug("Report '" + report.outputFile + "' written successfully.");
             } catch (Exception e) {
-                System.out.println("Report '" + report.outputFile + "' failed to write due to: " + e.getMessage());
+                logWarn("Report '" + report.outputFile + "' failed to write due to: " + e.getMessage());
             }
         }
         ReportPortalBridge.finishLaunch("PASSED");

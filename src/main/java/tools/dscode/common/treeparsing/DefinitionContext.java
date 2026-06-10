@@ -185,7 +185,7 @@ public final class DefinitionContext {
         };
 
 
-        ParseNode predicate = new ParseNode("(?:\\b(?<predicateType>starting with|ending with|containing|equaling|of)\\s+(?<predicateVal><<valueMask>>))") {
+        ParseNode predicate = new ParseNode("(?:\\b(?<predicateType>starting with|ending with|containing|equaling)\\s+(?<predicateVal><<valueMask>>))") {
             @Override
             public String onCapture(MatchNode self) {
                 String predicateType = self.resolvedGroupText("predicateType");
