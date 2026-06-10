@@ -506,8 +506,20 @@ public final class DefinitionContext {
                     );
 
 
-            category("Dropdown").children("Dropdowns").andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, "genericLabel")
+            category("Dropdown").children("Dropdowns").andAnyCategories("forLabel", HTML_NAME_ATTRIBUTES, "genericLabel", "defaultOrSelectedOption")
                     .addBase("//select");
+
+            category("defaultOrSelectedOption").and(
+                    (category, v, op) -> {
+                        if (v == null || v.isNullOrBlank()) {
+                            return null;
+                        }
+                        return "//select[options[@selected or string(@value)='']]" + descendantDeepNormalizedVisibleText(v, op) + "]";
+                    }
+            );
+
+            category("Option").children("Options").inheritsFrom(CONTAINS_TEXT)
+                    .addBase("//option");
 
 
             category("Close Button").children("Close Buttons")
@@ -577,9 +589,6 @@ public final class DefinitionContext {
                     .and((category, v, op) ->
                             "//*[self::input[@type='checkbox' or @checked or @aria-checked] or self::mat-slide-toggle]"
                     );
-
-            category("Option").children("Options").inheritsFrom(CONTAINS_TEXT)
-                    .addBase("//option");
 
 
             category("Table").children("Tables")
