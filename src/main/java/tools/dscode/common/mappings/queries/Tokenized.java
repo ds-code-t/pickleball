@@ -47,14 +47,19 @@ public final class Tokenized {
 
     public static final List<String> allowedMapNames = Arrays.stream(MapConfigurations.MapType.values()).map(Enum::name)
             .toList();
-    private static final Pattern SEGMENT_WITH_SPACES_PATTERN = Pattern.compile(
-            "(?:(?<=^)|(?<=[.\\]]))" +               // left boundary: BOS or . or ]
-                    "((?=[\\p{L}_][\\p{L}\\p{N}_ ]*[ ][\\p{L}\\p{N}_])[\\p{L}_][\\p{L}\\p{N}_ ]*[\\p{L}\\p{N}_])" +
-                    "(?=(?:$|[.\\[]))"   // right boundary: EOS or . or [
+
+    private static final Pattern SEGMENT_NEEDS_BACKTICKS_PATTERN = Pattern.compile(
+            "(?:(?<=^)|(?<=[.\\]]))" +
+                    "((?:" +
+                    "\\p{N}[\\p{L}\\p{N}_ ]*" +                    // starts with number
+                    "|" +
+                    "(?=[\\p{L}_][\\p{L}\\p{N}_ ]* [\\p{L}\\p{N}_])[\\p{L}_][\\p{L}\\p{N}_ ]*" + // has spaces
+                    "))" +
+                    "(?=(?:$|[.\\[]))"
     );
 
     public static String wrapSegments(String expr) {
-        Matcher m = SEGMENT_WITH_SPACES_PATTERN.matcher(expr);
+        Matcher m = SEGMENT_NEEDS_BACKTICKS_PATTERN.matcher(expr);
         StringBuffer sb = new StringBuffer();
 
         while (m.find()) {
@@ -82,10 +87,15 @@ public final class Tokenized {
         if (isSingletonKey)
             q = q.substring(1);
 
-        prefix = !Character.isLetter(q.charAt(0)) && q.charAt(0) != '_' ? q.replaceFirst("^([^A-Za-z_]+).*", "$1")
+//        prefix = !Character.isLetter(q.charAt(0)) && q.charAt(0) != '_' ? q.replaceFirst("^([^A-Za-z_]+).*", "$1")
+//                : null;
+        prefix = !Character.isLetterOrDigit(q.charAt(0)) && q.charAt(0) != '_'
+                ? q.replaceFirst("^([^0-9A-Za-z_]+).*", "$1")
                 : null;
+
         if (prefix != null)
             q = q.substring(prefix.length());
+
         int idx = q.indexOf("::");
         if (idx >= 0) {
             String mapNameString = q.substring(0, idx);

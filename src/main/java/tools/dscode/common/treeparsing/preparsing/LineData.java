@@ -129,14 +129,8 @@ public abstract class LineData implements Cloneable {
             return false;
         }
 
-        if (c != '.') {
-            return true;
-        }
-
-        boolean previousIsDigit = index > 0 && Character.isDigit(s.charAt(index - 1));
-        boolean nextIsDigit = index + 1 < s.length() && Character.isDigit(s.charAt(index + 1));
-
-        return !(previousIsDigit && nextIsDigit);
+        return index == s.length() - 1
+                || Character.isWhitespace(s.charAt(index + 1));
     }
 
     public static String wrapLooseConditionalExpression(String input) {
@@ -147,8 +141,9 @@ public abstract class LineData implements Cloneable {
         if (!containsConditionalOperator(masked)) return input;
 
         String replaced = masked.trim().replaceAll(
-                "^((?:(?:and|or|the|then)\\b)*\\s*(?:(?:else\\b\\s*)?if\\b|until\\b)?(?:\\s+the)?)(.*)$",
-                "$1 { $2 } "
+                "^((?:,\\s+)?(?:(?:and|or|the|then)\\b)*\\s*(?:(?:else\\b\\s*)?if\\b|until\\b|ensures?\\b|verify\\b|verfies\\b)?(?:\\s+the)?)(.*)$",
+//                "^((?:(?:and|or|the|then)\\b)*\\s*(?:(?:else\\b\\s*)?if\\b|until\\b)?(?:\\s+the)?)(.*)$",
+                "$1 <{ $2 }> "
         );
 
         return qp.restoreFrom(bm.restoreFrom(replaced));

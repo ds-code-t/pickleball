@@ -243,7 +243,7 @@ Feature: nested Feature File
 
   Scenario Outline: Data table set test
     * IF: 4 == <Z>:
-    : * test1 <any>
+#    : * test1 <any>
     : * RUN SCENARIOS
       | Run Tags |
       | %compT3  |
@@ -251,7 +251,7 @@ Feature: nested Feature File
   : * RUN SCENARIOS
     | Run Tags |
     | %compT3  |
-
+  * , wait 1 second
     Then , in the "Name Change" Data Table, for every Data Row:
   : * , save "<A>"
     * IF: "A" is "A":

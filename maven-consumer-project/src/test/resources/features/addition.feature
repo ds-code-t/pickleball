@@ -1,11 +1,49 @@
 Feature: Addition
 
+
+  Scenario Outline: datable tezsts354
+    * I have a DataTable
+      | Run Tags       |
+      | <3Azz>  |
+      | <qq2zz> |
+
+    Examples:
+      | qq2zz | 3Azz |
+      | 22te* | 3te* |
+
+  Scenario Outline: adssdddas
+    * RUN SCENARIOS
+      | Run Tags | B       |
+      | %sd1     | <3Azz>  |
+      | %sd1     | <qq2zz> |
+
+    Examples:
+      | qq2zz | 3Azz |
+      | 22te* | 3te* |
+
+  Scenario Outline: adssddd
+    * , save "A<B>"
+
+    Examples:
+      | Scenario Tags |
+      | %sd1          |
+
+  Scenario: adssdf1
+    * , save "ddd" as "A"
+    * , if "<A>" == "":
+  : * , save "A"
+
+  Scenario: adssdf2
+    * , save "ddd" as "A"
+    * IF: "<A>" != "":
+  : * , save "A"
+
   Scenario Outline: ol wait test <A>
     * , wait 3 seconds
     Examples:
-    | A|
-    |1 |
-    |2 |
+      | A |
+      | 1 |
+      | 2 |
 
   Scenario: sd
     * , if 88: if 11:
@@ -1094,7 +1132,7 @@ Feature: Addition
 
   Scenario: debug run Scena
     * Scenario Log: starting scenarios
-    * RUN SCENARIOS:
+    * RUN SCENARIOS
       | Tags   | A   | B   |
       | %tag99 | 111 | 222 |
 
