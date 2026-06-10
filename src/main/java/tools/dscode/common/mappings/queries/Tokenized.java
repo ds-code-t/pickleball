@@ -48,12 +48,17 @@ public final class Tokenized {
     public static final List<String> allowedMapNames = Arrays.stream(MapConfigurations.MapType.values()).map(Enum::name)
             .toList();
 
+    // CHANGE: define the simple JSONata identifier shape that does not need backticks.
+    // Do not include "$": in JSONata, $ starts a variable reference, so a property named "$gamma" must be backticked.
     private static final Pattern LEGAL_JSONATA_PROPERTY_NAME =
-            Pattern.compile("[\\p{L}_$][\\p{L}\\p{N}_$]*");
+            Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_]*");
 
+    // CHANGE: split each period-delimited segment into a property portion plus trailing array indexes.
+    // Example: "And an array property[2]" -> property "And an array property" and suffix "[2]".
     private static final Pattern ARRAY_INDEX_SUFFIX =
             Pattern.compile("\\s*((?:\\[[^\\]]*])*)\\s*$");
 
+    // CHANGE: preprocess every simple path segment independently, preserving periods and array indexes.
     public static String wrapSegments(String expr) {
         if (expr == null || expr.isBlank()) {
             return expr;
@@ -90,9 +95,22 @@ public final class Tokenized {
             return arraySuffix;
         }
 
-        String wrappedProperty = needsBackticks(propertyPart)
-                ? "`" + escapeBackticks(propertyPart) + "`"
-                : propertyPart;
+        // CHANGE: keep the synthetic NodeMap top-array marker as a plain internal token.
+        // It is not a user JSON property name and must remain comparable to topArrayFlag later
+        // in setWithPath(...), and removable from getQuery.
+        if (propertyPart.equals(topArrayFlag)) {
+            return propertyPart + arraySuffix;
+        }
+
+        String wrappedProperty;
+
+        if (isAlreadyBackticked(propertyPart)) {
+            wrappedProperty = propertyPart;
+        } else if (needsBackticks(propertyPart)) {
+            wrappedProperty = "`" + escapeBackticks(propertyPart) + "`";
+        } else {
+            wrappedProperty = propertyPart;
+        }
 
         return wrappedProperty + arraySuffix;
     }
@@ -101,8 +119,64 @@ public final class Tokenized {
         return !LEGAL_JSONATA_PROPERTY_NAME.matcher(propertyName).matches();
     }
 
+    private static boolean isAlreadyBackticked(String propertyName) {
+        return propertyName.length() >= 2
+                && propertyName.startsWith("`")
+                && propertyName.endsWith("`");
+    }
+
     private static String escapeBackticks(String propertyName) {
         return propertyName.replace("`", "``");
+    }
+
+    // CHANGE: replaces the previous regex-only topArrayFlag insertion.
+    // This uses the first path delimiter, so illegal root property names are not skipped.
+    private static String insertTopArrayFlag(String q) {
+        if (q == null || q.isBlank()) {
+            return q;
+        }
+
+        int firstDot = q.indexOf('.');
+        int firstArray = q.indexOf('[');
+
+        // Preserve the existing behavior for an indexed root, such as Root[0].Child.
+        if (firstArray >= 0 && (firstDot < 0 || firstArray < firstDot)) {
+            return q;
+        }
+
+        if (firstDot < 0) {
+            return q + "." + topArrayFlag;
+        }
+
+        return q.substring(0, firstDot) + "." + topArrayFlag + q.substring(firstDot);
+    }
+
+    // CHANGE: one shared method for converting backticked JSONata property tokens back to Jackson field names.
+    // This also reverses doubled backticks created by escapeBackticks().
+    private static String unquoteBacktickedProperty(String fieldName) {
+        if (fieldName != null
+                && fieldName.length() >= 2
+                && fieldName.startsWith("`")
+                && fieldName.endsWith("`")) {
+            return fieldName.substring(1, fieldName.length() - 1).replace("``", "`");
+        }
+
+        return fieldName;
+    }
+
+    // CHANGE: classify only simple dotted/indexed paths as direct, while ignoring punctuation inside backticked names.
+    // Example: `Address:Primary`.`Zip Code` is still direct even though the quoted name contains ':'.
+    private static boolean isDirectPath(String query) {
+        if (query == null || query.isBlank()) {
+            return true;
+        }
+
+        String withoutQuotedPropertyContents = query.replaceAll("`(?:``|[^`])*`", "name");
+        String withoutSimpleArrayIndexes = withoutQuotedPropertyContents.replaceAll("\\[-?\\d+\\]", "");
+
+        return !withoutSimpleArrayIndexes
+                .replaceAll("\\*|%|\\{|\\(|<|>|=|\\.\\.|,|:", "[")
+                .contains("[");
     }
 
     public Tokenized(String inputQuery) {
@@ -124,11 +198,14 @@ public final class Tokenized {
 
 //        prefix = !Character.isLetter(q.charAt(0)) && q.charAt(0) != '_' ? q.replaceFirst("^([^A-Za-z_]+).*", "$1")
 //                : null;
-        prefix = !Character.isLetterOrDigit(q.charAt(0)) && q.charAt(0) != '_'
-                ? q.replaceFirst("^([^0-9A-Za-z_]+).*", "$1")
+        // CHANGE: do not treat a leading backtick as a prefix; it may be the start of an already-quoted property name.
+        prefix = !Character.isLetterOrDigit(q.charAt(0)) && q.charAt(0) != '_' && q.charAt(0) != '`'
+                ? q.replaceFirst("^([^0-9A-Za-z_`]+).*", "$1")
                 : null;
+
         if (prefix != null)
             q = q.substring(prefix.length());
+
         int idx = q.indexOf("::");
         if (idx >= 0) {
             String mapNameString = q.substring(0, idx);
@@ -154,20 +231,28 @@ public final class Tokenized {
 
         if (q.contains("#"))
             q = rewrite(q);
-        q = q.strip().replaceAll("^\\$\\.", "").replaceAll("\\s*([\\(\\){}\\[\\].#:,-])\\s*", "$1");
+        // CHANGE: only trim whitespace around simple path delimiters supported by this preprocessor.
+        // The old cleanup also stripped spaces around characters like '-', ':', and ',',
+        // which can be valid parts of a JSON property name that should later be backticked.
+        q = q.strip().replaceAll("^\\$\\.", "").replaceAll("\\s*([\\[\\].])\\s*", "$1");
 
-
-        q = q.replaceAll("(^[A-Za-z0-9_\\s`]+)(\\..*|$)", "$1." + topArrayFlag + "$2");
+        // CHANGE: insert the synthetic top-array flag using delimiter positions instead of
+        // an identifier-shaped regex, so root properties like "Top-Level Property" still work.
+        q = insertTopArrayFlag(q);
 
         isValueAssignmentKey = q.endsWith("=");
         if (isValueAssignmentKey)
             q = q.substring(0, q.length() - 1);
         query = wrapSegments(q);
-        directPath = !query.replaceAll("\\[-?\\d+\\]", "")
-                .replaceAll("\\*|%|\\{|\\(|^|<|>|=|\\.\\.|,|:", "[").contains("\\[");
+        // CHANGE: direct-path detection must not treat quoted property contents as JSONata syntax.
+        // It also must not include the old zero-width ^ alternative, which makes every query look non-direct
+        // when contains("[") is used correctly as a literal string check.
+        directPath = isDirectPath(query);
         tokens = Arrays.stream(query.replaceAll("(\\[[^\\[\\]]*\\])", ".$1").split("\\.")).collect(Collectors.toList());
         tokenCount = tokens.size();
-        getQuery = query.replaceAll("\\." + topArrayFlag, "");
+        // CHANGE: remove the synthetic top-array marker from JSONata get queries using Pattern.quote,
+        // so any special characters inside META_FLAG are treated literally.
+        getQuery = query.replaceAll("\\." + Pattern.quote(topArrayFlag), "");
     }
 
     public static String rewrite(String input) {
@@ -275,10 +360,8 @@ public final class Tokenized {
         }
 
         if (singleton && root instanceof ObjectNode objectNode && !tokenList.isEmpty()) {
-            String rootField = tokenList.getFirst();
-            if (rootField.startsWith("`") && rootField.endsWith("`")) {
-                rootField = rootField.substring(1, rootField.length() - 1);
-            }
+            // CHANGE: use the shared backtick unquoting helper so removal uses the real Jackson field name.
+            String rootField = unquoteBacktickedProperty(tokenList.getFirst());
             if (!rootField.startsWith("[")) {
                 objectNode.remove(rootField);
             }
@@ -339,8 +422,13 @@ public final class Tokenized {
                         }
                     }
                 } else if (parent instanceof ObjectNode objectNode) {
-                    if (!lastToken.startsWith("[") && objectNode.has(lastToken)) {
-                        objectNode.set(lastToken, toSafeJsonNode(value));
+                    if (!lastToken.startsWith("[")) {
+                        // CHANGE: non-direct writes also need to convert a JSONata backticked token
+                        // back into the raw Jackson field name before checking or setting it.
+                        String fieldName = unquoteBacktickedProperty(lastToken);
+                        if (objectNode.has(fieldName)) {
+                            objectNode.set(fieldName, toSafeJsonNode(value));
+                        }
                     }
                 }
             }
@@ -349,9 +437,8 @@ public final class Tokenized {
         return root;
     }
     private static JsonNode setProperty(ObjectNode objectNode, String fieldName, Object value) {
-        if (fieldName.startsWith("`") && fieldName.endsWith("`")) {
-            fieldName = fieldName.substring(1, fieldName.length() - 1);
-        }
+        // CHANGE: convert any backticked JSONata token back into the raw Jackson field name.
+        fieldName = unquoteBacktickedProperty(fieldName);
 
         JsonNode valueToSet;
         if (value instanceof JsonNode valueNode) {
@@ -518,10 +605,8 @@ public final class Tokenized {
             return;
         }
 
-        String fieldName = token;
-        if (fieldName.startsWith("`") && fieldName.endsWith("`")) {
-            fieldName = fieldName.substring(1, fieldName.length() - 1);
-        }
+        // CHANGE: wildcard traversal also needs raw Jackson field names when tokens were backticked for JSONata.
+        String fieldName = unquoteBacktickedProperty(token);
 
         if (lastToken) {
             objectNode.set(fieldName, toSafeJsonNode(value));
