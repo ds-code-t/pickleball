@@ -48,26 +48,61 @@ public final class Tokenized {
     public static final List<String> allowedMapNames = Arrays.stream(MapConfigurations.MapType.values()).map(Enum::name)
             .toList();
 
-    private static final Pattern SEGMENT_NEEDS_BACKTICKS_PATTERN = Pattern.compile(
-            "(?:(?<=^)|(?<=[.\\]]))" +
-                    "((?:" +
-                    "\\p{N}[\\p{L}\\p{N}_ ]*" +                    // starts with number
-                    "|" +
-                    "(?=[\\p{L}_][\\p{L}\\p{N}_ ]* [\\p{L}\\p{N}_])[\\p{L}_][\\p{L}\\p{N}_ ]*" + // has spaces
-                    "))" +
-                    "(?=(?:$|[.\\[]))"
-    );
+    private static final Pattern LEGAL_JSONATA_PROPERTY_NAME =
+            Pattern.compile("[\\p{L}_$][\\p{L}\\p{N}_$]*");
+
+    private static final Pattern ARRAY_INDEX_SUFFIX =
+            Pattern.compile("\\s*((?:\\[[^\\]]*])*)\\s*$");
 
     public static String wrapSegments(String expr) {
-        Matcher m = SEGMENT_NEEDS_BACKTICKS_PATTERN.matcher(expr);
-        StringBuffer sb = new StringBuffer();
-
-        while (m.find()) {
-            String segment = m.group(1);
-            m.appendReplacement(sb, Matcher.quoteReplacement("`" + segment + "`"));
+        if (expr == null || expr.isBlank()) {
+            return expr;
         }
-        m.appendTail(sb);
-        return sb.toString();
+
+        String[] rawSegments = expr.split("\\.", -1);
+        StringBuilder result = new StringBuilder();
+
+        for (int i = 0; i < rawSegments.length; i++) {
+            if (i > 0) {
+                result.append('.');
+            }
+
+            result.append(wrapSingleSegment(rawSegments[i]));
+        }
+
+        return result.toString();
+    }
+
+    private static String wrapSingleSegment(String rawSegment) {
+        String segment = rawSegment.trim();
+
+        Matcher arraySuffixMatcher = ARRAY_INDEX_SUFFIX.matcher(segment);
+
+        String propertyPart = segment;
+        String arraySuffix = "";
+
+        if (arraySuffixMatcher.find()) {
+            arraySuffix = arraySuffixMatcher.group(1);
+            propertyPart = segment.substring(0, arraySuffixMatcher.start()).trim();
+        }
+
+        if (propertyPart.isEmpty()) {
+            return arraySuffix;
+        }
+
+        String wrappedProperty = needsBackticks(propertyPart)
+                ? "`" + escapeBackticks(propertyPart) + "`"
+                : propertyPart;
+
+        return wrappedProperty + arraySuffix;
+    }
+
+    private static boolean needsBackticks(String propertyName) {
+        return !LEGAL_JSONATA_PROPERTY_NAME.matcher(propertyName).matches();
+    }
+
+    private static String escapeBackticks(String propertyName) {
+        return propertyName.replace("`", "``");
     }
 
     public Tokenized(String inputQuery) {
@@ -92,10 +127,8 @@ public final class Tokenized {
         prefix = !Character.isLetterOrDigit(q.charAt(0)) && q.charAt(0) != '_'
                 ? q.replaceFirst("^([^0-9A-Za-z_]+).*", "$1")
                 : null;
-
         if (prefix != null)
             q = q.substring(prefix.length());
-
         int idx = q.indexOf("::");
         if (idx >= 0) {
             String mapNameString = q.substring(0, idx);

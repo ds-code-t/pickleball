@@ -142,8 +142,7 @@ public abstract class LineData implements Cloneable {
 
         String replaced = masked.trim().replaceAll(
                 "^((?:,\\s+)?(?:(?:and|or|the|then)\\b)*\\s*(?:(?:else\\b\\s*)?if\\b|until\\b|ensures?\\b|verify\\b|verfies\\b)?(?:\\s+the)?)(.*)$",
-//                "^((?:(?:and|or|the|then)\\b)*\\s*(?:(?:else\\b\\s*)?if\\b|until\\b)?(?:\\s+the)?)(.*)$",
-                "$1 <{ $2 }> "
+                "$1 { $2 } "
         );
 
         return qp.restoreFrom(bm.restoreFrom(replaced));
