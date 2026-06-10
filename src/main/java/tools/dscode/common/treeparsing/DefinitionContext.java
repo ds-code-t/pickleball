@@ -514,7 +514,7 @@ public final class DefinitionContext {
                         if (v == null || v.isNullOrBlank()) {
                             return null;
                         }
-                        return "//select[options[@selected or string(@value)='']]" + descendantDeepNormalizedVisibleText(v, op) + "]";
+                        return "//select[option[self::option[@selected or string(@value)='']]" + descendantDeepNormalizedVisibleText(v, op) + "]";
                     }
             );
 
