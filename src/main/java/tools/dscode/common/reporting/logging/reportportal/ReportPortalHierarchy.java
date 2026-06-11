@@ -15,6 +15,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class ReportPortalHierarchy {
@@ -167,12 +168,18 @@ public final class ReportPortalHierarchy {
         }
     }
 
-    public static void finishTest(Maybe<String> testId, String status) {
+    public static Maybe<?> finishTest(Maybe<String> testId, String status) {
         FinishTestItemRQ rq = new FinishTestItemRQ();
         rq.setStatus(status);
         rq.setEndTime(new Date());
-        getLaunch().finishTestItem(testId, rq);
+
+        Maybe<?> result = getLaunch().finishTestItem(testId, rq);
         CURRENT_TEST.remove();
+        return result;
+    }
+
+    public static void finishTestAndWait(Maybe<String> testId, String status) {
+        awaitReportPortal("finishing test", finishTest(testId, status));
     }
 
     public static void finishCurrentTest(String status) {
@@ -182,15 +189,23 @@ public final class ReportPortalHierarchy {
         }
     }
 
-    public static void finishSuite(Maybe<String> suiteId, String status) {
+    public static void finishCurrentTestAndWait(String status) {
+        Maybe<String> testId = CURRENT_TEST.get();
+        if (testId != null) {
+            finishTestAndWait(testId, status);
+        }
+    }
+
+    public static Maybe<?> finishSuite(Maybe<String> suiteId, String status) {
         if (suiteId == null) {
-            return;
+            return Maybe.empty();
         }
 
         FinishTestItemRQ rq = new FinishTestItemRQ();
         rq.setStatus(status);
         rq.setEndTime(new Date());
-        getLaunch().finishTestItem(suiteId, rq);
+
+        return getLaunch().finishTestItem(suiteId, rq);
     }
 
     public static void finishAllSuites(String status) {
@@ -201,7 +216,7 @@ public final class ReportPortalHierarchy {
                 .reversed());
 
         for (Map.Entry<String, Maybe<String>> entry : suites) {
-            finishSuite(entry.getValue(), status);
+            awaitReportPortal("finishing suite '" + entry.getKey() + "'", finishSuite(entry.getValue(), status));
         }
     }
 
@@ -212,6 +227,77 @@ public final class ReportPortalHierarchy {
         FinishExecutionRQ rq = new FinishExecutionRQ();
         rq.setEndTime(new Date());
         launch.finish(rq);
+    }
+
+    public static void resetLaunch() {
+        synchronized (LAUNCH_LOCK) {
+            launch = null;
+            reportPortal = null;
+            SUITES.clear();
+            LAST_CREATED_SUITE.set(null);
+            CURRENT_TEST.remove();
+        }
+    }
+
+    private static void awaitReportPortal(String action, Maybe<?> maybe) {
+        if (maybe == null) {
+            return;
+        }
+
+        try {
+            maybe.timeout(reportingTimeoutSeconds(), TimeUnit.SECONDS).blockingGet();
+        } catch (Throwable t) {
+            throw new RuntimeException("ReportPortal failed while " + action, t);
+        }
+    }
+
+    private static long reportingTimeoutSeconds() {
+        String configured = setting("dscode.reportportal.finishTimeoutSeconds");
+        if (configured != null && !configured.isBlank()) {
+            try {
+                return Math.max(1L, Long.parseLong(configured.trim()));
+            } catch (NumberFormatException ignored) {
+                // Fall back to ReportPortal's configured timeout below.
+            }
+        }
+
+        Long rpTimeout = listenerReportingTimeoutSeconds();
+        if (rpTimeout != null && rpTimeout > 0L) {
+            return rpTimeout;
+        }
+
+        return 120L;
+    }
+
+    private static Long listenerReportingTimeoutSeconds() {
+        ListenerParameters p = parameters;
+        if (p == null) {
+            return null;
+        }
+
+        try {
+            Object value = p.getClass().getMethod("getReportingTimeout").invoke(p);
+            if (value instanceof Number number) {
+                return number.longValue();
+            }
+            if (value != null) {
+                String s = String.valueOf(value).trim();
+                if (!s.isEmpty()) {
+                    return Long.parseLong(s);
+                }
+            }
+        } catch (Throwable ignored) {
+            // Older or customized ListenerParameters may not expose this method.
+        }
+
+        return null;
+    }
+
+    private static String setting(String property) {
+        String raw = System.getProperty(property);
+        if (raw != null) return raw;
+        String env = property.toUpperCase().replace('.', '_').replace('-', '_');
+        return System.getenv(env);
     }
 
     private static List<String> normalizePath(List<String> path) {

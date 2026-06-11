@@ -262,11 +262,11 @@ public final class ReportPortalBridge {
             try {
                 if (test != null) {
                     CleanupTrace.print("[ReportPortalBridge.finishCurrentTest worker] START: ReportPortalHierarchy.finishTest(" + finalStatus + ")");
-                    ReportPortalHierarchy.finishTest(test, finalStatus);
+                    ReportPortalHierarchy.finishTestAndWait(test, finalStatus);
                     CleanupTrace.print("[ReportPortalBridge.finishCurrentTest worker] END: ReportPortalHierarchy.finishTest(" + finalStatus + ")");
                 } else {
                     CleanupTrace.print("[ReportPortalBridge.finishCurrentTest worker] START: ReportPortalHierarchy.finishCurrentTest(" + finalStatus + ")");
-                    ReportPortalHierarchy.finishCurrentTest(finalStatus);
+                    ReportPortalHierarchy.finishCurrentTestAndWait(finalStatus);
                     CleanupTrace.print("[ReportPortalBridge.finishCurrentTest worker] END: ReportPortalHierarchy.finishCurrentTest(" + finalStatus + ")");
                 }
                 CleanupTrace.print("[ReportPortalBridge.finishCurrentTest worker] COMPLETE finalStatus=" + finalStatus);
@@ -504,6 +504,18 @@ public final class ReportPortalBridge {
             CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: launchStarted = false");
             launchStarted = false;
             CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: launchStarted = false");
+
+            CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: KNOWN_SUITES.clear()");
+            KNOWN_SUITES.clear();
+            CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: KNOWN_SUITES.clear()");
+
+            CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: ASYNC_FAILURE.set(null)");
+            ASYNC_FAILURE.set(null);
+            CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: ASYNC_FAILURE.set(null)");
+
+            CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: ReportPortalHierarchy.resetLaunch()");
+            ReportPortalHierarchy.resetLaunch();
+            CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: ReportPortalHierarchy.resetLaunch()");
 
             CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: shutdownReportPortalExecutor()");
             try {
