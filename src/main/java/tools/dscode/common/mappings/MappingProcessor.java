@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.LinkedListMultimap;
-import io.cucumber.core.runner.StepData;
 import tools.dscode.common.mappings.queries.Tokenized;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 
@@ -23,7 +22,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static io.cucumber.core.runner.NPickleStepTestStepFactory.getPickleStepTestStepFromStrings;
 import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
 import static io.cucumber.core.runner.util.TableUtils.DATA_OBJECT_KEY;
 import static io.cucumber.core.runner.util.TableUtils.DOCSTRING_KEY;
@@ -294,15 +292,64 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return keyOrder;
     }
 
+    private static final String DEFAULT_OPEN_BOOKEND = "<";
+    private static final String DEFAULT_CLOSE_BOOKEND = ">";
+    private static final String DEFAULT_OPEN_EXPRESSION_BOOKEND = "<{";
+    private static final String DEFAULT_CLOSE_EXPRESSION_BOOKEND = "}>";
+
+    private static final String TILDE_OPEN_BOOKEND = "~<~";
+    private static final String TILDE_CLOSE_BOOKEND = "~>~";
+    private static final String TILDE_OPEN_EXPRESSION_BOOKEND = "~<~{";
+    private static final String TILDE_CLOSE_EXPRESSION_BOOKEND = "}~>~";
+
     private static final Pattern ANGLE = Pattern.compile("<(?![\\s=])([^<>{}]*[^\\s<>{}])>");
+    private static final Pattern TILDE_ANGLE = Pattern.compile(
+            Pattern.quote(TILDE_OPEN_BOOKEND)
+                    + "(?![\\s=])([^{}]*?\\S)"
+                    + Pattern.quote(TILDE_CLOSE_BOOKEND));
+
+    private static final Pattern UNRESOLVED_OPTIONAL_ANGLE = Pattern.compile("<\\?[^<>{}]+>");
+    private static final Pattern UNRESOLVED_OPTIONAL_TILDE_ANGLE = Pattern.compile(
+            Pattern.quote(TILDE_OPEN_BOOKEND)
+                    + "\\?[^{}]+?"
+                    + Pattern.quote(TILDE_CLOSE_BOOKEND));
+
+    private static final Bookends DEFAULT_BOOKENDS = new Bookends(
+            DEFAULT_OPEN_BOOKEND,
+            DEFAULT_CLOSE_BOOKEND,
+            DEFAULT_OPEN_EXPRESSION_BOOKEND,
+            DEFAULT_CLOSE_EXPRESSION_BOOKEND,
+            ANGLE,
+            UNRESOLVED_OPTIONAL_ANGLE);
+
+    private static final Bookends TILDE_BOOKENDS = new Bookends(
+            TILDE_OPEN_BOOKEND,
+            TILDE_CLOSE_BOOKEND,
+            TILDE_OPEN_EXPRESSION_BOOKEND,
+            TILDE_CLOSE_EXPRESSION_BOOKEND,
+            TILDE_ANGLE,
+            UNRESOLVED_OPTIONAL_TILDE_ANGLE);
+
+    private record Bookends(
+            String open,
+            String close,
+            String expressionOpen,
+            String expressionClose,
+            Pattern mapPattern,
+            Pattern unresolvedOptionalPattern
+    ) {
+        String wrap(String key) {
+            return open + key + close;
+        }
+    }
 
     /**
-     * Private-use placeholders used to temporarily collapse the two-character
-     * expression bookends <{ and }> into single-character bookends.
+     * Private-use placeholders used to temporarily collapse expression bookends
+     * into single-character bookends.
      *
-     * This keeps expression matching separate from normal angle-map syntax
-     * like <key>, and prevents the > in }> from being treated as an angle
-     * close by the map resolver.
+     * This keeps expression matching separate from normal map syntax like <key>
+     * or ~<~key~>~, and prevents the expression close from being treated as a
+     * map close by the map resolver.
      */
     private static final String OPEN_EXPRESSION_BOOKEND_SUB = "\uE000";
     private static final String CLOSE_EXPRESSION_BOOKEND_SUB = "\uE001";
@@ -313,69 +360,80 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
 
     public String resolveWholeText(String input) {
+        return resolveWholeText(input, usesTildeBookends(input) ? TILDE_BOOKENDS : DEFAULT_BOOKENDS);
+    }
+
+    private String resolveWholeText(String input, Bookends bookends) {
 
         QuoteParser parsedObj = new QuoteParser(input);
 //        try {
         // Resolve quoted substring values first.
         // This lets expression bookends restore already-resolved quoted values.
         for (var e : parsedObj.entrySetWithoutTripleSingle()) {
-            parsedObj.put(e.getKey(), resolveAll(e.getValue(), parsedObj));
+            parsedObj.put(e.getKey(), resolveAll(e.getValue(), parsedObj, bookends));
         }
 
         // Now resolve the outer/masked text.
         // If resolveExpression restores quoted placeholders, they are already resolved.
-        parsedObj.setMasked(resolveAll(parsedObj.masked(), parsedObj));
+        parsedObj.setMasked(resolveAll(parsedObj.masked(), parsedObj, bookends));
         String resolvedText = parsedObj.restore();
         logTrace("Resolved: '" + input + "' -> '" + resolvedText + "'");
         return resolvedText;
 
     }
-    private static final Pattern UNRESOLVED_OPTIONAL_ANGLE =
-            Pattern.compile("<\\?[^<>{}]+>");
 
-    private String resolveAll(String input, QuoteParser parsedObj) {
+    private static boolean usesTildeBookends(String input) {
+        if (input == null) {
+            return false;
+        }
+        int openIndex = input.indexOf(TILDE_OPEN_BOOKEND);
+        return openIndex >= 0
+                && input.indexOf(TILDE_CLOSE_BOOKEND, openIndex + TILDE_OPEN_BOOKEND.length()) >= 0;
+    }
+
+    private String resolveAll(String input, QuoteParser parsedObj, Bookends bookends) {
         boolean isDirectoryPath = input.startsWith("</");
         try {
             String originalInput;
             do {
-                input = protectExpressionBookends(input);
+                input = protectExpressionBookends(input, bookends);
                 originalInput = input;
                 String prev;
                 do {
                     prev = input;
-                    if (input.contains("<")) {
-                        input = resolveByMap(input);
+                    if (input.contains(bookends.open())) {
+                        input = resolveByMap(input, bookends);
                     }
                     if (!isDirectoryPath && input.contains(OPEN_EXPRESSION_BOOKEND_SUB)) {
-                        input = resolveExpression(input, parsedObj);
+                        input = resolveExpression(input, parsedObj, bookends);
                     }
-                    input = protectExpressionBookends(input);
+                    input = protectExpressionBookends(input, bookends);
                 } while (!input.equals(prev));
-                input = UNRESOLVED_OPTIONAL_ANGLE.matcher(input).replaceAll("");
+                input = bookends.unresolvedOptionalPattern().matcher(input).replaceAll("");
             } while (!input.equals(originalInput));
-            return restoreExpressionBookends(decodeBackToText(input.replaceAll(MATCH_BREAK, "")));
+            return restoreExpressionBookends(decodeBackToText(input.replaceAll(MATCH_BREAK, "")), bookends);
         } catch (Throwable t) {
             t.printStackTrace();
             throw new RuntimeException("Could not resolve '" + input + "' due to '" + t.getMessage() + "'", t);
         }
     }
 
-    private String resolveByMap(String s) {
+    private String resolveByMap(String s, Bookends bookends) {
         String key = null;
         try {
-            Matcher m = ANGLE.matcher(s);
+            Matcher m = bookends.mapPattern().matcher(s);
             StringBuffer sb = new StringBuffer();
             Object replacement = null;
 
             while (m.find()) {
                 key = m.group(1);
                 if (key.contains(MATCH_BREAK) || key.contains("&&") || key.contains("||")) {
-                    replacement = "<" + key + ">";
+                    replacement = bookends.wrap(key);
                     break;
                 }
                 replacement = get(key);
                 if (replacement != null) {
-                    logTrace("'<" + key + ">' -> '" + replacement + "'");
+                    logTrace("'" + bookends.wrap(key) + "' -> '" + replacement + "'");
                     break;
                 }
             }
@@ -383,9 +441,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 return s;
 
             String stringReplacement = getStringValue(replacement);
+            String wrappedKey = bookends.wrap(key);
 
-            if (stringReplacement.contains("<") && !key.contains(MATCH_BREAK) && stringReplacement.contains("<" + key + ">")) {
-                stringReplacement = stringReplacement.replaceAll("<" + key + ">", "<" + MATCH_BREAK + key + ">");
+            if (stringReplacement.contains(bookends.open()) && !key.contains(MATCH_BREAK) && stringReplacement.contains(wrappedKey)) {
+                stringReplacement = stringReplacement.replace(wrappedKey, bookends.open() + MATCH_BREAK + key + bookends.close());
             }
 
             m.appendReplacement(sb, Matcher.quoteReplacement(stringReplacement));
@@ -396,7 +455,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
         }
     }
 
-    private String resolveExpression(String s, QuoteParser parsedObj) {
+    private String resolveExpression(String s, QuoteParser parsedObj, Bookends bookends) {
         Matcher m = EXPRESSION.matcher(s);
         StringBuffer sb = new StringBuffer();
         while (m.find()) {
@@ -405,23 +464,23 @@ public abstract class MappingProcessor implements Map<String, Object> {
             String repl = key.endsWith("?")
                     ? String.valueOf(evalToBoolean(key.substring(0, key.length() - 1), this))
                     : String.valueOf(eval(key, this));
-            logTrace("'<{" + key + "}>' -> '" + repl + "'");
+            logTrace("'" + bookends.expressionOpen() + key + bookends.expressionClose() + "' -> '" + repl + "'");
             m.appendReplacement(sb, repl == null ? m.group(0) : Matcher.quoteReplacement(repl));
         }
         m.appendTail(sb);
         return sb.toString();
     }
 
-    private static String protectExpressionBookends(String input) {
+    private static String protectExpressionBookends(String input, Bookends bookends) {
         return input
-                .replace("<{", OPEN_EXPRESSION_BOOKEND_SUB)
-                .replace("}>", CLOSE_EXPRESSION_BOOKEND_SUB);
+                .replace(bookends.expressionOpen(), OPEN_EXPRESSION_BOOKEND_SUB)
+                .replace(bookends.expressionClose(), CLOSE_EXPRESSION_BOOKEND_SUB);
     }
 
-    private static String restoreExpressionBookends(String input) {
+    private static String restoreExpressionBookends(String input, Bookends bookends) {
         return input
-                .replace(OPEN_EXPRESSION_BOOKEND_SUB, "<{")
-                .replace(CLOSE_EXPRESSION_BOOKEND_SUB, "}>");
+                .replace(OPEN_EXPRESSION_BOOKEND_SUB, bookends.expressionOpen())
+                .replace(CLOSE_EXPRESSION_BOOKEND_SUB, bookends.expressionClose());
     }
 
 
@@ -773,18 +832,19 @@ public abstract class MappingProcessor implements Map<String, Object> {
         String prepared = input;
 
         // 1. Protect the alternate bookend strings first.
-        // This allows replacements like "[<" and ">]" to work.
-        if (replaceOpenAngle) {
-            prepared = prepared.replace(openAngleReplacement, OPEN_ANGLE_REPLACEMENT_SUB);
-        }
-        if (replaceCloseAngle) {
-            prepared = prepared.replace(closeAngleReplacement, CLOSE_ANGLE_REPLACEMENT_SUB);
-        }
+        // Longer expression bookends must be protected before their shorter
+        // angle-bookend prefixes/suffixes, e.g. ~<~{ before ~<~.
         if (replaceOpenCurly) {
             prepared = prepared.replace(openCurlyReplacement, OPEN_CURLY_REPLACEMENT_SUB);
         }
         if (replaceCloseCurly) {
             prepared = prepared.replace(closeCurlyReplacement, CLOSE_CURLY_REPLACEMENT_SUB);
+        }
+        if (replaceOpenAngle) {
+            prepared = prepared.replace(openAngleReplacement, OPEN_ANGLE_REPLACEMENT_SUB);
+        }
+        if (replaceCloseAngle) {
+            prepared = prepared.replace(closeAngleReplacement, CLOSE_ANGLE_REPLACEMENT_SUB);
         }
 
         // 2. Protect literal real delimiters.
@@ -804,21 +864,21 @@ public abstract class MappingProcessor implements Map<String, Object> {
         // 3. Turn alternate-bookend placeholders into real delimiters.
         // Alternate curly replacements now mean alternate expression bookends.
         // They are converted to the paired <{ and }> syntax, not raw { and }.
-        if (replaceOpenAngle) {
-            prepared = prepared.replace(OPEN_ANGLE_REPLACEMENT_SUB, "<");
-        }
-        if (replaceCloseAngle) {
-            prepared = prepared.replace(CLOSE_ANGLE_REPLACEMENT_SUB, ">");
-        }
         if (replaceOpenCurly) {
             prepared = prepared.replace(OPEN_CURLY_REPLACEMENT_SUB, "<{");
         }
         if (replaceCloseCurly) {
             prepared = prepared.replace(CLOSE_CURLY_REPLACEMENT_SUB, "}>");
         }
+        if (replaceOpenAngle) {
+            prepared = prepared.replace(OPEN_ANGLE_REPLACEMENT_SUB, "<");
+        }
+        if (replaceCloseAngle) {
+            prepared = prepared.replace(CLOSE_ANGLE_REPLACEMENT_SUB, ">");
+        }
 
         // 4. Resolve normally.
-        String resolved = resolveWholeText(prepared);
+        String resolved = resolveWholeText(prepared, DEFAULT_BOOKENDS);
 
         // 5. Restore any unresolved alternate placeholders back to their original syntax.
         // This matters if something survives resolution unchanged.

@@ -11,6 +11,7 @@ import tools.dscode.common.annotations.DefinitionFlags;
 import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.reporting.logging.Attachment;
+import tools.dscode.common.reporting.logging.CleanupTrace;
 import tools.dscode.common.reporting.logging.Log;
 import tools.dscode.common.exceptions.SoftRuntimeException;
 import tools.dscode.common.reporting.logging.reportportal.ReportPortalBridge;
@@ -65,38 +66,65 @@ public class GeneralSteps extends CoreSteps {
 
     @AfterAll
     public static void afterAll() {
+        CleanupTrace.print("[AfterAll] START");
+
         Throwable failure = null;
 
+        CleanupTrace.print("[AfterAll] START: lifecycle.fire(AFTER_CUCUMBER_RUN)");
         try {
             lifecycle.fire(Phase.AFTER_CUCUMBER_RUN);
+            CleanupTrace.print("[AfterAll] END: lifecycle.fire(AFTER_CUCUMBER_RUN)");
         } catch (Throwable t) {
+            CleanupTrace.printThrowable("[AfterAll] THROWABLE: lifecycle.fire(AFTER_CUCUMBER_RUN)", t);
             failure = rememberFailure(failure, t);
         }
 
+        CleanupTrace.print("[AfterAll] START: Log.global().closeAll()");
         try {
             Log.global().closeAll();
+            CleanupTrace.print("[AfterAll] END: Log.global().closeAll()");
         } catch (Throwable t) {
+            CleanupTrace.printThrowable("[AfterAll] THROWABLE: Log.global().closeAll()", t);
             failure = rememberFailure(failure, t);
         }
 
+        String launchStatus = failure == null ? "PASSED" : "FAILED";
+
+        CleanupTrace.print("[AfterAll] START: ReportPortalBridge.finishLaunch(" + launchStatus + ")");
         try {
-            ReportPortalBridge.finishLaunch(failure == null ? "PASSED" : "FAILED");
+            ReportPortalBridge.finishLaunch(launchStatus);
+            CleanupTrace.print("[AfterAll] END: ReportPortalBridge.finishLaunch(" + launchStatus + ")");
         } catch (Throwable t) {
+            CleanupTrace.printThrowable("[AfterAll] THROWABLE: ReportPortalBridge.finishLaunch(" + launchStatus + ")", t);
             failure = rememberFailure(failure, t);
         } finally {
-            // This prevents GitHub Actions from hanging on non-daemon RP worker threads.
-            ReportPortalBridge.shutdown();
+            CleanupTrace.print("[AfterAll] START: ReportPortalBridge.shutdown()");
+
+            try {
+                // This prevents GitHub Actions from hanging on non-daemon RP worker threads.
+                ReportPortalBridge.shutdown();
+                CleanupTrace.print("[AfterAll] END: ReportPortalBridge.shutdown()");
+            } catch (Throwable t) {
+                CleanupTrace.printThrowable("[AfterAll] THROWABLE: ReportPortalBridge.shutdown()", t);
+                failure = rememberFailure(failure, t);
+            }
         }
 
+        CleanupTrace.print("[AfterAll] START: pickleballLog.stop()");
         try {
             pickleballLog.stop();
+            CleanupTrace.print("[AfterAll] END: pickleballLog.stop()");
         } catch (Throwable t) {
+            CleanupTrace.printThrowable("[AfterAll] THROWABLE: pickleballLog.stop()", t);
             failure = rememberFailure(failure, t);
         }
 
         if (failure != null) {
+            CleanupTrace.print("[AfterAll] THROWING accumulated failure");
             throw new RuntimeException(failure);
         }
+
+        CleanupTrace.print("[AfterAll] COMPLETE");
     }
 
 
