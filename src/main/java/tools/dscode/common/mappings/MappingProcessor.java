@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.LinkedListMultimap;
+import io.cucumber.core.runner.StepData;
 import tools.dscode.common.mappings.queries.Tokenized;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 
@@ -294,33 +295,50 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     private static final Pattern ANGLE = Pattern.compile("<(?![\\s=])([^<>{}]*[^\\s<>{}])>");
-    private static final Pattern CURLY = Pattern.compile("\\{([^{}]+)\\}");
+
+    /**
+     * Private-use placeholders used to temporarily collapse the two-character
+     * expression bookends <{ and }> into single-character bookends.
+     *
+     * This keeps expression matching separate from normal angle-map syntax
+     * like <key>, and prevents the > in }> from being treated as an angle
+     * close by the map resolver.
+     */
+    private static final String OPEN_EXPRESSION_BOOKEND_SUB = "\uE000";
+    private static final String CLOSE_EXPRESSION_BOOKEND_SUB = "\uE001";
+    private static final Pattern EXPRESSION = Pattern.compile(
+            Pattern.quote(OPEN_EXPRESSION_BOOKEND_SUB)
+                    + "([^" + OPEN_EXPRESSION_BOOKEND_SUB + CLOSE_EXPRESSION_BOOKEND_SUB + "]+)"
+                    + Pattern.quote(CLOSE_EXPRESSION_BOOKEND_SUB));
 
 
     public String resolveWholeText(String input) {
+
         QuoteParser parsedObj = new QuoteParser(input);
 //        try {
-            // Resolve quoted substring values first.
-            // This lets curly expressions restore already-resolved quoted values.
-            for (var e : parsedObj.entrySetWithoutTripleSingle()) {
-                parsedObj.put(e.getKey(), resolveAll(e.getValue(), parsedObj));
-            }
+        // Resolve quoted substring values first.
+        // This lets expression bookends restore already-resolved quoted values.
+        for (var e : parsedObj.entrySetWithoutTripleSingle()) {
+            parsedObj.put(e.getKey(), resolveAll(e.getValue(), parsedObj));
+        }
 
-            // Now resolve the outer/masked text.
-            // If resolveCurly restores quoted placeholders, they are already resolved.
-            parsedObj.setMasked(resolveAll(parsedObj.masked(), parsedObj));
-
-            String resolvedText = parsedObj.restore();
-            logTrace("Resolved: '" + input + "' -> '" + resolvedText + "'");
-            return resolvedText;
+        // Now resolve the outer/masked text.
+        // If resolveExpression restores quoted placeholders, they are already resolved.
+        parsedObj.setMasked(resolveAll(parsedObj.masked(), parsedObj));
+        String resolvedText = parsedObj.restore();
+        logTrace("Resolved: '" + input + "' -> '" + resolvedText + "'");
+        return resolvedText;
 
     }
+    private static final Pattern UNRESOLVED_OPTIONAL_ANGLE =
+            Pattern.compile("<\\?[^<>{}]+>");
 
     private String resolveAll(String input, QuoteParser parsedObj) {
         boolean isDirectoryPath = input.startsWith("</");
         try {
             String originalInput;
             do {
+                input = protectExpressionBookends(input);
                 originalInput = input;
                 String prev;
                 do {
@@ -328,13 +346,14 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     if (input.contains("<")) {
                         input = resolveByMap(input);
                     }
-                    if (!isDirectoryPath && input.contains("{")) {
-                        input = resolveCurly(input, parsedObj);
+                    if (!isDirectoryPath && input.contains(OPEN_EXPRESSION_BOOKEND_SUB)) {
+                        input = resolveExpression(input, parsedObj);
                     }
+                    input = protectExpressionBookends(input);
                 } while (!input.equals(prev));
-                input = input.replaceAll("<\\?[^<>{}]+>", "");
+                input = UNRESOLVED_OPTIONAL_ANGLE.matcher(input).replaceAll("");
             } while (!input.equals(originalInput));
-            return decodeBackToText(input.replaceAll(MATCH_BREAK, ""));
+            return restoreExpressionBookends(decodeBackToText(input.replaceAll(MATCH_BREAK, "")));
         } catch (Throwable t) {
             t.printStackTrace();
             throw new RuntimeException("Could not resolve '" + input + "' due to '" + t.getMessage() + "'", t);
@@ -377,20 +396,32 @@ public abstract class MappingProcessor implements Map<String, Object> {
         }
     }
 
-    private String resolveCurly(String s, QuoteParser parsedObj) {
-            Matcher m = CURLY.matcher(s);
-            StringBuffer sb = new StringBuffer();
-            while (m.find()) {
-                String key = m.group(1).trim();
-                key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
-                String repl = key.endsWith("?")
-                        ? String.valueOf(evalToBoolean(key.substring(0, key.length() - 1), this))
-                        : String.valueOf(eval(key, this));
-                logTrace("'{" + key + "}' -> '" + repl + "'");
-                m.appendReplacement(sb, repl == null ? m.group(0) : Matcher.quoteReplacement(repl));
-            }
-            m.appendTail(sb);
-            return sb.toString();
+    private String resolveExpression(String s, QuoteParser parsedObj) {
+        Matcher m = EXPRESSION.matcher(s);
+        StringBuffer sb = new StringBuffer();
+        while (m.find()) {
+            String key = m.group(1).trim();
+            key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
+            String repl = key.endsWith("?")
+                    ? String.valueOf(evalToBoolean(key.substring(0, key.length() - 1), this))
+                    : String.valueOf(eval(key, this));
+            logTrace("'<{" + key + "}>' -> '" + repl + "'");
+            m.appendReplacement(sb, repl == null ? m.group(0) : Matcher.quoteReplacement(repl));
+        }
+        m.appendTail(sb);
+        return sb.toString();
+    }
+
+    private static String protectExpressionBookends(String input) {
+        return input
+                .replace("<{", OPEN_EXPRESSION_BOOKEND_SUB)
+                .replace("}>", CLOSE_EXPRESSION_BOOKEND_SUB);
+    }
+
+    private static String restoreExpressionBookends(String input) {
+        return input
+                .replace(OPEN_EXPRESSION_BOOKEND_SUB, "<{")
+                .replace(CLOSE_EXPRESSION_BOOKEND_SUB, "}>");
     }
 
 
@@ -771,6 +802,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
         }
 
         // 3. Turn alternate-bookend placeholders into real delimiters.
+        // Alternate curly replacements now mean alternate expression bookends.
+        // They are converted to the paired <{ and }> syntax, not raw { and }.
         if (replaceOpenAngle) {
             prepared = prepared.replace(OPEN_ANGLE_REPLACEMENT_SUB, "<");
         }
@@ -778,10 +811,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
             prepared = prepared.replace(CLOSE_ANGLE_REPLACEMENT_SUB, ">");
         }
         if (replaceOpenCurly) {
-            prepared = prepared.replace(OPEN_CURLY_REPLACEMENT_SUB, "{");
+            prepared = prepared.replace(OPEN_CURLY_REPLACEMENT_SUB, "<{");
         }
         if (replaceCloseCurly) {
-            prepared = prepared.replace(CLOSE_CURLY_REPLACEMENT_SUB, "}");
+            prepared = prepared.replace(CLOSE_CURLY_REPLACEMENT_SUB, "}>");
         }
 
         // 4. Resolve normally.
@@ -789,6 +822,12 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
         // 5. Restore any unresolved alternate placeholders back to their original syntax.
         // This matters if something survives resolution unchanged.
+        if (replaceOpenCurly) {
+            resolved = resolved.replace("<{", openCurlyReplacement);
+        }
+        if (replaceCloseCurly) {
+            resolved = resolved.replace("}>", closeCurlyReplacement);
+        }
         if (replaceOpenAngle) {
             resolved = resolved.replace(OPEN_ANGLE_REPLACEMENT_SUB, openAngleReplacement);
         }
