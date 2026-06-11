@@ -1,19 +1,18 @@
 package tools.dscode.common.util.debug;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public final class DebugUtils {
 
-    public static final List<String> prefixes = new ArrayList<>();
-    public static final List<String> substrings = new ArrayList<>();
+    public static final List<String> prefixes = new CopyOnWriteArrayList<>();
+    public static final List<String> substrings = new CopyOnWriteArrayList<>();
 
+    public static final List<String> debugFlags = new CopyOnWriteArrayList<>();
 
-    public static List<String> debugFlags;
-
-    public static boolean disableBaseElement = false;
+    public static volatile boolean disableBaseElement = false;
 
     static {
 //        prefixes.add("@@");
@@ -24,23 +23,35 @@ public final class DebugUtils {
 //        substrings.add("##");
     }
 
-
     public static boolean parseDebugString(List<String> tags) {
-        if(debugFlags == null) debugFlags = new ArrayList<>();
+        if (tags == null || tags.isEmpty()) {
+            return false;
+        }
+
         List<String> flags = tags.stream()
+                .filter(Objects::nonNull)
                 .filter(t -> t.startsWith("DEBUG"))
                 .flatMap(s -> Arrays.stream(s.split(",")))
-                .filter(str -> !str.isBlank()).map(s -> s.trim().toLowerCase())
+                .map(String::trim)
+                .filter(str -> !str.isBlank())
+                .map(String::toLowerCase)
                 .toList();
+
         boolean startStep = flags.contains("debug");
-        debugFlags.addAll(flags);
-        if(debugFlags.isEmpty())
+
+        if (flags.isEmpty()) {
             return false;
+        }
+
+        debugFlags.addAll(flags);
         disableBaseElement = debugFlags.contains("nobase");
-        debugFlags.forEach(flag ->{
-            if(flag.startsWith("##"))
+
+        flags.forEach(flag -> {
+            if (flag.startsWith("##") && !substrings.contains(flag)) {
                 substrings.add(flag);
+            }
         });
+
         return startStep;
     }
 
