@@ -5,7 +5,6 @@ import tools.dscode.common.reporting.logging.Level;
 
 import java.io.InputStream;
 import java.net.URL;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
@@ -123,16 +122,14 @@ public abstract class PickleballRunner {
     private void applyDebugFlags() {
         String debugArgs = values.get(PKB_DEBUG_ARGS);
         if (debugArgs != null && !debugArgs.isBlank()) {
-            if (debugFlags == null) debugFlags = new ArrayList<>();
             debugFlags.addAll(
                     Arrays.stream(debugArgs.split(","))
                             .filter(s -> !s.isBlank())
                             .map(s -> s.trim().toLowerCase())
                             .toList());
         }
-        if (debugFlags != null) {
-            if (debugFlags.contains("logallsteps"))
-                CurrentScenarioState.logAllSteps = true;
+        if (debugFlags.contains("logallsteps")) {
+            CurrentScenarioState.logAllSteps = true;
         }
 
         String raw = values.get(PKB_DEBUG_BROWSER);

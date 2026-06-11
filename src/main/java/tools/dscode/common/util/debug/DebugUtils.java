@@ -23,6 +23,7 @@ public final class DebugUtils {
 //        substrings.add("##");
     }
 
+
     public static boolean parseDebugString(List<String> tags) {
         if (tags == null || tags.isEmpty()) {
             return false;
@@ -32,9 +33,8 @@ public final class DebugUtils {
                 .filter(Objects::nonNull)
                 .filter(t -> t.startsWith("DEBUG"))
                 .flatMap(s -> Arrays.stream(s.split(",")))
-                .map(String::trim)
                 .filter(str -> !str.isBlank())
-                .map(String::toLowerCase)
+                .map(s -> s.trim().toLowerCase())
                 .toList();
 
         boolean startStep = flags.contains("debug");
@@ -44,7 +44,10 @@ public final class DebugUtils {
         }
 
         debugFlags.addAll(flags);
-        disableBaseElement = debugFlags.contains("nobase");
+
+        if (flags.contains("nobase")) {
+            disableBaseElement = true;
+        }
 
         flags.forEach(flag -> {
             if (flag.startsWith("##") && !substrings.contains(flag)) {
