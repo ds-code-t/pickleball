@@ -97,17 +97,6 @@ public class GeneralSteps extends CoreSteps {
         } catch (Throwable t) {
             CleanupTrace.printThrowable("[AfterAll] THROWABLE: ReportPortalBridge.finishLaunch(" + launchStatus + ")", t);
             failure = rememberFailure(failure, t);
-        } finally {
-            CleanupTrace.print("[AfterAll] START: ReportPortalBridge.shutdown()");
-
-            try {
-                // This prevents GitHub Actions from hanging on non-daemon RP worker threads.
-                ReportPortalBridge.shutdown();
-                CleanupTrace.print("[AfterAll] END: ReportPortalBridge.shutdown()");
-            } catch (Throwable t) {
-                CleanupTrace.printThrowable("[AfterAll] THROWABLE: ReportPortalBridge.shutdown()", t);
-                failure = rememberFailure(failure, t);
-            }
         }
 
         CleanupTrace.print("[AfterAll] START: pickleballLog.stop()");

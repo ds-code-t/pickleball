@@ -21,7 +21,6 @@ import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
@@ -29,12 +28,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 public final class ReportPortalBridge {
@@ -50,37 +43,8 @@ public final class ReportPortalBridge {
     private static final ThreadLocal<Maybe<String>> CURRENT_TEST = new ThreadLocal<>();
     private static final Set<String> KNOWN_SUITES = ConcurrentHashMap.newKeySet();
 
-    private static final AtomicReference<Throwable> ASYNC_FAILURE = new AtomicReference<>();
+    private static final AtomicReference<Throwable> CLIENT_FAILURE = new AtomicReference<>();
     private static volatile boolean rxErrorHandlerInstalled;
-
-    /**
-     * ReportPortal client-java already supports parallel logging.  This bridge keeps heavy
-     * attachment materialization off scenario threads by default, but no longer serializes
-     * all ReportPortal sends through one worker or a global send lock.
-     *
-     * Work is ordered per ReportPortal item/test so a test's finish request cannot overtake
-     * that same test's earlier logs or screenshots.  Different tests can still hand work to
-     * ReportPortal in parallel.
-     */
-    private static final boolean ASYNC_LOGGING = boolSetting("dscode.reportportal.asyncLogging", true);
-    private static final int WORKER_THREADS = intSetting(
-            "dscode.reportportal.workerThreads",
-            Math.max(2, Runtime.getRuntime().availableProcessors())
-    );
-    private static final int MAX_PENDING_LOGS = intSetting("dscode.reportportal.maxPendingLogs", 512);
-    private static final int SHUTDOWN_TIMEOUT_SECONDS = intSetting("dscode.reportportal.shutdownTimeoutSeconds", 30);
-    private static final Semaphore PENDING_LOG_SLOTS = new Semaphore(Math.max(1, MAX_PENDING_LOGS));
-    private static final Object LAUNCH_WORK_KEY = new Object();
-    private static final AtomicLong WORKER_ID = new AtomicLong();
-    private static final ConcurrentHashMap<Object, CompletableFuture<Void>> WORK_CHAINS = new ConcurrentHashMap<>();
-    private static final ExecutorService RP_EXECUTOR = Executors.newFixedThreadPool(WORKER_THREADS, new ThreadFactory() {
-        @Override
-        public Thread newThread(Runnable r) {
-            Thread t = new Thread(r, "dscode-reportportal-log-worker-" + WORKER_ID.incrementAndGet());
-            t.setDaemon(true);
-            return t;
-        }
-    });
 
     private ReportPortalBridge() { }
 
@@ -98,21 +62,29 @@ public final class ReportPortalBridge {
                 Throwable t = (e instanceof UndeliverableException ude && ude.getCause() != null)
                         ? ude.getCause()
                         : e;
-                ASYNC_FAILURE.compareAndSet(null, t);
+                CLIENT_FAILURE.compareAndSet(null, t);
             });
 
             rxErrorHandlerInstalled = true;
         }
     }
 
-    public static void throwIfAsyncFailure() {
-        Throwable t = ASYNC_FAILURE.getAndSet(null);
+    public static void throwIfFailure() {
+        Throwable t = CLIENT_FAILURE.getAndSet(null);
         if (t == null) {
             return;
         }
         if (t instanceof RuntimeException re) throw re;
         if (t instanceof Error err) throw err;
-        throw new RuntimeException("ReportPortal async failure", t);
+        throw new RuntimeException("ReportPortal client failure", t);
+    }
+
+    /**
+     * Retained for source and binary compatibility. ReportPortal bridge work now runs synchronously.
+     */
+    @Deprecated(forRemoval = false)
+    public static void throwIfAsyncFailure() {
+        throwIfFailure();
     }
 
     public static void initIfNeeded() {
@@ -253,30 +225,30 @@ public final class ReportPortalBridge {
         CleanupTrace.print("[ReportPortalBridge.finishCurrentTest] END: CURRENT_TEST.get()/remove(), hasCurrentTest=" + (test != null));
 
         String finalStatus = fallback(status, "PASSED");
-        CleanupTrace.print("[ReportPortalBridge.finishCurrentTest] START: submitReportPortalWork finalStatus="
+        CleanupTrace.print("[ReportPortalBridge.finishCurrentTest] START: runReportPortalWork finalStatus="
                 + finalStatus + ", hasCurrentTest=" + (test != null));
 
-        submitReportPortalWork(test, () -> {
-            CleanupTrace.print("[ReportPortalBridge.finishCurrentTest worker] START finalStatus="
+        runReportPortalWork(() -> {
+            CleanupTrace.print("[ReportPortalBridge.finishCurrentTest work] START finalStatus="
                     + finalStatus + ", hasCurrentTest=" + (test != null));
             try {
                 if (test != null) {
-                    CleanupTrace.print("[ReportPortalBridge.finishCurrentTest worker] START: ReportPortalHierarchy.finishTest(" + finalStatus + ")");
+                    CleanupTrace.print("[ReportPortalBridge.finishCurrentTest work] START: ReportPortalHierarchy.finishTest(" + finalStatus + ")");
                     ReportPortalHierarchy.finishTestAndWait(test, finalStatus);
-                    CleanupTrace.print("[ReportPortalBridge.finishCurrentTest worker] END: ReportPortalHierarchy.finishTest(" + finalStatus + ")");
+                    CleanupTrace.print("[ReportPortalBridge.finishCurrentTest work] END: ReportPortalHierarchy.finishTest(" + finalStatus + ")");
                 } else {
-                    CleanupTrace.print("[ReportPortalBridge.finishCurrentTest worker] START: ReportPortalHierarchy.finishCurrentTest(" + finalStatus + ")");
+                    CleanupTrace.print("[ReportPortalBridge.finishCurrentTest work] START: ReportPortalHierarchy.finishCurrentTest(" + finalStatus + ")");
                     ReportPortalHierarchy.finishCurrentTestAndWait(finalStatus);
-                    CleanupTrace.print("[ReportPortalBridge.finishCurrentTest worker] END: ReportPortalHierarchy.finishCurrentTest(" + finalStatus + ")");
+                    CleanupTrace.print("[ReportPortalBridge.finishCurrentTest work] END: ReportPortalHierarchy.finishCurrentTest(" + finalStatus + ")");
                 }
-                CleanupTrace.print("[ReportPortalBridge.finishCurrentTest worker] COMPLETE finalStatus=" + finalStatus);
+                CleanupTrace.print("[ReportPortalBridge.finishCurrentTest work] COMPLETE finalStatus=" + finalStatus);
             } catch (Throwable t) {
-                CleanupTrace.print("[ReportPortalBridge.finishCurrentTest worker] THROWABLE: " + describeThrowable(t));
+                CleanupTrace.print("[ReportPortalBridge.finishCurrentTest work] THROWABLE: " + describeThrowable(t));
                 throw unchecked(t);
             }
         });
 
-        CleanupTrace.print("[ReportPortalBridge.finishCurrentTest] END: submitReportPortalWork finalStatus=" + finalStatus);
+        CleanupTrace.print("[ReportPortalBridge.finishCurrentTest] END: runReportPortalWork finalStatus=" + finalStatus);
         CleanupTrace.print("[ReportPortalBridge.finishCurrentTest] COMPLETE status=" + finalStatus);
     }
 
@@ -297,7 +269,7 @@ public final class ReportPortalBridge {
         String msg = safe(message);
         Date when = Date.from(logTime != null ? logTime : Instant.now());
 
-        submitReportPortalWork(test, () -> logNow(test, lvl, msg, when));
+        runReportPortalWork(() -> logNow(test, lvl, msg, when));
     }
 
     private static void logNow(Maybe<String> test, String lvl, String msg, Date when) {
@@ -346,12 +318,12 @@ public final class ReportPortalBridge {
         String safeName = fallback(filenameHint, "attachment.bin");
         Date when = Date.from(logTime != null ? logTime : Instant.now());
 
-        submitReportPortalWork(test, () -> logAttachmentNow(test, lvl, msg, data, null, safeName, when));
+        runReportPortalWork(() -> logAttachmentNow(test, lvl, msg, data, null, safeName, when));
     }
 
     /**
-     * Preferred attachment path.  The screenshot file is materialized by a ReportPortal
-     * bridge worker thread so scenario threads do not have to read or clone large files.
+     * Preferred attachment path. Uses a file-backed byte source when the installed
+     * ReportPortal client supports one.
      */
     public static void logAttachmentFile(String level,
                                          String message,
@@ -372,7 +344,7 @@ public final class ReportPortalBridge {
         Date when = Date.from(logTime != null ? logTime : Instant.now());
         Path safeFile = file == null ? null : file.toAbsolutePath().normalize();
 
-        submitReportPortalWork(test, () -> logAttachmentNow(test, lvl, msg, null, safeFile, safeName, when));
+        runReportPortalWork(() -> logAttachmentNow(test, lvl, msg, null, safeFile, safeName, when));
     }
 
     private static void logAttachmentNow(Maybe<String> test,
@@ -407,8 +379,8 @@ public final class ReportPortalBridge {
 
     /**
      * Prefer a file/path-backed ByteSource if the installed client exposes one.  client-java
-     * versions differ, so reflection keeps this drop-in compatible with 5.4.x.  If unavailable,
-     * fall back to byte[] materialization on the ReportPortal worker thread, not the scenario thread.
+     * versions differ, so reflection keeps this drop-in compatible with 5.4.x. If unavailable,
+     * fall back to byte[] materialization.
      */
     private static ByteSource byteSourceFromFileOrFallback(Path file) throws Exception {
         if (file == null) {
@@ -439,9 +411,7 @@ public final class ReportPortalBridge {
     public static void finishLaunch(String status) {
         CleanupTrace.print("[ReportPortalBridge.finishLaunch] START status=" + status
                 + ", enabled=" + enabled
-                + ", launchStarted=" + launchStarted
-                + ", workChains=" + WORK_CHAINS.size()
-                + ", pendingSlotsAvailable=" + PENDING_LOG_SLOTS.availablePermits());
+                + ", launchStarted=" + launchStarted);
 
         CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: initIfNeeded()");
         try {
@@ -457,10 +427,6 @@ public final class ReportPortalBridge {
                 CleanupTrace.print("[ReportPortalBridge.finishLaunch] SKIP enabled=" + enabled + ", launchStarted=" + launchStarted);
                 return;
             }
-
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: drainReportPortalWork()");
-            drainReportPortalWork();
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: drainReportPortalWork()");
 
             CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: fallback(status, PASSED)");
             String finalStatus = fallback(status, "PASSED");
@@ -482,9 +448,9 @@ public final class ReportPortalBridge {
             ReportPortalHierarchy.getLaunch().finish(rq);
             CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: ReportPortalHierarchy.getLaunch().finish(" + finalStatus + ")");
 
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: throwIfAsyncFailure()");
-            throwIfAsyncFailure();
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: throwIfAsyncFailure()");
+            CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: throwIfFailure()");
+            throwIfFailure();
+            CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: throwIfFailure()");
 
             CleanupTrace.print("[ReportPortalBridge.finishLaunch] COMPLETE status=" + finalStatus);
         } catch (Throwable t) {
@@ -509,257 +475,42 @@ public final class ReportPortalBridge {
             KNOWN_SUITES.clear();
             CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: KNOWN_SUITES.clear()");
 
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: ASYNC_FAILURE.set(null)");
-            ASYNC_FAILURE.set(null);
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: ASYNC_FAILURE.set(null)");
+            CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: CLIENT_FAILURE.set(null)");
+            CLIENT_FAILURE.set(null);
+            CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: CLIENT_FAILURE.set(null)");
 
             CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: ReportPortalHierarchy.resetLaunch()");
             ReportPortalHierarchy.resetLaunch();
             CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: ReportPortalHierarchy.resetLaunch()");
-
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: shutdownReportPortalExecutor()");
-            try {
-                shutdownReportPortalExecutor();
-                CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: shutdownReportPortalExecutor()");
-            } catch (Throwable t) {
-                CleanupTrace.print("[ReportPortalBridge.finishLaunch] THROWABLE: shutdownReportPortalExecutor() | " + describeThrowable(t));
-                throw unchecked(t);
-            }
 
             CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: cleanup");
         }
     }
 
     /**
-     * Final JVM cleanup for the bridge worker pool. Call this from the outer
-     * @AfterAll path even when ReportPortal was disabled or no launch was started.
+     * Retained for source and binary compatibility. There is no bridge executor to shut down.
      */
+    @Deprecated(forRemoval = false)
     public static void shutdown() {
-        CleanupTrace.print("[ReportPortalBridge.shutdown] START");
-        CleanupTrace.print("[ReportPortalBridge.shutdown] START: shutdownReportPortalExecutor()");
-        try {
-            shutdownReportPortalExecutor();
-            CleanupTrace.print("[ReportPortalBridge.shutdown] END: shutdownReportPortalExecutor()");
-            CleanupTrace.print("[ReportPortalBridge.shutdown] COMPLETE");
-        } catch (Throwable t) {
-            CleanupTrace.print("[ReportPortalBridge.shutdown] THROWABLE: shutdownReportPortalExecutor() | " + describeThrowable(t));
-            throw unchecked(t);
-        }
     }
-
 
     /**
-     * Returns a non-blocking marker future that completes after ReportPortal work
-     * submitted before this call has drained.
-     *
-     * This is useful for scenario-level cleanup orchestration: scenario close can
-     * continue, while the external lifecycle can wait for this future before deleting
-     * scenario/run attachment files.
+     * Retained for source and binary compatibility. Work is complete before logging methods return.
      */
+    @Deprecated(forRemoval = false)
     public static CompletableFuture<Void> drainSubmittedWorkAsync() {
-        CleanupTrace.print("[ReportPortalBridge.drainSubmittedWorkAsync] START enabled=" + enabled
-                + ", asyncLogging=" + ASYNC_LOGGING
-                + ", workChains=" + WORK_CHAINS.size());
-
-        CleanupTrace.print("[ReportPortalBridge.drainSubmittedWorkAsync] START: initIfNeeded()");
         initIfNeeded();
-        CleanupTrace.print("[ReportPortalBridge.drainSubmittedWorkAsync] END: initIfNeeded()");
-
-        if (!enabled || !ASYNC_LOGGING) {
-            try {
-                CleanupTrace.print("[ReportPortalBridge.drainSubmittedWorkAsync] START: throwIfAsyncFailure() before completed future");
-                throwIfAsyncFailure();
-                CleanupTrace.print("[ReportPortalBridge.drainSubmittedWorkAsync] END: throwIfAsyncFailure() before completed future");
-                CleanupTrace.print("[ReportPortalBridge.drainSubmittedWorkAsync] COMPLETE: returning completed future - disabled or sync logging");
-                return CompletableFuture.completedFuture(null);
-            } catch (Throwable t) {
-                CleanupTrace.print("[ReportPortalBridge.drainSubmittedWorkAsync] THROWABLE: returning failed future | " + describeThrowable(t));
-                return failedFuture(t);
-            }
-        }
-
-        CleanupTrace.print("[ReportPortalBridge.drainSubmittedWorkAsync] START: snapshot WORK_CHAINS");
-        List<CompletableFuture<Void>> snapshot = new ArrayList<>(WORK_CHAINS.values());
-        CleanupTrace.print("[ReportPortalBridge.drainSubmittedWorkAsync] END: snapshot WORK_CHAINS size=" + snapshot.size());
-
-        CompletableFuture<Void> marker = snapshot.isEmpty()
-                ? CompletableFuture.completedFuture(null)
-                : CompletableFuture.allOf(snapshot.toArray(CompletableFuture[]::new));
-
-        CleanupTrace.print("[ReportPortalBridge.drainSubmittedWorkAsync] COMPLETE: returning marker future snapshotSize=" + snapshot.size());
-        return marker.handle((ignored, throwable) -> {
-            CleanupTrace.print("[ReportPortalBridge.drainSubmittedWorkAsync marker] START throwable=" + throwable);
-            if (throwable != null) {
-                Throwable unwrapped = unwrapCompletionFailure(throwable);
-                CleanupTrace.print("[ReportPortalBridge.drainSubmittedWorkAsync marker] THROWABLE: marker failed | " + describeThrowable(unwrapped));
-                throw new java.util.concurrent.CompletionException(unwrapped);
-            }
-
-            Throwable asyncFailure = ASYNC_FAILURE.get();
-            if (asyncFailure != null) {
-                CleanupTrace.print("[ReportPortalBridge.drainSubmittedWorkAsync marker] THROWABLE: async failure | " + describeThrowable(asyncFailure));
-                throw new java.util.concurrent.CompletionException(asyncFailure);
-            }
-
-            CleanupTrace.print("[ReportPortalBridge.drainSubmittedWorkAsync marker] COMPLETE");
-            return null;
-        });
-    }
-
-    private static CompletableFuture<Void> failedFuture(Throwable t) {
-        CompletableFuture<Void> f = new CompletableFuture<>();
-        f.completeExceptionally(t);
-        return f;
-    }
-
-    private static void submitReportPortalWork(Maybe<String> test, Runnable work) {
-        Object key = test == null ? LAUNCH_WORK_KEY : test;
-        submitReportPortalWork(key, work);
-    }
-
-    private static void submitReportPortalWork(Object orderingKey, Runnable work) {
-        if (!ASYNC_LOGGING) {
-            runReportPortalWork(work);
-            throwIfAsyncFailure();
-            return;
-        }
-
-        acquirePendingSlot();
-
-        Object key = orderingKey == null ? LAUNCH_WORK_KEY : orderingKey;
-
         try {
-            WORK_CHAINS.compute(key, (k, previous) -> {
-                CompletableFuture<Void> base = previous == null
-                        ? CompletableFuture.completedFuture(null)
-                        : previous.exceptionally(t -> null);
-
-                CompletableFuture<Void> next = base.thenRunAsync(() -> runReportPortalWork(work), RP_EXECUTOR);
-                next.whenComplete((ignored, throwable) -> {
-                    try {
-                        if (throwable != null) {
-                            ASYNC_FAILURE.compareAndSet(null, unwrapCompletionFailure(throwable));
-                        }
-                    } finally {
-                        PENDING_LOG_SLOTS.release();
-                        WORK_CHAINS.remove(k, next);
-                    }
-                });
-                return next;
-            });
-        } catch (RuntimeException e) {
-            PENDING_LOG_SLOTS.release();
-            throw e;
+            throwIfFailure();
+            return CompletableFuture.completedFuture(null);
+        } catch (Throwable t) {
+            return CompletableFuture.failedFuture(t);
         }
     }
 
     private static void runReportPortalWork(Runnable work) {
-        try {
-            work.run();
-        } catch (Throwable t) {
-            ASYNC_FAILURE.compareAndSet(null, t);
-        }
-    }
-
-    private static void drainReportPortalWork() {
-        CleanupTrace.print("[ReportPortalBridge.drainReportPortalWork] START asyncLogging=" + ASYNC_LOGGING
-                + ", workChains=" + WORK_CHAINS.size()
-                + ", pendingSlotsAvailable=" + PENDING_LOG_SLOTS.availablePermits());
-
-        if (!ASYNC_LOGGING) {
-            CleanupTrace.print("[ReportPortalBridge.drainReportPortalWork] SKIP: async logging disabled");
-            return;
-        }
-
-        int iteration = 0;
-        while (true) {
-            CleanupTrace.print("[ReportPortalBridge.drainReportPortalWork] START: snapshot WORK_CHAINS iteration=" + iteration);
-            List<CompletableFuture<Void>> snapshot = new ArrayList<>(WORK_CHAINS.values());
-            CleanupTrace.print("[ReportPortalBridge.drainReportPortalWork] END: snapshot WORK_CHAINS iteration="
-                    + iteration + ", snapshotSize=" + snapshot.size());
-
-            if (snapshot.isEmpty()) {
-                CleanupTrace.print("[ReportPortalBridge.drainReportPortalWork] NO REMAINING WORK iterations=" + iteration);
-                break;
-            }
-
-            iteration++;
-            CleanupTrace.print("[ReportPortalBridge.drainReportPortalWork] START: wait for snapshot iteration=" + iteration
-                    + ", snapshotSize=" + snapshot.size()
-                    + ", workChains=" + WORK_CHAINS.size()
-                    + ", pendingSlotsAvailable=" + PENDING_LOG_SLOTS.availablePermits());
-            try {
-                CompletableFuture.allOf(snapshot.toArray(CompletableFuture[]::new)).get();
-                CleanupTrace.print("[ReportPortalBridge.drainReportPortalWork] END: wait for snapshot iteration=" + iteration);
-            } catch (Exception e) {
-                Throwable unwrapped = unwrapCompletionFailure(e);
-                CleanupTrace.print("[ReportPortalBridge.drainReportPortalWork] THROWABLE: wait for snapshot iteration="
-                        + iteration + " | " + describeThrowable(unwrapped));
-                ASYNC_FAILURE.compareAndSet(null, unwrapped);
-            }
-        }
-
-        CleanupTrace.print("[ReportPortalBridge.drainReportPortalWork] START: throwIfAsyncFailure()");
-        throwIfAsyncFailure();
-        CleanupTrace.print("[ReportPortalBridge.drainReportPortalWork] END: throwIfAsyncFailure()");
-        CleanupTrace.print("[ReportPortalBridge.drainReportPortalWork] COMPLETE");
-    }
-
-    private static void shutdownReportPortalExecutor() {
-        CleanupTrace.print("[ReportPortalBridge.shutdownReportPortalExecutor] START asyncLogging=" + ASYNC_LOGGING
-                + ", isShutdown=" + RP_EXECUTOR.isShutdown()
-                + ", isTerminated=" + RP_EXECUTOR.isTerminated());
-
-        if (!ASYNC_LOGGING || RP_EXECUTOR.isShutdown()) {
-            CleanupTrace.print("[ReportPortalBridge.shutdownReportPortalExecutor] SKIP asyncLogging=" + ASYNC_LOGGING
-                    + ", isShutdown=" + RP_EXECUTOR.isShutdown());
-            return;
-        }
-
-        CleanupTrace.print("[ReportPortalBridge.shutdownReportPortalExecutor] START: RP_EXECUTOR.shutdown()");
-        RP_EXECUTOR.shutdown();
-        CleanupTrace.print("[ReportPortalBridge.shutdownReportPortalExecutor] END: RP_EXECUTOR.shutdown()");
-
-        try {
-            CleanupTrace.print("[ReportPortalBridge.shutdownReportPortalExecutor] START: awaitTermination seconds="
-                    + SHUTDOWN_TIMEOUT_SECONDS);
-            if (!RP_EXECUTOR.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-                CleanupTrace.print("[ReportPortalBridge.shutdownReportPortalExecutor] TIMEOUT: awaitTermination; START: shutdownNow()");
-                RP_EXECUTOR.shutdownNow();
-                CleanupTrace.print("[ReportPortalBridge.shutdownReportPortalExecutor] END: shutdownNow()");
-
-                CleanupTrace.print("[ReportPortalBridge.shutdownReportPortalExecutor] START: awaitTermination after shutdownNow seconds="
-                        + SHUTDOWN_TIMEOUT_SECONDS);
-                RP_EXECUTOR.awaitTermination(SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                CleanupTrace.print("[ReportPortalBridge.shutdownReportPortalExecutor] END: awaitTermination after shutdownNow");
-            } else {
-                CleanupTrace.print("[ReportPortalBridge.shutdownReportPortalExecutor] END: awaitTermination");
-            }
-            CleanupTrace.print("[ReportPortalBridge.shutdownReportPortalExecutor] COMPLETE isTerminated=" + RP_EXECUTOR.isTerminated());
-        } catch (InterruptedException e) {
-            CleanupTrace.print("[ReportPortalBridge.shutdownReportPortalExecutor] THROWABLE: interrupted | " + describeThrowable(e));
-            RP_EXECUTOR.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private static void acquirePendingSlot() {
-        try {
-            PENDING_LOG_SLOTS.acquire();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("Interrupted while waiting for ReportPortal log queue capacity", e);
-        }
-    }
-
-    private static Throwable unwrapCompletionFailure(Throwable t) {
-        Throwable current = t;
-        while (current.getCause() != null
-                && (current instanceof java.util.concurrent.CompletionException
-                || current instanceof java.util.concurrent.ExecutionException)) {
-            current = current.getCause();
-        }
-        return current;
+        work.run();
+        throwIfFailure();
     }
 
     private static RuntimeException unchecked(Throwable t) {
@@ -789,26 +540,4 @@ public final class ReportPortalBridge {
         return t.isEmpty() ? null : t;
     }
 
-    private static boolean boolSetting(String property, boolean defaultValue) {
-        String raw = setting(property);
-        if (raw == null || raw.isBlank()) return defaultValue;
-        return Boolean.parseBoolean(raw.trim());
-    }
-
-    private static int intSetting(String property, int defaultValue) {
-        String raw = setting(property);
-        if (raw == null || raw.isBlank()) return defaultValue;
-        try {
-            return Math.max(1, Integer.parseInt(raw.trim()));
-        } catch (NumberFormatException ignored) {
-            return defaultValue;
-        }
-    }
-
-    private static String setting(String property) {
-        String raw = System.getProperty(property);
-        if (raw != null) return raw;
-        String env = property.toUpperCase().replace('.', '_').replace('-', '_');
-        return System.getenv(env);
-    }
 }

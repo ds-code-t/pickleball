@@ -309,8 +309,8 @@ public class CurrentScenarioState extends ScenarioMapping {
      * 2. close all converters attached to the scenario root,
      * 3. wait for each converter's scenario cleanup/completion hook.
      *
-     * The final wait is important for async mediums such as ReportPortal. It allows their
-     * scenario drain markers to complete before later scenario resource cleanup runs.
+     * The final wait preserves the converter lifecycle contract before later scenario
+     * resource cleanup runs. Synchronous converters complete this step immediately.
      */
     private void completeScenarioLogging() {
         Entry root = getScenarioLogRoot();

@@ -13,7 +13,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.concurrent.CompletableFuture;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -39,7 +38,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
     @Override
     public void onStart(Entry scope, Entry entry) {
-        ReportPortalBridge.throwIfAsyncFailure();
+        ReportPortalBridge.throwIfFailure();
 
         if (isScenarioRoot(scope, entry)) {
             ReportPortalBridge.startTest(entry.text, suitePath(ancestorPath));
@@ -47,12 +46,12 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
             ReportPortalBridge.log(level(entry.level), "STARTED: " + safe(entry.text), effectiveTime(entry.startedAt));
         }
 
-        ReportPortalBridge.throwIfAsyncFailure();
+        ReportPortalBridge.throwIfFailure();
     }
 
     @Override
     public void onTimestamp(Entry scope, Entry entry) {
-        ReportPortalBridge.throwIfAsyncFailure();
+        ReportPortalBridge.throwIfFailure();
 
         String lvl = level(entry.level);
         Instant when = effectiveTime(entry.timestampedAt);
@@ -65,12 +64,12 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
             ReportPortalBridge.log(lvl, safe(entry.text), when);
         }
 
-        ReportPortalBridge.throwIfAsyncFailure();
+        ReportPortalBridge.throwIfFailure();
     }
 
     @Override
     public void onStop(Entry scope, Entry entry) {
-        ReportPortalBridge.throwIfAsyncFailure();
+        ReportPortalBridge.throwIfFailure();
 
         String lvl = levelForStop(entry);
         Instant when = effectiveTime(entry.stoppedAt);
@@ -93,7 +92,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
             ReportPortalBridge.log(lvl, formatStoppedSpan(entry), when);
         }
 
-        ReportPortalBridge.throwIfAsyncFailure();
+        ReportPortalBridge.throwIfFailure();
     }
 
     @Override
@@ -115,24 +114,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
     @Override
     protected void onClose() {
-        // Per-scenario close should stay light. The scenario cleanup phase can
-        // wait asynchronously for ReportPortal work without blocking the next
-        // converter's onClose() call.
-        ReportPortalBridge.throwIfAsyncFailure();
-    }
-
-    @Override
-    protected CompletableFuture<Void> onScenarioCleanup() {
-        // Non-blocking scenario-level drain marker. External lifecycle code can
-        // wait on cleanupScenario() before deleting scenario/shared temp files.
-        return ReportPortalBridge.drainSubmittedWorkAsync();
-    }
-
-    @Override
-    protected CompletableFuture<Void> onRunComplete() {
-        // Do not finish the launch here because final launch status is owned by
-        // the outer test-run lifecycle.  Draining here is safe and idempotent.
-        return ReportPortalBridge.drainSubmittedWorkAsync();
+        ReportPortalBridge.throwIfFailure();
     }
 
     private boolean hasUnsentAttachments(Entry entry) {
@@ -157,9 +139,8 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
 
             try {
                 if (a.isFileBoth() || a.isFileBinary() || isExistingPath(payload)) {
-                    // Preferred ReportPortal path: pass the binary file reference through to the bridge.
-                    // The bridge serializes/offloads the EPAM client SaveLogRQ work and uses a file-backed
-                    // ByteSource when the installed client-java version exposes one.
+                    // Preferred ReportPortal path: pass the binary file reference through to the bridge,
+                    // which uses a file-backed ByteSource when the client-java version exposes one.
                     Path p = Path.of(payload);
                     if (a.name() == null || a.name().isBlank()) {
                         filename = p.getFileName().toString();
@@ -196,7 +177,7 @@ public final class ReportPortalBridgeConverter extends BaseConverter {
                 throw new RuntimeException("Failed to materialize attachment: " + describeAttachment(a), e);
             }
 
-            ReportPortalBridge.throwIfAsyncFailure();
+            ReportPortalBridge.throwIfFailure();
         }
     }
 
