@@ -2,6 +2,10 @@ Feature: Addition
 
 
   Scenario Outline: datable tezsts354
+    * , if 1==1, then save "A"
+    * , if 1==1,then save "A"
+
+
     * I have a DataTable
       | Run Tags       |
       | <3Azz>  |

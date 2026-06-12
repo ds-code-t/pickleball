@@ -128,6 +128,8 @@ public abstract class LineData implements Cloneable {
         if (!DELIMITERS.contains(c)) {
             return false;
         }
+        if (c == ',')
+            return true;
 
         return index == s.length() - 1
                 || Character.isWhitespace(s.charAt(index + 1));
