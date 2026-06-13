@@ -21,6 +21,7 @@ import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CON
 
 public enum ElementType {
     DEFAULT_STARTING_CONTEXT,
+    REPETITION,
     SINGLE_ELEMENT_IN_PHRASE, MULTIPLE_ELEMENTS_IN_PHRASE,
 //    FIRST_ELEMENT, SECOND_ELEMENT, LAST_ELEMENT,
 //    PRECEDING_OPERATION, FOLLOWING_OPERATION,
@@ -143,6 +144,7 @@ public enum ElementType {
                 case String x when x.equals(KEY_NAME) -> returnSet.add(KEY_VALUE);
                 case String x when TIME_UNITS.contains(x) -> returnSet.add(TIME_VALUE);
                 case String x when NUMERIC_TYPES.contains(x) -> returnSet.add(NUMERIC_VALUE);
+                case String x when "TIMES".equals(x) -> returnSet.add(REPETITION);
                 default -> returnSet.add(TEXT_VALUE);
             }
             returnSet.add(VALUE_TYPE);

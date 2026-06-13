@@ -26,6 +26,7 @@ import tools.dscode.common.treeparsing.preparsing.LineData;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -44,6 +45,7 @@ import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLev
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.REPETITION;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
 import static tools.dscode.common.treeparsing.preparsing.LineData.wrapLooseConditionalExpression;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
@@ -53,6 +55,7 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.ins
 
 
 public abstract class PhraseData extends PassedData {
+    protected Optional<ElementMatch> repetitionElementOptional;
     public boolean isChainedAssertion = false;
     public Entry phraseEntry;
     //    boolean isStartingContext;
@@ -84,8 +87,10 @@ public abstract class PhraseData extends PassedData {
         return getPreviousPhrase() == null ? "" : getPreviousPhrase().termination.toString();
     }
 
-    public boolean previousSemicolon() {
-        return getPreviousPhrase() != null && getPreviousPhrase().termination == ';';
+    protected boolean skipSync = false;
+
+    public boolean skipPageSync() {
+        return skipSync || (getPreviousPhrase() != null && getPreviousPhrase().termination == ';');
     }
 
     public boolean nextSemicolon() {
@@ -113,7 +118,7 @@ public abstract class PhraseData extends PassedData {
         return wrappedElements;
     }
 
-    private List<ElementWrapper> wrappedElements = new ArrayList<>();
+    List<ElementWrapper> wrappedElements = new ArrayList<>();
 
     public enum PhraseType {
         INITIAL, CONTEXT, ACTION, ASSERTION, CONDITIONAL, ELEMENT_ONLY, NO_EXECUTION, DATA_OPERATION, BROWSER_OPERATION
@@ -127,7 +132,7 @@ public abstract class PhraseData extends PassedData {
     }
 
     public String getResolvedText() {
-        return (resolvedText ==null? text: resolvedText).replaceAll(BOOK_END, "") + termination;
+        return (resolvedText == null ? text : resolvedText).replaceAll(BOOK_END, "") + termination;
     }
 
     public String getText() {
@@ -194,7 +199,7 @@ public abstract class PhraseData extends PassedData {
 
     public PhraseData(String inputText, Character delimiter, LineData lineData, PhraseData previousPhrase) {
         originalText = inputText;
-        var m = Pattern.compile( META_TEXT_SEPARATOR +"\\s*(.*?)\\s*"+ META_TEXT_SEPARATOR ).matcher(inputText);
+        var m = Pattern.compile(META_TEXT_SEPARATOR + "\\s*(.*?)\\s*" + META_TEXT_SEPARATOR).matcher(inputText);
         boolean found = m.find();
         metaTextPrefix = found ? m.group(1) : "";
         inputText = found ? m.replaceFirst("") : inputText;
@@ -307,8 +312,7 @@ public abstract class PhraseData extends PassedData {
                         return contextList;
                     }
                 }
-            }
-            else {
+            } else {
                 if (currentPhrase.isTopContext || currentPhrase.contextElement != null) {
                     return contextList;
                 }
@@ -448,8 +452,7 @@ public abstract class PhraseData extends PassedData {
         previouslyResolvedBoolean = (result == null || result.value() == null) ? null : (boolean) result.value();
 
         String assertionMessage = "Assertion evaluates to: " + previouslyResolvedBoolean;
-        if(assertionChain == null)
-        {
+        if (assertionChain == null) {
             phraseConditionalMode = previouslyResolvedBoolean ? 1 : -1;
             return previouslyResolvedBoolean;
         }
@@ -479,5 +482,22 @@ public abstract class PhraseData extends PassedData {
         return previouslyResolvedBoolean;
     }
 
+    public int getRepetition() {
+        if (repetitionElementOptional == null) {
+            repetitionElementOptional = elementMatches.stream()
+                    .filter(e -> e.elementTypes.contains(REPETITION)).findFirst();
+        }
+        if (repetitionElementOptional.isPresent()) {
+            ElementMatch repetitionElement = this.repetitionElementOptional.get();
+            elementMatches.remove(repetitionElement);
+            return repetitionElement.getValue().asInteger();
+        }
+        return 1;
+    }
+
+    public void resetElementWrapper() {
+        wrappedElements.clear();
+        elementMatches.forEach(e -> e.wrappedElements = null);
+    }
 
 }

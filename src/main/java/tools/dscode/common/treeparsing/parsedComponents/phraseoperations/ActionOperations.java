@@ -182,7 +182,7 @@ public enum ActionOperations implements OperationsInterface {
                     new ElementMatcher().mustMatchAtLeastOne(ElementType.TIME_VALUE, ElementType.HTML_ELEMENT)
             );
             ElementMatch waitElementMatch = phraseData.resultElements.getFirst();
-            boolean waitOnPageLoad = !phraseData.previousSemicolon();
+            boolean waitOnPageLoad = !phraseData.skipPageSync();
             phraseData.result = Attempt.run(() -> {
                 if (waitElementMatch.elementTypes.contains(ElementType.HTML_ELEMENT)) {
                     if (waitOnPageLoad)

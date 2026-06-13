@@ -1,7 +1,6 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.xpathy.XPathy;
-import io.cucumber.plugin.event.Node;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.browseroperations.WindowSwitch;
@@ -14,7 +13,6 @@ import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatcher;
-import tools.dscode.common.util.debug.DebugUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,7 +24,6 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static tools.dscode.common.GlobalConstants.NOT_DISPLAYED;
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.browseroperations.BrowserAlerts.getText;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
@@ -43,7 +40,6 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETUR
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrPredicate;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.everyNth;
 
 public class ElementMatch {
     public final String fullText;
@@ -542,10 +538,11 @@ public class ElementMatch {
         if (wrappedElements == null) {
             if (parentPhrase.contextElement != null)
                 wrappedElements = Collections.singletonList(parentPhrase.contextElement);
-            else if (parentPhrase.previousSemicolon())
+            else if (parentPhrase.skipPageSync()) {
                 findWrappedElements();
-            else
+            } else {
                 parentPhrase.syncWithDOM();
+            }
         }
         return wrappedElements;
     }
