@@ -3,50 +3,51 @@ package tools.dscode.coredefinitions;
 import io.cucumber.java.en.Given;
 import tools.dscode.common.util.datetime.BusinessCalendar;
 import tools.dscode.common.util.datetime.CalendarRegistry;
+import tools.dscode.common.util.datetime.TemporalValue;
 
 import static tools.dscode.common.util.datetime.CalendarRegistry.getCalendar;
 
 public class DateTimeUtilitySteps {
 
-    // General form (already exists)
-    @Given("^DateTime:(?:(?i:Calendar:)(\\S+)\\s+)?(.+)$")
-    public static String dateTime(String calendar, String dateTimeString) {
+    @Given("^(?i:DateTime:)\\s*(?:(?i:Calendar:)(\\S+)\\s+)?(.+)$")
+    public static TemporalValue dateTime(String calendar, String dateTimeString) {
         BusinessCalendar bc = (calendar == null || calendar.isBlank())
                 ? getCalendar()
                 : CalendarRegistry.get(calendar.trim());
         return bc.eval(dateTimeString);
     }
 
-    // ------------------------------------------------------------
-    // Convenience shortcuts (NO "DateTime:" prefix)
-    // These forward to dateTime(...) and allow trailing text.
-    // ------------------------------------------------------------
-
-    // today [<anything...>]
     @Given("^(?:(?i:Calendar:)(\\S+)\\s+)?(?i:today)(?:\\s+(.+))?$")
-    public static String todayShortcut(String calendar, String rest) {
-        String spec = (rest == null || rest.isBlank()) ? "today" : "today " + rest.trim();
-        return dateTime(calendar, spec);
+    public static TemporalValue todayShortcut(String calendar, String rest) {
+        return dateTime(calendar, append("today", rest));
     }
 
-    // tomorrow [<anything...>]
     @Given("^(?:(?i:Calendar:)(\\S+)\\s+)?(?i:tomorrow)(?:\\s+(.+))?$")
-    public static String tomorrowShortcut(String calendar, String rest) {
-        String spec = (rest == null || rest.isBlank()) ? "tomorrow" : "tomorrow " + rest.trim();
-        return dateTime(calendar, spec);
+    public static TemporalValue tomorrowShortcut(String calendar, String rest) {
+        return dateTime(calendar, append("tomorrow", rest));
     }
 
-    // yesterday [<anything...>]
     @Given("^(?:(?i:Calendar:)(\\S+)\\s+)?(?i:yesterday)(?:\\s+(.+))?$")
-    public static String yesterdayShortcut(String calendar, String rest) {
-        String spec = (rest == null || rest.isBlank()) ? "yesterday" : "yesterday " + rest.trim();
-        return dateTime(calendar, spec);
+    public static TemporalValue yesterdayShortcut(String calendar, String rest) {
+        return dateTime(calendar, append("yesterday", rest));
     }
 
-    // now [<anything...>]
     @Given("^(?:(?i:Calendar:)(\\S+)\\s+)?(?i:now)(?:\\s+(.+))?$")
-    public static String nowShortcut(String calendar, String rest) {
-        String spec = (rest == null || rest.isBlank()) ? "now" : "now " + rest.trim();
-        return dateTime(calendar, spec);
+    public static TemporalValue nowShortcut(String calendar, String rest) {
+        return dateTime(calendar, append("now", rest));
+    }
+
+    @Given("^(?i:Duration:)\\s*(.+)$")
+    public static TemporalValue duration(String durationString) {
+        return TemporalValue.duration(durationString);
+    }
+
+    @Given("^(?i:TimeRange:)\\s*(.+)$")
+    public static TemporalValue timeRange(String rangeString) {
+        return TemporalValue.timeRange(rangeString);
+    }
+
+    private static String append(String base, String rest) {
+        return (rest == null || rest.isBlank()) ? base : base + " " + rest.trim();
     }
 }

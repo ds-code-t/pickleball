@@ -2,6 +2,7 @@ package tools.dscode.common.treeparsing.parsedComponents;
 
 import tools.dscode.common.browseroperations.WindowSwitch;
 
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
@@ -30,6 +31,7 @@ public enum ElementType {
     BROWSER_TYPE, ALERT, BROWSER, BROWSER_WINDOW, BROWSER_TAB, URL,
     DATA_TYPE,
     VALUE_TYPE, TIME_VALUE, NUMERIC_VALUE, INTEGER_VALUE, DECIMAL_VALUE, TEXT_VALUE, KEY_VALUE,
+    TIME_DURATION, TIME_INSTANCE, TIME_RANGE,
     RETURNS_VALUE,
     REGEX_MATCH;
 
@@ -78,6 +80,7 @@ public enum ElementType {
 
     public static Set<ElementType> fromString(String raw) {
         Set<ElementType> returnSet = new java.util.HashSet<>();
+
         if(raw.equals(STARTING_CONTEXT))
         {
             returnSet.add(DEFAULT_STARTING_CONTEXT);
@@ -85,6 +88,25 @@ public enum ElementType {
         }
 
         String singular = raw.replaceAll("s$", "");
+
+        if (singular.equals("Duration")) {
+            returnSet.add(TIME_DURATION);
+            returnSet.add(TIME_VALUE);
+            return returnSet;
+        }
+
+        if (singular.equals("Date Time")) {
+            returnSet.add(TIME_INSTANCE);
+            returnSet.add(TIME_VALUE);
+            return returnSet;
+        }
+
+        if (singular.equals("Time Range")) {
+            returnSet.add(TIME_RANGE);
+            returnSet.add(TIME_VALUE);
+            return returnSet;
+        }
+
         if (singular.equals("Match")) {
             returnSet.add(REGEX_MATCH);
             return returnSet;
@@ -96,6 +118,7 @@ public enum ElementType {
             returnSet.add(HTML_TYPE);
             return returnSet;
         }
+
         if(DATA_ELEMENTS.contains(singular)) {
             returnSet.add(DATA_TYPE);
             returnSet.add(RETURNS_VALUE);
@@ -139,10 +162,14 @@ public enum ElementType {
                 .replace(' ', '_')
                 .replaceAll("S$", "")
                 .toUpperCase(Locale.ROOT);
+
         if (normalized.startsWith(VALUE_TYPE_MATCH.toUpperCase(Locale.ROOT))) {
             switch (normalized.substring(VALUE_TYPE_MATCH.length())) {
                 case String x when x.equals(KEY_NAME) -> returnSet.add(KEY_VALUE);
-                case String x when TIME_UNITS.contains(x) -> returnSet.add(TIME_VALUE);
+                case String x when TIME_UNITS.contains(x) -> {
+                    returnSet.add(TIME_DURATION);
+                    returnSet.add(TIME_VALUE);
+                }
                 case String x when NUMERIC_TYPES.contains(x) -> returnSet.add(NUMERIC_VALUE);
                 case String x when "TIMES".equals(x) -> returnSet.add(REPETITION);
                 default -> returnSet.add(TEXT_VALUE);
@@ -155,4 +182,5 @@ public enum ElementType {
 
         return returnSet;
     }
+
 }

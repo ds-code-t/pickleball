@@ -9,8 +9,10 @@ import java.math.BigInteger;
 import java.time.Duration;
 import java.util.*;
 
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.evaluations.AviatorUtil.isStringTruthy;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.normalizeText;
+import static tools.dscode.coredefinitions.DateTimeUtilitySteps.dateTime;
 
 public class ValueWrapper {
 
@@ -45,7 +47,7 @@ public class ValueWrapper {
 
     public enum ValueTypes {
         DOUBLE_QUOTED, SINGLE_QUOTED, BACK_TICKED, TILDE_QUOTED,
-        NUMERIC, DEFAULT, BOOLEAN,
+        NUMERIC, DEFAULT, BOOLEAN, DURATION, DATE_TIME,
         LIST, SET, MAP, MULTIMAP
     }
 
@@ -66,7 +68,8 @@ public class ValueWrapper {
         if (obj instanceof Set<?> set) {
             // preserve order when possible (LinkedHashSet for most sets, TreeSet if SortedSet)
             Set<ValueWrapper> wrapped;
-            if (set instanceof SortedSet<?>) wrapped = new TreeSet<>(Comparator.comparing(ValueWrapper::toNonNullString));
+            if (set instanceof SortedSet<?>)
+                wrapped = new TreeSet<>(Comparator.comparing(ValueWrapper::toNonNullString));
             else wrapped = new LinkedHashSet<>(Math.max(16, set.size() * 2));
 
             for (Object el : set) wrapped.add(createValueWrapper(el));
@@ -77,7 +80,7 @@ public class ValueWrapper {
             Map<Object, ValueWrapper> wrapped =
                     (map instanceof LinkedHashMap<?, ?>) ? new LinkedHashMap<>(Math.max(16, map.size() * 2))
                             : (map instanceof SortedMap<?, ?>) ? new TreeMap<>()
-                            : new LinkedHashMap<>(Math.max(16, map.size() * 2));
+                              : new LinkedHashMap<>(Math.max(16, map.size() * 2));
 
             for (Map.Entry<?, ?> e : map.entrySet()) {
                 // keys NOT wrapped, per your requirement
@@ -260,7 +263,7 @@ public class ValueWrapper {
             throw new IllegalArgumentException("Time unit must not be null or blank");
         }
 
-        BigInteger value = asBigInteger() ;
+        BigInteger value = asBigInteger();
         String u = unit.trim().toLowerCase();
 
         return switch (u) {
@@ -330,7 +333,7 @@ public class ValueWrapper {
     }
 
     public boolean hasResolvedValue() {
-        if(isNullOrBlank()) return false;
+        if (isNullOrBlank()) return false;
         return !(asNormalizedText().startsWith("<") && asNormalizedText().endsWith(">"));
     }
 
@@ -442,15 +445,13 @@ public class ValueWrapper {
 //        return createValueWrapper("'" + normalizedText.replaceAll(regex, replacement) + "'");
 //    }
 
-    public ValueWrapper normalizeLowerCaseAndStripAllWhiteSpace()
-    {
-        if(normalizedText == null) return null;
+    public ValueWrapper normalizeLowerCaseAndStripAllWhiteSpace() {
+        if (normalizedText == null) return null;
         return createValueWrapper("'" + normalizedText.toLowerCase().replaceAll("\\s+", "") + "'");
     }
 
-    public ValueWrapper stripAllNonLetters()
-    {
-        if(normalizedText == null) return null;
+    public ValueWrapper stripAllNonLetters() {
+        if (normalizedText == null) return null;
         return createValueWrapper("~" + normalizedText + "~");
     }
 
@@ -464,6 +465,18 @@ public class ValueWrapper {
     public boolean hasLetters() {
         if (normalizedText == null) return false;
         return normalizedText.chars().anyMatch(Character::isLetter);
+    }
+
+    public ValueWrapper getDateTimeStringValue() {
+        if (isNullOrBlank()) return null;
+        String dateTimeString = normalizedText.trim().startsWith("DateTime:") ? normalizedText.trim() : "DateTime:" + normalizedText.trim();
+        return new ValueWrapper(getRunningStep().resolveStepFromString(dateTimeString), ValueTypes.DATE_TIME);
+    }
+
+    public ValueWrapper getDurationStringValue() {
+        if (isNullOrBlank()) return null;
+        String durationString = normalizedText.trim().startsWith("Duration:") ? normalizedText.trim() : "Duration:" + normalizedText.trim();
+        return  new ValueWrapper(getRunningStep().resolveStepFromString(durationString), ValueTypes.DURATION);
     }
 
 }

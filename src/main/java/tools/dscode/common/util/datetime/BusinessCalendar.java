@@ -91,6 +91,11 @@ public final class BusinessCalendar {
 
     public ZoneId zone() { return zone; }
 
+    /** Parses a weekly time-range expression. If days are omitted, the range applies every day. */
+    public static BusinessTimeRange parseTimeRange(String spec) {
+        return RulesParser.parseBusinessTimeRange(spec, true);
+    }
+
     public static BusinessCalendar fromJson(String json) {
         try {
             JsonNode n = MAPPER.readTree(json);
@@ -180,18 +185,19 @@ public final class BusinessCalendar {
         for (int d = 0; d < 370; d++) {
             LocalDate date = z.toLocalDate().minusDays(d);
 
-            List<Interval> opens = openIntervalsFor(date);
+            List<Interval> opens = effectiveOpenIntervalsFor(date);
             // reverse order for backward search
             for (int i = opens.size() - 1; i >= 0; i--) {
                 Interval open = opens.get(i);
-                ZonedDateTime cand = open.end.minusMinutes(1);
+                if (!open.start.isBefore(open.end)) continue;
 
-                if (d == 0 && cand.isAfter(z)) {
-                    if (z.isAfter(open.start)) cand = z;
-                    else continue;
+                ZonedDateTime cand;
+                if (d == 0) {
+                    if (!open.start.isBefore(z)) continue;
+                    cand = open.end.isAfter(z) ? z.minusNanos(1) : open.end.minusNanos(1);
+                } else {
+                    cand = open.end.minusNanos(1);
                 }
-
-                cand = rewindIfClosed(cand);
 
                 if (!cand.isBefore(open.start) && isOpenAt(cand)) {
                     return cand;
@@ -204,8 +210,8 @@ public final class BusinessCalendar {
     private ZonedDateTime rewindIfClosed(ZonedDateTime z) {
         while (isClosedAt(z)) {
             Interval c = closedIntervalCovering(z);
-            if (c == null) return z.minusMinutes(1);
-            z = c.start.minusMinutes(1);
+            if (c == null) return z.minusNanos(1);
+            z = c.start.minusNanos(1);
         }
         return z;
     }
@@ -227,35 +233,48 @@ public final class BusinessCalendar {
      * Closed overrides are always skipped.
      */
     public ZonedDateTime addOpenDuration(Object start, Duration openDuration) {
-        long minutes = openDuration == null ? 0 : openDuration.toMinutes();
+        Duration remaining = openDuration == null ? Duration.ZERO : openDuration;
 
-        if (minutes < 0) {
-            return subtractOpenDuration(start, Duration.ofMinutes(Math.abs(minutes)));
+        if (remaining.isNegative()) {
+            return subtractOpenDuration(start, remaining.negated());
         }
 
-        long remaining = minutes;
         ZonedDateTime cur = nextOpen(start);
-        if (cur == null || remaining == 0) return cur;
+        if (cur == null || remaining.isZero()) return cur;
 
-        while (remaining > 0) {
+        while (remaining.compareTo(Duration.ZERO) > 0) {
             cur = skipIfClosed(cur);
             Interval open = openIntervalCovering(cur);
-            if (open == null) { cur = nextOpen(cur.plusMinutes(1)); continue; }
+            if (open == null) {
+                cur = nextOpen(cur.plusNanos(1));
+                if (cur == null) return null;
+                continue;
+            }
 
             ZonedDateTime limit = open.end;
-            ZonedDateTime nextClosedStart = nextClosedStartOnDate(cur);
+            ZonedDateTime nextClosedStart = nextClosedStartBefore(cur, limit);
             if (nextClosedStart != null && nextClosedStart.isAfter(cur) && nextClosedStart.isBefore(limit)) {
                 limit = nextClosedStart;
             }
 
-            long chunk = Math.min(remaining, Duration.between(cur, limit).toMinutes());
-            if (chunk <= 0) { cur = nextOpen(cur.plusMinutes(1)); continue; }
+            Duration available = Duration.between(cur, limit);
+            if (available.compareTo(Duration.ZERO) <= 0) {
+                cur = nextOpen(cur.plusNanos(1));
+                if (cur == null) return null;
+                continue;
+            }
 
-            cur = cur.plusMinutes(chunk);
-            remaining -= chunk;
+            if (remaining.compareTo(available) <= 0) {
+                return cur.plus(remaining);
+            }
 
-            if (remaining > 0) cur = nextOpen(cur);
-            if (cur == null) return null;
+            cur = limit;
+            remaining = remaining.minus(available);
+
+            if (remaining.compareTo(Duration.ZERO) > 0) {
+                cur = nextOpen(cur);
+                if (cur == null) return null;
+            }
         }
         return cur;
     }
@@ -267,81 +286,80 @@ public final class BusinessCalendar {
      * Closed overrides are always skipped.
      */
     public ZonedDateTime subtractOpenDuration(Object start, Duration openDuration) {
-        long remaining = Math.max(0, openDuration == null ? 0 : openDuration.toMinutes());
-        if (remaining == 0) {
+        Duration remaining = openDuration == null ? Duration.ZERO : openDuration;
+
+        if (remaining.isNegative()) {
+            return addOpenDuration(start, remaining.negated());
+        }
+
+        if (remaining.isZero()) {
             ZonedDateTime cur0 = normalizeForQuery(start);
             return isOpenAt(cur0) ? cur0 : lastOpen(cur0);
         }
 
         ZonedDateTime cur = normalizeForQuery(start);
 
-        // Cursor is EXCLUSIVE: we subtract open minutes strictly before "cur".
-        // If start isn't open, move to the most recent open instant <= start, then advance cursor by 1 minute
-        // so we subtract from the end of that last open minute slot.
+        // Cursor is EXCLUSIVE: we subtract open time strictly before "cur".
+        // If start is not open, use the end boundary of the most recent effective open segment.
         if (!isOpenAt(cur)) {
-            ZonedDateTime lo = lastOpen(cur);
-            if (lo == null) return null;
-            cur = lo.plusMinutes(1); // exclusive cursor at the end of that open minute
+            cur = previousOpenCursorAtOrBefore(cur);
+            if (cur == null) return null;
         }
 
-        while (remaining > 0) {
-            LocalDate date = cur.toLocalDate();
-
-            // Effective open segments for this date (open - closed), sorted ascending
-            List<Interval> segs = effectiveOpenIntervalsFor(date);
-
-            // Find the segment that is immediately "before" the cursor:
-            // choose the last segment with seg.start < cur
-            Interval seg = null;
-            for (int i = segs.size() - 1; i >= 0; i--) {
-                Interval s = segs.get(i);
-                if (s.start.isBefore(cur)) {
-                    seg = s;
-                    break;
-                }
-            }
+        while (remaining.compareTo(Duration.ZERO) > 0) {
+            Interval seg = effectiveOpenSegmentBeforeCursor(cur);
 
             if (seg == null) {
-                // No effective open time before cursor on this date: jump to previous open minute
-                ZonedDateTime lo = lastOpen(cur.minusMinutes(1));
-                if (lo == null) return null;
-                cur = lo.plusMinutes(1); // keep cursor exclusive
+                ZonedDateTime prev = previousOpenCursorAtOrBefore(cur.minusNanos(1));
+                if (prev == null) return null;
+                cur = prev;
                 continue;
             }
 
-            // Segment end to subtract from is the earlier of cursor and seg.end (cursor can be mid-segment)
+            // Segment end to subtract from is the earlier of cursor and seg.end (cursor can be mid-segment).
             ZonedDateTime segEndExclusive = seg.end.isBefore(cur) ? seg.end : cur;
 
-            // available open minutes in this segment before the cursor
-            long available = Duration.between(seg.start, segEndExclusive).toMinutes();
+            Duration available = Duration.between(seg.start, segEndExclusive);
 
-            if (available <= 0) {
-                // Cursor is at/before seg.start; hop to previous open minute
-                ZonedDateTime lo = lastOpen(seg.start.minusMinutes(1));
-                if (lo == null) return null;
-                cur = lo.plusMinutes(1);
+            if (available.compareTo(Duration.ZERO) <= 0) {
+                ZonedDateTime prev = previousOpenCursorAtOrBefore(seg.start.minusNanos(1));
+                if (prev == null) return null;
+                cur = prev;
                 continue;
             }
 
-            long chunk = Math.min(remaining, available);
-
-            // Move cursor back by chunk minutes (cursor stays exclusive)
-            cur = segEndExclusive.minusMinutes(chunk);
-            remaining -= chunk;
-
-            if (remaining > 0) {
-                // If we landed exactly on a boundary that is not open, hop to previous open minute
-                if (!isOpenAt(cur)) {
-                    ZonedDateTime lo = lastOpen(cur.minusMinutes(1));
-                    if (lo == null) return null;
-                    cur = lo.plusMinutes(1);
-                }
+            if (remaining.compareTo(available) <= 0) {
+                return segEndExclusive.minus(remaining);
             }
+
+            remaining = remaining.minus(available);
+            cur = seg.start;
         }
 
-        // At the end, "cur" is an exclusive cursor that is also the desired result instant under this model.
-        // Example: 14:00 minus 90 open minutes => cur = 11:30.
         return cur;
+    }
+
+    private Interval effectiveOpenSegmentBeforeCursor(ZonedDateTime cursor) {
+        List<Interval> segs = effectiveOpenIntervalsFor(cursor.toLocalDate());
+        for (int i = segs.size() - 1; i >= 0; i--) {
+            Interval s = segs.get(i);
+            if (s.start.isBefore(cursor)) return s;
+        }
+        return null;
+    }
+
+    private ZonedDateTime previousOpenCursorAtOrBefore(ZonedDateTime z) {
+        for (int d = 0; d < 370; d++) {
+            LocalDate date = z.toLocalDate().minusDays(d);
+            List<Interval> segs = effectiveOpenIntervalsFor(date);
+            for (int i = segs.size() - 1; i >= 0; i--) {
+                Interval s = segs.get(i);
+                if (!s.start.isBefore(s.end)) continue;
+                if (d == 0 && s.end.isAfter(z)) continue;
+                return s.end;
+            }
+        }
+        return null;
     }
 
 
@@ -428,22 +446,17 @@ public final class BusinessCalendar {
 
     private boolean isOpenAt(ZonedDateTime z) {
         if (isClosedAt(z)) return false;
-        return openRules.stream().anyMatch(r -> r.matches(z));
+        return openIntervalCovering(z) != null;
     }
 
     private boolean isClosedAt(ZonedDateTime z) {
-        LocalDate date = z.toLocalDate();
-        int minute = z.getHour() * 60 + z.getMinute();
-        for (ClosedRule r : closedRules) {
-            if (r.appliesTo(date) && r.matchesMinute(minute)) return true;
-        }
-        return false;
+        return closedIntervalCovering(z) != null;
     }
 
     private ZonedDateTime skipIfClosed(ZonedDateTime z) {
         while (isClosedAt(z)) {
             Interval c = closedIntervalCovering(z);
-            if (c == null) return z.plusMinutes(1);
+            if (c == null) return z.plusNanos(1);
             z = c.end;
         }
         return z;
@@ -463,27 +476,52 @@ public final class BusinessCalendar {
         return null;
     }
 
-    private ZonedDateTime nextClosedStartOnDate(ZonedDateTime z) {
-        List<Interval> cs = closedIntervalsFor(z.toLocalDate());
+    private ZonedDateTime nextClosedStartBefore(ZonedDateTime z, ZonedDateTime limit) {
+        LocalDate startDate = z.toLocalDate();
+        LocalDate endDate = limit.toLocalDate();
         ZonedDateTime best = null;
-        for (Interval i : cs) {
-            if (i.start.isAfter(z) && (best == null || i.start.isBefore(best))) best = i.start;
+        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
+            for (Interval i : closedIntervalsFor(date)) {
+                if (i.start.isAfter(z) && i.start.isBefore(limit) && (best == null || i.start.isBefore(best))) {
+                    best = i.start;
+                }
+            }
         }
         return best;
     }
 
     private List<Interval> openIntervalsFor(LocalDate date) {
+        ZonedDateTime dayStart = date.atStartOfDay(zone);
+        ZonedDateTime dayEnd = date.plusDays(1).atStartOfDay(zone);
         List<Interval> out = new ArrayList<>();
-        for (WeeklyOpenRule r : openRules) out.addAll(r.materialize(date, zone));
+        for (LocalDate materializeDate : List.of(date.minusDays(1), date)) {
+            for (WeeklyOpenRule r : openRules) {
+                for (Interval i : r.materialize(materializeDate, zone)) {
+                    if (overlaps(i, dayStart, dayEnd)) out.add(i);
+                }
+            }
+        }
         out.sort(Comparator.comparing(a -> a.start));
         return out;
     }
 
     private List<Interval> closedIntervalsFor(LocalDate date) {
+        ZonedDateTime dayStart = date.atStartOfDay(zone);
+        ZonedDateTime dayEnd = date.plusDays(1).atStartOfDay(zone);
         List<Interval> out = new ArrayList<>();
-        for (ClosedRule r : closedRules) out.addAll(r.materialize(date, zone));
+        for (LocalDate materializeDate : List.of(date.minusDays(1), date)) {
+            for (ClosedRule r : closedRules) {
+                for (Interval i : r.materialize(materializeDate, zone)) {
+                    if (overlaps(i, dayStart, dayEnd)) out.add(i);
+                }
+            }
+        }
         out.sort(Comparator.comparing(a -> a.start));
         return out;
+    }
+
+    private static boolean overlaps(Interval i, ZonedDateTime start, ZonedDateTime end) {
+        return i.start.isBefore(end) && i.end.isAfter(start);
     }
 
     private ZonedDateTime normalizeForQuery(Object t) {
@@ -541,16 +579,41 @@ public final class BusinessCalendar {
     }
 
     static final class TimeRange {
-        final int startMin;   // inclusive
-        final int endMin;     // exclusive (can be 1440)
-        TimeRange(int s, int e) { this.startMin = s; this.endMin = e; }
-        boolean containsMinute(int m) { return m >= startMin && m < endMin; }
+        static final long NANOS_PER_DAY = BusinessTimeRange.NANOS_PER_DAY;
+
+        final long startNanoOfDay;   // inclusive
+        final long endNanoOfDay;     // exclusive (can be NANOS_PER_DAY for 24:00; can be less than start for overnight)
+
+        TimeRange(long startNanoOfDay, long endNanoOfDay) {
+            if (startNanoOfDay < 0 || startNanoOfDay > NANOS_PER_DAY) {
+                throw new IllegalArgumentException("Invalid start time nanos-of-day: " + startNanoOfDay);
+            }
+            if (endNanoOfDay < 0 || endNanoOfDay > NANOS_PER_DAY) {
+                throw new IllegalArgumentException("Invalid end time nanos-of-day: " + endNanoOfDay);
+            }
+            if (startNanoOfDay == endNanoOfDay) {
+                throw new IllegalArgumentException("Zero-length time ranges are not supported");
+            }
+            this.startNanoOfDay = startNanoOfDay;
+            this.endNanoOfDay = endNanoOfDay;
+        }
+
+        boolean contains(ZonedDateTime z) {
+            long n = z.toLocalTime().toNanoOfDay();
+            if (endNanoOfDay > startNanoOfDay) return n >= startNanoOfDay && n < endNanoOfDay;
+            return n >= startNanoOfDay || n < endNanoOfDay;
+        }
 
         Interval materialize(LocalDate date, ZoneId zone) {
-            ZonedDateTime base = date.atStartOfDay(zone);
-            ZonedDateTime s = base.plusMinutes(startMin);
-            ZonedDateTime e = base.plusMinutes(endMin);
-            return new Interval(s, e);
+            ZonedDateTime start = atNanoOfDay(date, zone, startNanoOfDay);
+            LocalDate endDate = (endNanoOfDay < startNanoOfDay) ? date.plusDays(1) : date;
+            ZonedDateTime end = atNanoOfDay(endDate, zone, endNanoOfDay);
+            return new Interval(start, end);
+        }
+
+        private static ZonedDateTime atNanoOfDay(LocalDate date, ZoneId zone, long nanoOfDay) {
+            if (nanoOfDay == NANOS_PER_DAY) return date.plusDays(1).atStartOfDay(zone);
+            return date.atTime(LocalTime.ofNanoOfDay(nanoOfDay)).atZone(zone);
         }
     }
 
@@ -561,8 +624,7 @@ public final class BusinessCalendar {
 
         boolean matches(ZonedDateTime z) {
             if (!days.contains(z.getDayOfWeek())) return false;
-            int m = z.getHour() * 60 + z.getMinute();
-            for (TimeRange r : ranges) if (r.containsMinute(m)) return true;
+            for (TimeRange r : ranges) if (r.contains(z)) return true;
             return false;
         }
 
@@ -640,9 +702,9 @@ public final class BusinessCalendar {
             return true;
         }
 
-        boolean matchesMinute(int m) {
+        boolean matches(ZonedDateTime z) {
             if (times.isEmpty()) return true; // full day
-            for (TimeRange r : times) if (r.containsMinute(m)) return true;
+            for (TimeRange r : times) if (r.contains(z)) return true;
             return false;
         }
 
@@ -679,22 +741,48 @@ public final class BusinessCalendar {
             String raw = s.trim();
             if (raw.isEmpty()) return List.of();
 
+            BusinessTimeRange parsed;
+            try {
+                parsed = parseBusinessTimeRange(raw, false);
+            } catch (IllegalArgumentException e) {
+                return List.of();
+            }
+
+            List<WeeklyOpenRule> out = new ArrayList<>();
+            for (BusinessTimeRange.Segment segment : parsed.segments()) {
+                out.add(new WeeklyOpenRule(segment.days(), List.of(new TimeRange(segment.startNanoOfDay(), segment.endNanoOfDay()))));
+            }
+            return out;
+        }
+
+        static BusinessTimeRange parseBusinessTimeRange(String s, boolean defaultAllDaysIfMissing) {
+            String raw = s == null ? "" : s.trim();
+            if (raw.isEmpty()) throw new IllegalArgumentException("Time range expression is blank");
+
             List<String> tokens = splitSpace(raw);
             int firstTimeIdx = -1;
             for (int i = 0; i < tokens.size(); i++) {
                 if (tokens.get(i).matches(".*\\d.*")) { firstTimeIdx = i; break; }
             }
-            if (firstTimeIdx < 0) return List.of();
+            if (firstTimeIdx < 0) throw new IllegalArgumentException("Missing time range in expression: \"" + s + "\"");
 
             String daysPart = String.join(" ", tokens.subList(0, firstTimeIdx)).trim();
             String timesPart = String.join(" ", tokens.subList(firstTimeIdx, tokens.size())).trim();
 
             EnumSet<DayOfWeek> days = parseDows(daysPart);
-            List<TimeRange> ranges = parseTimeRanges(timesPart);
+            if (days.isEmpty()) {
+                if (!defaultAllDaysIfMissing) throw new IllegalArgumentException("Missing day selector in expression: \"" + s + "\"");
+                days = EnumSet.allOf(DayOfWeek.class);
+            }
 
-            return days.isEmpty() || ranges.isEmpty()
-                    ? List.of()
-                    : List.of(new WeeklyOpenRule(days, ranges));
+            List<TimeRange> ranges = parseTimeRanges(timesPart);
+            if (ranges.isEmpty()) throw new IllegalArgumentException("Missing time range in expression: \"" + s + "\"");
+
+            List<BusinessTimeRange.Segment> segments = new ArrayList<>();
+            for (TimeRange r : ranges) {
+                segments.add(new BusinessTimeRange.Segment(days, r.startNanoOfDay, r.endNanoOfDay));
+            }
+            return new BusinessTimeRange(raw, segments);
         }
 
         /**
@@ -706,6 +794,7 @@ public final class BusinessCalendar {
          *  - "2,5,24-27,31 DEC"
          *  - "WED,TUE DEC"
          *  - "3,5 FEB 2026 1300-1500 , 1100-1200" (time-only clause continues previous date selector)
+         *  - "15 JUN 2026 19:30:00.000000500-19:30:00.000000800" (sub-second precise time range)
          */
         static List<ClosedRule> parseClosed(String s) {
             // IMPORTANT:
@@ -780,24 +869,15 @@ public final class BusinessCalendar {
         }
 
         private static boolean isLikelyTimeRange(String tok) {
-            // HHmm-HHmm where HH is 00-24 and mm 00-59, but 24 is only valid with 00 minutes.
             String[] lr = tok.split("-", 2);
             if (lr.length != 2) return false;
-            if (!lr[0].matches("\\d{4}") || !lr[1].matches("\\d{4}")) return false;
-
-            int aH = Integer.parseInt(lr[0].substring(0, 2));
-            int aM = Integer.parseInt(lr[0].substring(2, 4));
-            int bH = Integer.parseInt(lr[1].substring(0, 2));
-            int bM = Integer.parseInt(lr[1].substring(2, 4));
-
-            if (aH < 0 || aH > 24 || bH < 0 || bH > 24) return false;
-            if (aM < 0 || aM > 59 || bM < 0 || bM > 59) return false;
-
-            // 24:xx only allowed as 24:00
-            if (aH == 24 && aM != 0) return false;
-            if (bH == 24 && bM != 0) return false;
-
-            return true;
+            try {
+                parseTimeToNanoOfDay(lr[0]);
+                parseTimeToNanoOfDay(lr[1]);
+                return true;
+            } catch (RuntimeException ignored) {
+                return false;
+            }
         }
 
 
@@ -903,20 +983,66 @@ public final class BusinessCalendar {
                 if (tok.isBlank()) continue;
                 if (!tok.contains("-")) continue;
                 String[] lr = tok.split("-", 2);
-                int a = parseHHmmToMin(lr[0]);
-                int b = parseHHmmToMin(lr[1]);
-                if (b < a) { int tmp = a; a = b; b = tmp; }
+                long a = parseTimeToNanoOfDay(lr[0]);
+                long b = parseTimeToNanoOfDay(lr[1]);
                 out.add(new TimeRange(a, b));
             }
             return out;
         }
 
-        private static int parseHHmmToMin(String hhmm) {
-            String x = hhmm.trim();
-            int h = Integer.parseInt(x.substring(0, 2));
-            int m = Integer.parseInt(x.substring(2, 4));
-            if (h == 24 && m == 0) return 1440;
-            return h * 60 + m;
+        private static long parseTimeToNanoOfDay(String text) {
+            String x = text.trim();
+            if (x.isEmpty()) throw new IllegalArgumentException("Blank time value");
+
+            if (x.contains(":")) {
+                String[] parts = x.split(":", -1);
+                if (parts.length < 2 || parts.length > 3) {
+                    throw new IllegalArgumentException("Invalid time value: " + text);
+                }
+
+                int hour = Integer.parseInt(parts[0]);
+                int minute = Integer.parseInt(parts[1]);
+                int second = 0;
+                int nano = 0;
+
+                if (parts.length == 3) {
+                    String secPart = parts[2];
+                    int dot = secPart.indexOf('.');
+                    if (dot >= 0) {
+                        second = Integer.parseInt(secPart.substring(0, dot));
+                        String fraction = secPart.substring(dot + 1);
+                        if (fraction.isEmpty() || fraction.length() > 9 || !fraction.matches("\\d+")) {
+                            throw new IllegalArgumentException("Invalid fractional seconds in time value: " + text);
+                        }
+                        nano = Integer.parseInt((fraction + "000000000").substring(0, 9));
+                    } else {
+                        second = Integer.parseInt(secPart);
+                    }
+                }
+
+                return timeToNanoOfDay(hour, minute, second, nano, text);
+            }
+
+            if (!x.matches("\\d{3,4}")) {
+                throw new IllegalArgumentException("Invalid time value: " + text);
+            }
+
+            int hour = Integer.parseInt(x.substring(0, x.length() - 2));
+            int minute = Integer.parseInt(x.substring(x.length() - 2));
+            return timeToNanoOfDay(hour, minute, 0, 0, text);
+        }
+
+        private static long timeToNanoOfDay(int hour, int minute, int second, int nano, String original) {
+            if (hour < 0 || hour > 24 || minute < 0 || minute > 59 || second < 0 || second > 59 || nano < 0 || nano > 999_999_999) {
+                throw new IllegalArgumentException("Invalid time value: " + original);
+            }
+            if (hour == 24) {
+                if (minute != 0 || second != 0 || nano != 0) {
+                    throw new IllegalArgumentException("24 is only valid as 24:00 / 2400: " + original);
+                }
+                return TimeRange.NANOS_PER_DAY;
+            }
+            return LocalTime.of(hour, minute, second, nano).toNanoOfDay();
         }
 
         private static List<String> splitSpace(String s) {
@@ -992,8 +1118,12 @@ public final class BusinessCalendar {
         return of(start).durationBetween(end);
     }
 
-    public String eval(String spec) {
-        return (new BusinessTime(this)).eval(spec);
+    public BusinessTime evalToBusinessTime(String spec) {
+        return BusinessTime.evaluate(this, spec);
+    }
+
+    public TemporalValue eval(String spec) {
+        return TemporalValue.dateTime(spec, evalToBusinessTime(spec));
     }
 
 }

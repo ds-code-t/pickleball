@@ -1,6 +1,5 @@
 Feature: Addition
 
-
   Scenario Outline: datable tezsts354
 #    * , click the unchecked Checkbox
     * , click the unchecked Checkbox 3 times

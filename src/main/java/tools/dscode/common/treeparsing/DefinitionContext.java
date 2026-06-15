@@ -59,6 +59,7 @@ public final class DefinitionContext {
     public static String preParseDynamicStepString(String input) {
         BracketMasker bm = getBracketMasker(input);
         String parsedText = normalizeWhitespace(bm.masked())
+                .replaceAll("\\bmargin\\s+of\\b", "margin-of")
                 .replaceAll("\\bno\\s+attribute\\b", "noattribute")
                 .replaceAll("\\b(?:the|a)\\b", "")
                 .replaceAll("\\bare\\b", "is")
@@ -338,6 +339,18 @@ public final class DefinitionContext {
             }
         };
 
+        ParseNode margin = new ParseNode("\\bmargin-of\\s+(?<element><<elementMatch>>)") {
+            @Override
+            public String onSubstitute(MatchNode self) {
+                String elementToken = self.groups().get("element");
+                MatchNode elementMatchNode = self.getMatchNode(elementToken);
+                elementMatchNode.putToLocalState("margin", "true");
+                self.parent().putToLocalState("marginelementMatchNode", elementMatchNode);
+                // I want to remove the 'elementToken from the self.parent() parent
+                return "";
+            }
+        };
+
         ParseNode root = buildFromYaml("""
                 line:
                   - quoteMask
@@ -354,6 +367,7 @@ public final class DefinitionContext {
                     - no
                     - valueTypes
                     - assertionType
+                    - margin
                     - reindex
                     - action
                     - assertion

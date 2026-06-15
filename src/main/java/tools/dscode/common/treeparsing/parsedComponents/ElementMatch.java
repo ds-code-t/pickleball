@@ -14,6 +14,7 @@ import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatcher;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -510,6 +511,15 @@ public class ElementMatch {
                 returnList.add(createValueWrapper(getText(parentPhrase.getDriver())));
 
             }
+        } else if (elementTypes.contains(ElementType.TIME_VALUE)) {
+            if (elementTypes.contains(ElementType.TIME_INSTANCE)) {
+                returnList.add(defaultText.getDateTimeStringValue());
+            }
+            else
+            {
+                returnList.add(defaultText.getDurationStringValue());
+            }
+
         } else {
             returnList.addAll(nonHTMLValues);
         }
