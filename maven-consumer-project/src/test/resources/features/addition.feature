@@ -2,7 +2,7 @@ Feature: Addition
 
   Scenario Outline: datable tezsts354
 #    * , click the unchecked Checkbox
-    * , click the unchecked Checkbox 3 times
+    * , click the unchecked Checkbox 5 times
 #    * , "!" Link is displayed
 #    * , if 1==1, then save "A"
 #    * , if 1==1,then save "A"

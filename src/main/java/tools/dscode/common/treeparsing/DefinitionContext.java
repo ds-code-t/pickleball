@@ -369,7 +369,7 @@ public final class DefinitionContext {
                     - no
                     - valueTypes
                     - assertionType
-                    - margin
+                    - specialElements
                     - reindex
                     - action
                     - assertion
