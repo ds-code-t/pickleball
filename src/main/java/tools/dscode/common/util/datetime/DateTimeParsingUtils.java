@@ -69,13 +69,17 @@ final class DateTimeParsingUtils {
     public static Object tryParse(String text, String... patterns) {
         if (patterns == null || patterns.length == 0) return null;
 
-        List<DateTimeFormatter> fs = Arrays.stream(patterns)
+        return tryParse(formattersFromPatterns(Arrays.asList(patterns)), text);
+    }
+
+    static List<DateTimeFormatter> formattersFromPatterns(List<String> patterns) {
+        if (patterns == null || patterns.isEmpty()) return List.of();
+
+        return patterns.stream()
                 .filter(Objects::nonNull)
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .map(p -> DateTimeFormatter.ofPattern(p).withResolverStyle(ResolverStyle.STRICT))
                 .collect(Collectors.toList());
-
-        return tryParse(fs, text);
     }
 }

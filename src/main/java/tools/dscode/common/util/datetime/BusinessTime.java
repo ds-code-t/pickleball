@@ -7,6 +7,8 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -49,6 +51,14 @@ public final class BusinessTime {
         return applyCalendarDefaultOutput(new BusinessTime(cal, z));
     }
 
+    private static BusinessTime of(BusinessCalendar cal, String dateTime, List<DateTimeFormatter> inputFormatters) {
+        Objects.requireNonNull(cal, "cal");
+        Objects.requireNonNull(dateTime, "dateTime");
+
+        ZonedDateTime z = cal.toCalendarZoneAssumeGmtIfMissing(dateTime.trim(), inputFormatters);
+        return applyCalendarDefaultOutput(new BusinessTime(cal, z));
+    }
+
     /**
      * Evaluates the same syntax that eval(...) used to support, but returns the resolved object.
      */
@@ -56,11 +66,28 @@ public final class BusinessTime {
         Objects.requireNonNull(cal, "cal");
         Objects.requireNonNull(spec, "spec");
 
+        ParsedDateTimeSpec parsed = parseSpec(spec);
+        BusinessTime bt = evaluateBase(cal, parsed);
+
+        if (parsed.zoneText() != null) bt = bt.asZone(parseZoneIdLenient(parsed.zoneText()));
+        if (parsed.formatText() != null) bt = bt.asPattern(parsed.formatText());
+
+        return bt;
+    }
+
+    static ZonedDateTime evaluateValue(BusinessCalendar cal, String spec) {
+        Objects.requireNonNull(cal, "cal");
+        Objects.requireNonNull(spec, "spec");
+
+        return evaluateBase(cal, parseSpec(spec)).value();
+    }
+
+    private static ParsedDateTimeSpec parseSpec(String spec) {
         String raw = stripPrefix(spec.trim(), "DateTime:");
         if (raw.isEmpty()) throw new IllegalArgumentException("spec is blank");
 
-        ExtractedFormat extractedFormat = extractFormat(raw);
-        raw = extractedFormat.remaining();
+        ExtractedClauses extractedClauses = extractClauses(raw);
+        raw = extractedClauses.remaining();
 
         ExtractedZone extractedZone = extractOutputZone(raw);
         raw = extractedZone.remaining();
@@ -71,17 +98,27 @@ public final class BusinessTime {
 
         if (baseText.isEmpty()) throw new IllegalArgumentException("Missing base time in spec: \"" + spec + "\"");
 
-        BusinessTime bt = switch (baseText.toLowerCase(Locale.ROOT)) {
+        return new ParsedDateTimeSpec(
+                baseText,
+                deltaText,
+                extractedZone.zoneText(),
+                extractedClauses.formatText(),
+                extractedClauses.patternTexts()
+        );
+    }
+
+    private static BusinessTime evaluateBase(BusinessCalendar cal, ParsedDateTimeSpec parsed) {
+        List<DateTimeFormatter> inputFormatters = inputFormatters(cal, parsed.patternTexts());
+
+        BusinessTime bt = switch (parsed.baseText().toLowerCase(Locale.ROOT)) {
             case "today" -> cal.today();
             case "tomorrow" -> cal.tomorrow();
             case "yesterday" -> cal.yesterday();
             case "now" -> cal.now();
-            default -> cal.of(baseText);
+            default -> inputFormatters == null ? cal.of(parsed.baseText()) : of(cal, parsed.baseText(), inputFormatters);
         };
 
-        if (!deltaText.isBlank()) bt = bt.add(deltaText);
-        if (extractedZone.zoneText() != null) bt = bt.asZone(parseZoneIdLenient(extractedZone.zoneText()));
-        if (extractedFormat.formatText() != null) bt = bt.asPattern(extractedFormat.formatText());
+        if (!parsed.deltaText().isBlank()) bt = bt.add(parsed.deltaText());
 
         return bt;
     }
@@ -182,12 +219,54 @@ public final class BusinessTime {
                 .add(BigInteger.valueOf(instant.getNano()));
     }
 
-    private static ExtractedFormat extractFormat(String raw) {
-        int idx = indexOfIgnoreCase(raw, "format:");
-        if (idx < 0) return new ExtractedFormat(raw.trim(), null);
-        String format = blankToNull(raw.substring(idx + "format:".length()));
-        String remaining = raw.substring(0, idx).trim();
-        return new ExtractedFormat(remaining, format);
+    private static ExtractedClauses extractClauses(String raw) {
+        ClauseMarker first = nextClauseMarker(raw, 0);
+        if (first == null) return new ExtractedClauses(raw.trim(), null, List.of());
+
+        String remaining = raw.substring(0, first.index()).trim();
+        String format = null;
+        List<String> patterns = new ArrayList<>();
+
+        ClauseMarker cur = first;
+        while (cur != null) {
+            int valueStart = cur.index() + cur.tokenLength();
+            ClauseMarker next = nextClauseMarker(raw, valueStart);
+            String value = raw.substring(valueStart, next == null ? raw.length() : next.index()).trim();
+
+            if (cur.format()) {
+                format = blankToNull(value);
+            } else if (!value.isBlank()) {
+                patterns.add(value);
+            }
+
+            cur = next;
+        }
+
+        return new ExtractedClauses(remaining, format, List.copyOf(patterns));
+    }
+
+    private static List<DateTimeFormatter> inputFormatters(BusinessCalendar cal, List<String> patternTexts) {
+        if (patternTexts.isEmpty()) return null;
+
+        List<DateTimeFormatter> out = new ArrayList<>();
+        for (String pattern : patternTexts) {
+            String p = pattern.trim();
+            if (p.isEmpty()) throw new IllegalArgumentException("Date/time input pattern is blank");
+            if ("*".equals(p)) out.addAll(cal.dateTimeFormatters());
+            else out.addAll(DateTimeParsingUtils.formattersFromPatterns(List.of(p)));
+        }
+        return List.copyOf(out);
+    }
+
+    private static ClauseMarker nextClauseMarker(String raw, int from) {
+        int formatIdx = indexOfIgnoreCase(raw, "format:", from);
+        int patternIdx = indexOfIgnoreCase(raw, "pattern:", from);
+
+        if (formatIdx < 0 && patternIdx < 0) return null;
+        if (patternIdx < 0 || (formatIdx >= 0 && formatIdx < patternIdx)) {
+            return new ClauseMarker(formatIdx, "format:".length(), true);
+        }
+        return new ClauseMarker(patternIdx, "pattern:".length(), false);
     }
 
     private static ExtractedZone extractOutputZone(String raw) {
@@ -234,7 +313,11 @@ public final class BusinessTime {
     }
 
     private static int indexOfIgnoreCase(String s, String needle) {
-        return s.toLowerCase(Locale.ROOT).indexOf(needle.toLowerCase(Locale.ROOT));
+        return indexOfIgnoreCase(s, needle, 0);
+    }
+
+    private static int indexOfIgnoreCase(String s, String needle, int from) {
+        return s.toLowerCase(Locale.ROOT).indexOf(needle.toLowerCase(Locale.ROOT), from);
     }
 
     private static String stripPrefix(String text, String prefix) {
@@ -247,6 +330,14 @@ public final class BusinessTime {
         return s == null || s.isBlank() ? null : s.trim();
     }
 
-    private record ExtractedFormat(String remaining, String formatText) {}
+    private record ExtractedClauses(String remaining, String formatText, List<String> patternTexts) {}
+    private record ParsedDateTimeSpec(
+            String baseText,
+            String deltaText,
+            String zoneText,
+            String formatText,
+            List<String> patternTexts
+    ) {}
+    private record ClauseMarker(int index, int tokenLength, boolean format) {}
     private record ExtractedZone(String remaining, String zoneText) {}
 }

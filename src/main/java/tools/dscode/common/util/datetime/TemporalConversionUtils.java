@@ -5,12 +5,10 @@ import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -21,6 +19,7 @@ import java.util.Objects;
  *  - Date/time instances normalize through the underlying instant, not their rendered string.
  *  - Durations normalize through java.time.Duration, not their rendered string.
  *  - Existing presentation clauses such as "format: ..." are ignored for normalization.
+ *  - Inline date/time input clauses such as "pattern: ..." affect parsing, not normalization.
  *  - Existing date/time output-zone clauses such as "to America/Phoenix TimeZone" are ignored
  *    for instant normalization, because they are presentation-only in BusinessTime.eval(...).
  *
@@ -69,44 +68,7 @@ public final class TemporalConversionUtils {
         Objects.requireNonNull(calendar, "calendar");
         Objects.requireNonNull(dateTimeSpec, "dateTimeSpec");
 
-        String raw = stripCaseInsensitivePrefix(dateTimeSpec.trim(), "DateTime:").trim();
-        if (raw.isEmpty()) throw new IllegalArgumentException("Date/time spec is blank");
-
-        // Strip presentation-only formatting first. This mirrors BusinessTime.eval(...),
-        // but the normalization path ignores the requested render format.
-        raw = stripFormatClause(raw).trim();
-
-        // Strip presentation-only output zone conversion. This mirrors BusinessTime.eval(...),
-        // but the normalization path compares the underlying instant.
-        raw = stripOutputTimeZoneClause(raw).trim();
-
-        int deltaIdx = findFirstDeltaStart(raw);
-        String baseText = (deltaIdx < 0) ? raw.trim() : raw.substring(0, deltaIdx).trim();
-        String deltaText = (deltaIdx < 0) ? "" : raw.substring(deltaIdx).trim();
-
-        if (baseText.isEmpty()) {
-            throw new IllegalArgumentException("Missing base time in date/time spec: \"" + dateTimeSpec + "\"");
-        }
-
-        BusinessTime bt;
-        switch (baseText.toLowerCase(Locale.ROOT)) {
-            case "today" -> bt = calendar.today();
-            case "tomorrow" -> bt = calendar.tomorrow();
-            case "yesterday" -> bt = calendar.yesterday();
-            case "now" -> bt = calendar.now();
-            default -> bt = calendar.of(baseText);
-        }
-
-        ZonedDateTime cur = bt.value();
-        if (!deltaText.isBlank()) {
-            // DateTimeDeltaParsingUtils.Delta now supports decimal amounts, so callers must not
-            // pass Delta.amount() directly into ZonedDateTime.plus(long, TemporalUnit).
-            // applyTo(...) preserves sequential calendar behavior for whole years/months/days
-            // and converts decimal exact units, such as 1.5 hours, into exact Duration math.
-            cur = DateTimeDeltaParsingUtils.applyTo(cur, deltaText);
-        }
-
-        return cur;
+        return BusinessTime.evaluateValue(calendar, dateTimeSpec);
     }
 
     /** Returns the canonical ISO instant string, e.g. 2026-02-02T10:00:00Z. */
@@ -345,44 +307,11 @@ public final class TemporalConversionUtils {
         return idx < 0 ? raw : raw.substring(0, idx);
     }
 
-    private static String stripOutputTimeZoneClause(String raw) {
-        String lower = raw.toLowerCase(Locale.ROOT);
-        int toIdx = lower.indexOf(" to ");
-        if (toIdx < 0) return raw;
-
-        int tzIdx = lower.indexOf(" timezone", toIdx);
-        int tzLen = " timezone".length();
-        if (tzIdx < 0) {
-            tzIdx = lower.indexOf(" time zone", toIdx);
-            tzLen = " time zone".length();
-        }
-        if (tzIdx <= toIdx) return raw;
-
-        String left = raw.substring(0, toIdx).trim();
-        String right = raw.substring(tzIdx + tzLen).trim();
-        return (left + " " + right).trim();
-    }
-
     private static String stripCaseInsensitivePrefix(String raw, String prefix) {
         if (raw.regionMatches(true, 0, prefix, 0, prefix.length())) {
             return raw.substring(prefix.length());
         }
         return raw;
-    }
-
-    private static int findFirstDeltaStart(String s) {
-        // Find first +/- that is preceded by whitespace and followed by a digit.
-        // This avoids treating ISO date hyphens like 2026-02-05 as deltas.
-        for (int i = 1; i < s.length(); i++) {
-            char ch = s.charAt(i);
-            if (ch != '+' && ch != '-') continue;
-            if (!Character.isWhitespace(s.charAt(i - 1))) continue;
-
-            int j = i + 1;
-            while (j < s.length() && Character.isWhitespace(s.charAt(j))) j++;
-            if (j < s.length() && Character.isDigit(s.charAt(j))) return i;
-        }
-        return -1;
     }
 
     private static int indexOfIgnoreCase(String s, String needle) {

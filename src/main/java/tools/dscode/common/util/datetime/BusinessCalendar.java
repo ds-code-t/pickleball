@@ -91,6 +91,8 @@ public final class BusinessCalendar {
 
     public ZoneId zone() { return zone; }
 
+    List<DateTimeFormatter> dateTimeFormatters() { return dateTimeFormatters; }
+
     /** Parses a weekly time-range expression. If days are omitted, the range applies every day. */
     public static BusinessTimeRange parseTimeRange(String spec) {
         return RulesParser.parseBusinessTimeRange(spec, true);
@@ -416,9 +418,13 @@ public final class BusinessCalendar {
      * If the input has no zone/offset, assume it was GMT/UTC.
      */
     public ZonedDateTime toCalendarZoneAssumeGmtIfMissing(Object t) {
+        return toCalendarZoneAssumeGmtIfMissing(t, dateTimeFormatters);
+    }
+
+    ZonedDateTime toCalendarZoneAssumeGmtIfMissing(Object t, List<DateTimeFormatter> formatters) {
         // Option B: allow String here too (this method bypasses normalizeForQuery)
         if (t instanceof String s) {
-            Object parsed = DateTimeParsingUtils.tryParse(dateTimeFormatters, s);
+            Object parsed = DateTimeParsingUtils.tryParse(formatters, s);
             if (parsed == null) {
                 throw new IllegalArgumentException("Unparseable date/time: \"" + s + "\"");
             }
