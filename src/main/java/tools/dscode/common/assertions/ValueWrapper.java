@@ -12,7 +12,6 @@ import java.util.*;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.evaluations.AviatorUtil.isStringTruthy;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.normalizeText;
-import static tools.dscode.coredefinitions.DateTimeUtilitySteps.dateTime;
 
 public class ValueWrapper {
 
@@ -47,7 +46,7 @@ public class ValueWrapper {
 
     public enum ValueTypes {
         DOUBLE_QUOTED, SINGLE_QUOTED, BACK_TICKED, TILDE_QUOTED,
-        NUMERIC, DEFAULT, BOOLEAN, DURATION, DATE_TIME,
+        NUMERIC, DEFAULT, BOOLEAN, DURATION, DATE_TIME, TIME_RANGE,
         LIST, SET, MAP, MULTIMAP
     }
 
@@ -477,6 +476,12 @@ public class ValueWrapper {
         if (isNullOrBlank()) return null;
         String durationString = normalizedText.trim().startsWith("Duration:") ? normalizedText.trim() : "Duration:" + normalizedText.trim();
         return  new ValueWrapper(getRunningStep().resolveStepFromString(durationString), ValueTypes.DURATION);
+    }
+
+    public ValueWrapper getTimeRangeStringValue() {
+        if (isNullOrBlank()) return null;
+        String durationString = normalizedText.trim().startsWith("TimeRange:") ? normalizedText.trim() : "TimeRange:" + normalizedText.trim();
+        return  new ValueWrapper(getRunningStep().resolveStepFromString(durationString), ValueTypes.TIME_RANGE);
     }
 
 }

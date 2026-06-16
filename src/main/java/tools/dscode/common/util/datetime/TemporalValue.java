@@ -1,5 +1,7 @@
 package tools.dscode.common.util.datetime;
 
+import tools.dscode.common.assertions.ValueWrapper;
+
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
@@ -145,6 +147,24 @@ public final class TemporalValue {
     }
 
     /**
+     * Factory for temporal values already classified by ValueWrapper.
+     */
+    public static TemporalValue fromValueWrapper(ValueWrapper valueWrapper) {
+        Objects.requireNonNull(valueWrapper, "valueWrapper");
+        BusinessCalendar calendar = CalendarRegistry.getCalendar();
+
+        return switch (valueWrapper.type.name()) {
+            case "TIME_INSTANCE", "DATE_TIME" -> fromDateTimeValueWrapper(valueWrapper, calendar);
+            case "TIME_DURATION", "DURATION" -> fromDurationValueWrapper(valueWrapper);
+            case "TIME_RANGE" -> fromTimeRangeValueWrapper(valueWrapper);
+            default -> throw new IllegalArgumentException(
+                    "Unsupported temporal ValueWrapper type: " + valueWrapper.type
+                            + ". Expected one of TIME_INSTANCE, TIME_RANGE, TIME_DURATION."
+            );
+        };
+    }
+
+    /**
      * Object convenience for already-resolved date/time objects. String is intentionally not accepted here.
      * Use dateTime(String) or duration(String) to avoid kind ambiguity.
      */
@@ -275,6 +295,64 @@ public final class TemporalValue {
                     : ChronoUnit.MONTHS.between(EPOCH_UTC, z));
         }
         return divide(instantToEpochNanos(instant), nanosPerUnit(unit));
+    }
+
+    private static TemporalValue fromDateTimeValueWrapper(ValueWrapper valueWrapper, BusinessCalendar calendar) {
+        Object value = valueWrapper.getValue();
+        String originalInput = valueWrapper.toString();
+
+        if (value instanceof TemporalValue tv) {
+            if (!tv.isDateTime()) throw new IllegalArgumentException("ValueWrapper DATE_TIME value is not DATE_TIME");
+            return tv;
+        }
+        if (value instanceof BusinessTime bt) return dateTime(originalInput, bt);
+        if (value instanceof ZonedDateTime zdt) {
+            return dateTime(originalInput, new BusinessTime(calendar, zdt.withZoneSameInstant(calendar.zone())));
+        }
+        if (value instanceof OffsetDateTime odt) {
+            return dateTime(originalInput, new BusinessTime(calendar, odt.toInstant().atZone(calendar.zone())));
+        }
+        if (value instanceof Instant instant) {
+            return dateTime(originalInput, new BusinessTime(calendar, instant.atZone(calendar.zone())));
+        }
+        if (value instanceof String s) {
+            return dateTime(originalInput, BusinessTime.evaluate(calendar, s));
+        }
+        if (value != null) {
+            return dateTime(originalInput, BusinessTime.evaluate(calendar, value.toString()));
+        }
+
+        throw new IllegalArgumentException("ValueWrapper DATE_TIME value is null");
+    }
+
+    private static TemporalValue fromDurationValueWrapper(ValueWrapper valueWrapper) {
+        Object value = valueWrapper.getValue();
+        String originalInput = valueWrapper.toString();
+
+        if (value instanceof TemporalValue tv) {
+            if (!tv.isDuration()) throw new IllegalArgumentException("ValueWrapper DURATION value is not DURATION");
+            return tv;
+        }
+        if (value instanceof Duration d) return duration(originalInput, d, null);
+        if (value instanceof String s) return duration(s);
+        if (value != null) return duration(value.toString());
+
+        throw new IllegalArgumentException("ValueWrapper DURATION value is null");
+    }
+
+    private static TemporalValue fromTimeRangeValueWrapper(ValueWrapper valueWrapper) {
+        Object value = valueWrapper.getValue();
+        String originalInput = valueWrapper.toString();
+
+        if (value instanceof TemporalValue tv) {
+            if (!tv.isTimeRange()) throw new IllegalArgumentException("ValueWrapper TIME_RANGE value is not TIME_RANGE");
+            return tv;
+        }
+        if (value instanceof BusinessTimeRange tr) return timeRange(originalInput, tr);
+        if (value instanceof String s) return timeRange(s);
+        if (value != null) return timeRange(value.toString());
+
+        throw new IllegalArgumentException("ValueWrapper TIME_RANGE value is null");
     }
 
     private static BigDecimal durationToUnits(Duration duration, Unit unit) {

@@ -5,6 +5,13 @@ DefaultCalendar:
   DefaultOutputPattern: "yyyy-MM-dd HH:mm:ss VV"
   DefaultOutputZone: America/New_York
 
+  DateTimeFormats:
+   - "M/d/yyyy"
+   - "uuuu-M-d"
+   - "uuuu-M-d H:m:s"
+   - "uuuu-MM-dd HH:mm:ss VV"
+
+
   Open:
     - "MON-FRI 0900-1200 1300-1700"
 

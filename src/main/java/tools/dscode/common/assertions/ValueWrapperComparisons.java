@@ -1,6 +1,9 @@
 package tools.dscode.common.assertions;
 
 import org.apache.commons.lang3.StringUtils;
+import tools.dscode.common.util.datetime.TemporalValue;
+
+import java.math.BigInteger;
 import java.util.regex.Pattern;
 
 import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLevel;
@@ -13,7 +16,8 @@ import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLev
  * - String comparisons normally use asNormalizedText()
  * - If either arg is SINGLE_QUOTED → case-insensitive comparison
  * - If either arg is BACK_TICKED → use getValue().toString() for BOTH sides
- * - Numeric comparisons use asBigInteger()
+ * - Numeric comparisons use asBigDecimal()
+ * - Temporal comparisons use TemporalValue nanoseconds
  */
 public final class ValueWrapperComparisons {
 
@@ -46,7 +50,28 @@ public final class ValueWrapperComparisons {
         logComparison(comparisonType, a.asBigDecimal(), b.asBigDecimal());
     }
 
+    private static void logTemporalComparison(String comparisonType, ValueWrapper a, ValueWrapper b) {
+        if (a == null || b == null) {
+            logComparison(comparisonType, a, b);
+            return;
+        }
+
+        logComparison(comparisonType, temporalNanos(a), temporalNanos(b));
+    }
+
     /* ---------------- helpers ---------------- */
+
+    private static boolean eitherTemporal(ValueWrapper a, ValueWrapper b) {
+        return isTemporal(a) || isTemporal(b);
+    }
+
+    private static boolean isTemporal(ValueWrapper value) {
+        if (value == null || value.type == null) return false;
+        return switch (value.type.name()) {
+            case "TIME_INSTANCE", "TIME_RANGE", "TIME_DURATION", "DATE_TIME", "DURATION" -> true;
+            default -> false;
+        };
+    }
 
     private static boolean eitherNumeric(ValueWrapper a, ValueWrapper b) {
         return a.type == ValueWrapper.ValueTypes.NUMERIC
@@ -79,6 +104,7 @@ public final class ValueWrapperComparisons {
 
     private static boolean equalsInternal(ValueWrapper a, ValueWrapper b) {
         if (a == null || b == null) return a == b;
+        if (eitherTemporal(a, b)) return temporalEqualsInternal(a, b);
         if (eitherNumeric(a, b)) return numericEqualsInternal(a, b);
 
         String left = stringValue(a, b);
@@ -94,15 +120,37 @@ public final class ValueWrapperComparisons {
         return a.asBigDecimal().compareTo(b.asBigDecimal()) == 0;
     }
 
+    private static boolean temporalEqualsInternal(ValueWrapper a, ValueWrapper b) {
+        if (a == null || b == null) return a == b;
+        return temporalCompare(a, b) == 0;
+    }
+
+    private static int temporalCompare(ValueWrapper a, ValueWrapper b) {
+        return temporalNanos(a).compareTo(temporalNanos(b));
+    }
+
+    private static BigInteger temporalNanos(ValueWrapper value) {
+        return TemporalValue.fromValueWrapper(value).toNanos();
+    }
+
     /* ---------------- string comparisons ---------------- */
 
     public static boolean notEquals(ValueWrapper a, ValueWrapper b) {
-        logStringComparison("non-equality", a, b);
+        if (a != null && b != null && eitherTemporal(a, b)) {
+            logTemporalComparison("temporal non-equality", a, b);
+        } else if (a != null && b != null && eitherNumeric(a, b)) {
+            logNumericComparison("numeric non-equality", a, b);
+        } else {
+            logStringComparison("non-equality", a, b);
+        }
+
         return !equalsInternal(a, b);
     }
 
     public static boolean equals(ValueWrapper a, ValueWrapper b) {
-        if (a != null && b != null && eitherNumeric(a, b)) {
+        if (a != null && b != null && eitherTemporal(a, b)) {
+            logTemporalComparison("temporal equality", a, b);
+        } else if (a != null && b != null && eitherNumeric(a, b)) {
             logNumericComparison("numeric equality", a, b);
         } else {
             logStringComparison("equality", a, b);
@@ -171,11 +219,15 @@ public final class ValueWrapperComparisons {
     /* ---------------- numeric comparisons ---------------- */
 
     public static boolean numericEquals(ValueWrapper a, ValueWrapper b) {
+        if (a != null && b != null && eitherTemporal(a, b)) return temporalEquals(a, b);
+
         logNumericComparison("numeric equality", a, b);
         return numericEqualsInternal(a, b);
     }
 
     public static boolean numericGreaterThan(ValueWrapper a, ValueWrapper b) {
+        if (a != null && b != null && eitherTemporal(a, b)) return temporalGreaterThan(a, b);
+
         logNumericComparison("numeric greater-than", a, b);
 
         if (a == null || b == null) return false;
@@ -183,6 +235,8 @@ public final class ValueWrapperComparisons {
     }
 
     public static boolean numericLessThan(ValueWrapper a, ValueWrapper b) {
+        if (a != null && b != null && eitherTemporal(a, b)) return temporalLessThan(a, b);
+
         logNumericComparison("numeric less-than", a, b);
 
         if (a == null || b == null) return false;
@@ -190,6 +244,8 @@ public final class ValueWrapperComparisons {
     }
 
     public static boolean numericGreaterThanOrEqualTo(ValueWrapper a, ValueWrapper b) {
+        if (a != null && b != null && eitherTemporal(a, b)) return temporalGreaterThanOrEqualTo(a, b);
+
         logNumericComparison("numeric greater-than-or-equal-to", a, b);
 
         if (a == null || b == null) return a == b;
@@ -197,11 +253,47 @@ public final class ValueWrapperComparisons {
     }
 
     public static boolean numericLessThanOrEqualTo(ValueWrapper a, ValueWrapper b) {
+        if (a != null && b != null && eitherTemporal(a, b)) return temporalLessThanOrEqualTo(a, b);
+
         logNumericComparison("numeric less-than-or-equal-to", a, b);
 
         if (a == null || b == null) return a == b;
         return a.asBigDecimal().compareTo(b.asBigDecimal()) <= 0;
     }
 
+    /* ---------------- temporal comparisons ---------------- */
+
+    public static boolean temporalEquals(ValueWrapper a, ValueWrapper b) {
+        logTemporalComparison("temporal equality", a, b);
+        return temporalEqualsInternal(a, b);
+    }
+
+    public static boolean temporalGreaterThan(ValueWrapper a, ValueWrapper b) {
+        logTemporalComparison("temporal greater-than", a, b);
+
+        if (a == null || b == null) return false;
+        return temporalCompare(a, b) > 0;
+    }
+
+    public static boolean temporalLessThan(ValueWrapper a, ValueWrapper b) {
+        logTemporalComparison("temporal less-than", a, b);
+
+        if (a == null || b == null) return false;
+        return temporalCompare(a, b) < 0;
+    }
+
+    public static boolean temporalGreaterThanOrEqualTo(ValueWrapper a, ValueWrapper b) {
+        logTemporalComparison("temporal greater-than-or-equal-to", a, b);
+
+        if (a == null || b == null) return a == b;
+        return temporalCompare(a, b) >= 0;
+    }
+
+    public static boolean temporalLessThanOrEqualTo(ValueWrapper a, ValueWrapper b) {
+        logTemporalComparison("temporal less-than-or-equal-to", a, b);
+
+        if (a == null || b == null) return a == b;
+        return temporalCompare(a, b) <= 0;
+    }
 
 }

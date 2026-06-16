@@ -88,22 +88,26 @@ public enum ElementType {
         }
 
         String singular = raw.replaceAll("s$", "");
-
+        System.out.println("@@singular: '" + singular + "' raw: '" + raw + "'");
         if (singular.equals("Duration")) {
             returnSet.add(TIME_DURATION);
             returnSet.add(TIME_VALUE);
+            returnSet.add(RETURNS_VALUE);
             return returnSet;
         }
 
-        if (singular.equals("Date Time")) {
+        if (singular.equals("Time")) {
+            System.out.println("@@!!!");
             returnSet.add(TIME_INSTANCE);
             returnSet.add(TIME_VALUE);
+            returnSet.add(RETURNS_VALUE);
             return returnSet;
         }
 
         if (singular.equals("Time Range")) {
             returnSet.add(TIME_RANGE);
             returnSet.add(TIME_VALUE);
+            returnSet.add(RETURNS_VALUE);
             return returnSet;
         }
 

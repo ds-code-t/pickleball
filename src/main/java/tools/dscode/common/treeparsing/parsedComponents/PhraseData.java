@@ -488,6 +488,12 @@ public abstract class PhraseData extends PassedData {
         return repetitionElement.getValue().asInteger();
     }
 
+    public ValueWrapper getMargin() {
+        ElementMatch repetitionElement = getSpecialElementByFlag(ElementMatch.SpecialUse.MARGIN);
+        if (repetitionElement == null) return null;
+        return repetitionElement.getValue();
+    }
+
     public void resetElementWrapper() {
         wrappedElements.clear();
         elementMatches.forEach(e -> e.wrappedElements = null);

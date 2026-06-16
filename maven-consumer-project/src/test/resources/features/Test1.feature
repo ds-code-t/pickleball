@@ -1,5 +1,15 @@
 Feature: nested Feature File
 
+  Scenario: date time tests
+
+    * , verify "yesterday" Date Time is equal to "today" Date Time
+    * , verify "today" Date Time is greater than "yesterday" Date Time
+    * , verify "yesterday" Date Time is greater than "today" Date Time
+
+#    Given , save "<$DateTime:today>" as "A"
+#    Given , save "<$DateTime:tomorrow>" as "A"
+#    Given , save "<$DateTime:yesterday>" as "A"
+
   Scenario: fsdfd hrfgh 3
     * , save "a" as "A"
     * , until "<A>" equals "aaa", or 3 == 3:
