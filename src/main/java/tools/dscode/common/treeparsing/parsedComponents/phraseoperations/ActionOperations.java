@@ -51,6 +51,8 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
+            int repetition = phraseData.getRepetition();
+
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT),
@@ -62,7 +64,7 @@ public enum ActionOperations implements OperationsInterface {
 
             ElementMatch filePathElement = phraseData.resultElements.get(1);
 
-            phraseData.result = Attempt.run(() -> {
+            phraseData.result = Attempt.run(repetition, 500, () -> {
                 WebElement inputElement = fileInputElement.getElementWrappers().getFirst().getElement();
                 FileUploadUtil.createTempAndUpload(getCurrentDriver(), inputElement, filePathElement.getValue().toString());
                 return true;
@@ -73,6 +75,7 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
+            int repetition = phraseData.getRepetition();
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT),
@@ -84,7 +87,7 @@ public enum ActionOperations implements OperationsInterface {
 
             ElementMatch filePathElement = phraseData.resultElements.get(1);
 
-            phraseData.result = Attempt.run(() -> {
+            phraseData.result = Attempt.run(repetition, 500, () -> {
                 WebElement inputElement = fileInputElement.getElementWrappers().getFirst().getElement();
                 FileUploadUtil.upload(getCurrentDriver(), inputElement, filePathElement.getValue().toString());
                 return true;
@@ -95,6 +98,7 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
+            int repetition = phraseData.getRepetition();
 
             ElementMatch regexMatchElement = phraseData.getElementMatches().stream().filter(e -> e.elementTypes.contains(ElementType.REGEX_MATCH)).findFirst().orElse(null);
             List<ElementMatch> valueElements = phraseData.getElementMatches().stream().filter(e -> e.elementTypes.contains(ElementType.RETURNS_VALUE) && !e.elementTypes.contains(ElementType.KEY_VALUE)).toList();
@@ -124,7 +128,7 @@ public enum ActionOperations implements OperationsInterface {
             final Pattern pattern = tempPattern;
 
             String keyName = keyElement == null ? (regexMatchWithReference ? regexReference : "saved") : keyElement.getValue().toString();
-            phraseData.result = Attempt.run(() -> {
+            phraseData.result = Attempt.run(repetition, 500, () -> {
                 for (ValueWrapper valueWrapper : valueElement.getValues()) {
                     Object value = valueWrapper.getValue();
                     if (pattern != null) {
@@ -178,12 +182,14 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
+            int repetition = phraseData.getRepetition();
+
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher().mustMatchAtLeastOne(ElementType.TIME_VALUE, ElementType.HTML_ELEMENT)
             );
             ElementMatch waitElementMatch = phraseData.resultElements.getFirst();
             boolean waitOnPageLoad = !phraseData.skipPageSync();
-            phraseData.result = Attempt.run(() -> {
+            phraseData.result = Attempt.run(repetition, 500, () -> {
                 if (waitElementMatch.elementTypes.contains(ElementType.HTML_ELEMENT)) {
                     if (waitOnPageLoad)
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
@@ -212,6 +218,7 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
+            int repetition = phraseData.getRepetition();
 
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
@@ -225,7 +232,7 @@ public enum ActionOperations implements OperationsInterface {
 
             boolean waitOnPageLoad = !phraseData.nextSemicolon();
 
-            phraseData.result = Attempt.run(() -> {
+            phraseData.result = Attempt.run(repetition, 500, () -> {
                 int count = 0;
                 for (ElementWrapper dropDownWrapper : dropDowns.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if (waitOnPageLoad && count > 0) {
@@ -257,6 +264,8 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
+            int repetition = phraseData.getRepetition();
+
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
@@ -264,7 +273,7 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch element = phraseData.resultElements.getFirst();
             boolean waitOnPageLoad = !phraseData.nextSemicolon();
 
-            phraseData.result = Attempt.run(() -> {
+            phraseData.result = Attempt.run(repetition, 500, () -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if (waitOnPageLoad && count > 0) {
@@ -283,6 +292,8 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
+            int repetition = phraseData.getRepetition();
+
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
@@ -290,7 +301,7 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch element = phraseData.resultElements.getFirst();
             boolean waitOnPageLoad = !phraseData.nextSemicolon();
 
-            phraseData.result = Attempt.run(() -> {
+            phraseData.result = Attempt.run(repetition, 500, () -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if (waitOnPageLoad && count > 0) {
@@ -309,6 +320,8 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
+            int repetition = phraseData.getRepetition();
+
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
@@ -318,7 +331,7 @@ public enum ActionOperations implements OperationsInterface {
 
             boolean waitOnPageLoad = !phraseData.nextSemicolon();
 
-            phraseData.result = Attempt.run(() -> {
+            phraseData.result = Attempt.run(repetition, 500, () -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if (waitOnPageLoad && count > 0) {
@@ -336,13 +349,15 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
+            int repetition = phraseData.getRepetition();
+
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
             ElementMatch element = phraseData.resultElements.getFirst();
             boolean waitOnPageLoad = !phraseData.nextSemicolon();
-            phraseData.result = Attempt.run(() -> {
+            phraseData.result = Attempt.run(repetition, 500, () -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if (waitOnPageLoad && count > 0) {
@@ -387,6 +402,8 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
+            int repetition = phraseData.getRepetition();
+
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
@@ -394,7 +411,7 @@ public enum ActionOperations implements OperationsInterface {
 
             ElementMatch element = phraseData.resultElements.getFirst();
             boolean waitOnPageLoad = !phraseData.nextSemicolon();
-            phraseData.result = Attempt.run(() -> {
+            phraseData.result = Attempt.run(repetition, 500, () -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if (waitOnPageLoad && count > 0) {
@@ -411,13 +428,15 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
+            int repetition = phraseData.getRepetition();
+
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.BROWSER_WINDOW)
             );
 
             ElementMatch element = phraseData.resultElements.getFirst();
-            phraseData.result = Attempt.run(() -> {
+            phraseData.result = Attempt.run(repetition, 500, () -> {
                 List<ValueWrapper> handleWrappers = element.getValues();
 
 
@@ -436,7 +455,7 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
-
+            int repetition = phraseData.getRepetition();
 
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
@@ -446,7 +465,7 @@ public enum ActionOperations implements OperationsInterface {
 
             ElementMatch element = phraseData.resultElements.getFirst();
             boolean waitOnPageLoad = !phraseData.nextSemicolon();
-            phraseData.result = Attempt.run(() -> {
+            phraseData.result = Attempt.run(repetition, 500, () -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
                     if (waitOnPageLoad && count > 0) {
@@ -465,7 +484,9 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             waitMilliseconds(2000);
             logInfo(phraseData + " : Executing Action " + this.name());
-            phraseData.result = Attempt.runVoid(() -> {
+            int repetition = phraseData.getRepetition();
+
+            phraseData.result = Attempt.runVoid(repetition, 500, () -> {
                 try {
                     if (!phraseData.getFirstElement().category.startsWith("Alert"))
                         throw new RuntimeException("Accept only works on Alerts");
@@ -481,7 +502,9 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
-            phraseData.result = Attempt.runVoid(() ->
+            int repetition = phraseData.getRepetition();
+
+            phraseData.result = Attempt.runVoid(repetition, 500, () ->
                     dismiss(getCurrentDriver())
             );
         }
@@ -490,7 +513,9 @@ public enum ActionOperations implements OperationsInterface {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
-            phraseData.result = Attempt.runVoid(() -> {
+            int repetition = phraseData.getRepetition();
+
+            phraseData.result = Attempt.runVoid(repetition, 500, () -> {
                 ElementMatch firstElement = phraseData.getElementMatchAfterOperation(VALUE_TYPE);
                 StepExtension newStepExtension = getRunningStep().createNewStepExtension(firstElement.getValue().toString());
                 newStepExtension.runAndGetReturnValue();
@@ -512,7 +537,7 @@ public enum ActionOperations implements OperationsInterface {
                               boolean shouldClear,
                               boolean shouldEnterText,
                               boolean enterKeys) {
-
+        int repetition = phraseData.getRepetition();
         boolean waitOnPageLoad = !phraseData.nextSemicolon();
 
         // Keep your original semantics:
@@ -527,7 +552,7 @@ public enum ActionOperations implements OperationsInterface {
                 .map(ElementMatch::getValue)
                 .toList();
 
-        phraseData.result = Attempt.run(() -> {
+        phraseData.result = Attempt.run(repetition, 500, () -> {
             int count = 0;
 
             if (elementMatches == null || elementMatches.isEmpty()) {

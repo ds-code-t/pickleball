@@ -184,16 +184,7 @@ public final class Phrase extends PhraseData {
         });
 
         if (isOperationPhrase) {
-            int repetition = getRepetition();
-            boolean multipleOperations = repetition > 1;
-            for(int i=0; i < repetition; i++) {
-                runOperation();
-                if (multipleOperations) {
-                    skipSync = true;
-                    resetElementWrapper();
-                }
-            }
-            skipSync = false;
+            runOperation();
         } else if (phraseType == PhraseType.CONTEXT) {
             processContextPhrase();
         }
