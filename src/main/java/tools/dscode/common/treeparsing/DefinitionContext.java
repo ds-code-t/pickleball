@@ -119,8 +119,11 @@ public final class DefinitionContext {
         ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?!\\s*[A-Z])(?<unitMatch>\\s+(?<unit>times|second|minute|hour|day|week|month|year|time|number|integer|decimal|color|text)s?\\b)?") {
             @Override
             public String onSubstitute(MatchNode self) {
+                String originalUnit = self.groups().getOrDefault("unit", "").trim().replaceAll("\\s$", "");
                 String value = " " + self.groups().get("value") + " ";
-                String unit = " " + VALUE_TYPE_MATCH + self.groups().getOrDefault("unit", "").trim().replaceAll("\\s$", "") + " ";
+                String unit = " " + VALUE_TYPE_MATCH + originalUnit + " ";
+                if(originalUnit.equals("times"))
+                    return " repetition-of" +value + unit;
                 return value + unit;
             }
         };
@@ -339,14 +342,13 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode margin = new ParseNode("\\bmargin-of\\s+(?<element><<elementMatch>>)") {
+        ParseNode specialElements = new ParseNode("\\b(?<type>repetition|margin)-of\\s+(?<element><<elementMatch>>)") {
             @Override
             public String onSubstitute(MatchNode self) {
                 String elementToken = self.groups().get("element");
                 MatchNode elementMatchNode = self.getMatchNode(elementToken);
-                elementMatchNode.putToLocalState("margin", "true");
-                self.parent().putToLocalState("marginelementMatchNode", elementMatchNode);
-                // I want to remove the 'elementToken from the self.parent() parent
+                String type = self.groups().get("type");
+                elementMatchNode.putToLocalState("special", type);
                 return "";
             }
         };

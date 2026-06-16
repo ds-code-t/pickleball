@@ -5,6 +5,7 @@ import tools.dscode.common.assertions.ValueWrapper;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -150,6 +151,31 @@ public final class MatchNode {
 
     public void addChildMatchNode(MatchNode child) {
         children.put(child.name(), child);
+    }
+
+    public boolean removeChildMatchNode(MatchNode child) {
+        if (child == null) return false;
+        boolean removed = children.remove(child.name(), child);
+        if (!removed) return false;
+
+        child.position = -1;
+        child.previousSibling = null;
+        child.nextSibling = null;
+
+        if (sortedChildren != null) rebuildChildOrdering();
+        return true;
+    }
+
+    void rebuildChildOrdering() {
+        sortedChildren = new ArrayList<>(children.values());
+        sortedChildren.sort(Comparator.comparingInt(m -> m.start));
+
+        for (int i = 0; i < sortedChildren.size(); i++) {
+            var n = sortedChildren.get(i);
+            n.position = i;
+            n.previousSibling = (i > 0) ? sortedChildren.get(i - 1) : null;
+            n.nextSibling = (i + 1 < sortedChildren.size()) ? sortedChildren.get(i + 1) : null;
+        }
     }
 
     /**

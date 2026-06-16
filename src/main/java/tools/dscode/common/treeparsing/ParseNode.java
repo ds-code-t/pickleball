@@ -4,7 +4,6 @@ import com.google.common.collect.LinkedListMultimap;
 import org.intellij.lang.annotations.Language;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -125,15 +124,7 @@ public class ParseNode {
 
 
     public void descendantsResolved(MatchNode self) {
-        self.sortedChildren = new ArrayList<>(self.children.values());
-        self.sortedChildren.sort(Comparator.comparingInt(m -> m.start));
-
-        for (int i = 0; i < self.sortedChildren.size(); i++) {
-            var n = self.sortedChildren.get(i);
-            n.position = i;
-            n.previousSibling = (i > 0) ? self.sortedChildren.get(i - 1) : null;
-            n.nextSibling = (i + 1 < self.sortedChildren.size()) ? self.sortedChildren.get(i + 1) : null;
-        }
+        self.rebuildChildOrdering();
         onResolve(self);
     }
 

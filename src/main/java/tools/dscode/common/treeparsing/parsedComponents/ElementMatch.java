@@ -14,13 +14,13 @@ import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatcher;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -43,6 +43,10 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.com
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrPredicate;
 
 public class ElementMatch {
+    public enum SpecialUse {
+        MARGIN, REPETITION
+    }
+
     public final String fullText;
     public final int startIndex;
     public final int position;
@@ -59,6 +63,7 @@ public class ElementMatch {
     public XPathy xPathy;
     //    public XPathy xPathyWithIndex;
     public Set<ElementType> elementTypes;
+    public Set<SpecialUse> specialUseSet = new HashSet<>();
     public ElementMatcher elementMatcher;
     public ContextWrapper contextWrapper;
     public List<String> defaultValueKeys = new ArrayList<>(List.of(ELEMENT_RETURN_VALUE, "attributes.value", "childValue", "textContent"));
@@ -131,6 +136,17 @@ public class ElementMatch {
 
 
         elementTypes = ElementType.fromString(categoryString);
+        String specialList = elementNode.getStringFromLocalState("special");
+        if (specialList != null && !specialList.isBlank()) {
+            for (String special : specialList.split(",")) {
+                String normalizedSpecial = special.trim().toUpperCase(Locale.ROOT);
+                try {
+                    specialUseSet.add(SpecialUse.valueOf(normalizedSpecial));
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException("Unknown ElementMatch special type '" + special.trim() + "' in '" + specialList + "'", e);
+                }
+            }
+        }
         category = categoryString.replaceFirst("^" + VALUE_TYPE_MATCH, "");
 
         this.elementPosition = elementNode.getStringFromLocalState("elementPosition");
@@ -314,6 +330,7 @@ public class ElementMatch {
 
         this.category = elementMatch.category;
         this.elementTypes = new HashSet<>(elementMatch.elementTypes);
+        this.specialUseSet.addAll(elementMatch.specialUseSet);
         this.elementPosition = elementMatch.elementPosition;
         this.selectionType = elementMatch.selectionType;
         this.valueTypes = elementMatch.valueTypes == null

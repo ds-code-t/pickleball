@@ -55,7 +55,7 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.ins
 
 
 public abstract class PhraseData extends PassedData {
-    protected Optional<ElementMatch> repetitionElementOptional;
+    //    protected Optional<ElementMatch> repetitionElementOptional;
     public boolean isChainedAssertion = false;
     public Entry phraseEntry;
     //    boolean isStartingContext;
@@ -483,16 +483,9 @@ public abstract class PhraseData extends PassedData {
     }
 
     public int getRepetition() {
-        if (repetitionElementOptional == null) {
-            repetitionElementOptional = elementMatches.stream()
-                    .filter(e -> e.elementTypes.contains(REPETITION)).findFirst();
-        }
-        if (repetitionElementOptional.isPresent()) {
-            ElementMatch repetitionElement = this.repetitionElementOptional.get();
-            elementMatches.remove(repetitionElement);
-            return repetitionElement.getValue().asInteger();
-        }
-        return 1;
+        ElementMatch repetitionElement = getSpecialElementByFlag(ElementMatch.SpecialUse.REPETITION);
+        if (repetitionElement == null) return 1;
+        return repetitionElement.getValue().asInteger();
     }
 
     public void resetElementWrapper() {

@@ -36,6 +36,7 @@ public abstract class PassedData {
     private PhraseData nextPhrase;
 
     protected List<ElementMatch> elementMatches = new ArrayList<>();
+    protected List<ElementMatch> specialElements = new ArrayList<>();
     public boolean hasNo;
     String conditional = "";
     public String body;
@@ -254,12 +255,39 @@ public abstract class PassedData {
         return elementMatches;
     }
 
+
+    public ElementMatch getSpecialElementByFlag(ElementMatch.SpecialUse... flags) {
+        List<ElementMatch> matches = getSpecialElementsByFlag(flags);
+        return matches.isEmpty() ? null : matches.getFirst();
+    }
+
+    public List<ElementMatch> getSpecialElementsByFlag(ElementMatch.SpecialUse... flags) {
+        List<ElementMatch> matches = new ArrayList<>();
+        if (flags == null || flags.length == 0) {
+            return matches;
+        }
+        Set<ElementMatch.SpecialUse> flagSet = new HashSet<>(Arrays.asList(flags));
+        specialElements.forEach(elementMatch -> {
+            if (elementMatch.specialUseSet.stream().anyMatch(flagSet::contains)) {
+                matches.add(elementMatch);
+            }
+        });
+        return matches;
+    }
+
     public void setElementMatches(List<ElementMatch> elementMatchesInput) {
-        elementMatches = elementMatchesInput.size() > 2
-                ? new ArrayList<>(elementMatchesInput.stream()
+        specialElements = new ArrayList<>(elementMatchesInput.stream()
+                .filter(elementMatch -> !elementMatch.specialUseSet.isEmpty())
+                .toList());
+        List<ElementMatch> nonSpecialElementMatches = elementMatchesInput.stream()
+                .filter(elementMatch -> elementMatch.specialUseSet.isEmpty())
+                .toList();
+
+        elementMatches = nonSpecialElementMatches.size() > 2
+                ? new ArrayList<>(nonSpecialElementMatches.stream()
                 .filter(elementMatch -> !elementMatch.isPlaceHolder())
                 .toList())
-                : new ArrayList<>(elementMatchesInput);
+                : new ArrayList<>(nonSpecialElementMatches);
 
         categoryFlags.clear();
 
