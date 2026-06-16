@@ -11,7 +11,6 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -21,12 +20,8 @@ import java.util.regex.Pattern;
  * Resolved temporal value that preserves both the original input and the parsed object.
  *
  * DATE_TIME values wrap BusinessTime/ZonedDateTime.
- * DURATION values wrap java.time.Duration.
+ * DELTA values wrap ordered calendar/time deltas.
  * TIME_RANGE values wrap a parsed weekly BusinessTimeRange.
- *
- * toString() renders the user-facing output format.
- * toIso() and toUnits(...) ignore presentation formatting where applicable.
- * For TIME_RANGE, toUnits(...) returns total selected range duration across the weekly segments.
  */
 public final class TemporalValue {
 
@@ -34,7 +29,7 @@ public final class TemporalValue {
     private static final ZonedDateTime EPOCH_UTC = Instant.EPOCH.atZone(ZoneOffset.UTC);
     private static final Pattern CALENDAR_PREFIX = Pattern.compile("(?i)^Calendar:(\\S+)\\s+(.+)$");
 
-    public enum Kind { DATE_TIME, DURATION, TIME_RANGE }
+    public enum Kind { DATE_TIME, DELTA, TIME_RANGE }
 
     public enum Unit {
         YEARS, MONTHS, WEEKS, DAYS, HOURS, MINUTES, SECONDS, MILLIS, MICROS, NANOS;
@@ -48,29 +43,27 @@ public final class TemporalValue {
     private final String originalInput;
     private final BusinessCalendar calendar;
     private final BusinessTime dateTime;
-    private final Duration duration;
+    private final TemporalDelta delta;
     private final BusinessTimeRange timeRange;
-    private final String durationOutputFormat;
+    private final String deltaOutputFormat;
 
     private TemporalValue(
             Kind kind,
             String originalInput,
             BusinessCalendar calendar,
             BusinessTime dateTime,
-            Duration duration,
+            TemporalDelta delta,
             BusinessTimeRange timeRange,
-            String durationOutputFormat
+            String deltaOutputFormat
     ) {
         this.kind = Objects.requireNonNull(kind, "kind");
         this.originalInput = originalInput;
         this.calendar = calendar;
         this.dateTime = dateTime;
-        this.duration = duration;
+        this.delta = delta;
         this.timeRange = timeRange;
-        this.durationOutputFormat = blankToNull(durationOutputFormat);
+        this.deltaOutputFormat = blankToNull(deltaOutputFormat);
     }
-
-    // ---------------- factories: explicit type paths ----------------
 
     public static TemporalValue dateTime(String spec) {
         Objects.requireNonNull(spec, "spec");
@@ -118,8 +111,21 @@ public final class TemporalValue {
         return dateTime(value.toInstant());
     }
 
-    public static TemporalValue duration(String spec) {
+    public static TemporalValue delta(String spec) {
         return DurationFormattingUtils.evaluate(spec);
+    }
+
+    public static TemporalValue delta(TemporalDelta value) {
+        return delta(null, value, null);
+    }
+
+    public static TemporalValue delta(String originalInput, TemporalDelta value, String outputFormat) {
+        Objects.requireNonNull(value, "value");
+        return new TemporalValue(Kind.DELTA, originalInput, null, null, value, null, outputFormat);
+    }
+
+    public static TemporalValue duration(String spec) {
+        return delta(spec);
     }
 
     public static TemporalValue duration(Duration value) {
@@ -128,7 +134,7 @@ public final class TemporalValue {
 
     public static TemporalValue duration(String originalInput, Duration value, String outputFormat) {
         Objects.requireNonNull(value, "value");
-        return new TemporalValue(Kind.DURATION, originalInput, null, null, value, null, outputFormat);
+        return delta(originalInput, TemporalDelta.fromDuration(value), outputFormat);
     }
 
     public static TemporalValue timeRange(String spec) {
@@ -146,16 +152,13 @@ public final class TemporalValue {
         return new TemporalValue(Kind.TIME_RANGE, originalInput, null, null, null, value, null);
     }
 
-    /**
-     * Factory for temporal values already classified by ValueWrapper.
-     */
     public static TemporalValue fromValueWrapper(ValueWrapper valueWrapper) {
         Objects.requireNonNull(valueWrapper, "valueWrapper");
         BusinessCalendar calendar = CalendarRegistry.getCalendar();
 
         return switch (valueWrapper.type.name()) {
             case "TIME_INSTANCE", "DATE_TIME" -> fromDateTimeValueWrapper(valueWrapper, calendar);
-            case "TIME_DURATION", "DURATION" -> fromDurationValueWrapper(valueWrapper);
+            case "TIME_DURATION", "DURATION", "DELTA" -> fromDeltaValueWrapper(valueWrapper);
             case "TIME_RANGE" -> fromTimeRangeValueWrapper(valueWrapper);
             default -> throw new IllegalArgumentException(
                     "Unsupported temporal ValueWrapper type: " + valueWrapper.type
@@ -164,10 +167,6 @@ public final class TemporalValue {
         };
     }
 
-    /**
-     * Object convenience for already-resolved date/time objects. String is intentionally not accepted here.
-     * Use dateTime(String) or duration(String) to avoid kind ambiguity.
-     */
     public static TemporalValue ofDateTimeObject(Object value) {
         if (value instanceof TemporalValue tv) {
             if (!tv.isDateTime()) throw new IllegalArgumentException("TemporalValue is not DATE_TIME");
@@ -180,20 +179,20 @@ public final class TemporalValue {
         throw new IllegalArgumentException("Unsupported date/time object: " + typeName(value));
     }
 
-    /**
-     * Object convenience for already-resolved durations. String is intentionally not accepted here.
-     * Use duration(String) for duration expression strings.
-     */
-    public static TemporalValue ofDurationObject(Object value) {
+    public static TemporalValue ofDeltaObject(Object value) {
         if (value instanceof TemporalValue tv) {
-            if (!tv.isDuration()) throw new IllegalArgumentException("TemporalValue is not DURATION");
+            if (!tv.isDelta()) throw new IllegalArgumentException("TemporalValue is not DELTA");
             return tv;
         }
+        if (value instanceof TemporalDelta td) return delta(td);
         if (value instanceof Duration d) return duration(d);
-        throw new IllegalArgumentException("Unsupported duration object: " + typeName(value));
+        throw new IllegalArgumentException("Unsupported delta object: " + typeName(value));
     }
 
-    /** Convenience for already-resolved time-range values. */
+    public static TemporalValue ofDurationObject(Object value) {
+        return ofDeltaObject(value);
+    }
+
     public static TemporalValue ofTimeRangeObject(Object value) {
         if (value instanceof TemporalValue tv) {
             if (!tv.isTimeRange()) throw new IllegalArgumentException("TemporalValue is not TIME_RANGE");
@@ -203,18 +202,19 @@ public final class TemporalValue {
         throw new IllegalArgumentException("Unsupported time-range object: " + typeName(value));
     }
 
-    // ---------------- accessors ----------------
-
     public Kind kind() { return kind; }
     public String originalInput() { return originalInput; }
     public Optional<BusinessCalendar> calendar() { return Optional.ofNullable(calendar); }
     public Optional<BusinessTime> businessTime() { return Optional.ofNullable(dateTime); }
-    public Optional<Duration> duration() { return Optional.ofNullable(duration); }
+    public Optional<TemporalDelta> delta() { return Optional.ofNullable(delta); }
+    public Optional<Duration> duration() { return Optional.ofNullable(delta).map(TemporalDelta::toDuration); }
     public Optional<BusinessTimeRange> timeRange() { return Optional.ofNullable(timeRange); }
-    public Optional<String> durationOutputFormat() { return Optional.ofNullable(durationOutputFormat); }
+    public Optional<String> deltaOutputFormat() { return Optional.ofNullable(deltaOutputFormat); }
+    public Optional<String> durationOutputFormat() { return deltaOutputFormat(); }
 
     public boolean isDateTime() { return kind == Kind.DATE_TIME; }
-    public boolean isDuration() { return kind == Kind.DURATION; }
+    public boolean isDelta() { return kind == Kind.DELTA; }
+    public boolean isDuration() { return isDelta(); }
     public boolean isTimeRange() { return kind == Kind.TIME_RANGE; }
 
     public BusinessTime requireBusinessTime() {
@@ -222,9 +222,13 @@ public final class TemporalValue {
         return dateTime;
     }
 
+    public TemporalDelta requireDelta() {
+        if (!isDelta()) throw new IllegalStateException("TemporalValue is not DELTA");
+        return delta;
+    }
+
     public Duration requireDuration() {
-        if (!isDuration()) throw new IllegalStateException("TemporalValue is not DURATION");
-        return duration;
+        return requireDelta().toDuration();
     }
 
     public BusinessTimeRange requireTimeRange() {
@@ -232,18 +236,14 @@ public final class TemporalValue {
         return timeRange;
     }
 
-    // ---------------- normalization / comparison helpers ----------------
-
-    /** DATE_TIME -> ISO instant. DURATION -> ISO-8601 Duration. TIME_RANGE -> canonical range string. */
     public String toIso() {
         return switch (kind) {
             case DATE_TIME -> dateTime.value().toInstant().toString();
-            case DURATION -> duration.toString();
+            case DELTA -> delta.toIsoString();
             case TIME_RANGE -> timeRange.toCanonicalString();
         };
     }
 
-    /** Default comparison unit is nanoseconds. */
     public BigDecimal toUnits() {
         return toUnits(Unit.NANOS);
     }
@@ -252,7 +252,7 @@ public final class TemporalValue {
         unit = Unit.normalize(unit);
         return switch (kind) {
             case DATE_TIME -> dateTimeToUnits(dateTime.value().toInstant(), unit);
-            case DURATION -> durationToUnits(duration, unit);
+            case DELTA -> deltaToUnits(delta, unit);
             case TIME_RANGE -> durationToUnits(timeRange.totalDuration(), unit);
         };
     }
@@ -260,7 +260,7 @@ public final class TemporalValue {
     public BigInteger toNanos() {
         return switch (kind) {
             case DATE_TIME -> instantToEpochNanos(dateTime.value().toInstant());
-            case DURATION -> durationToNanos(duration);
+            case DELTA -> durationToNanos(delta.toDuration());
             case TIME_RANGE -> timeRange.totalNanos();
         };
     }
@@ -269,9 +269,6 @@ public final class TemporalValue {
         return requireBusinessTime().value().toInstant();
     }
 
-    // ---------------- display ----------------
-
-    /** Renders the value using its presentation/output settings. */
     public String render() {
         return toString();
     }
@@ -280,12 +277,10 @@ public final class TemporalValue {
     public String toString() {
         return switch (kind) {
             case DATE_TIME -> dateTime.render();
-            case DURATION -> DurationFormattingUtils.format(duration, durationOutputFormat);
+            case DELTA -> DurationFormattingUtils.format(delta, deltaOutputFormat);
             case TIME_RANGE -> timeRange.toCanonicalString();
         };
     }
-
-    // ---------------- internals ----------------
 
     private static BigDecimal dateTimeToUnits(Instant instant, Unit unit) {
         if (unit == Unit.YEARS || unit == Unit.MONTHS) {
@@ -295,6 +290,14 @@ public final class TemporalValue {
                     : ChronoUnit.MONTHS.between(EPOCH_UTC, z));
         }
         return divide(instantToEpochNanos(instant), nanosPerUnit(unit));
+    }
+
+    private static BigDecimal deltaToUnits(TemporalDelta delta, Unit unit) {
+        ZonedDateTime start = ZonedDateTime.now(ZoneOffset.UTC);
+        ZonedDateTime end = delta.applyTo(start);
+        if (unit == Unit.YEARS) return BigDecimal.valueOf(ChronoUnit.YEARS.between(start, end));
+        if (unit == Unit.MONTHS) return BigDecimal.valueOf(ChronoUnit.MONTHS.between(start, end));
+        return durationToUnits(Duration.between(start, end), unit);
     }
 
     private static TemporalValue fromDateTimeValueWrapper(ValueWrapper valueWrapper, BusinessCalendar calendar) {
@@ -325,19 +328,20 @@ public final class TemporalValue {
         throw new IllegalArgumentException("ValueWrapper DATE_TIME value is null");
     }
 
-    private static TemporalValue fromDurationValueWrapper(ValueWrapper valueWrapper) {
+    private static TemporalValue fromDeltaValueWrapper(ValueWrapper valueWrapper) {
         Object value = valueWrapper.getValue();
         String originalInput = valueWrapper.toString();
 
         if (value instanceof TemporalValue tv) {
-            if (!tv.isDuration()) throw new IllegalArgumentException("ValueWrapper DURATION value is not DURATION");
+            if (!tv.isDelta()) throw new IllegalArgumentException("ValueWrapper DELTA value is not DELTA");
             return tv;
         }
+        if (value instanceof TemporalDelta td) return delta(originalInput, td, null);
         if (value instanceof Duration d) return duration(originalInput, d, null);
-        if (value instanceof String s) return duration(s);
-        if (value != null) return duration(value.toString());
+        if (value instanceof String s) return delta(s);
+        if (value != null) return delta(value.toString());
 
-        throw new IllegalArgumentException("ValueWrapper DURATION value is null");
+        throw new IllegalArgumentException("ValueWrapper DELTA value is null");
     }
 
     private static TemporalValue fromTimeRangeValueWrapper(ValueWrapper valueWrapper) {
@@ -410,7 +414,7 @@ public final class TemporalValue {
 
     public Duration toDuration() {
         return switch (kind) {
-            case DURATION -> duration;
+            case DELTA -> delta.toDuration();
             case TIME_RANGE -> timeRange.totalDuration();
             case DATE_TIME -> throw new IllegalStateException("DATE_TIME does not have a duration");
         };

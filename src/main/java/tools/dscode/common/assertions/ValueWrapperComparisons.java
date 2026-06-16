@@ -68,7 +68,7 @@ public final class ValueWrapperComparisons {
     private static boolean isTemporal(ValueWrapper value) {
         if (value == null || value.type == null) return false;
         return switch (value.type.name()) {
-            case "TIME_INSTANCE", "TIME_RANGE", "TIME_DURATION", "DATE_TIME", "DURATION" -> true;
+            case "TIME_INSTANCE", "TIME_RANGE", "TIME_DURATION", "DATE_TIME", "DURATION", "DELTA" -> true;
             default -> false;
         };
     }

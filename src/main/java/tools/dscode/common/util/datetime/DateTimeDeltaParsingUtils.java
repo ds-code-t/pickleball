@@ -55,29 +55,7 @@ public final class DateTimeDeltaParsingUtils {
     /** Applies parsed date/time deltas sequentially to a real ZonedDateTime instance. */
     public static ZonedDateTime applyTo(ZonedDateTime start, String expr) {
         Objects.requireNonNull(start, "start");
-        ZonedDateTime cur = start;
-
-        for (Delta delta : parse(expr)) {
-            if (delta.unit() == ChronoUnit.YEARS || delta.unit() == ChronoUnit.MONTHS) {
-                if (!delta.isWholeNumber()) {
-                    throw new IllegalArgumentException("Date/time expressions cannot include fractional months/years: \"" + expr + "\"");
-                }
-                cur = cur.plus(delta.wholeAmountExact(), delta.unit());
-                continue;
-            }
-
-            // Preserve Java's calendar-based behavior for whole weeks/days.
-            // Example: +2 days is a date-based operation on ZonedDateTime.
-            if ((delta.unit() == ChronoUnit.WEEKS || delta.unit() == ChronoUnit.DAYS) && delta.isWholeNumber()) {
-                cur = cur.plus(delta.wholeAmountExact(), delta.unit());
-                continue;
-            }
-
-            // Decimal exact units are converted to an exact Duration.
-            cur = cur.plus(toExactDuration(delta, expr));
-        }
-
-        return cur;
+        return TemporalDelta.parse(expr).applyTo(start);
     }
 
     public static Duration parseDuration(String text) {

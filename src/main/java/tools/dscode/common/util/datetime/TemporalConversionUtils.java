@@ -17,7 +17,7 @@ import java.util.Objects;
  *
  * Design goals:
  *  - Date/time instances normalize through the underlying instant, not their rendered string.
- *  - Durations normalize through java.time.Duration, not their rendered string.
+ *  - Deltas normalize through a Duration conversion, not their rendered string.
  *  - Existing presentation clauses such as "format: ..." are ignored for normalization.
  *  - Inline date/time input clauses such as "pattern: ..." affect parsing, not normalization.
  *  - Existing date/time output-zone clauses such as "to America/Phoenix TimeZone" are ignored
@@ -25,10 +25,10 @@ import java.util.Objects;
  *
  * Recommended comparison values:
  *  - Date/time instance: dateTimeToEpochNanos(...) or dateTimeToInstant(...)
- *  - Duration: durationToNanos(...) or parseDuration(...)
+ *  - Delta/duration: durationToNanos(...) or parseDuration(...)
  *
  * Notes about years/months:
- *  - Duration does not safely support years/months because they are calendar-relative.
+ *  - Delta years/months are converted using the current time as the anchor.
  *  - Date/time year/month conversion here means completed calendar years/months since
  *    1970-01-01T00:00:00Z in UTC. That is useful for coarse bucketing, but it is lossy.
  *    For exact ordering/equality comparisons, use nanos/millis/seconds instead.
@@ -43,7 +43,7 @@ public final class TemporalConversionUtils {
 
     public enum TemporalKind {
         DATE_TIME,
-        DURATION
+        DELTA
     }
 
     // ---------------------------------------------------------------------
@@ -129,7 +129,7 @@ public final class TemporalConversionUtils {
         raw = stripFormatClause(raw).trim();
         if (raw.isEmpty()) throw new IllegalArgumentException("Duration expression is blank");
 
-        return DateTimeDeltaParsingUtils.parseDuration(raw);
+        return DurationFormattingUtils.parseDuration(raw);
     }
 
     /** Returns the canonical Java/ISO-8601 Duration string, e.g. PT1H30M. */
@@ -193,7 +193,7 @@ public final class TemporalConversionUtils {
         Objects.requireNonNull(kind, "kind");
         return switch (kind) {
             case DATE_TIME -> dateTimeToIsoInstant(calendar, spec);
-            case DURATION -> durationToIso(spec);
+            case DELTA -> durationToIso(spec);
         };
     }
 
@@ -205,7 +205,7 @@ public final class TemporalConversionUtils {
         Objects.requireNonNull(kind, "kind");
         return switch (kind) {
             case DATE_TIME -> dateTimeToUnits(calendar, spec, unit);
-            case DURATION -> durationToUnits(spec, unit);
+            case DELTA -> durationToUnits(spec, unit);
         };
     }
 
@@ -324,6 +324,7 @@ public final class TemporalConversionUtils {
         if (s.isEmpty()) return false;
 
         if (s.regionMatches(true, 0, "Duration:", 0, "Duration:".length())) return true;
+        if (s.regionMatches(true, 0, "Delta:", 0, "Delta:".length())) return true;
         if (s.regionMatches(true, 0, "DateTime:", 0, "DateTime:".length())) return false;
 
         String noFormat = stripFormatClause(s).trim();
@@ -334,7 +335,7 @@ public final class TemporalConversionUtils {
         // Friendly duration heuristic: if the duration parser accepts it, treat it as a duration.
         // This makes "2 days" a duration, while strings like "today + 2 days" remain date/time.
         try {
-            DateTimeDeltaParsingUtils.parseDuration(noFormat);
+            DurationFormattingUtils.parseSpec(noFormat);
             return true;
         } catch (Exception ignored) {
             return false;

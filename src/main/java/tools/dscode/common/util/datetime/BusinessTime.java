@@ -291,13 +291,21 @@ public final class BusinessTime {
     private static int findFirstDeltaStart(String s) {
         for (int i = 1; i < s.length(); i++) {
             char ch = s.charAt(i);
-            if (ch != '+' && ch != '-') continue;
             if (!Character.isWhitespace(s.charAt(i - 1))) continue;
-            int j = i + 1;
-            while (j < s.length() && Character.isWhitespace(s.charAt(j))) j++;
-            if (j < s.length() && Character.isDigit(s.charAt(j))) return i;
+            if (ch == '+' || ch == '-') {
+                int j = i + 1;
+                while (j < s.length() && Character.isWhitespace(s.charAt(j))) j++;
+                if (j < s.length() && (Character.isDigit(s.charAt(j)) || isIsoDurationStart(s.charAt(j)))) return i;
+            } else if (isIsoDurationStart(ch)) {
+                int j = i + 1;
+                if (j < s.length() && (Character.isDigit(s.charAt(j)) || s.charAt(j) == 'T' || s.charAt(j) == 't')) return i;
+            }
         }
         return -1;
+    }
+
+    private static boolean isIsoDurationStart(char ch) {
+        return ch == 'P' || ch == 'p';
     }
 
     private static ZoneId parseZoneIdLenient(String zoneText) {
