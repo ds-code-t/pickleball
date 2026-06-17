@@ -56,7 +56,7 @@ public final class ValueWrapperComparisons {
             return;
         }
 
-        logComparison(comparisonType, temporalNanos(a), temporalNanos(b));
+        logComparison(comparisonType, temporalLogValue(a), temporalLogValue(b));
     }
 
     /* ---------------- helpers ---------------- */
@@ -131,6 +131,11 @@ public final class ValueWrapperComparisons {
 
     private static BigInteger temporalNanos(ValueWrapper value) {
         return TemporalValue.fromValueWrapper(value).toNanos();
+    }
+
+    private static String temporalLogValue(ValueWrapper value) {
+        TemporalValue temporalValue = TemporalValue.fromValueWrapper(value);
+        return temporalValue + " (" + temporalValue.toNanos() + " ns)";
     }
 
     /* ---------------- string comparisons ---------------- */

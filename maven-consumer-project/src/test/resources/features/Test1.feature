@@ -2,9 +2,11 @@ Feature: nested Feature File
 
   Scenario: date time tests
 
-    * , verify "yesterday" Date Time is equal to "today" Date Time
-    * , verify "today" Date Time is greater than "yesterday" Date Time
-    * , verify "yesterday" Date Time is greater than "today" Date Time
+    * , verify "today" Time is equal to "today" Time
+    * , verify "yesterday" Time is equal to "yesterday" Time
+    * , verify "yesterday" Time is equal to "today" Time
+    * , verify "today" Time is greater than "yesterday" Time
+    * , verify "yesterday" Time is greater than "today" Time
 
 #    Given , save "<$DateTime:today>" as "A"
 #    Given , save "<$DateTime:tomorrow>" as "A"

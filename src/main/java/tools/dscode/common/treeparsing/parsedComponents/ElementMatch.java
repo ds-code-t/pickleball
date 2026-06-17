@@ -497,7 +497,6 @@ public class ElementMatch {
     private List<ValueWrapper> previouslyReturnedValues = null;
 
     public List<ValueWrapper> getComparisonValues() {
-        System.out.println("@@getComparisonValues: " + elementTypes);
         List<ValueWrapper> values = getValues();
         if (values.isEmpty()) return Collections.singletonList(createValueWrapper(null));
         return values;
@@ -506,7 +505,6 @@ public class ElementMatch {
 
     public List<ValueWrapper> getValues() {
         List<ValueWrapper> returnList = new ArrayList<>();
-        System.out.println("@@getValues: " + elementTypes);
         if (elementTypes.contains(ElementType.HTML_TYPE)) {
             getElementWrappers().forEach(e -> returnList.add(e.getElementReturnValue()));
         } else if (elementTypes.contains(ElementType.BROWSER_WINDOW)) {
