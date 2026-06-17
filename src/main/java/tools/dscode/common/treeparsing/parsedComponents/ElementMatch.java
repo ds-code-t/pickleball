@@ -44,7 +44,7 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyA
 
 public class ElementMatch {
     public enum SpecialUse {
-        MARGIN, REPETITION
+        MARGIN, TIMES
     }
 
     public final String fullText;

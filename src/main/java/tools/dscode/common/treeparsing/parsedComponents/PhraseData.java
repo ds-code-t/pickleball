@@ -26,7 +26,6 @@ import tools.dscode.common.treeparsing.preparsing.LineData;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -45,7 +44,6 @@ import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLev
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 import static tools.dscode.common.treeparsing.DefinitionContext.getNodeDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.PLACE_HOLDER_MATCH;
-import static tools.dscode.common.treeparsing.parsedComponents.ElementType.REPETITION;
 import static tools.dscode.common.treeparsing.parsedComponents.PhraseData.PhraseType.ELEMENT_ONLY;
 import static tools.dscode.common.treeparsing.preparsing.LineData.wrapLooseConditionalExpression;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.afterOf;
@@ -483,15 +481,16 @@ public abstract class PhraseData extends PassedData {
     }
 
     public int getRepetition() {
-        ElementMatch repetitionElement = getSpecialElementByFlag(ElementMatch.SpecialUse.REPETITION);
+        ElementMatch repetitionElement = getSpecialElementByFlag(ElementMatch.SpecialUse.TIMES);
         if (repetitionElement == null) return 1;
         return repetitionElement.getValue().asInteger();
     }
 
     public ValueWrapper getMargin() {
-        ElementMatch repetitionElement = getSpecialElementByFlag(ElementMatch.SpecialUse.MARGIN);
-        if (repetitionElement == null) return null;
-        return repetitionElement.getValue();
+        ElementMatch marginElement = getSpecialElementByFlag(ElementMatch.SpecialUse.MARGIN);
+        System.out.println("@@marginElement: " + marginElement);
+        if (marginElement == null) return null;
+        return marginElement.getValue();
     }
 
     public void resetElementWrapper() {

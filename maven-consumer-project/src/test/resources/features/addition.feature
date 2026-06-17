@@ -1,17 +1,17 @@
 Feature: Addition
 
-  Scenario Outline: datable tezsts354
+  Scenario Outline: datable tezsts354s
 #    * , click the unchecked Checkbox
-    * , click the unchecked Checkbox 5 times
+    * , click the unchecked Checkbox 15 times
 #    * , "!" Link is displayed
 #    * , if 1==1, then save "A"
 #    * , if 1==1,then save "A"
 
 
-    * I have a DataTable
-      | Run Tags       |
-      | <3Azz>  |
-      | <qq2zz> |
+#    * I have a DataTable
+#      | Run Tags       |
+#      | <3Azz>  |
+#      | <qq2zz> |
 
     Examples:
       | qq2zz | 3Azz |

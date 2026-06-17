@@ -116,15 +116,11 @@ public final class DefinitionContext {
         };
 
 
-        ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?!\\s*[A-Z])(?<unitMatch>\\s+(?<unit>times|second|minute|hour|day|week|month|year|time|number|integer|decimal|color|text)s?\\b)?") {
+        ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?!\\s*[A-Z])") {
             @Override
             public String onSubstitute(MatchNode self) {
-                String originalUnit = self.groups().getOrDefault("unit", "").trim().replaceAll("\\s$", "");
-                String value = " " + self.groups().get("value") + " ";
-                String unit = " " + VALUE_TYPE_MATCH + originalUnit + " ";
-                if(originalUnit.equals("times"))
-                    return " repetition-of" +value + unit;
-                return value + unit;
+                System.out.println("@@@valueTransform: " + self.originalText() + " " + VALUE_TYPE_MATCH + " ");
+                return " " + self.originalText() + " " + VALUE_TYPE_MATCH + " ";
             }
         };
 
@@ -342,12 +338,26 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode specialElements = new ParseNode("\\b(?<type>repetition|margin)-of\\s+(?<element><<elementMatch>>)") {
+        ParseNode specialElementsA = new ParseNode("\\b(?<type>margin)-of\\s+(?<element><<elementMatch>>)") {
             @Override
             public String onSubstitute(MatchNode self) {
                 String elementToken = self.groups().get("element");
                 MatchNode elementMatchNode = self.getMatchNode(elementToken);
                 String type = self.groups().get("type");
+                System.out.println("@@typeA: " + type);
+                elementMatchNode.putToLocalState("special", type);
+                return "";
+            }
+        };
+
+        ParseNode specialElementsB = new ParseNode("(?<element><<elementMatch>>)\\s*(?<type>times)") {
+            @Override
+            public String onSubstitute(MatchNode self) {
+                System.out.println("@@self");
+                String elementToken = self.groups().get("element");
+                MatchNode elementMatchNode = self.getMatchNode(elementToken);
+                String type = self.groups().get("type");
+                System.out.println("@@typeB: " + type);
                 elementMatchNode.putToLocalState("special", type);
                 return "";
             }
@@ -369,7 +379,8 @@ public final class DefinitionContext {
                     - no
                     - valueTypes
                     - assertionType
-                    - specialElements
+                    - specialElementsA
+                    - specialElementsB
                     - reindex
                     - action
                     - assertion

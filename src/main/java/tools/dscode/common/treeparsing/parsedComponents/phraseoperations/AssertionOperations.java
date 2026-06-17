@@ -26,18 +26,18 @@ public enum AssertionOperations implements OperationsInterface {
             logInfo(phraseData + " : Executing Assertion " + this.name());
             int repetition = phraseData.getRepetition();
             ValueWrapper margin = phraseData.getMargin();
+            System.out.println("@@margin: " + margin);
 
             ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
             ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 return ValueWrapperCompareReducer.eval(
-                        ValueWrapperComparisons::equals,
+                        (left, right) -> ValueWrapperComparisons.equals(left, right, margin),
                         firstElement.getComparisonValues(),
                         secondElement.getComparisonValues(),
                         getModeSet(phraseData)
                 );
             });
-
         }
     },
 
@@ -53,7 +53,7 @@ public enum AssertionOperations implements OperationsInterface {
 
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 return ValueWrapperCompareReducer.eval(
-                        ValueWrapperComparisons::numericGreaterThan,
+                        (left, right) -> ValueWrapperComparisons.numericGreaterThan(left, right, margin),
                         firstElement.getComparisonValues(),
                         secondElement.getComparisonValues(),
                         getModeSet(phraseData)
@@ -75,7 +75,7 @@ public enum AssertionOperations implements OperationsInterface {
 
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 return ValueWrapperCompareReducer.eval(
-                        ValueWrapperComparisons::numericLessThan,
+                        (left, right) -> ValueWrapperComparisons.numericLessThan(left, right, margin),
                         firstElement.getComparisonValues(),
                         secondElement.getComparisonValues(),
                         getModeSet(phraseData)
@@ -96,7 +96,7 @@ public enum AssertionOperations implements OperationsInterface {
 
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 return ValueWrapperCompareReducer.eval(
-                        ValueWrapperComparisons::numericGreaterThanOrEqualTo,
+                        (left, right) -> ValueWrapperComparisons.numericGreaterThanOrEqualTo(left, right, margin),
                         firstElement.getComparisonValues(),
                         secondElement.getComparisonValues(),
                         getModeSet(phraseData)
@@ -118,7 +118,7 @@ public enum AssertionOperations implements OperationsInterface {
 
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 return ValueWrapperCompareReducer.eval(
-                        ValueWrapperComparisons::numericLessThanOrEqualTo,
+                        (left, right) -> ValueWrapperComparisons.numericLessThanOrEqualTo(left, right, margin),
                         firstElement.getComparisonValues(),
                         secondElement.getComparisonValues(),
                         getModeSet(phraseData)

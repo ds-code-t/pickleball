@@ -174,6 +174,9 @@ public class ParseNode {
             StringBuilder newMasked = new StringBuilder(parentSnapshot.length());
             int lastEnd = 0;
             int occurrence = 1;
+            logTrace("MatchNode: name: " + childDef.getName() );
+            logTrace("MatchNode: pattern: " + pattern );
+            logTrace("MatchNode: parentSnapshot: " + parentSnapshot);
             while (m.find()) {
                 if (m.start() > lastEnd) {
                     newMasked.append(parentSnapshot, lastEnd, m.start());
@@ -182,7 +185,7 @@ public class ParseNode {
                 String childOriginal = m.group(0);
 
                 logTrace("MatchNode: name: " + childDef.getName() );
-                logTrace("MatchNode: parentSnapshot: " + parentSnapshot  + "matched: " + childOriginal);
+                logTrace("Matched: " + childOriginal);
 
                 // Build token with Option A format
                 String childToken = childDef.keyBase();

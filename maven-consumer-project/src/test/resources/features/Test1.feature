@@ -2,11 +2,11 @@ Feature: nested Feature File
 
   Scenario: date time tests
 
-    * , verify "today" Time is equal to "today" Time
-    * , verify "yesterday" Time is equal to "yesterday" Time
-    * , verify "yesterday" Time is equal to "today" Time
-    * , verify "today" Time is greater than "yesterday" Time
-    * , verify "yesterday" Time is greater than "today" Time
+#    * , verify "today" Time is equal to "today" Time
+#    * , verify "yesterday" Time is equal to "yesterday" Time
+#    * , verify "yesterday" Time is equal to "today" Time
+#    * , verify "today" Time is greater than "yesterday" Time
+    * , verify "yesterday" Time is equal to "today" Time with a margin of "2 days" Duration
 
 #    Given , save "<$DateTime:today>" as "A"
 #    Given , save "<$DateTime:tomorrow>" as "A"
