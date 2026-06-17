@@ -127,7 +127,12 @@ public final class ValueWrapperComparisons {
         if (!hasMargin(margin)) return null;
         if (isTemporal(margin)) return temporalNanos(margin).abs();
         if (margin.isNumeric()) return margin.asBigDecimal().abs().toBigInteger();
-        return null;
+
+        try {
+            return TemporalValue.duration(margin.toString()).toNanos().abs();
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private static boolean temporalWithinMargin(ValueWrapper a, ValueWrapper b, ValueWrapper margin, boolean requirePositiveMargin) {

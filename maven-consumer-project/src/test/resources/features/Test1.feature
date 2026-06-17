@@ -6,7 +6,11 @@ Feature: nested Feature File
 #    * , verify "yesterday" Time is equal to "yesterday" Time
 #    * , verify "yesterday" Time is equal to "today" Time
 #    * , verify "today" Time is greater than "yesterday" Time
-    * , verify "yesterday" Time is equal to "today" Time with a margin of "2 days" Duration
+#    * , verify "yesterday" Time is equal to "today" Time with a margin of "2 days" Duration
+#    * , verify "yesterday" Time is equal to "today" Time with a margin of "2 days"
+    * , verify "31" is less than 0 with a margin of 32
+    * , verify 31 is less than "0" with a margin of "32"
+    * , verify "31" is less than "0" with a margin of 22
 
 #    Given , save "<$DateTime:today>" as "A"
 #    Given , save "<$DateTime:tomorrow>" as "A"

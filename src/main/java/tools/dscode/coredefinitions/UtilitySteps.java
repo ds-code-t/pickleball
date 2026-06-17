@@ -549,5 +549,12 @@ public class UtilitySteps {
             if (v.compareTo(hi) > 0) v = hi;
             return v.stripTrailingZeros().toPlainString();
         }
+
+        @Given("^string:\\s*\"(.*)\"\\s+contains:\\s*\"(.*)\"$")
+        public static boolean stringContains(String fullString, String substring) {
+            boolean result = fullString.contains(substring);
+            logInfo("string contains: '" + fullString + "' contains '" + substring + "' -> " + result);
+            return result;
+        }
     }
 }
