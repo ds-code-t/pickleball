@@ -26,7 +26,6 @@ public enum AssertionOperations implements OperationsInterface {
             logInfo(phraseData + " : Executing Assertion " + this.name());
             int repetition = phraseData.getRepetition();
             ValueWrapper margin = phraseData.getMargin();
-            System.out.println("@@margin: " + margin);
 
             ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
             ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);

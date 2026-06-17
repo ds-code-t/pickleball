@@ -8,9 +8,13 @@ Feature: nested Feature File
 #    * , verify "today" Time is greater than "yesterday" Time
 #    * , verify "yesterday" Time is equal to "today" Time with a margin of "2 days" Duration
 #    * , verify "yesterday" Time is equal to "today" Time with a margin of "2 days"
-    * , verify "31" is less than 0 with a margin of 32
-    * , verify 31 is less than "0" with a margin of "32"
-    * , verify "31" is less than "0" with a margin of 22
+#    * , verify "31" is less than 0 with a margin of 32
+#    * , verify 31 is less than "0" with a margin of "32"
+#    * , verify "31" is less than "0" with a margin of 22
+
+  * , if <$string:"Assa" contains: "s">, save "A"
+  * , if <$string:"Assa" contains: "ss">, save "b"
+  * , if <$string:"Assa" contains: "sas">, save "c"
 
 #    Given , save "<$DateTime:today>" as "A"
 #    Given , save "<$DateTime:tomorrow>" as "A"

@@ -119,7 +119,6 @@ public final class DefinitionContext {
         ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?!\\s*[A-Z])") {
             @Override
             public String onSubstitute(MatchNode self) {
-                System.out.println("@@@valueTransform: " + self.originalText() + " " + VALUE_TYPE_MATCH + " ");
                 return " " + self.originalText() + " " + VALUE_TYPE_MATCH + " ";
             }
         };
@@ -344,7 +343,6 @@ public final class DefinitionContext {
                 String elementToken = self.groups().get("element");
                 MatchNode elementMatchNode = self.getMatchNode(elementToken);
                 String type = self.groups().get("type");
-                System.out.println("@@typeA: " + type);
                 elementMatchNode.putToLocalState("special", type);
                 return "";
             }
@@ -353,11 +351,9 @@ public final class DefinitionContext {
         ParseNode specialElementsB = new ParseNode("(?<element><<elementMatch>>)\\s*(?<type>times)") {
             @Override
             public String onSubstitute(MatchNode self) {
-                System.out.println("@@self");
                 String elementToken = self.groups().get("element");
                 MatchNode elementMatchNode = self.getMatchNode(elementToken);
                 String type = self.groups().get("type");
-                System.out.println("@@typeB: " + type);
                 elementMatchNode.putToLocalState("special", type);
                 return "";
             }

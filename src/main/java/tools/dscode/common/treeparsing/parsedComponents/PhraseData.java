@@ -488,7 +488,6 @@ public abstract class PhraseData extends PassedData {
 
     public ValueWrapper getMargin() {
         ElementMatch marginElement = getSpecialElementByFlag(ElementMatch.SpecialUse.MARGIN);
-        System.out.println("@@marginElement: " + marginElement);
         if (marginElement == null) return null;
         return marginElement.getValue();
     }

@@ -346,7 +346,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
     /**
      * Private-use placeholders used to temporarily collapse expression bookends
      * into single-character bookends.
-     *
+     * <p>
      * This keeps expression matching separate from normal map syntax like <key>
      * or ~<~key~>~, and prevents the expression close from being treated as a
      * map close by the map resolver.
@@ -402,7 +402,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 do {
                     prev = input;
                     if (input.contains(bookends.open())) {
-                        input = resolveByMap(input, bookends);
+                        input = resolveByMap(input, parsedObj,  bookends);
                     }
                     if (!isDirectoryPath && input.contains(OPEN_EXPRESSION_BOOKEND_SUB)) {
                         input = resolveExpression(input, parsedObj, bookends);
@@ -418,7 +418,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
         }
     }
 
-    private String resolveByMap(String s, Bookends bookends) {
+    private String resolveByMap(String s, QuoteParser parsedObj, Bookends bookends) {
         String key = null;
         try {
             Matcher m = bookends.mapPattern().matcher(s);
@@ -427,6 +427,12 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
             while (m.find()) {
                 key = m.group(1);
+
+                if (key.startsWith("$")) {
+                    key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
+                    replacement = getRunningStep().resolveStepFromString(key.substring(1));
+                    break;
+                }
                 if (key.contains(MATCH_BREAK) || key.contains("&&") || key.contains("||")) {
                     replacement = bookends.wrap(key);
                     break;
@@ -548,9 +554,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
 
     public Object get(String key) {
-        if (key.startsWith("$"))
-            return getRunningStep().resolveStepFromString(key.substring(1));
-
         boolean directGet = (key.startsWith("`") && key.endsWith("`"));
 
         if (directGet) {
@@ -810,7 +813,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 .collect(Collectors.joining(System.lineSeparator()))
                 + "\n---\n";
     }
-
 
 
     public String resolveWholeTextWithAlternateBookends(
