@@ -14,6 +14,8 @@ import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatcher;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -443,7 +445,6 @@ public class ElementMatch {
     }
 
 
-
     public String getMatchElementStringValue() {
         List<ValueWrapper> values = getValues();
         Object currentValue = values;
@@ -506,7 +507,17 @@ public class ElementMatch {
 
     public List<ValueWrapper> getValues() {
         List<ValueWrapper> returnList = new ArrayList<>();
-        if (elementTypes.contains(ElementType.HTML_TYPE)) {
+        if (elementTypes.contains(ElementType.STEP_TYPE)) {
+            if (elementTypes.contains(ElementType.STEP_DURATION)){
+                defaultText = createValueWrapper(Duration.between(parentPhrase.parsedLine.stepExtension.startTime, Instant.now()));
+                category = "Duration";
+                returnList.add(defaultText);
+            } else if (elementTypes.contains(ElementType.STEP_REPETITION)){
+                defaultText = createValueWrapper(parentPhrase.parsedLine.stepExtension.runCount);
+                category = VALUE_TYPE_MATCH;
+                returnList.add(defaultText);
+            }
+        } else if (elementTypes.contains(ElementType.HTML_TYPE)) {
             getElementWrappers().forEach(e -> returnList.add(e.getElementReturnValue()));
         } else if (elementTypes.contains(ElementType.BROWSER_WINDOW)) {
             String normalized = category.toUpperCase().replaceAll("WINDOWS?", "").trim();
@@ -532,18 +543,14 @@ public class ElementMatch {
         } else if (elementTypes.contains(ElementType.TIME_VALUE)) {
             if (elementTypes.contains(ElementType.TIME_INSTANCE)) {
                 returnList.add(defaultText.getDateTimeStringValue());
-            }
-            else if (elementTypes.contains(ElementType.TIME_RANGE)) {
+            } else if (elementTypes.contains(ElementType.TIME_RANGE)) {
                 returnList.add(defaultText.getTimeRangeStringValue());
-            }
-            else if (elementTypes.contains(ElementType.TIME_UNIT)) {
+            } else if (elementTypes.contains(ElementType.TIME_UNIT)) {
                 defaultText = createValueWrapper(defaultText.asNormalizedText() + " " + category, DURATION);
                 elementTypes.remove(ElementType.TIME_UNIT);
                 category = "Duration";
                 returnList.add(defaultText.getDurationStringValue());
-            }
-            else
-            {
+            } else {
                 returnList.add(defaultText.getDurationStringValue());
             }
 

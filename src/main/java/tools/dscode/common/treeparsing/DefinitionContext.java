@@ -115,7 +115,6 @@ public final class DefinitionContext {
             }
         };
 
-
         ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?!\\s*[A-Z])(?<unitMatch>\\s+(?<unit>second|minute|hour|day|week|month|year|time|number|integer|decimal|color|text)s?\\b)?") {
             @Override
             public String onSubstitute(MatchNode self) {
@@ -127,7 +126,6 @@ public final class DefinitionContext {
         };
 
         ParseNode position = new ParseNode("#\\d+");
-
 
         ParseNode phrase = new ParseNode("^\\s*(?<separatorA>\\b[tT]hen\\b\\s*)?(?<conjunction>\\b(?:[aA]nd|[oO]r)\\b\\s*)?(?<separatorB>\\b[tT]hen\\b\\s*)?\\s*(?<conditional>\\b(?:until|else\\s+if|else|if)\\b)?\\s*(?i:(?<context>from|after|before|for|in|below|above|left of|right of)\\b)?(?<body>.*)$") {
             @Override
@@ -291,7 +289,6 @@ public final class DefinitionContext {
                         }
                     });
                 }
-
                 return self.originalText();
             }
         };

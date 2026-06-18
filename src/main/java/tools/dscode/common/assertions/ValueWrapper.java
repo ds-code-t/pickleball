@@ -7,9 +7,14 @@ import com.google.common.collect.ListMultimap;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 
+import tools.dscode.common.util.datetime.BusinessTimeRange;
+import tools.dscode.common.util.datetime.DurationFormattingUtils;
+
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
+
 import static tools.dscode.common.evaluations.AviatorUtil.isStringTruthy;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.normalizeText;
 
@@ -60,6 +65,12 @@ public class ValueWrapper {
             return new ValueWrapper((String) obj);
         if (obj instanceof Number)
             return new ValueWrapper(obj, ValueTypes.NUMERIC);
+        if (obj instanceof Duration duration)
+            return new ValueWrapper(duration, ValueTypes.DURATION, durationSyntax(duration));
+        if (obj instanceof Instant instant)
+            return new ValueWrapper(instant, ValueTypes.DATE_TIME, instant.toString());
+        if (obj instanceof BusinessTimeRange timeRange)
+            return new ValueWrapper(timeRange, ValueTypes.TIME_RANGE, timeRange.toCanonicalString());
 
         // NEW: containers (wrap inner values)
         if (obj instanceof List<?> list) {
@@ -116,9 +127,13 @@ public class ValueWrapper {
     }
 
     private ValueWrapper(Object raw, ValueTypes type) {
+        this(raw, type, canonicalNormalizedText(raw, type));
+    }
+
+    private ValueWrapper(Object raw, ValueTypes type, String normalizedText) {
         this.type = type;
         this.value = raw;
-        this.normalizedText = raw == null ? null : normalizeText(raw.toString());
+        this.normalizedText = normalizedText == null ? null : normalizeText(normalizedText);
     }
 
     private ValueWrapper(String raw) {
@@ -170,6 +185,18 @@ public class ValueWrapper {
             type = ValueTypes.DEFAULT;
             value = raw;
         }
+    }
+
+    private static String canonicalNormalizedText(Object raw, ValueTypes type) {
+        if (raw == null) return null;
+        if (type == ValueTypes.DURATION && raw instanceof Duration duration) return durationSyntax(duration);
+        if (type == ValueTypes.DATE_TIME && raw instanceof Instant instant) return instant.toString();
+        if (type == ValueTypes.TIME_RANGE && raw instanceof BusinessTimeRange timeRange) return timeRange.toCanonicalString();
+        return raw.toString();
+    }
+
+    private static String durationSyntax(Duration duration) {
+        return DurationFormattingUtils.format(duration, null);
     }
 
     public BigInteger asForcedSimpleNumber() {
@@ -458,18 +485,21 @@ public class ValueWrapper {
 
     public ValueWrapper getDateTimeStringValue() {
         if (isNullOrBlank()) return null;
+        if (value instanceof Instant) return new ValueWrapper(normalizedText, ValueTypes.DATE_TIME);
         String dateTimeString = normalizedText.trim().startsWith("DateTime:") ? normalizedText.trim() : "DateTime:" + normalizedText.trim();
         return new ValueWrapper(getRunningStep().resolveStepFromString(dateTimeString), ValueTypes.DATE_TIME);
     }
 
     public ValueWrapper getDurationStringValue() {
         if (isNullOrBlank()) return null;
+        if (value instanceof Duration) return new ValueWrapper(normalizedText, ValueTypes.DURATION);
         String durationString = normalizedText.trim().startsWith("Duration:") ? normalizedText.trim() : "Duration:" + normalizedText.trim();
         return  new ValueWrapper(getRunningStep().resolveStepFromString(durationString), ValueTypes.DURATION);
     }
 
     public ValueWrapper getTimeRangeStringValue() {
         if (isNullOrBlank()) return null;
+        if (value instanceof BusinessTimeRange) return new ValueWrapper(normalizedText, ValueTypes.TIME_RANGE);
         String durationString = normalizedText.trim().startsWith("TimeRange:") ? normalizedText.trim() : "TimeRange:" + normalizedText.trim();
         return  new ValueWrapper(getRunningStep().resolveStepFromString(durationString), ValueTypes.TIME_RANGE);
     }

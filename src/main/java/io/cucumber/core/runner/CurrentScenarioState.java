@@ -46,6 +46,8 @@ import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.GlobalState.pickleballLog;
+import static io.cucumber.core.runner.StepData.globalMaxIterations;
+import static io.cucumber.core.runner.StepData.globalTimeoutSeconds;
 import static io.cucumber.core.runner.StepLogic.stepCloner;
 import static org.junit.jupiter.api.Assertions.fail;
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
@@ -60,6 +62,7 @@ import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
 import static tools.dscode.common.assertions.AssertionChain.copyAssertionChainToNewPhrase;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
+import static tools.dscode.common.reporting.logging.LogForwarder.logError;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.reporting.logging.LogForwarder.logSkip;
 import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry;
@@ -362,6 +365,11 @@ public class CurrentScenarioState extends ScenarioMapping {
         if (endCurrentScenario)
             return;
         currentStep = stepExtension;
+
+        if(currentStep.startTime == null)
+            currentStep.startTime = Instant.now();
+        currentStep.runCount++;
+
         if (currentStep.definitionFlags.contains(NO_LOGGING) || currentStep.definitionFlags.contains(_NO_LOGGING))
             setDefaultLoggingLevel(Level.DEBUG);
         else
@@ -481,39 +489,30 @@ public class CurrentScenarioState extends ScenarioMapping {
                 stepExtension.lineData.inheritancePhrases.add(null);
             for (PhraseData inheritancePhrase : new ArrayList<>(stepExtension.lineData.inheritancePhrases)) {
                 if (inheritancePhrase != null && inheritancePhrase.untilPhrase) {
-                    long timeoutSeconds = Long.parseLong(String.valueOf(resolveFromVarsOrDefault("stepRepeatMaxTime", 3600)));     // 0 = no time limit
-                    int maxIterations = Integer.parseInt(String.valueOf(resolveFromVarsOrDefault("stepRepeatMaxCount", 100)));
-
-                    logInfo("Repeating step for a maximum of " + timeoutSeconds + " seconds, or " + maxIterations + " iterations");
-
-                    long deadline = timeoutSeconds > 0
-                            ? System.nanoTime() + Duration.ofSeconds(timeoutSeconds).toNanos()
-                            : Long.MAX_VALUE;
-
-                    int iteration = 0;
-
+                    int cloneRunCount = 0;
+                    Instant cloneStartTime = null;
                     while (true) {
-                        if (maxIterations > 0 && iteration >= maxIterations) {
-                            break;
-                        }
-
-                        if (timeoutSeconds > 0 && System.nanoTime() >= deadline) {
-                            break;
-                        }
-                        iteration++;
-
                         StepExtension clonedStep = stepCloner(inheritancePhrase, stepExtension, IGNORE_CHILDREN_IF_FALSE).getFirst();
+                        clonedStep.runCount = cloneRunCount;
+                        clonedStep.startTime = cloneStartTime;
                         clonedStep.overridePhrase = inheritancePhrase.clonePhrase(inheritancePhrase.getPreviousPhrase());
-                        ;
                         copyAssertionChainToNewPhrase(inheritancePhrase, clonedStep.overridePhrase);
                         clonedStep.nextSibling = null;
                         clonedStep.pickleStepTestStep.substituteStep = clonedStep.createNewStepExtension(", ---" + clonedStep.overridePhrase.assertionChain).pickleStepTestStep;
                         waitMilliseconds(400);
+
+                        if(clonedStep.checkGlobalMax()){
+                            isScenarioHardFail = true;
+                            isScenarioComplete = true;
+                            return;
+                        }
+
                         runStep(clonedStep);
+
+                        cloneStartTime = clonedStep.startTime;
+                        cloneRunCount = clonedStep.runCount;
                         if (clonedStep.overridePhrase.phraseConditionalMode > 0)
                             break;
-
-
                     }
 
                 } else {

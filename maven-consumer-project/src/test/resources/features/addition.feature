@@ -1,5 +1,11 @@
 Feature: Addition
 
+  Scenario: run metrics test
+    * , verify Step Duration is less than 1 day
+    * , verify Step Duration is greater than 1 day
+    * , verify Step Repetition is less than 5
+    * , verify Step Repetition is greater than 5
+
   Scenario Outline: datable tezsts354s
 #    * , click the unchecked Checkbox
     * , click the unchecked Checkbox 15 times

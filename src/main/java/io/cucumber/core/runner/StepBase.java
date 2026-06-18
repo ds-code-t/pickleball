@@ -11,6 +11,8 @@ import tools.dscode.common.treeparsing.preparsing.LineData;
 import tools.dscode.coredefinitions.GeneralSteps;
 
 import java.lang.reflect.Method;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,6 +20,15 @@ import static tools.dscode.common.mappings.MapConfigurations.MapType.STEP_MAP;
 
 
 public abstract class StepBase implements Cloneable {
+
+    public Duration stepTimeoutSeconds; // 0 = no time limit
+    public Integer stepMaxIterations;
+
+    public Instant startTime;
+    public int runCount = 0;
+
+
+
     public PhraseData overridePhrase;
 
     public PhraseData inheritancePhrase;
