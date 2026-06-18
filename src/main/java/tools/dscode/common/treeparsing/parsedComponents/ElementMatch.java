@@ -25,6 +25,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static tools.dscode.common.assertions.ValueWrapper.ValueTypes.DURATION;
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.browseroperations.BrowserAlerts.getText;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
@@ -534,6 +535,12 @@ public class ElementMatch {
             }
             else if (elementTypes.contains(ElementType.TIME_RANGE)) {
                 returnList.add(defaultText.getTimeRangeStringValue());
+            }
+            else if (elementTypes.contains(ElementType.TIME_UNIT)) {
+                defaultText = createValueWrapper(defaultText.asNormalizedText() + " " + category, DURATION);
+                elementTypes.remove(ElementType.TIME_UNIT);
+                category = "Duration";
+                returnList.add(defaultText.getDurationStringValue());
             }
             else
             {

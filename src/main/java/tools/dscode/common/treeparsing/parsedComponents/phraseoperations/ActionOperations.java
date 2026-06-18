@@ -43,6 +43,7 @@ import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedEl
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
 import static tools.dscode.common.util.StringUtilities.limitText;
+import static tools.dscode.common.util.datetime.TemporalValue.delta;
 import static tools.dscode.coredefinitions.BrowserSteps.getCurrentDriver;
 
 
@@ -206,7 +207,7 @@ public enum ActionOperations implements OperationsInterface {
                         waitMilliseconds(3000);
                     }
                 } else {
-                    waitForDuration(waitElementMatch.getValue().asDuration(waitElementMatch.category));
+                    waitForDuration(delta(waitElementMatch.getValue().asNormalizedText()).toDuration());
                 }
                 return true;
             });

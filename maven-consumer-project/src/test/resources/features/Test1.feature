@@ -1,5 +1,10 @@
 Feature: nested Feature File
 
+  Scenario: date time testsjh
+    * , wait 1 second
+    * , wait 2 second
+    * , wait 3 second
+
   Scenario: date time tests
 
 #    * , verify "today" Time is equal to "today" Time
@@ -12,9 +17,18 @@ Feature: nested Feature File
 #    * , verify 31 is less than "0" with a margin of "32"
 #    * , verify "31" is less than "0" with a margin of 22
 
-  * , if <$string:"Assa" contains: "s">, save "A"
-  * , if <$string:"Assa" contains: "ss">, save "b"
-  * , if <$string:"Assa" contains: "sas">, save "c"
+#    * , verify "false"
+#    * , verify "true"
+#    * , verify !"false"
+#    * , verify !"true"
+
+    *  IF: `<$string:"Assa" contains: "s">`:
+  : * , save "A"
+    *  IF: `<$string:"Assa" contains: "ss">`:
+  : * , save "B"
+    *  IF: `<$string:"Assa" contains: "sas">`:
+  : * , save "C"
+
 
 #    Given , save "<$DateTime:today>" as "A"
 #    Given , save "<$DateTime:tomorrow>" as "A"
@@ -24,7 +38,6 @@ Feature: nested Feature File
     * , save "a" as "A"
     * , until "<A>" equals "aaa", or 3 == 3:
   :  * , save "<A>a" as "A" , wait 1 second
-
 
 
   Scenario:  ss sd fgg
@@ -90,7 +103,7 @@ Feature: nested Feature File
   Scenario: dfsfd
     Then , I save "1" as "Var"
     Then , until "<Var>" is not equal to "1":
-    : * , I wait 1 second, then I save "Test" as "Var"
+  : * , I wait 1 second, then I save "Test" as "Var"
 
   Scenario: scenario 2
     * , verify if "Bananas" Checkbox is selected
@@ -102,14 +115,14 @@ Feature: nested Feature File
     Given DateTime:05/02/2026 format: MM/dd/yyyy
 
   Scenario: test23
-  * , save 3 as "ABcasdsdf_NdsfsOfOsdfsd"
+    * , save 3 as "ABcasdsdf_NdsfsOfOsdfsd"
     * IF: 3 <= q <ABcasdsdf_NdsfsOfOsdfsd>:
-    : * , save "A"
+  : * , save "A"
     * , if 3 <= <ABcasdsdf_NdsfsOfOsdfsd>:
-   : * , save "A"
+  : * , save "A"
 
 
-    Scenario: untilt test 5sds
+  Scenario: untilt test 5sds
 
 #      * , verify 'ZZZZ' Text is "zzzz"
 #      * , verify 'ZZZZ' Text is not "zzzz"
@@ -122,8 +135,8 @@ Feature: nested Feature File
 #      * , verify "zzzz" Text not is "zzzz"
 #      * , verify "zzzz" Text is not "zzzz"
 
-      * , verify "zzxxzz" Text is "zzzz"
-      * , verify "zzxxzz" Text is not "zzzz"
+    * , verify "zzxxzz" Text is "zzzz"
+    * , verify "zzxxzz" Text is not "zzzz"
 
 
 #      * , verify 'ZZZZ' Text is displayed
@@ -195,8 +208,8 @@ Feature: nested Feature File
     * , if <n>==1  , then  save "A" , else if <n>==2   , then  save "B"  , else if <n>==3    , then save "C" , else save "D"
 
 
-    Scenario: else if 8
-      * IF: <n>==12 THEN: , save "A" ELSE-IF: <n>==2   THEN: , save "B"   ELSE-IF: <n>==3   THEN:  , save "C"  ELSE: , save "D"
+  Scenario: else if 8
+    * IF: <n>==12 THEN: , save "A" ELSE-IF: <n>==2   THEN: , save "B"   ELSE-IF: <n>==3   THEN:  , save "C"  ELSE: , save "D"
 
   Scenario: tezstfgsds inline conditionals
     * , save 1 as "n"
@@ -264,21 +277,21 @@ Feature: nested Feature File
   Scenario Outline: Data table set test
     * IF: 4 == <Z>:
 #    : * test1 <any>
-    : * RUN SCENARIOS
-      | Run Tags |
-      | %compT3  |
+  : * RUN SCENARIOS
+    | Run Tags |
+    | %compT3  |
     * IF: 4 < <X>:
   : * RUN SCENARIOS
     | Run Tags |
     | %compT3  |
-  * , wait 1 second
+    * , wait 1 second
     Then , in the "Name Change" Data Table, for every Data Row:
   : * , save "<A>"
     * IF: "A" is "A":
   : * , save "22"
-    : * RUN SCENARIOS
-      | Run Tags |
-      | %compT2  |
+  : * RUN SCENARIOS
+    | Run Tags |
+    | %compT2  |
 
     Examples:
       | Z | X |

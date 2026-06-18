@@ -50,6 +50,10 @@ public class ValueWrapper {
         LIST, SET, MAP, MULTIMAP
     }
 
+    public static ValueWrapper createValueWrapper(Object obj, ValueTypes type) {
+        return new ValueWrapper(obj, type);
+
+    }
     public static ValueWrapper createValueWrapper(Object obj) {
         // Keep existing scalar behavior first
         if (obj == null || obj instanceof String)
@@ -249,6 +253,9 @@ public class ValueWrapper {
     public BigInteger asBigInteger() {
         return asBigDecimal().toBigInteger();
     }
+    public long asLong() {
+        return asBigDecimal().longValue();
+    }
 
 
     public String asNormalizedText() {
@@ -257,23 +264,6 @@ public class ValueWrapper {
 
     private Boolean isNumeric;
 
-    public Duration asDuration(String unit) {
-        if (unit == null || unit.isBlank()) {
-            throw new IllegalArgumentException("Time unit must not be null or blank");
-        }
-
-        BigInteger value = asBigInteger();
-        String u = unit.trim().toLowerCase();
-
-        return switch (u) {
-            case "s", "sec", "secs", "second", "seconds" -> Duration.ofSeconds(value.longValueExact());
-            case "m", "min", "mins", "minute", "minutes" -> Duration.ofMinutes(value.longValueExact());
-            case "h", "hr", "hrs", "hour", "hours" -> Duration.ofHours(value.longValueExact());
-            case "d", "day", "days" -> Duration.ofDays(value.longValueExact());
-            case "ms", "millis", "millisecond", "milliseconds" -> Duration.ofMillis(value.longValueExact());
-            default -> throw new IllegalArgumentException("Unsupported time unit: " + unit);
-        };
-    }
 
     @Override
     public String toString() {

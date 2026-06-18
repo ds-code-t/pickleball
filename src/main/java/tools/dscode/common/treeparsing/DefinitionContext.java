@@ -116,10 +116,13 @@ public final class DefinitionContext {
         };
 
 
-        ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?!\\s*[A-Z])") {
+        ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?!\\s*[A-Z])(?<unitMatch>\\s+(?<unit>second|minute|hour|day|week|month|year|time|number|integer|decimal|color|text)s?\\b)?") {
             @Override
             public String onSubstitute(MatchNode self) {
-                return " " + self.originalText() + " " + VALUE_TYPE_MATCH + " ";
+                String originalUnit = self.groups().getOrDefault("unit", "").trim().replaceAll("\\s$", "");
+                String value = " " + self.groups().get("value") + " ";
+                String unit = " " + VALUE_TYPE_MATCH + originalUnit + " ";
+                return value + unit;
             }
         };
 
