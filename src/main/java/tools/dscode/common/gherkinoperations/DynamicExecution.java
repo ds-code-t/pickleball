@@ -82,7 +82,7 @@ public class DynamicExecution {
     }
 
     private static void setStepAndDescendantsToNoLog(StepExtension step) {
-        step.addDefinitionFlag(DefinitionFlag.NO_LOGGING);
+        step.addDefinitionFlag(DefinitionFlag.DEBUG_LOGGING);
         step.childSteps.forEach(childStep -> setStepAndDescendantsToNoLog((StepExtension) childStep));
     }
 

@@ -14,11 +14,10 @@ import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.GlobalConstants.META_TEXT_SEPARATOR;
 import static tools.dscode.common.annotations.DefinitionFlag.BLOCK_CONDITIONAL;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_FALSE;
-import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
-import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
+import static tools.dscode.common.annotations.DefinitionFlag.DEBUG_LOGGING;
+import static tools.dscode.common.annotations.DefinitionFlag._DEBUG_LOGGING;
 import static tools.dscode.common.assertions.AssertionChain.isAssertionChainBorder;
 import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
-import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry;
 
 
 public final class ParsedLine extends LineData {
@@ -50,7 +49,7 @@ public final class ParsedLine extends LineData {
             return input;
         }
 
-        stepExtension.addDefinitionFlag(BLOCK_CONDITIONAL, NO_LOGGING, _NO_LOGGING, IGNORE_CHILDREN_IF_FALSE);
+        stepExtension.addDefinitionFlag(BLOCK_CONDITIONAL, DEBUG_LOGGING, _DEBUG_LOGGING, IGNORE_CHILDREN_IF_FALSE);
 
         String returnText = "";
 

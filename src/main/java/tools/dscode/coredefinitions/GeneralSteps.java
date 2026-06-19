@@ -1,21 +1,17 @@
 package tools.dscode.coredefinitions;
 
 
-import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.java.AfterAll;
 import io.cucumber.java.BeforeAll;
 import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.DefinitionFlags;
-import tools.dscode.common.annotations.LifecycleManager;
 import tools.dscode.common.annotations.Phase;
-import tools.dscode.common.reporting.logging.Attachment;
 import tools.dscode.common.reporting.logging.CleanupTrace;
 import tools.dscode.common.reporting.logging.Log;
 import tools.dscode.common.exceptions.SoftRuntimeException;
 import tools.dscode.common.reporting.logging.reportportal.ReportPortalBridge;
-import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
 
 import java.lang.reflect.Method;
 
@@ -28,7 +24,7 @@ import static tools.dscode.common.GlobalConstants.NEXT_SIBLING_STEP;
 import static tools.dscode.common.GlobalConstants.ROOT_STEP;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
 import static tools.dscode.common.GlobalConstants.SOFT_ERROR_STEP;
-import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
+import static tools.dscode.common.annotations.DefinitionFlag._DEBUG_LOGGING;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 
 
@@ -156,7 +152,7 @@ public class GeneralSteps extends CoreSteps {
     }
 
 
-    @DefinitionFlags(_NO_LOGGING)
+    @DefinitionFlags(_DEBUG_LOGGING)
     @Given(NEXT_SIBLING_STEP)
     public static void NEXT_SIBLING_STEP() {
 

@@ -9,7 +9,6 @@ import io.cucumber.plugin.event.Result;
 import io.cucumber.plugin.event.Status;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.annotations.Phase;
-import tools.dscode.common.assertions.AssertionChain;
 import tools.dscode.common.domoperations.SeleniumUtils;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
@@ -23,8 +22,6 @@ import tools.dscode.common.exceptions.SoftExceptionInterface;
 import tools.dscode.common.exceptions.SoftRuntimeException;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
-import tools.dscode.common.treeparsing.preparsing.ParsedLine;
-import tools.dscode.common.variables.RunVars;
 import tools.dscode.coredefinitions.ReportingSteps;
 import tools.dscode.parallelutilities.Stagger;
 import tools.dscode.registry.GlobalRegistry;
@@ -42,12 +39,9 @@ import java.util.stream.Stream;
 
 import static io.cucumber.core.gherkin.messages.MessageUtilities.getFeatureName;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
-import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.getTestCaseState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.GlobalState.pickleballLog;
-import static io.cucumber.core.runner.StepData.globalMaxIterations;
-import static io.cucumber.core.runner.StepData.globalTimeoutSeconds;
 import static io.cucumber.core.runner.StepLogic.stepCloner;
 import static org.junit.jupiter.api.Assertions.fail;
 import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
@@ -57,13 +51,11 @@ import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_PASSING;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_FALSE;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN;
-import static tools.dscode.common.annotations.DefinitionFlag.NO_LOGGING;
-import static tools.dscode.common.annotations.DefinitionFlag._NO_LOGGING;
+import static tools.dscode.common.annotations.DefinitionFlag.DEBUG_LOGGING;
+import static tools.dscode.common.annotations.DefinitionFlag._DEBUG_LOGGING;
 import static tools.dscode.common.assertions.AssertionChain.copyAssertionChainToNewPhrase;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
-import static tools.dscode.common.reporting.logging.LogForwarder.logError;
-import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.reporting.logging.LogForwarder.logSkip;
 import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry;
 import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultLoggingLevel;
@@ -72,7 +64,6 @@ import static tools.dscode.common.util.GeneralUtils.toLongOrZero;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.util.StringUtilities.safeFileName;
 import static tools.dscode.common.variables.PlatformSnapshot.getInitiatorSnapshot;
-import static tools.dscode.common.variables.RunVars.resolveFromVars;
 import static tools.dscode.common.variables.RunVars.resolveFromVarsOrDefault;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
 import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
@@ -370,7 +361,7 @@ public class CurrentScenarioState extends ScenarioMapping {
             currentStep.startTime = Instant.now();
         currentStep.runCount++;
 
-        if (currentStep.definitionFlags.contains(NO_LOGGING) || currentStep.definitionFlags.contains(_NO_LOGGING))
+        if (currentStep.noStepLogging())
             setDefaultLoggingLevel(Level.DEBUG);
         else
             setDefaultLoggingLevel(Level.INFO);

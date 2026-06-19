@@ -63,6 +63,14 @@ public class LogForwarder {
         return level == null ? Level.INFO : level;
     }
 
+    private static Boolean debugLoggingEnabled;
+
+    public static boolean isDebugLoggingEnabled() {
+        if (debugLoggingEnabled == null)
+            debugLoggingEnabled = Level.DEBUG.ordinal() >= getGlobalLogLevel().ordinal();
+        return debugLoggingEnabled;
+    }
+
     public static boolean shouldLog(Level messageLevel) {
         return messageLevel.ordinal() >= getGlobalLogLevel().ordinal();
     }
