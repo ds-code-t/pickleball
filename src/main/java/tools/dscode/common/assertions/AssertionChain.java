@@ -1,13 +1,10 @@
 package tools.dscode.common.assertions;
 
 import io.cucumber.core.runner.StepExtension;
-import kotlin.reflect.jvm.internal.calls.Caller;
-import kotlin.reflect.jvm.internal.calls.CallerImpl;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Attempt;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -52,13 +49,7 @@ public class AssertionChain {
     public List<PhraseData> cloneExecutionChain;
 
     public void addAssertionPhrase(PhraseData phrase) {
-//        phrase.untilPhrase = false;
         phrase = cloneAssertionPhrase(phrase);
-//        if(phrase.isContextTermination()) {
-//            parentPhrase.termination = phrase.termination;
-//            phrase.termination = ',';
-//        }
-//        phrase.setConditional(parentPhrase.getConditional());
         phrase.assertionChainMembership = this;
         if (phrase.phraseType != CONTEXT)
             phrase.isChainedAssertion = true;
@@ -74,9 +65,6 @@ public class AssertionChain {
 
         cloneExecutionChain = phraseChain.stream().map(AssertionChain::cloneAssertionPhrase).toList();
 
-//        String assertionType =  cloneExecutionChain.getFirst().getAssertionType().isBlank() ? "if" :  cloneExecutionChain.getFirst().getAssertionType();
-
-
         PhraseData lastPhrase = null;
         for (PhraseData phraseData : cloneExecutionChain) {
             if (lastPhrase != null) {
@@ -84,7 +72,6 @@ public class AssertionChain {
                 lastPhrase.setNextPhrase(phraseData);
             }
             lastPhrase = phraseData;
-//            phraseData.setAssertionType(assertionType);
         }
 
         runChainPhrases();
@@ -137,17 +124,17 @@ public class AssertionChain {
                         break;
                     nextPhrase = nextPhrase.getNextPhrase();
                 }
-                String emitText =  "," + nextPhrase.text + nextPhrase.termination;
+                String emitText =  "," + nextPhrase.getText() + nextPhrase.termination;
                 PhraseData lastPhrase = nextPhrase;
                 while ((nextPhrase= nextPhrase.getNextPhrase()) != null) {
                     if (nextPhrase.metaTextPrefix.contains("BLOCK_CONDITIONAL")) {
                         lastPhrase.setNextPhrase(null);
                         break;
                     }
-                    emitText += nextPhrase.text + nextPhrase.termination;
+                    emitText += nextPhrase.getText() + nextPhrase.termination;
                     lastPhrase = nextPhrase;
                 }
-                runningStep.emitStepStart(emitText);
+                runningStep.childSteps.add(runningStep.modifyStepExtension(emitText));
             }
 //            else {
 //                parentPhrase.setNextPhrase(null);

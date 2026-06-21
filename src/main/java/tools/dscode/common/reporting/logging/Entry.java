@@ -156,7 +156,7 @@ public class Entry {
         return guarded(() -> createChild(text));
     }
 
-    public Entry logWithType(String type, String message) {
+    public Entry logWithType(String type, String message, Level logLevel) {
         if (type == null || type.isBlank()) {
             throw new IllegalArgumentException("type must not be null or blank");
         }
@@ -176,12 +176,12 @@ public class Entry {
                     .incrementAndGet();
             nestedCounts = parent == null || parent.nestedCounts == null || parent.nestedCounts.isBlank() ? String.valueOf(count) : parent.nestedCounts + "." + count;
             String nestingText = nestedCounts.contains(".") ? " (" + nestedCounts + ") " : "  ";
-            return logHeader(flatCount + " " + normalizedType + nestingText + "\u201C" + safe(message) + "\u201D");
+            return logHeader(flatCount + " " + normalizedType + nestingText + "\u201C" + safe(message) + "\u201D", logLevel);
         });
     }
 
-    private Entry logHeader(String message) {
-        return print(log(Level.INFO, Status.PASS, message), HEADER);
+    private Entry logHeader(String message, Level logLevel) {
+        return print(log(logLevel, Status.PASS, message), HEADER);
     }
 
     Entry logSkipped(String message) {

@@ -13,17 +13,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static tools.dscode.common.annotations.DefinitionFlag.BLOCK_CONDITIONAL;
 import static tools.dscode.common.assertions.AssertionChain.copyAssertionChainToNewPhrase;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
-import static tools.dscode.common.reporting.logging.LogForwarder.getDefaultLoggingLevel;
 import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
-import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.reporting.logging.LogForwarder.logSkip;
 import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLevel;
 import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry;
-import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultLoggingLevel;
+
 
 
 public final class Phrase extends PhraseData {
@@ -150,10 +147,8 @@ public final class Phrase extends PhraseData {
         StepExtension currentStep = getRunningStep();
 
         if (shouldRun()) {
-            if (parsedLine.isBlockConditionalStep && !metaTextPrefix.contains("BLOCK_CONDITIONAL"))
-                setDefaultLoggingLevel(Level.INFO);
             if (assertionChain == null) {
-                phraseEntry = currentStep.stepEntry.logWithType("PHRASE", toString()).tags("phrase").start();
+                phraseEntry = currentStep.stepEntry.logWithType("PHRASE", toString(), currentStep.stepLogLevel).tags("phrase").start();
                 logToDefaultLevel("Running Phrase: " + this.resolvedText);
             } else {
                 logToDefaultLevel("Initiating Assertion Chain: " + assertionChain);
@@ -163,8 +158,6 @@ public final class Phrase extends PhraseData {
                 currentStep.waitForPageReady = false;
             }
         } else {
-            if (parsedLine.isBlockConditionalStep && metaTextPrefix.contains("BLOCK_CONDITIONAL"))
-                setDefaultLoggingLevel(Level.DEBUG);
             logSkip("Skipping Phrase: " + this.resolvedText);
             wasPhraseSkipped = true;
             assertionChain = null;

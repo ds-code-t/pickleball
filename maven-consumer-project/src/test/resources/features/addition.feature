@@ -1,5 +1,35 @@
 Feature: Addition
 
+  Scenario: nesting test B
+    * , then save  "A" as "V"
+
+    * IF: 1 == 2 THEN: , save "b" as "V"
+    * IF: 1 == 1 THEN: , save "A" as "V"
+   * , save "B"
+
+  Scenario: nesting test A
+
+  * IF: 1 == 1:
+  : * , if 1.1 == 1.1 , save "A"
+  : * , if 1.1 == 1.11 , save "A"
+  : * , if 1.2 == 1.2:
+  :: * , save "A"
+  : * , if 1.2 == 1.21:
+  :: * , save "A"
+  : * IF: 2 == 2:
+  :: * IF: 3 == 3:
+  ::: * IF: 4 == 4:
+  :::: * , save "FF1"
+  : * IF: 2 == 21:
+  :: * IF: 3 == 3:
+  ::: * IF: 4 == 41:
+  :::: * , save "FF2"
+  : * IF: 2 == 2:
+  :: * IF: 3 == 31:
+  ::: * IF: 4 == 4:
+  :::: * , save "FF3"
+
+
   Scenario: run metrics test
     * , verify Step Duration is less than 1 day
     * , verify Step Duration is greater than 1 day

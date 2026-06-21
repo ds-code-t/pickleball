@@ -15,7 +15,6 @@ import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
 import tools.dscode.common.reporting.logging.BaseConverter;
 import tools.dscode.common.reporting.logging.Entry;
-import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.common.reporting.logging.reportportal.ReportPortalBridgeConverter;
 import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
 import tools.dscode.common.exceptions.SoftExceptionInterface;
@@ -51,14 +50,11 @@ import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_PASSING;
 import static tools.dscode.common.GlobalConstants.RUN_IF_SCENARIO_SOFT_FAILED;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN_IF_FALSE;
 import static tools.dscode.common.annotations.DefinitionFlag.IGNORE_CHILDREN;
-import static tools.dscode.common.annotations.DefinitionFlag.DEBUG_LOGGING;
-import static tools.dscode.common.annotations.DefinitionFlag._DEBUG_LOGGING;
 import static tools.dscode.common.assertions.AssertionChain.copyAssertionChainToNewPhrase;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.reporting.logging.LogForwarder.logSkip;
 import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry;
-import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultLoggingLevel;
 import static tools.dscode.common.treeparsing.preparsing.ParsedLine.createParsedLine;
 import static tools.dscode.common.util.GeneralUtils.toLongOrZero;
 import static tools.dscode.common.util.Reflect.getProperty;
@@ -361,10 +357,6 @@ public class CurrentScenarioState extends ScenarioMapping {
             currentStep.startTime = Instant.now();
         currentStep.runCount++;
 
-        if (currentStep.noStepLogging())
-            setDefaultLoggingLevel(Level.DEBUG);
-        else
-            setDefaultLoggingLevel(Level.INFO);
         int lineConditionalMode = stepExtension.lineData == null ? 1 : stepExtension.lineData.lineConditionalMode;
         stepExtension.lineData = createParsedLine(stepExtension);
         stepExtension.lineData.lineConditionalMode = lineConditionalMode;

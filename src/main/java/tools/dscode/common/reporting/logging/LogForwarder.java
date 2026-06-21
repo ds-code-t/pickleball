@@ -5,6 +5,7 @@ import io.cucumber.core.runner.StepExtension;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.testengine.PickleballRunner;
 
+import static io.cucumber.core.runner.CurrentScenarioState.getScenarioLogRoot;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningPhrase;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
@@ -15,7 +16,6 @@ public class LogForwarder {
     public static final Entry defaultEntry = Entry.of("default");
 
     private static final ThreadLocal<Entry> threadLocalEntry = ThreadLocal.withInitial(() -> defaultEntry);
-    private static final ThreadLocal<Level> threadLocalLevel = ThreadLocal.withInitial(() -> Level.INFO);
 
     public static Entry getDefaultEntry() {
         Entry entry = threadLocalEntry.get();
@@ -34,7 +34,7 @@ public class LogForwarder {
     }
 
     public static Level getDefaultLoggingLevel() {
-        Level level = threadLocalLevel.get();
+        Level level = getDefaultEntry().level;
         return level == null ? Level.INFO : level;
     }
 
@@ -42,9 +42,6 @@ public class LogForwarder {
         threadLocalEntry.set(entry);
     }
 
-    public static void setDefaultLoggingLevel(Level level) {
-        threadLocalLevel.set(level == null ? Level.INFO : level);
-    }
 
     public static void logToDefaultLevel(String message) {
         switch (getDefaultLoggingLevel()) {
@@ -58,18 +55,13 @@ public class LogForwarder {
 
     public static boolean globalStateInitialized = false;
 
-    private static Level getGlobalLogLevel() {
+    public static Level getGlobalLogLevel() {
         Level level = PickleballRunner.LOG_LEVEL;
         return level == null ? Level.INFO : level;
     }
 
     private static Boolean debugLoggingEnabled;
 
-    public static boolean isDebugLoggingEnabled() {
-        if (debugLoggingEnabled == null)
-            debugLoggingEnabled = Level.DEBUG.ordinal() >= getGlobalLogLevel().ordinal();
-        return debugLoggingEnabled;
-    }
 
     public static boolean shouldLog(Level messageLevel) {
         return messageLevel.ordinal() >= getGlobalLogLevel().ordinal();
@@ -148,6 +140,29 @@ public class LogForwarder {
             return closestEntryToStep();
 
         return currentPhrase.phraseEntry;
+    }
+
+    public static Entry getParentEntryForStep(StepExtension stepExtension)
+    {
+        System.out.println("@@getParentEntryForStep: " + stepExtension);
+        Level stepLogLevel = stepExtension.stepLogLevel;
+
+        if(stepLogLevel == Level.DEBUG)
+            return (stepExtension.parentStep == null || ((StepExtension) stepExtension.parentStep).stepEntry == null) ?  getScenarioLogRoot()  : ((StepExtension) stepExtension.parentStep).stepEntry;
+
+        StepExtension currentStep = stepExtension;
+
+        while ((currentStep = (StepExtension) currentStep.parentStep) != null) {
+            if(currentStep.stepEntry  == null)
+                return pickleballLog;
+            if(currentStep.stepLogLevel == Level.INFO) {
+                return currentStep.stepEntry;
+            }
+            if (currentStep.parentStep == null || ((StepExtension) currentStep.parentStep).stepEntry == null) {
+                return getScenarioLogRoot();
+            }
+        }
+        throw new RuntimeException("Could not fine parent Entry for step: " + stepExtension);
     }
 
 

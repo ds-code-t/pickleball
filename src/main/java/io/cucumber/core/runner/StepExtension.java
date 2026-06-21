@@ -1,6 +1,5 @@
 package io.cucumber.core.runner;
 
-import io.cucumber.core.gherkin.Step;
 import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.core.stepexpression.DataTableArgument;
 import io.cucumber.core.stepexpression.DocStringArgument;
@@ -14,7 +13,6 @@ import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
-import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Level;
 
 import java.lang.reflect.InvocationTargetException;
@@ -29,7 +27,6 @@ import java.util.stream.Collectors;
 
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
-import static io.cucumber.core.runner.CurrentScenarioState.getScenarioLogRoot;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getGlobalEventBus;
@@ -48,7 +45,8 @@ import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.gherkinoperations.DynamicExecution.getCustomStep;
 import static tools.dscode.common.mappings.MappingProcessor.getDataTableMap;
 import static tools.dscode.common.mappings.MappingProcessor.getDocStringMap;
-import static tools.dscode.common.reporting.logging.LogForwarder.isDebugLoggingEnabled;
+import static tools.dscode.common.reporting.logging.LogForwarder.getGlobalLogLevel;
+import static tools.dscode.common.reporting.logging.LogForwarder.getParentEntryForStep;
 import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
 import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry;
 import static tools.dscode.common.util.GeneralUtils.stackTraceToString;
@@ -78,9 +76,6 @@ public class StepExtension extends StepData {
         this.methodName = this.method == null ? "" : this.method.getName();
         this.isDynamicStep = isCoreStep && methodName.startsWith("executeDynamicStep");
         this.isCoreConditionalStep = isCoreStep && methodName.equals("runConditional");
-
-        if (noStepLogging())
-            pickleStepTestStep.setNoLogging(true);
 
         if (isCoreStep) {
             if (methodName.startsWith("flagStep_")) {
@@ -173,25 +168,15 @@ public class StepExtension extends StepData {
         }
         executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
         executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
-        Entry parentEntry = null;
-        StepExtension currentStep = this;
-        if(definitionFlags.contains(DefinitionFlag.DEBUG_LOGGING) || definitionFlags.contains(DefinitionFlag._DEBUG_LOGGING))
+
+        if (definitionFlags.contains(DefinitionFlag.BLOCK_CONDITIONAL) || definitionFlags.contains(DefinitionFlag.DEBUG_LOGGING) || definitionFlags.contains(DefinitionFlag._DEBUG_LOGGING))
             stepLogLevel = Level.DEBUG;
-
-        while (true) {
-            if (currentStep.parentStep == null || ((StepExtension) currentStep.parentStep).stepEntry == null) {
-                parentEntry = getScenarioLogRoot();
-                break;
-            }
-            if(stepLogLevel == Level.DEBUG || currentStep.stepLogLevel == Level.INFO) {
-                parentEntry = ((StepExtension) currentStep.parentStep).stepEntry;
-                break;
-            }
-        }
+        if(!shouldLog())
+            executingPickleStepTestStep.setNoLogging(true);
 
 
-    String stepText = executingPickleStepTestStep.getStep().getKeyword() + " " + executingPickleStepTestStep.getStepText().replaceFirst("^([:\\s]*)", "");
-        stepEntry = parentEntry.logWithType("STEP", stepText).tags("Step").start();
+        String stepText = executingPickleStepTestStep.getStep().getKeyword() + " " + executingPickleStepTestStep.getStepText().replaceFirst("^([:\\s]*)", "");
+        stepEntry = getParentEntryForStep(this).logWithType("STEP", stepText, stepLogLevel).tags("Step").start();
         setDefaultEntry(getRunningStep().stepEntry);
         lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
         result = execute(executingPickleStepTestStep, executionMode);
@@ -248,14 +233,16 @@ public class StepExtension extends StepData {
         }
     }
 
+    public boolean shouldLog() {
+        return stepLogLevel.ordinal() >= getGlobalLogLevel().ordinal();
+    }
 
     @Override
     public void addDefinitionFlag(DefinitionFlag... flags) {
         for (DefinitionFlag flag : flags) {
-            if (flag == DefinitionFlag.DEBUG_LOGGING && !isDebugLoggingEnabled())
-                pickleStepTestStep.setNoLogging(true);
             if (!flag.toString().startsWith("_"))
                 this.definitionFlags.add(flag);
+
         }
     }
 
@@ -355,8 +342,7 @@ public class StepExtension extends StepData {
             clonePickleStepTestStep = getCustomStep(HARD_ERROR_STEP + e.getMessage()).pickleStepTestStep;
             return clonePickleStepTestStep;
         }
-        if (noStepLogging())
-            clonePickleStepTestStep.setNoLogging(true);
+
         return clonePickleStepTestStep;
     }
 
@@ -396,20 +382,6 @@ public class StepExtension extends StepData {
         }
     }
 
-//    public void emitStepEnd() {
-//        invokeAnyMethod(pickleStepTestStep, "emitTestStepStarted", testCase, getCurrentScenarioState().scenarioRunner.getBus(), getTestCaseState().getTestExecutionId(), Instant.now());
-//        Instant startTime = stepEntry.startedAt;
-//        Instant stopTime = getCurrentScenarioState().scenarioRunner.getBus().getInstant();
-//        Duration duration = Duration.between(startTime, stopTime);
-//        Result result = mapStatusToResult(status, error, duration);
-//        pickleStepTestStep.emitTestStepFinished(
-//                testCase, getCurrentScenarioState().scenarioRunner.getBus() ,getTestCaseState() , Instant.now() , Duration duration, Result result
-//        )
-//        finalizeStepEntryLogging();
-//
-//
-////        pickleStepTestStep.setNoLogging(false);
-//    }
 
 
 }

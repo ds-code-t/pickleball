@@ -20,15 +20,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import static tools.dscode.common.GlobalConstants.ROOT_STEP;
-import static tools.dscode.common.reporting.logging.LogForwarder.isDebugLoggingEnabled;
+
 import static tools.dscode.common.reporting.logging.LogForwarder.logError;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.variables.RunVars.resolveFromVarsOrDefault;
 
 
 public abstract class StepData extends StepMapping {
-    Level stepLogLevel = Level.INFO;
+    public Level stepLogLevel = Level.INFO;
 
     public static Duration globalTimeoutSeconds =
             Duration.ofSeconds(Long.parseLong(String.valueOf(resolveFromVarsOrDefault("stepRepeatMaxTime", 3600)))); // 0 = no time limit
@@ -89,9 +88,9 @@ public abstract class StepData extends StepMapping {
         return true;
     }
 
-    public boolean noStepLogging() {
-        return (definitionFlags.contains(DefinitionFlag.DEBUG_LOGGING) || definitionFlags.contains(DefinitionFlag._DEBUG_LOGGING)) && !isDebugLoggingEnabled();
-    }
+//    public boolean noStepLogging() {
+//        return (definitionFlags.contains(DefinitionFlag.DEBUG_LOGGING) || definitionFlags.contains(DefinitionFlag._DEBUG_LOGGING)) && !isDebugLoggingEnabled();
+//    }
 
 
     public Entry stepEntry;
