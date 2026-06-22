@@ -144,7 +144,6 @@ public class LogForwarder {
 
     public static Entry getParentEntryForStep(StepExtension stepExtension)
     {
-        System.out.println("@@getParentEntryForStep: " + stepExtension);
         Level stepLogLevel = stepExtension.stepLogLevel;
 
         if(stepLogLevel == Level.DEBUG)

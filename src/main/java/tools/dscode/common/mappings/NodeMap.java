@@ -165,11 +165,11 @@ public class NodeMap  extends ValueFormatting{
             throw new IllegalArgumentException("Keys and values must have the same size");
         }
 
-        Map<Object, Object> map = IntStream.range(0, keys.size())
-                .boxed()
-                .collect(Collectors.toMap(keys::get, values::get));
+        LinkedListMultimap<Object, Object> multimap = LinkedListMultimap.create();
+        IntStream.range(0, keys.size())
+                .forEach(i -> multimap.put(keys.get(i), values.get(i)));
 
-        merge(map); // delegate to your original method
+        merge(multimap);
     }
 
 

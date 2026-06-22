@@ -1,5 +1,24 @@
 Feature: nested Feature File
 
+  Scenario Outline: so test1
+    * , save "<A>"
+    * , save "<B>"
+    * , save "<A #1>"
+    * , save "<B #1>"
+    * , save "<A #2>"
+    * , save "<B #2>"
+    Examples:
+      | A | B | A | B |
+      | 1 | 2 | 1 | 2 |
+      | 1 | 2 | 3 | 4 |
+
+
+  @testjunitoutput
+  Scenario: tredf save
+    * , save "A"
+
+
+  @tjasdsa
   Scenario: date time testsjh
     * , wait 1 second
     * , wait 2 second
