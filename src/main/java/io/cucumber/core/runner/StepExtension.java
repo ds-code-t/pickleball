@@ -367,20 +367,7 @@ public class StepExtension extends StepData {
     }
 
 
-    public boolean emittedStepStartManually = false;
 
-    public void emitStepStart(String emitText) {
-        if (emittedStepStartManually) return;
-        emittedStepStartManually = true;
-        PickleStepTestStep emitPickleStep = emitText == null || emitText.isBlank() ? pickleStepTestStep : createNewStepExtension(emitText).pickleStepTestStep;
-        emitPickleStep.setNoLogging(false);
-        pickleStepTestStep.substituteStep = emitPickleStep;
-        try {
-            invokeAnyMethodOrThrow(pickleStepTestStep, "emitTestStepStarted", testCase, getCurrentScenarioState().scenarioRunner.getBus(), getTestCaseState().getTestExecutionId(), getCurrentScenarioState().scenarioRunner.getBus().getInstant());
-        } catch (Throwable e) {
-            throw new RuntimeException(e);
-        }
-    }
 
 
 

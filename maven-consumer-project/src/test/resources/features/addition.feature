@@ -1,5 +1,19 @@
 Feature: Addition
 
+  Scenario: matching , starting, contains, ending
+    * , verify "AAA" matches "A+"
+    * , verify "AAA" matches `A+`
+    * , verify "AAA" matches `[A]*`
+    * , verify "bAbb" contains "A"
+    * , verify "babb" contains 'a'
+    * , verify "bbA" ends with "a"
+    * , verify "abba" ends with  'a'
+    * , verify "abA" starts with "A"
+    * , verify "abbA" starts with 'A'
+    * , verify "abbA" starts with `A`
+
+
+
   Scenario: nesting test B
     * , then save  "A" as "V"
 

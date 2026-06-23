@@ -67,21 +67,25 @@ public final class Phrase extends PhraseData {
 
             if (getConditional().trim().equals("else")) {
 
-                if (!getRunningStep().emittedStepStartManually && metaTextPrefix.contains("BLOCK_CONDITIONAL")) {
-                    if (phraseConditionalMode > 0) {
-                        PhraseData phraseData = this;
-                        String emitText = " , " + phraseData.text.replaceFirst("else", "") + phraseData.termination;
-                        while ((phraseData = phraseData.getNextPhrase()) != null) {
-                            if (phraseData.metaTextPrefix.contains("BLOCK_CONDITIONAL")) {
-                                phraseData.setNextPhrase(null);
-                                break;
-                            }
-                            emitText += phraseData.text + phraseData.termination;
-                            phraseData = phraseData.getPreviousPhrase();
+                if(parsedLine.isBlockConditionalStep && phraseConditionalMode > 0)
+                {
+                    PhraseData nextPhrase = this;
+                    String emitText =  " , " + nextPhrase.getText().replaceFirst("else","") + nextPhrase.termination + " ";
+                    PhraseData lastPhrase = nextPhrase;
+                    while ((nextPhrase= nextPhrase.getNextPhrase()) != null) {
+                        if (nextPhrase.metaTextPrefix.contains("BLOCK_CONDITIONAL")) {
+                            lastPhrase.setNextPhrase(null);
+                            break;
                         }
-                        getRunningStep().emitStepStart(emitText);
+                        emitText += nextPhrase.getText() + nextPhrase.termination + " ";
+                        lastPhrase = nextPhrase;
                     }
+                    StepExtension runningStep = getRunningStep();
+                    runningStep.childSteps.add(runningStep.modifyStepExtension(emitText));
+                    setNextPhrase(null);
+                    return false;
                 }
+
 
             }
 

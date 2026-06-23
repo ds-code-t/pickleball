@@ -1,16 +1,63 @@
 Feature: nested Feature File
 
+  Scenario: double runs te 2
+    * IF: 1 == 11 THEN:  , save "A" ELSE:
+  : * , save "Aaaa"
+    * IF: 1 == 12 THEN:  , save "A" ELSE:
+  : * , save "Bbbb"
+    * ELSE:
+  : * , save "Cccc"
+
+  Scenario: test last
+    * IF: 5 == 1 THEN:  , save "A" as "shortCircuitResult" ELSE-IF: 5==2  THEN: , save "B" as "shortCircuitResult" ELSE-IF: 5==3  THEN: , save "C" as "shortCircuitResult" ELSE-IF: 5==4  THEN: , save "D" as "shortCircuitResult" ELSE: , save "E" as "shortCircuitResult"
+    * , verify "<shortCircuitResult>" equals "E"
+
+  Scenario: double runs
+    * IF: 1 == 11 THEN:  , save "A" ELSE: , save "B"
+    * IF: 1 == 11 THEN:  , save "A" ELSE-IF: 1==2  THEN: , save "B" ELSE: , save "C"
+    * IF: 1 == 11 THEN:  , save "A" ELSE: , save "B"
+#    * IF: 1 == 1 THEN:  , save "A" ELSE-IF: 1==2  THEN: , save "B" ELSE: , save "C"
+#    * IF: 2 == 1 THEN:  , save "A" ELSE-IF: 2==2  THEN: , save "B" ELSE: , save "C"
+
+  Scenario: additional else-if runs
+    * IF: 1 == 1 THEN:  , save "A" ELSE-IF: 1==2  THEN: , save "B" ELSE-IF: 1==3  THEN: , save "C" ELSE-IF: 1==4  THEN: , save "D" ELSE: , save "E"
+    * IF: 2 == 1 THEN:  , save "A" ELSE-IF: 2==2  THEN: , save "B" ELSE-IF: 2==3  THEN: , save "C" ELSE-IF: 2==4  THEN: , save "D" ELSE: , save "E"
+    * IF: 3 == 1 THEN:  , save "A" ELSE-IF: 3==2  THEN: , save "B" ELSE-IF: 3==3  THEN: , save "C" ELSE-IF: 3==4  THEN: , save "D" ELSE: , save "E"
+    * IF: 4 == 1 THEN:  , save "A" ELSE-IF: 4==2  THEN: , save "B" ELSE-IF: 4==3  THEN: , save "C" ELSE-IF: 4==4  THEN: , save "D" ELSE: , save "E"
+    * IF: 5 == 1 THEN:  , save "A" ELSE-IF: 5==2  THEN: , save "B" ELSE-IF: 5==3  THEN: , save "C" ELSE-IF: 5==4  THEN: , save "D" ELSE: , save "E"
+
+  Scenario: additional else-if short circuit runs
+    * IF: 1 == 1 THEN:  , save "A" as "shortCircuitResult" ELSE-IF: 1<=1  THEN: , save "B" as "shortCircuitResult" ELSE-IF: 1<2  THEN: , save "C" as "shortCircuitResult" ELSE-IF: 1!=2  THEN: , save "D" as "shortCircuitResult" ELSE: , save "E" as "shortCircuitResult"
+    * , verify "<shortCircuitResult>" equals "A"
+    * IF: 2 == 1 THEN:  , save "A" as "shortCircuitResult" ELSE-IF: 2==2  THEN: , save "B" as "shortCircuitResult" ELSE-IF: 2<=2  THEN: , save "C" as "shortCircuitResult" ELSE-IF: 2<3  THEN: , save "D" as "shortCircuitResult" ELSE: , save "E" as "shortCircuitResult"
+    * , verify "<shortCircuitResult>" equals "B"
+    * IF: 3 == 1 THEN:  , save "A" as "shortCircuitResult" ELSE-IF: 3==2  THEN: , save "B" as "shortCircuitResult" ELSE-IF: 3==3  THEN: , save "C" as "shortCircuitResult" ELSE-IF: 3<=3  THEN: , save "D" as "shortCircuitResult" ELSE: , save "E" as "shortCircuitResult"
+    * , verify "<shortCircuitResult>" equals "C"
+    * IF: 4 == 1 THEN:  , save "A" as "shortCircuitResult" ELSE-IF: 4==2  THEN: , save "B" as "shortCircuitResult" ELSE-IF: 4==3  THEN: , save "C" as "shortCircuitResult" ELSE-IF: 4==4  THEN: , save "D" as "shortCircuitResult" ELSE: , save "E" as "shortCircuitResult"
+    * , verify "<shortCircuitResult>" equals "D"
+    * IF: 5 == 1 THEN:  , save "A" as "shortCircuitResult" ELSE-IF: 5==2  THEN: , save "B" as "shortCircuitResult" ELSE-IF: 5==3  THEN: , save "C" as "shortCircuitResult" ELSE-IF: 5==4  THEN: , save "D" as "shortCircuitResult" ELSE: , save "E" as "shortCircuitResult"
+    * , verify "<shortCircuitResult>" equals "E"
+
+  Scenario: tesdt dfs
+    * IF:  1 == 1 THEN: , click "ett" Checkbox
+    * IF:  2 == THEN: , click "Apples" Checkbox
+
+  Scenario: tesdt dfs
+    * IF:  1 == 1 :
+  : * , click "ett" Checkbox
+    * IF:  2==2:
+  : * , click "Apples" Checkbox
 
   Scenario: calling sc A
     * RUN SCENARIOS
       | Run Tags | A |
-      | %tta     | 2  |
+      | %tta     | 2 |
 
   Scenario Outline: ex test a
     * print <A>
     Examples:
       | Scenario Tags | ?A |
-      | %tta          | q |
+      | %tta          | q  |
 
 
   Scenario Outline: so test1
@@ -34,8 +81,8 @@ Feature: nested Feature File
   @tjasdsa
   Scenario: date time testsjh
     * , wait 1 second
-    * , wait 2 second
-    * , wait 3 second
+#    * , wait 2 second
+#    * , wait 3 second
 
   Scenario: date time tests
 

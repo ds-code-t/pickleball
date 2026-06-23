@@ -409,13 +409,11 @@ public abstract class PhraseData extends PassedData {
         }
         if (operation instanceof AssertionOperations && assertionChain != null) {
             assertionChain.executeAssertionChain();
-//            if (untilPhrase) {
-//                if (phraseConditionalMode <= 0) {
-//                    phraseConditionalMode = 1;
-//                } else {
-//                    phraseConditionalMode = 0;
-//                }
-//            }
+            if(parsedLine.isBlockConditionalStep && assertionChain.chainStatus)
+            {
+                setNextPhrase(null);
+                return;
+            }
         } else {
             operation.execute(this);
         }

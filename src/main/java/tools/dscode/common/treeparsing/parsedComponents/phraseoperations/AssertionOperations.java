@@ -8,11 +8,12 @@ import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
+import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETURNS_VALUE;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
@@ -180,6 +181,80 @@ public enum AssertionOperations implements OperationsInterface {
                         ValueWrapperComparisons::matchesRegex,
                         firstElement.getValues(),
                         secondElement.getValues(),
+                        getModeSet(phraseData)
+                );
+            });
+        }
+    },
+    START {
+        @Override
+        public void execute(PhraseData phraseData) {
+            logInfo(phraseData + " : Executing Assertion " + this.name());
+            int repetition = phraseData.getRepetition();
+
+            ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
+            ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
+
+            List<ValueWrapper> secondVals = secondElement.getValues().stream().map(val ->
+                    createLiteralRegexWrapper(val, name(), "", ".*")
+            ).toList();
+
+
+            phraseData.result = Attempt.run(repetition, 500, () -> {
+                return ValueWrapperCompareReducer.eval(
+                        ValueWrapperComparisons::matchesRegex,
+                        firstElement.getValues(),
+                        secondVals,
+                        getModeSet(phraseData)
+                );
+            });
+        }
+    },
+
+    END {
+        @Override
+        public void execute(PhraseData phraseData) {
+            logInfo(phraseData + " : Executing Assertion " + this.name());
+            int repetition = phraseData.getRepetition();
+
+            ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
+            ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
+
+            List<ValueWrapper> secondVals = secondElement.getValues().stream().map(val ->
+                    createLiteralRegexWrapper(val, name(), ".*", "")
+            ).toList();
+
+
+            phraseData.result = Attempt.run(repetition, 500, () -> {
+                return ValueWrapperCompareReducer.eval(
+                        ValueWrapperComparisons::matchesRegex,
+                        firstElement.getValues(),
+                        secondVals,
+                        getModeSet(phraseData)
+                );
+            });
+        }
+    },
+
+    CONTAIN {
+        @Override
+        public void execute(PhraseData phraseData) {
+            logInfo(phraseData + " : Executing Assertion " + this.name());
+            int repetition = phraseData.getRepetition();
+
+            ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
+            ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
+
+            List<ValueWrapper> secondVals = secondElement.getValues().stream().map(val ->
+                    createLiteralRegexWrapper(val, name(), ".*", ".*")
+            ).toList();
+
+
+            phraseData.result = Attempt.run(repetition, 500, () -> {
+                return ValueWrapperCompareReducer.eval(
+                        ValueWrapperComparisons::matchesRegex,
+                        firstElement.getValues(),
+                        secondVals,
                         getModeSet(phraseData)
                 );
             });
@@ -440,6 +515,21 @@ public enum AssertionOperations implements OperationsInterface {
             });
         }
     };
+
+
+    private static ValueWrapper createLiteralRegexWrapper(ValueWrapper val, String assertion, String prefix, String suffix) {
+        if (val == null) {
+            throw new IllegalArgumentException(assertion + " assertion cannot use a null ValueWrapper");
+        }
+        if (val.getValue() == null) {
+            throw new IllegalArgumentException(assertion + " assertion cannot use a null expected value");
+        }
+
+        return createValueWrapper(
+                prefix + Pattern.quote(String.valueOf(val.getValue())) + suffix,
+                val.type
+        );
+    }
 
 
     public static AssertionOperations

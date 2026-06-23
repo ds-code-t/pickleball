@@ -124,24 +124,19 @@ public class AssertionChain {
                         break;
                     nextPhrase = nextPhrase.getNextPhrase();
                 }
-                String emitText =  "," + nextPhrase.getText() + nextPhrase.termination;
+                String emitText =  " , " + nextPhrase.getText() + nextPhrase.termination + " ";
                 PhraseData lastPhrase = nextPhrase;
                 while ((nextPhrase= nextPhrase.getNextPhrase()) != null) {
                     if (nextPhrase.metaTextPrefix.contains("BLOCK_CONDITIONAL")) {
                         lastPhrase.setNextPhrase(null);
                         break;
                     }
-                    emitText += nextPhrase.getText() + nextPhrase.termination;
+                    emitText += nextPhrase.getText() + nextPhrase.termination + " ";
                     lastPhrase = nextPhrase;
                 }
                 runningStep.childSteps.add(runningStep.modifyStepExtension(emitText));
             }
-//            else {
-//                parentPhrase.setNextPhrase(null);
-//            }
         }
-
-
     }
 
 
