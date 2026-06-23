@@ -10,7 +10,7 @@ Feature: nested Feature File
     * print <A>
     Examples:
       | Scenario Tags | ?A |
-      | %tta          | 1 |
+      | %tta          | q |
 
 
   Scenario Outline: so test1

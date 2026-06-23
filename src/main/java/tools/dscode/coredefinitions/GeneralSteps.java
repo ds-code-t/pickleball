@@ -141,7 +141,7 @@ public class GeneralSteps extends CoreSteps {
     }
 
 
-    @Given("^print (.*)$")
+    @Given("^print(.*)$")
     public static void printVal(String message) {
         logInfo("PRINT: " + message);
     }

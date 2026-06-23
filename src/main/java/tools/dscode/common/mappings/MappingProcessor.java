@@ -402,7 +402,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 do {
                     prev = input;
                     if (input.contains(bookends.open())) {
-                        input = resolveByMap(input, parsedObj,  bookends);
+                        input = resolveByMap(input, parsedObj, bookends);
                     }
                     if (!isDirectoryPath && input.contains(OPEN_EXPRESSION_BOOKEND_SUB)) {
                         input = resolveExpression(input, parsedObj, bookends);
@@ -575,17 +575,15 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 if (map == null)
                     continue;
                 Object replacement = null;
-                        if(directGet) {
-                            var temp = map.directGet(key);
-                            System.out.println((temp == null ? "null" : temp.getClass().getName()));
-                            if(temp instanceof ArrayNode arrayNode && !arrayNode.isEmpty()) {
-                                replacement = arrayNode.get(0);
-                            }
-                        }
-                        else
-                        {
-                            replacement =  map.get(tokenized);
-                        }
+                if (directGet) {
+                    replacement = map.directGet(key);
+//                    System.out.println((replacement == null ? "null" : replacement.getClass().getName()));
+                    if (replacement instanceof ArrayNode arrayNode) {
+                        replacement = arrayNode.isEmpty() ? null : arrayNode.get(0);
+                    }
+                } else {
+                    replacement = map.get(tokenized);
+                }
 
                 if (replacement != null) {
                     if (replacement instanceof String replacementString && replacementString.isEmpty() && !key.startsWith("?")) {
