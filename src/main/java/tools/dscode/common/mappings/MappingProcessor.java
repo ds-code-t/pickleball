@@ -574,7 +574,18 @@ public abstract class MappingProcessor implements Map<String, Object> {
             for (NodeMap map : (tokenized.isSingletonKey ? getMapsForSingletonResolution() : getMapsForResolution())) {
                 if (map == null)
                     continue;
-                Object replacement = directGet ? map.directGet(key) : map.get(tokenized);
+                Object replacement = null;
+                        if(directGet) {
+                            var temp = map.directGet(key);
+                            System.out.println((temp == null ? "null" : temp.getClass().getName()));
+                            if(temp instanceof ArrayNode arrayNode && !arrayNode.isEmpty()) {
+                                replacement = arrayNode.get(0);
+                            }
+                        }
+                        else
+                        {
+                            replacement =  map.get(tokenized);
+                        }
 
                 if (replacement != null) {
                     if (replacement instanceof String replacementString && replacementString.isEmpty() && !key.startsWith("?")) {

@@ -1,5 +1,18 @@
 Feature: nested Feature File
 
+
+  Scenario: calling sc A
+    * RUN SCENARIOS
+      | Run Tags | zA |
+      | %tta     | 2  |
+
+  Scenario Outline: ex test a
+    * print <A>
+    Examples:
+      | Scenario Tags | ?A |
+      | %tta          | 1 |
+
+
   Scenario Outline: so test1
     * , save "<A>"
     * , save "<B>"
