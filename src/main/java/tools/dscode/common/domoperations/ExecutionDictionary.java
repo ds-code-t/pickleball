@@ -271,6 +271,25 @@ public class ExecutionDictionary {
         lineageCache.clear();
     }
 
+    /**
+     * Clear registrations defined directly on a category before redefining it.
+     * Child categories that inherit from this category are left intact.
+     */
+    public void resetCategory(String category) {
+        Objects.requireNonNull(category, "category must not be null");
+        if (category.isBlank()) return;
+
+        orReg.remove(category);
+        andReg.remove(category);
+        contextReg.remove(category);
+        categoryFlags.remove(category);
+        primaryBaseReg.remove(category);
+        alternateBaseReg.remove(category);
+        categoryParents.removeAll(category);
+
+        lineageCache.clear();
+    }
+
 
     /**
      * Resolve full inheritance chain for a category.
@@ -690,6 +709,11 @@ public class ExecutionDictionary {
         private CategorySpec(ExecutionDictionary dict, List<String> categories) {
             this.dict = dict;
             this.categories = List.copyOf(categories);
+        }
+
+        public CategorySpec reset() {
+            for (String cat : categories) dict.resetCategory(cat);
+            return this;
         }
 
         // --- parent -> children convenience ---

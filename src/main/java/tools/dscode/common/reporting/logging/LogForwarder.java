@@ -161,7 +161,7 @@ public class LogForwarder {
                 return getScenarioLogRoot();
             }
         }
-        throw new RuntimeException("Could not fine parent Entry for step: " + stepExtension);
+        return closestEntryToScenario();
     }
 
 
