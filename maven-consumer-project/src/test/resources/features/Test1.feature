@@ -3,7 +3,7 @@ Feature: nested Feature File
 
   Scenario: calling sc A
     * RUN SCENARIOS
-      | Run Tags | zA |
+      | Run Tags | A |
       | %tta     | 2  |
 
   Scenario Outline: ex test a

@@ -579,7 +579,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     replacement = map.directGet(key);
 //                    System.out.println((replacement == null ? "null" : replacement.getClass().getName()));
                     if (replacement instanceof ArrayNode arrayNode) {
-                        replacement = arrayNode.isEmpty() ? null : arrayNode.get(0);
+                        replacement = arrayNode.isEmpty() ? null : arrayNode.get(arrayNode.size() - 1);
                     }
                 } else {
                     replacement = map.get(tokenized);
