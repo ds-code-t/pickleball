@@ -153,12 +153,12 @@ public class LogForwarder {
 
         while ((currentStep = (StepExtension) currentStep.parentStep) != null) {
             if(currentStep.stepEntry  == null)
-                return pickleballLog;
+                return closestEntryToScenario();
             if(currentStep.stepLogLevel == Level.INFO) {
                 return currentStep.stepEntry;
             }
             if (currentStep.parentStep == null || ((StepExtension) currentStep.parentStep).stepEntry == null) {
-                return getScenarioLogRoot();
+                return closestEntryToScenario();
             }
         }
         return closestEntryToScenario();
