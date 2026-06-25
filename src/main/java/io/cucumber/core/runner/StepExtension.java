@@ -156,6 +156,8 @@ public class StepExtension extends StepData {
 
         ExecutionMode executionMode = ExecutionMode.RUN;
 
+//        if(pickleStepTestStep.getStepText().contains()
+
         if (logAndIgnore) {
             executingPickleStepTestStep = pickleStepTestStep;
             executionMode = ExecutionMode.SKIP;

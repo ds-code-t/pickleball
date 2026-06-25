@@ -24,13 +24,18 @@ final class CucumberStepTextCloneUtil {
 
         IdentityHashMap<Object, Object> seen = new IdentityHashMap<>();
 
-        return new PickleStep(
+        PickleStep clone = new PickleStep(
                 deepCloneAny(source.getArgument().orElse(null), seen),
                 new ArrayList<>(source.getAstNodeIds()),
                 source.getId(),
                 source.getType().orElse(null),
                 Objects.requireNonNull(newText, "newText cannot be null")
         );
+        if (!clone.hasInlineArgument() && source.hasInlineArgument()) {
+            clone.inlineArgumentType = source.inlineArgumentType;
+            clone.inlineArgumentText = source.inlineArgumentText;
+        }
+        return clone;
     }
 
     static GherkinMessagesStep deepCloneGherkinMessagesStepWithText(GherkinMessagesStep source, String newText) {

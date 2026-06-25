@@ -32,6 +32,8 @@ public final class CucumberDeepCloneUtil {
                 source.getText()
         );
         clone.metaText = source.metaText;
+        clone.inlineArgumentType = source.inlineArgumentType;
+        clone.inlineArgumentText = source.inlineArgumentText;
         clone.nestingLevel = source.nestingLevel;
 
         return clone;

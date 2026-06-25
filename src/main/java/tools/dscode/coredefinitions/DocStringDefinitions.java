@@ -87,13 +87,43 @@ public class DocStringDefinitions {
     }
 
     @DocStringType(contentType = "json")
+    public Map<String, String> jsonStringMap(String docString) throws JsonProcessingException {
+        return toStringMap(parseJson(docString), "json");
+    }
+
+    @DocStringType(contentType = "json")
+    public Map<String, Integer> jsonIntegerMap(String docString) throws JsonProcessingException {
+        return toIntegerMap(parseJson(docString), "json");
+    }
+
+    @DocStringType(contentType = "json")
     public List<Object> jsonList(String docString) throws JsonProcessingException {
         return toList(parseJson(docString), "json");
     }
 
     @DocStringType(contentType = "json")
+    public List<String> jsonStringList(String docString) throws JsonProcessingException {
+        return toStringList(parseJson(docString), "json");
+    }
+
+    @DocStringType(contentType = "json")
+    public List<Integer> jsonIntegerList(String docString) throws JsonProcessingException {
+        return toIntegerList(parseJson(docString), "json");
+    }
+
+    @DocStringType(contentType = "json")
     public Set<Object> jsonSet(String docString) throws JsonProcessingException {
         return toSet(parseJson(docString), "json");
+    }
+
+    @DocStringType(contentType = "json")
+    public Set<String> jsonStringSet(String docString) throws JsonProcessingException {
+        return toStringSet(parseJson(docString), "json");
+    }
+
+    @DocStringType(contentType = "json")
+    public Set<Integer> jsonIntegerSet(String docString) throws JsonProcessingException {
+        return toIntegerSet(parseJson(docString), "json");
     }
 
     @DocStringType(contentType = "json")
@@ -116,13 +146,43 @@ public class DocStringDefinitions {
     }
 
     @DocStringType(contentType = "yaml")
+    public Map<String, String> yamlStringMap(String docString) throws JsonProcessingException {
+        return toStringMap(parseYaml(docString), "yaml");
+    }
+
+    @DocStringType(contentType = "yaml")
+    public Map<String, Integer> yamlIntegerMap(String docString) throws JsonProcessingException {
+        return toIntegerMap(parseYaml(docString), "yaml");
+    }
+
+    @DocStringType(contentType = "yaml")
     public List<Object> yamlList(String docString) throws JsonProcessingException {
         return toList(parseYaml(docString), "yaml");
     }
 
     @DocStringType(contentType = "yaml")
+    public List<String> yamlStringList(String docString) throws JsonProcessingException {
+        return toStringList(parseYaml(docString), "yaml");
+    }
+
+    @DocStringType(contentType = "yaml")
+    public List<Integer> yamlIntegerList(String docString) throws JsonProcessingException {
+        return toIntegerList(parseYaml(docString), "yaml");
+    }
+
+    @DocStringType(contentType = "yaml")
     public Set<Object> yamlSet(String docString) throws JsonProcessingException {
         return toSet(parseYaml(docString), "yaml");
+    }
+
+    @DocStringType(contentType = "yaml")
+    public Set<String> yamlStringSet(String docString) throws JsonProcessingException {
+        return toStringSet(parseYaml(docString), "yaml");
+    }
+
+    @DocStringType(contentType = "yaml")
+    public Set<Integer> yamlIntegerSet(String docString) throws JsonProcessingException {
+        return toIntegerSet(parseYaml(docString), "yaml");
     }
 
     @DocStringType(contentType = "yaml")
@@ -145,13 +205,43 @@ public class DocStringDefinitions {
     }
 
     @DocStringType(contentType = "xml")
+    public Map<String, String> xmlStringMap(String docString) throws JsonProcessingException {
+        return toStringMap(parseXml(docString), "xml");
+    }
+
+    @DocStringType(contentType = "xml")
+    public Map<String, Integer> xmlIntegerMap(String docString) throws JsonProcessingException {
+        return toIntegerMap(parseXml(docString), "xml");
+    }
+
+    @DocStringType(contentType = "xml")
     public List<Object> xmlList(String docString) throws JsonProcessingException {
         return toList(parseXml(docString), "xml");
     }
 
     @DocStringType(contentType = "xml")
+    public List<String> xmlStringList(String docString) throws JsonProcessingException {
+        return toStringList(parseXml(docString), "xml");
+    }
+
+    @DocStringType(contentType = "xml")
+    public List<Integer> xmlIntegerList(String docString) throws JsonProcessingException {
+        return toIntegerList(parseXml(docString), "xml");
+    }
+
+    @DocStringType(contentType = "xml")
     public Set<Object> xmlSet(String docString) throws JsonProcessingException {
         return toSet(parseXml(docString), "xml");
+    }
+
+    @DocStringType(contentType = "xml")
+    public Set<String> xmlStringSet(String docString) throws JsonProcessingException {
+        return toStringSet(parseXml(docString), "xml");
+    }
+
+    @DocStringType(contentType = "xml")
+    public Set<Integer> xmlIntegerSet(String docString) throws JsonProcessingException {
+        return toIntegerSet(parseXml(docString), "xml");
     }
 
     @DocStringType(contentType = "xml")
@@ -188,6 +278,34 @@ public class DocStringDefinitions {
         return JSON_MAPPER.convertValue(node, MAP_TYPE);
     }
 
+    private static Map<String, String> toStringMap(JsonNode node, String contentType) {
+        if (node == null || !node.isObject()) {
+            throw new IllegalArgumentException(
+                    "DocString contentType '" + contentType + "' must parse to an object node to be converted to Map, but got: "
+                            + describeNode(node));
+        }
+
+        Map<String, String> result = new LinkedHashMap<>();
+        for (Map.Entry<String, JsonNode> entry : node.properties()) {
+            result.put(entry.getKey(), toStringValue(entry.getValue(), contentType, "map value for key '" + entry.getKey() + "'"));
+        }
+        return result;
+    }
+
+    private static Map<String, Integer> toIntegerMap(JsonNode node, String contentType) {
+        if (node == null || !node.isObject()) {
+            throw new IllegalArgumentException(
+                    "DocString contentType '" + contentType + "' must parse to an object node to be converted to Map, but got: "
+                            + describeNode(node));
+        }
+
+        Map<String, Integer> result = new LinkedHashMap<>();
+        for (Map.Entry<String, JsonNode> entry : node.properties()) {
+            result.put(entry.getKey(), toIntegerValue(entry.getValue(), contentType, "map value for key '" + entry.getKey() + "'"));
+        }
+        return result;
+    }
+
     private static List<Object> toList(JsonNode node, String contentType) {
         if (node == null || !node.isArray()) {
             throw new IllegalArgumentException(
@@ -197,12 +315,87 @@ public class DocStringDefinitions {
         return JSON_MAPPER.convertValue(node, LIST_TYPE);
     }
 
+    private static List<String> toStringList(JsonNode node, String contentType) {
+        if (node == null || !node.isArray()) {
+            throw new IllegalArgumentException(
+                    "DocString contentType '" + contentType + "' must parse to an array node to be converted to List, but got: "
+                            + describeNode(node));
+        }
+
+        List<String> result = new ArrayList<>();
+        for (int i = 0; i < node.size(); i++) {
+            result.add(toStringValue(node.get(i), contentType, "list value at index " + i));
+        }
+        return result;
+    }
+
+    private static List<Integer> toIntegerList(JsonNode node, String contentType) {
+        if (node == null || !node.isArray()) {
+            throw new IllegalArgumentException(
+                    "DocString contentType '" + contentType + "' must parse to an array node to be converted to List, but got: "
+                            + describeNode(node));
+        }
+
+        List<Integer> result = new ArrayList<>();
+        for (int i = 0; i < node.size(); i++) {
+            result.add(toIntegerValue(node.get(i), contentType, "list value at index " + i));
+        }
+        return result;
+    }
+
     private static Set<Object> toSet(JsonNode node, String contentType) {
         return new LinkedHashSet<>(toList(node, contentType));
     }
 
+    private static Set<String> toStringSet(JsonNode node, String contentType) {
+        return new LinkedHashSet<>(toStringList(node, contentType));
+    }
+
+    private static Set<Integer> toIntegerSet(JsonNode node, String contentType) {
+        return new LinkedHashSet<>(toIntegerList(node, contentType));
+    }
+
     private static Object toJavaObject(JsonNode node) throws JsonProcessingException {
         return JSON_MAPPER.treeToValue(node, Object.class);
+    }
+
+    private static String toStringValue(JsonNode node, String contentType, String location) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        if (node.isContainerNode()) {
+            throw scalarConversionException(contentType, location, "String", node);
+        }
+        return node.asText();
+    }
+
+    private static Integer toIntegerValue(JsonNode node, String contentType, String location) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        if (node.isIntegralNumber() && node.canConvertToInt()) {
+            return node.intValue();
+        }
+        if (node.isTextual()) {
+            try {
+                return Integer.valueOf(node.asText().trim());
+            } catch (NumberFormatException ignored) {
+                throw scalarConversionException(contentType, location, "Integer", node);
+            }
+        }
+        throw scalarConversionException(contentType, location, "Integer", node);
+    }
+
+    private static IllegalArgumentException scalarConversionException(
+            String contentType,
+            String location,
+            String targetType,
+            JsonNode node
+    ) {
+        return new IllegalArgumentException(
+                "DocString contentType '" + contentType + "' " + location
+                        + " cannot be converted to " + targetType + ", got: " + describeNode(node)
+        );
     }
 
     private static String describeNode(JsonNode node) {

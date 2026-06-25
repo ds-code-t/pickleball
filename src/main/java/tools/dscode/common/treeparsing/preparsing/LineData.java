@@ -151,10 +151,11 @@ public abstract class LineData implements Cloneable {
     }
 
     private static boolean containsConditionalOperator(String masked) {
-        return masked.contains("==")
-                || masked.contains("!=")
-                || masked.contains("&&")
-                || masked.contains("||")
+        masked = masked.replaceAll("\\b[A-Z]+:::.*$", "");
+        return masked.contains("=")
+                || masked.contains("!")
+                || masked.contains("&")
+                || masked.contains("|")
                 || masked.contains(">")
                 || masked.contains("<");
     }
