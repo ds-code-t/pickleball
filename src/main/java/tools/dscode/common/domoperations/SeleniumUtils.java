@@ -58,8 +58,8 @@ public class SeleniumUtils {
     }
 
 
-    public static void waitForDuration(Duration duration) {
-        WebDriver driver = tools.dscode.coredefinitions.BrowserSteps.getCurrentDriverForNonUse();
+    public static void waitForDuration(Duration duration, RemoteWebDriver driver) {
+//        WebDriver driver = tools.dscode.coredefinitions.BrowserSteps.getCurrentDriverForNonUse();
 
         if (duration == null || duration.isNegative() || duration.isZero()) {
             System.out.print("wait completed");

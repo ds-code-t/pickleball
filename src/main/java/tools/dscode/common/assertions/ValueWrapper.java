@@ -12,6 +12,7 @@ import java.util.*;
 
 import tools.dscode.common.util.datetime.BusinessTimeRange;
 import tools.dscode.common.util.datetime.DurationFormattingUtils;
+import tools.dscode.common.util.datetime.TemporalValue;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 
@@ -71,6 +72,23 @@ public class ValueWrapper {
             return new ValueWrapper(instant, ValueTypes.DATE_TIME, instant.toString());
         if (obj instanceof BusinessTimeRange timeRange)
             return new ValueWrapper(timeRange, ValueTypes.TIME_RANGE, timeRange.toCanonicalString());
+        if (obj instanceof TemporalValue temporalValue)
+            return switch (temporalValue.kind()) {
+                case DATE_TIME -> new ValueWrapper(
+                        temporalValue.requireBusinessTime().value().toInstant(),
+                        ValueTypes.DATE_TIME,
+                        temporalValue.toString()
+                );
+                case DELTA -> new ValueWrapper(temporalValue.requireDuration(), ValueTypes.DURATION, temporalValue.toString());
+                case TIME_RANGE -> new ValueWrapper(
+                        temporalValue.requireTimeRange(),
+                        ValueTypes.TIME_RANGE,
+                        temporalValue.requireTimeRange().toCanonicalString()
+                );
+                case TEXT -> new ValueWrapper(temporalValue.requireText());
+                case BOOLEAN -> new ValueWrapper(temporalValue.requireBoolean(), ValueTypes.BOOLEAN);
+                case NULL -> new ValueWrapper(null);
+            };
 
         // NEW: containers (wrap inner values)
         if (obj instanceof List<?> list) {

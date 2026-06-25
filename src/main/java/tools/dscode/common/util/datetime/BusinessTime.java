@@ -66,6 +66,19 @@ public final class BusinessTime {
         Objects.requireNonNull(cal, "cal");
         Objects.requireNonNull(spec, "spec");
 
+        return requireBusinessTimeResult(spec, evaluateAny(cal, spec));
+    }
+
+    static Object evaluateAny(BusinessCalendar cal, String spec) {
+        Objects.requireNonNull(cal, "cal");
+        Objects.requireNonNull(spec, "spec");
+
+        BusinessTimePostModifier.Parsed post = BusinessTimePostModifier.split(spec);
+        BusinessTime bt = evaluateWithoutPostModifiers(cal, post.baseSpec());
+        return BusinessTimePostModifier.apply(bt, post.modifiers());
+    }
+
+    private static BusinessTime evaluateWithoutPostModifiers(BusinessCalendar cal, String spec) {
         ParsedDateTimeSpec parsed = parseSpec(spec);
         BusinessTime bt = evaluateBase(cal, parsed);
 
@@ -79,7 +92,8 @@ public final class BusinessTime {
         Objects.requireNonNull(cal, "cal");
         Objects.requireNonNull(spec, "spec");
 
-        return evaluateBase(cal, parseSpec(spec)).value();
+        BusinessTime bt = evaluate(cal, spec);
+        return bt == null ? null : bt.value();
     }
 
     private static ParsedDateTimeSpec parseSpec(String spec) {
@@ -124,7 +138,7 @@ public final class BusinessTime {
     }
 
     public TemporalValue eval(String spec) {
-        return TemporalValue.dateTime(spec, evaluate(cal, spec));
+        return TemporalValue.fromDateTimeEvaluation(spec, evaluateAny(cal, spec));
     }
 
     public BusinessCalendar calendar() { return cal; }
@@ -154,6 +168,10 @@ public final class BusinessTime {
         return new BusinessTime(cal, zdt, null, null);
     }
 
+    BusinessTime withValue(ZonedDateTime value) {
+        return value == null ? null : new BusinessTime(cal, value, outputZone, outputFormat);
+    }
+
     public BusinessCalendar.Status status() { return cal.status(zdt); }
     public boolean isOpen() { return cal.isOpen(zdt); }
     public boolean isClosed() { return cal.isClosed(zdt); }
@@ -170,7 +188,9 @@ public final class BusinessTime {
 
     /** General date/time math. Supports months/years because it is applied to a real instance. */
     public BusinessTime add(String expr) {
-        ZonedDateTime cur = DateTimeDeltaParsingUtils.applyTo(zdt, expr);
+        ZonedDateTime cur = BusinessTemporalDelta.hasBusinessTerms(expr)
+                ? BusinessTemporalDelta.applyTo(cal, zdt, expr)
+                : DateTimeDeltaParsingUtils.applyTo(zdt, expr);
         return new BusinessTime(cal, cur, outputZone, outputFormat);
     }
 
@@ -336,6 +356,15 @@ public final class BusinessTime {
 
     private static String blankToNull(String s) {
         return s == null || s.isBlank() ? null : s.trim();
+    }
+
+    private static BusinessTime requireBusinessTimeResult(String spec, Object result) {
+        if (result == null) return null;
+        if (result instanceof BusinessTime bt) return bt;
+        throw new IllegalArgumentException(
+                "Date/time expression does not resolve to a BusinessTime: \"" + spec + "\" resolves to "
+                        + result.getClass().getSimpleName()
+        );
     }
 
     private record ExtractedClauses(String remaining, String formatText, List<String> patternTexts) {}

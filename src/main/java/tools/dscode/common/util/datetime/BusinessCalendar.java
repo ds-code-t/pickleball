@@ -24,6 +24,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -36,6 +37,8 @@ import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
  * "Closed" overrides "Open". Outside open hours is closed by default.
  */
 public final class BusinessCalendar {
+
+    private static final int BUSINESS_DATE_SEARCH_LIMIT_DAYS = 370;
 
     private static final List<DateTimeFormatter> DEFAULT_DATE_TIME_FORMATTERS = List.of(
             DateTimeFormatter.ISO_ZONED_DATE_TIME,
@@ -160,6 +163,45 @@ public final class BusinessCalendar {
     public boolean isOpen(Object t) { return status(t) == Status.OPEN; }
     public boolean isClosed(Object t) { return !isOpen(t); }
 
+    /** A business date is any local calendar date with at least one effective open interval. */
+    public boolean isBusinessDate(LocalDate date) {
+        return !effectiveOpenIntervalsFor(Objects.requireNonNull(date, "date")).isEmpty();
+    }
+
+    ZonedDateTime addBusinessDateUnits(Object start, long amount, ChronoUnit unit) {
+        Objects.requireNonNull(unit, "unit");
+        if (!isBusinessDateUnit(unit)) {
+            throw new IllegalArgumentException("Unsupported business date unit: " + unit);
+        }
+        if (amount == Long.MIN_VALUE) {
+            throw new IllegalArgumentException("Business date amount is too large: " + amount);
+        }
+
+        ZonedDateTime cur = normalizeForQuery(start);
+        if (amount == 0) return cur;
+
+        int direction = amount > 0 ? 1 : -1;
+        long remaining = Math.abs(amount);
+        while (remaining > 0) {
+            cur = plusDateUnit(cur, unit, direction);
+
+            LocalDate adjusted = direction > 0
+                    ? nextBusinessDateOnOrAfter(cur.toLocalDate())
+                    : previousBusinessDateOnOrBefore(cur.toLocalDate());
+            if (adjusted == null) {
+                throw new IllegalStateException("No business date found within "
+                        + BUSINESS_DATE_SEARCH_LIMIT_DAYS + " days of " + cur.toLocalDate());
+            }
+
+            if (!adjusted.equals(cur.toLocalDate())) {
+                cur = ZonedDateTime.of(adjusted, cur.toLocalTime(), zone);
+            }
+            remaining--;
+        }
+
+        return cur;
+    }
+
     /** Next open time >= input time (best-effort for ambiguous inputs). */
     public ZonedDateTime nextOpen(Object t) {
         ZonedDateTime z = normalizeForQuery(t);
@@ -207,6 +249,86 @@ public final class BusinessCalendar {
             }
         }
         return null;
+    }
+
+    public ZonedDateTime nextClosed(Object t) {
+        ZonedDateTime z = normalizeForQuery(t);
+        if (isClosedAt(z)) return z;
+
+        Interval open = effectiveOpenIntervalCovering(z);
+        return open == null ? z : open.end;
+    }
+
+    public ZonedDateTime lastClosed(Object t) {
+        ZonedDateTime z = normalizeForQuery(t);
+        if (isClosedAt(z)) return z;
+
+        Interval open = effectiveOpenIntervalCovering(z);
+        return open == null ? z : open.start.minusNanos(1);
+    }
+
+    public ZonedDateTime nextOpening(Object t) {
+        ZonedDateTime z = normalizeForQuery(t);
+
+        for (int d = 0; d < BUSINESS_DATE_SEARCH_LIMIT_DAYS; d++) {
+            LocalDate date = z.toLocalDate().plusDays(d);
+            for (Interval open : effectiveOpenIntervalsFor(date)) {
+                if (!open.start.isBefore(z)) return open.start;
+            }
+        }
+        return null;
+    }
+
+    public ZonedDateTime previousOpening(Object t) {
+        ZonedDateTime z = normalizeForQuery(t);
+
+        for (int d = 0; d < BUSINESS_DATE_SEARCH_LIMIT_DAYS; d++) {
+            LocalDate date = z.toLocalDate().minusDays(d);
+            List<Interval> opens = effectiveOpenIntervalsFor(date);
+            for (int i = opens.size() - 1; i >= 0; i--) {
+                Interval open = opens.get(i);
+                if (!open.start.isAfter(z)) return open.start;
+            }
+        }
+        return null;
+    }
+
+    public ZonedDateTime nextClosing(Object t) {
+        ZonedDateTime z = normalizeForQuery(t);
+
+        for (int d = 0; d < BUSINESS_DATE_SEARCH_LIMIT_DAYS; d++) {
+            LocalDate date = z.toLocalDate().plusDays(d);
+            for (Interval open : effectiveOpenIntervalsFor(date)) {
+                if (!open.end.isBefore(z)) return open.end;
+            }
+        }
+        return null;
+    }
+
+    public ZonedDateTime previousClosing(Object t) {
+        ZonedDateTime z = normalizeForQuery(t);
+
+        for (int d = 0; d < BUSINESS_DATE_SEARCH_LIMIT_DAYS; d++) {
+            LocalDate date = z.toLocalDate().minusDays(d);
+            List<Interval> opens = effectiveOpenIntervalsFor(date);
+            for (int i = opens.size() - 1; i >= 0; i--) {
+                Interval open = opens.get(i);
+                if (!open.end.isAfter(z)) return open.end;
+            }
+        }
+        return null;
+    }
+
+    public ZonedDateTime openingTime(Object t) {
+        ZonedDateTime z = normalizeForQuery(t);
+        List<Interval> opens = effectiveOpenIntervalsFor(z.toLocalDate());
+        return opens.isEmpty() ? null : opens.get(0).start;
+    }
+
+    public ZonedDateTime closingTime(Object t) {
+        ZonedDateTime z = normalizeForQuery(t);
+        List<Interval> opens = effectiveOpenIntervalsFor(z.toLocalDate());
+        return opens.isEmpty() ? null : opens.get(opens.size() - 1).end;
     }
 
     private ZonedDateTime rewindIfClosed(ZonedDateTime z) {
@@ -475,6 +597,13 @@ public final class BusinessCalendar {
         return null;
     }
 
+    private Interval effectiveOpenIntervalCovering(ZonedDateTime z) {
+        for (Interval i : effectiveOpenIntervalsFor(z.toLocalDate())) {
+            if (!z.isBefore(i.start) && z.isBefore(i.end)) return i;
+        }
+        return null;
+    }
+
     private Interval closedIntervalCovering(ZonedDateTime z) {
         for (Interval i : closedIntervalsFor(z.toLocalDate())) {
             if (!z.isBefore(i.start) && z.isBefore(i.end)) return i;
@@ -528,6 +657,39 @@ public final class BusinessCalendar {
 
     private static boolean overlaps(Interval i, ZonedDateTime start, ZonedDateTime end) {
         return i.start.isBefore(end) && i.end.isAfter(start);
+    }
+
+    private static boolean isBusinessDateUnit(ChronoUnit unit) {
+        return unit == ChronoUnit.YEARS
+                || unit == ChronoUnit.MONTHS
+                || unit == ChronoUnit.WEEKS
+                || unit == ChronoUnit.DAYS;
+    }
+
+    private static ZonedDateTime plusDateUnit(ZonedDateTime z, ChronoUnit unit, int direction) {
+        return switch (unit) {
+            case YEARS -> z.plusYears(direction);
+            case MONTHS -> z.plusMonths(direction);
+            case WEEKS -> z.plusWeeks(direction);
+            case DAYS -> z.plusDays(direction);
+            default -> throw new IllegalArgumentException("Unsupported business date unit: " + unit);
+        };
+    }
+
+    private LocalDate nextBusinessDateOnOrAfter(LocalDate date) {
+        for (int offset = 0; offset <= BUSINESS_DATE_SEARCH_LIMIT_DAYS; offset++) {
+            LocalDate candidate = date.plusDays(offset);
+            if (isBusinessDate(candidate)) return candidate;
+        }
+        return null;
+    }
+
+    private LocalDate previousBusinessDateOnOrBefore(LocalDate date) {
+        for (int offset = 0; offset <= BUSINESS_DATE_SEARCH_LIMIT_DAYS; offset++) {
+            LocalDate candidate = date.minusDays(offset);
+            if (isBusinessDate(candidate)) return candidate;
+        }
+        return null;
     }
 
     private ZonedDateTime normalizeForQuery(Object t) {
@@ -1129,7 +1291,7 @@ public final class BusinessCalendar {
     }
 
     public TemporalValue eval(String spec) {
-        return TemporalValue.dateTime(spec, evalToBusinessTime(spec));
+        return TemporalValue.fromDateTimeEvaluation(spec, BusinessTime.evaluateAny(this, spec));
     }
 
 }

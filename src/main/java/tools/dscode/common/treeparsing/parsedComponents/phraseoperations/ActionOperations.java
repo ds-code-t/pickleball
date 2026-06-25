@@ -4,6 +4,7 @@ import io.cucumber.core.runner.StepExtension;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.NoAlertPresentException;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.remote.RemoteWebDriver;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.browseroperations.WindowSwitch;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
@@ -189,7 +190,8 @@ public enum ActionOperations implements OperationsInterface {
                     new ElementMatcher().mustMatchAtLeastOne(ElementType.TIME_VALUE, ElementType.HTML_ELEMENT)
             );
             ElementMatch waitElementMatch = phraseData.resultElements.getFirst();
-            boolean waitOnPageLoad = !phraseData.skipPageSync();
+            RemoteWebDriver driver = tools.dscode.coredefinitions.BrowserSteps.getCurrentDriverForNonUse();
+            boolean waitOnPageLoad = driver != null && !phraseData.skipPageSync();
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 if (waitElementMatch.elementTypes.contains(ElementType.HTML_ELEMENT)) {
                     if (waitOnPageLoad)
@@ -207,11 +209,10 @@ public enum ActionOperations implements OperationsInterface {
                         waitMilliseconds(3000);
                     }
                 } else {
-                    waitForDuration(delta(waitElementMatch.getValue().asNormalizedText()).toDuration());
+                    waitForDuration(delta(waitElementMatch.getValue().asNormalizedText()).toDuration(), driver);
                 }
                 return true;
             });
-//            phraseData.blurAfterOperation = true;
         }
     },
 

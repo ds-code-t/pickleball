@@ -80,6 +80,7 @@ dependencies {
     api("org.junit.platform:junit-platform-suite-engine:1.13.4")
     api("org.junit.platform:junit-platform-launcher:1.13.4")
     api("org.junit.jupiter:junit-jupiter-api:5.13.4")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.13.4")
 
     api("com.google.guava:guava:33.5.0-jre")
     api("com.fasterxml.jackson.core:jackson-databind:2.20.0")
@@ -144,6 +145,7 @@ tasks.register('ajcMain', JavaExec) {
     description = 'Compile Java + AspectJ (main) with ajc'
 
     def outDir = sourceSets.main.java.destinationDirectory.get().asFile
+    inputs.files(sourceSets.main.java)
     outputs.dir(outDir)
 
     mainClass.set('org.aspectj.tools.ajc.Main')
@@ -616,7 +618,9 @@ tasks.withType(Sign).configureEach {
 
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        includeEngines("junit-jupiter")
+    }
     dependsOn("expandWoven") // expandWoven already dependsOn weaveTargets
 
     // Put woven classes FIRST so they beat the unwoven dependency jars

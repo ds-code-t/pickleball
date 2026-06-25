@@ -165,7 +165,7 @@ public final class DateTimeDeltaParsingUtils {
         };
     }
 
-    private static ChronoUnit normalizeUnit(String raw) {
+    static ChronoUnit normalizeUnit(String raw) {
         String u = raw.toLowerCase(Locale.ROOT).trim();
         return switch (u) {
             case "y", "yr", "yrs", "year", "years" -> ChronoUnit.YEARS;
