@@ -102,7 +102,7 @@ public class NGherkinFactory {
     }
 
     static String getInlineDataTableArgumentText(PickleStep pickleStep) {
-        if (pickleStep == null || !pickleStep.hasInlineArgument() || !"DATATABLE".equals(pickleStep.getInlineArgumentType())) {
+        if (pickleStep == null || !pickleStep.hasInlineArgument() || !"DT".equals(pickleStep.getInlineArgumentType())) {
             return null;
         }
 
