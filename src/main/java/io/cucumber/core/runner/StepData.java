@@ -4,6 +4,7 @@ package io.cucumber.core.runner;
 import io.cucumber.core.stepexpression.ExpressionArgument;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
+import io.cucumber.messages.types.PickleStep;
 import io.cucumber.plugin.event.Result;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.remote.RemoteWebDriver;
@@ -116,6 +117,25 @@ public abstract class StepData extends StepMapping {
         if(dataTable == null && parentStep != null)
             return parentStep.getDataTable();
         return dataTable;
+    }
+
+    public String getInlineArgumentType() {
+        PickleStep pickleStep = getPickleStep();
+        return pickleStep == null ? "" : pickleStep.getInlineArgumentType();
+    }
+
+    public String getInlineArgumentText() {
+        PickleStep pickleStep = getPickleStep();
+        return pickleStep == null ? "" : pickleStep.getInlineArgumentText();
+    }
+
+    public boolean hasInlineArgument() {
+        PickleStep pickleStep = getPickleStep();
+        return pickleStep != null && pickleStep.hasInlineArgument();
+    }
+
+    private PickleStep getPickleStep() {
+        return pickleStepTestStep == null ? null : pickleStepTestStep.getPickleStep();
     }
 
 
