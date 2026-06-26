@@ -75,8 +75,13 @@ public class StepExtension extends StepData {
 
         this.methodName = this.method == null ? "" : this.method.getName();
         this.isDynamicStep = isCoreStep && methodName.startsWith("executeDynamicStep");
+        this.isStepMarker = isCoreStep && methodName.equals("stepMarker");
         this.isCoreConditionalStep = isCoreStep && methodName.equals("runConditional");
 
+        if (isStepMarker) {
+            stepMarkerText = (String) arguments.getFirst().getValue();
+            stepMarkerText = stepMarkerText == null ? "" : stepMarkerText.trim();
+        }
         if (isCoreStep) {
             if (methodName.startsWith("flagStep_")) {
                 this.isFlagStep = true;
@@ -173,7 +178,7 @@ public class StepExtension extends StepData {
 
         if (definitionFlags.contains(DefinitionFlag.BLOCK_CONDITIONAL) || definitionFlags.contains(DefinitionFlag.DEBUG_LOGGING) || definitionFlags.contains(DefinitionFlag._DEBUG_LOGGING))
             stepLogLevel = Level.DEBUG;
-        if(!shouldLog())
+        if (!shouldLog())
             executingPickleStepTestStep.setNoLogging(true);
 
 
@@ -367,10 +372,6 @@ public class StepExtension extends StepData {
         modifiedStep.setStepParsingMap(getStepParsingMap());
         return modifiedStep;
     }
-
-
-
-
 
 
 }

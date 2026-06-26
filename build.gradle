@@ -7,7 +7,7 @@ plugins {
 }
 
 group = 'tools.dscode'
-version = '2.0.59'
+version = '2.0.60'
 
 
 repositories {
@@ -23,6 +23,8 @@ def gherkinVersion = findProperty('gherkinVersion') ?: '35.1.0'
 // List of modules to weave (add more entries here later)
 def toWeave = [
         [group: 'io.cucumber', name: 'cucumber-core', version: cucumberVersion],
+        [group: 'io.cucumber', name: 'cucumber-gherkin', version: cucumberVersion],
+        [group: 'io.cucumber', name: 'cucumber-gherkin-messages', version: cucumberVersion],
         [group: 'io.cucumber', name: 'cucumber-java', version: cucumberVersion],
         [group: 'io.cucumber', name: 'cucumber-plugin', version: cucumberVersion],
         [group: 'io.cucumber', name: 'messages', version: messagesVersion],
@@ -68,6 +70,8 @@ dependencies {
     api("io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}") {
         // Prevent consumers from pulling the UNWOVEN cucumber internals transitively
         exclude group: "io.cucumber", module: "cucumber-core"
+        exclude group: "io.cucumber", module: "cucumber-gherkin"
+        exclude group: "io.cucumber", module: "cucumber-gherkin-messages"
         exclude group: "io.cucumber", module: "cucumber-java"
         exclude group: "io.cucumber", module: "cucumber-plugin"
         exclude group: "io.cucumber", module: "messages"
@@ -406,6 +410,8 @@ publishing {
                         'org.aspectj:aspectjrt',
                         'io.cucumber:cucumber-bom',
                         'io.cucumber:cucumber-core',
+                        'io.cucumber:cucumber-gherkin',
+                        'io.cucumber:cucumber-gherkin-messages',
                         'io.cucumber:cucumber-java',
                         'io.cucumber:cucumber-plugin',
                         'io.cucumber:messages',
@@ -461,6 +467,8 @@ publishing {
                     def exclsNode = engineDep.appendNode('exclusions')
                     [
                             "io.cucumber:cucumber-core",
+                            "io.cucumber:cucumber-gherkin",
+                            "io.cucumber:cucumber-gherkin-messages",
                             "io.cucumber:cucumber-java",
                             "io.cucumber:cucumber-plugin",
                             "io.cucumber:messages",
@@ -630,6 +638,8 @@ tasks.test {
 
 configurations.named("testRuntimeClasspath") {
     exclude group: "io.cucumber", module: "cucumber-core"
+    exclude group: "io.cucumber", module: "cucumber-gherkin"
+    exclude group: "io.cucumber", module: "cucumber-gherkin-messages"
     exclude group: "io.cucumber", module: "cucumber-java"
     exclude group: "io.cucumber", module: "cucumber-plugin"
     exclude group: "io.cucumber", module: "messages"

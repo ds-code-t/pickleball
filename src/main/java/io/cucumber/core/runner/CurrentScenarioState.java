@@ -196,7 +196,8 @@ public class CurrentScenarioState extends ScenarioMapping {
 
 
         rootScenarioStep.setStepParsingMap(getParsingMap());
-        startStep = stepExtensions.stream().filter(s -> s.debugStartStep).findFirst().orElse(null);
+        if (startStep == null)
+            startStep = stepExtensions.stream().filter(s -> s.debugStartStep).findFirst().orElse(null);
         if (startStep != null) {
             rootScenarioStep.childSteps.clear();
             StepExtension currentStep = startStep;
@@ -298,7 +299,7 @@ public class CurrentScenarioState extends ScenarioMapping {
      * 1. stop the scenario root entry,
      * 2. close all converters attached to the scenario root,
      * 3. wait for each converter's scenario cleanup/completion hook.
-     *
+     * <p>
      * The final wait preserves the converter lifecycle contract before later scenario
      * resource cleanup runs. Synchronous converters complete this step immediately.
      */
@@ -341,7 +342,6 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
 
-
     public void runStep(StepExtension stepExtension) {
         if (runAndEndStep != null) {
             runAndEndStep.stepFlags.add(ALWAYS_RUN);
@@ -353,7 +353,7 @@ public class CurrentScenarioState extends ScenarioMapping {
             return;
         currentStep = stepExtension;
 
-        if(currentStep.startTime == null)
+        if (currentStep.startTime == null)
             currentStep.startTime = Instant.now();
         currentStep.runCount++;
 
@@ -484,7 +484,7 @@ public class CurrentScenarioState extends ScenarioMapping {
                         clonedStep.pickleStepTestStep.substituteStep = clonedStep.createNewStepExtension(", ---" + clonedStep.overridePhrase.assertionChain).pickleStepTestStep;
                         waitMilliseconds(400);
 
-                        if(clonedStep.checkGlobalMax()){
+                        if (clonedStep.checkGlobalMax()) {
                             isScenarioHardFail = true;
                             isScenarioComplete = true;
                             return;

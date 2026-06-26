@@ -5,10 +5,12 @@ import tools.dscode.common.reporting.logging.Level;
 
 import java.io.InputStream;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
@@ -56,6 +58,9 @@ public abstract class PickleballRunner {
     private final Map<String, String> readOnlyValues = Collections.unmodifiableMap(values);
 
     private static final String PKB_OPTIONS = PKB_PREFIX + "options";
+    public static final String PKB_CUCUMBER_CLI_ARGS = PKB_PREFIX + "cucumber_cli_args";
+    public static final String PKB_CUCUMBER_CLI_FEATURE_SELECTORS =
+            PKB_PREFIX + "cucumber_cli_feature_selectors";
 
     protected PickleballRunner() {
         debug("Constructing suite subclass: " + getClass().getName());
@@ -116,6 +121,19 @@ public abstract class PickleballRunner {
 
     public static String getOptionsString() {
         return INSTANCE.values.get(PKB_OPTIONS);
+    }
+
+    public synchronized void captureCucumberCliArgs(String[] argv) {
+        String[] args = argv == null ? new String[0] : Arrays.copyOf(argv, argv.length);
+        values.put(PKB_CUCUMBER_CLI_ARGS, formatCliArgs(args));
+
+        CliOptionProjection projection = projectCucumberCliArgs(args);
+        putCliOverride(PKB_TAGS, FILTER_TAGS_PROPERTY_NAME, joinTagExpressions(projection.tags));
+        putCliOverride(PKB_NAME, FILTER_NAME_PROPERTY_NAME, joinNameFilters(projection.names));
+        putCliOverride(PKB_GLUE, GLUE_PROPERTY_NAME, joinCommaSeparated(projection.glue));
+        putCliReference(PKB_CUCUMBER_CLI_FEATURE_SELECTORS, formatCliArgs(projection.features));
+
+        refreshPkbOptions();
     }
 
 
@@ -323,6 +341,151 @@ public abstract class PickleballRunner {
             aliasValue = canonicalValue;
             values.put(aliasKey, aliasValue);
         }
+    }
+
+    private void putCliOverride(String aliasKey, String canonicalKey, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        String trimmed = value.trim();
+        values.put(aliasKey, trimmed);
+        values.put(canonicalKey, trimmed);
+    }
+
+    private void putCliReference(String key, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+        values.put(key, value.trim());
+    }
+
+    private static CliOptionProjection projectCucumberCliArgs(String[] args) {
+        CliOptionProjection projection = new CliOptionProjection();
+        if (args == null || args.length == 0) {
+            return projection;
+        }
+
+        for (int i = 0; i < args.length; i++) {
+            String arg = args[i];
+            if (arg == null) {
+                continue;
+            }
+
+            arg = arg.trim();
+            if (arg.isEmpty()) {
+                continue;
+            }
+
+            switch (arg) {
+                case "--tags", "-t" -> i = addNext(args, i, projection.tags);
+                case "--name", "-n" -> i = addNext(args, i, projection.names);
+                case "--glue", "-g" -> i = addNext(args, i, projection.glue);
+                case "--threads", "--plugin", "-p", "--snippets", "--order", "--count",
+                     "--object-factory", "--uuid-generator", "--i18n" -> i = skipNext(args, i);
+                case "--help", "-h", "--version", "-v", "--publish", "--dry-run", "-d",
+                     "--no-dry-run", "--no-summary", "--monochrome", "-m", "--no-monochrome",
+                     "--wip", "-w" -> {
+                    // Recognized Cucumber CLI flags without a direct pkb_* counterpart.
+                }
+                default -> {
+                    if (!arg.startsWith("-")) {
+                        projection.features.add(arg);
+                    }
+                }
+            }
+        }
+        return projection;
+    }
+
+    private static int addNext(String[] args, int index, List<String> out) {
+        int valueIndex = index + 1;
+        if (valueIndex < args.length) {
+            String value = args[valueIndex];
+            if (value != null && !value.isBlank()) {
+                out.add(value.trim());
+            }
+            return valueIndex;
+        }
+        return index;
+    }
+
+    private static int skipNext(String[] args, int index) {
+        return index + 1 < args.length ? index + 1 : index;
+    }
+
+    private static String joinTagExpressions(List<String> expressions) {
+        if (expressions == null || expressions.isEmpty()) {
+            return null;
+        }
+        if (expressions.size() == 1) {
+            return expressions.getFirst();
+        }
+        return expressions.stream()
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .map(s -> "(" + s + ")")
+                .collect(java.util.stream.Collectors.joining(" and "));
+    }
+
+    private static String joinNameFilters(List<String> names) {
+        if (names == null || names.isEmpty()) {
+            return null;
+        }
+        if (names.size() == 1) {
+            return names.getFirst();
+        }
+        return names.stream()
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .map(s -> "(?:" + s + ")")
+                .collect(java.util.stream.Collectors.joining("|"));
+    }
+
+    private static String joinCommaSeparated(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+        return values.stream()
+                .map(String::trim)
+                .filter(s -> !s.isBlank())
+                .collect(java.util.stream.Collectors.joining(","));
+    }
+
+    private static String formatCliArgs(String[] args) {
+        if (args == null || args.length == 0) {
+            return "";
+        }
+        return Arrays.stream(args)
+                .map(arg -> arg == null ? "" : arg)
+                .map(PickleballRunner::quoteCliArg)
+                .collect(java.util.stream.Collectors.joining(" "));
+    }
+
+    private static String formatCliArgs(List<String> args) {
+        if (args == null || args.isEmpty()) {
+            return "";
+        }
+        return formatCliArgs(args.toArray(new String[0]));
+    }
+
+    private static String quoteCliArg(String arg) {
+        if (arg.isEmpty()) {
+            return "\"\"";
+        }
+        boolean needsQuotes = arg.chars().anyMatch(Character::isWhitespace)
+                || arg.indexOf('"') >= 0
+                || arg.indexOf('\\') >= 0;
+        if (!needsQuotes) {
+            return arg;
+        }
+        return "\"" + arg.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+    }
+
+    private static final class CliOptionProjection {
+        private final List<String> tags = new ArrayList<>();
+        private final List<String> names = new ArrayList<>();
+        private final List<String> glue = new ArrayList<>();
+        private final List<String> features = new ArrayList<>();
     }
 
     private String formatPkbOptions() {

@@ -61,6 +61,7 @@ Feature: nested Feature File
 
 
   Scenario Outline: so test1
+  -EXAMPLES:2
     * , save "<A>"
     * , save "<B>"
     * , save "<A #1>"
@@ -70,6 +71,7 @@ Feature: nested Feature File
     Examples:
       | A | B | A | B |
       | 1 | 2 | 1 | 2 |
+      | 9 | 9 | 9 | 9 |
       | 1 | 2 | 3 | 4 |
 
 

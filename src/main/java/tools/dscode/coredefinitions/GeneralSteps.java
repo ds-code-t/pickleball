@@ -4,6 +4,7 @@ package tools.dscode.coredefinitions;
 import io.cucumber.java.AfterAll;
 import io.cucumber.java.BeforeAll;
 import io.cucumber.java.en.Given;
+import io.cucumber.messages.types.DataTable;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.DefinitionFlags;
@@ -44,6 +45,11 @@ public class GeneralSteps extends CoreSteps {
 
     @Given("^" + SCENARIO_STEP + "\\s*(?:.*)$")
     public static void scenarioStep() {
+
+    }
+
+    @Given("^---(.*)$")
+    public static void stepMarker(String markerText) {
 
     }
 

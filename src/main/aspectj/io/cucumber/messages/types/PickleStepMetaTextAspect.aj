@@ -51,6 +51,10 @@ public privileged aspect PickleStepMetaTextAspect {
                 && inlineArgumentText != null && !inlineArgumentText.isEmpty();
     }
 
+    public List<?> io.cucumber.messages.types.PickleStep.getInlineArgumentAsList() {
+        return InlinePickleArgument.asListOrMaps(getInlineArgumentText());
+    }
+
     /* =========================
      * Pointcut: constructor call to PickleStep
      * PickleStep(PickleStepArgument, List<String>, String, PickleStepType, String)

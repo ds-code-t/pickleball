@@ -34,6 +34,7 @@ public abstract class StepBase implements Cloneable {
     public PhraseData inheritancePhrase;
     public boolean dataArgumentStep = false;
     public boolean isDynamicStep;
+    public boolean isStepMarker;
     public boolean isPreRunFailStep;
     public boolean isCoreConditionalStep;
     public boolean logAndIgnore = false;
@@ -42,6 +43,8 @@ public abstract class StepBase implements Cloneable {
 
     protected boolean runMethodDirectly = false;
     public boolean debugStartStep = false;
+    public boolean startStep = false;
+    public boolean endStep = false;
     //    public LineData inheritedLineData;
     public LineData lineData;
     public io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep;
@@ -72,6 +75,7 @@ public abstract class StepBase implements Cloneable {
     public List<String> bookmarks = new ArrayList<>();
     public Method method;
     public String methodName;
+    public String stepMarkerText;
     public boolean isFlagStep = false;
     public static final String corePackagePath = GeneralSteps.class.getPackageName() + ".";
     public boolean hardFail = false;
