@@ -319,7 +319,7 @@ public class StepExtension extends StepData {
         modifiedStep.setStepParsingMap(getStepParsingMap());
         modifiedStep.parentStep = parentStep;
         modifiedStep.nestingLevel = nestingLevel;
-        modifiedStep.lineData = lineData.clone();
+        modifiedStep.lineData = lineData == null ? null : lineData.clone();
         return modifiedStep;
     }
 

@@ -60,12 +60,34 @@ Feature: nested Feature File
       | %tta          | q  |
 
 
-  Scenario Outline: so test1
+  Scenario Outline: zzso test2
   -EXAMPLES:2
     * , save "<A>"
     * , save "<B>"
+    * , save "<B>"
+    * ---startstep
     * , save "<A #1>"
     * , save "<B #1>"
+    * ---endstep
+    * , save "<A #2>"
+    * , save "<B #2>"
+
+    Examples:
+      | A | B | A | B |
+      | 1 | 2 | 1 | 2 |
+      | 9 | 9 | 9 | 9 |
+      | 1 | 2 | 3 | 4 |
+
+
+  Scenario Outline: zzso test1
+  -EXAMPLES:2
+    * , save "<A>"
+    * , save "<B>"
+  :  * , save "<B>"
+  :: * ---startstep
+  ::: * , save "<A #1>"
+    * , save "<B #1>"
+    * ---endstep
     * , save "<A #2>"
     * , save "<B #2>"
     Examples:

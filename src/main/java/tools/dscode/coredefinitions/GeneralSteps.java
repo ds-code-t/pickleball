@@ -53,6 +53,11 @@ public class GeneralSteps extends CoreSteps {
 
     }
 
+    @Given("___")
+    public static void placeHolder() {
+
+    }
+
 
     @DefinitionFlags(DefinitionFlag.RUN_METHOD_DIRECTLY)
     @Given(ROOT_STEP)
