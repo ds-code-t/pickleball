@@ -8,6 +8,7 @@ public final class PKB_props {
 
     public static final String PKB_GLUE     = PREFIX + "glue";
     public static final String PKB_FEATURES = PREFIX + "features";
+    public static final String PKB_FEATURE_NAME = PREFIX + "featurename";
     public static final String PKB_TAGS     = PREFIX + "tags";
     public static final String PKB_NAME     = PREFIX + "name";
     public static final String PKB_PROFILE  = PREFIX + "profile";
@@ -63,6 +64,15 @@ public final class PKB_props {
     }
     public static void features(String featurePaths) {
         put(PKB_FEATURES, featurePaths);
+    }
+
+    // -- feature name filter --
+    public static String featureName() {
+        return get(PKB_FEATURE_NAME);
+    }
+
+    public static void featureName(String featureName) {
+        put(PKB_FEATURE_NAME, featureName);
     }
 
     // -- tags --

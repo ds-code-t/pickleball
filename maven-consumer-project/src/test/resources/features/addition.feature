@@ -1,5 +1,9 @@
 Feature: Addition
 
+  Scenario: test
+    * , until Step Duration is greater than 5 seconds:
+  : * , save  "A"
+
   Scenario: matching , starting, contains, ending
     * , verify "AAA" matches "A+"
     * , verify "AAA" matches `A+`
@@ -13,17 +17,16 @@ Feature: Addition
     * , verify "abbA" starts with `A`
 
 
-
   Scenario: nesting test B
     * , then save  "A" as "V"
 
     * IF: 1 == 2 THEN: , save "b" as "V"
     * IF: 1 == 1 THEN: , save "A" as "V"
-   * , save "B"
+    * , save "B"
 
   Scenario: nesting test A
 
-  * IF: 1 == 1:
+    * IF: 1 == 1:
   : * , if 1.1 == 1.1 , save "A"
   : * , if 1.1 == 1.11 , save "A"
   : * , if 1.2 == 1.2:

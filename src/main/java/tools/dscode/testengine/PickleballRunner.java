@@ -39,6 +39,7 @@ public abstract class PickleballRunner {
     static final String PKB_LOGLEVEL = PKB_PREFIX + "loglevel";
     static final String PKB_GLUE = PKB_PREFIX + "glue";
     static final String PKB_FEATURES = PKB_PREFIX + "features";
+    static final String PKB_FEATURE_NAME = PKB_PREFIX + "featurename";
     static final String PKB_TAGS = PKB_PREFIX + "tags";
 
     static final String CUCUMBER_GLUE = "cucumber.glue";

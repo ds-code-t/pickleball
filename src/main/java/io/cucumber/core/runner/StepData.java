@@ -159,11 +159,13 @@ public abstract class StepData extends StepMapping {
 
         StepBase lastChild = null;
 
+        boolean isBlockConditionalStep = lineData != null && lineData.isBlockConditionalStep;
+
         for (StepBase child : childSteps) {
 
             child.childSteps.addAll(grandChildrenSteps);
 
-            child.parentStep = this;
+            child.parentStep = isBlockConditionalStep? this.parentStep: this;
             child.nestingLevel = nestingLevel + 1;
 
             child.stepFlags.addAll(stepFlags);
