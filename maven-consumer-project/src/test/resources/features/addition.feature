@@ -1,5 +1,30 @@
 Feature: Addition
 
+
+  Scenario:
+
+  Scenario Outline: calling scenario with dataTable
+    * RUN SCENARIOS
+      | Run Tags | A   | B   | C   |
+      | %dtTest2 | <A> | <B> | <C> |
+
+    Examples:
+      | Scenario | A   | B   |
+      | 1        | aaa | bbb |
+
+
+  Scenario Outline: called with dtp
+    * I have a DataTable
+      | A1  | B2  | C3     |
+      | <A> | <B> | <C>    |
+      | <A> | <B> | <A>debug |
+      | <A> | <B> | <C>    |
+
+    Examples:
+      | Scenario Tags |
+      | %dtTest2      |
+
+
   Scenario: test
     * , until Step Duration is greater than 5 seconds:
   : * , save  "A"

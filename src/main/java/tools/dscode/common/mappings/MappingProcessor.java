@@ -302,41 +302,23 @@ public abstract class MappingProcessor implements Map<String, Object> {
     private static final String TILDE_OPEN_EXPRESSION_BOOKEND = "~<~{";
     private static final String TILDE_CLOSE_EXPRESSION_BOOKEND = "}~>~";
 
-    private static final Pattern ANGLE = Pattern.compile("<(?![\\s=])([^<>{}]*[^\\s<>{}])>");
-    private static final Pattern TILDE_ANGLE = Pattern.compile(
-            Pattern.quote(TILDE_OPEN_BOOKEND)
-                    + "(?![\\s=])([^{}]*?\\S)"
-                    + Pattern.quote(TILDE_CLOSE_BOOKEND));
-
-    private static final Pattern UNRESOLVED_OPTIONAL_ANGLE = Pattern.compile("<\\?[^<>{}]+>");
-    private static final Pattern UNRESOLVED_OPTIONAL_TILDE_ANGLE = Pattern.compile(
-            Pattern.quote(TILDE_OPEN_BOOKEND)
-                    + "\\?[^{}]+?"
-                    + Pattern.quote(TILDE_CLOSE_BOOKEND));
-
     private static final Bookends DEFAULT_BOOKENDS = new Bookends(
             DEFAULT_OPEN_BOOKEND,
             DEFAULT_CLOSE_BOOKEND,
             DEFAULT_OPEN_EXPRESSION_BOOKEND,
-            DEFAULT_CLOSE_EXPRESSION_BOOKEND,
-            ANGLE,
-            UNRESOLVED_OPTIONAL_ANGLE);
+            DEFAULT_CLOSE_EXPRESSION_BOOKEND);
 
     private static final Bookends TILDE_BOOKENDS = new Bookends(
             TILDE_OPEN_BOOKEND,
             TILDE_CLOSE_BOOKEND,
             TILDE_OPEN_EXPRESSION_BOOKEND,
-            TILDE_CLOSE_EXPRESSION_BOOKEND,
-            TILDE_ANGLE,
-            UNRESOLVED_OPTIONAL_TILDE_ANGLE);
+            TILDE_CLOSE_EXPRESSION_BOOKEND);
 
     private record Bookends(
             String open,
             String close,
             String expressionOpen,
-            String expressionClose,
-            Pattern mapPattern,
-            Pattern unresolvedOptionalPattern
+            String expressionClose
     ) {
         String wrap(String key) {
             return open + key + close;
@@ -344,20 +326,51 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     /**
-     * Private-use placeholders used to temporarily collapse expression bookends
-     * into single-character bookends.
-     * <p>
-     * This keeps expression matching separate from normal map syntax like <key>
-     * or ~<~key~>~, and prevents the expression close from being treated as a
-     * map close by the map resolver.
+     * Private-use placeholders used to temporarily collapse active bookends
+     * into one internal syntax.  The resolver logic after this point does not
+     * need to know whether the original input used default or tilde bookends.
      */
-    private static final String OPEN_EXPRESSION_BOOKEND_SUB = "\uE000";
-    private static final String CLOSE_EXPRESSION_BOOKEND_SUB = "\uE001";
-    private static final Pattern EXPRESSION = Pattern.compile(
-            Pattern.quote(OPEN_EXPRESSION_BOOKEND_SUB)
-                    + "([^" + OPEN_EXPRESSION_BOOKEND_SUB + CLOSE_EXPRESSION_BOOKEND_SUB + "]+)"
-                    + Pattern.quote(CLOSE_EXPRESSION_BOOKEND_SUB));
+    private static final String INTERNAL_OPEN_BOOKEND_SUB = "\uE000";
+    private static final String INTERNAL_CLOSE_BOOKEND_SUB = "\uE001";
+    private static final String INTERNAL_MAP_BOOKEND_FLAG = "\uE002";
+    private static final String INTERNAL_EXPRESSION_BOOKEND_FLAG = "\uE003";
 
+    private static final String INTERNAL_MAP_OPEN = INTERNAL_OPEN_BOOKEND_SUB + INTERNAL_MAP_BOOKEND_FLAG;
+    private static final String INTERNAL_MAP_CLOSE = INTERNAL_MAP_BOOKEND_FLAG + INTERNAL_CLOSE_BOOKEND_SUB;
+    private static final String INTERNAL_EXPRESSION_OPEN = INTERNAL_OPEN_BOOKEND_SUB + INTERNAL_EXPRESSION_BOOKEND_FLAG;
+    private static final String INTERNAL_EXPRESSION_CLOSE = INTERNAL_EXPRESSION_BOOKEND_FLAG + INTERNAL_CLOSE_BOOKEND_SUB;
+
+    /*
+     * Important:
+     * Do not use Pattern.MULTILINE here.
+     *
+     * Matcher.find() already searches through the whole input, including multi-line input.
+     * These patterns intentionally exclude \r and \n inside the matched placeholder body,
+     * so a placeholder may be found on any line, but may not span lines.
+     *
+     * The internal flags are also excluded so a single placeholder match cannot contain
+     * another normalized map or expression placeholder.
+     */
+    private static final String INTERNAL_BODY_EXCLUSIONS =
+            "\\r\\n" + INTERNAL_MAP_BOOKEND_FLAG + INTERNAL_EXPRESSION_BOOKEND_FLAG;
+
+    private static final Pattern MAP_PLACEHOLDER = Pattern.compile(
+            Pattern.quote(INTERNAL_MAP_OPEN)
+                    + "([^" + INTERNAL_BODY_EXCLUSIONS + "]+)"
+                    + Pattern.quote(INTERNAL_MAP_CLOSE)
+    );
+
+    private static final Pattern EXPRESSION = Pattern.compile(
+            Pattern.quote(INTERNAL_EXPRESSION_OPEN)
+                    + "([^" + INTERNAL_BODY_EXCLUSIONS + "]+)"
+                    + Pattern.quote(INTERNAL_EXPRESSION_CLOSE)
+    );
+
+    private static final Pattern UNRESOLVED_OPTIONAL_PLACEHOLDER = Pattern.compile(
+            Pattern.quote(INTERNAL_MAP_OPEN)
+                    + "\\?[^" + INTERNAL_BODY_EXCLUSIONS + "]+?"
+                    + Pattern.quote(INTERNAL_MAP_CLOSE)
+    );
 
     public String resolveWholeText(String input) {
         return resolveWholeText(input, usesTildeBookends(input) ? TILDE_BOOKENDS : DEFAULT_BOOKENDS);
@@ -383,12 +396,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     private static boolean usesTildeBookends(String input) {
-        if (input == null) {
-            return false;
-        }
-        int openIndex = input.indexOf(TILDE_OPEN_BOOKEND);
-        return openIndex >= 0
-                && input.indexOf(TILDE_CLOSE_BOOKEND, openIndex + TILDE_OPEN_BOOKEND.length()) >= 0;
+        return input != null && !input.equals(normalizeBookends(input, TILDE_BOOKENDS));
     }
 
     private String resolveAll(String input, QuoteParser parsedObj, Bookends bookends) {
@@ -396,22 +404,22 @@ public abstract class MappingProcessor implements Map<String, Object> {
         try {
             String originalInput;
             do {
-                input = protectExpressionBookends(input, bookends);
+                input = normalizeBookends(input, bookends);
                 originalInput = input;
                 String prev;
                 do {
                     prev = input;
-                    if (input.contains(bookends.open())) {
+                    if (input.contains(INTERNAL_MAP_OPEN)) {
                         input = resolveByMap(input, parsedObj, bookends);
                     }
-                    if (!isDirectoryPath && input.contains(OPEN_EXPRESSION_BOOKEND_SUB)) {
+                    if (!isDirectoryPath && input.contains(INTERNAL_EXPRESSION_OPEN)) {
                         input = resolveExpression(input, parsedObj, bookends);
                     }
-                    input = protectExpressionBookends(input, bookends);
+                    input = normalizeBookends(input, bookends);
                 } while (!input.equals(prev));
-                input = bookends.unresolvedOptionalPattern().matcher(input).replaceAll("");
+                input = UNRESOLVED_OPTIONAL_PLACEHOLDER.matcher(input).replaceAll("");
             } while (!input.equals(originalInput));
-            return restoreExpressionBookends(decodeBackToText(input.replaceAll(MATCH_BREAK, "")), bookends);
+            return restoreBookends(decodeBackToText(input.replaceAll(MATCH_BREAK, "")), bookends);
         } catch (Throwable t) {
             t.printStackTrace();
             throw new RuntimeException("Could not resolve '" + input + "' due to '" + t.getMessage() + "'", t);
@@ -421,7 +429,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
     private String resolveByMap(String s, QuoteParser parsedObj, Bookends bookends) {
         String key = null;
         try {
-            Matcher m = bookends.mapPattern().matcher(s);
+            Matcher m = MAP_PLACEHOLDER.matcher(s);
             StringBuffer sb = new StringBuffer();
             Object replacement = null;
 
@@ -433,7 +441,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     replacement = getRunningStep().resolveStepFromString(key.substring(1));
                     break;
                 }
-                if (key.contains(MATCH_BREAK) || key.contains("&&") || key.contains("||")) {
+                if (key.contains(MATCH_BREAK)) {
+                    continue;
+                }
+                if (key.contains("&&") || key.contains("||")) {
                     replacement = bookends.wrap(key);
                     break;
                 }
@@ -443,10 +454,12 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     break;
                 }
             }
+
             if (replacement == null)
                 return s;
 
             String stringReplacement = getStringValue(replacement);
+
             String wrappedKey = bookends.wrap(key);
 
             if (stringReplacement.contains(bookends.open()) && !key.contains(MATCH_BREAK) && stringReplacement.contains(wrappedKey)) {
@@ -477,16 +490,112 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return sb.toString();
     }
 
-    private static String protectExpressionBookends(String input, Bookends bookends) {
-        return input
-                .replace(bookends.expressionOpen(), OPEN_EXPRESSION_BOOKEND_SUB)
-                .replace(bookends.expressionClose(), CLOSE_EXPRESSION_BOOKEND_SUB);
+    private static String normalizeBookends(String input, Bookends bookends) {
+        if (input == null || input.isEmpty()) {
+            return input;
+        }
+        return normalizeMapBookends(normalizeExpressionBookends(input, bookends), bookends);
     }
 
-    private static String restoreExpressionBookends(String input, Bookends bookends) {
+    private static String normalizeExpressionBookends(String input, Bookends bookends) {
+        return normalizeBalancedBookends(
+                input,
+                bookends.expressionOpen(),
+                bookends.expressionClose(),
+                INTERNAL_EXPRESSION_OPEN,
+                INTERNAL_EXPRESSION_CLOSE,
+                false);
+    }
+
+    private static String normalizeMapBookends(String input, Bookends bookends) {
+        return normalizeBalancedBookends(
+                input,
+                bookends.open(),
+                bookends.close(),
+                INTERNAL_MAP_OPEN,
+                INTERNAL_MAP_CLOSE,
+                true);
+    }
+
+    private static String normalizeBalancedBookends(
+            String input,
+            String open,
+            String close,
+            String internalOpen,
+            String internalClose,
+            boolean mapBookends
+    ) {
+        StringBuilder sb = null;
+        int copyFrom = 0;
+        int searchFrom = 0;
+
+        while (true) {
+            int openIndex = input.indexOf(open, searchFrom);
+            if (openIndex < 0) {
+                break;
+            }
+
+            int bodyStart = openIndex + open.length();
+            int closeIndex = input.indexOf(close, bodyStart);
+            if (closeIndex < 0) {
+                break;
+            }
+
+            String body = input.substring(bodyStart, closeIndex);
+            if (isValidBookendBody(body, open, close, mapBookends)) {
+                if (sb == null) {
+                    sb = new StringBuilder(input.length());
+                }
+                sb.append(input, copyFrom, openIndex)
+                        .append(internalOpen)
+                        .append(body)
+                        .append(internalClose);
+                copyFrom = closeIndex + close.length();
+                searchFrom = copyFrom;
+            } else {
+                searchFrom = bodyStart;
+            }
+        }
+
+        if (sb == null) {
+            return input;
+        }
+        return sb.append(input, copyFrom, input.length()).toString();
+    }
+
+    private static boolean isValidBookendBody(String body, String open, String close, boolean mapBookends) {
+        if (body.isEmpty()
+                || containsLineBreak(body)
+                || body.contains(INTERNAL_MAP_BOOKEND_FLAG)
+                || body.contains(INTERNAL_EXPRESSION_BOOKEND_FLAG)
+                || body.contains(open)
+                || body.contains(close)) {
+            return false;
+        }
+        if (!mapBookends) {
+            return true;
+        }
+        char first = body.charAt(0);
+        char last = body.charAt(body.length() - 1);
+        return first != '='
+                && !Character.isWhitespace(first)
+                && !Character.isWhitespace(last)
+                && body.indexOf('<') < 0
+                && body.indexOf('>') < 0
+                && body.indexOf('{') < 0
+                && body.indexOf('}') < 0;
+    }
+
+    private static boolean containsLineBreak(String value) {
+        return value.indexOf('\r') >= 0 || value.indexOf('\n') >= 0;
+    }
+
+    private static String restoreBookends(String input, Bookends bookends) {
         return input
-                .replace(OPEN_EXPRESSION_BOOKEND_SUB, bookends.expressionOpen())
-                .replace(CLOSE_EXPRESSION_BOOKEND_SUB, bookends.expressionClose());
+                .replace(INTERNAL_MAP_OPEN, bookends.open())
+                .replace(INTERNAL_MAP_CLOSE, bookends.close())
+                .replace(INTERNAL_EXPRESSION_OPEN, bookends.expressionOpen())
+                .replace(INTERNAL_EXPRESSION_CLOSE, bookends.expressionClose());
     }
 
 

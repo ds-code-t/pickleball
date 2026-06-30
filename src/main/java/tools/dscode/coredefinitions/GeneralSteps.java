@@ -1,10 +1,12 @@
 package tools.dscode.coredefinitions;
 
 
+import com.fasterxml.jackson.databind.JsonNode;
+import io.cucumber.datatable.DataTable;
 import io.cucumber.java.AfterAll;
 import io.cucumber.java.BeforeAll;
 import io.cucumber.java.en.Given;
-import io.cucumber.messages.types.DataTable;
+//import io.cucumber.messages.types.DataTable;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.annotations.DefinitionFlags;
@@ -42,6 +44,45 @@ public class GeneralSteps extends CoreSteps {
             throw new RuntimeException(e);
         }
     }
+
+
+    @Given("^ARG:(.*)$")
+    public static void getArgValue(String stepAddress) {
+
+    }
+
+
+    @Given("^DATA\\.[A-Z]+$")
+    public static DataTable datatableStep(DataTable dataTable) {
+        return dataTable;
+    }
+
+    @Given("^DATA\\.TEXT$")
+    public static String dateTextStep(String text) {
+        return text;
+    }
+
+    @Given("^DATA$")
+    public static JsonNode dataStep(JsonNode jsonNode) {
+        return jsonNode;
+    }
+
+    @Given("^DATA\\.TABLE$")
+    public static DataTable dataTableStep(DataTable dataTable) {
+        return dataTable;
+    }
+
+    @Given("^DATA\\.(LISTS?|MAPS?)$")
+    public static Object dataStep(String dataType, io.cucumber.datatable.DataTable dataTable) {
+        return switch (dataType) {
+            case "LIST" -> dataTable.asLists(String.class).getFirst();
+            case "LISTS" -> dataTable.asLists(String.class);
+            case "MAP" -> dataTable.asMaps(String.class, String.class).getFirst();
+            case "MAPS" -> dataTable.asMaps(String.class, String.class);
+            default -> throw new IllegalArgumentException("Unsupported data type: " + dataType);
+        };
+    }
+
 
     @Given("^" + SCENARIO_STEP + "\\s*(?:.*)$")
     public static void scenarioStep() {

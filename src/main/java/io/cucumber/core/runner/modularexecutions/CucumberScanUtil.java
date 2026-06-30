@@ -39,6 +39,7 @@ public final class CucumberScanUtil {
      * CucumberPropertiesParser, then applied directly to parsed Feature objects.
      */
     public static final String PKB_FILTER_FEATURE_NAME = "pkb_featurename";
+    public static final String FEATURE_SCENARIO_SELECTOR_DELIMITER = "/";
 
     // Cache parsed Features keyed by normalized, sorted feature-URI list
     private static final ConcurrentHashMap<String, List<Feature>> FEATURE_CACHE = new ConcurrentHashMap<>();
@@ -137,23 +138,65 @@ public final class CucumberScanUtil {
     }
 
     /**
-     * Finds exactly one Pickle by literal Gherkin feature name and literal scenario name.
+     * Finds exactly one Pickle by optional literal Gherkin feature name and literal scenario name.
      *
-     * The featureName is the text after "Feature:".
+     * The featureName is the text after "Feature:". If featureName is null or blank,
+     * it is ignored and only the scenarioName filter is used.
+     *
      * The scenarioName is the text after "Scenario:" or "Scenario Outline:".
      */
     public static Pickle getPickleByFeatureAndScenarioName(String featureName, String scenarioName) {
-        Objects.requireNonNull(featureName, "featureName");
         Objects.requireNonNull(scenarioName, "scenarioName");
 
-        Map<String, String> props = new HashMap<>();
-        props.put(PKB_FILTER_FEATURE_NAME, featureName);
-        props.put("cucumber.filter.name", exactNameRegex(scenarioName));
+        if (scenarioName.isBlank()) {
+            throw new IllegalArgumentException("scenarioName must not be blank");
+        }
 
-        return requireSinglePickle(
-                listPickles(props),
-                "feature name [%s] and scenario name [%s]".formatted(featureName, scenarioName)
-        );
+        Map<String, String> props = new HashMap<>();
+
+        String trimmedFeatureName = trimToNull(featureName);
+        if (trimmedFeatureName != null) {
+            props.put(PKB_FILTER_FEATURE_NAME, trimmedFeatureName);
+        }
+
+        props.put("cucumber.filter.name", exactNameRegex(scenarioName.trim()));
+
+        String selectionDescription = trimmedFeatureName == null
+                ? "scenario name [%s]".formatted(scenarioName.trim())
+                : "feature name [%s] and scenario name [%s]".formatted(trimmedFeatureName, scenarioName.trim());
+
+        return requireSinglePickle(listPickles(props), selectionDescription);
+    }
+
+    /**
+     * Finds exactly one Pickle from a single readable selector string.
+     *
+     * Supported formats:
+     * - "Scenario name"
+     * - "Feature name :: Scenario name"
+     *
+     * The delimiter is intentionally a Pickleball convention, not a native
+     * Cucumber selector syntax.
+     */
+    public static Pickle getPickleByFeatureAndScenarioName(String selector) {
+        Objects.requireNonNull(selector, "selector");
+
+        String trimmedSelector = selector.trim();
+        if (trimmedSelector.isBlank()) {
+            throw new IllegalArgumentException("selector must not be blank");
+        }
+
+        int delimiterIndex = trimmedSelector.indexOf(FEATURE_SCENARIO_SELECTOR_DELIMITER);
+        if (delimiterIndex < 0) {
+            return getPickleByFeatureAndScenarioName(null, trimmedSelector);
+        }
+
+        String featureName = trimmedSelector.substring(0, delimiterIndex).trim();
+        String scenarioName = trimmedSelector.substring(
+                delimiterIndex + FEATURE_SCENARIO_SELECTOR_DELIMITER.length()
+        ).trim();
+
+        return getPickleByFeatureAndScenarioName(featureName, scenarioName);
     }
 
     /**
@@ -166,12 +209,17 @@ public final class CucumberScanUtil {
     public static Pickle getPickleByScenarioName(String scenarioName) {
         Objects.requireNonNull(scenarioName, "scenarioName");
 
+        String trimmedScenarioName = scenarioName.trim();
+        if (trimmedScenarioName.isBlank()) {
+            throw new IllegalArgumentException("scenarioName must not be blank");
+        }
+
         Map<String, String> props = new HashMap<>();
-        props.put("cucumber.filter.name", exactNameRegex(scenarioName));
+        props.put("cucumber.filter.name", exactNameRegex(trimmedScenarioName));
 
         return requireSinglePickle(
                 listPickles(props),
-                "scenario name [%s]".formatted(scenarioName)
+                "scenario name [%s]".formatted(trimmedScenarioName)
         );
     }
 
