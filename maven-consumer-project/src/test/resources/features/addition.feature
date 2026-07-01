@@ -1,24 +1,36 @@
-Feature: Addition
+Feature: Additionz
 
 
-  Scenario:
+  Scenario: ssf
+    * , in the "<$RETURN:Additionz.ee2.DATA-TABLE>" Data Table,  for every Data Table Row:
+  : * print <Aq>
+#    * ,  save "<$DATA-TABLE>"
+#    * ,  save "<$RETURN:Additionz.ee2.DATA-TABLE>"
 
-  Scenario Outline: calling scenario with dataTable
-    * RUN SCENARIOS
-      | Run Tags | A   | B   | C   |
-      | %dtTest2 | <A> | <B> | <C> |
+
+
+  Scenario Outline: ee<Scenario>
+    * DATA-TABLE
+      | qq | Aq  | Bq  |
+      | 1  | aaa<A> | bbb<B> |
+      | 2  | xxx<A> | yyy<B> |
+#
+#    * RUN SCENARIOS
+#      | Run Tags | A   | B   | C   |
+#      | %dtTest2 | <A> | <B> | <C> |
 
     Examples:
       | Scenario | A   | B   |
-      | 1        | aaa | bbb |
+      | 1        | 11 | 222 |
+      | 2        | 77 | 88 |
 
 
   Scenario Outline: called with dtp
     * I have a DataTable
-      | A1  | B2  | C3     |
-      | <A> | <B> | <C>    |
+      | A1  | B2  | C3       |
+      | <A> | <B> | <C>      |
       | <A> | <B> | <A>debug |
-      | <A> | <B> | <C>    |
+      | <A> | <B> | <C>      |
 
     Examples:
       | Scenario Tags |

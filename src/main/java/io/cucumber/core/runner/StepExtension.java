@@ -14,6 +14,7 @@ import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.reporting.logging.Level;
+import tools.dscode.coredefinitions.GeneralSteps;
 
 import java.lang.reflect.InvocationTargetException;
 import java.time.Duration;
@@ -125,6 +126,7 @@ public class StepExtension extends StepData {
             dataContextStepNodeMap.put(TABLE_KEY, toRowsStringMultimap(dataTable));
         }
     }
+
 
     public Object runAndGetReturnValue() {
         Object instanceOrNull = null;
@@ -342,15 +344,18 @@ public class StepExtension extends StepData {
 
 
     public PickleStepTestStep resolveAndClone(ParsingMap parsingMap) {
-        PickleStepTestStep clonePickleStepTestStep;
+        String errorMessage;
         try {
-            clonePickleStepTestStep = resolvePickleStepTestStep(pickleStepTestStep, parsingMap);
+            return resolvePickleStepTestStep(pickleStepTestStep, parsingMap);
         } catch (Exception e) {
-            clonePickleStepTestStep = getCustomStep(HARD_ERROR_STEP + e.getMessage()).pickleStepTestStep;
-            return clonePickleStepTestStep;
+            try {
+                errorMessage = GeneralSteps.registerStepThrowable(new RuntimeException("Step: '"+ pickleStepTestStep.getStepText() + "' failed",e));
+            }
+            catch (Exception e1) {
+                errorMessage = GeneralSteps.registerStepThrowable(e);
+            }
+            return getCustomStep(HARD_ERROR_STEP + errorMessage).pickleStepTestStep;
         }
-
-        return clonePickleStepTestStep;
     }
 
     public PickleStepTestStep resolveAndClone(ParsingMap parsingMap, String newText) {

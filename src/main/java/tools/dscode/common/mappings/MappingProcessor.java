@@ -55,6 +55,7 @@ import static tools.dscode.common.util.StringUtilities.decodeBackToText;
 import static tools.dscode.common.util.StringUtilities.encodeToPlaceHolders;
 
 import static tools.dscode.common.variables.RunVars.resolveFromVars;
+import static tools.dscode.coredefinitions.GeneralSteps.getReturnValue;
 import static tools.dscode.testengine.PickleballRunner.PKB_PREFIX;
 
 public abstract class MappingProcessor implements Map<String, Object> {
@@ -436,6 +437,12 @@ public abstract class MappingProcessor implements Map<String, Object> {
             while (m.find()) {
                 key = m.group(1);
 
+                if (key.startsWith("&")) {
+                    key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
+                    replacement = getReturnValue(key.substring(1));
+                    break;
+
+                }
                 if (key.startsWith("$")) {
                     key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
                     replacement = getRunningStep().resolveStepFromString(key.substring(1));

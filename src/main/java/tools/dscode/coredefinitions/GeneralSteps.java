@@ -17,10 +17,14 @@ import tools.dscode.common.exceptions.SoftRuntimeException;
 import tools.dscode.common.reporting.logging.reportportal.ReportPortalBridge;
 
 import java.lang.reflect.Method;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.GlobalState.pickleballLog;
+import static io.cucumber.core.runner.modularexecutions.CucumberScanUtil.getStepReturn;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.GlobalConstants.INFO_STEP;
 import static tools.dscode.common.GlobalConstants.NEXT_SIBLING_STEP;
@@ -32,6 +36,47 @@ import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 
 
 public class GeneralSteps extends CoreSteps {
+
+    private static final AtomicInteger REGISTERED_THROWABLE_ID = new AtomicInteger();
+    private static final ConcurrentMap<Integer, Throwable> REGISTERED_THROWABLES = new ConcurrentHashMap<>();
+
+    public static String registerStepThrowable(Throwable throwable) {
+        if (throwable == null) {
+            throw new IllegalArgumentException("Throwable cannot be null");
+        }
+
+        int id = REGISTERED_THROWABLE_ID.incrementAndGet();
+        REGISTERED_THROWABLES.put(id, throwable);
+
+        String message = throwable.getMessage();
+        if (message == null || message.isBlank()) {
+            message = throwable.getClass().getName();
+        }
+
+        message = message.replace("\r", " ").replace("\n", " ").trim();
+
+        return id + " " + message;
+    }
+
+    private static Throwable removeRegisteredThrowable(String message) {
+        if (message == null || message.isBlank()) {
+            return null;
+        }
+
+        String trimmed = message.trim();
+        int firstSpace = trimmed.indexOf(' ');
+
+        String idText = firstSpace < 0 ? trimmed : trimmed.substring(0, firstSpace);
+
+        try {
+            int id = Integer.parseInt(idText);
+            return REGISTERED_THROWABLES.remove(id);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+
 
     public static Method rootStepMethod;
     public static Method scenarioStepMethod;
@@ -46,18 +91,14 @@ public class GeneralSteps extends CoreSteps {
     }
 
 
-    @Given("^ARG:(.*)$")
-    public static void getArgValue(String stepAddress) {
-
+    @Given("^RETURN:(.*)$")
+    public static Object getReturnValue(String stepAddress) {
+        return getStepReturn(stepAddress);
     }
 
 
-    @Given("^DATA\\.[A-Z]+$")
-    public static DataTable datatableStep(DataTable dataTable) {
-        return dataTable;
-    }
 
-    @Given("^DATA\\.TEXT$")
+    @Given("^DATA-TEXT$")
     public static String dateTextStep(String text) {
         return text;
     }
@@ -67,7 +108,7 @@ public class GeneralSteps extends CoreSteps {
         return jsonNode;
     }
 
-    @Given("^DATA\\.TABLE$")
+    @Given("^DATA-TABLE$")
     public static DataTable dataTableStep(DataTable dataTable) {
         return dataTable;
     }
@@ -176,16 +217,43 @@ public class GeneralSteps extends CoreSteps {
     public static void infoStep(String message) {
         logInfo(message);
     }
-
     @Given("^" + HARD_ERROR_STEP + "(.*)$")
     public static void hardFailStep(String message) {
-        throw new RuntimeException(message);
+        Throwable throwable = removeRegisteredThrowable(message);
+
+        if (throwable == null) {
+            throw new RuntimeException(message);
+        }
+
+        if (throwable instanceof RuntimeException runtimeException) {
+            throw runtimeException;
+        }
+
+        if (throwable instanceof Error error) {
+            throw error;
+        }
+
+        throw new RuntimeException(throwable.getMessage(), throwable);
     }
 
     @Given("^" + SOFT_ERROR_STEP + "(.*)$")
     public static void softFailStep(String message) {
-        throw new SoftRuntimeException(message);
+        Throwable throwable = removeRegisteredThrowable(message);
+
+        if (throwable == null) {
+            throw new SoftRuntimeException(message);
+        }
+
+        String throwableMessage = throwable.getMessage();
+        if (throwableMessage == null || throwableMessage.isBlank()) {
+            throwableMessage = message;
+        }
+
+        SoftRuntimeException softException = new SoftRuntimeException(throwableMessage);
+        softException.initCause(throwable);
+        throw softException;
     }
+
 
     @Given("^SKIPPING: (.*)$")
     public static void skippedStep(String message) {

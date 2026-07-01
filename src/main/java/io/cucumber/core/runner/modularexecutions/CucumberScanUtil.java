@@ -7,6 +7,8 @@ import io.cucumber.core.gherkin.Feature;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.options.CucumberPropertiesParser;
 import io.cucumber.core.options.RuntimeOptions;
+import io.cucumber.core.runner.ScenarioStep;
+import io.cucumber.core.runner.StepExtension;
 import io.cucumber.core.runtime.FeaturePathFeatureSupplier;
 
 import java.io.IOException;
@@ -27,19 +29,20 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static io.cucumber.core.runner.ScenarioStep.createScenarioStep;
 import static io.cucumber.core.runner.modularexecutions.FilePathResolver.findFileDirectoryPaths;
+import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.testengine.DynamicSuiteConfigUtils.getFeaturePaths;
 
 public final class CucumberScanUtil {
 
     /**
      * Custom, non-standard CucumberScanUtil option.
-     *
+     * <p>
      * This is intentionally removed from the properties before passing them to
      * CucumberPropertiesParser, then applied directly to parsed Feature objects.
      */
     public static final String PKB_FILTER_FEATURE_NAME = "pkb_featurename";
-    public static final String FEATURE_SCENARIO_SELECTOR_DELIMITER = "/";
 
     // Cache parsed Features keyed by normalized, sorted feature-URI list
     private static final ConcurrentHashMap<String, List<Feature>> FEATURE_CACHE = new ConcurrentHashMap<>();
@@ -85,14 +88,14 @@ public final class CucumberScanUtil {
 
     /**
      * List matching scenarios (Pickles) for the given cucumber.* properties.
-     *
+     * <p>
      * Important keys you may pass:
      * - cucumber.features (comma-separated URIs; file: or classpath:)
      * - pkb_featurename (custom literal Feature: name filter)
      * - cucumber.filter.tags (tag expression)
      * - cucumber.filter.name (regex)
      * - others are passed through; glue is not required for listing
-     *
+     * <p>
      * The custom pkb_featurename option is applied first at the
      * parsed Feature level, before Cucumber's Pickle filters are applied.
      */
@@ -139,10 +142,10 @@ public final class CucumberScanUtil {
 
     /**
      * Finds exactly one Pickle by optional literal Gherkin feature name and literal scenario name.
-     *
+     * <p>
      * The featureName is the text after "Feature:". If featureName is null or blank,
      * it is ignored and only the scenarioName filter is used.
-     *
+     * <p>
      * The scenarioName is the text after "Scenario:" or "Scenario Outline:".
      */
     public static Pickle getPickleByFeatureAndScenarioName(String featureName, String scenarioName) {
@@ -168,42 +171,12 @@ public final class CucumberScanUtil {
         return requireSinglePickle(listPickles(props), selectionDescription);
     }
 
-    /**
-     * Finds exactly one Pickle from a single readable selector string.
-     *
-     * Supported formats:
-     * - "Scenario name"
-     * - "Feature name :: Scenario name"
-     *
-     * The delimiter is intentionally a Pickleball convention, not a native
-     * Cucumber selector syntax.
-     */
-    public static Pickle getPickleByFeatureAndScenarioName(String selector) {
-        Objects.requireNonNull(selector, "selector");
-
-        String trimmedSelector = selector.trim();
-        if (trimmedSelector.isBlank()) {
-            throw new IllegalArgumentException("selector must not be blank");
-        }
-
-        int delimiterIndex = trimmedSelector.indexOf(FEATURE_SCENARIO_SELECTOR_DELIMITER);
-        if (delimiterIndex < 0) {
-            return getPickleByFeatureAndScenarioName(null, trimmedSelector);
-        }
-
-        String featureName = trimmedSelector.substring(0, delimiterIndex).trim();
-        String scenarioName = trimmedSelector.substring(
-                delimiterIndex + FEATURE_SCENARIO_SELECTOR_DELIMITER.length()
-        ).trim();
-
-        return getPickleByFeatureAndScenarioName(featureName, scenarioName);
-    }
 
     /**
      * Finds exactly one Pickle by literal scenario name.
-     *
+     * <p>
      * The scenarioName is the text after "Scenario:" or "Scenario Outline:".
-     *
+     * <p>
      * This searches across all resolved feature files/directories.
      */
     public static Pickle getPickleByScenarioName(String scenarioName) {
@@ -326,5 +299,35 @@ public final class CucumberScanUtil {
 
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    public static Object getStepReturn(String stepAddress) {
+        List<String> segments = Arrays.stream(stepAddress.split("\\.")).toList();
+        try {
+            Pickle gherkinMessagesPickle = getPickleByFeatureAndScenarioName(segments.get(0), segments.get(1));
+
+            String stepText = segments.get(2);
+            gherkinMessagesPickle.getSteps().removeIf(step -> !stepText.equals(step.getText()));
+            if (gherkinMessagesPickle.getSteps().isEmpty())
+                throw new IllegalArgumentException("Step not found: " + stepText);
+            if (gherkinMessagesPickle.getSteps().size() > 1)
+                throw new IllegalArgumentException("Multiple steps found with the same text: " + stepText);
+
+            io.cucumber.messages.types.Pickle pickle = (io.cucumber.messages.types.Pickle) getProperty(gherkinMessagesPickle, "pickle");
+            ScenarioStep currentScenarioNameStep = createScenarioStep(gherkinMessagesPickle);
+            StepExtension stepExtension = (StepExtension) currentScenarioNameStep.childSteps.getFirst();
+            if (pickle.getValueRow() != null && !pickle.getValueRow().isEmpty()) {
+                stepExtension.getDefaultStepNodeMap().merge(pickle.getHeaderRow(), pickle.getValueRow());
+                stepExtension.getStepParsingMap().addMaps(stepExtension.getDefaultStepNodeMap());
+            }
+            StepExtension newStep = new StepExtension(stepExtension.testCase, stepExtension.resolveAndClone(stepExtension.getStepParsingMap()));
+            if (pickle.getValueRow() != null && !pickle.getValueRow().isEmpty()) {
+                newStep.getDefaultStepNodeMap().merge(pickle.getHeaderRow(), pickle.getValueRow());
+                newStep.getStepParsingMap().addMaps(newStep.getDefaultStepNodeMap());
+            }
+            return newStep.runAndGetReturnValue();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }
