@@ -47,6 +47,7 @@ public abstract class StepMapping extends StepBase {
 
 
     public void copyParsingMap(ParsingMap inputParsingMap) {
+        if(inputParsingMap == this.stepParsingMap || inputParsingMap.getMaps() == this.stepParsingMap.maps) return;
         this.stepParsingMap.removeMaps(MapConfigurations.MapType.STEP_MAP, MapConfigurations.MapType.PHRASE_MAP);
         if (this instanceof ScenarioStep) {
             this.stepParsingMap.maps.putAll(Multimaps.filterKeys(inputParsingMap.getMaps(), includeStepMaps::contains));

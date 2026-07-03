@@ -155,7 +155,12 @@ public class ElementMatch {
         this.elementPosition = elementNode.getStringFromLocalState("elementPosition");
         this.selectionType = elementNode.getStringFromLocalState("selectionType");
         this.valueTypes = Arrays.stream(elementNode.getStringFromLocalState("valueTypes").split("\\s+")).sorted(Comparator.reverseOrder()).toList();
-
+        this.valueTypes.forEach(v -> {
+            if(v.endsWith("-attribute"))
+            {
+                defaultValueKeys.addFirst("attributes." + v.replaceFirst("-attribute$", ""));
+            }
+        });
 
         if (elementNode.localStateBoolean("text")) {
             textOps.add(new TextOp(elementNode.getValueWrapper("text"), ExecutionDictionary.Op.EQUALS));
@@ -339,6 +344,8 @@ public class ElementMatch {
         this.valueTypes = elementMatch.valueTypes == null
                 ? Collections.emptyList()
                 : elementMatch.valueTypes.stream().sorted(Comparator.reverseOrder()).toList();
+        this.defaultValueKeys.clear();
+        this.defaultValueKeys.addAll(elementMatch.defaultValueKeys);
 
         this.textOps.addAll(elementMatch.textOps);
 

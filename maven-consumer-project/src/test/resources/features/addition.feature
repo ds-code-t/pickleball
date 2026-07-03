@@ -1,10 +1,21 @@
 Feature: Additionz
 
 
+  Scenario:ss
+#    * , click 2nd "Bananas" Checkbox
+#    * , click 2nd "Bananas" Checkbox
+#    * , save "Bananas" Checkbox
+#    * , save 2nd "Bananas" Checkbox
+#    * , save "Strawberries" Checkbox
+#    * , save 2nd "Strawberries" Checkbox
+    * , save ddd-attribute of "Bananas" Checkbox
+    * , save ddd-attribute of 2nd "Bananas" Checkbox
+
   Scenario: ssf
-    * , in the "<$RETURN:Additionz.ee2.DATA-TABLE>" Data Table,  for every Data Table Row:
-  : * print <Aq>
+#    * , in the "<$RETURN:Additionz.ee2.DATA-TABLE>" Data Table,  for every Data Table Row:
+#  : * print <Aq>
 #    * ,  save "<$DATA-TABLE>"
+    * ,  save "<&Additionz.ee2.DATA-TABLE>"
 #    * ,  save "<$RETURN:Additionz.ee2.DATA-TABLE>"
 
 

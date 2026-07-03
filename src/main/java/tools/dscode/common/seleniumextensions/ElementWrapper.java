@@ -14,6 +14,8 @@ import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForElementReady;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.intersection;
+import static tools.dscode.common.domoperations.SeleniumUtils.safeDomAttribute;
+import static tools.dscode.common.domoperations.SeleniumUtils.safeDomProperty;
 import static tools.dscode.common.domoperations.SeleniumUtils.union;
 import static tools.dscode.common.domoperations.elementstates.BinaryStateConditions.isCheckedSelectedOrOn;
 import static tools.dscode.common.domoperations.elementstates.CollapsedExpandedConditions.isCollapsedState;
@@ -37,6 +39,13 @@ public class ElementWrapper {
     public final ElementMatch elementMatch;
     public final Integer matchIndex;
 
+    private static final Set<String> DOM_PROPERTY_FALLBACK_KEYS = Set.of(
+            "innerHTML",
+            "outerHTML",
+            "innerText",
+            "outerText",
+            "textContent"
+    );
 
     public static List<ElementWrapper> getWrappedElements(ElementMatch elementMatch) {
         if (elementMatch.parentPhrase.contextElement != null)
@@ -90,7 +99,7 @@ public class ElementWrapper {
         // textContent (DOM text, not just visible text)
         String textContent;
         if ("textarea".equals(tagName) || "input".equals(tagName)) {
-            textContent = element.getAttribute("value");
+            textContent = safeDomAttribute(element, "value");
         } else if ("select".equals(tagName)) {
             textContent = (String) js.executeScript(
                     "var sel = arguments[0]; return sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';", element
@@ -100,7 +109,7 @@ public class ElementWrapper {
                     "return arguments[0].innerText;", element
             );
             if (textContent == null || textContent.isEmpty()) {
-                textContent = element.getAttribute("value");
+                textContent = safeDomAttribute(element, "value");
             }
         }
         attributeSnapshot.put("textContent", textContent == null ? "" : textContent);
@@ -109,7 +118,8 @@ public class ElementWrapper {
         String childValue = "";
         if (!children.isEmpty()) {
             for (WebElement child : children) {
-                String temp = child.getAttribute("value");
+                String temp = safeDomAttribute(child, "value");
+
                 childValue += temp == null ? child.getText() : temp;
             }
             attributeSnapshot.put("childValue", childValue);
@@ -202,10 +212,9 @@ public class ElementWrapper {
         }
         for (String key : elementMatch.defaultValueKeys) {
             ObjectNode node;
-
-            if (key.startsWith("attributes")) {
+            if (key.startsWith("attributes.")) {
                 node = (ObjectNode) attributeSnapshot.get("attributes");
-                key = key.substring("attributes".length() + 1);
+                key = key.substring("attributes.".length());
             } else {
                 node = attributeSnapshot;
             }
@@ -213,6 +222,13 @@ public class ElementWrapper {
                 String returnVal = node.get(key).asText();
                 attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
                 return createValueWrapper(returnVal);
+            } else if (DOM_PROPERTY_FALLBACK_KEYS.contains(key)) {
+                String returnVal = safeDomProperty(getElement(), key);
+                if (returnVal != null) {
+                    node.put(key, returnVal);
+                    attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
+                    return createValueWrapper(returnVal);
+                }
             }
         }
         attributeSnapshot.put(ELEMENT_RETURN_VALUE, "");
@@ -625,7 +641,7 @@ public class ElementWrapper {
 
     private static String getAttrOrEmpty(WebElement el, String name) {
         try {
-            String v = el.getAttribute(name);
+            String v = safeDomAttribute(el, name);
             return v == null ? "" : v;
         } catch (WebDriverException e) {
             return "";

@@ -221,13 +221,12 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode valueTypes = new ParseNode("(?<valueTypes>\\s(?:(?:and\\s+)?[a-z-]+\\s+of\\s+)+)(?<element><<elementMatch>>)") {
+        ParseNode valueTypes = new ParseNode("(?<valueTypes>\\s(?:(?:and\\s+)?\\b[a-z-]+\\s+of\\s+)+)(?<element><<elementMatch>>)") {
             @Override
             public String onSubstitute(MatchNode self) {
                 String valueTypes = self.resolvedGroupText("valueTypes").replaceAll("\\b(?:and|of)\\b", "").trim();
                 String elementToken = self.groups().get("element");
                 MatchNode elementMatchNode = self.getMatchNode(elementToken);
-
                 elementMatchNode.putToLocalState("valueTypes", valueTypes);
 
                 return " " + self.groups().get("element") + " ";

@@ -255,5 +255,28 @@ public class SeleniumUtils {
                 .collect(Collectors.toList());
     }
 
+
+    public static String safeDomAttribute(WebElement element, String name) {
+        try {
+            return element.getDomAttribute(name);
+        } catch (WebDriverException e) {
+            return null;
+        }
+    }
+
+    public static String safeDomProperty(WebElement element, String name) {
+        try {
+            return element.getDomProperty(name);
+        } catch (WebDriverException e) {
+            return null;
+        }
+    }
+
+    public static String safeDomAttributeOrProperty(WebElement element, String name) {
+        String value = safeDomAttribute(element, name);
+        return value != null ? value : safeDomProperty(element, name);
+    }
+
+
 }
 
