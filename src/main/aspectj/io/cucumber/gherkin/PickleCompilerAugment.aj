@@ -2,7 +2,6 @@ package io.cucumber.gherkin;
 
 import io.cucumber.messages.types.Location;
 import io.cucumber.messages.types.Pickle;
-import io.cucumber.messages.types.Scenario;
 import io.cucumber.messages.types.TableCell;
 import io.cucumber.messages.types.TableRow;
 import io.cucumber.messages.types.Tag;
@@ -21,7 +20,6 @@ public aspect PickleCompilerAugment {
     /* (1) Introduced metadata on Pickle */
     private transient List<String> io.cucumber.messages.types.Pickle.headerRow;
     private transient List<String> io.cucumber.messages.types.Pickle.valueRow;
-    private transient String io.cucumber.messages.types.Pickle.description;
 
     public List<String> io.cucumber.messages.types.Pickle.getHeaderRow() {
         return (this.headerRow == null) ? List.of() : this.headerRow;
@@ -34,37 +32,13 @@ public aspect PickleCompilerAugment {
         this.valueRow = (vals == null || vals.isEmpty()) ? List.of() : List.copyOf(vals);
     }
 
-    public String io.cucumber.messages.types.Pickle.getDescription() {
-        return (this.description == null) ? "" : this.description;
-    }
-    public void io.cucumber.messages.types.Pickle.setDescription(String description) {
-        this.description = (description == null) ? "" : description;
-    }
-
     /* (2) Per-thread context for Examples row: [hdr, vals, loc] */
     private static final ThreadLocal<Deque<Object[]>> CTX =
             ThreadLocal.withInitial(ArrayDeque::new);
 
-    private static final ThreadLocal<Deque<String>> DESCRIPTION_CTX =
-            ThreadLocal.withInitial(ArrayDeque::new);
-
     /* (3) Pointcuts */
-    pointcut executeCompileScenario(Scenario scenario):
-            execution(* io.cucumber.gherkin.PickleCompiler.compileScenario(..))
-                    && args(java.util.List, scenario, ..);
-
-    pointcut executeCompileScenarioOutline(Scenario scenario):
-            execution(* io.cucumber.gherkin.PickleCompiler.compileScenarioOutline(..))
-                    && args(java.util.List, scenario, ..);
-
-    pointcut withinCompileScenario():
-            withincode(* io.cucumber.gherkin.PickleCompiler.compileScenario(..));
-
     pointcut withinCompileScenarioOutline():
             withincode(* io.cucumber.gherkin.PickleCompiler.compileScenarioOutline(..));
-
-    pointcut withinCompileScenarioOrOutline():
-            withinCompileScenario() || withinCompileScenarioOutline();
 
     pointcut callCompilePickleStepsWithCells(
             List<?> bgSteps, List<?> scenarioSteps,
@@ -79,21 +53,7 @@ public aspect PickleCompilerAugment {
     pointcut callPickleCtor():
             call(io.cucumber.messages.types.Pickle+.new(..));
 
-    /* (4) Push scenario description while the compiler builds each Pickle. */
-    void around(Scenario scenario)
-            : executeCompileScenario(scenario) || executeCompileScenarioOutline(scenario)
-            {
-                Deque<String> stack = DESCRIPTION_CTX.get();
-                stack.push(scenario == null ? "" : scenario.getDescription());
-                try {
-                    proceed(scenario);
-                } finally {
-                    stack.pop();
-                    if (stack.isEmpty()) DESCRIPTION_CTX.remove();
-                }
-            }
-
-    /* (5) Push header/value rows + location for the current Examples row */
+    /* (4) Push header/value rows + location for the current Examples row */
     Object around(List<?> bgSteps, List<?> scenarioSteps,
                   List<TableCell> variableCells, TableRow valuesRow)
             : callCompilePickleStepsWithCells(bgSteps, scenarioSteps, variableCells, valuesRow)
@@ -114,7 +74,7 @@ public aspect PickleCompilerAugment {
                 return proceed(bgSteps, scenarioSteps, variableCells, valuesRow);
             }
 
-    /* (6) Augment tags using header/value rows */
+    /* (5) Augment tags using header/value rows */
     List<Tag> around(List<Tag> a, List<Tag> b)
             : callCompileTags(a, b)
             && withinCompileScenarioOutline()
@@ -151,18 +111,7 @@ public aspect PickleCompilerAugment {
                 return out;
             }
 
-    /* (7) After Pickle creation: attach scenario description. */
-    after() returning(Pickle p)
-            : callPickleCtor()
-            && withinCompileScenarioOrOutline()
-            {
-                Deque<String> stack = DESCRIPTION_CTX.get();
-                if (!stack.isEmpty()) {
-                    p.setDescription(stack.peek());
-                }
-            }
-
-    /* (8) After outline Pickle creation: attach rows and pop */
+    /* (6) After outline Pickle creation: attach rows and pop */
     after() returning(Pickle p)
             : callPickleCtor()
             && withinCompileScenarioOutline()
@@ -178,7 +127,7 @@ public aspect PickleCompilerAugment {
                 }
             }
 
-    /* (9) Guard against leaks if an exception aborts before Pickle construction */
+    /* (7) Guard against leaks if an exception aborts before Pickle construction */
     after() throwing(Throwable t)
             : withinCompileScenarioOutline()
             && call(* io.cucumber.gherkin.PickleCompiler.compilePickleSteps(..))
