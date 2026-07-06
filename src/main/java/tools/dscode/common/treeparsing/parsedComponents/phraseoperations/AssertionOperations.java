@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import static io.cucumber.core.runner.util.TableUtils.LIST_KEY;
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETURNS_VALUE;
@@ -244,6 +245,17 @@ public enum AssertionOperations implements OperationsInterface {
 
             ElementMatch firstElement = phraseData.getElementMatchBeforeOperation(RETURNS_VALUE);
             ElementMatch secondElement = phraseData.getElementMatchAfterOperation(RETURNS_VALUE);
+
+            if (firstElement.elementTypes.contains(ElementType.DATA_TYPE)) {
+                switch (firstElement.category) {
+                    case LIST_KEY -> {
+                        List<ValueWrapper> valueWrappers = (List<ValueWrapper>) firstElement.getValue().getValue();
+                    }
+                    default -> {
+                        // fallback
+                    }
+                }
+            }
 
             List<ValueWrapper> secondVals = secondElement.getValues().stream().map(val ->
                     createLiteralRegexWrapper(val, name(), ".*", ".*")

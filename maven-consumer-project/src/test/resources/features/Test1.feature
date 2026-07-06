@@ -1,5 +1,9 @@
 Feature: nested Feature File
 
+  Scenario: test
+    * , verify "AAAA" Text contains "AA"
+
+
   Scenario: double runs te 2
     * IF: 1 == 11 THEN:  , save "A" ELSE:
   : * , save "Aaaa"

@@ -53,7 +53,7 @@ public class ValueWrapper {
     public enum ValueTypes {
         DOUBLE_QUOTED, SINGLE_QUOTED, BACK_TICKED, TILDE_QUOTED,
         NUMERIC, DEFAULT, BOOLEAN, DURATION, DATE_TIME, TIME_RANGE,
-        LIST, SET, MAP, MULTIMAP
+        LIST, SET, MAP, MULTIMAP, DATA
     }
 
     public static ValueWrapper createValueWrapper(Object obj, ValueTypes type) {
@@ -138,7 +138,9 @@ public class ValueWrapper {
             if (node.isNumber()) {
                 return new ValueWrapper(node.decimalValue(), ValueTypes.NUMERIC);
             }
-            return new ValueWrapper(node.textValue());
+            if (node.isArray() || node.isObject()) {
+                return new ValueWrapper(node, ValueTypes.DATA);
+            }
         }
 
         return new ValueWrapper(obj.toString());

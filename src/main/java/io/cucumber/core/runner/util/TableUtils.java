@@ -25,6 +25,9 @@ public class TableUtils {
     public static final String VALUE_KEY = "Data Value";
     public static final String DATA_OBJECT_KEY = "Data";
     public static final String ENTRY_KEY = "Data Entry";
+    public static final String LIST_KEY = "List";
+    public static final String MAP_KEY = "Map";
+
     public static <K, V> LinkedListMultimap<String, LinkedListMultimap<K, V>> toRowsMultimap(DataTable dataTable) {
         List<LinkedListMultimap<K, V>> rowList = toListOfMultimap(dataTable);
         LinkedListMultimap<String, LinkedListMultimap<K, V>> returnMap = LinkedListMultimap.create();

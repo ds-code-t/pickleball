@@ -15,12 +15,23 @@ Feature: Additionz
 #    * , in the "<$RETURN:Additionz.ee2.DATA-TABLE>" Data Table,  for every Data Table Row:
 #  : * print <Aq>
 #    * ,  save "<$DATA-TABLE>"
-    * ,  save "<&Additionz.ee2.DATA-TABLE>"
+#    * ,  save "&Additionz.ee2.DATA" List
+    * ,  save "&Additionz.ee2.DATA-TABLE" List
+#    * ,  save "<&Additionz.ee2.DATA>"
+#    * ,  save "<&Additionz.ee2.DATA-TABLE>"
 #    * ,  save "<$RETURN:Additionz.ee2.DATA-TABLE>"
 
 
 
   Scenario Outline: ee<Scenario>
+    * DATA
+    """json
+    {
+      "name": "John Doe",
+      "age": 30,
+      "isActive": true
+    }
+    """
     * DATA-TABLE
       | qq | Aq  | Bq  |
       | 1  | aaa<A> | bbb<B> |

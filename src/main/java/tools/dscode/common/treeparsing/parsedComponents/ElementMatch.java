@@ -1,6 +1,7 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.xpathy.XPathy;
+import io.cucumber.datatable.DataTable;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.browseroperations.WindowSwitch;
@@ -27,6 +28,11 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
+import static io.cucumber.core.runner.util.TableUtils.ENTRY_KEY;
+import static io.cucumber.core.runner.util.TableUtils.LIST_KEY;
+import static io.cucumber.core.runner.util.TableUtils.MAP_KEY;
+import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
 import static tools.dscode.common.assertions.ValueWrapper.ValueTypes.DURATION;
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.browseroperations.BrowserAlerts.getText;
@@ -44,6 +50,8 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETUR
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrPredicate;
+import static tools.dscode.common.util.StringUtilities.decodeBackToText;
+import static tools.dscode.coredefinitions.GeneralSteps.getReturnValue;
 
 public class ElementMatch {
     public enum SpecialUse {
@@ -58,6 +66,7 @@ public class ElementMatch {
     public static final String ELEMENT_RETURN_VALUE = "_elementReturnValue";
     public List<TextOp> textOps = new ArrayList<>();
     public String category;
+    public String categorySingular;
     public String selectionType = "";
     public String elementPosition;
     public List<String> valueTypes;
@@ -151,13 +160,13 @@ public class ElementMatch {
             }
         }
         category = categoryString.replaceFirst("^" + VALUE_TYPE_MATCH, "");
+        categorySingular = category.replaceAll("s$", "");
 
         this.elementPosition = elementNode.getStringFromLocalState("elementPosition");
         this.selectionType = elementNode.getStringFromLocalState("selectionType");
         this.valueTypes = Arrays.stream(elementNode.getStringFromLocalState("valueTypes").split("\\s+")).sorted(Comparator.reverseOrder()).toList();
         this.valueTypes.forEach(v -> {
-            if(v.endsWith("-attribute"))
-            {
+            if (v.endsWith("-attribute")) {
                 defaultValueKeys.addFirst("attributes." + v.replaceFirst("-attribute$", ""));
             }
         });
@@ -229,6 +238,7 @@ public class ElementMatch {
                     elementTypes.add(HTML_DROPDOWN);
             }
         } else if (elementTypes.contains(ElementType.DATA_TYPE)) {
+
 
         } else if (elementTypes.contains(ElementType.VALUE_TYPE)) {
             nonHTMLValues.add(defaultText);
@@ -337,6 +347,7 @@ public class ElementMatch {
         this.state = elementMatch.state;
 
         this.category = elementMatch.category;
+        this.categorySingular = elementMatch.categorySingular;
         this.elementTypes = new HashSet<>(elementMatch.elementTypes);
         this.specialUseSet.addAll(elementMatch.specialUseSet);
         this.elementPosition = elementMatch.elementPosition;
@@ -514,12 +525,43 @@ public class ElementMatch {
 
     public List<ValueWrapper> getValues() {
         List<ValueWrapper> returnList = new ArrayList<>();
-        if (elementTypes.contains(ElementType.STEP_TYPE)) {
-            if (elementTypes.contains(ElementType.STEP_DURATION)){
+        if (elementTypes.contains(ElementType.DATA_TYPE)) {
+            String key = defaultText.isNullOrBlank() ? "" : defaultText.asNormalizedText();
+            System.out.println("@@key: " + key);
+            Object returnObject = null;
+            if (key.startsWith("&")) {
+                returnObject = getReturnValue(key.substring(1));
+                System.out.println("@@returnObject: " + returnObject);
+                System.out.println("@@returnObject.getClass: " + returnObject.getClass());
+            } else {
+                //TODO best guess conversion of string to data object
+            }
+            if(returnObject instanceof DataTable dataTable) {
+                switch (categorySingular) {
+                    case ROW_KEY:
+                    case MAP_KEY:
+                        returnList.add(createValueWrapper(dataTable.asMaps()));
+                        returnList.add(createValueWrapper(dataTable.asMaps()));
+                    case LIST_KEY:
+                        returnList.add(createValueWrapper(dataTable.asLists()));
+                    case CELL_KEY:
+                        returnList.add(createValueWrapper(dataTable.asLists().stream().flatMap(List::stream).toList()));
+                }
+            }
+
+
+            switch (category) {
+                case "DataTable":
+
+            }
+
+            returnList.add(createValueWrapper(returnObject));
+        } else if (elementTypes.contains(ElementType.STEP_TYPE)) {
+            if (elementTypes.contains(ElementType.STEP_DURATION)) {
                 defaultText = createValueWrapper(Duration.between(parentPhrase.parsedLine.stepExtension.startTime, Instant.now()));
                 category = "Duration";
                 returnList.add(defaultText);
-            } else if (elementTypes.contains(ElementType.STEP_REPETITION)){
+            } else if (elementTypes.contains(ElementType.STEP_REPETITION)) {
                 defaultText = createValueWrapper(parentPhrase.parsedLine.stepExtension.runCount);
                 category = VALUE_TYPE_MATCH;
                 returnList.add(defaultText);
@@ -565,6 +607,7 @@ public class ElementMatch {
             returnList.addAll(nonHTMLValues);
         }
         previouslyReturnedValues = new ArrayList<>(returnList);
+        System.out.println("@@returnList2: " + returnList);
         return returnList;
     }
 
