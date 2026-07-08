@@ -33,6 +33,7 @@ import static io.cucumber.core.runner.util.TableUtils.ENTRY_KEY;
 import static io.cucumber.core.runner.util.TableUtils.LIST_KEY;
 import static io.cucumber.core.runner.util.TableUtils.MAP_KEY;
 import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
+import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static tools.dscode.common.assertions.ValueWrapper.ValueTypes.DURATION;
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.browseroperations.BrowserAlerts.getText;
@@ -42,6 +43,7 @@ import static tools.dscode.common.domoperations.elementstates.BinaryStateConditi
 import static tools.dscode.common.domoperations.elementstates.BinaryStateConditions.onElement;
 import static tools.dscode.common.domoperations.elementstates.BlankElementConditions.blankElement;
 import static tools.dscode.common.domoperations.elementstates.BlankElementConditions.nonBlankElement;
+import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.HTML_DROPDOWN;
@@ -534,28 +536,45 @@ public class ElementMatch {
                 System.out.println("@@returnObject: " + returnObject);
                 System.out.println("@@returnObject.getClass: " + returnObject.getClass());
             } else {
+                returnObject = getRunningParsingMap().get(this);
                 //TODO best guess conversion of string to data object
             }
-            if(returnObject instanceof DataTable dataTable) {
-                switch (categorySingular) {
-                    case ROW_KEY:
-                    case MAP_KEY:
-                        returnList.add(createValueWrapper(dataTable.asMaps()));
-                        returnList.add(createValueWrapper(dataTable.asMaps()));
-                    case LIST_KEY:
-                        returnList.add(createValueWrapper(dataTable.asLists()));
-                    case CELL_KEY:
-                        returnList.add(createValueWrapper(dataTable.asLists().stream().flatMap(List::stream).toList()));
+            List<?> list = null;
+            if (returnObject instanceof DataTable dataTable) {
+                if (categorySingular.equals(TABLE_KEY)) {
+                    returnList.add(createValueWrapper(dataTable));
+
+                } else {
+
+                    switch (categorySingular) {
+                        case ROW_KEY:
+                        case MAP_KEY:
+                            list = dataTable.asMaps();
+                            break;
+                        case LIST_KEY:
+                            list = dataTable.asLists();
+                            break;
+                        case CELL_KEY:
+                            list = dataTable.asLists().stream().flatMap(List::stream).toList();
+                            break;
+                    }
+                    if (list == null) throw new RuntimeException("Invalid data table category: " + category);
+
+                    elementIndex = elementPosition.isEmpty() ? 1 : Integer.parseInt(elementPosition);
+                    if (elementIndex > list.size()) {
+                        throw new RuntimeException("Invalid element index: " + elementIndex + " for list of size " + list.size() + " for: " + this);
+                    }
+                    returnList.add(createValueWrapper(list.get(elementIndex - 1)));
                 }
             }
 
 
-            switch (category) {
-                case "DataTable":
-
-            }
-
-            returnList.add(createValueWrapper(returnObject));
+//            switch (category) {
+//                case "DataTable":
+//
+//            }
+//
+//            returnList.add(createValueWrapper(returnObject));
         } else if (elementTypes.contains(ElementType.STEP_TYPE)) {
             if (elementTypes.contains(ElementType.STEP_DURATION)) {
                 defaultText = createValueWrapper(Duration.between(parentPhrase.parsedLine.stepExtension.startTime, Instant.now()));

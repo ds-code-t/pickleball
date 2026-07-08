@@ -131,14 +131,21 @@ public class GeneralSteps extends CoreSteps {
     }
 
     @Given("^---(.*)$")
-    public static void stepMarker(String markerText) {
-
+    public static void stepMarker(String markerText, JsonNode obj) {
+        System.out.println("@@marketText: " + markerText + "");
+        System.out.println("@@obj: " + obj + "");
+        System.out.println("@@obj.getClass: " + obj.getClass() + "");
     }
 
-    @Given("___")
+    @Given("^\\|___$")
     public static void placeHolder() {
 
     }
+
+//    @Given("^___+$")
+//    public static Object dataAttachment(Object data) {
+//        return data;
+//    }
 
 
     @DefinitionFlags(DefinitionFlag.RUN_METHOD_DIRECTLY)

@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import static io.cucumber.core.options.Constants.FILTER_TAGS_PROPERTY_NAME;
+
 public final class CucumberTagUtils {
     private CucumberTagUtils() {
     }
@@ -37,7 +39,7 @@ public final class CucumberTagUtils {
         Object cfgParams = tryField(runnerOptions, "configurationParameters");
         if (cfgParams != null) {
             // Optional<String> get(String key)
-            Object optStr = tryInvoke(cfgParams, "get", "cucumber.filter.tags");
+            Object optStr = tryInvoke(cfgParams, "get", FILTER_TAGS_PROPERTY_NAME);
             Object val = unwrapOptional(optStr);
             if (val instanceof String s && !s.isBlank()) {
                 // Could be comma-delimited; normalize into individual entries.

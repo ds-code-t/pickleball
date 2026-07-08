@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 
+import io.cucumber.datatable.DataTable;
 import tools.dscode.common.util.datetime.BusinessTimeRange;
 import tools.dscode.common.util.datetime.DurationFormattingUtils;
 import tools.dscode.common.util.datetime.TemporalValue;
@@ -53,7 +54,7 @@ public class ValueWrapper {
     public enum ValueTypes {
         DOUBLE_QUOTED, SINGLE_QUOTED, BACK_TICKED, TILDE_QUOTED,
         NUMERIC, DEFAULT, BOOLEAN, DURATION, DATE_TIME, TIME_RANGE,
-        LIST, SET, MAP, MULTIMAP, DATA
+        LIST, SET, MAP, MULTIMAP, TABLE,  DATA
     }
 
     public static ValueWrapper createValueWrapper(Object obj, ValueTypes type) {
@@ -141,6 +142,10 @@ public class ValueWrapper {
             if (node.isArray() || node.isObject()) {
                 return new ValueWrapper(node, ValueTypes.DATA);
             }
+        }
+
+        if (obj instanceof DataTable dataTable) {
+            return new ValueWrapper(dataTable, ValueTypes.TABLE);
         }
 
         return new ValueWrapper(obj.toString());

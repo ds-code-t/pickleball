@@ -11,7 +11,7 @@ import java.util.Locale;
 import static tools.dscode.common.mappings.MappingProcessor.getSingletonMap;
 import static tools.dscode.common.mappings.custommappings.ValConverter.valConverter;
 
-import static tools.dscode.testengine.PickleballRunner.PKB_PREFIX;
+import static tools.dscode.testengine.PKB_props.PKB_PREFIX;
 import static tools.dscode.testengine.DynamicSuiteConfigUtils.getPkbValues;
 
 
@@ -23,14 +23,6 @@ public class RunVars extends NodeMap {
 //    private static final String ENV_PREFIX = "env_";
 //    private static final String SYS_PREFIX = "sys_";
 //
-//
-//    public static final String PKB_PREFIX = "pkb_";
-//
-//
-//    private static final String RUN_CONFIGS = "runconfigs";
-//    private static final String PROFILES_DIR = "profiles";
-//    private static final String PROFILEProp = PKB_PREFIX + "profile";
-
     public final static RunVars RUN_VARS = new RunVars();
 
     @Override

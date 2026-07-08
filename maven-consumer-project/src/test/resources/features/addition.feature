@@ -1,5 +1,52 @@
 Feature: Additionz
 
+  Scenario: sdftrudnersc
+    * ___
+      | A |
+      | 1 |
+
+  Scenario: ssfgf
+#    * ,  verify  "&Additionz.ee2.DATA-TABLE" Data Table contains "qq"
+#    * ,  verify  "&Additionz.ee2.DATA-TABLE" Data Table contains "qq" Data Cell
+#    * ,  verify  "&Additionz.ee2.DATA-TABLE" Data Table contains "qq" Data Value
+#    * ,  verify  "&Additionz.ee2.DATA-TABLE" Data Table contains "77"
+#    * ,  verify  "&Additionz.ee2.DATA-TABLE" Data Table contains "77" Data Cell
+#    * ,  verify  "&Additionz.ee2.DATA-TABLE" Data Table contains "77" Data Value
+#    * ,  verify  "&Additionz.ee2.DATA-TABLE" List contains "77"
+#    * ,  verify  "&Additionz.ee2.DATA-TABLE" List contains "27"
+
+    * , in the "&Additionz.ee2.DATA-TABLE" Data Table, for ever Data Row:
+  : * , save <Aq>
+
+  Scenario Outline: ee<Scenario>
+    * DATA
+    """json
+    {
+      "name": "John Doe",
+      "age": 30,
+      "isActive": true
+    }
+    """
+
+
+#    * DATA-TABLE
+#      | 1  | aaa<A> | bbb<B> | 77 |
+#
+    * DATA-TABLE
+      | qq | Aq     | Bq     | C  |
+      | 1  | aaa<A> | bbb<B> | 77 |
+      | 2  | xxx<A> | yyy<B> | 77 |
+      | 3  | zzz<A> | yyy<B> | 77 |
+#
+#    * RUN SCENARIOS
+#      | Run Tags | A   | B   | C   |
+#      | %dtTest2 | <A> | <B> | <C> |
+
+    Examples:
+      | Scenario | A  | B   |
+      | 1        | 11 | 222 |
+      | 2        | 77 | 88  |
+
 
   Scenario:ss
 #    * , click 2nd "Bananas" Checkbox
@@ -23,28 +70,7 @@ Feature: Additionz
 
 
 
-  Scenario Outline: ee<Scenario>
-    * DATA
-    """json
-    {
-      "name": "John Doe",
-      "age": 30,
-      "isActive": true
-    }
-    """
-    * DATA-TABLE
-      | qq | Aq  | Bq  |
-      | 1  | aaa<A> | bbb<B> |
-      | 2  | xxx<A> | yyy<B> |
-#
-#    * RUN SCENARIOS
-#      | Run Tags | A   | B   | C   |
-#      | %dtTest2 | <A> | <B> | <C> |
 
-    Examples:
-      | Scenario | A   | B   |
-      | 1        | 11 | 222 |
-      | 2        | 77 | 88 |
 
 
   Scenario Outline: called with dtp

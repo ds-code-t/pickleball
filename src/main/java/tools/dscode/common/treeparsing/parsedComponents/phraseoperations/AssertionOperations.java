@@ -1,5 +1,7 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
+import io.cucumber.datatable.DataTable;
+import io.cucumber.datatable.DataTableDiff;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.assertions.ValueWrapperCompareReducer;
 import tools.dscode.common.assertions.ValueWrapperComparisons;
@@ -8,12 +10,19 @@ import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
+import static io.cucumber.core.runner.util.TableUtils.HEADER_KEY;
 import static io.cucumber.core.runner.util.TableUtils.LIST_KEY;
+import static io.cucumber.core.runner.util.TableUtils.MAP_KEY;
+import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
+import static io.cucumber.core.runner.util.TableUtils.VALUE_KEY;
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETURNS_VALUE;
@@ -249,10 +258,64 @@ public enum AssertionOperations implements OperationsInterface {
             if (firstElement.elementTypes.contains(ElementType.DATA_TYPE)) {
                 switch (firstElement.category) {
                     case LIST_KEY -> {
-                        List<ValueWrapper> valueWrappers = (List<ValueWrapper>) firstElement.getValue().getValue();
+                        ValueWrapper margin = phraseData.getMargin();
+                        @SuppressWarnings("unchecked")
+                        List<ValueWrapper> valueWrapperList = (List<ValueWrapper>) firstElement.getValue().getValue();
+                        Set<ValueWrapperCompareReducer.Mode> modeSet = new HashSet<>(getModeSet(phraseData));
+                        if (!modeSet.contains(ValueWrapperCompareReducer.Mode.NONE)
+                                && !modeSet.contains(ValueWrapperCompareReducer.Mode.ANY)) {
+                            modeSet.add(ValueWrapperCompareReducer.Mode.ANY);
+                        }
+                        phraseData.result = Attempt.run(repetition, 500, () ->
+                                ValueWrapperCompareReducer.eval(
+                                        (left, right) -> ValueWrapperComparisons.equals(left, right, margin),
+                                        valueWrapperList,
+                                        secondElement.getComparisonValues(),
+                                        modeSet
+                                )
+                        );
+                        return;
+                    }
+                    case TABLE_KEY, MAP_KEY -> {
+                        ValueWrapper margin = phraseData.getMargin();
+                        DataTable dataTable = (DataTable) firstElement.getValue().getValue();
+                        List<ValueWrapper> comparisonList = switch (secondElement.categorySingular) {
+                            case CELL_KEY -> dataTable.asLists().stream()
+                                    .flatMap(Collection::stream)
+                                    .map(ValueWrapper::createValueWrapper)
+                                    .toList();
+                            case VALUE_KEY -> dataTable.asMaps().stream()
+                                    .flatMap(m -> m.values().stream())
+                                    .map(ValueWrapper::createValueWrapper)
+                                    .toList();
+                            case HEADER_KEY -> dataTable.asLists().getFirst().stream()
+                                    .map(ValueWrapper::createValueWrapper)
+                                    .toList();
+                            default -> dataTable.asLists().getFirst().stream()
+                                    .map(ValueWrapper::createValueWrapper)
+                                    .toList();
+                        };
+                        System.out.println("@@dataTable---: " + dataTable);
+                        System.out.println("@@category: " + secondElement.category);
+                        System.out.println("@@comparisonList: " + comparisonList);
+                        System.out.println("@@secondElement.getComparisonValues(): " + secondElement.getComparisonValues());
+                        Set<ValueWrapperCompareReducer.Mode> modeSet = new HashSet<>(getModeSet(phraseData));
+                        if (!modeSet.contains(ValueWrapperCompareReducer.Mode.NONE)
+                                && !modeSet.contains(ValueWrapperCompareReducer.Mode.ANY)) {
+                            modeSet.add(ValueWrapperCompareReducer.Mode.ANY);
+                        }
+                        phraseData.result = Attempt.run(repetition, 500, () ->
+                                ValueWrapperCompareReducer.eval(
+                                        (left, right) -> ValueWrapperComparisons.equals(left, right, margin),
+                                        comparisonList,
+                                        secondElement.getComparisonValues(),
+                                        modeSet
+                                )
+                        );
+                        return;
                     }
                     default -> {
-                        // fallback
+                        throw new RuntimeException("Cannot use CONTAIN on a data type");
                     }
                 }
             }

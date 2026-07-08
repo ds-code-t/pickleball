@@ -2,23 +2,40 @@ package tools.dscode.testengine;
 
 import java.util.LinkedHashMap;
 
+/**
+ * Canonical definitions for pickleball {@code pkb_*} configuration property names.
+ * <p>
+ * Cucumber {@code cucumber.*} property names are defined in
+ * {@link io.cucumber.core.options.Constants} and
+ * {@link io.cucumber.junit.platform.engine.Constants}.
+ */
 public final class PKB_props {
 
-    private static final String PREFIX = PickleballRunner.PKB_PREFIX;
+    public static final String PKB_PREFIX = "pkb_";
 
-    public static final String PKB_GLUE     = PREFIX + "glue";
-    public static final String PKB_FEATURES = PREFIX + "features";
-    public static final String PKB_FEATURE_NAME = PREFIX + "featurename";
-    public static final String PKB_TAGS     = PREFIX + "tags";
-    public static final String PKB_NAME     = PREFIX + "name";
-    public static final String PKB_PROFILE  = PREFIX + "profile";
-    public static final String PKB_PLUGINS  = PREFIX + "plugins";
-    public static final String PKB_PARALLEL = PREFIX + "parallel";
-    public static final String PKB_ENVIRONMENT = PREFIX + "environment";
-    public static final String PKB_BROWSER = PREFIX + "browser";
-    public static final String PKB_DEBUG_BROWSER = PREFIX + "debugBrowser";
+    public static final String PKB_GLUE = PKB_PREFIX + "glue";
+    public static final String PKB_FEATURES = PKB_PREFIX + "features";
+    public static final String PKB_FEATURE_NAME = PKB_PREFIX + "featurename";
+    public static final String PKB_TAGS = PKB_PREFIX + "tags";
+    public static final String PKB_NAME = PKB_PREFIX + "name";
+    public static final String PKB_ORDER = PKB_PREFIX + "order";
+    public static final String PKB_LIMIT = PKB_PREFIX + "limit";
+    public static final String PKB_PROFILE = PKB_PREFIX + "profile";
+    public static final String PKB_PLUGINS = PKB_PREFIX + "plugins";
+    public static final String PKB_PARALLEL = PKB_PREFIX + "parallel";
+    public static final String PKB_ENVIRONMENT = PKB_PREFIX + "environment";
+    public static final String PKB_BROWSER = PKB_PREFIX + "browser";
 
-    private PKB_props() {}
+    public static final String PKB_OPTIONS = PKB_PREFIX + "options";
+    public static final String PKB_CUCUMBER_CLI_ARGS = PKB_PREFIX + "cucumber_cli_args";
+    public static final String PKB_CUCUMBER_CLI_FEATURE_SELECTORS =  PKB_PREFIX + "cucumber_cli_feature_selectors";
+    public static final String PKB_LOGLEVEL = PKB_PREFIX + "loglevel";
+
+    public static final String PKB_DEBUG_BROWSER = PKB_PREFIX + "debugBrowser";
+    public static final String PKB_DEBUG_ARGS = PKB_PREFIX + "debugargs";
+
+    private PKB_props() {
+    }
 
     private static LinkedHashMap<String, String> values() {
         return PickleballRunner.rawInstance().values;
@@ -62,6 +79,7 @@ public final class PKB_props {
     public static String features() {
         return get(PKB_FEATURES);
     }
+
     public static void features(String featurePaths) {
         put(PKB_FEATURES, featurePaths);
     }
@@ -123,6 +141,7 @@ public final class PKB_props {
     public static String debugBrowser() {
         return get(PKB_DEBUG_BROWSER);
     }
+
     public static void debugBrowser(String enable) {
         put(PKB_DEBUG_BROWSER, enable);
     }

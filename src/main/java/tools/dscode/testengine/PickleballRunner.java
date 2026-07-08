@@ -19,8 +19,24 @@ import static io.cucumber.core.options.Constants.FEATURES_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.FILTER_NAME_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.FILTER_TAGS_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
+import static io.cucumber.junit.platform.engine.Constants.PARALLEL_CONFIG_FIXED_MAX_POOL_SIZE_PROPERTY_NAME;
+import static io.cucumber.junit.platform.engine.Constants.PARALLEL_CONFIG_FIXED_PARALLELISM_PROPERTY_NAME;
+import static io.cucumber.junit.platform.engine.Constants.PARALLEL_CONFIG_STRATEGY_PROPERTY_NAME;
+import static io.cucumber.junit.platform.engine.Constants.PARALLEL_EXECUTION_ENABLED_PROPERTY_NAME;
 import static tools.dscode.common.reporting.logging.LogForwarder.logError;
 import static tools.dscode.common.util.debug.DebugUtils.debugFlags;
+import static tools.dscode.testengine.PKB_props.PKB_CUCUMBER_CLI_ARGS;
+import static tools.dscode.testengine.PKB_props.PKB_CUCUMBER_CLI_FEATURE_SELECTORS;
+import static tools.dscode.testengine.PKB_props.PKB_DEBUG_ARGS;
+import static tools.dscode.testengine.PKB_props.PKB_DEBUG_BROWSER;
+import static tools.dscode.testengine.PKB_props.PKB_FEATURES;
+import static tools.dscode.testengine.PKB_props.PKB_GLUE;
+import static tools.dscode.testengine.PKB_props.PKB_LOGLEVEL;
+import static tools.dscode.testengine.PKB_props.PKB_NAME;
+import static tools.dscode.testengine.PKB_props.PKB_OPTIONS;
+import static tools.dscode.testengine.PKB_props.PKB_PARALLEL;
+import static tools.dscode.testengine.PKB_props.PKB_PREFIX;
+import static tools.dscode.testengine.PKB_props.PKB_TAGS;
 
 
 public abstract class PickleballRunner {
@@ -35,33 +51,9 @@ public abstract class PickleballRunner {
 
 
     private static volatile PickleballRunner INSTANCE;
-    public static final String PKB_PREFIX = "pkb_";
-    static final String PKB_LOGLEVEL = PKB_PREFIX + "loglevel";
-    static final String PKB_GLUE = PKB_PREFIX + "glue";
-    static final String PKB_FEATURES = PKB_PREFIX + "features";
-    static final String PKB_FEATURE_NAME = PKB_PREFIX + "featurename";
-    static final String PKB_TAGS = PKB_PREFIX + "tags";
-
-    static final String CUCUMBER_GLUE = "cucumber.glue";
-    static final String CUCUMBER_FEATURES = "cucumber.features";
-    static final String CUCUMBER_TAGS = "cucumber.filter.tags";
-    private static final String PKB_NAME = PKB_PREFIX + "name";
-    private static final String PKB_PARALLEL = PKB_PREFIX + "parallel";
-    private static final String PKB_DEBUG_BROWSER = PKB_PREFIX + "debugbrowser";
-    private static final String PKB_DEBUG_ARGS = PKB_PREFIX + "debugargs";
-
-    private static final String CUCUMBER_PARALLEL_ENABLED = "cucumber.execution.parallel.enabled";
-    private static final String CUCUMBER_PARALLEL_STRATEGY = "cucumber.execution.parallel.config.strategy";
-    private static final String CUCUMBER_PARALLELISM = "cucumber.execution.parallel.config.fixed.parallelism";
-    private static final String CUCUMBER_MAX_POOL_SIZE = "cucumber.execution.parallel.config.fixed.max-pool-size";
 
     protected final LinkedHashMap<String, String> values = new LinkedHashMap<>();
     private final Map<String, String> readOnlyValues = Collections.unmodifiableMap(values);
-
-    private static final String PKB_OPTIONS = PKB_PREFIX + "options";
-    public static final String PKB_CUCUMBER_CLI_ARGS = PKB_PREFIX + "cucumber_cli_args";
-    public static final String PKB_CUCUMBER_CLI_FEATURE_SELECTORS =
-            PKB_PREFIX + "cucumber_cli_feature_selectors";
 
     protected PickleballRunner() {
         debug("Constructing suite subclass: " + getClass().getName());
@@ -116,7 +108,7 @@ public abstract class PickleballRunner {
         debug("Registered singleton instance: " + getClass().getName());
 
         values.putIfAbsent(PKB_LOGLEVEL,"INFO");
-        LOG_LEVEL = Level.valueOf(values.get(PKB_LOGLEVEL).toUpperCase().trim());
+        LOG_LEVEL = Level.valueOf(get(PKB_LOGLEVEL).toUpperCase().trim());
 
     }
 
@@ -139,7 +131,7 @@ public abstract class PickleballRunner {
 
 
     private void applyDebugFlags() {
-        String debugArgs = values.get(PKB_DEBUG_ARGS);
+        String debugArgs = get(PKB_DEBUG_ARGS);
         if (debugArgs != null && !debugArgs.isBlank()) {
             debugFlags.addAll(
                     Arrays.stream(debugArgs.split(","))
@@ -151,7 +143,7 @@ public abstract class PickleballRunner {
             CurrentScenarioState.logAllSteps = true;
         }
 
-        String raw = values.get(PKB_DEBUG_BROWSER);
+        String raw = get(PKB_DEBUG_BROWSER);
         if (raw == null || !"true".equalsIgnoreCase(raw.trim())) {
             return;
         }
@@ -309,16 +301,16 @@ public abstract class PickleballRunner {
         syncPair(PKB_NAME, FILTER_NAME_PROPERTY_NAME);
         syncPair(PKB_TAGS, FILTER_TAGS_PROPERTY_NAME);
 
-        String parallel = values.get(PKB_PARALLEL);
+        String parallel = get(PKB_PARALLEL);
         if (parallel != null && !parallel.isBlank()) {
             String trimmed = parallel.trim();
             Integer.parseInt(trimmed);
 
             values.put(PKB_PARALLEL, trimmed);
-            values.putIfAbsent(CUCUMBER_PARALLEL_ENABLED, "true");
-            values.putIfAbsent(CUCUMBER_PARALLEL_STRATEGY, "fixed");
-            values.putIfAbsent(CUCUMBER_PARALLELISM, trimmed);
-            values.putIfAbsent(CUCUMBER_MAX_POOL_SIZE, trimmed);
+            values.putIfAbsent(PARALLEL_EXECUTION_ENABLED_PROPERTY_NAME, "true");
+            values.putIfAbsent(PARALLEL_CONFIG_STRATEGY_PROPERTY_NAME, "fixed");
+            values.putIfAbsent(PARALLEL_CONFIG_FIXED_PARALLELISM_PROPERTY_NAME, trimmed);
+            values.putIfAbsent(PARALLEL_CONFIG_FIXED_MAX_POOL_SIZE_PROPERTY_NAME, trimmed);
         }
     }
 

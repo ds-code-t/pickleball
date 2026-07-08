@@ -1,5 +1,6 @@
 package io.cucumber.core.runner;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.core.stepexpression.DataTableArgument;
 import io.cucumber.core.stepexpression.DocStringArgument;
@@ -53,6 +54,7 @@ import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry
 import static tools.dscode.common.util.GeneralUtils.stackTraceToString;
 import static tools.dscode.common.util.Reflect.invokeAnyMethodOrThrow;
 import static tools.dscode.common.util.debug.DebugUtils.parseDebugString;
+import static tools.dscode.coredefinitions.DocStringDefinitions.docStringtoJsonNode;
 
 public class StepExtension extends StepData {
     public io.cucumber.plugin.event.Result result = null;
@@ -103,28 +105,54 @@ public class StepExtension extends StepData {
         debugStartStep = parseDebugString(stepTags);
         setNestingLevel((int) matcher.replaceAll("").chars().filter(ch -> ch == ':').count());
 
+        dataArgumentStep = isCoreStep && methodName.equals("dataAttachment");
 
-        if (isCoreStep && methodName.equals("docString")) {
-            dataArgumentStep = true;
-            String docStringName = (String) arguments.getFirst().getValue();
-            docString = (DocString) arguments.getLast().getValue();
-            if (docStringName != null && !docStringName.isBlank()) {
-                getDocStringMap().put(DOCSTRING_KEY, Map.of(docStringName.trim(), docString));
-            }
-            dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP);
-            dataContextStepNodeMap.setDataSource(MapConfigurations.DataSource.DOC_STRING);
-            dataContextStepNodeMap.put("DOCSTRING", docString);
-        } else if (isCoreStep && methodName.equals("dataTable")) {
-            dataArgumentStep = true;
-            String tableName = (String) arguments.getFirst().getValue();
-            dataTable = (DataTable) arguments.getLast().getValue();
-            if (tableName != null && !tableName.isBlank()) {
-                getDataTableMap().put(TABLE_KEY, Map.of(tableName.trim(), toRowsStringMultimap(dataTable)));
-            }
-            dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP);
-            dataContextStepNodeMap.setDataSource(MapConfigurations.DataSource.DATA_TABLE);
-            dataContextStepNodeMap.put(TABLE_KEY, toRowsStringMultimap(dataTable));
-        }
+//        if (isCoreStep && methodName.equals("dataAttachment")) {
+//            dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP);
+//            Object arg = arguments.getLast().getValue();
+//            if(arg instanceof DataTableArgument) {
+//                dataArgumentStep = true;
+//                dataTable = (DataTable) arguments.getLast().getValue();
+//                dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP);
+//                dataContextStepNodeMap.setDataSource(MapConfigurations.DataSource.DATA_TABLE);
+//                dataContextStepNodeMap.put(TABLE_KEY, toRowsStringMultimap(dataTable));
+//            }
+//            else if(arg instanceof DocStringArgument) {
+//                dataArgumentStep = true;
+//                docString = (DocString) arguments.getLast().getValue();
+//                dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP);
+//                dataContextStepNodeMap.setDataSource(MapConfigurations.DataSource.DOC_STRING);
+//                try {
+//                    dataContextStepNodeMap.put(DOCSTRING_KEY, docStringtoJsonNode(docString));
+//                } catch (JsonProcessingException e) {
+//                    throw new RuntimeException(e);
+//                }
+//            }
+//        } else if (isCoreStep && methodName.equals("docString")) {
+//            dataArgumentStep = true;
+//            String docStringName = (String) arguments.getFirst().getValue();
+//            docString = (DocString) arguments.getLast().getValue();
+//            if (docStringName != null && !docStringName.isBlank()) {
+//                getDocStringMap().put(DOCSTRING_KEY, Map.of(docStringName.trim(), docString));
+//            }
+//            dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP);
+//            dataContextStepNodeMap.setDataSource(MapConfigurations.DataSource.DOC_STRING);
+//            try {
+//                dataContextStepNodeMap.put(DOCSTRING_KEY, docStringtoJsonNode(docString));
+//            } catch (JsonProcessingException e) {
+//                throw new RuntimeException(e);
+//            }
+//        } else if (isCoreStep && methodName.equals("dataTable")) {
+//            dataArgumentStep = true;
+//            String tableName = (String) arguments.getFirst().getValue();
+//            dataTable = (DataTable) arguments.getLast().getValue();
+//            if (tableName != null && !tableName.isBlank()) {
+//                getDataTableMap().put(TABLE_KEY, Map.of(tableName.trim(), toRowsStringMultimap(dataTable)));
+//            }
+//            dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP);
+//            dataContextStepNodeMap.setDataSource(MapConfigurations.DataSource.DATA_TABLE);
+//            dataContextStepNodeMap.put(TABLE_KEY, toRowsStringMultimap(dataTable));
+//        }
     }
 
 
