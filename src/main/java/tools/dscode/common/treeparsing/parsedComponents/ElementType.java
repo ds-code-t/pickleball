@@ -11,6 +11,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
+import static io.cucumber.core.runner.util.TableUtils.COLUMN_KEY;
+import static io.cucumber.core.runner.util.TableUtils.COLUMN_LIST_KEY;
 import static io.cucumber.core.runner.util.TableUtils.DATA_OBJECT_KEY;
 import static io.cucumber.core.runner.util.TableUtils.DOCSTRING_KEY;
 import static io.cucumber.core.runner.util.TableUtils.HEADER_KEY;
@@ -76,6 +78,9 @@ public enum ElementType {
 
     public static final Set<String> DATA_ELEMENTS =
             Set.of(DOCSTRING_KEY, TABLE_KEY, ROW_KEY, CELL_KEY, HEADER_KEY, VALUE_KEY, DATA_OBJECT_KEY, ENTRY_KEY, LIST_KEY, MAP_KEY);
+
+    public static final Set<String> DATA_TABLE_ELEMENTS =
+            Set.of(TABLE_KEY, ROW_KEY, COLUMN_KEY,  CELL_KEY, HEADER_KEY, VALUE_KEY, ENTRY_KEY , COLUMN_LIST_KEY);
 
     public static final Set<String> BROWSER_ELEMENTS =
             Set.of("Alert", "Window", "BROWSER", "Browser Tab", "Address Bar");

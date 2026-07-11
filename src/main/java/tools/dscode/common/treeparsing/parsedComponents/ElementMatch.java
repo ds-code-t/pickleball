@@ -1,6 +1,7 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.xpathy.XPathy;
+import io.cucumber.core.runner.StepExtension;
 import io.cucumber.datatable.DataTable;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.assertions.ValueWrapper;
@@ -14,6 +15,8 @@ import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.MatchNode;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatcher;
+import tools.dscode.common.treeparsing.preparsing.LineData;
+import tools.dscode.common.treeparsing.preparsing.ParsedLine;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -28,6 +31,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
 import static io.cucumber.core.runner.util.TableUtils.ENTRY_KEY;
 import static io.cucumber.core.runner.util.TableUtils.LIST_KEY;
@@ -50,6 +54,7 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementType.HTML_
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.HTML_OPTION;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETURNS_VALUE;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE_MATCH;
+import static tools.dscode.common.treeparsing.preparsing.ParsedLine.createParsedLine;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineAnd;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.applyAttrPredicate;
 import static tools.dscode.common.util.StringUtilities.decodeBackToText;
@@ -658,6 +663,18 @@ public class ElementMatch {
             }
         }
         return wrappedElements;
+    }
+
+
+    public String getKey(String... suffixes) {
+        String suffix = suffixes== null || suffixes.length==0 ? "" : "-" +  String.join("-", suffixes);
+        return (defaultText == null || defaultText.isNullOrBlank() ? "" : defaultText.asNormalizedText() + "_") +  categorySingular;
+    }
+
+    public static List<ElementMatch> getElementMatchesFromString(String elementString) {
+        StepExtension stepExtension = getRunningStep().modifyStepExtension(" , " + elementString);
+        ParsedLine lineData = createParsedLine(stepExtension);
+        return lineData.phrases().stream().flatMap(phraseData -> phraseData.getElementMatches().stream()).toList();
     }
 
 

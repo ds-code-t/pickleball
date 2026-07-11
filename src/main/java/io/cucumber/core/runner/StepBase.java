@@ -1,5 +1,6 @@
 package io.cucumber.core.runner;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.cucumber.core.stepexpression.Argument;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
@@ -58,6 +59,8 @@ public abstract class StepBase implements Cloneable {
     public String overrideLoggingText = null;
     protected List<Argument> arguments;
     public Argument argument;
+    public JsonNode dataArgument;
+    public Argument dataArgumentRaw;
 
     protected final ParsingMap stepParsingMap = new ParsingMap();
     protected final NodeMap defaultStepNodeMap = new NodeMap(STEP_MAP);

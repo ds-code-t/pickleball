@@ -1,6 +1,9 @@
 package io.cucumber.core.runner;
 
 
+import io.cucumber.core.stepexpression.Argument;
+import io.cucumber.core.stepexpression.DataTableArgument;
+import io.cucumber.core.stepexpression.DocStringArgument;
 import io.cucumber.core.stepexpression.ExpressionArgument;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
@@ -22,6 +25,8 @@ import java.util.Arrays;
 import java.util.List;
 
 
+import static io.cucumber.core.runner.util.ArgumentUtility.toDataTable;
+import static io.cucumber.core.runner.util.ArgumentUtility.toDocString;
 import static tools.dscode.common.reporting.logging.LogForwarder.logError;
 import static tools.dscode.common.util.Reflect.getProperty;
 import static tools.dscode.common.variables.RunVars.resolveFromVarsOrDefault;
@@ -240,5 +245,21 @@ public abstract class StepData extends StepMapping {
 //        return pickleStepTestStep.getStep().step .getOriginalText();
         return (String) getProperty(getProperty(pickleStepTestStep.getStep(), "pickleStep"), "text");
     }
+
+
+
+    public DataTable getUnmodifiedDataTable() {
+        if(argument instanceof DataTableArgument dataTableArgument)
+            return toDataTable(dataTableArgument);
+        return null;
+    }
+
+    public DocString getUnmodifiedDocString() {
+        if(argument instanceof DocStringArgument docStringArgument)
+            return toDocString(docStringArgument);
+        return null;
+    }
+
+
 
 }

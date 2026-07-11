@@ -25,8 +25,10 @@ import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.GlobalState.pickleballLog;
 import static io.cucumber.core.runner.modularexecutions.CucumberScanUtil.getStepReturn;
+import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.GlobalConstants.INFO_STEP;
+import static tools.dscode.common.GlobalConstants.META_FLAG;
 import static tools.dscode.common.GlobalConstants.NEXT_SIBLING_STEP;
 import static tools.dscode.common.GlobalConstants.ROOT_STEP;
 import static tools.dscode.common.GlobalConstants.SCENARIO_STEP;
@@ -96,7 +98,12 @@ public class GeneralSteps extends CoreSteps {
         return getStepReturn(stepAddress);
     }
 
-
+//
+//
+//    @Given("^" + META_FLAG + "_" + TABLE_KEY +"$")
+//    public static String rawDataTable(DataTable dataTable) {
+//        return text;
+//    }
 
     @Given("^DATA-TEXT$")
     public static String dateTextStep(String text) {
@@ -131,10 +138,10 @@ public class GeneralSteps extends CoreSteps {
     }
 
     @Given("^---(.*)$")
-    public static void stepMarker(String markerText, JsonNode obj) {
+    public static void stepMarker(String markerText, JsonNode jsonNode) {
         System.out.println("@@marketText: " + markerText + "");
-        System.out.println("@@obj: " + obj + "");
-        System.out.println("@@obj.getClass: " + obj.getClass() + "");
+        System.out.println("@@jsonNode: " + jsonNode + "");
+        System.out.println("@@jsonNode.getClass: " + jsonNode.getClass() + "");
     }
 
     @Given("^\\|___$")
@@ -142,10 +149,10 @@ public class GeneralSteps extends CoreSteps {
 
     }
 
-//    @Given("^___+$")
-//    public static Object dataAttachment(Object data) {
-//        return data;
-//    }
+    @Given("^___+$")
+    public static Object dataAttachment(JsonNode jsonNode) {
+        return jsonNode;
+    }
 
 
     @DefinitionFlags(DefinitionFlag.RUN_METHOD_DIRECTLY)

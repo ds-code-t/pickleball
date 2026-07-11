@@ -106,7 +106,7 @@ public abstract class LineData implements Cloneable {
                     addPhrase(unmasked, c, sentenceCount);
                 }
                 buf.setLength(0);
-                if (c != ',') sentenceCount++;
+                if (c != ',' && c != ';') sentenceCount++;
             } else {
                 buf.append(c);
             }

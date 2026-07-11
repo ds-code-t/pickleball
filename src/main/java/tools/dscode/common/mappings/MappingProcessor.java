@@ -5,8 +5,11 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.LinkedListMultimap;
+import io.cucumber.datatable.DataTable;
+import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.mappings.queries.Tokenized;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
+import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -51,6 +54,7 @@ import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.mappings.queries.Tokenized.AS_LIST_SUFFIX;
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementMatch.getElementMatchesFromString;
 import static tools.dscode.common.util.StringUtilities.decodeBackToText;
 import static tools.dscode.common.util.StringUtilities.encodeToPlaceHolders;
 
@@ -68,16 +72,18 @@ public abstract class MappingProcessor implements Map<String, Object> {
     public static ThreadLocal<NodeMap> singletonMap = new ThreadLocal<>();
     public static ThreadLocal<NodeMap> overridesMap = new ThreadLocal<>();
     public static ThreadLocal<NodeMap> defaultsMap = new ThreadLocal<>();
-    public static ThreadLocal<NodeMap> dataTableMap = new ThreadLocal<>();
-    public static ThreadLocal<NodeMap> docStringMap = new ThreadLocal<>();
+    public static ThreadLocal<DataMap> dataMap = new ThreadLocal<>();
+//    public static ThreadLocal<NodeMap> dataTableMap = new ThreadLocal<>();
+//    public static ThreadLocal<NodeMap> docStringMap = new ThreadLocal<>();
 
     public static void resetCommonMaps() {
         runMap.set(new NodeMap(MapConfigurations.MapType.RUN_MAP));
         singletonMap.set(new NodeMap(MapConfigurations.MapType.SINGLETON));
         overridesMap.set(new NodeMap(MapConfigurations.MapType.OVERRIDE_MAP));
         defaultsMap.set(new NodeMap(MapConfigurations.MapType.DEFAULT));
-        dataTableMap.set(new NodeMap(MapConfigurations.MapType.DATATABLE));
-        docStringMap.set(new NodeMap(MapConfigurations.MapType.DOCSTRING));
+        dataMap.set(new DataMap());
+//        dataTableMap.set(new NodeMap(MapConfigurations.MapType.DATATABLE));
+//        docStringMap.set(new NodeMap(MapConfigurations.MapType.DOCSTRING));
     }
 
     public NodeMap getOrAddAndGetMap(MapConfigurations.MapType mapType) {
@@ -106,25 +112,26 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return defaultsMap.get();
     }
 
-    public static NodeMap getDataTableMap() {
-        return dataTableMap.get();
-    }
+//    public static NodeMap getDataTableMap() {
+//        return dataTableMap.get();
+//    }
 
-    public static NodeMap getDocStringMap() {
-        return docStringMap.get();
-    }
+//    public static NodeMap getDocStringMap() {
+//        return docStringMap.get();
+//    }
 
 
     public MappingProcessor() {
         // Defensive copy to make key order immutable
-        addMaps(GLOBALS, runMap.get(), singletonMap.get(), overridesMap.get(), defaultsMap.get(), dataTableMap.get(), docStringMap.get());
+//        addMaps(GLOBALS, runMap.get(), singletonMap.get(), overridesMap.get(), defaultsMap.get(), dataTableMap.get(), docStringMap.get());
+        addMaps(GLOBALS, runMap.get(), singletonMap.get(), overridesMap.get(), defaultsMap.get());
 
         this.keyOrder.addAll(Arrays.asList(
                 MapConfigurations.MapType.OVERRIDE_MAP,
                 MapConfigurations.MapType.PHRASE_MAP,
                 MapConfigurations.MapType.STEP_MAP,
-                MapConfigurations.MapType.DATATABLE,
-                MapConfigurations.MapType.DOCSTRING,
+//                MapConfigurations.MapType.DATATABLE,
+//                MapConfigurations.MapType.DOCSTRING,
                 MapConfigurations.MapType.PASSED_MAP,
                 MapConfigurations.MapType.EXAMPLE_MAP,
                 MapConfigurations.MapType.RUN_MAP,
@@ -136,8 +143,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 MapConfigurations.MapType.SINGLETON,
                 MapConfigurations.MapType.PHRASE_MAP,
                 MapConfigurations.MapType.STEP_MAP,
-                MapConfigurations.MapType.DATATABLE,
-                MapConfigurations.MapType.DOCSTRING,
+//                MapConfigurations.MapType.DATATABLE,
+//                MapConfigurations.MapType.DOCSTRING,
                 MapConfigurations.MapType.PASSED_MAP,
                 MapConfigurations.MapType.EXAMPLE_MAP,
                 MapConfigurations.MapType.RUN_MAP,
@@ -720,83 +727,83 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return returnReplacement;
     }
 
-    public List<?> get(ElementMatch element) {
-        String categoryName = element.category.replaceFirst("(?i:s)$", "");
-        boolean noQuotedText = element.defaultText == null || element.defaultText.isNullOrBlank();
-        if (categoryName.equals(TABLE_KEY)) {
-            if (noQuotedText) {
-                return element.parentPhrase.getPhraseParsingMap().getPhraseMap().getAsList(TABLE_KEY);
-            } else {
-                List<JsonNode> tableList = getDataTableMap().getAsList(TABLE_KEY);
-                List<String> tableNames = new ArrayList<>();
-                List<JsonNode> tableNodes = new ArrayList<>();
-                for (JsonNode jsonNode : tableList) {
-                    if (jsonNode instanceof ObjectNode objectNode) {
-                        String tableName = objectNode.fieldNames().next();
-                        tableNames.add(tableName);
-                        tableNodes.add(MAPPER.valueToTree(objectNode.get(tableName)));
-                    }
-                }
-                return filterGroupedValues(tableNames, tableNodes, element, false);
-            }
-        } else if (categoryName.equals(DOCSTRING_KEY)) {
-            if (noQuotedText) {
-                return element.parentPhrase.getPhraseParsingMap().getPhraseMap().getAsList(DOCSTRING_KEY);
-            } else {
-                ObjectNode objectNode = (ObjectNode) getDocStringMap().get(DOCSTRING_KEY);
-                return new ArrayList<>(Collections.singleton(objectNode));
-            }
-        }
-        NodeMap phraseMap = getPhraseMap();
-
-        switch (categoryName) {
-            case ENTRY_KEY:
-                JsonNode jsonNode = phraseMap.getRoot().get(ROW_KEY);
-                ArrayList<JsonNode> list = new ArrayList<>();
-                if (jsonNode instanceof ArrayNode arrayNode) {
-                    arrayNode.forEach(list::add);
-                } else {
-                    phraseMap.getRoot().elements().forEachRemaining(list::add);
-                }
-                return list;
-            case ROW_KEY:
-                List<JsonNode> rowsArray = findRows(phraseMap.getRoot());
-                List<String> keyList = new ArrayList<>();
-                rowsArray.forEach(row -> keyList.add(row.values().next().get(0).asText()));
-                return filterGroupedValues(keyList, rowsArray, element, false);
-            case CELL_KEY:
-
-                List<JsonNode> cellsArray = findCells(phraseMap.getRoot());
-                List<String> cellKeys = new ArrayList<>();
-                List<String> cellValues = new ArrayList<>();
-
-                for (JsonNode cell : cellsArray) {
-                    if (cell.isObject() && cell.size() == 1) {
-                        cellKeys.add(cell.fieldNames().next());
-                        JsonNode value = cell.elements().next();
-                        cellValues.add(value == null || value.isNull() || value.isMissingNode() ? "" : value.asText(""));
-                    } else {
-                        cellKeys.add("");
-                        cellValues.add(cell == null || cell.isNull() || cell.isMissingNode() ? "" : cell.asText(""));
-                    }
-                }
-
-                List<Map<String, String>> keyedCellValues = new ArrayList<>(cellKeys.size());
-                for (int i = 0; i < cellKeys.size(); i++) {
-                    keyedCellValues.add(Map.of(cellKeys.get(i), cellValues.get(i)));
-                }
-
-                return filterGroupedValues(cellKeys, keyedCellValues, element, false);
-            case HEADER_KEY:
-                List<String> headers = findHeaders(phraseMap.root);
-                return filterGroupedValues(headers, headers, element, false);
-            case DATA_OBJECT_KEY:
-                return Collections.singletonList(get(element.defaultText.toString()));
-            default:
-                return null;
-        }
-
-    }
+//    public List<?> get(ElementMatch element) {
+//        String categoryName = element.category.replaceFirst("(?i:s)$", "");
+//        boolean noQuotedText = element.defaultText == null || element.defaultText.isNullOrBlank();
+//        if (categoryName.equals(TABLE_KEY)) {
+//            if (noQuotedText) {
+//                return element.parentPhrase.getPhraseParsingMap().getPhraseMap().getAsList(TABLE_KEY);
+//            } else {
+//                List<JsonNode> tableList = getDataTableMap().getAsList(TABLE_KEY);
+//                List<String> tableNames = new ArrayList<>();
+//                List<JsonNode> tableNodes = new ArrayList<>();
+//                for (JsonNode jsonNode : tableList) {
+//                    if (jsonNode instanceof ObjectNode objectNode) {
+//                        String tableName = objectNode.fieldNames().next();
+//                        tableNames.add(tableName);
+//                        tableNodes.add(MAPPER.valueToTree(objectNode.get(tableName)));
+//                    }
+//                }
+//                return filterGroupedValues(tableNames, tableNodes, element, false);
+//            }
+//        } else if (categoryName.equals(DOCSTRING_KEY)) {
+//            if (noQuotedText) {
+//                return element.parentPhrase.getPhraseParsingMap().getPhraseMap().getAsList(DOCSTRING_KEY);
+//            } else {
+//                ObjectNode objectNode = (ObjectNode) getDocStringMap().get(DOCSTRING_KEY);
+//                return new ArrayList<>(Collections.singleton(objectNode));
+//            }
+//        }
+//        NodeMap phraseMap = getPhraseMap();
+//
+//        switch (categoryName) {
+//            case ENTRY_KEY:
+//                JsonNode jsonNode = phraseMap.getRoot().get(ROW_KEY);
+//                ArrayList<JsonNode> list = new ArrayList<>();
+//                if (jsonNode instanceof ArrayNode arrayNode) {
+//                    arrayNode.forEach(list::add);
+//                } else {
+//                    phraseMap.getRoot().elements().forEachRemaining(list::add);
+//                }
+//                return list;
+//            case ROW_KEY:
+//                List<JsonNode> rowsArray = findRows(phraseMap.getRoot());
+//                List<String> keyList = new ArrayList<>();
+//                rowsArray.forEach(row -> keyList.add(row.values().next().get(0).asText()));
+//                return filterGroupedValues(keyList, rowsArray, element, false);
+//            case CELL_KEY:
+//
+//                List<JsonNode> cellsArray = findCells(phraseMap.getRoot());
+//                List<String> cellKeys = new ArrayList<>();
+//                List<String> cellValues = new ArrayList<>();
+//
+//                for (JsonNode cell : cellsArray) {
+//                    if (cell.isObject() && cell.size() == 1) {
+//                        cellKeys.add(cell.fieldNames().next());
+//                        JsonNode value = cell.elements().next();
+//                        cellValues.add(value == null || value.isNull() || value.isMissingNode() ? "" : value.asText(""));
+//                    } else {
+//                        cellKeys.add("");
+//                        cellValues.add(cell == null || cell.isNull() || cell.isMissingNode() ? "" : cell.asText(""));
+//                    }
+//                }
+//
+//                List<Map<String, String>> keyedCellValues = new ArrayList<>(cellKeys.size());
+//                for (int i = 0; i < cellKeys.size(); i++) {
+//                    keyedCellValues.add(Map.of(cellKeys.get(i), cellValues.get(i)));
+//                }
+//
+//                return filterGroupedValues(cellKeys, keyedCellValues, element, false);
+//            case HEADER_KEY:
+//                List<String> headers = findHeaders(phraseMap.root);
+//                return filterGroupedValues(headers, headers, element, false);
+//            case DATA_OBJECT_KEY:
+//                return Collections.singletonList(get(element.defaultText.toString()));
+//            default:
+//                return null;
+//        }
+//
+//    }
 
 
     @Override
@@ -1048,6 +1055,78 @@ public abstract class MappingProcessor implements Map<String, Object> {
     private static boolean hasText(String value) {
         return value != null && !value.isEmpty();
     }
+
+
+    public static DataMap getDataMap() {
+        return dataMap.get();
+    }
+
+    public static JsonNode getFromDataMap(String key) {
+        return dataMap.get().getData(key);
+    }
+
+    public static JsonNode getFromDataMap(ElementMatch elementMatch) {
+        return dataMap.get().getData(elementMatch);
+    }
+
+    public static void setInDataMap(ElementMatch elementMatch, DataTable dataTable) {
+        dataMap.get().setData(elementMatch, dataTable);
+    }
+
+
+
+
+    public static void setInDataMap(ElementMatch elementMatch, JsonNode jsonNode) {
+        dataMap.get().setData(elementMatch, jsonNode);
+    }
+
+    public static void setInDataMap(String key, JsonNode jsonNode) {
+        dataMap.get().setData(key, jsonNode);
+    }
+
+//    public static ValueWrapper dataMapGet(ElementMatch elementMatch) {
+//        Object object = dataMap.get().get(elementMatch.getKey());
+//        if(object instanceof ValueWrapper valueWrapper)
+//            return valueWrapper;
+//        return ValueWrapper.createValueWrapper(object , ValueWrapper.ValueTypes.DATA);
+//    }
+//
+//    public static ValueWrapper dataMapGet(String key) {
+//        List<ElementMatch> elementMatches = new ArrayList<>();
+//        try {
+//            elementMatches.addAll(getElementMatchesFromString(key));
+//        } catch (Exception e) {
+//            // ignore
+//        }
+//        if (!elementMatches.isEmpty() && elementMatches.getFirst().elementTypes.contains(ElementType.DATA_TYPE))
+//            return dataMapGet(elementMatches.getFirst());
+//
+//        Object object =  dataMap.get().get(key);
+//        if(object instanceof ValueWrapper valueWrapper)
+//            return valueWrapper;
+//        return ValueWrapper.createValueWrapper(object , ValueWrapper.ValueTypes.DATA);
+//    }
+//
+//
+//    public static void dataMapPut(String key, Object value) {
+//        ValueWrapper valueWrapper = value instanceof ValueWrapper valueWrapper1 ? valueWrapper1 : ValueWrapper.createValueWrapper(value , ValueWrapper.ValueTypes.DATA);
+//
+//        List<ElementMatch> elementMatches = new ArrayList<>();
+//        try {
+//            elementMatches.addAll(getElementMatchesFromString(key));
+//        } catch (Exception e) {
+//            // ignore
+//        }
+//        if (!elementMatches.isEmpty() && elementMatches.getFirst().elementTypes.contains(ElementType.DATA_TYPE))
+//            dataMapPut(elementMatches.getFirst(), valueWrapper);
+//        else
+//            dataMap.get().put(key, valueWrapper);
+//    }
+//
+//    public static void dataMapPut(ElementMatch elementMatch, Object value) {
+//        ValueWrapper valueWrapper = value instanceof ValueWrapper valueWrapper1 ? valueWrapper1 : ValueWrapper.createValueWrapper(value , ValueWrapper.ValueTypes.DATA);
+//        dataMap.get().put(elementMatch.getKey(), value);
+//    }
 
 
 }

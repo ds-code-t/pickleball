@@ -8,6 +8,7 @@ import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.mappings.NodeMap;
+import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 
 import java.util.Map;
 
@@ -16,8 +17,10 @@ import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static io.cucumber.core.runner.util.TableUtils.toFlatStringMultimap;
 import static io.cucumber.core.runner.util.TableUtils.toRowsStringMultimap;
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
-import static tools.dscode.common.mappings.MappingProcessor.getDataTableMap;
+import static tools.dscode.common.mappings.MappingProcessor.getDataMap;
+//import static tools.dscode.common.mappings.MappingProcessor.getDataTableMap;
 import static tools.dscode.common.mappings.MappingProcessor.getRunMap;
+import static tools.dscode.common.mappings.MappingProcessor.setInDataMap;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.variables.RunVars.resolveFromVars;
 
@@ -58,7 +61,13 @@ public class MappingSteps extends CoreSteps {
 
     @Given("^SET \"(.*)\" DATA TABLE$")
     public static void setDataTable(String tableName, DataTable dataTable) {
-        getDataTableMap().put(TABLE_KEY, Map.of(tableName.trim(), toRowsStringMultimap(dataTable)));
+//        getDataTableMap().put(TABLE_KEY, Map.of(tableName.trim(), toRowsStringMultimap(dataTable)));
+//        getDataMap().put(TABLE_KEY, Map.of(tableName.trim(), toRowsStringMultimap(dataTable)));
+        ElementMatch tableElement = NodeMap.getDataElementMatch("\"" + tableName + "\" Data Table");
+        if (tableElement != null) {
+            setInDataMap(tableElement, dataTable);
+        }
+        getDataMap().put(TABLE_KEY, Map.of(tableName.trim(), toRowsStringMultimap(dataTable)));
         logInfo("Setting Data Table" + tableName + ":" + dataTable);
     }
 

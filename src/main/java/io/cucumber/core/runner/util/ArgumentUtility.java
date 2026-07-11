@@ -9,10 +9,12 @@ import io.cucumber.datatable.DataTableTypeRegistryTableConverter;
 import io.cucumber.docstring.DocString;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 public final class ArgumentUtility {
@@ -73,6 +75,36 @@ public final class ArgumentUtility {
      */
     public static DataTableArgument emptyDataTable() {
         return dataTable("| |");
+    }
+
+    /** Extract the {@link DataTable} represented by a {@link DataTableArgument}. */
+    public static DataTable toDataTable(DataTableArgument argument) {
+        Objects.requireNonNull(argument);
+        try {
+            Field field = DataTableArgument.class.getDeclaredField("argument");
+            field.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            List<List<String>> rows = (List<List<String>>) field.get(argument);
+            return createDataTableWithDefaultConverter(rows);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Unable to extract DataTable from DataTableArgument", e);
+        }
+    }
+
+    /** Extract the {@link DocString} represented by a {@link DocStringArgument}. */
+    public static DocString toDocString(DocStringArgument argument) {
+        Objects.requireNonNull(argument);
+        try {
+            Field contentField = DocStringArgument.class.getDeclaredField("content");
+            Field contentTypeField = DocStringArgument.class.getDeclaredField("contentType");
+            contentField.setAccessible(true);
+            contentTypeField.setAccessible(true);
+            String content = (String) contentField.get(argument);
+            String contentType = (String) contentTypeField.get(argument);
+            return DocString.create(content, contentType);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException("Unable to extract DocString from DocStringArgument", e);
+        }
     }
 
     // ---------- Internals ----------

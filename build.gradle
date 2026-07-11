@@ -85,6 +85,8 @@ dependencies {
     api("org.junit.platform:junit-platform-launcher:1.13.4")
     api("org.junit.jupiter:junit-jupiter-api:5.13.4")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.13.4")
+    testImplementation("io.cucumber:datatable:${cucumberVersion}")
+    testImplementation("io.cucumber:cucumber-expressions:18.0.1")
 
     api("com.google.guava:guava:33.5.0-jre")
     api("com.fasterxml.jackson.core:jackson-databind:2.20.0")
@@ -644,4 +646,11 @@ configurations.named("testRuntimeClasspath") {
     exclude group: "io.cucumber", module: "cucumber-plugin"
     exclude group: "io.cucumber", module: "messages"
     exclude group: "io.cucumber", module: "gherkin"
+}
+tasks.register('dataComparatorSmokeTest', JavaExec) {
+    group = 'verification'
+    description = 'Runs DataComparatorSmokeTest'
+    dependsOn 'ajcMain', 'expandWoven'
+    classpath = files(wovenExpanded, sourceSets.main.runtimeClasspath, sourceSets.main.output)
+    mainClass = 'tools.dscode.common.dataoperations.DataComparatorSmokeTest'
 }

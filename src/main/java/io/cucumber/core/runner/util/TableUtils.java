@@ -20,13 +20,16 @@ public class TableUtils {
     public static final String DOCSTRING_KEY = "Doc String";
     public static final String TABLE_KEY = "Data Table";
     public static final String ROW_KEY = "Data Row";
+    public static final String COLUMN_KEY = "Data Column";
     public static final String CELL_KEY = "Data Cell";
     public static final String HEADER_KEY = "Data Header";
     public static final String VALUE_KEY = "Data Value";
     public static final String DATA_OBJECT_KEY = "Data";
     public static final String ENTRY_KEY = "Data Entry";
     public static final String LIST_KEY = "List";
+    public static final String COLUMN_LIST_KEY = "Column List";
     public static final String MAP_KEY = "Map";
+//    public static final String FILTERED_LIST_KEY = "FILTERED LIST";
 
     public static <K, V> LinkedListMultimap<String, LinkedListMultimap<K, V>> toRowsMultimap(DataTable dataTable) {
         List<LinkedListMultimap<K, V>> rowList = toListOfMultimap(dataTable);

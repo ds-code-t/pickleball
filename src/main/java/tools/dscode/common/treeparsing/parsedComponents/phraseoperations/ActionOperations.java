@@ -1,5 +1,6 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.cucumber.core.runner.StepExtension;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.NoAlertPresentException;
@@ -36,11 +37,13 @@ import static tools.dscode.common.domoperations.KeyParser.sendComplexKeys;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitForDuration;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
+import tools.dscode.common.mappings.MappingProcessor;
 import static tools.dscode.common.mappings.ParsingMap.configsRoot;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
+import static tools.dscode.common.treeparsing.parsedComponents.ElementType.DATA_TYPE;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE;
 import static tools.dscode.common.treeparsing.parsedComponents.phraseoperations.ElementMatching.processElementMatches;
 import static tools.dscode.common.util.StringUtilities.limitText;
@@ -107,7 +110,9 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch firstValueElement = valueElements.isEmpty() ? null : valueElements.getFirst();
             ElementMatch keyElement = phraseData.getElementMatches().stream().filter(e -> e.elementTypes.contains(ElementType.KEY_VALUE)).findFirst().orElse(null);
 
-            if (keyElement == null && regexMatchElement == null && valueElements.size() == 2) {
+
+            final ElementMatch dataElementKey = (firstValueElement != null && firstValueElement.elementTypes.contains(DATA_TYPE) && valueElements.size() == 1) ? firstValueElement : null;
+             if (dataElementKey == null && keyElement == null && regexMatchElement == null && valueElements.size() == 2) {
                 firstValueElement = valueElements.get(1);
                 keyElement = valueElements.get(0);
             }
@@ -129,7 +134,9 @@ public enum ActionOperations implements OperationsInterface {
             }
             final Pattern pattern = tempPattern;
 
-            String keyName = keyElement == null ? (regexMatchWithReference ? regexReference : "saved") : keyElement.getValue().toString();
+               String keyString = keyElement == null ? (regexMatchWithReference ? regexReference : "saved") : keyElement.getValue().toString();
+
+
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 for (ValueWrapper valueWrapper : valueElement.getValues()) {
                     Object value = valueWrapper.getValue();
@@ -163,8 +170,11 @@ public enum ActionOperations implements OperationsInterface {
                             }
                         }
                     }
-                    logInfo("Saving '" + limitText(value, 10000) + "' to key: '" + keyName + "'");
-                    getRunningParsingMap().put(keyName, value);
+                    logInfo("Saving '" + limitText(value, 10000) + "' to key: '" + keyString + "'");
+                    if (dataElementKey != null)
+                        MappingProcessor.getDataMap().setData(dataElementKey, value);
+                    else
+                        getRunningParsingMap().put(keyString, value);
                 }
                 return true;
             });

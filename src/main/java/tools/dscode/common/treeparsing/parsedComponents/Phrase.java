@@ -194,9 +194,9 @@ public final class Phrase extends PhraseData {
             categoryFlags.add(ExecutionDictionary.CategoryFlags.DATA_CONTEXT);
 //            String categoryName = firstElement.category.replaceFirst("(?i:s)$", "");
             String key = null;
-            List obj;
+            List obj = null;
             try {
-                obj = getPhraseParsingMap().get(firstElement);
+//                obj = getPhraseParsingMap().get(firstElement);
             } catch (NullPointerException e) {
                 obj = null;
             }

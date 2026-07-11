@@ -98,8 +98,12 @@ public class ScenarioStep extends StepExtension {
             StepExtension previousSibling = currentNesting > lastNestingLevel ? null : nestingMap.get(currentNesting);
             if (currentStep.dataArgumentStep) {
                 if (previousSibling != null) {
-                    previousSibling.dataTable = currentStep.dataTable;
-                    previousSibling.docString = currentStep.docString;
+                    previousSibling.dataArgumentRaw = currentStep.pickleStepTestStep.getDefinitionMatch().getArguments().getLast();
+                    previousSibling.dataArgument = (com.fasterxml.jackson.databind.JsonNode) currentStep.pickleStepTestStep.getDefinitionMatch().getArguments().getLast().getValue();
+                    System.out.println("@@this: " + this);
+                    System.out.println("@@previousSibling.dataArgument===: " + previousSibling.dataArgument);
+//                    previousSibling.dataTable = currentStep.dataTable;
+//                    previousSibling.docString = currentStep.docString;
                     previousSibling.dataContextStepNodeMap = currentStep.dataContextStepNodeMap;
 //                    previousSibling.getStepParsingMap().addMaps(currentStep.dataContextStepNodeMap);
                 }
