@@ -21,7 +21,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
+import static io.cucumber.core.runner.util.DataUtils.TABLE_KEY;
 import static tools.dscode.common.GlobalConstants.META_FLAG;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementMatch.getElementMatchesFromString;
 
@@ -266,6 +266,7 @@ public class NodeMap  extends ValueFormatting{
         List<ElementMatch> elementMatches;
         try {
             elementMatches = new ArrayList<>(getElementMatchesFromString(key));
+            System.out.println("@@elementMatches=== " + elementMatches);
         } catch (Exception e) {
             return null;
         }

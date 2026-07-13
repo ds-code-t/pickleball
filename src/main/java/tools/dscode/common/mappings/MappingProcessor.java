@@ -25,13 +25,12 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
-import static io.cucumber.core.runner.util.TableUtils.DATA_OBJECT_KEY;
-import static io.cucumber.core.runner.util.TableUtils.DOCSTRING_KEY;
-import static io.cucumber.core.runner.util.TableUtils.HEADER_KEY;
-import static io.cucumber.core.runner.util.TableUtils.ENTRY_KEY;
-import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
-import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
+import static io.cucumber.core.runner.util.DataUtils.CELL_KEY;
+import static io.cucumber.core.runner.util.DataUtils.DOCSTRING_KEY;
+import static io.cucumber.core.runner.util.DataUtils.HEADER_KEY;
+import static io.cucumber.core.runner.util.DataUtils.ENTRY_KEY;
+import static io.cucumber.core.runner.util.DataUtils.ROW_KEY;
+import static io.cucumber.core.runner.util.DataUtils.TABLE_KEY;
 import static tools.dscode.common.GlobalConstants.CLOSE_ANGLE_REPLACEMENT_SUB;
 import static tools.dscode.common.GlobalConstants.CLOSE_BRACKET_SUB_A;
 import static tools.dscode.common.GlobalConstants.CLOSE_BRACKET_SUB_B;
@@ -229,9 +228,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
 
     public void addMaps(List<NodeMap> nodes) {
-        boolean log = (nodes.stream().anyMatch(m -> m.getMapType() == MapConfigurations.MapType.STEP_MAP));
-        if (log) {
-        }
+//        boolean log = (nodes.stream().anyMatch(m -> m.getMapType() == MapConfigurations.MapType.STEP_MAP));
+//        if (log) {
+//        }
         if (nodes != null) {
             for (NodeMap node : nodes) {
                 maps.put(node.getMapType(), node);
@@ -244,9 +243,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     public void addMapsToStart(List<NodeMap> nodes) {
-        boolean log = (nodes.stream().anyMatch(m -> m.getMapType() == MapConfigurations.MapType.STEP_MAP));
-        if (log) {
-        }
+//        boolean log = (nodes.stream().anyMatch(m -> m.getMapType() == MapConfigurations.MapType.STEP_MAP));
+//        if (log) {
+//        }
         List<List<NodeMap>> grouped = groupByMapType(nodes);
         for (List<NodeMap> list : grouped) {
             if (list.isEmpty())

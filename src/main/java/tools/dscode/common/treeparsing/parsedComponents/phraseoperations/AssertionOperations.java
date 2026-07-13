@@ -17,12 +17,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
-import static io.cucumber.core.runner.util.TableUtils.HEADER_KEY;
-import static io.cucumber.core.runner.util.TableUtils.LIST_KEY;
-import static io.cucumber.core.runner.util.TableUtils.MAP_KEY;
-import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
-import static io.cucumber.core.runner.util.TableUtils.VALUE_KEY;
+import static io.cucumber.core.runner.util.DataUtils.CELL_KEY;
+import static io.cucumber.core.runner.util.DataUtils.HEADER_KEY;
+import static io.cucumber.core.runner.util.DataUtils.LIST_KEY;
+import static io.cucumber.core.runner.util.DataUtils.MAP_KEY;
+import static io.cucumber.core.runner.util.DataUtils.TABLE_KEY;
+import static io.cucumber.core.runner.util.DataUtils.VALUE_KEY;
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.RETURNS_VALUE;

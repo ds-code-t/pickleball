@@ -32,12 +32,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
-import static io.cucumber.core.runner.util.TableUtils.ENTRY_KEY;
-import static io.cucumber.core.runner.util.TableUtils.LIST_KEY;
-import static io.cucumber.core.runner.util.TableUtils.MAP_KEY;
-import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
-import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
+import static io.cucumber.core.runner.util.DataUtils.CELL_KEY;
+import static io.cucumber.core.runner.util.DataUtils.LIST_KEY;
+import static io.cucumber.core.runner.util.DataUtils.MAP_KEY;
+import static io.cucumber.core.runner.util.DataUtils.ROW_KEY;
+import static io.cucumber.core.runner.util.DataUtils.TABLE_KEY;
 import static tools.dscode.common.assertions.ValueWrapper.ValueTypes.DURATION;
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
 import static tools.dscode.common.browseroperations.BrowserAlerts.getText;
@@ -47,6 +46,7 @@ import static tools.dscode.common.domoperations.elementstates.BinaryStateConditi
 import static tools.dscode.common.domoperations.elementstates.BinaryStateConditions.onElement;
 import static tools.dscode.common.domoperations.elementstates.BlankElementConditions.blankElement;
 import static tools.dscode.common.domoperations.elementstates.BlankElementConditions.nonBlankElement;
+import static tools.dscode.common.gherkinoperations.DynamicExecution.getCustomStep;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
@@ -668,13 +668,27 @@ public class ElementMatch {
 
     public String getKey(String... suffixes) {
         String suffix = suffixes== null || suffixes.length==0 ? "" : "-" +  String.join("-", suffixes);
-        return (defaultText == null || defaultText.isNullOrBlank() ? "" : defaultText.asNormalizedText() + "_") +  categorySingular;
+        return (defaultText == null || defaultText.isNullOrBlank() ? "" : defaultText.asNormalizedText() + "_") +  categorySingular + suffix;
     }
 
     public static List<ElementMatch> getElementMatchesFromString(String elementString) {
-        StepExtension stepExtension = getRunningStep().modifyStepExtension(" , " + elementString);
-        ParsedLine lineData = createParsedLine(stepExtension);
-        return lineData.phrases().stream().flatMap(phraseData -> phraseData.getElementMatches().stream()).toList();
+        System.out.println("@@elementString: " + elementString);
+
+//            StepExtension stepExtension = getCustomStep(" , " + elementString);
+//            System.out.println("@@stepExtension: " + stepExtension);
+//            ParsedLine lineData = createParsedLine(stepExtension);
+        try {
+            ParsedLine lineData = new ParsedLine(" , " + elementString);
+            System.out.println("@@phrases(): " + lineData.phrases());
+            System.out.println("elementMAtches: " +  lineData.phrases().getFirst().getElementMatches());
+
+            return lineData.phrases().stream().flatMap(phraseData -> phraseData.getElementMatches().stream()).toList();
+        }
+        catch (Throwable t)
+        {
+            t.printStackTrace();
+            throw new RuntimeException(t);
+        }
     }
 
 

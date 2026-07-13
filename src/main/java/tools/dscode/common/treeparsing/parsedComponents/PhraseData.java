@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.xpathy.XPathy;
+import io.cucumber.core.runner.StepExtension;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebElement;
 import tools.dscode.common.annotations.Phase;
@@ -31,12 +32,13 @@ import java.util.stream.Collectors;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
-import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
+import static io.cucumber.core.runner.util.DataUtils.ROW_KEY;
 import static tools.dscode.common.GlobalConstants.BOOK_END;
 import static tools.dscode.common.GlobalConstants.META_TEXT_SEPARATOR;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 import static tools.dscode.common.domoperations.LeanWaits.waitForPhraseEntities;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
+import static tools.dscode.common.mappings.ParsingMap.getGlobalsParsingmap;
 import static tools.dscode.common.mappings.StepMapping.copytoNewParsingMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.logError;
@@ -146,7 +148,8 @@ public abstract class PhraseData extends PassedData {
         if (phraseParsingMap == null) {
             PhraseData previousPhrase = getPreviousPhrase();
             if (isNewContext() || previousPhrase == null || previousPhrase.termination == '.' || previousPhrase.termination == '?') {
-                phraseParsingMap = getRunningStep().getStepParsingMap();
+                StepExtension currentStep = getRunningStep();
+                phraseParsingMap = currentStep == null ?  getGlobalsParsingmap() : getRunningStep().getStepParsingMap();
             } else {
                 phraseParsingMap = previousPhrase.getPhraseParsingMap();
             }

@@ -9,7 +9,7 @@ import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import java.util.ArrayList;
 import java.util.List;
 
-import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
+import static io.cucumber.core.runner.util.DataUtils.TABLE_KEY;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementMatch.getElementMatchesFromString;
 
 public class DataMap extends NodeMap {

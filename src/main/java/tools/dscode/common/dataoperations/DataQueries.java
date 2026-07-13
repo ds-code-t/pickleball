@@ -2,7 +2,7 @@
 //
 //import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 //
-//import static io.cucumber.core.runner.util.TableUtils.VALUE_KEY;
+//import static io.cucumber.core.runner.util.DataUtils.VALUE_KEY;
 //import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 //
 //public class DataQueries {

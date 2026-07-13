@@ -113,7 +113,7 @@ public abstract class PickleballRunner {
     }
 
     public static String getOptionsString() {
-        return INSTANCE.values.get(PKB_OPTIONS);
+        return getInstance().values.get(PKB_OPTIONS);
     }
 
     public synchronized void captureCucumberCliArgs(String[] argv) {

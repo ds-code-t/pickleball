@@ -10,18 +10,17 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
-import static io.cucumber.core.runner.util.TableUtils.COLUMN_KEY;
-import static io.cucumber.core.runner.util.TableUtils.COLUMN_LIST_KEY;
-import static io.cucumber.core.runner.util.TableUtils.DATA_OBJECT_KEY;
-import static io.cucumber.core.runner.util.TableUtils.DOCSTRING_KEY;
-import static io.cucumber.core.runner.util.TableUtils.HEADER_KEY;
-import static io.cucumber.core.runner.util.TableUtils.ENTRY_KEY;
-import static io.cucumber.core.runner.util.TableUtils.LIST_KEY;
-import static io.cucumber.core.runner.util.TableUtils.MAP_KEY;
-import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
-import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
-import static io.cucumber.core.runner.util.TableUtils.VALUE_KEY;
+import static io.cucumber.core.runner.util.DataUtils.CELL_KEY;
+import static io.cucumber.core.runner.util.DataUtils.COLUMN_KEY;
+import static io.cucumber.core.runner.util.DataUtils.COLUMN_LIST_KEY;
+import static io.cucumber.core.runner.util.DataUtils.DOCSTRING_KEY;
+import static io.cucumber.core.runner.util.DataUtils.HEADER_KEY;
+import static io.cucumber.core.runner.util.DataUtils.ENTRY_KEY;
+import static io.cucumber.core.runner.util.DataUtils.LIST_KEY;
+import static io.cucumber.core.runner.util.DataUtils.MAP_KEY;
+import static io.cucumber.core.runner.util.DataUtils.ROW_KEY;
+import static io.cucumber.core.runner.util.DataUtils.TABLE_KEY;
+import static io.cucumber.core.runner.util.DataUtils.VALUE_KEY;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 
 public enum ElementType {
@@ -77,7 +76,7 @@ public enum ElementType {
 
 
     public static final Set<String> DATA_ELEMENTS =
-            Set.of(DOCSTRING_KEY, TABLE_KEY, ROW_KEY, CELL_KEY, HEADER_KEY, VALUE_KEY, DATA_OBJECT_KEY, ENTRY_KEY, LIST_KEY, MAP_KEY);
+            Set.of(DOCSTRING_KEY, TABLE_KEY, ROW_KEY, CELL_KEY, HEADER_KEY, VALUE_KEY,  ENTRY_KEY, LIST_KEY, MAP_KEY);
 
     public static final Set<String> DATA_TABLE_ELEMENTS =
             Set.of(TABLE_KEY, ROW_KEY, COLUMN_KEY,  CELL_KEY, HEADER_KEY, VALUE_KEY, ENTRY_KEY , COLUMN_LIST_KEY);

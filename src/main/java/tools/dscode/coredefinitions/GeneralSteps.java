@@ -25,7 +25,7 @@ import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.GlobalState.pickleballLog;
 import static io.cucumber.core.runner.modularexecutions.CucumberScanUtil.getStepReturn;
-import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
+import static io.cucumber.core.runner.util.DataUtils.TABLE_KEY;
 import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.GlobalConstants.INFO_STEP;
 import static tools.dscode.common.GlobalConstants.META_FLAG;

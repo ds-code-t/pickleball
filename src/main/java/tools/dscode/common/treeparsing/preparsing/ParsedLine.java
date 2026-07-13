@@ -27,7 +27,7 @@ public final class ParsedLine extends LineData {
     }
 
 
-    private ParsedLine(String input) {
+    public ParsedLine(String input) {
         super(input);
     }
 

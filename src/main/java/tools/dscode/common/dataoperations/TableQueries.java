@@ -9,8 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
-import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
+import static io.cucumber.core.runner.util.DataUtils.CELL_KEY;
+import static io.cucumber.core.runner.util.DataUtils.ROW_KEY;
 import static tools.dscode.common.GlobalConstants.META_FLAG;
 
 public final class TableQueries {

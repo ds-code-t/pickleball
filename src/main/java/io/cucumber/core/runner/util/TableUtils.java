@@ -13,23 +13,69 @@ import java.util.Optional;
 
 import static io.cucumber.core.runner.util.CucumberQueryUtil.examplesOf;
 import static io.cucumber.core.runner.util.CucumberQueryUtil.messagePickle;
+import static io.cucumber.core.runner.util.DataUtils.ROW_KEY;
 
 
 public class TableUtils {
 
-    public static final String DOCSTRING_KEY = "Doc String";
-    public static final String TABLE_KEY = "Data Table";
-    public static final String ROW_KEY = "Data Row";
-    public static final String COLUMN_KEY = "Data Column";
-    public static final String CELL_KEY = "Data Cell";
-    public static final String HEADER_KEY = "Data Header";
-    public static final String VALUE_KEY = "Data Value";
-    public static final String DATA_OBJECT_KEY = "Data";
-    public static final String ENTRY_KEY = "Data Entry";
-    public static final String LIST_KEY = "List";
-    public static final String COLUMN_LIST_KEY = "Column List";
-    public static final String MAP_KEY = "Map";
+//    public static final String DOCSTRING_KEY = "Doc String";
+//    public static final String TABLE_KEY = "Data Table";
+//    public static final String ROW_KEY = "Data Row";
+//    public static final String COLUMN_KEY = "Data Column";
+//    public static final String CELL_KEY = "Data Cell";
+//    public static final String HEADER_KEY = "Data Header";
+//    public static final String VALUE_KEY = "Data Value";
+//    public static final String DATA_OBJECT_KEY = "Data";
+//    public static final String ENTRY_KEY = "Data Entry";
+//    public static final String LIST_KEY = "List";
+//    public static final String COLUMN_LIST_KEY = "Column List";
+//    public static final String MAP_KEY = "Map";
 //    public static final String FILTERED_LIST_KEY = "FILTERED LIST";
+
+
+    public static <K, V> LinkedListMultimap<String, LinkedListMultimap<K, V>>
+    toRowsMultimapWithFirstCellKeys(DataTable dataTable) {
+
+        Objects.requireNonNull(dataTable, "dataTable must not be null");
+
+        List<List<String>> table = dataTable.asLists();
+        LinkedListMultimap<String, LinkedListMultimap<K, V>> returnMap =
+                LinkedListMultimap.create();
+
+        // An empty table or header-only table has no data rows.
+        if (table == null || table.size() < 2) {
+            return returnMap;
+        }
+
+        List<String> headerStrings = table.getFirst();
+        if (headerStrings == null || headerStrings.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "The DataTable must contain at least one column");
+        }
+
+        @SuppressWarnings("unchecked")
+        List<? extends K> header = (List<? extends K>) headerStrings;
+
+        for (int rowIndex = 1; rowIndex < table.size(); rowIndex++) {
+            List<String> rowStrings = table.get(rowIndex);
+
+            if (rowStrings == null || rowStrings.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Data row " + rowIndex
+                                + " must contain at least one value");
+            }
+
+            String rowKey = rowStrings.getFirst();
+
+            @SuppressWarnings("unchecked")
+            List<? extends V> row = (List<? extends V>) rowStrings;
+
+            returnMap.put(rowKey, toMultimap(header, row));
+        }
+
+        return returnMap;
+    }
+
 
     public static <K, V> LinkedListMultimap<String, LinkedListMultimap<K, V>> toRowsMultimap(DataTable dataTable) {
         List<LinkedListMultimap<K, V>> rowList = toListOfMultimap(dataTable);

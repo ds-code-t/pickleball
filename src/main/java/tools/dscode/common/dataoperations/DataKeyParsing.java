@@ -10,11 +10,10 @@ import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static io.cucumber.core.runner.util.TableUtils.DOCSTRING_KEY;
-import static io.cucumber.core.runner.util.TableUtils.LIST_KEY;
-import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
-import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
-import static io.cucumber.core.runner.util.TableUtils.toRowsStringMultimap;
+import static io.cucumber.core.runner.util.DataUtils.DOCSTRING_KEY;
+import static io.cucumber.core.runner.util.DataUtils.LIST_KEY;
+import static io.cucumber.core.runner.util.DataUtils.ROW_KEY;
+import static io.cucumber.core.runner.util.DataUtils.TABLE_KEY;
 import static tools.dscode.common.GlobalConstants.META_FLAG;
 import static tools.dscode.common.evaluations.AviatorUtil.isTruthy;
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;

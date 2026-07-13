@@ -15,7 +15,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
+import static io.cucumber.core.runner.util.DataUtils.ROW_KEY;
 
 public final class DataComparisons {
 

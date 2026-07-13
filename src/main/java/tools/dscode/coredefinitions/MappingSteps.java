@@ -13,7 +13,7 @@ import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import java.util.Map;
 
 import static io.cucumber.core.runner.GlobalState.*;
-import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
+import static io.cucumber.core.runner.util.DataUtils.TABLE_KEY;
 import static io.cucumber.core.runner.util.TableUtils.toFlatStringMultimap;
 import static io.cucumber.core.runner.util.TableUtils.toRowsStringMultimap;
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
