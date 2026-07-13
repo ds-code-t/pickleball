@@ -1,0 +1,27 @@
+# Copy this file to:
+# src/test/resources/pickleball_local.properties
+#
+# Keep the copied local file out of Git:
+# src/test/resources/pickleball_local.properties
+
+# Select only the scenarios needed for local development.
+pkb_tags=@local
+
+# Local browser and diagnostics.
+pkb_browser=chrome
+pkb_debugbrowser=true
+# pkb_loglevel=trace
+# pkb_debugargs=elementsnapshot
+# pkb_debugargs=logallsteps,nobase,rawxpaths
+
+# Repeating-step limits.
+# pkb_steprepeatmaxtime=20
+# pkb_steprepeatmaxcount=300
+
+# JUnit filtering/report behavior.
+# pkb_suppressjunitfilteredskips=false
+
+# HTML reports.
+# pkb_htmlreportformat=scenarioReport,compositeReport
+# pkb_compositereport=reports/local-summary.html
+# pkb_scenarioreport=reports/<SCENARIO_NAME>-<TIME>.html
