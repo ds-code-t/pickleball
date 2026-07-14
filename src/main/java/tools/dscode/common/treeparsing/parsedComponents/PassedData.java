@@ -132,7 +132,6 @@ public abstract class PassedData {
     }
 
 
-
     public List<ElementMatch> getClosestWebElementMatches() {
         return getAllElementMatchesPreviousFallback(HTML_ELEMENT);
     }
@@ -401,7 +400,7 @@ public abstract class PassedData {
     public PhraseData getLastOperationPhrase() {
         PhraseData currentPhrase = (PhraseData) this;
 
-        while ( (currentPhrase = currentPhrase.getPreviousPhraseWithinBoundary()) != null) {
+        while ((currentPhrase = currentPhrase.getPreviousPhraseWithinBoundary()) != null) {
             if (currentPhrase.operationInheritancePhrase == null && !currentPhrase.getOperation().isBlank()) {
                 return currentPhrase;
             }
@@ -415,8 +414,16 @@ public abstract class PassedData {
                 && operationInheritancePhrase == null
                 && getOperation().isBlank()
                 && !elementMatches.isEmpty()) {
-
-            if ((operationInheritancePhrase = getLastOperationPhrase()) != null) {
+            if (!assertion.isBlank()) {
+                PhraseData nextOperationPhrase = getNextOperationPhrase();
+                if (nextOperationPhrase != null || nextOperationPhrase.assertion.isBlank()) {
+                    setAssertion("true");
+                } else {
+                    operationInheritancePhrase = nextOperationPhrase;
+                    operationIndex = 10000;
+                    setInheritedOperationFromPhrase(nextOperationPhrase);
+                }
+            } else if ((operationInheritancePhrase = getLastOperationPhrase()) != null) {
                 operationIndex = 0;
                 setInheritedOperationFromPhrase(operationInheritancePhrase);
             } else if ((operationInheritancePhrase = getNextOperationPhrase()) != null) {

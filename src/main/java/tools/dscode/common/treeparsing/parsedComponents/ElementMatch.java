@@ -162,7 +162,7 @@ public class ElementMatch {
             }
         });
 
-        if (elementNode.localStateBoolean("text")) {
+        if (elementNode.getFromLocalState("text") != null) {
             textOps.add(new TextOp(elementNode.getValueWrapper("text"), ExecutionDictionary.Op.EQUALS));
         }
 

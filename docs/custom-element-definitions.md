@@ -1,18 +1,20 @@
 # Custom Element and XPath Definitions
 
-Pickleball's dynamic steps resolve natural-language element categories through an `ExecutionDictionary`. A consumer project can extend that dictionary in its test runner so project-specific terms map to XPath expressions or custom context behavior.
+> This page is for project maintainers. Feature authors normally use the element vocabulary that has already been configured for the project.
 
-Examples of project vocabulary might include:
+A project can add business-specific element words so feature files describe the application in familiar terms:
 
-- `Submit Button`
-- `Top Panel`
-- `Account Row`
-- `Results Frame`
-- `Form Field`
+```gherkin
+Then , in the "Top Panel", click the "Submit" Button
+Then , from the "Accounts" Table, verify the "Primary" Account Row is displayed
+Then , switch to the "Results Frame"
+```
 
-## Register definitions before the Cucumber run
+The feature file should describe the application. The test runner can define how words such as `Top Panel`, `Account Row`, or `Results Frame` locate real page elements.
 
-Add a lifecycle hook to the same runner used for initial setup:
+## Add definitions during project startup
+
+The initial dependency and test runner remain the only required setup. Custom definitions are optional additions to the runner.
 
 ```java
 package com.example.tests;
@@ -60,18 +62,18 @@ public class PickleballTests extends PickleballRunner {
 }
 ```
 
-The initial dependency and runner remain the only required setup. This hook is optional customization placed inside the runner when a project needs its own element vocabulary.
+Register shared vocabulary before the Cucumber run so it is available to every feature.
 
-## Add a base XPath
+## Add a basic element category
 
 ```java
 dictionary.category("Project Panel")
     .addBase("//div");
 ```
 
-This associates `Project Panel` with a base XPath. Dynamic phrases can then use that category as part of their element description.
+Feature files can then use `Project Panel` as an element category.
 
-## Add an alternative definition
+## Add another way to recognize an element
 
 ```java
 dictionary.category("Submit Button")
@@ -79,9 +81,9 @@ dictionary.category("Submit Button")
         input.byAttribute(type).equals("submit"));
 ```
 
-This adds an alternative way to recognize a `Submit Button`: an `<input>` whose `type` attribute equals `submit`.
+This lets the phrase `Submit Button` include an `<input type="submit">` element.
 
-## Combine several XPath bases
+## Combine several HTML element types
 
 ```java
 dictionary.category("Form Field")
@@ -93,11 +95,9 @@ dictionary.category("Form Field")
         ));
 ```
 
-This combines several XPath expressions into one category definition.
+The business term `Form Field` can now represent inputs, text areas, or selects.
 
-## Inherit behavior from another category
-
-The consumer project demonstrates category composition:
+## Reuse an existing category
 
 ```java
 dictionary.category("Content Container")
@@ -106,11 +106,11 @@ dictionary.category("Content Container")
     .or("//section", "//div");
 ```
 
-Composition can reuse existing matching behavior while adding project-specific bases or alternatives.
+Reusing categories keeps the feature language consistent while allowing project-specific HTML structures.
 
-## Custom starting contexts
+## Define a page or section context
 
-A category can supply the DOM or browser context from which descendant searches begin:
+A category can establish the area in which child elements should be found:
 
 ```java
 dictionary.category("Top Panel")
@@ -118,7 +118,11 @@ dictionary.category("Top Panel")
         context);
 ```
 
-Starting contexts are useful when a phrase should scope later element searches to a panel, frame, section, or other project-defined region.
+This supports feature language such as:
+
+```gherkin
+Then , in the "Top Panel", click the "Save" Button
+```
 
 ## Register an iframe
 
@@ -134,7 +138,7 @@ dictionary.registerTopLevelIframe("Results Frame")
             .equals("iframeResult"));
 ```
 
-A project can also register default context-switching behavior using `registerDefaultStartingContext(...)`. The existing consumer runner contains a complete example that switches to a registered frame when available.
+A project can then describe the frame by its business name instead of repeating iframe-selection details in feature files.
 
 ## Mark a page context
 
@@ -143,11 +147,11 @@ dictionary.category("Results Frame")
     .flags(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT);
 ```
 
-A page-context flag identifies a category that changes the search context rather than merely describing a normal page element.
+A page-context category changes where later element searches begin rather than representing a normal clickable element.
 
-## Other lifecycle phases
+## Other project lifecycle hooks
 
-The runner may define project hooks for phases such as:
+The runner may also contain project-specific setup, cleanup, or diagnostics:
 
 ```java
 @LifecycleHook(Phase.AFTER_CUCUMBER_RUN)
@@ -159,15 +163,10 @@ public static void afterRun() {
 public static void afterScenarioFailure() {
     // Failure diagnostics
 }
-
-@LifecycleHook(Phase.AFTER_SCENARIO_PASS)
-public static void afterScenarioPass() {
-    // Successful-scenario handling
-}
 ```
 
-Keep shared element registration in `BEFORE_CUCUMBER_RUN` so the dictionary is ready before dynamic scenario steps are executed.
+Keep technical setup in the runner so feature files remain focused on the business flow.
 
 ---
 
-[Previous: Configuration](configuration.md) · [Documentation home](README.md) · [Next: Dynamic steps](dynamic-steps.md)
+[Previous: Execution Configuration](configuration.md) · [Documentation home](README.md)

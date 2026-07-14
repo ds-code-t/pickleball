@@ -1,18 +1,10 @@
 # Nested Steps and Conditional Flow
 
-Pickleball supports hierarchical step nesting. Nested dynamic steps can form conditional execution trees similar to structured programming.
-
-Nesting supports:
-
-- conditional gating of descendant steps;
-- DOM-context inheritance;
-- `if` / `else if` / `else` branches;
-- scoped execution trees; and
-- logical grouping of actions.
+Nested steps show that one part of a business flow belongs beneath another. They are useful for conditions, scoped page sections, and multi-step branches.
 
 ## Nesting syntax
 
-A nested step begins with one or more colons **before** the Cucumber step keyword. Each leading colon represents one nesting level:
+Place one or more colons before the Cucumber keyword. Each leading colon adds one level:
 
 ```gherkin
 Then , parent step:
@@ -20,53 +12,81 @@ Then , parent step:
 :: Then , grandchild step
 ```
 
-A colon only indicates nesting when it occurs before the step keyword.
-
-This is a nested step:
+A colon before the keyword controls nesting:
 
 ```gherkin
 : Then , click the "Submit" Button
 ```
 
-This is not a nesting prefix:
-
-```gherkin
-Then , click the "Submit" Button:
-```
-
-A trailing colon controls what the parent passes to its children.
-
-## Execution tree
-
-A scenario forms a tree containing:
-
-- top-level steps;
-- child steps; and
-- deeper descendants.
-
-A nested step attempts execution only when its ancestor chain allows it. When an ancestor passes a false conditional state, its gated subtree is skipped.
-
-## Pass condition and context with `:`
-
-When a step ends with `:`, it passes both:
-
-- its Boolean conditional result; and
-- its HTML/DOM context
-
-to child and descendant steps.
+A colon at the end of a parent controls what the parent passes to its children:
 
 ```gherkin
 Then , if the "Submit" Button is enabled:
 : Then , click the "Submit" Button
 ```
 
-If the button is disabled, the child is skipped. If it is enabled, the child executes.
+## Reading the execution tree
 
-## Equivalent nested structures
+A scenario forms a visible parent-and-child tree:
 
-These two structures express equivalent logic.
+- top-level steps begin without a leading colon;
+- child steps begin with one colon;
+- grandchildren begin with two colons; and
+- deeper levels continue the same pattern.
 
-### Chained parent condition
+A child runs only when the conditions inherited from its parents allow it to run.
+
+## Passing a condition and page context with `:`
+
+A trailing colon passes both:
+
+- the parent’s true/false result; and
+- the page or DOM context established by the parent.
+
+```gherkin
+Then , in the "Accounts" Section, if the "Case Found" Text is displayed:
+: Then , click the "Open Case" Link
+```
+
+The child runs only when the text is displayed, and its element search remains inside the `Accounts` section.
+
+## Passing only the condition with `?`
+
+A trailing question mark passes the true/false result but not the parent’s page context:
+
+```gherkin
+Then , in the "Accounts" Section, if the "Case Found" Text is displayed?
+: Then , click the "Open Case" Link
+```
+
+The child is still conditional, but it searches from the normal page context.
+
+| Parent ending | Passes condition | Passes page context |
+|---|---:|---:|
+| `:` | Yes | Yes |
+| `?` | Yes | No |
+
+## Implied condition with `?`
+
+A trailing `?` can make a check conditional without writing `if`:
+
+```gherkin
+Then , the "Case Found" Text is displayed?
+: Then , click the "Open Case" Link
+```
+
+This has the same conditional meaning as:
+
+```gherkin
+Then , if the "Case Found" Text is displayed?
+: Then , click the "Open Case" Link
+```
+
+## One combined condition or several nested conditions
+
+These structures express similar business rules.
+
+### Combined condition
 
 ```gherkin
 Then , if the "Submit" Button is enabled, and the "Error" Banner is not displayed:
@@ -74,7 +94,7 @@ Then , if the "Submit" Button is enabled, and the "Error" Banner is not displaye
 : And , wait 5 seconds
 ```
 
-### Separate nested conditions
+### Separate levels
 
 ```gherkin
 Then , if the "Submit" Button is enabled:
@@ -83,15 +103,13 @@ Then , if the "Submit" Button is enabled:
 :: And , wait 5 seconds
 ```
 
-The second form can make each condition and its scope easier to see.
+Use the form that makes the rule easiest to read. Separate levels are often clearer when each condition has a different business meaning.
 
-## Branches with `else` and `else if`
+## `if`, `else if`, and `else`
 
-An `else` or `else if` branch applies at the same nesting level as its related `if`.
+Place related branches at the same nesting level.
 
-A branch depends on the immediately preceding conditional sibling. It runs only when the relevant earlier branch executed and resolved to false.
-
-### `if` / `else`
+### `if` and `else`
 
 ```gherkin
 Then , if the "Submit" Button is enabled:
@@ -100,9 +118,9 @@ Then , if the "Submit" Button is enabled:
 : Then , else click the "Submit" Button
 ```
 
-The innermost save runs when both conditions are true. The sibling `else` runs when the outer condition is true but the inner condition is false.
+The `else` belongs to the inner conditional because it is at the same level as that inner `if`.
 
-### `if` / `else if` / `else`
+### `if`, `else if`, and `else`
 
 ```gherkin
 Then , if the "Submit" Button is displayed:
@@ -113,74 +131,25 @@ Then , if the "Submit" Button is displayed:
 : Then , else click the "Refresh" Link
 ```
 
-Only one branch at that nesting level executes.
+Only one branch at that level runs.
 
-## `:` versus `?`
+## Without `:` or `?`
 
-Both endings pass conditional state, but only `:` passes DOM context.
+A nested step still has access to values saved in the scenario, but it does not automatically inherit a condition or page context unless the parent ends with `:` or `?`.
 
-| Ending | Passes conditional result | Passes DOM context |
-|---|---:|---:|
-| `:` | Yes | Yes |
-| `?` | Yes | No |
+Use those endings whenever a parent is meant to control its descendants.
 
-### Pass condition and DOM context
+## Readability guidelines
 
-```gherkin
-Then , in the "Accounts" Section, if the "Case Found" Text is displayed:
-: Then , click the "Submit" Button
-```
+1. Match the number of leading colons to the intended nesting level.
+2. Keep related `if`, `else if`, and `else` branches at the same level.
+3. Use `:` when children should inherit both the condition and the current page section.
+4. Use `?` when children should inherit only the condition.
+5. Split complex rules into several nested levels when that makes the business meaning clearer.
+6. Avoid nesting so deeply that the flow becomes difficult to scan.
 
-The child search remains scoped to the `Accounts` section.
-
-### Pass only the condition
-
-```gherkin
-Then , in the "Accounts" Section, if the "Case Found" Text is displayed?
-: Then , click the "Submit" Button
-```
-
-The condition is passed, but the child searches from the normal DOM context rather than inheriting the `Accounts` section.
-
-## Implied condition with `?`
-
-A trailing `?` can make the conditional intent explicit without writing `if`.
-
-These are equivalent:
-
-```gherkin
-Then , if the "Case Found" Text is displayed?
-```
-
-```gherkin
-Then , the "Case Found" Text is displayed?
-```
-
-A concise nested check can therefore be written as:
-
-```gherkin
-Then , the "Case Found" Text is displayed?
-: Then , click the "Open Case" Link
-```
-
-## Default inheritance
-
-Without a trailing `:` or `?`:
-
-- nested steps do not inherit a conditional result;
-- nested steps do not inherit DOM context; and
-- nested steps do retain access to scenario-state storage.
-
-Use `:` or `?` when a parent is intended to gate descendants.
-
-## Rules to remember
-
-1. Leading colons determine nesting depth.
-2. A trailing `:` passes condition and context.
-3. A trailing `?` passes condition only.
-4. `else if` and `else` relate to branches at the same nesting level.
-5. Nesting may continue to any depth, but indentation and consistent colon counts make scenarios easier to maintain.
+For condition branches whose control details should stay out of normal reports, see [Block Conditionals](block-conditionals.md).
 
 ---
 
-[Previous: Dynamic steps](dynamic-steps.md) · [Documentation home](README.md) · [Next: Keyboard DSL](key-parser-dsl.md)
+[Previous: Shared Configuration Files](config-files-and-resource-mapping.md) · [Documentation home](README.md) · [Next: Block Conditionals](block-conditionals.md)

@@ -1,25 +1,23 @@
 # Getting Started
 
-For an existing Java test project, the Pickleball framework setup consists of **only two additions**:
+Adding Pickleball to an existing Java test project requires only two framework additions:
 
 1. Add the Pickleball test dependency.
-2. Add one Pickleball test-runner class.
+2. Add one Pickleball test runner.
 
-Your feature files and any project-specific step definitions are test content, not additional framework setup.
+After that, most test work happens in `.feature` files.
 
 ## Requirements
 
 - Java 21
 - Maven or Gradle
-- Feature files under `src/test/resources/features`, unless another location is configured
+- Feature files under `src/test/resources/features`, unless a different location is configured
 
 ## 1. Add the dependency
 
-Choose either Maven or Gradle.
-
 ### Maven
 
-Add Pickleball to the `<dependencies>` section of `pom.xml`:
+Add this dependency to `pom.xml`:
 
 ```xml
 <dependencies>
@@ -34,7 +32,7 @@ Add Pickleball to the `<dependencies>` section of `pom.xml`:
 
 ### Gradle — Groovy DSL
 
-Add Pickleball to `build.gradle`:
+Add this to `build.gradle`:
 
 ```groovy
 dependencies {
@@ -44,7 +42,7 @@ dependencies {
 
 ### Gradle — Kotlin DSL
 
-Add Pickleball to `build.gradle.kts`:
+Add this to `build.gradle.kts`:
 
 ```kotlin
 dependencies {
@@ -54,13 +52,11 @@ dependencies {
 
 ## 2. Add the test runner
 
-Create:
+Create a test class such as:
 
 ```text
 src/test/java/com/example/tests/PickleballTests.java
 ```
-
-Replace the package and glue package with names appropriate for your project:
 
 ```java
 package com.example.tests;
@@ -79,26 +75,9 @@ public class PickleballTests extends PickleballRunner {
 }
 ```
 
-The name `PickleballTests` is intentional: its `Tests` suffix follows the normal test-class naming convention used by Maven and Gradle test discovery.
+Use a name ending in `Tests` so normal Maven and Gradle test discovery can find the runner.
 
-A copyable version is available at [`examples/PickleballTests.java`](examples/PickleballTests.java).
-
-## That completes the framework setup
-
-No separate Pickleball bootstrap file is required. The two required pieces are:
-
-- the test-scoped dependency; and
-- the class extending `PickleballRunner`.
-
-The runner establishes project-wide defaults:
-
-| Setting | Example | Purpose |
-|---|---|---|
-| `glue` | `com.example.tests.steps` | Packages containing project step definitions and hooks |
-| `features` | `classpath:features` | Location of Gherkin feature files |
-| `plugins` | `pretty` | Cucumber output/plugin configuration |
-
-Pickleball supplies defaults for values that are not explicitly configured. For example, the feature location defaults to `classpath:features`.
+That completes the required Pickleball setup.
 
 ## Suggested project layout
 
@@ -116,12 +95,13 @@ your-project/
         └── resources/
             ├── features/
             │   └── example.feature
+            ├── configs/
             └── pickleball_local.properties
 ```
 
-The local properties file is optional and should normally be excluded from Git. See [Configuration and local overrides](configuration.md).
+The `configs` directory and local properties file are optional.
 
-## Run the tests
+## Run the scenarios
 
 ### Maven
 
@@ -141,8 +121,14 @@ On Windows:
 gradlew.bat test
 ```
 
-You can also run scenarios through an IntelliJ Cucumber or JUnit run configuration. Pickleball merges the same project and local properties during either form of execution.
+Scenarios may also be run from IntelliJ using the Cucumber plugin or the test runner.
+
+## Continue with feature files
+
+- [Dynamic steps](dynamic-steps.md)
+- [Mapping and templating](mapping-and-templating.md)
+- [Local execution settings](configuration.md#local-overrides)
 
 ---
 
-[Documentation home](README.md) · [Next: Configuration](configuration.md)
+[Documentation home](README.md) · [Next: Dynamic steps](dynamic-steps.md)

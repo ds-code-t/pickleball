@@ -1,12 +1,8 @@
-# Installation map
+# Documentation installation
 
-Copy these files into the repository root:
+Place these items in the repository root:
 
-- `README.md` → `/README.md`
-- `docs/` → `/docs/`
+- `README.md`
+- `docs/`
 
-The `docs/examples/` files are reference examples. They are not intended to replace
-the consumer project's real runner or local properties file automatically.
-
-The existing `md files/` directory can be removed after reviewing that all useful
-content is represented in the new documentation.
+The files in `docs/examples/` are reference examples. Review their package names and values before copying them into a consumer project.
