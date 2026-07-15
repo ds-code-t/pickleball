@@ -414,9 +414,9 @@ public abstract class PassedData {
                 && operationInheritancePhrase == null
                 && getOperation().isBlank()
                 && !elementMatches.isEmpty()) {
-            if (!assertion.isBlank()) {
+            if (!assertionType.isBlank()) {
                 PhraseData nextOperationPhrase = getNextOperationPhrase();
-                if (nextOperationPhrase != null || nextOperationPhrase.assertion.isBlank()) {
+                if (nextOperationPhrase == null || nextOperationPhrase.assertion.isBlank()) {
                     setAssertion("true");
                 } else {
                     operationInheritancePhrase = nextOperationPhrase;
