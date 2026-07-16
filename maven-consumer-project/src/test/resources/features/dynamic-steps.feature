@@ -30,18 +30,18 @@ Feature: Pickleball dynamic steps against a local interaction playground
     * , ensure "Phone" Radio Button is selected
     * , ensure "Contact Preference: Phone" Text is displayed
 
-#  Scenario: A dropdown selection updates visible text
+  Scenario: A dropdown selection updates visible text
     * , select "Green" in the "Favorite Color" Dropdown
     * , ensure "Favorite Color: Green" Text is displayed
     * , select "Blue" in the "Favorite Color" Dropdown
     * , ensure "Favorite Color: Blue" Text is displayed
 
-#  Scenario: Ordinal selection chooses the correct repeated element
+  Scenario: Ordinal selection chooses the correct repeated element
     * , click the 2nd "Choose" Button
     * , ensure "Chosen Button: 2" Text is displayed
     * , click the last "Choose" Button
     * , ensure "Chosen Button: 3" Text is displayed
 
-#  Scenario: A chained dynamic step performs multiple DOM interactions
+  Scenario: A chained dynamic step performs multiple DOM interactions
     * , enter "Mia" in the "First Name" Textbox, enter "Tempe" in the "City" Textbox, and click the "Submit" Button
     * , ensure "Submitted: Mia | Tempe | none | no updates" Text is displayed
