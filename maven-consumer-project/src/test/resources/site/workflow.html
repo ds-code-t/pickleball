@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Workflow Playground | Pickleball Test Lab</title>
+    <link rel="stylesheet" href="assets/styles.css"><script src="assets/app.js" defer></script>
+</head>
+<body data-page="workflow">
+<header class="site-header"><div class="header-inner"><a class="brand" href="index.html">Pickleball Test Lab</a><nav class="site-nav" aria-label="Primary navigation"><a data-nav="home" href="index.html">Home</a><a data-nav="forms" href="forms.html">Forms</a><a data-nav="catalog" href="catalog.html">Catalog</a><a data-nav="workflow" href="workflow.html">Workflow</a><a data-nav="keyboard" href="keyboard.html">Keyboard</a><a data-nav="dialogs" href="dialogs.html">Dialogs</a><a data-nav="components" href="components.html">Components</a></nav></div></header>
+<main>
+    <div class="page-heading"><h1>Conditional Workflow Playground</h1><p>Preset buttons create predictable ready, review, and error states for nested steps and block conditional branches.</p></div>
+
+    <section class="test-panel" aria-label="State Presets">
+        <h2>State Presets</h2>
+        <div class="button-row"><button id="use-ready-state" type="button">Use Ready State</button><button id="use-review-state" class="secondary" type="button">Use Review State</button><button id="use-error-state" class="danger" type="button">Use Error State</button></div>
+    </section>
+
+    <section class="test-panel" aria-label="Decision Panel">
+        <h2>Decision Panel</h2>
+        <p class="notice" id="validation-error" hidden>Validation Error: request needs attention</p>
+        <label class="choice-row" for="approval-check"><input id="approval-check" type="checkbox"> Approval Complete</label>
+        <div class="button-row" style="margin-top: 1rem"><button id="submit-request" type="button" disabled>Submit Request</button><button id="refresh-request" class="secondary" type="button">Refresh Request</button></div>
+    </section>
+
+    <div class="grid">
+        <p class="output" id="workflow-state">Workflow State: review</p>
+        <p class="output" id="request-result">Request Result: none</p>
+    </div>
+</main>
+<footer class="site-footer"><a href="index.html">Return to the test lab home page</a></footer>
+</body>
+</html>

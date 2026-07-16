@@ -3,264 +3,66 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Pickleball Dynamic Steps Playground</title>
-    <style>
-        :root {
-            color-scheme: light;
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        }
-
-        body {
-            max-width: 860px;
-            margin: 0 auto;
-            padding: 2rem 1rem 4rem;
-            background: #f5f7fb;
-            color: #172033;
-        }
-
-        main {
-            display: grid;
-            gap: 1rem;
-        }
-
-        section {
-            padding: 1rem;
-            border: 1px solid #cbd3e1;
-            border-radius: 0.75rem;
-            background: white;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-            gap: 1rem;
-        }
-
-        .field {
-            display: grid;
-            gap: 0.35rem;
-        }
-
-        input[type="text"], textarea, select, button {
-            font: inherit;
-        }
-
-        input[type="text"], textarea, select {
-            box-sizing: border-box;
-            width: 100%;
-            padding: 0.65rem;
-            border: 1px solid #8792a5;
-            border-radius: 0.4rem;
-        }
-
-        textarea {
-            min-height: 6rem;
-            resize: vertical;
-        }
-
-        .choices {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-
-        button {
-            padding: 0.6rem 0.9rem;
-            border: 1px solid #53617a;
-            border-radius: 0.4rem;
-            background: #eef2f8;
-            cursor: pointer;
-        }
-
-        button:hover, button:focus-visible {
-            background: #dfe7f3;
-        }
-
-        .status-list {
-            display: grid;
-            gap: 0.35rem;
-            margin: 0;
-            padding: 0;
-            list-style: none;
-        }
-
-        .status-list li {
-            padding: 0.45rem 0.6rem;
-            border-radius: 0.35rem;
-            background: #edf3ff;
-        }
-    </style>
+    <title>Pickleball Test Lab</title>
+    <link rel="stylesheet" href="assets/styles.css">
+    <script src="assets/app.js" defer></script>
 </head>
-<body>
-<header>
-    <h1>Dynamic Steps Playground</h1>
-    <p id="page-ready" role="status">Ready for dynamic steps</p>
+<body data-page="home">
+<header class="site-header">
+    <div class="header-inner">
+        <a class="brand" href="index.html">Pickleball Test Lab</a>
+        <nav class="site-nav" aria-label="Primary navigation">
+            <a data-nav="home" href="index.html">Home</a>
+            <a data-nav="forms" href="forms.html">Forms</a>
+            <a data-nav="catalog" href="catalog.html">Catalog</a>
+            <a data-nav="workflow" href="workflow.html">Workflow</a>
+            <a data-nav="keyboard" href="keyboard.html">Keyboard</a>
+            <a data-nav="dialogs" href="dialogs.html">Dialogs</a>
+            <a data-nav="components" href="components.html">Components</a>
+        </nav>
+    </div>
 </header>
-
 <main>
-    <section aria-labelledby="text-controls-heading">
-        <h2 id="text-controls-heading">Text controls</h2>
-        <div class="grid">
-            <div class="field">
-                <label for="first-name">First Name</label>
-                <input id="first-name" name="firstName" type="text" aria-label="First Name" autocomplete="off">
-            </div>
-            <div class="field">
-                <label for="city">City</label>
-                <input id="city" name="city" type="text" aria-label="City" autocomplete="off">
-            </div>
-        </div>
-        <div class="field">
-            <label for="comments">Comments</label>
-            <textarea id="comments" name="comments" aria-label="Comments"></textarea>
-        </div>
+    <section class="hero">
+        <h1>Pickleball Test Lab</h1>
+        <p>A self-contained multi-page site for exercising dynamic browser steps, navigation, conditions, reusable scenario components, keyboard expressions, and mapped test data.</p>
     </section>
 
-    <section aria-labelledby="choice-controls-heading">
-        <h2 id="choice-controls-heading">Choice controls</h2>
-        <div class="choices">
-            <label for="receive-updates">
-                <input id="receive-updates" name="receiveUpdates" type="checkbox" aria-label="Receive Updates">
-                Receive Updates
-            </label>
-        </div>
+    <p class="output" id="site-status">Site Status: ready</p>
 
-        <fieldset>
-            <legend>Contact Preference</legend>
-            <div class="choices">
-                <label for="contact-email">
-                    <input id="contact-email" name="contactPreference" type="radio" value="Email" aria-label="Email">
-                    Email
-                </label>
-                <label for="contact-phone">
-                    <input id="contact-phone" name="contactPreference" type="radio" value="Phone" aria-label="Phone">
-                    Phone
-                </label>
-            </div>
-        </fieldset>
-
-        <div class="field">
-            <label for="favorite-color">Favorite Color</label>
-            <select id="favorite-color" name="favoriteColor" aria-label="Favorite Color">
-                <option value="">Choose a color</option>
-                <option value="Red">Red</option>
-                <option value="Green">Green</option>
-                <option value="Blue">Blue</option>
-            </select>
-        </div>
-    </section>
-
-    <section aria-labelledby="repeated-controls-heading">
-        <h2 id="repeated-controls-heading">Repeated controls for ordinal selection</h2>
-        <div class="choices" id="choose-buttons">
-            <button type="button" data-choice="1">Choose</button>
-            <button type="button" data-choice="2">Choose</button>
-            <button type="button" data-choice="3">Choose</button>
-        </div>
-    </section>
-
-    <section aria-labelledby="actions-heading">
-        <h2 id="actions-heading">Actions</h2>
-        <div class="choices">
-            <button id="submit" type="button">Submit</button>
-            <button id="reset" type="button">Reset</button>
-        </div>
-    </section>
-
-    <section aria-labelledby="dom-state-heading">
-        <h2 id="dom-state-heading">Current DOM state</h2>
-        <ul class="status-list" aria-live="polite">
-            <li id="name-output">Name: (empty)</li>
-            <li id="city-output">City: (empty)</li>
-            <li id="comments-output">Comments: (empty)</li>
-            <li id="updates-output">Updates: unchecked</li>
-            <li id="contact-output">Contact Preference: none</li>
-            <li id="color-output">Favorite Color: none</li>
-            <li id="chosen-output">Chosen Button: none</li>
-            <li id="submitted-output">Submitted: not yet</li>
-        </ul>
-    </section>
+    <div class="grid">
+        <article class="card">
+            <h2>Forms Playground</h2>
+            <p>Textboxes, textarea, choices, dropdowns, pointer actions, state assertions, and DOM updates.</p>
+            <a class="card-link" href="forms.html">Open Forms Playground</a>
+        </article>
+        <article class="card">
+            <h2>Catalog &amp; Context</h2>
+            <p>Repeated elements, ordinal selection, context scoping, custom categories, filtering, and tables.</p>
+            <a class="card-link" href="catalog.html">Open Catalog Playground</a>
+        </article>
+        <article class="card">
+            <h2>Conditional Workflow</h2>
+            <p>Enabled and disabled controls, nested flow, phrase conditions, expression conditions, and branch results.</p>
+            <a class="card-link" href="workflow.html">Open Workflow Playground</a>
+        </article>
+        <article class="card">
+            <h2>Keyboard Playground</h2>
+            <p>Keyboard expressions for sequential keys, modifier keys, selection, replacement, and key events.</p>
+            <a class="card-link" href="keyboard.html">Open Keyboard Playground</a>
+        </article>
+        <article class="card">
+            <h2>Dialogs Playground</h2>
+            <p>JavaScript alerts and confirmations for testing accept and dismiss behavior.</p>
+            <a class="card-link" href="dialogs.html">Open Dialogs Playground</a>
+        </article>
+        <article class="card">
+            <h2>Component Scenarios</h2>
+            <p>A small customer form designed for reusable <code>RUN SCENARIOS</code> business flows.</p>
+            <a class="card-link" href="components.html">Open Components Playground</a>
+        </article>
+    </div>
 </main>
-
-<script>
-    "use strict";
-
-    const firstName = document.querySelector("#first-name");
-    const city = document.querySelector("#city");
-    const comments = document.querySelector("#comments");
-    const receiveUpdates = document.querySelector("#receive-updates");
-    const contactPreferences = [...document.querySelectorAll('input[name="contactPreference"]')];
-    const favoriteColor = document.querySelector("#favorite-color");
-
-    const showValue = (value, fallback = "(empty)") => value.trim() || fallback;
-
-    function updateTextOutputs() {
-        document.querySelector("#name-output").textContent = `Name: ${showValue(firstName.value)}`;
-        document.querySelector("#city-output").textContent = `City: ${showValue(city.value)}`;
-        document.querySelector("#comments-output").textContent = `Comments: ${showValue(comments.value)}`;
-    }
-
-    function updateCheckboxOutput() {
-        document.querySelector("#updates-output").textContent =
-            `Updates: ${receiveUpdates.checked ? "checked" : "unchecked"}`;
-    }
-
-    function selectedContactPreference() {
-        return contactPreferences.find((radio) => radio.checked)?.value ?? "none";
-    }
-
-    function updateContactOutput() {
-        document.querySelector("#contact-output").textContent =
-            `Contact Preference: ${selectedContactPreference()}`;
-    }
-
-    function updateColorOutput() {
-        document.querySelector("#color-output").textContent =
-            `Favorite Color: ${favoriteColor.value || "none"}`;
-    }
-
-    [firstName, city, comments].forEach((control) => {
-        control.addEventListener("input", updateTextOutputs);
-    });
-
-    receiveUpdates.addEventListener("change", updateCheckboxOutput);
-    contactPreferences.forEach((radio) => radio.addEventListener("change", updateContactOutput));
-    favoriteColor.addEventListener("change", updateColorOutput);
-
-    document.querySelectorAll("#choose-buttons button").forEach((button) => {
-        button.addEventListener("click", () => {
-            document.querySelector("#chosen-output").textContent =
-                `Chosen Button: ${button.dataset.choice}`;
-        });
-    });
-
-    document.querySelector("#submit").addEventListener("click", () => {
-        const submittedName = firstName.value.trim() || "(empty)";
-        const submittedCity = city.value.trim() || "(empty)";
-        const submittedContact = selectedContactPreference();
-        const submittedUpdates = receiveUpdates.checked ? "updates enabled" : "no updates";
-
-        document.querySelector("#submitted-output").textContent =
-            `Submitted: ${submittedName} | ${submittedCity} | ${submittedContact} | ${submittedUpdates}`;
-    });
-
-    document.querySelector("#reset").addEventListener("click", () => {
-        document.querySelectorAll('input[type="text"], textarea').forEach((control) => {
-            control.value = "";
-        });
-        receiveUpdates.checked = false;
-        contactPreferences.forEach((radio) => {
-            radio.checked = false;
-        });
-        favoriteColor.value = "";
-
-        updateTextOutputs();
-        updateCheckboxOutput();
-        updateContactOutput();
-        updateColorOutput();
-        document.querySelector("#chosen-output").textContent = "Chosen Button: none";
-        document.querySelector("#submitted-output").textContent = "Submitted: not yet";
-    });
-</script>
+<footer class="site-footer">Local test site served only on 127.0.0.1 during the Maven test run.</footer>
 </body>
 </html>

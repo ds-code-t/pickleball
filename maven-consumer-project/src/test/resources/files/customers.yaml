@@ -1,0 +1,6 @@
+- name: Ava
+  city: Phoenix
+  tier: Premium
+- name: Ben
+  city: Tempe
+  tier: Standard

@@ -6,14 +6,18 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static tools.dscode.testengine.PickleballRunner.CUCUMBER_FEATURES;
-import static tools.dscode.testengine.PickleballRunner.CUCUMBER_GLUE;
-import static tools.dscode.testengine.PickleballRunner.CUCUMBER_TAGS;
-import static tools.dscode.testengine.PickleballRunner.PKB_FEATURES;
-import static tools.dscode.testengine.PickleballRunner.PKB_GLUE;
-import static tools.dscode.testengine.PickleballRunner.PKB_PREFIX;
-import static tools.dscode.testengine.PickleballRunner.PKB_TAGS;
+import static io.cucumber.core.options.Constants.FEATURES_PROPERTY_NAME;
+import static io.cucumber.core.options.Constants.FILTER_TAGS_PROPERTY_NAME;
+import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
+import static tools.dscode.testengine.PKB_props.PKB_FEATURES;
+import static tools.dscode.testengine.PKB_props.PKB_GLUE;
+import static tools.dscode.testengine.PKB_props.PKB_PREFIX;
+import static tools.dscode.testengine.PKB_props.PKB_TAGS;
 
+/**
+ * Resolves suite configuration by preferring {@link PKB_props} aliases and falling back to
+ * Cucumber {@link io.cucumber.core.options.Constants} property names.
+ */
 public final class DynamicSuiteConfigUtils {
 
 
@@ -22,15 +26,15 @@ public final class DynamicSuiteConfigUtils {
     }
 
     public static List<String> getGluePaths() {
-        return splitCommaSeparated(getFirstNonBlank(PKB_GLUE, CUCUMBER_GLUE));
+        return splitCommaSeparated(getFirstNonBlank(PKB_GLUE, GLUE_PROPERTY_NAME));
     }
 
     public static List<String> getFeaturePaths() {
-        return splitCommaSeparated(getFirstNonBlank(PKB_FEATURES, CUCUMBER_FEATURES));
+        return splitCommaSeparated(getFirstNonBlank(PKB_FEATURES, FEATURES_PROPERTY_NAME));
     }
 
     public static String getTags() {
-        return getFirstNonBlank(PKB_TAGS, CUCUMBER_TAGS);
+        return getFirstNonBlank(PKB_TAGS, FILTER_TAGS_PROPERTY_NAME);
     }
 
     public static HashMap<String, Object> getPkbValues() {

@@ -1,0 +1,14 @@
+# Copy this file to pickleball_local.properties in the same directory.
+# Keep the copied local file out of Git.
+
+# Select a suite or functionality while developing.
+# The JVM command-line -Dpkb_tags value has higher priority.
+# pkb_tags=@all
+# pkb_tags=@smoke
+# pkb_tags=@forms
+# pkb_tags=@workflow and @block-conditionals
+
+pkb_browser=chrome
+pkb_loglevel=info
+# pkb_debugbrowser=true
+# pkb_debugargs=elementsnapshot

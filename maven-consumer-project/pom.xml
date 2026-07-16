@@ -7,13 +7,15 @@
     <groupId>com.example</groupId>
     <artifactId>pickleball-dynamic-steps-consumer</artifactId>
     <version>1.0.0-SNAPSHOT</version>
-    <name>Pickleball Dynamic Steps Consumer</name>
-    <description>A minimal consumer project for the Pickleball browser-testing framework.</description>
+    <name>Pickleball Multi-page Consumer</name>
+    <description>A multi-page browser-testing consumer project for Pickleball.</description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>21</maven.compiler.release>
         <pickleball.version>2.1.1</pickleball.version>
+        <!-- Empty by default. A Maven suite profile supplies a -Dpkb_tags argument. -->
+        <tagArgLine></tagArgLine>
     </properties>
 
     <dependencies>
@@ -40,9 +42,86 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.2</version>
                 <configuration>
-                    <useModulePath>false</useModulePath>
+                    <testFailureIgnore>false</testFailureIgnore>
+                    <argLine>${tagArgLine}</argLine>
                 </configuration>
             </plugin>
         </plugins>
     </build>
+
+    <!--
+      Named entry points for the Cucumber tag suites. Examples:
+        mvn test -Pforms
+        mvn test -Pworkflow
+        mvn test -Pall
+
+      Direct expressions continue to work without a profile:
+        mvn test -Dpkb_tags="@forms and @state-assertions"
+    -->
+    <profiles>
+        <profile>
+            <id>all</id>
+            <properties><tagArgLine>-Dpkb_tags=@all</tagArgLine></properties>
+        </profile>
+        <profile>
+            <id>regression</id>
+            <properties><tagArgLine>-Dpkb_tags=@regression</tagArgLine></properties>
+        </profile>
+        <profile>
+            <id>smoke</id>
+            <properties><tagArgLine>-Dpkb_tags=@smoke</tagArgLine></properties>
+        </profile>
+        <profile>
+            <id>browser</id>
+            <properties><tagArgLine>-Dpkb_tags=@browser</tagArgLine></properties>
+        </profile>
+        <profile>
+            <id>data</id>
+            <properties><tagArgLine>-Dpkb_tags=@data</tagArgLine></properties>
+        </profile>
+        <profile>
+            <id>navigation</id>
+            <properties><tagArgLine>-Dpkb_tags=@navigation</tagArgLine></properties>
+        </profile>
+        <profile>
+            <id>forms</id>
+            <properties><tagArgLine>-Dpkb_tags=@forms</tagArgLine></properties>
+        </profile>
+        <profile>
+            <id>catalog</id>
+            <properties><tagArgLine>-Dpkb_tags=@catalog</tagArgLine></properties>
+        </profile>
+        <profile>
+            <id>mapping</id>
+            <properties><tagArgLine>-Dpkb_tags=@mapping</tagArgLine></properties>
+        </profile>
+        <profile>
+            <id>resources</id>
+            <properties><tagArgLine>-Dpkb_tags=@resources</tagArgLine></properties>
+        </profile>
+        <profile>
+            <id>workflow</id>
+            <properties><tagArgLine>-Dpkb_tags=@workflow</tagArgLine></properties>
+        </profile>
+        <profile>
+            <id>conditionals</id>
+            <properties><tagArgLine>-Dpkb_tags=@block-conditionals</tagArgLine></properties>
+        </profile>
+        <profile>
+            <id>nested</id>
+            <properties><tagArgLine>-Dpkb_tags=@nested-steps</tagArgLine></properties>
+        </profile>
+        <profile>
+            <id>keyboard</id>
+            <properties><tagArgLine>-Dpkb_tags=@keyboard</tagArgLine></properties>
+        </profile>
+        <profile>
+            <id>dialogs</id>
+            <properties><tagArgLine>-Dpkb_tags=@dialogs</tagArgLine></properties>
+        </profile>
+        <profile>
+            <id>components</id>
+            <properties><tagArgLine>-Dpkb_tags=@components</tagArgLine></properties>
+        </profile>
+    </profiles>
 </project>

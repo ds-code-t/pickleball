@@ -1,0 +1,12 @@
+siteName: Pickleball Test Lab
+featureFlags:
+  workflowEnabled: true
+users:
+  - name: Ava
+    city: Phoenix
+    accountType: Premium
+  - name: Ben
+    city: Tempe
+    accountType: Standard
+expected:
+  catalogCount: 3

@@ -10,7 +10,7 @@ import tools.dscode.testengine.PickleballRunner;
 import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
 
 /**
- * Minimal Pickleball runner discovered by Maven Surefire because its name ends in "Tests".
+ * Pickleball runner discovered by Maven Surefire because its name ends in "Tests".
  */
 public final class PickleballTests extends PickleballRunner {
     private static final int TEST_SITE_PORT = 8765;
@@ -21,14 +21,30 @@ public final class PickleballTests extends PickleballRunner {
         PKB_props.glue("com.example.pickleball");
         PKB_props.features("classpath:features");
         PKB_props.plugins("pretty");
+        PKB_props.tags("@all");
         PKB_props.browser("chrome");
     }
 
     @LifecycleHook(Phase.BEFORE_CUCUMBER_RUN)
     public static void beforeRun() {
-        ExecutionDictionary dictionary = getExecutionDictionary();
-        dictionary.category("Radio Button").addBase("//input[@type='radio']");
+        registerProjectElementVocabulary();
         testSite = LocalTestSite.start(TEST_SITE_PORT);
+    }
+
+    private static void registerProjectElementVocabulary() {
+        ExecutionDictionary dictionary = getExecutionDictionary();
+
+        dictionary.category("Radio Button")
+                .addBase("//input[@type='radio']");
+
+        dictionary.category("Test Panel")
+                .addBase("//section[contains(concat(' ', normalize-space(@class), ' '), ' test-panel ')]");
+
+        dictionary.category("Product Card")
+                .addBase("//article[contains(concat(' ', normalize-space(@class), ' '), ' product-card ')]");
+
+        dictionary.category("Status Badge")
+                .addBase("//*[contains(concat(' ', normalize-space(@class), ' '), ' status-badge ')]");
     }
 
     @LifecycleHook(Phase.AFTER_CUCUMBER_RUN)

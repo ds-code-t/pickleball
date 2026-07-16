@@ -2,4 +2,4 @@ target/
 .idea/
 .vscode/
 *.iml
-pickleball_local.properties
+src/test/resources/pickleball_local.properties

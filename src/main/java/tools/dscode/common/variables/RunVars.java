@@ -11,8 +11,9 @@ import java.util.Locale;
 import static tools.dscode.common.mappings.MappingProcessor.getSingletonMap;
 import static tools.dscode.common.mappings.custommappings.ValConverter.valConverter;
 
-import static tools.dscode.testengine.PickleballRunner.PKB_PREFIX;
+
 import static tools.dscode.testengine.DynamicSuiteConfigUtils.getPkbValues;
+import static tools.dscode.testengine.PKB_props.PKB_PREFIX;
 
 
 public class RunVars extends NodeMap {

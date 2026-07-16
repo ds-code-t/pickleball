@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Keyboard Playground | Pickleball Test Lab</title>
+    <link rel="stylesheet" href="assets/styles.css"><script src="assets/app.js" defer></script>
+</head>
+<body data-page="keyboard">
+<header class="site-header"><div class="header-inner"><a class="brand" href="index.html">Pickleball Test Lab</a><nav class="site-nav" aria-label="Primary navigation"><a data-nav="home" href="index.html">Home</a><a data-nav="forms" href="forms.html">Forms</a><a data-nav="catalog" href="catalog.html">Catalog</a><a data-nav="workflow" href="workflow.html">Workflow</a><a data-nav="keyboard" href="keyboard.html">Keyboard</a><a data-nav="dialogs" href="dialogs.html">Dialogs</a><a data-nav="components" href="components.html">Components</a></nav></div></header>
+<main>
+    <div class="page-heading"><h1>Keyboard Playground</h1><p>Use Pickleball keyboard expressions to select, delete, replace, and submit text while the page records input and keydown events.</p></div>
+    <section class="test-panel" aria-label="Keyboard Test Panel">
+        <h2>Keyboard Input</h2>
+        <div class="field"><label for="keyboard-input">Keyboard Input</label><input id="keyboard-input" type="text" autocomplete="off"></div>
+        <p>Examples: <kbd>CONTROL[A]</kbd>, <kbd>CONTROL[A] BACK_SPACE</kbd>, and <kbd>ENTER</kbd>.</p>
+        <div class="grid"><p class="output" id="keyboard-value">Keyboard Value: (empty)</p><p class="output" id="last-key">Last Key: none</p></div>
+    </section>
+</main>
+<footer class="site-footer"><a href="index.html">Return to the test lab home page</a></footer>
+</body>
+</html>

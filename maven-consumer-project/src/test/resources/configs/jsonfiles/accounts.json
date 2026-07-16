@@ -1,0 +1,10 @@
+{
+  "primary": {
+    "id": "A-100",
+    "status": "Approved"
+  },
+  "secondary": {
+    "id": "A-200",
+    "status": "Review"
+  }
+}

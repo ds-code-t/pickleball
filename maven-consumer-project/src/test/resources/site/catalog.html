@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Catalog Playground | Pickleball Test Lab</title>
+    <link rel="stylesheet" href="assets/styles.css"><script src="assets/app.js" defer></script>
+</head>
+<body data-page="catalog">
+<header class="site-header"><div class="header-inner"><a class="brand" href="index.html">Pickleball Test Lab</a><nav class="site-nav" aria-label="Primary navigation"><a data-nav="home" href="index.html">Home</a><a data-nav="forms" href="forms.html">Forms</a><a data-nav="catalog" href="catalog.html">Catalog</a><a data-nav="workflow" href="workflow.html">Workflow</a><a data-nav="keyboard" href="keyboard.html">Keyboard</a><a data-nav="dialogs" href="dialogs.html">Dialogs</a><a data-nav="components" href="components.html">Components</a></nav></div></header>
+<main>
+    <div class="page-heading"><h1>Catalog &amp; Context Playground</h1><p>Use this page for repeated elements, ordinal matching, custom element categories, scoped searches, and visible filtering results.</p></div>
+
+    <section class="test-panel catalog-tools" aria-label="Catalog Filters">
+        <h2>Catalog Filters</h2>
+        <div class="form-grid">
+            <div class="field"><label for="catalog-search">Catalog Search</label><input id="catalog-search" type="text"></div>
+            <div class="field"><label for="catalog-category">Product Category</label><select id="catalog-category"><option value="">All categories</option><option value="software">Software</option><option value="service">Service</option></select></div>
+        </div>
+        <div class="button-row" style="margin-top: 1rem"><button id="advanced-filters" class="secondary" type="button" aria-expanded="false">Advanced Filters</button></div>
+        <div id="advanced-filter-panel" class="output" hidden>Advanced Filter Panel: open</div>
+        <p class="output" id="catalog-result-count">Visible Products: 3</p>
+    </section>
+
+    <section aria-label="Product Results">
+        <div class="grid">
+            <article class="product-card" data-category="software"><span class="status-badge approved">Available</span><h2>Starter Plan</h2><p>Core browser testing for a small project.</p><p class="price">$10</p><button class="details-button" type="button">View Details</button></article>
+            <article class="product-card" data-category="software"><span class="status-badge review">Popular</span><h2>Team Plan</h2><p>Shared testing flows for a growing team.</p><p class="price">$25</p><button class="details-button" type="button">View Details</button></article>
+            <article class="product-card" data-category="service"><span class="status-badge approved">Available</span><h2>Support Plan</h2><p>Assisted setup and test design help.</p><p class="price">$40</p><button class="details-button" type="button">View Details</button></article>
+        </div>
+        <p class="output" id="selected-product">Selected Product: none</p>
+    </section>
+
+    <div class="grid">
+        <section class="test-panel" aria-label="Primary Queue"><h2>Primary Queue</h2><p>Account A-100</p><span class="status-badge approved">Approved</span><div class="button-row" style="margin-top: 1rem"><button class="queue-action" data-queue="primary" type="button">Approve</button></div></section>
+        <section class="test-panel" aria-label="Secondary Queue"><h2>Secondary Queue</h2><p>Account A-200</p><span class="status-badge review">Review</span><div class="button-row" style="margin-top: 1rem"><button class="queue-action" data-queue="secondary" type="button">Approve</button></div></section>
+    </div>
+    <p class="output" id="queue-result">Queue Result: none</p>
+
+    <section class="test-panel" aria-label="Account Table">
+        <h2>Account Table</h2>
+        <div class="table-wrap"><table><thead><tr><th>Account</th><th>Owner</th><th>Status</th></tr></thead><tbody><tr><td>A-100</td><td>Ava</td><td>Approved</td></tr><tr><td>A-200</td><td>Ben</td><td>Review</td></tr></tbody></table></div>
+    </section>
+</main>
+<footer class="site-footer"><a href="index.html">Return to the test lab home page</a></footer>
+</body>
+</html>

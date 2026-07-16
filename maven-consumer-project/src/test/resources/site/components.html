@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Components Playground | Pickleball Test Lab</title>
+    <link rel="stylesheet" href="assets/styles.css"><script src="assets/app.js" defer></script>
+</head>
+<body data-page="components">
+<header class="site-header"><div class="header-inner"><a class="brand" href="index.html">Pickleball Test Lab</a><nav class="site-nav" aria-label="Primary navigation"><a data-nav="home" href="index.html">Home</a><a data-nav="forms" href="forms.html">Forms</a><a data-nav="catalog" href="catalog.html">Catalog</a><a data-nav="workflow" href="workflow.html">Workflow</a><a data-nav="keyboard" href="keyboard.html">Keyboard</a><a data-nav="dialogs" href="dialogs.html">Dialogs</a><a data-nav="components" href="components.html">Components</a></nav></div></header>
+<main>
+    <div class="page-heading"><h1>Component Scenario Playground</h1><p>This small form is intentionally repeatable so one reusable component scenario can save several customers with different caller values.</p></div>
+    <section class="test-panel" aria-label="Customer Form">
+        <h2>Customer Form</h2>
+        <form id="customer-form">
+            <div class="form-grid">
+                <div class="field"><label for="customer-name">Customer Name</label><input id="customer-name" type="text"></div>
+                <div class="field"><label for="customer-tier">Customer Tier</label><select id="customer-tier"><option value="">Choose a tier</option><option>Standard</option><option>Premium</option><option>Enterprise</option></select></div>
+                <div class="field full button-row"><button type="submit">Save Customer</button><button class="secondary" type="reset">Reset Customer</button></div>
+            </div>
+        </form>
+        <p class="output" id="saved-customer">Saved Customer: none</p>
+    </section>
+</main>
+<footer class="site-footer"><a href="index.html">Return to the test lab home page</a></footer>
+</body>
+</html>
