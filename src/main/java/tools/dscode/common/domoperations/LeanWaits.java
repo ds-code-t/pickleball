@@ -32,12 +32,9 @@ public final class LeanWaits {
     public static void waitForPhraseEntities( PhraseData parsingPhrase) {
 
         WebDriver driver =  parsingPhrase.getDriver();
-
-        if(hasAlert(driver))
-            return;
-
         // SAFE version: never throws
-        safeWaitForPageReady(driver, Duration.ofSeconds(60));
+        if(!safeWaitForPageReady(driver, Duration.ofSeconds(60)))
+            return;
 
         for (ElementMatch elementMatch : parsingPhrase.getElementMatches()) {
             if (elementMatch.elementTypes.contains(ElementType.HTML_ELEMENT)) {
@@ -65,7 +62,9 @@ public final class LeanWaits {
     }
 
 
-    public static void safeWaitForPageReady(WebDriver driver, Duration timeout, int startWaitMilliseconds) {
+    public static boolean safeWaitForPageReady(WebDriver driver, Duration timeout, int startWaitMilliseconds) {
+        if(hasAlert(driver))
+            return false;
         try {
             if(windowsChanged()){
                 waitMilliseconds(2000);
@@ -75,17 +74,21 @@ public final class LeanWaits {
             safeWaitForPageReady(driver, timeout);
         }
         catch (Exception e) {
-            return;
+            return false;
         }
+        return true;
     }
 
-    public static void safeWaitForPageReady(WebDriver driver, Duration timeout) {
+    public static boolean safeWaitForPageReady(WebDriver driver, Duration timeout) {
+        if(hasAlert(driver))
+            return false;
 
         try {
             waitForPageReady(driver, timeout);
         } catch (Exception e) {
             logWarn("[WARN] Page did NOT reach ready state in time: " + e);
         }
+        return true;
     }
 
     /**
