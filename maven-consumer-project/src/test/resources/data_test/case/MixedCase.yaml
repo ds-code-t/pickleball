@@ -1,3 +1,0 @@
-message: "case-insensitive file fallback worked"
-inner:
-  flag: true

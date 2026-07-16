@@ -1,1 +1,0 @@
-This txt file should become a JSON text node.

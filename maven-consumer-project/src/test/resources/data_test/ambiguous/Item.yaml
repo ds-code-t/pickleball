@@ -1,2 +1,0 @@
-value: "YAML file with same base name; should not be chosen if Item.json sorts first"
-source: "Item.yaml"

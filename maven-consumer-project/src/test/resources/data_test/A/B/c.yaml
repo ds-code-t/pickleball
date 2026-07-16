@@ -1,7 +1,0 @@
-D:
-  E:
-    - F: "found from A/B/C.yaml at D.E[0].F"
-      note: "first array item"
-    - F: "second array item"
-  nested:
-    value: 123

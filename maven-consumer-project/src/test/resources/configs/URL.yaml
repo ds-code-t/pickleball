@@ -1,7 +1,1 @@
-test A: http://google.com/<configs.USER.<suffix>>
-google: http://google.com/
-bad: https://expired.badssl.com/
-textbox: https://www.w3schools.com/tags/tryit.asp?filename=tryhtml_input_test
-select: https://www.w3schools.com/tags/tryit.asp?filename=tryhtml_select
-buttons: https://www.w3schools.com/w3css/w3css_buttons.asp
-alert: https://www.w3schools.com/jsref/tryit.asp?filename=tryjsref_alert
+dynamicSteps: http://127.0.0.1:8765/index.html
