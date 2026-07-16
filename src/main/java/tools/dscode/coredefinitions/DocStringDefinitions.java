@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
+import io.cucumber.docstring.DocString;
 import io.cucumber.java.DocStringType;
 
 import java.util.ArrayList;
@@ -247,6 +248,27 @@ public class DocStringDefinitions {
     @DocStringType(contentType = "xml")
     public Object xmlObject(String docString) throws JsonProcessingException {
         return toJavaObject(parseXml(docString));
+    }
+
+    public static JsonNode docStringtoJsonNode(DocString docString) throws JsonProcessingException {
+        if (docString == null) {
+            throw new IllegalArgumentException("DocString cannot be null");
+        }
+
+        String contentType = docString.getContentType();
+        if (contentType == null || contentType.isBlank()) {
+            throw new IllegalArgumentException("DocString contentType is required to convert to JsonNode");
+        }
+
+        String content = docString.getContent();
+        return switch (contentType.trim().toLowerCase()) {
+            case "json" -> parseJson(content);
+            case "yaml" -> parseYaml(content);
+            case "xml" -> parseXml(content);
+            default -> throw new IllegalArgumentException(
+                    "DocString contentType '" + contentType + "' cannot be converted to JsonNode; expected json, yaml, or xml"
+            );
+        };
     }
 
     // =========================================================
