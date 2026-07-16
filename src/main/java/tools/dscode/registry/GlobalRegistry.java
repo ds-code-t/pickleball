@@ -133,8 +133,4 @@ public final class GlobalRegistry {
         LOCAL.remove();
     }
 
-    public static List<WebDriver> getScenarioWebDrivers() {
-        return LOCAL.get().values().stream().filter(WebDriver.class::isInstance).map(WebDriver.class::cast).toList();
-    }
-
 }

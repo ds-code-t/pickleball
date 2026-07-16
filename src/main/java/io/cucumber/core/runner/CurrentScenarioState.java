@@ -14,6 +14,7 @@ import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ScenarioMapping;
 import tools.dscode.common.reporting.logging.BaseConverter;
+import tools.dscode.common.reporting.logging.CleanupTrace;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.reportportal.ReportPortalBridgeConverter;
 import tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter;
@@ -21,6 +22,7 @@ import tools.dscode.common.exceptions.SoftExceptionInterface;
 import tools.dscode.common.exceptions.SoftRuntimeException;
 import tools.dscode.common.treeparsing.parsedComponents.Phrase;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
+import tools.dscode.coredefinitions.ObjectRegistrationSteps;
 import tools.dscode.coredefinitions.ReportingSteps;
 import tools.dscode.parallelutilities.Stagger;
 import tools.dscode.registry.GlobalRegistry;
@@ -29,8 +31,11 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -62,7 +67,6 @@ import static tools.dscode.common.util.StringUtilities.safeFileName;
 import static tools.dscode.common.variables.PlatformSnapshot.getInitiatorSnapshot;
 import static tools.dscode.common.variables.RunVars.resolveFromVarsOrDefault;
 import static tools.dscode.registry.GlobalRegistry.LOCAL;
-import static tools.dscode.registry.GlobalRegistry.getScenarioWebDrivers;
 import static tools.dscode.testengine.PickleballRunner.getOptionsString;
 
 public class CurrentScenarioState extends ScenarioMapping {
@@ -72,6 +76,35 @@ public class CurrentScenarioState extends ScenarioMapping {
     public boolean endCurrentScenario;
 
     public List<Throwable> stepFailures = new ArrayList<>();
+
+    private final List<Object> cleanupRegistry = new ArrayList<>();
+    private final Set<Object> cleanupRegistrySeen = Collections.newSetFromMap(new IdentityHashMap<>());
+
+    /**
+     * Records a scenario object so that any {@code cleanup} steps declared in its
+     * registered configuration are executed automatically at scenario teardown.
+     * Objects are tracked by identity and de-duplicated; insertion order is preserved
+     * so teardown can run in reverse (dependents before dependencies).
+     */
+    public synchronized void registerCleanupCandidate(Object object) {
+        if (object == null) {
+            return;
+        }
+        if (cleanupRegistrySeen.add(object)) {
+            cleanupRegistry.add(object);
+        }
+    }
+
+    /**
+     * Static convenience used by registration code outside this package. No-op when
+     * there is no active scenario.
+     */
+    public static void registerScenarioCleanupCandidate(Object object) {
+        CurrentScenarioState state = getCurrentScenarioState();
+        if (state != null) {
+            state.registerCleanupCandidate(object);
+        }
+    }
 
     public final UUID id = UUID.randomUUID();
 
@@ -314,16 +347,65 @@ public class CurrentScenarioState extends ScenarioMapping {
     }
 
     public void scenarioRunCleanUp() {
-        for (WebDriver driver : getScenarioWebDrivers()) {
-            if (driver == null) {
-                continue;
-            }
+        runConfiguredObjectCleanups();
+        quitUnmanagedWebDrivers();
+    }
 
-            if (!debugBrowser) {
+    /**
+     * Backup teardown: quit any registered WebDriver that did NOT declare a cleanup
+     * configuration (drivers that declared one are already handled by
+     * {@link #runConfiguredObjectCleanups()}). Skipped when {@code debugBrowser} is true.
+     */
+    private void quitUnmanagedWebDrivers() {
+        if (debugBrowser) {
+            return;
+        }
+
+        List<Object> candidates;
+        synchronized (this) {
+            candidates = new ArrayList<>(cleanupRegistry);
+        }
+
+        for (Object candidate : candidates) {
+            if (candidate instanceof WebDriver driver
+                    && !ObjectRegistrationSteps.hasCleanupConfigured(candidate)) {
                 try {
                     driver.quit();
+                    CleanupTrace.print("[scenarioRunCleanUp] Backup quit for undeclared WebDriver: "
+                            + candidate.getClass().getName());
                 } catch (Exception ignored) {
                 }
+            }
+        }
+    }
+
+
+    /**
+     * Runs the {@code cleanup} steps declared in each registered scenario object's
+     * configuration, in reverse registration order. Objects without a cleanup
+     * configuration are no-ops. Each object's cleanup is isolated so a single
+     * failure does not prevent the remaining objects from being cleaned up.
+     */
+    private void runConfiguredObjectCleanups() {
+        if (debugBrowser) {
+            CleanupTrace.print("[scenarioRunCleanUp] Skipping configured cleanups (debugBrowser=true)");
+            return;
+        }
+
+        List<Object> candidates;
+        synchronized (this) {
+            candidates = new ArrayList<>(cleanupRegistry);
+        }
+        Collections.reverse(candidates);
+
+        for (Object candidate : candidates) {
+            try {
+                ObjectRegistrationSteps.cleanup(candidate);
+            } catch (Throwable t) {
+                CleanupTrace.printThrowable(
+                        "[scenarioRunCleanUp] Cleanup failed for object of type "
+                                + (candidate == null ? "null" : candidate.getClass().getName()),
+                        t);
             }
         }
     }

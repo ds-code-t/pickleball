@@ -38,6 +38,7 @@ public final class PickleballTests extends PickleballRunner {
                 .addBase("//input[@type='radio']");
 
         dictionary.category("Test Panel")
+                .inheritsFrom(ExecutionDictionary.CONTAINS_TEXT)
                 .addBase("//section[contains(concat(' ', normalize-space(@class), ' '), ' test-panel ')]");
 
         dictionary.category("Product Card")

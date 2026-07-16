@@ -1,5 +1,6 @@
 package tools.dscode.common.domoperations;
 
+import org.openqa.selenium.NoAlertPresentException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
@@ -277,6 +278,19 @@ public class SeleniumUtils {
         return value != null ? value : safeDomProperty(element, name);
     }
 
+
+    /**
+     * @return true if a browser-level alert is currently present;
+     *         false if no alert is present.
+     */
+    public static boolean hasAlert(WebDriver driver) {
+        try {
+            driver.switchTo().alert();
+            return true;
+        } catch (NoAlertPresentException ignored) {
+            return false;
+        }
+    }
 
 }
 

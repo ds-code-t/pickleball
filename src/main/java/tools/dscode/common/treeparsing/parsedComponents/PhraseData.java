@@ -381,7 +381,7 @@ public abstract class PhraseData extends PassedData {
 
 
     public void syncWithDOM() {
-        waitMilliseconds(1000);
+        waitMilliseconds(400);
         lifecycle.fire(Phase.BEFORE_DOM_LOAD_CHECK);
         waitForPhraseEntities(this);
         waitMilliseconds(100);

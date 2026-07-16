@@ -6,6 +6,7 @@ import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebDriverException;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.remote.RemoteWebDriver;
 import org.openqa.selenium.support.ui.FluentWait;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
@@ -18,6 +19,7 @@ import java.util.function.Function;
 
 
 import static tools.dscode.common.domoperations.HumanInteractions.blur;
+import static tools.dscode.common.domoperations.SeleniumUtils.hasAlert;
 import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.domoperations.SeleniumUtils.windowsChanged;
 import static tools.dscode.common.reporting.logging.LogForwarder.logWarn;
@@ -29,14 +31,19 @@ public final class LeanWaits {
 
     public static void waitForPhraseEntities( PhraseData parsingPhrase) {
 
+        WebDriver driver =  parsingPhrase.getDriver();
+
+        if(hasAlert(driver))
+            return;
+
         // SAFE version: never throws
-        safeWaitForPageReady(parsingPhrase.getDriver(), Duration.ofSeconds(60));
+        safeWaitForPageReady(driver, Duration.ofSeconds(60));
 
         for (ElementMatch elementMatch : parsingPhrase.getElementMatches()) {
             if (elementMatch.elementTypes.contains(ElementType.HTML_ELEMENT)) {
                 elementMatch.findWrappedElements();
                 for (ElementWrapper elementWrapper : elementMatch.getElementWrappers()) {
-                    safeWaitForElementReady(parsingPhrase.getDriver(), elementWrapper.element, Duration.ofSeconds(60));
+                    safeWaitForElementReady(driver, elementWrapper.element, Duration.ofSeconds(60));
                 }
             }
         }

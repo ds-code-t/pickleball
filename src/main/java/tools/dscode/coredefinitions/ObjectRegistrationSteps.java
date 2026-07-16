@@ -9,6 +9,7 @@ import io.cucumber.java.en.Given;
 import java.util.Map;
 
 import static io.cucumber.core.runner.CurrentScenarioState.getScenarioObject;
+import static io.cucumber.core.runner.CurrentScenarioState.registerScenarioCleanupCandidate;
 import static io.cucumber.core.runner.CurrentScenarioState.registerScenarioObject;
 import static io.cucumber.core.runner.CurrentScenarioState.removeScenarioObjectByKey;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
@@ -84,6 +85,15 @@ public class ObjectRegistrationSteps {
         }
 
         return created;
+    }
+
+    public static boolean hasCleanupConfigured(Object object) {
+        ObjectNode config = getRegisteredObjectConfig(object);
+        if (config == null) {
+            return false;
+        }
+        JsonNode cleanup = config.get(cleanupProperty);
+        return cleanup != null && !cleanup.isNull();
     }
 
     public static Object cleanup(Object object) {
@@ -188,6 +198,7 @@ public class ObjectRegistrationSteps {
     public static void registerObjectAndConfig(String pathKey, Object object, ObjectNode config) {
         if (pathKey != null && !pathKey.isBlank() && object != null) {
             registerScenarioObject(pathKey, object);
+            registerScenarioCleanupCandidate(object);
         }
         registerObjectConfig(object, config);
     }
