@@ -37,7 +37,7 @@ Pickleball feature files are written as executable business-language description
 ## Copyable setup examples
 
 - [`PickleballTests.java`](examples/PickleballTests.java)
-- [`pickleball_local.properties.example`](examples/pickleball_local.properties.example)
+- [`pickleball_local.properties`](examples/pickleball_local.properties.example)
 
 ---
 

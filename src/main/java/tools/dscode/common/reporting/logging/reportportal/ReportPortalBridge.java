@@ -6,6 +6,7 @@ import com.epam.reportportal.message.TypeAwareByteSource;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.utils.files.ByteSource;
+import com.epam.reportportal.utils.properties.ListenerProperty;
 import com.epam.reportportal.utils.properties.PropertiesLoader;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
@@ -89,6 +90,7 @@ public final class ReportPortalBridge {
 
     public static void initIfNeeded() {
         installRxErrorHandlerIfNeeded();
+
         if (initialized) {
             return;
         }
@@ -98,12 +100,29 @@ public final class ReportPortalBridge {
                 return;
             }
 
-            ListenerParameters params = new ListenerParameters(PropertiesLoader.load());
-            enabled = Optional.ofNullable(params.getEnable()).orElse(false);
+            PropertiesLoader properties = PropertiesLoader.load();
+
+            /*
+             * ReportPortal is enabled only when rp.enable is
+             * explicitly set to true.
+             *
+             * null, blank, false, and every other value disable it.
+             */
+            boolean explicitlyEnabled = Boolean.parseBoolean(
+                    properties.getProperty(ListenerProperty.ENABLE)
+            );
+
+            ListenerParameters params =
+                    new ListenerParameters(properties);
+
+            params.setEnable(explicitlyEnabled);
+            enabled = explicitlyEnabled;
 
             if (enabled) {
                 ReportPortalHierarchy.setParameters(params);
-                ReportPortalHierarchy.setLaunchName(fallback(params.getLaunchName(), "Launch"));
+                ReportPortalHierarchy.setLaunchName(
+                        fallback(params.getLaunchName(), "Launch")
+                );
             }
 
             initialized = true;
