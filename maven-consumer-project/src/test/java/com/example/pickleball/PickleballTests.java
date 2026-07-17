@@ -39,13 +39,21 @@ public final class PickleballTests extends PickleballRunner {
 
         dictionary.category("Test Panel")
                 .inheritsFrom(ExecutionDictionary.CONTAINS_TEXT)
-                .addBase("//section[contains(concat(' ', normalize-space(@class), ' '), ' test-panel ')]");
+                .addBase(
+                        "//section[contains(concat(' ', normalize-space(@class), ' '), ' test-panel ')]"
+                );
 
         dictionary.category("Product Card")
-                .addBase("//article[contains(concat(' ', normalize-space(@class), ' '), ' product-card ')]");
+                .inheritsFrom(ExecutionDictionary.CONTAINS_TEXT)
+                .addBase(
+                        "//article[contains(concat(' ', normalize-space(@class), ' '), ' product-card ')]"
+                );
 
         dictionary.category("Status Badge")
-                .addBase("//*[contains(concat(' ', normalize-space(@class), ' '), ' status-badge ')]");
+                .inheritsFrom(ExecutionDictionary.CONTAINS_TEXT)
+                .addBase(
+                        "//*[contains(concat(' ', normalize-space(@class), ' '), ' status-badge ')]"
+                );
     }
 
     @LifecycleHook(Phase.AFTER_CUCUMBER_RUN)
