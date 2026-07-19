@@ -28,6 +28,7 @@ public final class PickleballTests extends PickleballRunner {
     @LifecycleHook(Phase.BEFORE_CUCUMBER_RUN)
     public static void beforeRun() {
         registerProjectElementVocabulary();
+        // local site for testing.
         testSite = LocalTestSite.start(TEST_SITE_PORT);
     }
 
@@ -58,6 +59,7 @@ public final class PickleballTests extends PickleballRunner {
 
     @LifecycleHook(Phase.AFTER_CUCUMBER_RUN)
     public static void stopLocalTestSite() {
+        //closing local site for testing.
         if (testSite != null) {
             testSite.close();
             testSite = null;
