@@ -31,6 +31,8 @@ public class ScenarioStep extends StepExtension {
         ScenarioStep scenarioStep = new ScenarioStep(testCase, scenarioPickleStepTestStep);
         setProperty(testCase, "rootScenarioStep", scenarioStep);
         scenarioStep.initializeScenarioSteps((List<StepExtension>) getProperty(testCase, "stepExtensions"), null);
+        scenarioStep.getDefaultStepNodeMap().put("SCENARIO NAME", pickleName);
+        scenarioStep.getDefaultStepNodeMap().put("ROOT SCENARIO NAME", pickleName);
         return scenarioStep;
     }
 
@@ -51,6 +53,7 @@ public class ScenarioStep extends StepExtension {
             scenarioStep.stepParsingMap.getMaps().putAll(parsingMap.getMaps());
         }
         scenarioStep.initializeScenarioSteps(createPickleStepTestStepsFromPickle(pickle).stream().map(step -> new StepExtension(getTestCase(), step)).toList(), parsingMap);
+        scenarioStep.getDefaultStepNodeMap().put("SCENARIO NAME", pickleName);
         return scenarioStep;
     }
 
