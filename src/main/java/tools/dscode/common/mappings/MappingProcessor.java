@@ -419,6 +419,27 @@ public abstract class MappingProcessor implements Map<String, Object> {
      * </pre>
      */
     public String resolveWholeText(String input, String... delimiterReplacements) {
+        return resolveWholeText(input, true, delimiterReplacements);
+    }
+
+    /**
+     * Same as {@link #resolveWholeText(String, String...)} but controls whether
+     * evaluations run during resolution:
+     * <ul>
+     *     <li>expression placeholders ({@code <{...}>} / bookend-equivalent)</li>
+     *     <li>embedded step references ({@code <$...>} / keys that start with
+     *     {@code $}), executed via {@code resolveStepFromString}</li>
+     * </ul>
+     *
+     * <p>When {@code resolveEvaluations} is {@code false}, map (and {@code &})
+     * placeholders still resolve; expressions and {@code $} step refs are left
+     * unresolved for a later pass.</p>
+     */
+    public String resolveWholeText(
+            String input,
+            boolean resolveEvaluations,
+            String... delimiterReplacements
+    ) {
         validateDelimiterReplacements(delimiterReplacements);
 
         String resolvedText;
@@ -429,7 +450,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     SECONDARY_DEFAULT_CLOSE_BOOKEND,
                     delimiterReplacements);
 
-            resolvedText = resolveUsingBookends(input, xmlSafeBookends);
+            resolvedText = resolveUsingBookends(
+                    input, xmlSafeBookends, resolveEvaluations);
         } else if (usesDualDefaultOuterBookends(delimiterReplacements)) {
             Bookends angleBookends = createBookendsForOuter(
                     DEFAULT_OPEN_BOOKEND,
@@ -443,12 +465,14 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
             resolvedText = resolveUntilStable(
                     input,
+                    resolveEvaluations,
                     angleBookends,
                     tildeSquareBookends);
         } else {
             resolvedText = resolveUsingBookends(
                     input,
-                    createBookends(delimiterReplacements));
+                    createBookends(delimiterReplacements),
+                    resolveEvaluations);
         }
 
         logTrace("Resolved: '" + input + "' -> '" + resolvedText + "'");
@@ -487,7 +511,11 @@ public abstract class MappingProcessor implements Map<String, Object> {
      * pass. This preserves the original unresolved syntax because each pass
      * restores its own active bookends before the next dialect is attempted.
      */
-    private String resolveUntilStable(String input, Bookends... bookendStyles) {
+    private String resolveUntilStable(
+            String input,
+            boolean resolveEvaluations,
+            Bookends... bookendStyles
+    ) {
         Set<String> seenValues = new HashSet<>();
         String current = input;
 
@@ -495,7 +523,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
             String previous = current;
 
             for (Bookends bookends : bookendStyles) {
-                current = resolveUsingBookends(current, bookends);
+                current = resolveUsingBookends(
+                        current, bookends, resolveEvaluations);
             }
 
             if (current.equals(previous)) {
@@ -512,7 +541,11 @@ public abstract class MappingProcessor implements Map<String, Object> {
      * Performs one complete quote, normalization, resolution, restoration, and
      * unquote-cleanup pass using exactly one bookend style.
      */
-    private String resolveUsingBookends(String input, Bookends bookends) {
+    private String resolveUsingBookends(
+            String input,
+            Bookends bookends,
+            boolean resolveEvaluations
+    ) {
         QuoteParser parsedObj = new QuoteParser(input);
 
         // Resolve quoted substring values first. This lets expression bookends
@@ -520,10 +553,18 @@ public abstract class MappingProcessor implements Map<String, Object> {
         for (var entry : parsedObj.entrySetWithoutTripleSingle()) {
             parsedObj.put(
                     entry.getKey(),
-                    resolveAll(entry.getValue(), parsedObj, bookends));
+                    resolveAll(
+                            entry.getValue(),
+                            parsedObj,
+                            bookends,
+                            resolveEvaluations));
         }
 
-        parsedObj.setMasked(resolveAll(parsedObj.masked(), parsedObj, bookends));
+        parsedObj.setMasked(resolveAll(
+                parsedObj.masked(),
+                parsedObj,
+                bookends,
+                resolveEvaluations));
         return cleanupUnquotedReplacements(parsedObj.restore());
     }
 
@@ -590,7 +631,12 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return replacement;
     }
 
-    private String resolveAll(String input, QuoteParser parsedObj, Bookends bookends) {
+    private String resolveAll(
+            String input,
+            QuoteParser parsedObj,
+            Bookends bookends,
+            boolean resolveEvaluations
+    ) {
         try {
             String originalInput;
             do {
@@ -600,9 +646,14 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 do {
                     previousInput = input;
                     if (input.contains(INTERNAL_MAP_OPEN)) {
-                        input = resolveByMap(input, parsedObj, bookends);
+                        input = resolveByMap(
+                                input,
+                                parsedObj,
+                                bookends,
+                                resolveEvaluations);
                     }
-                    if (input.contains(INTERNAL_EXPRESSION_OPEN)) {
+                    if (resolveEvaluations
+                            && input.contains(INTERNAL_EXPRESSION_OPEN)) {
                         input = resolveExpression(input, parsedObj, bookends);
                     }
                     input = normalizeBookends(input, bookends);
@@ -622,7 +673,12 @@ public abstract class MappingProcessor implements Map<String, Object> {
         }
     }
 
-    private String resolveByMap(String input, QuoteParser parsedObj, Bookends bookends) {
+    private String resolveByMap(
+            String input,
+            QuoteParser parsedObj,
+            Bookends bookends,
+            boolean resolveEvaluations
+    ) {
         String key = null;
         String matchedKey = null;
         boolean unquote = false;
@@ -646,6 +702,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 }
 
                 if (key.startsWith("$")) {
+                    if (!resolveEvaluations) {
+                        continue;
+                    }
                     key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
                     replacement = getRunningStep().resolveStepFromString(key.substring(1));
                     break;
