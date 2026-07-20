@@ -78,7 +78,7 @@ public final class FileAndDataParsing {
 
         try (InputStream in = raw) {
             String content = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            return resolveAndParseSingleFile(content, path);
+            return resolveAndParseSingleFile(content, path, true);
         } catch (ParseFailureException e) {
             throw new IOException(e.getMessage(), e);
         } catch (IOException e) {
@@ -87,16 +87,24 @@ public final class FileAndDataParsing {
     }
 
     public static JsonNode buildJsonFromPath(String resourcePath) {
-        return attemptBuildJsonFromPath(resourcePath);
+        return buildJsonFromPath(resourcePath, true);
+    }
+
+    public static JsonNode buildJsonFromPath(String resourcePath, boolean resolveTemplates) {
+        return attemptBuildJsonFromPath(resourcePath, resolveTemplates);
     }
 
     public static JsonNode attemptBuildJsonFromPath(String resourcePath) {
+        return attemptBuildJsonFromPath(resourcePath, true);
+    }
+
+    public static JsonNode attemptBuildJsonFromPath(String resourcePath, boolean resolveTemplates) {
         SplitResourcePath split = splitResourcePath(resourcePath);
         if (split == null) {
             return null;
         }
 
-        JsonNode resolved = buildJsonFromSuffixAgnosticPath(split.lookupPath());
+        JsonNode resolved = buildJsonFromSuffixAgnosticPath(split.lookupPath(), resolveTemplates);
         if (resolved == null) {
             return null;
         }
@@ -182,7 +190,7 @@ public final class FileAndDataParsing {
         return normalized;
     }
 
-    private static JsonNode buildJsonFromSuffixAgnosticPath(String resourcePath) {
+    private static JsonNode buildJsonFromSuffixAgnosticPath(String resourcePath, boolean resolveTemplates) {
         String normalized = normalizeResourcePath(resourcePath);
         if (normalized.isBlank()) {
             return null;
@@ -204,13 +212,13 @@ public final class FileAndDataParsing {
                             ? fs.getPath("/")
                             : fs.getPath(parentResourcePath);
                     Path matched = findSuffixAgnosticChild(parent, requestedName);
-                    return matched == null ? null : buildFromRoot(matched);
+                    return matched == null ? null : buildFromRoot(matched, resolveTemplates);
                 }
             }
 
             Path parent = Paths.get(parentUrl.toURI());
             Path matched = findSuffixAgnosticChild(parent, requestedName);
-            return matched == null ? null : buildFromRoot(matched);
+            return matched == null ? null : buildFromRoot(matched, resolveTemplates);
         } catch (ParseFailureException e) {
             throw e;
         } catch (Exception e) {
@@ -400,13 +408,13 @@ public final class FileAndDataParsing {
         return fileName.substring(dot + 1).toLowerCase();
     }
 
-    private static JsonNode buildFromRoot(Path root) throws IOException {
+    private static JsonNode buildFromRoot(Path root, boolean resolveTemplates) throws IOException {
         if (root == null || !Files.exists(root)) {
             return null;
         }
 
         if (!Files.isDirectory(root)) {
-            return readAndParseFile(root);
+            return readAndParseFile(root, resolveTemplates);
         }
 
         ObjectNode dir = JSON_MAPPER.createObjectNode();
@@ -423,13 +431,13 @@ public final class FileAndDataParsing {
                         try {
                             if (Files.isDirectory(p)) {
                                 String key = p.getFileName().toString();
-                                JsonNode child = buildFromRoot(p);
+                                JsonNode child = buildFromRoot(p, resolveTemplates);
                                 if (child != null) {
                                     dir.set(key, child);
                                 }
                             } else {
                                 String base = getBaseFileName(p.getFileName().toString());
-                                JsonNode parsed = readAndParseFile(p);
+                                JsonNode parsed = readAndParseFile(p, resolveTemplates);
                                 if (parsed != null) {
                                     dir.set(base, parsed);
                                 }
@@ -445,7 +453,7 @@ public final class FileAndDataParsing {
         return dir.size() == 0 ? null : dir;
     }
 
-    private static JsonNode readAndParseFile(Path file) throws IOException {
+    private static JsonNode readAndParseFile(Path file, boolean resolveTemplates) throws IOException {
         if (file == null || !Files.exists(file) || Files.isDirectory(file)) {
             return null;
         }
@@ -462,11 +470,13 @@ public final class FileAndDataParsing {
         }
 
         String content = Files.readString(file, StandardCharsets.UTF_8);
-        return resolveAndParseSingleFile(content, fileName);
+        return resolveAndParseSingleFile(content, fileName, resolveTemplates);
     }
 
-    private static JsonNode resolveAndParseSingleFile(String content, String fileName) {
-        String resolvedContent = getRunningParsingMap().resolveWholeText(content);
+    private static JsonNode resolveAndParseSingleFile(String content, String fileName, boolean resolveTemplates) {
+        String resolvedContent = resolveTemplates
+                ? getRunningParsingMap().resolveWholeText(content)
+                : content;
         return parseSingleFile(resolvedContent, fileName);
     }
 

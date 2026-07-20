@@ -18,7 +18,9 @@ public class ParsingMap extends MappingProcessor {
     public static final String configsRoot = "configs";
 
     static {
-        JsonNode configsNode = FileAndDataParsing.buildJsonFromPath(configsRoot);
+        // Skip template resolution: configs may contain late-bound placeholders
+        // (e.g. <$ScenarioNameAndLine>) that require a running step.
+        JsonNode configsNode = FileAndDataParsing.buildJsonFromPath(configsRoot, false);
         GLOBALS.root.set(configsRoot, configsNode);
     }
 
