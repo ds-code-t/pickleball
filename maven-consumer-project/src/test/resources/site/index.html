@@ -1,67 +1,71 @@
 <!doctype html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Pickleball Test Lab</title>
-    <link rel="stylesheet" href="assets/styles.css">
-    <script src="assets/app.js" defer></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pickleball Test Lab</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/app.js" defer></script>
 </head>
 <body data-page="home">
 <header class="site-header">
-    <div class="header-inner">
-        <a class="brand" href="index.html">Pickleball Test Lab</a>
-        <nav class="site-nav" aria-label="Primary navigation">
-            <a data-nav="home" href="index.html">Home</a>
-            <a data-nav="forms" href="forms.html">Forms</a>
-            <a data-nav="catalog" href="catalog.html">Catalog</a>
-            <a data-nav="workflow" href="workflow.html">Workflow</a>
-            <a data-nav="keyboard" href="keyboard.html">Keyboard</a>
-            <a data-nav="dialogs" href="dialogs.html">Dialogs</a>
-            <a data-nav="components" href="components.html">Components</a>
-        </nav>
-    </div>
+  <div class="header-inner">
+    <a class="brand" href="index.html">Pickleball Test Lab</a>
+    <nav class="site-nav" aria-label="Primary navigation">
+      <a data-nav="home" href="index.html">Home</a>
+      <a data-nav="forms" href="forms.html">Forms</a>
+      <a data-nav="catalog" href="catalog.html">Catalog</a>
+      <a data-nav="workflow" href="workflow.html">Workflow</a>
+      <a data-nav="keyboard" href="keyboard.html">Keyboard</a>
+      <a data-nav="dialogs" href="dialogs.html">Dialogs</a>
+      <a data-nav="components" href="components.html">Components</a>
+      <a data-nav="datetime" href="datetime.html">Date &amp; Time</a>
+    </nav>
+  </div>
 </header>
 <main>
-    <section class="hero">
-        <h1>Pickleball Test Lab</h1>
-        <p>A self-contained multi-page site for exercising dynamic browser steps, navigation, conditions, reusable scenario components, keyboard expressions, and mapped test data.</p>
-    </section>
-
-    <p class="output" id="site-status">Site Status: ready</p>
-
-    <div class="grid">
-        <article class="card">
-            <h2>Forms Playground</h2>
-            <p>Textboxes, textarea, choices, dropdowns, pointer actions, state assertions, and DOM updates.</p>
-            <a class="card-link" href="forms.html">Open Forms Playground</a>
-        </article>
-        <article class="card">
-            <h2>Catalog &amp; Context</h2>
-            <p>Repeated elements, ordinal selection, context scoping, custom categories, filtering, and tables.</p>
-            <a class="card-link" href="catalog.html">Open Catalog Playground</a>
-        </article>
-        <article class="card">
-            <h2>Conditional Workflow</h2>
-            <p>Enabled and disabled controls, nested flow, phrase conditions, expression conditions, and branch results.</p>
-            <a class="card-link" href="workflow.html">Open Workflow Playground</a>
-        </article>
-        <article class="card">
-            <h2>Keyboard Playground</h2>
-            <p>Keyboard expressions for sequential keys, modifier keys, selection, replacement, and key events.</p>
-            <a class="card-link" href="keyboard.html">Open Keyboard Playground</a>
-        </article>
-        <article class="card">
-            <h2>Dialogs Playground</h2>
-            <p>JavaScript alerts and confirmations for testing accept and dismiss behavior.</p>
-            <a class="card-link" href="dialogs.html">Open Dialogs Playground</a>
-        </article>
-        <article class="card">
-            <h2>Component Scenarios</h2>
-            <p>A small customer form designed for reusable <code>RUN SCENARIOS</code> business flows.</p>
-            <a class="card-link" href="components.html">Open Components Playground</a>
-        </article>
-    </div>
+  <section class="hero">
+    <h1>Pickleball Test Lab</h1>
+    <p>A self-contained multi-page site for exercising dynamic browser steps, navigation, conditions, reusable scenario components, keyboard expressions, mapped test data, and date/time expressions.</p>
+  </section>
+  <p class="output" id="site-status">Site Status: ready</p>
+  <div class="grid">
+    <article class="card">
+      <h2>Forms Playground</h2>
+      <p>Textboxes, textarea, choices, dropdowns, pointer actions, state assertions, and DOM updates.</p>
+      <a class="card-link" href="forms.html">Open Forms Playground</a>
+    </article>
+    <article class="card">
+      <h2>Catalog &amp; Context</h2>
+      <p>Repeated elements, ordinal selection, context scoping, custom categories, filtering, and tables.</p>
+      <a class="card-link" href="catalog.html">Open Catalog Playground</a>
+    </article>
+    <article class="card">
+      <h2>Conditional Workflow</h2>
+      <p>Enabled and disabled controls, nested flow, phrase conditions, expression conditions, and branch results.</p>
+      <a class="card-link" href="workflow.html">Open Workflow Playground</a>
+    </article>
+    <article class="card">
+      <h2>Keyboard Playground</h2>
+      <p>Keyboard expressions for sequential keys, modifier keys, selection, replacement, and key events.</p>
+      <a class="card-link" href="keyboard.html">Open Keyboard Playground</a>
+    </article>
+    <article class="card">
+      <h2>Dialogs Playground</h2>
+      <p>JavaScript alerts and confirmations for testing accept and dismiss behavior.</p>
+      <a class="card-link" href="dialogs.html">Open Dialogs Playground</a>
+    </article>
+    <article class="card">
+      <h2>Component Scenarios</h2>
+      <p>A small customer form designed for reusable <code>RUN SCENARIOS</code> business flows.</p>
+      <a class="card-link" href="components.html">Open Components Playground</a>
+    </article>
+    <article class="card">
+      <h2>Date &amp; Time Playground</h2>
+      <p>Formatting, input parsing, time-zone conversion, durations, margins, business dates, and opening or closing hours.</p>
+      <a class="card-link" href="datetime.html">Open Date &amp; Time Playground</a>
+    </article>
+  </div>
 </main>
 <footer class="site-footer">Local test site served only on 127.0.0.1 during the Maven test run.</footer>
 </body>

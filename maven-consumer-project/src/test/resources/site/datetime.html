@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Date &amp; Time Playground | Pickleball Test Lab</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/app.js" defer></script>
+</head>
+<body data-page="datetime">
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="index.html">Pickleball Test Lab</a>
+    <nav class="site-nav" aria-label="Primary navigation">
+      <a data-nav="home" href="index.html">Home</a>
+      <a data-nav="forms" href="forms.html">Forms</a>
+      <a data-nav="catalog" href="catalog.html">Catalog</a>
+      <a data-nav="workflow" href="workflow.html">Workflow</a>
+      <a data-nav="keyboard" href="keyboard.html">Keyboard</a>
+      <a data-nav="dialogs" href="dialogs.html">Dialogs</a>
+      <a data-nav="components" href="components.html">Components</a>
+      <a data-nav="datetime" href="datetime.html">Date &amp; Time</a>
+    </nav>
+  </div>
+</header>
+<main>
+  <div class="page-heading">
+    <h1>Date &amp; Time Playground</h1>
+    <p>Text fields for testing Pickleball date/time formatting, parsing, zones, margins, durations, ranges, and configured business-calendar operations.</p>
+  </div>
+
+  <div class="grid">
+    <section class="test-panel" aria-label="Date Values and Formatting">
+      <h2>Date Values and Formatting</h2>
+      <div class="form-grid">
+        <div class="field"><label for="date">Date</label><input id="date" name="date" type="text" autocomplete="off"></div>
+        <div class="field"><label for="iso-date">ISO Date</label><input id="iso-date" name="isoDate" type="text" autocomplete="off"></div>
+        <div class="field"><label for="previous-date">Previous Date</label><input id="previous-date" name="previousDate" type="text" autocomplete="off"></div>
+        <div class="field"><label for="due-date">Due Date</label><input id="due-date" name="dueDate" type="text" autocomplete="off"></div>
+        <div class="field full"><label for="formatted-date-time">Formatted Date Time</label><input id="formatted-date-time" name="formattedDateTime" type="text" autocomplete="off"></div>
+      </div>
+    </section>
+
+    <section class="test-panel" aria-label="Parsing and Reformatting">
+      <h2>Parsing and Reformatting</h2>
+      <div class="form-grid">
+        <div class="field full"><label for="source-date-time">Source Date Time</label><input id="source-date-time" name="sourceDateTime" type="text" autocomplete="off"></div>
+        <div class="field full"><label for="reformatted-date-time">Reformatted Date Time</label><input id="reformatted-date-time" name="reformattedDateTime" type="text" autocomplete="off"></div>
+      </div>
+    </section>
+
+    <section class="test-panel" aria-label="Time Zone Conversion">
+      <h2>Time Zone Conversion</h2>
+      <div class="form-grid">
+        <div class="field full"><label for="source-zone-date-time">Source Zone Date Time</label><input id="source-zone-date-time" name="sourceZoneDateTime" type="text" autocomplete="off"></div>
+        <div class="field full"><label for="converted-zone-date-time">Converted Zone Date Time</label><input id="converted-zone-date-time" name="convertedZoneDateTime" type="text" autocomplete="off"></div>
+      </div>
+    </section>
+
+    <section class="test-panel" aria-label="Durations and Time Ranges">
+      <h2>Durations and Time Ranges</h2>
+      <div class="form-grid">
+        <div class="field full"><label for="duration">Duration</label><input id="duration" name="duration" type="text" autocomplete="off"></div>
+        <div class="field full"><label for="business-hours-range">Business Hours Range</label><input id="business-hours-range" name="businessHoursRange" type="text" autocomplete="off"></div>
+      </div>
+    </section>
+
+    <section class="test-panel" aria-label="Business Calendar Values">
+      <h2>Business Calendar Values</h2>
+      <div class="form-grid">
+        <div class="field full"><label for="business-date">Business Date</label><input id="business-date" name="businessDate" type="text" autocomplete="off"></div>
+        <div class="field"><label for="opening-time">Opening Time</label><input id="opening-time" name="openingTime" type="text" autocomplete="off"></div>
+        <div class="field"><label for="closing-time">Closing Time</label><input id="closing-time" name="closingTime" type="text" autocomplete="off"></div>
+      </div>
+    </section>
+  </div>
+</main>
+<footer class="site-footer"><a href="index.html">Return to the test lab home page</a></footer>
+</body>
+</html>

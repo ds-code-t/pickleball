@@ -1,0 +1,29 @@
+# Documentation example only.
+# Keep the real consumer configuration in:
+# maven-consumer-project/src/test/resources/configs/CALENDARS.yaml
+#
+# Property names can vary with the version of tools.dscode.common.util.datetime.
+# This file illustrates the information a business calendar commonly carries.
+
+RetailCalendar:
+  timeZone: America/Phoenix
+  businessDays:
+    - MONDAY
+    - TUESDAY
+    - WEDNESDAY
+    - THURSDAY
+    - FRIDAY
+  businessHours:
+    MONDAY:    ["09:00-17:00"]
+    TUESDAY:   ["09:00-17:00"]
+    WEDNESDAY: ["09:00-17:00"]
+    THURSDAY:  ["09:00-17:00"]
+    FRIDAY:    ["09:00-17:00"]
+  holidays:
+    - 2026-01-01
+    - 2026-07-04
+    - 2026-12-25
+  exceptionalHours:
+    2026-12-24: ["09:00-13:00"]
+  closedDates:
+    - 2026-11-26

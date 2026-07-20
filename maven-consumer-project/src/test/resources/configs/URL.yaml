@@ -5,3 +5,4 @@ workflow: http://127.0.0.1:8765/workflow.html
 keyboard: http://127.0.0.1:8765/keyboard.html
 dialogs: http://127.0.0.1:8765/dialogs.html
 components: http://127.0.0.1:8765/components.html
+dateTime: http://127.0.0.1:8765/datetime.html

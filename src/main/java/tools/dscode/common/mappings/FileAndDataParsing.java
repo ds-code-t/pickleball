@@ -1,3 +1,10 @@
+/*
+ * FileAndDataParsing resource/template integration — revision v2
+ *
+ * Resolves templates once per individual resource file immediately before
+ * parsing, applies the same logic to direct files and directory children, and
+ * intentionally avoids caching context-specific resolved JsonNode results.
+ */
 package tools.dscode.common.mappings;
 
 import com.fasterxml.jackson.core.JsonParser;
@@ -23,18 +30,15 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Map;
-import java.util.Objects;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import com.fasterxml.jackson.databind.node.NullNode;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-
+import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 
 public final class FileAndDataParsing {
@@ -56,25 +60,6 @@ public final class FileAndDataParsing {
             "csv"
     );
 
-    private static final int BUILD_JSON_CACHE_MAX_SIZE = 256;
-    private static final long BUILD_JSON_CACHE_TTL_NANOS = TimeUnit.MINUTES.toNanos(10);
-    private static final JsonNode NULL_SENTINEL = NullNode.getInstance();
-    private static final ConcurrentHashMap<String, CacheEntry> BUILD_JSON_CACHE = new ConcurrentHashMap<>();
-
-    private static final class CacheEntry {
-        private final JsonNode value;
-        private final long expiresAtNanos;
-
-        private CacheEntry(JsonNode value, long expiresAtNanos) {
-            this.value = value;
-            this.expiresAtNanos = expiresAtNanos;
-        }
-
-        private boolean isExpired(long now) {
-            return now >= expiresAtNanos;
-        }
-    }
-
     private static final class ParseFailureException extends RuntimeException {
         private ParseFailureException(String message, Throwable cause) {
             super(message, cause);
@@ -93,7 +78,7 @@ public final class FileAndDataParsing {
 
         try (InputStream in = raw) {
             String content = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            return parseSingleFile(content, path);
+            return resolveAndParseSingleFile(content, path);
         } catch (ParseFailureException e) {
             throw new IOException(e.getMessage(), e);
         } catch (IOException e) {
@@ -102,45 +87,8 @@ public final class FileAndDataParsing {
     }
 
     public static JsonNode buildJsonFromPath(String resourcePath) {
-        String key = normalizeResourcePath(resourcePath);
-        long now = System.nanoTime();
-
-        CacheEntry entry = BUILD_JSON_CACHE.compute(key, (k, existing) -> {
-            if (existing != null && !existing.isExpired(now)) {
-                return existing;
-            }
-
-            JsonNode jsonNode = attemptBuildJsonFromPath(k);
-
-            return new CacheEntry(
-                    jsonNode == null ? NULL_SENTINEL : jsonNode.deepCopy(),
-                    now + BUILD_JSON_CACHE_TTL_NANOS
-            );
-        });
-
-        cleanupBuildJsonCache(now);
-        return entry.value == NULL_SENTINEL ? null : entry.value.deepCopy();
+        return attemptBuildJsonFromPath(resourcePath);
     }
-
-    private static void cleanupBuildJsonCache(long now) {
-        if (BUILD_JSON_CACHE.size() <= BUILD_JSON_CACHE_MAX_SIZE) {
-            return;
-        }
-
-        BUILD_JSON_CACHE.entrySet().removeIf(e -> e.getValue().isExpired(now));
-
-        int overflow = BUILD_JSON_CACHE.size() - BUILD_JSON_CACHE_MAX_SIZE;
-        if (overflow <= 0) {
-            return;
-        }
-
-        var it = BUILD_JSON_CACHE.keySet().iterator();
-        while (overflow-- > 0 && it.hasNext()) {
-            it.next();
-            it.remove();
-        }
-    }
-
 
     public static JsonNode attemptBuildJsonFromPath(String resourcePath) {
         SplitResourcePath split = splitResourcePath(resourcePath);
@@ -458,20 +406,7 @@ public final class FileAndDataParsing {
         }
 
         if (!Files.isDirectory(root)) {
-            String fileName = root.getFileName().toString();
-            String ext = getExtensionLower(fileName);
-
-            if (!ALLOWED_EXTENSIONS.contains(ext)) {
-                return null;
-            }
-
-            long size = Files.size(root);
-            if (size <= 0 || size > MAX_CONFIG_FILE_SIZE_BYTES) {
-                return null;
-            }
-
-            String content = Files.readString(root, StandardCharsets.UTF_8);
-            return parseSingleFile(content, fileName);
+            return readAndParseFile(root);
         }
 
         ObjectNode dir = JSON_MAPPER.createObjectNode();
@@ -493,21 +428,8 @@ public final class FileAndDataParsing {
                                     dir.set(key, child);
                                 }
                             } else {
-                                String fileName = p.getFileName().toString();
-                                String ext = getExtensionLower(fileName);
-
-                                if (!ALLOWED_EXTENSIONS.contains(ext)) {
-                                    return;
-                                }
-
-                                long size = Files.size(p);
-                                if (size <= 0 || size > MAX_CONFIG_FILE_SIZE_BYTES) {
-                                    return;
-                                }
-
-                                String base = getBaseFileName(fileName);
-                                String content = Files.readString(p, StandardCharsets.UTF_8);
-                                JsonNode parsed = parseSingleFile(content, fileName);
+                                String base = getBaseFileName(p.getFileName().toString());
+                                JsonNode parsed = readAndParseFile(p);
                                 if (parsed != null) {
                                     dir.set(base, parsed);
                                 }
@@ -521,6 +443,31 @@ public final class FileAndDataParsing {
         }
 
         return dir.size() == 0 ? null : dir;
+    }
+
+    private static JsonNode readAndParseFile(Path file) throws IOException {
+        if (file == null || !Files.exists(file) || Files.isDirectory(file)) {
+            return null;
+        }
+
+        String fileName = file.getFileName().toString();
+        String ext = getExtensionLower(fileName);
+        if (!ALLOWED_EXTENSIONS.contains(ext)) {
+            return null;
+        }
+
+        long size = Files.size(file);
+        if (size <= 0 || size > MAX_CONFIG_FILE_SIZE_BYTES) {
+            return null;
+        }
+
+        String content = Files.readString(file, StandardCharsets.UTF_8);
+        return resolveAndParseSingleFile(content, fileName);
+    }
+
+    private static JsonNode resolveAndParseSingleFile(String content, String fileName) {
+        String resolvedContent = getRunningParsingMap().resolveWholeText(content);
+        return parseSingleFile(resolvedContent, fileName);
     }
 
     private static boolean hasMeaningfulContent(String content, String name) {

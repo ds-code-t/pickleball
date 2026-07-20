@@ -1,129 +1,93 @@
-# Pickleball Multi-page Consumer
+# Pickleball Dynamic Steps Consumer
 
-This Maven consumer project uses Pickleball as a test-scoped dependency and runs browser scenarios against a self-contained multi-page HTML5/JavaScript test site.
+A regular Maven example implementation for the Pickleball browser-testing framework. It uses Pickleball as a test-scoped dependency and runs executable feature examples against a self-contained HTML5/JavaScript site.
 
 ## Requirements
 
 - JDK 21
 - Maven 3.9 or newer
-- Chrome available to Selenium, or another browser selected through Pickleball configuration
-- Port `8765` available during the test run
+- Chrome available to Selenium, or a different browser configured through Pickleball
 
-## Run the complete suite
+## Run
 
-Every executable scenario has the aggregate `@all` tag. The test runner uses `@all` as its overridable default, so either command runs all functionality:
-
-```powershell
+```bash
 mvn test
-mvn test -Pall
 ```
 
-The equivalent direct Pickleball/Cucumber tag command is:
+`PickleballTests` starts a loopback-only HTTP server on `127.0.0.1:8765` before the Cucumber run and stops it afterward. Features navigate to URLs defined in `src/test/resources/configs/URL.yaml`.
 
-```powershell
-mvn test "-Dpkb_tags=@all"
-```
-
-`PickleballTests` starts a loopback-only server at `127.0.0.1:8765` before Cucumber begins and stops it after the run. `LocalTestSite` serves all files below `src/test/resources/site`, including HTML, CSS, and JavaScript assets.
-
-## Functional entry points
-
-Maven profiles provide short, single-purpose entry points. Each profile supplies one `pkb_tags` expression to Pickleball.
-
-| Functionality | Maven entry point | Tag selected |
-|---|---|---|
-| All functionality | `mvn test -Pall` | `@all` |
-| Smoke coverage | `mvn test -Psmoke` | `@smoke` |
-| Full regression coverage | `mvn test -Pregression` | `@regression` |
-| All browser scenarios | `mvn test -Pbrowser` | `@browser` |
-| Data-only scenarios | `mvn test -Pdata` | `@data` |
-| Navigation | `mvn test -Pnavigation` | `@navigation` |
-| Forms and dynamic steps | `mvn test -Pforms` | `@forms` |
-| Catalog and element context | `mvn test -Pcatalog` | `@catalog` |
-| Mapping and templating | `mvn test -Pmapping` | `@mapping` |
-| Shared resources | `mvn test -Presources` | `@resources` |
-| Nested and conditional workflows | `mvn test -Pworkflow` | `@workflow` |
-| Block conditionals only | `mvn test -Pconditionals` | `@block-conditionals` |
-| Nested steps only | `mvn test -Pnested` | `@nested-steps` |
-| Keyboard expressions | `mvn test -Pkeyboard` | `@keyboard` |
-| Browser dialogs | `mvn test -Pdialogs` | `@dialogs` |
-| Reusable component scenarios | `mvn test -Pcomponents` | `@components` |
-
-## Direct tag expressions
-
-Any Cucumber tag expression can be supplied without adding a Maven profile:
-
-```powershell
-mvn test "-Dpkb_tags=@forms"
-mvn test "-Dpkb_tags=@forms and @state-assertions"
-mvn test "-Dpkb_tags=@browser and not @dialogs"
-mvn test "-Dpkb_tags=@mapping or @components"
-```
-
-Use either a Maven profile or a direct `-Dpkb_tags` expression for a run; there is normally no reason to combine them. Both become JVM properties and therefore take precedence over the runner default and local properties.
-
-For IntelliJ or repeated local development without a Maven suite profile, copy `pickleball_local.properties.example` to `pickleball_local.properties` and set a tag expression there. A JVM `-Dpkb_tags` value still takes precedence over the local file.
-
-See [TAGGING.md](TAGGING.md) for the complete tag taxonomy and scenario-to-tag matrix.
-
-## Site pages
-
-| Page | Main test purpose |
-|---|---|
-| `index.html` | Navigation links and page transitions |
-| `forms.html` | Text entry, selections, state checks, pointer actions, chained dynamic steps |
-| `catalog.html` | Context phrases, custom element words, repeated elements, ordinal positions, filtering |
-| `workflow.html` | Nested steps, dynamic conditions, `IF:` / `ELSE-IF:` / `ELSE:` blocks |
-| `keyboard.html` | Keyboard expressions and modifier-key timing |
-| `dialogs.html` | Accepting and dismissing JavaScript alerts and confirmations |
-| `components.html` | Reusable flows invoked with `RUN SCENARIOS` |
-
-## Feature files
+## Project layout
 
 ```text
+pom.xml
+src/test/java/com/example/pickleball/PickleballTests.java
+src/test/java/com/example/pickleball/support/LocalTestSite.java
+src/test/resources/configs/CALENDARS.yaml
+src/test/resources/configs/URL.yaml
 src/test/resources/features/
-├── navigation.feature
-├── forms-dynamic-steps.feature
-├── catalog-context.feature
-├── mapping-and-resources.feature
-├── nested-and-block-conditionals.feature
-├── keyboard.feature
-├── dialogs.feature
-└── component-scenarios.feature
+src/test/resources/site/
 ```
 
-## Resource mapping examples
+## Runnable feature examples
 
-The project includes examples of every documented shared resource type:
+- [Catalog and custom context](src/test/resources/features/catalog-context.feature)
+- [Component scenarios](src/test/resources/features/component-scenarios.feature)
+- [Dialogs](src/test/resources/features/dialogs.feature)
+- [Dynamic steps](src/test/resources/features/dynamic-steps.feature)
+- [Form-oriented dynamic steps](src/test/resources/features/forms-dynamic-steps.feature)
+- [Keyboard expressions](src/test/resources/features/keyboard.feature)
+- [Mapping and resources](src/test/resources/features/mapping-and-resources.feature)
+- [Navigation](src/test/resources/features/navigation.feature)
+- [Nested steps and block conditionals](src/test/resources/features/nested-and-block-conditionals.feature)
+- [Date and time utilities](src/test/resources/features/date-time-utilities.feature)
+
+## What the scenarios cover
+
+- Accessible selection of textboxes, textareas, checkboxes, radio buttons, dropdowns, text, buttons, dialogs, and custom element categories
+- Entering values and observing JavaScript-driven DOM changes
+- State, text, ordinal, navigation, keyboard, nested-flow, block-condition, and component-scenario behavior
+- Runtime mapping from YAML and other resource files
+- Multiple actions in comma-delimited dynamic steps
+- Date/time formatting, input parsing, reformatting, time-zone conversion, durations, time ranges, assertion margins, business dates, and opening or closing hours
+
+## Date/time consumer example
+
+The [date-time-utilities.feature](src/test/resources/features/date-time-utilities.feature) example uses [datetime.html](src/test/resources/site/datetime.html), mapped as `URL.dateTime` in [URL.yaml](src/test/resources/configs/URL.yaml).
+
+The project already defines calendars in:
 
 ```text
-src/test/resources/configs/
-├── URL.yaml
-├── TEST_DATA.yaml
-├── jsonfiles/accounts.json
-└── otherfiles/
-    ├── regions.csv
-    └── banner.txt
+src/test/resources/configs/CALENDARS.yaml
 ```
 
-It also includes `src/test/resources/files/customers.yaml` for an on-demand `/` template.
+The date/time feature uses the calendar that is already defined there under the `OpsUS` key. `CALENDARS.yaml` remains an ordinary checked-in consumer configuration file and is not generated or replaced by this bundle.
 
-## Custom element vocabulary
+Run only the date/time examples with:
 
-The runner registers these project-specific categories before the Cucumber run:
-
-- `Radio Button`
-- `Test Panel`
-- `Product Card`
-- `Status Badge`
-
-The feature files can therefore use business-readable phrases such as:
-
-```gherkin
-* , in the "Secondary Queue" Test Panel, click the "Approve" Button
-* , ensure the "Starter Plan" Product Card is displayed
+```bash
+mvn test "-Dpkb_tags=@datetime"
 ```
 
-## Local overrides
+## Configuration overrides
 
-Machine-specific values can be supplied in `src/test/resources/pickleball_local.properties`. It is excluded by `.gitignore`.
+The runner defaults to Chrome. To keep machine-specific settings out of Git, copy:
+
+```text
+src/test/resources/pickleball_local.properties.example
+```
+
+to:
+
+```text
+pickleball_local.properties
+```
+
+Then adjust its values. The generated `.gitignore` excludes that local file.
+
+## Notes
+
+- The Maven dependency is intentionally in `test` scope.
+- The runner class name ends in `Tests`, so Maven Surefire discovers it without extra includes.
+- No custom Cucumber step definitions are needed.
+- The runner adds one small `Radio Button` element category at startup, following Pickleball's documented custom-element mechanism, and the features otherwise use framework and dynamic steps.
+- Port `8765` must be free while the tests run.
