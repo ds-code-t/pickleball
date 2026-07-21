@@ -17,8 +17,8 @@ public class ServiceCallScenarios extends CoreSteps {
     static final String CALL_NAME = ServiceCallContext.CALL_NAME;
     static final String DEFAULT_CALLS_PATH = "src/test/resources/calls";
 
-    @Given("^SERVICE CALLS?:?(.*)?$")
-    public static void serviceCalls(String inlineTags, DataTable dataTable) {
+    @Given("^(?:\"(.)\")?SERVICE CALL(.*)?$")
+    public static void serviceCalls(String serviceCallObjectName , String inlineTags, DataTable dataTable) {
         ModularScenarios.populateRunScenariosStep(
             getRunningStep(),
             inlineTags,

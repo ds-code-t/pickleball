@@ -226,12 +226,30 @@ public class GlobalState {
         return GlobalState.getCurrentScenarioState().id.toString();
     }
 
+    public static ScenarioStep getClosestScenarioStepAncestor() {
+        StepExtension currentStep = getRunningStep();
+        while ((currentStep != null )) {
+            if (currentStep instanceof ScenarioStep scenarioStep) {
+                return scenarioStep;
+            }
+            currentStep = (StepExtension) currentStep.parentStep;
+        }
+        return null;
+    }
+
+    public static ScenarioStep getRootScenarioStep() {
+        CurrentScenarioState currentScenarioState = getCurrentScenarioState();
+        if(currentScenarioState == null) return null;
+        return currentScenarioState.testCase.getRootScenarioStep();
+    }
+
 
     public static StepExtension getRunningStep() {
         CurrentScenarioState currentScenarioState = getCurrentScenarioState();
         if (currentScenarioState == null) return null;
         return currentScenarioState.getCurrentStep();
     }
+
 
     public static Phrase getRunningPhrase() {
         CurrentScenarioState currentScenarioState = getCurrentScenarioState();

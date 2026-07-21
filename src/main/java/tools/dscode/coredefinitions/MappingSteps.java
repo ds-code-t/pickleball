@@ -1,6 +1,8 @@
 package tools.dscode.coredefinitions;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
@@ -10,15 +12,21 @@ import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.mappings.NodeMap;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static io.cucumber.core.runner.util.TableUtils.toFlatStringMultimap;
 import static io.cucumber.core.runner.util.TableUtils.toRowsStringMultimap;
+import static tools.dscode.common.mappings.FileAndDataParsing.JSON_MAPPER;
+import static tools.dscode.common.mappings.FileAndDataParsing.XML_MAPPER;
+import static tools.dscode.common.mappings.FileAndDataParsing.YAML_MAPPER;
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
 import static tools.dscode.common.mappings.MappingProcessor.getDataTableMap;
 import static tools.dscode.common.mappings.MappingProcessor.getRunMap;
+import static tools.dscode.common.mappings.ParsingMap.getClosestScenarioStepAncestorNodeMap;
+import static tools.dscode.common.mappings.ParsingMap.getRootScenarioStepNodeMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.variables.RunVars.resolveFromVars;
@@ -28,8 +36,8 @@ public class MappingSteps extends CoreSteps {
     @Given("^CLEAR SAVED VALUES(:.*)?$")
     public static void clearRunMap(String keys) {
         String[] keyArray = keys == null || keys.trim().length() == 1
-            ? new String[0]
-            : java.util.Arrays.stream(keys.substring(1).split(","))
+                ? new String[0]
+                : java.util.Arrays.stream(keys.substring(1).split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
                 .toArray(String[]::new);
@@ -40,8 +48,8 @@ public class MappingSteps extends CoreSteps {
             logInfo("Clearing Scenario Run Map");
         } else {
             logInfo(
-                "Clearing Scenario Run Map values: "
-                    + String.join(", ", keyArray)
+                    "Clearing Scenario Run Map values: "
+                            + String.join(", ", keyArray)
             );
         }
     }
@@ -49,24 +57,24 @@ public class MappingSteps extends CoreSteps {
     @Given("^(:?\"(.*)\"\\s+)?DOC STRING$")
     public static void docString(String docStringName, DocString docString) {
         String docStringNameText = docStringName == null || docStringName.isBlank()
-            ? ""
-            : " " + docStringName;
+                ? ""
+                : " " + docStringName;
         logInfo("Setting Doc String" + docStringNameText + ":" + docString);
     }
 
     @Given("^(:?\"(.*)\"\\s+)?DATA TABLE$")
     public static void dataTable(String tableName, DataTable dataTable) {
         String tableNameText = tableName == null || tableName.isBlank()
-            ? ""
-            : " " + tableName;
+                ? ""
+                : " " + tableName;
         logInfo("Setting Data Table" + tableNameText + ":" + dataTable);
     }
 
     @Given("^SET \"(.*)\" DATA TABLE$")
     public static void setDataTable(String tableName, DataTable dataTable) {
         getDataTableMap().put(
-            TABLE_KEY,
-            Map.of(tableName.trim(), toRowsStringMultimap(dataTable))
+                TABLE_KEY,
+                Map.of(tableName.trim(), toRowsStringMultimap(dataTable))
         );
         logInfo("Setting Data Table" + tableName + ":" + dataTable);
     }
@@ -78,7 +86,7 @@ public class MappingSteps extends CoreSteps {
         rowName = rowName == null || rowName.isBlank() ? "" : rowName;
         StepExtension currentStep = getRunningStep();
         StepExtension modifiedStep = currentStep.modifyStepExtension(
-            ", in the " + tableName + "Data Table, for every " + rowName + "Data Row:"
+                ", in the " + tableName + "Data Table, for every " + rowName + "Data Row:"
         );
         currentStep.addReplacementStep(modifiedStep);
     }
@@ -95,31 +103,51 @@ public class MappingSteps extends CoreSteps {
         nodeMap.merge(toFlatStringMultimap(dataTable.asLists()));
     }
 
-    /**
-     * Maps each two-column row into the run map.
-     *
-     * <p>The first column is the destination key/path. The second column is
-     * the value itself, not another key to look up. Runtime templates are
-     * resolved by the normal step parsing before this method is invoked. The
-     * resolved cell is then interpreted as JSON when possible:</p>
-     *
-     * <ul>
-     *     <li>{@code 200} becomes a numeric value.</li>
-     *     <li>{@code "200"} becomes a string value.</li>
-     *     <li>{@code true}, arrays, objects, and {@code null} retain their
-     *     JSON types.</li>
-     *     <li>Non-JSON text remains a string.</li>
-     * </ul>
-     */
-    @Given("^MAP VALUES$")
-    public static void mapValues(DataTable dataTable) {
-        mapValues(getRunMap(), dataTable.cells());
+
+    @Given("^MAP \"(.*)\" (TEXT|OBJECT) VALUE(?: TO (DEFAULT|OVERRIDE|SINGLETON|STEP|ROOT SCENARIO|SCENARIO|RUN) MAP)?$")
+    public static void mapDocString(String key, String dataType, String mapType, DocString docString) {
+        NodeMap nodeMap = switch (mapType) {
+            case "DEFAULT" -> MappingProcessor.getDefaultsMap();
+            case "OVERRIDE" -> MappingProcessor.getOverridesMap();
+            case "SINGLETON" -> MappingProcessor.getSingletonMap();
+            case "STEP" -> getRunningStep().getDefaultStepNodeMap();
+            case "SCENARIO" -> getClosestScenarioStepAncestorNodeMap();
+            case "SCENARIO ROOT" -> getRootScenarioStepNodeMap();
+            case "RUN" -> getRunMap();
+            case null, default -> getRunMap();
+        };
+        String content = docString.getContent();
+
+        Object value = switch (dataType == null ? "TEXT" : dataType) {
+            case "TEXT" -> content;
+            case "OBJECT" -> parseData(content, docString.getContentType());
+            default -> throw new IllegalArgumentException(
+                    "Unsupported map value type: " + dataType
+            );
+        };
+        nodeMap.put(key, value);
+    }
+
+    @Given("^MAP (?:\"(.*)\" )?TABLE VALUES(?: TO (DEFAULT|OVERRIDE|SINGLETON|STEP|ROOT SCENARIO|SCENARIO|RUN) MAP)?$")
+    public static void mapValues(String prefix, String mapType, DataTable dataTable) {
+        NodeMap nodeMap = switch (mapType) {
+            case "DEFAULT" -> MappingProcessor.getDefaultsMap();
+            case "OVERRIDE" -> MappingProcessor.getOverridesMap();
+            case "SINGLETON" -> MappingProcessor.getSingletonMap();
+            case "STEP" -> getRunningStep().getDefaultStepNodeMap();
+            case "SCENARIO" -> getClosestScenarioStepAncestorNodeMap();
+            case "SCENARIO ROOT" -> getRootScenarioStepNodeMap();
+            case "RUN" -> getRunMap();
+            case null, default -> getRunMap();
+        };
+        final String keyPrefix = prefix == null || prefix.isBlank() ? "" : prefix;
+        dataTable.asLists().forEach(row -> nodeMap.put(keyPrefix + row.getFirst(), row.get(1)));
     }
 
     static void mapValues(NodeMap destination, List<List<String>> rows) {
         if (rows == null || rows.isEmpty()) {
             throw new IllegalArgumentException(
-                "MAP VALUES requires at least one two-column row"
+                    "MAP VALUES requires at least one two-column row"
             );
         }
 
@@ -129,10 +157,10 @@ public class MappingSteps extends CoreSteps {
             if (row == null || row.size() != 2) {
                 int actualColumns = row == null ? 0 : row.size();
                 throw new IllegalArgumentException(
-                    "MAP VALUES row "
-                        + (rowIndex + 1)
-                        + " must contain exactly two columns but contained "
-                        + actualColumns
+                        "MAP VALUES row "
+                                + (rowIndex + 1)
+                                + " must contain exactly two columns but contained "
+                                + actualColumns
                 );
             }
 
@@ -164,9 +192,9 @@ public class MappingSteps extends CoreSteps {
 
         if (key.isBlank()) {
             throw new IllegalArgumentException(
-                "MAP VALUES row "
-                    + (rowIndex + 1)
-                    + " requires a non-blank destination key"
+                    "MAP VALUES row "
+                            + (rowIndex + 1)
+                            + " requires a non-blank destination key"
             );
         }
 
@@ -190,4 +218,50 @@ public class MappingSteps extends CoreSteps {
         }
         return buildJsonFromPath(path.trim());
     }
+
+
+    private static JsonNode parseData(
+            String content,
+            String contentType
+    ) {
+
+        if (contentType == null || contentType.isBlank()) {
+            throw new IllegalArgumentException(
+                    "MAP DATA VALUE requires a DocString content type, "
+                            + "such as \"\"\"json, \"\"\"xml, or \"\"\"yaml"
+            );
+        }
+
+        String normalizedType = contentType
+                .toLowerCase(Locale.ROOT)
+                .trim();
+
+        ObjectMapper mapper = switch (normalizedType) {
+            case "json",
+                 "application/json",
+                 "text/json" -> JSON_MAPPER;
+
+            case "xml",
+                 "application/xml",
+                 "text/xml" -> XML_MAPPER;
+
+            case "yaml",
+                 "yml",
+                 "application/yaml",
+                 "application/x-yaml",
+                 "text/yaml",
+                 "text/x-yaml" -> YAML_MAPPER;
+
+            default -> throw new IllegalArgumentException(
+                    "Unsupported DocString content type: " + contentType
+            );
+        };
+
+        try {
+            return mapper.readTree(content);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 }

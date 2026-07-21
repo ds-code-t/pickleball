@@ -8,7 +8,9 @@ import io.cucumber.core.stepexpression.DocStringArgument;
 
 import java.util.List;
 
+import static io.cucumber.core.runner.GlobalState.getClosestScenarioStepAncestor;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
+import static io.cucumber.core.runner.GlobalState.getRootScenarioStep;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.mappings.custommappings.ValConverter.valConverter;
 
@@ -92,4 +94,11 @@ public class ParsingMap extends MappingProcessor {
     }
 
 
+    public static NodeMap getRootScenarioStepNodeMap() {
+        return getRootScenarioStep().getDefaultStepNodeMap();
+    }
+
+    public static NodeMap getClosestScenarioStepAncestorNodeMap() {
+        return getClosestScenarioStepAncestor().getDefaultStepNodeMap();
+    }
 }
