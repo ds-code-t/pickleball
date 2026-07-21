@@ -1,3 +1,17 @@
+OpsUS:
+  TimeZone: America/New_York
+  DateTimeFormats:
+    - M/d/uuuu
+    - uuuu-M-d H:m:s
+  DefaultOutputPattern: uuuu-MM-dd HH:mm:ss VV
+  DefaultOutputZone: America/New_York
+  Open:
+    - MON-FRI 09:00-17:00
+  Closed:
+    - 1 JAN
+    - 4 JUL
+    - 25 DEC
+
 DefaultCalendar:
   TimeZone: America/New_York
 

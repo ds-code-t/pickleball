@@ -1,35 +1,9 @@
-# Pickleball service-call endpoint fix
+# Pickleball
 
-This package contains the complete current service-call implementation and consumer-project tests.
+Pickleball is a dynamic version of Cucumber for writing executable behavior in business-readable feature files.
 
-## Main correction
+Instead of requiring a new Java step definition for every sentence, Pickleball provides a shared language for describing values, browser elements, actions, assertions, conditions, reusable scenario components, and nested business flows. This lets a feature file explain **what should happen** while still remaining directly executable.
 
-The previous request log showed:
+Pickleball is designed for teams that want scenarios to serve as both automated tests and readable descriptions of application behavior.
 
-```text
-Request URI: http://localhost:8080/
-```
-
-That is REST Assured's default URI and showed that the stored request endpoint was not being read during execution.
-
-The corrected implementation:
-
-1. Reads the service-call request with `NodeMap.get("<call name>.request")`.
-2. Uses one absolute endpoint value such as `http://127.0.0.1:8765/api/items/73`.
-3. Fails the call immediately into its response error object when no endpoint was defined, instead of contacting `localhost:8080`.
-4. Keeps `REQUEST CONFIGURATION` only as an optional step for other REST Assured request-specification settings.
-5. Logs the stored request object before invoking REST Assured.
-
-## Included files
-
-- `src/main/java/tools/dscode/coredefinitions/ModularScenarios.java`
-- `src/main/java/tools/dscode/coredefinitions/ServiceCallScenarios.java`
-- `src/main/java/tools/dscode/coredefinitions/ServiceCallSteps.java`
-- `src/main/java/tools/dscode/common/servicecalls/RestAssuredUtil.java`
-- `maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java`
-- `maven-consumer-project/src/test/resources/calls/service-call-definitions.feature`
-- `maven-consumer-project/src/test/resources/features/service-call-execution.feature`
-- `docs/service-call-scenarios.md`
-- `docs/README.md`
-
-Extract the archive over the repository root and run the consumer-project tests normally.
+[Read the Pickleball documentation](docs/README.md)

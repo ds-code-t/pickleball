@@ -25,6 +25,6 @@ Feature: Use scenario templates and shared resource data
 
   @all @regression @data @mapping @resources @resource-mapping @on-demand-resource
   Scenario: A resource loaded on demand supplies nested values
-    * , ensure "</files/customers #1.name>" equals "Ava"
-    * , ensure "</files/customers #2.city>" equals "Tempe"
-    * , ensure "</files/customers #2.tier>" equals "Standard"
+    * , ensure "<FILE:files/customers #1.name>" equals "Ava"
+    * , ensure "<FILE:files/customers #2.city>" equals "Tempe"
+    * , ensure "<FILE:files/customers #2.tier>" equals "Standard"

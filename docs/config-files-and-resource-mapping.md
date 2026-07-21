@@ -194,16 +194,16 @@ The file extension may be omitted.
 This alternative also resolves to `112`:
 
 ```text
-</files.items #1.b>
+<FILE:files.items #1.b>
 ```
 
-Here `/files` identifies the resource directory. The remaining `.items #1.b` selects `items.yaml`, then its first row, then the `b` value.
+Here `files` identifies the resource directory. The remaining `.items #1.b` selects `items.yaml`, then its first row, then the `b` value.
 
 Both forms are valid:
 
 ```text
-</files/items #1.b>
-</files.items #1.b>
+<FILE:files/items #1.b>
+<FILE:files.items #1.b>
 ```
 
 Prefer the direct file path when the target file is known. It avoids loading an entire directory. Load a directory when one query needs to work across several files beneath it.
@@ -216,7 +216,7 @@ Read a `/` template in two parts:
 /<resource path><data query>
 ```
 
-- The first `/` means “start under `src/test/resources`.”
+- The `FILE:` means “start under `src/test/resources`.”
 - Forward slashes identify physical directories and files.
 - File extensions may be omitted.
 - After the chosen file or directory is loaded, periods, positions, and wildcards navigate its contents.
@@ -224,10 +224,10 @@ Read a `/` template in two parts:
 Examples:
 
 ```text
-</files/items #2.c>
-</files.items #2.c>
-</datasets/accounts.records #1.owner.name>
-</datasets/accounts.records[*].owner.name as:LIST>
+<FILE:files/items #2.c>
+<FILE:files.items #2.c>
+<FILE:datasets/accounts.records #1.owner.name>
+<FILE:datasets/accounts.records[*].owner.name as:LIST>
 ```
 
 ## Choosing the right source
@@ -235,7 +235,7 @@ Examples:
 | Need | Recommended approach |
 |---|---|
 | Values used by many scenarios | Put them under `src/test/resources/configs` and use `<configs...>` |
-| One known file needed only at that moment | Use a direct `/` template such as `</files/items #1.b>` |
+| One known file needed only at that moment | Use a direct `/` template such as `<FILE:files/items #1.b>` |
 | Several files in one directory must be queried together | Load the directory and continue with a data path |
 | Every matching value is needed | Use `[*]` and append `as:LIST` |
 

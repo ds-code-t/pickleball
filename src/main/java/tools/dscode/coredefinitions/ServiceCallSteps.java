@@ -17,69 +17,78 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static tools.dscode.common.mappings.MappingProcessor.getRunMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
-import static tools.dscode.coredefinitions.ServiceCallScenarios.CALL_NAME;
 
 public class ServiceCallSteps extends CoreSteps {
 
     @Given("^ENDPOINT:(.*)$")
     public static void endpoint(String endpoint) {
-        put("request.endpoint", endpoint.trim());
+        requestNode().put("endpoint", endpoint.trim());
     }
 
     @Given("^METHOD:(.*)$")
     public static void method(String method) {
-        put("request.method", method.trim().toUpperCase(Locale.ROOT));
+        requestNode().put("method", method.trim().toUpperCase(Locale.ROOT));
     }
 
     @Given("^HEADERS$")
     public static void headers(DataTable dataTable) {
-        put(
-                "request.headers",
+        requestNode().set(
+            "headers",
+            MAPPER.valueToTree(
                 dataTable.asMaps(String.class, String.class).getFirst()
+            )
         );
     }
 
     @Given("^BODY(?::(.*))?$")
     public static void body(String type, String body) {
-        put("request.body", body.replace("~[~", "<").replace("~]~", ">"));
+        ObjectNode request = requestNode();
+        request.put("body", body.replace("~[~", "<").replace("~]~", ">"));
+
         if (type != null && !type.isBlank()) {
-            put("request.config.contentType", contentType(type));
+            ServiceCallContext.objectChild(request, "config")
+                .put("contentType", contentType(type));
         }
     }
 
     @Given("^REQUEST CONFIG(?:URATION)?$")
     public static void requestConfiguration(DataTable dataTable) {
-        dataTable.asMap(String.class, String.class)
-                .forEach((key, value) -> put("request.config." + key, typed(value)));
+        ObjectNode config = ServiceCallContext.objectChild(
+            requestNode(),
+            "config"
+        );
+
+        dataTable.asMap(String.class, String.class).forEach((key, value) -> {
+            JsonNode typedValue = MAPPER.valueToTree(typed(value));
+            config.set(key, typedValue);
+        });
     }
 
     @Given("^(?:EXECUTE|SEND) SERVICE CALL$")
     public static void executeServiceCall() {
         ScenarioStep scenario = scenarioStep(getRunningStep());
         NodeMap nodeMap = scenario.getDefaultStepNodeMap();
-        String callName = callName(scenario);
-        JsonNode request = requestNode(nodeMap, callName);
+        String callName = ServiceCallContext.callName(nodeMap);
+        ObjectNode request = ServiceCallContext.request(nodeMap);
+
         String method = request.path("method").asText("GET");
         String endpoint = request.path("endpoint").asText("").trim();
         long started = System.nanoTime();
+        ObjectNode extractedResponse;
 
-        ObjectNode responseNode;
         try (PrintStream restLog = new PrintStream(
-                new LogInfoOutputStream(),
-                true,
-                StandardCharsets.UTF_8
+            new LogInfoOutputStream(),
+            true,
+            StandardCharsets.UTF_8
         )) {
             if (endpoint.isBlank()) {
                 throw new IllegalArgumentException(
-                        "No endpoint was defined for service call " + callName
+                    "No endpoint was defined for service call " + callName
                 );
             }
 
@@ -90,60 +99,59 @@ public class ServiceCallSteps extends CoreSteps {
             RestAssuredUtil.logRequestAndResponse(specification, restLog);
 
             Response response = RestAssuredUtil.execute(
-                    specification,
-                    method,
-                    endpoint
+                specification,
+                method,
+                endpoint
             );
-            responseNode = (ObjectNode) RestAssuredUtil.extractResponse(response);
 
-            logInfo("REST Assured service call completed in " + elapsedMillis(started) + " ms");
+            extractedResponse = (ObjectNode) RestAssuredUtil.extractResponse(response);
+            logInfo(
+                "REST Assured service call completed in "
+                    + elapsedMillis(started)
+                    + " ms"
+            );
         } catch (Exception exception) {
-            logInfo("REST Assured service call failed after "
+            logInfo(
+                "REST Assured service call failed after "
                     + elapsedMillis(started)
                     + " ms: "
-                    + exception);
+                    + exception
+            );
 
-            responseNode = MAPPER.createObjectNode();
-            responseNode.put("error", exception.getMessage());
-            responseNode.set("headers", MAPPER.createObjectNode());
-            responseNode.put("body", "");
+            extractedResponse = MAPPER.createObjectNode();
+            extractedResponse.put("error", exception.getMessage());
+            extractedResponse.set("headers", MAPPER.createObjectNode());
+            extractedResponse.put("body", "");
         }
 
-        responseNode.put("method", method);
-        nodeMap.put(callName + ".response", responseNode);
-    }
+        extractedResponse.put("method", method);
 
-    @Given("^MAP SERVICE RESPONSE$")
-    public static void mapServiceResponse(DataTable dataTable) {
-        NodeMap source = scenarioStep(getRunningStep()).getDefaultStepNodeMap();
-        for (List<String> row : dataTable.cells()) {
-            getRunMap().put(row.get(1), source.get(row.get(0)));
-        }
+        // Mutate the existing shared response node instead of replacing it.
+        // Both the scenario-step named call and the run-map call history
+        // reference this same ObjectNode.
+        ServiceCallContext.replaceContents(
+            ServiceCallContext.response(nodeMap),
+            extractedResponse
+        );
     }
 
     public static ScenarioStep scenarioStep(StepBase step) {
         if (step instanceof ScenarioStep scenarioStep) {
             return scenarioStep;
         }
+
+        if (step == null || step.parentStep == null) {
+            throw new IllegalStateException(
+                "No parent ScenarioStep is available for the running service-call step"
+            );
+        }
+
         return scenarioStep(step.parentStep);
     }
 
-    private static JsonNode requestNode(NodeMap nodeMap, String callName) {
-        Object value = nodeMap.get(callName + ".request");
-        return value instanceof JsonNode node ? node : MAPPER.valueToTree(value);
-    }
-
-    private static void put(String path, Object value) {
+    private static ObjectNode requestNode() {
         ScenarioStep scenario = scenarioStep(getRunningStep());
-        scenario.getDefaultStepNodeMap().put(callName(scenario) + "." + path, value);
-    }
-
-    private static String callName(ScenarioStep scenario) {
-        Object value = scenario.getDefaultStepNodeMap().get(CALL_NAME);
-        if (value == null) {
-            value = scenario.getDefaultStepNodeMap().get("SCENARIO NAME");
-        }
-        return value instanceof JsonNode node ? node.asText() : String.valueOf(value);
+        return ServiceCallContext.request(scenario.getDefaultStepNodeMap());
     }
 
     private static long elapsedMillis(long started) {
@@ -154,6 +162,7 @@ public class ServiceCallSteps extends CoreSteps {
         if (value == null || value.isBlank()) {
             return "";
         }
+
         try {
             return MAPPER.readTree(value);
         } catch (Exception ignored) {

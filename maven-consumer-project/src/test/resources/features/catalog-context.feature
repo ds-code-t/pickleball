@@ -20,7 +20,7 @@ Feature: Locate repeated and scoped catalog elements
     * , click the last "View Details" Button
     * , ensure "Selected Product: 3" Text is displayed
 
-  @all @regression @browser @local-site @catalog @context @page-context @scoped-elements @failed
+  @all @regression @browser @local-site @catalog @context @page-context @scoped-elements
   Scenario: A page context restricts a repeated action
     * , in the "Secondary Queue" Test Panel, click the "Approve" Button
     * , ensure "Queue Result: secondary" Text is displayed

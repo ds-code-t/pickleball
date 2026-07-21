@@ -4,7 +4,7 @@ Feature: Choose workflow paths with nested steps and block conditionals
     * navigate to: URL.workflow
     * , ensure "Conditional Workflow Playground" Text is displayed
 
-  @all @regression @browser @local-site @workflow @nested-steps @conditional-steps @smoke @failed
+  @all @regression @browser @local-site @workflow @nested-steps @conditional-steps @smoke
   Scenario: A nested condition passes its result and panel context to a child step
     * , click the "Use Ready State" Button
     * , in the "Decision Panel" Test Panel, if the "Submit Request" Button is enabled, and the "Validation Error" Text is not displayed:
