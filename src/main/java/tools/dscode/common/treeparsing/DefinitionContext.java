@@ -115,7 +115,7 @@ public final class DefinitionContext {
             }
         };
 
-        ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?!\\s*[A-Z])(?<unitMatch>\\s+(?<unit>second|minute|hour|day|week|month|year|time|number|integer|decimal|color|text)s?\\b)?") {
+        ParseNode valueTransform = new ParseNode("\\s(?<value><<valueMask>>)(?!\\s*[A-Z])(?<unitMatch>\\s+(?<unit>second|minute|hour|day|week|month|year|time\\b|number|integer|decimal|color|text)s?\\b)?") {
             @Override
             public String onSubstitute(MatchNode self) {
                 String originalUnit = self.groups().getOrDefault("unit", "").trim().replaceAll("\\s$", "");
@@ -352,6 +352,8 @@ public final class DefinitionContext {
             public String onSubstitute(MatchNode self) {
                 String elementToken = self.groups().get("element");
                 MatchNode elementMatchNode = self.getMatchNode(elementToken);
+                if(!String.valueOf(elementMatchNode).contains(VALUE_TYPE_MATCH))
+                    return self.originalText();
                 String type = self.groups().get("type");
                 elementMatchNode.putToLocalState("special", type);
                 return "";
