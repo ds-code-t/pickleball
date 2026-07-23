@@ -77,14 +77,15 @@ public class ServiceCallSteps extends CoreSteps {
     @Given("^EXECUTE SERVICE CALL$")
     public static void executeServiceCall() {
         ScenarioStep scenarioStep = scenarioStep(getRunningStep());
-        ObjectNode serviceCallObject = scenarioStep.getDefaultStepNodeMap().getRoot();
+        NodeMap serviceCallMap = scenarioStep.getDefaultStepNodeMap();
+        ObjectNode serviceCallObject = serviceCallMap.getRoot();
 
         // This empty object remains available if validation/execution throws or
         // REST Assured returns no Response instance.
         serviceCallObject.set(RESPONSE, MAPPER.createObjectNode());
 
-        ObjectNode request = requiredObject(serviceCallObject, REQUEST);
-        ObjectNode configuration = optionalObject(serviceCallObject, CONFIGURATION);
+        ObjectNode request = requiredObject(serviceCallMap, REQUEST);
+        ObjectNode configuration = optionalObject(serviceCallMap, CONFIGURATION);
 
         String method = request.path("method")
                 .asText("GET")
@@ -227,12 +228,18 @@ public class ServiceCallSteps extends CoreSteps {
         return finalizer;
     }
 
-    private static ObjectNode requiredObject(ObjectNode parent, String fieldName) {
-        JsonNode value = parent.get(fieldName);
-        if (value instanceof ObjectNode objectNode) {
+    private static ObjectNode requiredObject(NodeMap parent, String fieldName) {
+        Object value = parent.get(fieldName);
+        if (value == null) {
+            throw new IllegalStateException(
+                    "The service-call object is missing the " + fieldName + " object"
+            );
+        }
+        JsonNode node = asJsonNode(value);
+        if (node instanceof ObjectNode objectNode) {
             return objectNode;
         }
-        if (value == null || value.isNull()) {
+        if (node == null || node.isNull()) {
             throw new IllegalStateException(
                     "The service-call object is missing the " + fieldName + " object"
             );
@@ -240,25 +247,37 @@ public class ServiceCallSteps extends CoreSteps {
         throw new IllegalStateException(
                 "The service-call " + fieldName
                         + " property must be an object but was "
-                        + value.getNodeType()
+                        + node.getNodeType()
                         + ": "
                         + value
                         + ". Complete service-call root: "
-                        + parent
+                        + parent.getRoot()
         );
     }
 
-    private static ObjectNode optionalObject(ObjectNode parent, String fieldName) {
-        JsonNode value = parent.get(fieldName);
-        if (value == null || value.isNull()) {
+    private static ObjectNode optionalObject(NodeMap parent, String fieldName) {
+        Object value = parent.get(fieldName);
+        if (value == null) {
             return MAPPER.createObjectNode();
         }
-        if (value instanceof ObjectNode objectNode) {
+        JsonNode node = asJsonNode(value);
+        if (node == null || node.isNull()) {
+            return MAPPER.createObjectNode();
+        }
+        if (node instanceof ObjectNode objectNode) {
             return objectNode;
         }
         throw new IllegalStateException(
                 "The service-call " + fieldName + " property must be an object"
         );
+    }
+
+    /** Coerces a NodeMap {@code get} result into a JsonNode for object checks. */
+    private static JsonNode asJsonNode(Object value) {
+        if (value instanceof JsonNode jsonNode) {
+            return jsonNode;
+        }
+        return MAPPER.valueToTree(value);
     }
 
     private static String resolve(ScenarioStep scenarioStep, String value) {

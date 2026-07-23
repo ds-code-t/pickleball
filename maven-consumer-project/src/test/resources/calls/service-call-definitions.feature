@@ -72,14 +72,14 @@ Feature: Reusable service call definitions
       | %status-call | http://127.0.0.1:8765     | 418    |
 
 
-  # This component intentionally omits CONFIGURATION and uses SEND SERVICE CALL.
+  # This component intentionally omits CONFIGURATION and uses EXECUTE SERVICE CALL.
   # Its scenario name is used as the caller's fallback object key.
   Scenario Outline: HealthCall
     Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
       | endpoint | <endpoint>/api/health |
       | method   | GET                   |
       | accept   | application/json      |
-    When SEND SERVICE CALL
+    When EXECUTE SERVICE CALL
 
     Examples:
       | Scenario Tags | endpoint                  |
