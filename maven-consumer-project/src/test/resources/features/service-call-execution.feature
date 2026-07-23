@@ -1,7 +1,6 @@
 @service-call @local-api
 Feature: Service call orchestration with generic request mappings
 
-  @failed
   Scenario: Select by inline percent tag and save under the quoted object name
     When "inlineRead" SERVICE CALL: %inspect-get
       | endpoint                  | client      | traceId     | include   | mode |
@@ -98,7 +97,6 @@ Feature: Service call orchestration with generic request mappings
     And , verify "<deletedItem.RESPONSE.headers.X-deleted-item>" equals "55"
     And , verify "<deletedItem.RESPONSE.body>" equals ""
 
-  @failed
   Scenario: Map a raw XML request body with the TEXT DocString mapper
     When "soapAdd" SERVICE CALL: %soap-add
       | endpoint                  | traceId       | left | right |

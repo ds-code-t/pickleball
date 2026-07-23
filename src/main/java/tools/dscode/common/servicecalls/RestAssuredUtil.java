@@ -290,6 +290,12 @@ public final class RestAssuredUtil {
     }
 
     private static void apply(Object target, String methodPath, JsonNode value) {
+        if (value == null
+                || value.isNull()
+                || (value.isTextual() && value.asText().isBlank())) {
+            return;
+        }
+
         Object current = target;
         String[] names = methodPath.split("\\.");
 

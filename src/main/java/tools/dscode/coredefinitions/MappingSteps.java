@@ -11,7 +11,6 @@ import tools.dscode.common.CoreSteps;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.mappings.NodeMap;
 
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -152,62 +151,8 @@ public class MappingSteps extends CoreSteps {
         });
     }
 
-    static void mapValues(NodeMap destination, List<List<String>> rows) {
-        if (rows == null || rows.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "MAP VALUES requires at least one two-column row"
-            );
-        }
 
-        for (int rowIndex = 0; rowIndex < rows.size(); rowIndex++) {
-            List<String> row = rows.get(rowIndex);
 
-            if (row == null || row.size() != 2) {
-                int actualColumns = row == null ? 0 : row.size();
-                throw new IllegalArgumentException(
-                        "MAP VALUES row "
-                                + (rowIndex + 1)
-                                + " must contain exactly two columns but contained "
-                                + actualColumns
-                );
-            }
-
-            String key = normalizeKey(row.get(0), rowIndex);
-            destination.put(key, actualValue(row.get(1)));
-        }
-    }
-
-    static Object actualValue(String rawValue) {
-        if (rawValue == null) {
-            return null;
-        }
-
-        String value = rawValue.trim();
-        if (value.isEmpty()) {
-            return "";
-        }
-
-        try {
-            JsonNode parsed = MAPPER.readTree(value);
-            return parsed == null ? value : parsed;
-        } catch (Exception ignored) {
-            return value;
-        }
-    }
-
-    private static String normalizeKey(String rawKey, int rowIndex) {
-        String key = rawKey == null ? "" : rawKey.trim();
-
-        if (key.isBlank()) {
-            throw new IllegalArgumentException(
-                    "MAP VALUES row "
-                            + (rowIndex + 1)
-                            + " requires a non-blank destination key"
-            );
-        }
-
-        return key;
-    }
 
     @Given("(?i)^resolveVar:(.+)$")
     public static Object resolveToVarStepDef(String varName) {

@@ -68,6 +68,7 @@ public abstract class PickleballRunner {
 
         mergeResourcePropertiesIfMissing("pickleball.properties");
         mergeResourcePropertiesOverwriting("pickleball_local.properties");
+        mergeResourcePropertiesOverwriting("pickleball_local2.properties");
 
         debug("Values after resource property merge: " + values);
 

@@ -18,9 +18,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * Loopback-only server that serves the test site and exposes local JSON endpoints.
+ * Loopback-only server that serves the test site and exposes local REST and SOAP endpoints.
  */
 public final class LocalTestSite implements AutoCloseable {
 
@@ -62,6 +64,7 @@ public final class LocalTestSite implements AutoCloseable {
 
             // HttpServer uses the longest matching context.
             server.createContext("/api/", LocalTestSite::handleApiRequest);
+            server.createContext("/soap/calculator", LocalTestSite::handleSoapRequest);
             server.createContext("/", LocalTestSite::handleStaticRequest);
 
             server.start();
@@ -257,6 +260,49 @@ public final class LocalTestSite implements AutoCloseable {
         }
     }
 
+
+    private static void handleSoapRequest(HttpExchange exchange) throws IOException {
+        try (exchange) {
+            String method = exchange.getRequestMethod().toUpperCase(Locale.ROOT);
+
+            if ("OPTIONS".equals(method)) {
+                exchange.getResponseHeaders().set("Allow", "POST, OPTIONS");
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+
+            if (!allowMethods(exchange, method, "POST", "OPTIONS")) {
+                return;
+            }
+
+            String requestBody = readRequestBody(exchange);
+            String operation = firstXmlOperation(requestBody);
+            int left = xmlInteger(requestBody, "left");
+            int right = xmlInteger(requestBody, "right");
+
+            int result = switch (operation) {
+                case "Subtract" -> left - right;
+                case "Multiply" -> left * right;
+                default -> left + right;
+            };
+
+            String response = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                                      xmlns:calc="urn:pickleball:calculator">
+                      <soapenv:Body>
+                        <calc:%sResponse>
+                          <calc:%sResult>%d</calc:%sResult>
+                        </calc:%sResponse>
+                      </soapenv:Body>
+                    </soapenv:Envelope>
+                    """.formatted(operation, operation, result, operation, operation);
+
+            exchange.getResponseHeaders().set("X-SOAP-Operation", operation);
+            sendXml(exchange, 200, response, method);
+        }
+    }
+
     private static void handleStaticRequest(HttpExchange exchange) throws IOException {
         try (exchange) {
             String method = exchange.getRequestMethod();
@@ -369,6 +415,23 @@ public final class LocalTestSite implements AutoCloseable {
         }
     }
 
+
+    private static String firstXmlOperation(String body) {
+        Matcher matcher = Pattern.compile(
+                "<(?:[A-Za-z_][\\w.-]*:)?(Add|Subtract|Multiply)(?:\\s|>)"
+        ).matcher(body);
+        return matcher.find() ? matcher.group(1) : "Add";
+    }
+
+    private static int xmlInteger(String body, String localName) {
+        Matcher matcher = Pattern.compile(
+                "<(?:[A-Za-z_][\\w.-]*:)?" + Pattern.quote(localName)
+                        + "(?:\\s[^>]*)?>(-?\\d+)</(?:[A-Za-z_][\\w.-]*:)?"
+                        + Pattern.quote(localName) + ">"
+        ).matcher(body);
+        return matcher.find() ? Integer.parseInt(matcher.group(1)) : 0;
+    }
+
     private static String jsonString(String value) {
         String escaped = value
                 .replace("\\", "\\\\")
@@ -392,6 +455,27 @@ public final class LocalTestSite implements AutoCloseable {
 
         exchange.getResponseHeaders()
                 .set("Content-Type", "application/json; charset=UTF-8");
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.sendResponseHeaders(status, content.length);
+
+        if (!"HEAD".equals(method)) {
+            try (OutputStream responseBody = exchange.getResponseBody()) {
+                responseBody.write(content);
+            }
+        }
+    }
+
+
+    private static void sendXml(
+            HttpExchange exchange,
+            int status,
+            String xml,
+            String method
+    ) throws IOException {
+        byte[] content = xml.strip().getBytes(StandardCharsets.UTF_8);
+
+        exchange.getResponseHeaders()
+                .set("Content-Type", "text/xml; charset=UTF-8");
         exchange.getResponseHeaders().set("Cache-Control", "no-store");
         exchange.sendResponseHeaders(status, content.length);
 
