@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.util.*;
 
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
+import static tools.dscode.common.domoperations.HumanInteractions.centerScroll;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForElementReady;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.intersection;
@@ -188,6 +189,8 @@ public class ElementWrapper {
     public ValueWrapper getElementReturnValue() {
         if (attributeSnapshot.has(ELEMENT_RETURN_VALUE))
             return createValueWrapper(attributeSnapshot.get(ELEMENT_RETURN_VALUE).asText());
+
+        scrollIntoView();
 
         switch (elementMatch.category) {
             case "Field":
@@ -672,9 +675,18 @@ public class ElementWrapper {
         return withoutImplicitWait(driver, () -> elementMatch.contextWrapper.getFinalSearchContext().findElements(new By.ByXPath(xpathyWithId)));
     }
 
+    public void scrollIntoView() {
+        try {
+            centerScroll(driver, element);
+        } catch (RuntimeException ignored) {
+            // Best-effort scroll;
+        }
+    }
+
     public boolean isDisplayed() {
         if (elementMatch.categoryFlags.contains(ExecutionDictionary.CategoryFlags.NON_DISPLAY_ELEMENT))
             return true;
+        scrollIntoView();
         return getElement().isDisplayed();
     }
 

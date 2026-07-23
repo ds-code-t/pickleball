@@ -375,7 +375,7 @@ public final class HumanInteractions {
     /**
      * Center-scroll to reduce sticky header/overlay issues.
      */
-    private static void centerScroll(WebDriver driver, WebElement el) {
+    public static void centerScroll(WebDriver driver, WebElement el) {
         ((JavascriptExecutor) driver).executeScript(
                 "try{arguments[0].scrollIntoView({block:'center',inline:'center'});}catch(e){}", el);
     }

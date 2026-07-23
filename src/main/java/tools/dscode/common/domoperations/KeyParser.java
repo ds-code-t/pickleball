@@ -1,5 +1,6 @@
 package tools.dscode.common.domoperations;
 
+import groovyjarjarantlr4.v4.codegen.model.dbg;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -9,9 +10,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import static tools.dscode.common.domoperations.HumanInteractions.centerScroll;
+
 public final class KeyParser {
 
-    private KeyParser() {}
+    private KeyParser() {
+    }
 
     // Flip this on/off as needed
     private static final boolean DEBUG = false;
@@ -66,7 +70,9 @@ public final class KeyParser {
      *   keyUp CONTROL
      */
 
-    /** Sends to the active element / browser context. */
+    /**
+     * Sends to the active element / browser context.
+     */
     public static void sendComplexKeys(WebDriver driver, String input) {
         dbg("sendComplexKeys(driver) input=%s", quote(input));
         Actions actions = new Actions(driver);
@@ -76,11 +82,19 @@ public final class KeyParser {
         dbg("done");
     }
 
-    /** Sends to a specific element. Focus/click is NOT forced. */
+    /**
+     * Sends to a specific element. Focus/click is NOT forced.
+     */
     public static void sendComplexKeys(WebDriver driver, WebElement element, String input) {
         if (element == null) {
             sendComplexKeys(driver, input);
             return;
+        }
+
+        try {
+            centerScroll(driver, element);
+        } catch (RuntimeException ignored) {
+            // Best-effort scroll;
         }
 
         dbg("sendComplexKeys(driver, element) input=%s", quote(input));
@@ -182,12 +196,12 @@ public final class KeyParser {
 
     /**
      * Parses one simultaneous key group:
-     *
+     * <p>
      * A
      * A+B
      * CONTROL + A
      * CONTROL + SHIFT
-     *
+     * <p>
      * Spaces around + are ignored.
      * A plain space without + ends the group.
      */
