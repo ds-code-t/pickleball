@@ -3,3 +3,4 @@ target/
 .vscode/
 *.iml
 src/test/resources/pickleball_local.properties
+src/test/resources/pickleball_local2.properties
