@@ -26,7 +26,7 @@ import static tools.dscode.common.mappings.ValueFormatting.fromSafeJsonNode;
  * <p>Read queries are normal JSONata with three small conveniences:</p>
  * <ul>
  *   <li>{@code #N} uses one-based indexes and is converted to JSONata indexes.</li>
- *   <li>Unambiguous path properties containing spaces are backticked.</li>
+ *   <li>Unambiguous path properties containing spaces or compact internal dashes are backticked.</li>
  *   <li>A plain non-underscore root property selects its last collection item.</li>
  * </ul>
  *
@@ -36,8 +36,6 @@ import static tools.dscode.common.mappings.ValueFormatting.fromSafeJsonNode;
  */
 public final class Tokenized {
     private static final Pattern IDENTIFIER = Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_]*");
-    private static final Pattern SPACED_PROPERTY = Pattern.compile(
-            "[\\p{L}\\p{N}_]+(?:\\h+[\\p{L}\\p{N}_]+)+");
     private static final Set<String> ROOT_LITERALS = Set.of("true", "false", "null");
     private static final Set<String> WORD_OPERATORS = Set.of("and", "or", "in");
 
@@ -353,7 +351,7 @@ public final class Tokenized {
         if (!root && (property.equals("*") || property.equals("**") || property.equals("%"))) {
             return new Property(property, property, end);
         }
-        if (SPACED_PROPERTY.matcher(property).matches()) {
+        if (isAutoBacktickedProperty(property)) {
             return new Property("`" + property + "`", property, end);
         }
         return null;
@@ -363,7 +361,11 @@ public final class Tokenized {
         int cursor = start;
         while (cursor < input.length()) {
             char current = input.charAt(cursor);
-            if (".[](){};,?:=<>!&|~+-*/%^@#'\"`".indexOf(current) >= 0) {
+            if (current == '-' && isInternalPropertyDash(input, cursor, start)) {
+                cursor++;
+                continue;
+            }
+            if (".[](){};,?:=<>!&|~+*/%^@#'\"`".indexOf(current) >= 0) {
                 break;
             }
 
@@ -388,6 +390,40 @@ public final class Tokenized {
             cursor--;
         }
         return cursor;
+    }
+
+
+    /**
+     * A compact dash belongs to a property name when it has non-whitespace
+     * characters on both sides. Whitespace around the dash keeps normal
+     * JSONata subtraction semantics.
+     */
+    private static boolean isInternalPropertyDash(String input, int index, int segmentStart) {
+        return index > segmentStart
+                && index + 1 < input.length()
+                && !Character.isWhitespace(input.charAt(index - 1))
+                && !Character.isWhitespace(input.charAt(index + 1));
+    }
+
+    private static boolean isAutoBacktickedProperty(String property) {
+        boolean needsBackticks = false;
+
+        for (int index = 0; index < property.length(); index++) {
+            char current = property.charAt(index);
+            if (Character.isLetterOrDigit(current) || current == '_') {
+                continue;
+            }
+            if (Character.isWhitespace(current)) {
+                needsBackticks = true;
+                continue;
+            }
+            if (current == '-' && isInternalPropertyDash(property, index, 0)) {
+                needsBackticks = true;
+                continue;
+            }
+            return false;
+        }
+        return needsBackticks;
     }
 
     /* ------------------------------------------------------------------
@@ -479,7 +515,7 @@ public final class Tokenized {
 
         int end = findWritablePropertyEnd(expression, start);
         String property = expression.substring(start, end).strip();
-        if (IDENTIFIER.matcher(property).matches() || SPACED_PROPERTY.matcher(property).matches()) {
+        if (IDENTIFIER.matcher(property).matches() || isAutoBacktickedProperty(property)) {
             return new DirectProperty(new PropertyStep(property), end);
         }
         return null;
@@ -492,7 +528,11 @@ public final class Tokenized {
             if (current == '.' || current == '[') {
                 break;
             }
-            if ("(){};,?:=<>!&|~+-*/%^@#'\"`".indexOf(current) >= 0) {
+            if (current == '-' && isInternalPropertyDash(expression, cursor, start)) {
+                cursor++;
+                continue;
+            }
+            if ("(){};,?:=<>!&|~+*/%^@#'\"`".indexOf(current) >= 0) {
                 return start;
             }
             cursor++;

@@ -85,6 +85,16 @@ final class TokenizedQueryTest {
                 {"`property.with.periods`", "`property.with.periods`[][-1]"},
                 {"Customer Requests.Endpoint Name", "`Customer Requests`[][-1].`Endpoint Name`"},
                 {"`Customer Requests`.`Endpoint Name`", "`Customer Requests`[][-1].`Endpoint Name`"},
+                {"foo-bar", "`foo-bar`[][-1]"},
+                {"foo - bar", "foo - bar"},
+                {"1-2", "`1-2`[][-1]"},
+                {"1 - 2", "1 - 2"},
+                {"REQUEST.my-property", "REQUEST[][-1].`my-property`"},
+                {"order-items #last.product-name", "`order-items`[-1].`product-name`"},
+                {"foo--bar", "`foo--bar`[][-1]"},
+                {"-foo", "-foo"},
+                {"foo-", "foo-"},
+                {"REQUEST[price-tax]", "REQUEST[price-tax]"},
                 {"foo and bar", "foo[][-1] and bar"},
                 {"price * 1.25", "price[][-1] * 1.25"},
                 {"orders[].products[].id", "orders[].products[].id"},
@@ -272,6 +282,15 @@ final class TokenizedQueryTest {
                 spaced,
                 "[{\"Endpoint Name\":\"/service\"}]",
                 spaced.getRoot().get("Customer Requests"));
+
+        TraceNodeMap dashed = new TraceNodeMap();
+        dashed.put("order-items[].product-name", "first");
+        dashed.put("order-items[].product-name", "second");
+        checkMapJson(
+                "put(\"order-items[].product-name\", value) — compact dashes are property characters",
+                dashed,
+                "[{\"product-name\":\"first\"},{\"product-name\":\"second\"}]",
+                dashed.getRoot().get("order-items"));
 
         TraceNodeMap appended = new TraceNodeMap();
         appended.put("orders[].id", 1);
