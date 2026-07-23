@@ -48,7 +48,6 @@ import static tools.dscode.common.evaluations.AviatorUtil.evalToBoolean;
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
-import static tools.dscode.common.mappings.queries.Tokenized.AS_LIST_SUFFIX;
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 import static tools.dscode.common.util.StringUtilities.decodeBackToText;
 import static tools.dscode.common.util.StringUtilities.encodeToPlaceHolders;
@@ -876,9 +875,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
         }
 
         Tokenized tokenized = new Tokenized(key);
-        for (NodeMap map : tokenized.isSingletonKey
-                ? getMapsForSingletonResolution()
-                : getMapsForResolution()) {
+        for (NodeMap map : getMapsForResolution()) {
             if (map == null) {
                 continue;
             }
@@ -899,9 +896,26 @@ public abstract class MappingProcessor implements Map<String, Object> {
         singletonMap.get().putAsSingleton(key, value);
     }
 
-    @SuppressWarnings("unchecked")
     public List<Object> getList(String key) {
-        return (List<Object>) get(addSuffix(key, AS_LIST_SUFFIX));
+        Object obj = get(key);
+
+        if (obj instanceof List<?> list) {
+            return new ArrayList<>(list);
+        }
+
+        if (obj instanceof Set<?> set) {
+            return new ArrayList<>(set);
+        }
+
+        if (obj instanceof ArrayNode arrayNode) {
+            List<Object> result = new ArrayList<>(arrayNode.size());
+            arrayNode.forEach(result::add);
+            return result;
+        }
+
+        List<Object> result = new ArrayList<>(1);
+        result.add(obj);
+        return result;
     }
 
     public static String addSuffix(String key, String suffix) {
@@ -941,9 +955,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
         Tokenized tokenized = new Tokenized(key);
         Object returnReplacement = null;
         while (true) {
-            for (NodeMap map : tokenized.isSingletonKey
-                    ? getMapsForSingletonResolution()
-                    : getMapsForResolution()) {
+            for (NodeMap map : getMapsForResolution()) {
                 if (map == null) {
                     continue;
                 }
@@ -1091,11 +1103,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
         }
 
         Tokenized tokenized = new Tokenized(key);
-        if (tokenized.isSingletonKey) {
-            Object oldValue = getRootSingletonMap().get(tokenized);
-            getRootSingletonMap().put(tokenized, value);
-            return oldValue;
-        }
 
         if (key.startsWith("`") && key.endsWith("`")) {
             key = key.substring(1, key.length() - 1);

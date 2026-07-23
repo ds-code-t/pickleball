@@ -7,620 +7,990 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import tools.dscode.common.mappings.MapConfigurations;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.regex.Matcher;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
-import static tools.dscode.common.GlobalConstants.META_FLAG;
-import static tools.dscode.common.mappings.NodeMap.MapTypeKey;
 import static tools.dscode.common.mappings.NodeMap.toSafeJsonNode;
-import static tools.dscode.common.mappings.ValueFormatting.fromSafeJsonNode;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+import static tools.dscode.common.mappings.ValueFormatting.fromSafeJsonNode;
 
+/**
+ * Compiles a NodeMap query for reading and writing.
+ *
+ * <p>Read queries are normal JSONata with three small conveniences:</p>
+ * <ul>
+ *   <li>{@code #N} uses one-based indexes and is converted to JSONata indexes.</li>
+ *   <li>Unambiguous path properties containing spaces are backticked.</li>
+ *   <li>A plain non-underscore root property selects its last collection item.</li>
+ * </ul>
+ *
+ * <p>Write queries are either a direct writable path or a JSONata selector
+ * followed by a direct writable suffix. Ordinary root properties are stored as
+ * arrays; underscore-prefixed root properties are stored as singleton values.</p>
+ */
 public final class Tokenized {
+    private static final Pattern IDENTIFIER = Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_]*");
+    private static final Pattern SPACED_PROPERTY = Pattern.compile(
+            "[\\p{L}\\p{N}_]+(?:\\h+[\\p{L}\\p{N}_]+)+");
+    private static final Set<String> ROOT_LITERALS = Set.of("true", "false", "null");
+    private static final Set<String> WORD_OPERATORS = Set.of("and", "or", "in");
 
-    public final String query;
-    public final String getQuery;
-    public final String suffix;
-    public final String prefix;
-    public List<String> mapNames;
-    public final List<String> tokens;
-    public final int tokenCount;
+    private final String readExpression;
+    private final String listExpression;
+    private final WritePlan writePlan;
+    private final boolean singletonRoot;
 
-    public final boolean directPath;
-
-    public final boolean isSingletonKey;
-    public final boolean isValueAssignmentKey;
-
-    private static final Pattern INDEX_PATTERN = Pattern.compile("#(?:\\.\\.|[\\d,-]+)");
-    private static final Pattern INT_PATTERN = Pattern.compile("\\d+");
-    private static final Pattern SUFFIX_PATTERN = Pattern.compile("^(.*?)(?:\\s(as:[A-Z]+))?$");
-
-    public static String topArrayFlag = META_FLAG + "_topArray";
-
-    public static final List<String> allowedMapNames = Arrays.stream(MapConfigurations.MapType.values()).map(Enum::name)
-            .toList();
-
-    // CHANGE: define the simple JSONata identifier shape that does not need backticks.
-    // Do not include "$": in JSONata, $ starts a variable reference, so a property named "$gamma" must be backticked.
-    private static final Pattern LEGAL_JSONATA_PROPERTY_NAME =
-            Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_]*");
-
-    // CHANGE: split each period-delimited segment into a property portion plus trailing array indexes.
-    // Example: "And an array property[2]" -> property "And an array property" and suffix "[2]".
-    private static final Pattern ARRAY_INDEX_SUFFIX =
-            Pattern.compile("\\s*((?:\\[[^\\]]*])*)\\s*$");
-
-    // CHANGE: preprocess every simple path segment independently, preserving periods and array indexes.
-    public static String wrapSegments(String expr) {
-        if (expr == null || expr.isBlank()) {
-            return expr;
-        }
-
-        String[] rawSegments = expr.split("\\.", -1);
-        StringBuilder result = new StringBuilder();
-
-        for (int i = 0; i < rawSegments.length; i++) {
-            if (i > 0) {
-                result.append('.');
-            }
-
-            result.append(wrapSingleSegment(rawSegments[i]));
-        }
-
-        return result.toString();
+    public Tokenized(String query) {
+        this(query, false);
     }
 
-    private static String wrapSingleSegment(String rawSegment) {
-        String segment = rawSegment.trim();
-
-        Matcher arraySuffixMatcher = ARRAY_INDEX_SUFFIX.matcher(segment);
-
-        String propertyPart = segment;
-        String arraySuffix = "";
-
-        if (arraySuffixMatcher.find()) {
-            arraySuffix = arraySuffixMatcher.group(1);
-            propertyPart = segment.substring(0, arraySuffixMatcher.start()).trim();
+    private Tokenized(String query, boolean singletonRoot) {
+        if (query == null) {
+            throw new IllegalArgumentException("Query cannot be null");
         }
 
-        if (propertyPart.isEmpty()) {
-            return arraySuffix;
-        }
-
-        // CHANGE: keep the synthetic NodeMap top-array marker as a plain internal token.
-        // It is not a user JSON property name and must remain comparable to topArrayFlag later
-        // in setWithPath(...), and removable from getQuery.
-        if (propertyPart.equals(topArrayFlag)) {
-            return propertyPart + arraySuffix;
-        }
-
-        String wrappedProperty;
-
-        if (isAlreadyBackticked(propertyPart)) {
-            wrappedProperty = propertyPart;
-        } else if (needsBackticks(propertyPart)) {
-            wrappedProperty = "`" + escapeBackticks(propertyPart) + "`";
-        } else {
-            wrappedProperty = propertyPart;
-        }
-
-        return wrappedProperty + arraySuffix;
+        String source = query.strip();
+        this.readExpression = normalizeRead(source, true);
+        this.listExpression = normalizeRead(source, false);
+        this.writePlan = parseWritePlan(listExpression);
+        this.singletonRoot = singletonRoot;
     }
 
-    private static boolean needsBackticks(String propertyName) {
-        return !LEGAL_JSONATA_PROPERTY_NAME.matcher(propertyName).matches();
+    /** Creates an explicit singleton write without encoding it in query punctuation. */
+    public static Tokenized singletonWrite(String query) {
+        return new Tokenized(query, true);
     }
 
-    private static boolean isAlreadyBackticked(String propertyName) {
-        return propertyName.length() >= 2
-                && propertyName.startsWith("`")
-                && propertyName.endsWith("`");
+    /** Returns the JSONata expression used by a normal read. */
+    public static String preprocessReadQuery(String query) {
+        return normalizeRead(query, true);
     }
-
-    private static String escapeBackticks(String propertyName) {
-        return propertyName.replace("`", "``");
-    }
-
-    // CHANGE: replaces the previous regex-only topArrayFlag insertion.
-    // This uses the first path delimiter, so illegal root property names are not skipped.
-    private static String insertTopArrayFlag(String q) {
-        if (q == null || q.isBlank()) {
-            return q;
-        }
-
-        int firstDot = q.indexOf('.');
-        int firstArray = q.indexOf('[');
-
-        // Preserve the existing behavior for an indexed root, such as Root[0].Child.
-        if (firstArray >= 0 && (firstDot < 0 || firstArray < firstDot)) {
-            return q;
-        }
-
-        if (firstDot < 0) {
-            return q + "." + topArrayFlag;
-        }
-
-        return q.substring(0, firstDot) + "." + topArrayFlag + q.substring(firstDot);
-    }
-
-    // CHANGE: one shared method for converting backticked JSONata property tokens back to Jackson field names.
-    // This also reverses doubled backticks created by escapeBackticks().
-    private static String unquoteBacktickedProperty(String fieldName) {
-        if (fieldName != null
-                && fieldName.length() >= 2
-                && fieldName.startsWith("`")
-                && fieldName.endsWith("`")) {
-            return fieldName.substring(1, fieldName.length() - 1).replace("``", "`");
-        }
-
-        return fieldName;
-    }
-
-    // CHANGE: classify only simple dotted/indexed paths as direct, while ignoring punctuation inside backticked names.
-    // Example: `Address:Primary`.`Zip Code` is still direct even though the quoted name contains ':'.
-    private static boolean isDirectPath(String query) {
-        if (query == null || query.isBlank()) {
-            return true;
-        }
-
-        String withoutQuotedPropertyContents = query.replaceAll("`(?:``|[^`])*`", "name");
-        String withoutSimpleArrayIndexes = withoutQuotedPropertyContents.replaceAll("\\[-?\\d+\\]", "");
-
-        return !withoutSimpleArrayIndexes
-                .replaceAll("\\*|%|\\{|\\(|<|>|=|\\.\\.|,|:", "[")
-                .contains("[");
-    }
-
-    public Tokenized(String inputQuery) {
-        Matcher m = SUFFIX_PATTERN.matcher(inputQuery);
-        m.matches();
-        String q = m.group(1).strip();
-        suffix = m.group(2);
-
-        if (q.startsWith("[")) {
-            throw new IllegalArgumentException(
-                    "Leading array path is not supported for NodeMap/ObjectNode root: " + inputQuery
-                            + ". Use a named root property such as 'key[0].A' instead."
-            );
-        }
-
-        isSingletonKey = q.startsWith("-");
-        if (isSingletonKey)
-            q = q.substring(1);
-
-//        prefix = !Character.isLetter(q.charAt(0)) && q.charAt(0) != '_' ? q.replaceFirst("^([^A-Za-z_]+).*", "$1")
-//                : null;
-        // CHANGE: do not treat a leading backtick as a prefix; it may be the start of an already-quoted property name.
-        prefix = !Character.isLetterOrDigit(q.charAt(0)) && q.charAt(0) != '_' && q.charAt(0) != '`'
-                ? q.replaceFirst("^([^0-9A-Za-z_`]+).*", "$1")
-                : null;
-
-        if (prefix != null)
-            q = q.substring(prefix.length());
-
-        int idx = q.indexOf("::");
-        if (idx >= 0) {
-            String mapNameString = q.substring(0, idx);
-            q = q.substring(idx + 2);
-
-            mapNames = Arrays.stream(mapNameString.split(","))
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
-                    .toList();
-
-            List<String> invalid = new ArrayList<>();
-            List<MapConfigurations.MapType> result = new ArrayList<>();
-
-            for (String n : mapNames)
-                if (allowedMapNames.contains(n))
-                    result.add(MapConfigurations.MapType.valueOf(n));
-                else
-                    invalid.add(n);
-
-            if (!invalid.isEmpty())
-                throw new IllegalArgumentException("Invalid: " + invalid + ", allowed: " + allowedMapNames);
-        }
-
-        if (q.contains("#"))
-            q = rewrite(q);
-        // CHANGE: only trim whitespace around simple path delimiters supported by this preprocessor.
-        // The old cleanup also stripped spaces around characters like '-', ':', and ',',
-        // which can be valid parts of a JSON property name that should later be backticked.
-        q = q.strip().replaceAll("^\\$\\.", "").replaceAll("\\s*([\\[\\].])\\s*", "$1");
-
-        // CHANGE: insert the synthetic top-array flag using delimiter positions instead of
-        // an identifier-shaped regex, so root properties like "Top-Level Property" still work.
-        q = insertTopArrayFlag(q);
-
-        isValueAssignmentKey = q.endsWith("=");
-        if (isValueAssignmentKey)
-            q = q.substring(0, q.length() - 1);
-        query = wrapSegments(q);
-        // CHANGE: direct-path detection must not treat quoted property contents as JSONata syntax.
-        // It also must not include the old zero-width ^ alternative, which makes every query look non-direct
-        // when contains("[") is used correctly as a literal string check.
-        directPath = isDirectPath(query);
-        tokens = Arrays.stream(query.replaceAll("(\\[[^\\[\\]]*\\])", ".$1").split("\\.")).collect(Collectors.toList());
-        tokenCount = tokens.size();
-        // CHANGE: remove the synthetic top-array marker from JSONata get queries using Pattern.quote,
-        // so any special characters inside META_FLAG are treated literally.
-        getQuery = query.replaceAll("\\." + Pattern.quote(topArrayFlag), "");
-    }
-
-    public static String rewrite(String input) {
-        if (input == null)
-            return null;
-        return INDEX_PATTERN.matcher(input).replaceAll(mr -> {
-            String body = mr.group().substring(1);
-            String decremented = INT_PATTERN.matcher(body).replaceAll(nmr -> {
-                int n = Integer.parseInt(nmr.group());
-                return Integer.toString(n - 1);
-            });
-            return "[" + decremented + "]";
-        });
-    }
-
-    public static final String AS_LIST_SUFFIX = "as:LIST";
 
     public Object get(JsonNode root) {
-
-        List<JsonNode> list = getList(root, getQuery);
-        if (list == null)
-            return null;
-        if (suffix == null) {
-            if (list.isEmpty())
-                return null;
-            return fromSafeJsonNode(list.getLast());
-        }
-        if (suffix.equals(AS_LIST_SUFFIX)) {
-            return fromSafeJsonNode(list);
-//            return list.stream().map(ValueFormatting::fromSafeJsonNode).toList();
-        }
-        return null;
+        JsonNode result = evaluate(root, readExpression);
+        return result == null ? null : fromSafeJsonNode(result);
     }
 
+    /** Evaluates without implicit last-root selection and adapts the result to a list. */
     public List<JsonNode> getList(JsonNode root) {
-        return getList(root, getQuery);
-    }
-
-    public List<JsonNode> getList(JsonNode root, String queryString) {
-        JsonNode returnedNode = getWithPath(root, queryString);
-        if (returnedNode == null)
+        JsonNode result = evaluate(root, listExpression);
+        if (result == null) {
             return null;
-        if (returnedNode instanceof ArrayNode arrayNode)
-            return arrayNode.valueStream().toList();
-        List<JsonNode> nodeList = new ArrayList<>();
-
-        nodeList.add(returnedNode);
-        return nodeList;
+        }
+        if (result instanceof ArrayNode array) {
+            return array.valueStream().toList();
+        }
+        return List.of(result);
     }
 
-    // public List<JsonNode> getParentsList(JsonNode root) {
-    // return getList(root, query + ".{ 'p': % }.p");
-    // }
+    /** Applies this query as a write against a NodeMap root. */
+    public void put(ObjectNode root, Object value) {
+        if (root == null) {
+            throw new IllegalArgumentException("Write root cannot be null");
+        }
+        if (writePlan instanceof ReadOnly) {
+            throw new IllegalArgumentException(
+                    "The expression is readable but is not a writable NodeMap path: " + listExpression);
+        }
 
-    public JsonNode getWithPath(JsonNode root) {
-        return getWithPath(root, getQuery);
+        JsonNode safeValue = toSafeJsonNode(value);
+        safeValue = safeValue == null ? NullNode.instance : safeValue;
+
+        switch (writePlan) {
+            case Direct direct -> applyDirectRoot(root, direct.steps(), safeValue);
+            case Selected selected -> applySelected(root, selected, safeValue);
+            case ReadOnly ignored -> throw new IllegalStateException("Unexpected read-only write plan");
+        }
     }
 
-    public static JsonNode getWithPath(JsonNode root, String passedQuery) {
+    /** Evaluates a JSONata expression and returns {@code null} for invalid or missing results. */
+    public static JsonNode evaluate(JsonNode root, String expression) {
+        if (root == null || expression == null || expression.isBlank()) {
+            return null;
+        }
         try {
-            Expressions e = Expressions.parse(passedQuery.replaceAll("\\[\\*\\]", ""));
-            return e.evaluate(root);
+            return Expressions.parse(expression).evaluate(root);
         } catch (ParseException | IOException | EvaluateException ex) {
             return null;
         }
     }
 
-    public JsonNode setWithPath(ObjectNode root, Object finalValue, Tokenized... tokenizeds) {
-        JsonNode currentValue = root;
-        Tokenized lastTokenized = tokenizeds[tokenizeds.length - 1];
-        currentValue = lastTokenized.setWithPath(finalValue);
-        for (int t = tokenizeds.length - 2; t > 0; t--) {
-            Tokenized tokenize = tokenizeds[t];
-            currentValue = tokenize.setWithPath(currentValue);
+    /* ------------------------------------------------------------------
+       Read normalization
+       ------------------------------------------------------------------ */
+
+    private static String normalizeRead(String query, boolean selectLastRoot) {
+        if (query == null) {
+            return null;
         }
-        Tokenized firstTokenized = tokenizeds[0];
-        return firstTokenized.setWithPath(root, currentValue);
+
+        String indexed = rewriteCustomIndexes(query.strip());
+        SimplePath path = parseSimplePath(indexed);
+        if (path == null) {
+            return indexed;
+        }
+
+        String expression = path.expression();
+        if (!selectLastRoot
+                || path.rootIndexed()
+                || path.rootFunction()
+                || path.rootName().startsWith("_")) {
+            return expression;
+        }
+
+        return expression.substring(0, path.rootEnd())
+                + "[][-1]"
+                + expression.substring(path.rootEnd());
     }
 
-    public JsonNode setWithPath(Object value) {
-        JsonNode root = tokens.getFirst().startsWith("[") ? MAPPER.createArrayNode() : MAPPER.createObjectNode();
-        setWithPath(root, value);
-        return root;
-    }
+    private static String rewriteCustomIndexes(String input) {
+        StringBuilder result = new StringBuilder(input.length());
 
-    public JsonNode setWithPath(JsonNode root, Object value) {
-        boolean singleton = isSingletonKey || "-".equals(prefix);
-
-        List<String> tokenList = new ArrayList<>(tokens);
-
-        boolean containsWildcard = tokenList.stream().anyMatch(t -> t.equals("*") || t.equals("[*]"));
-
-        if (singleton && tokenList.size() > 1 && tokenList.get(1).equals(topArrayFlag)) {
-            tokenList.remove(1);
-        } else {
-            boolean containsTopArrayFlag = tokenList.size() > 1 && tokenList.get(1).equals(topArrayFlag);
-            if (containsTopArrayFlag) {
-                tokenList.set(1, containsWildcard ? "[*]" : "[]");
-            }
-        }
-
-        if (containsWildcard) {
-            setExistingWildcardPath(root, tokenList, 0, value);
-            return root;
-        }
-
-        if (singleton && root instanceof ObjectNode objectNode && !tokenList.isEmpty()) {
-            // CHANGE: use the shared backtick unquoting helper so removal uses the real Jackson field name.
-            String rootField = unquoteBacktickedProperty(tokenList.getFirst());
-            if (!rootField.startsWith("[")) {
-                objectNode.remove(rootField);
-            }
-        }
-
-        if (directPath) {
-            JsonNode currentNode = root;
-            int tokenSize = tokenList.size();
-
-            for (int i = 0; i < tokenSize; i++) {
-                String token = tokenList.get(i);
-                String nextToken = i + 1 < tokenSize ? tokenList.get(i + 1) : null;
-
-                Object valueToSet = nextToken == null
-                        ? toSafeJsonNode(value)
-                        : nextToken.startsWith("[") ? ArrayNode.class : ObjectNode.class;
-
-                if (currentNode instanceof ArrayNode arrayNode) {
-                    Integer index = token.startsWith("[")
-                            ? token.equals("[]")
-                            ? null
-                            : Integer.parseInt(token.substring(1, token.length() - 1))
-                            : null;
-
-                    if (index != null && index < 0) {
-                        ensureIndex(arrayNode, Math.abs(index));
-                        index = arrayNode.size() + index;
-                    }
-
-                    currentNode = setArrayNode(arrayNode, index, valueToSet);
-
-                } else if (currentNode instanceof ObjectNode objectNode) {
-                    currentNode = setProperty(objectNode, token, valueToSet);
-
-                } else {
-                    throw new RuntimeException(
-                            "Cannot set '" + currentNode + "'. JsonNode needs to be ArrayNode or ObjectNode");
-                }
+        for (int index = 0; index < input.length();) {
+            int protectedEnd = protectedEnd(input, index);
+            if (protectedEnd > index) {
+                result.append(input, index, protectedEnd);
+                index = protectedEnd;
+                continue;
             }
 
-        } else {
-            String lastToken = tokenList.getLast();
-
-            String effectiveQuery = String.join(".", tokenList);
-            List<JsonNode> parentNodes = getList(root, effectiveQuery.replaceAll("\\.?" + Pattern.quote(lastToken) + "$", ""));
-
-            for (JsonNode parent : parentNodes) {
-                if (parent instanceof ArrayNode arrayNode) {
-                    if (lastToken.startsWith("[")) {
-                        if (lastToken.equals("[*]")) {
-                            JsonNode valueNode = toSafeJsonNode(value);
-                            IntStream.range(0, arrayNode.size())
-                                    .forEach(i -> arrayNode.set(i, valueNode.deepCopy()));
-                        } else if (lastToken.equals("[]")) {
-                            arrayNode.add(toSafeJsonNode(value));
-                        } else {
-                            arrayNode.set(arrayNode.size() - 1, toSafeJsonNode(value));
-                        }
-                    }
-                } else if (parent instanceof ObjectNode objectNode) {
-                    if (!lastToken.startsWith("[")) {
-                        // CHANGE: non-direct writes also need to convert a JSONata backticked token
-                        // back into the raw Jackson field name before checking or setting it.
-                        String fieldName = unquoteBacktickedProperty(lastToken);
-                        if (objectNode.has(fieldName)) {
-                            objectNode.set(fieldName, toSafeJsonNode(value));
-                        }
-                    }
-                }
-            }
-        }
-
-        return root;
-    }
-    private static JsonNode setProperty(ObjectNode objectNode, String fieldName, Object value) {
-        // CHANGE: convert any backticked JSONata token back into the raw Jackson field name.
-        fieldName = unquoteBacktickedProperty(fieldName);
-
-        JsonNode valueToSet;
-        if (value instanceof JsonNode valueNode) {
-            valueToSet = valueNode;
-        } else {
-            JsonNode existing = objectNode.get(fieldName);
-            boolean wantsArray = value.equals(ArrayNode.class);
-            // Reuse existing node only if it's the right container type
-            if (wantsArray && existing instanceof ArrayNode) {
-                valueToSet = existing;
-            } else if (!wantsArray && existing instanceof ObjectNode) {
-                valueToSet = existing;
+            Selector selector = input.charAt(index) == '#' ? parseSelector(input, index) : null;
+            if (selector == null) {
+                result.append(input.charAt(index++));
             } else {
-                // Wrong type or absent - create fresh
-                valueToSet = wantsArray ? MAPPER.createArrayNode() : MAPPER.createObjectNode();
+                result.append(selector.replacement());
+                index = selector.end();
             }
         }
-
-        objectNode.set(fieldName, valueToSet);
-        return valueToSet;
+        return result.toString();
     }
 
-    public static JsonNode setArrayNode(ArrayNode arrayNode, Integer index, Object value) {
-        if (index == null) {
-            JsonNode valueToSet = value instanceof JsonNode valueNode
-                    ? valueNode
-                    : value.equals(ArrayNode.class) ? MAPPER.createArrayNode() : MAPPER.createObjectNode();
+    private static Selector parseSelector(String input, int hashIndex) {
+        int start = hashIndex + 1;
 
-            arrayNode.add(valueToSet);
-            return valueToSet;
+        if (input.regionMatches(true, start, "first", 0, 5)
+                && isTokenBoundary(input, start + 5)) {
+            return new Selector("[0]", start + 5);
+        }
+        if (input.regionMatches(true, start, "last", 0, 4)
+                && isTokenBoundary(input, start + 4)) {
+            return new Selector("[-1]", start + 4);
         }
 
-        JsonNode currentlySet = ensureIndex(arrayNode, index);
-
-        if (value instanceof JsonNode valueNode) {
-            arrayNode.set(index, valueNode);
-            return valueNode;
+        NumberToken first = parseSignedInteger(input, start);
+        if (first == null) {
+            return null;
         }
 
-        boolean wantsArray = value.equals(ArrayNode.class);
+        int cursor = skipWhitespace(input, first.end());
+        if (cursor < input.length() && input.charAt(cursor) == ',') {
+            List<Long> positions = new ArrayList<>();
+            positions.add(toJsonataIndex(first.value()));
 
-        if (wantsArray && currentlySet instanceof ArrayNode) {
-            return currentlySet;
+            while (cursor < input.length() && input.charAt(cursor) == ',') {
+                NumberToken next = parseSignedInteger(input, skipWhitespace(input, cursor + 1));
+                if (next == null) {
+                    return null;
+                }
+                positions.add(toJsonataIndex(next.value()));
+                cursor = skipWhitespace(input, next.end());
+            }
+
+            if (!isTokenBoundary(input, cursor)) {
+                return null;
+            }
+            String values = positions.stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(","));
+            return new Selector("[[" + values + "]]", cursor);
         }
 
-        if (!wantsArray && currentlySet instanceof ObjectNode) {
-            return currentlySet;
+        if (cursor < input.length() && input.charAt(cursor) == '-') {
+            NumberToken last = parseSignedInteger(input, skipWhitespace(input, cursor + 1));
+            if (last == null || !isTokenBoundary(input, last.end())) {
+                return null;
+            }
+            return new Selector(
+                    "[[" + toJsonataIndex(first.value()) + ".." + toJsonataIndex(last.value()) + "]]",
+                    last.end());
         }
 
-        JsonNode defaultValue = wantsArray ? MAPPER.createArrayNode() : MAPPER.createObjectNode();
-        arrayNode.set(index, defaultValue);
-        return defaultValue;
+        if (!isTokenBoundary(input, first.end())) {
+            return null;
+        }
+        return new Selector("[" + toJsonataIndex(first.value()) + "]", first.end());
     }
 
-    public static JsonNode ensureIndex(ArrayNode array, int index) {
-        if (array == null || index < 0) {
-            throw new IllegalArgumentException("ArrayNode is null or index < 0");
+    private static NumberToken parseSignedInteger(String input, int start) {
+        int cursor = start;
+        if (cursor < input.length() && (input.charAt(cursor) == '-' || input.charAt(cursor) == '+')) {
+            cursor++;
         }
 
+        int digits = cursor;
+        while (cursor < input.length() && Character.isDigit(input.charAt(cursor))) {
+            cursor++;
+        }
+        if (cursor == digits) {
+            return null;
+        }
+
+        try {
+            return new NumberToken(Long.parseLong(input.substring(start, cursor)), cursor);
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("Index is outside the supported numeric range", ex);
+        }
+    }
+
+    private static long toJsonataIndex(long oneBasedIndex) {
+        try {
+            return Math.subtractExact(oneBasedIndex, 1L);
+        } catch (ArithmeticException ex) {
+            throw new IllegalArgumentException("Index is outside the supported numeric range", ex);
+        }
+    }
+
+    /**
+     * Normalizes only a clear path prefix. Once the expression becomes
+     * ambiguous, the remaining JSONata is copied unchanged.
+     */
+    private static SimplePath parseSimplePath(String input) {
+        if (input.isEmpty() || input.charAt(0) == '(') {
+            return null;
+        }
+
+        StringBuilder output = new StringBuilder(input.length());
+        int cursor = 0;
+        int rootEnd = -1;
+        String rootName = null;
+        boolean rootIndexed = false;
+        boolean rootFunction = false;
+        boolean root = true;
+
+        while (true) {
+            cursor = skipWhitespace(input, cursor);
+            int propertyStart = cursor;
+            Property property = parseReadableProperty(input, cursor, root);
+            if (property == null) {
+                if (root) {
+                    return null;
+                }
+                output.append(input.substring(propertyStart));
+                return new SimplePath(output.toString(), rootEnd, rootName, rootIndexed, rootFunction);
+            }
+
+            output.append(property.expression());
+            cursor = property.end();
+            if (root) {
+                rootName = property.name();
+                rootEnd = output.length();
+            }
+
+            int next = skipWhitespace(input, cursor);
+            while (next < input.length() && input.charAt(next) == '[') {
+                int bracketEnd = balancedBracketEnd(input, next);
+                if (bracketEnd < 0) {
+                    output.append(input.substring(cursor));
+                    return new SimplePath(output.toString(), rootEnd, rootName, rootIndexed, rootFunction);
+                }
+                if (root) {
+                    rootIndexed = true;
+                }
+                output.append(input, next, bracketEnd);
+                cursor = bracketEnd;
+                next = skipWhitespace(input, cursor);
+            }
+
+            if (root && next < input.length() && input.charAt(next) == '(') {
+                rootFunction = true;
+            }
+            if (next == input.length()) {
+                return new SimplePath(output.toString(), rootEnd, rootName, rootIndexed, rootFunction);
+            }
+            if (input.charAt(next) != '.'
+                    || (next + 1 < input.length() && input.charAt(next + 1) == '.')) {
+                output.append(input.substring(cursor));
+                return new SimplePath(output.toString(), rootEnd, rootName, rootIndexed, rootFunction);
+            }
+
+            output.append('.');
+            cursor = next + 1;
+            root = false;
+        }
+    }
+
+    private static Property parseReadableProperty(String input, int start, boolean root) {
+        if (start >= input.length()) {
+            return null;
+        }
+
+        if (input.charAt(start) == '`') {
+            int end = quotedEnd(input, start, '`');
+            if (end < 0) {
+                return null;
+            }
+            String expression = input.substring(start, end);
+            return new Property(expression, unquoteProperty(expression), end);
+        }
+
+        int end = findReadablePropertyEnd(input, start);
+        String property = input.substring(start, end).strip();
+        if (property.isEmpty()) {
+            return null;
+        }
+        if (IDENTIFIER.matcher(property).matches()) {
+            if (root && ROOT_LITERALS.contains(property)) {
+                return null;
+            }
+            return new Property(property, property, end);
+        }
+        if (!root && (property.equals("*") || property.equals("**") || property.equals("%"))) {
+            return new Property(property, property, end);
+        }
+        if (SPACED_PROPERTY.matcher(property).matches()) {
+            return new Property("`" + property + "`", property, end);
+        }
+        return null;
+    }
+
+    private static int findReadablePropertyEnd(String input, int start) {
+        int cursor = start;
+        while (cursor < input.length()) {
+            char current = input.charAt(cursor);
+            if (".[](){};,?:=<>!&|~+-*/%^@#'\"`".indexOf(current) >= 0) {
+                break;
+            }
+
+            if (Character.isWhitespace(current)) {
+                int wordStart = skipWhitespace(input, cursor);
+                int wordEnd = wordStart;
+                while (wordEnd < input.length()
+                        && (Character.isLetterOrDigit(input.charAt(wordEnd))
+                        || input.charAt(wordEnd) == '_')) {
+                    wordEnd++;
+                }
+                if (wordEnd > wordStart
+                        && WORD_OPERATORS.contains(input.substring(wordStart, wordEnd))
+                        && isTokenBoundary(input, wordEnd)) {
+                    break;
+                }
+            }
+            cursor++;
+        }
+
+        while (cursor > start && Character.isWhitespace(input.charAt(cursor - 1))) {
+            cursor--;
+        }
+        return cursor;
+    }
+
+    /* ------------------------------------------------------------------
+       Write planning
+       ------------------------------------------------------------------ */
+
+    private static WritePlan parseWritePlan(String expression) {
+        if (expression == null || expression.isBlank()) {
+            return ReadOnly.INSTANCE;
+        }
+
+        DirectPath completePath = parseDirectPath(expression);
+        if (completePath != null) {
+            return new Direct(completePath.steps());
+        }
+
+        for (int dot : topLevelDots(expression)) {
+            String selector = expression.substring(0, dot).stripTrailing();
+            DirectPath suffix = parseDirectPath(expression.substring(dot + 1).stripLeading());
+            if (!selector.isBlank() && suffix != null && !suffix.steps().isEmpty()) {
+                return new Selected(selector, suffix.steps());
+            }
+        }
+        return ReadOnly.INSTANCE;
+    }
+
+    private static DirectPath parseDirectPath(String expression) {
+        if (expression == null || expression.isBlank()) {
+            return null;
+        }
+
+        List<WriteStep> steps = new ArrayList<>();
+        int cursor = 0;
+        boolean needProperty = true;
+
+        while (cursor < expression.length()) {
+            cursor = skipWhitespace(expression, cursor);
+            if (cursor >= expression.length()) {
+                break;
+            }
+
+            if (needProperty) {
+                DirectProperty property = parseWritableProperty(expression, cursor);
+                if (property == null) {
+                    return null;
+                }
+                steps.add(property.step());
+                cursor = property.end();
+                needProperty = false;
+            }
+
+            cursor = skipWhitespace(expression, cursor);
+            while (cursor < expression.length() && expression.charAt(cursor) == '[') {
+                BracketStep bracket = parseWritableBracket(expression, cursor);
+                if (bracket == null) {
+                    return null;
+                }
+                steps.add(bracket.step());
+                cursor = skipWhitespace(expression, bracket.end());
+            }
+
+            if (cursor >= expression.length()) {
+                break;
+            }
+            if (expression.charAt(cursor) != '.'
+                    || (cursor + 1 < expression.length() && expression.charAt(cursor + 1) == '.')) {
+                return null;
+            }
+            cursor++;
+            needProperty = true;
+        }
+
+        return needProperty || steps.isEmpty() ? null : new DirectPath(List.copyOf(steps));
+    }
+
+    private static DirectProperty parseWritableProperty(String expression, int start) {
+        if (start >= expression.length()) {
+            return null;
+        }
+
+        if (expression.charAt(start) == '`') {
+            int end = quotedEnd(expression, start, '`');
+            if (end < 0) {
+                return null;
+            }
+            return new DirectProperty(
+                    new PropertyStep(unquoteProperty(expression.substring(start, end))), end);
+        }
+
+        int end = findWritablePropertyEnd(expression, start);
+        String property = expression.substring(start, end).strip();
+        if (IDENTIFIER.matcher(property).matches() || SPACED_PROPERTY.matcher(property).matches()) {
+            return new DirectProperty(new PropertyStep(property), end);
+        }
+        return null;
+    }
+
+    private static int findWritablePropertyEnd(String expression, int start) {
+        int cursor = start;
+        while (cursor < expression.length()) {
+            char current = expression.charAt(cursor);
+            if (current == '.' || current == '[') {
+                break;
+            }
+            if ("(){};,?:=<>!&|~+-*/%^@#'\"`".indexOf(current) >= 0) {
+                return start;
+            }
+            cursor++;
+        }
+        while (cursor > start && Character.isWhitespace(expression.charAt(cursor - 1))) {
+            cursor--;
+        }
+        return cursor;
+    }
+
+    private static BracketStep parseWritableBracket(String expression, int start) {
+        int end = balancedBracketEnd(expression, start);
+        if (end < 0) {
+            return null;
+        }
+
+        String content = expression.substring(start + 1, end - 1).strip();
+        if (content.isEmpty()) {
+            return new BracketStep(AppendStep.INSTANCE, end);
+        }
+        if (content.equals("*")) {
+            return new BracketStep(WildcardStep.INSTANCE, end);
+        }
+        if (!content.matches("[+-]?\\d+")) {
+            return null;
+        }
+
+        try {
+            return new BracketStep(new IndexStep(Integer.parseInt(content)), end);
+        } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException(
+                    "Array index is outside the supported integer range: " + content, ex);
+        }
+    }
+
+    private static List<Integer> topLevelDots(String expression) {
+        List<Integer> dots = new ArrayList<>();
+        int brackets = 0;
+        int parentheses = 0;
+        int braces = 0;
+
+        for (int index = 0; index < expression.length();) {
+            int protectedEnd = protectedEnd(expression, index);
+            if (protectedEnd > index) {
+                index = protectedEnd;
+                continue;
+            }
+
+            switch (expression.charAt(index)) {
+                case '[' -> brackets++;
+                case ']' -> brackets--;
+                case '(' -> parentheses++;
+                case ')' -> parentheses--;
+                case '{' -> braces++;
+                case '}' -> braces--;
+                case '.' -> {
+                    if (brackets == 0 && parentheses == 0 && braces == 0
+                            && !(index + 1 < expression.length()
+                            && expression.charAt(index + 1) == '.')) {
+                        dots.add(index);
+                    }
+                }
+                default -> { }
+            }
+            index++;
+        }
+        return dots;
+    }
+
+    /* ------------------------------------------------------------------
+       Write execution
+       ------------------------------------------------------------------ */
+
+    private void applyDirectRoot(ObjectNode root, List<WriteStep> steps, JsonNode value) {
+        if (steps.isEmpty() || !(steps.getFirst() instanceof PropertyStep property)) {
+            throw new IllegalArgumentException("A writable NodeMap path must start with a property name");
+        }
+
+        List<WriteStep> remaining = steps.subList(1, steps.size());
+        if (singletonRoot || property.name().startsWith("_")) {
+            applySingletonRoot(root, property.name(), remaining, value);
+        } else {
+            applyCollectionRoot(root, property.name(), remaining, value);
+        }
+    }
+
+    private static void applySingletonRoot(
+            ObjectNode root,
+            String name,
+            List<WriteStep> remaining,
+            JsonNode value) {
+
+        if (remaining.isEmpty()) {
+            root.set(name, copy(value));
+            return;
+        }
+
+        JsonNode current = root.get(name);
+        WriteStep first = remaining.getFirst();
+        if (isMissing(current) || !accepts(current, first)) {
+            if (creationBlockedByWildcard(remaining, 0)) {
+                return;
+            }
+            current = containerFor(first);
+            root.set(name, current);
+        }
+        applySteps(current, remaining, 0, value);
+    }
+
+    private static void applyCollectionRoot(
+            ObjectNode root,
+            String name,
+            List<WriteStep> remaining,
+            JsonNode value) {
+
+        JsonNode current = root.get(name);
+        if (remaining.isEmpty()) {
+            ArrayNode collection = asCollection(root, name, current);
+            collection.add(copy(value));
+            return;
+        }
+
+        WriteStep first = remaining.getFirst();
+        ArrayNode collection;
+        if (current instanceof ArrayNode existingCollection) {
+            collection = existingCollection;
+        } else {
+            if (first instanceof WildcardStep || creationBlockedByWildcard(remaining, 0)) {
+                return;
+            }
+            collection = MAPPER.createArrayNode();
+            root.set(name, collection);
+        }
+
+        if (first instanceof IndexStep || first instanceof AppendStep || first instanceof WildcardStep) {
+            applySteps(collection, remaining, 0, value);
+            return;
+        }
+
+        if (collection.isEmpty()) {
+            if (creationBlockedByWildcard(remaining, 0)) {
+                return;
+            }
+            collection.add(containerFor(first));
+        }
+
+        int lastIndex = collection.size() - 1;
+        JsonNode selected = collection.get(lastIndex);
+        if (isMissing(selected) || !accepts(selected, first)) {
+            if (creationBlockedByWildcard(remaining, 0)) {
+                return;
+            }
+            selected = containerFor(first);
+            collection.set(lastIndex, selected);
+        }
+        applySteps(selected, remaining, 0, value);
+    }
+
+    private static ArrayNode asCollection(ObjectNode root, String name, JsonNode current) {
+        if (current instanceof ArrayNode array) {
+            return array;
+        }
+
+        ArrayNode array = MAPPER.createArrayNode();
+        if (!isMissing(current)) {
+            array.add(current);
+        }
+        root.set(name, array);
+        return array;
+    }
+
+    private static void applySelected(ObjectNode root, Selected selected, JsonNode value) {
+        JsonNode result = evaluate(root, selected.selector());
+        if (isMissing(result)) {
+            return;
+        }
+
+        IdentityHashMap<JsonNode, Boolean> attached = new IdentityHashMap<>();
+        collectAttached(root, attached);
+
+        List<JsonNode> matches = result instanceof ArrayNode array && !attached.containsKey(result)
+                ? array.valueStream().toList()
+                : List.of(result);
+
+        WriteStep first = selected.suffix().getFirst();
+        for (JsonNode match : matches) {
+            if (isMissing(match)) {
+                continue;
+            }
+            if (!attached.containsKey(match)) {
+                throw new IllegalArgumentException(
+                        "JSONata selector returned a detached or constructed value: " + selected.selector());
+            }
+            if (accepts(match, first)) {
+                applySteps(match, selected.suffix(), 0, value);
+            }
+        }
+    }
+
+    private static void collectAttached(JsonNode node, IdentityHashMap<JsonNode, Boolean> attached) {
+        if (node == null || attached.put(node, Boolean.TRUE) != null) {
+            return;
+        }
+        if (node instanceof ObjectNode object) {
+            object.elements().forEachRemaining(child -> collectAttached(child, attached));
+        } else if (node instanceof ArrayNode array) {
+            array.forEach(child -> collectAttached(child, attached));
+        }
+    }
+
+    private static boolean applySteps(
+            JsonNode current,
+            List<WriteStep> steps,
+            int index,
+            JsonNode value) {
+
+        WriteStep step = steps.get(index);
+        boolean last = index == steps.size() - 1;
+
+        if (step instanceof PropertyStep property) {
+            if (!(current instanceof ObjectNode object)) {
+                throw typeError(property.name(), "ObjectNode", current);
+            }
+            if (last) {
+                object.set(property.name(), copy(value));
+                return true;
+            }
+
+            WriteStep next = steps.get(index + 1);
+            JsonNode child = object.get(property.name());
+            if (isMissing(child) || !accepts(child, next)) {
+                if (creationBlockedByWildcard(steps, index + 1)) {
+                    return false;
+                }
+                child = containerFor(next);
+                object.set(property.name(), child);
+            }
+            return applySteps(child, steps, index + 1, value);
+        }
+
+        if (step instanceof IndexStep arrayIndex) {
+            if (!(current instanceof ArrayNode array)) {
+                throw typeError("[" + arrayIndex.index() + "]", "ArrayNode", current);
+            }
+
+            int resolved = resolveIndex(array, arrayIndex.index());
+            if (last) {
+                if (resolved < 0) {
+                    return false;
+                }
+                ensureIndex(array, resolved);
+                array.set(resolved, copy(value));
+                return true;
+            }
+
+            if (resolved < 0 || resolved >= array.size()) {
+                if (creationBlockedByWildcard(steps, index + 1)) {
+                    return false;
+                }
+                resolved = arrayIndex.index() < 0 ? 0 : arrayIndex.index();
+                ensureIndex(array, resolved);
+            }
+
+            WriteStep next = steps.get(index + 1);
+            JsonNode child = array.get(resolved);
+            if (isMissing(child) || !accepts(child, next)) {
+                if (creationBlockedByWildcard(steps, index + 1)) {
+                    return false;
+                }
+                child = containerFor(next);
+                array.set(resolved, child);
+            }
+            return applySteps(child, steps, index + 1, value);
+        }
+
+        if (step instanceof AppendStep) {
+            if (!(current instanceof ArrayNode array)) {
+                throw typeError("[]", "ArrayNode", current);
+            }
+            if (last) {
+                array.add(copy(value));
+                return true;
+            }
+
+            JsonNode child = containerFor(steps.get(index + 1));
+            array.add(child);
+            return applySteps(child, steps, index + 1, value);
+        }
+
+        if (step instanceof WildcardStep) {
+            if (!(current instanceof ArrayNode array) || array.isEmpty()) {
+                return false;
+            }
+            if (last) {
+                for (int element = 0; element < array.size(); element++) {
+                    array.set(element, copy(value));
+                }
+                return true;
+            }
+
+            boolean changed = false;
+            WriteStep next = steps.get(index + 1);
+            for (JsonNode child : array) {
+                if (accepts(child, next)) {
+                    changed |= applySteps(child, steps, index + 1, value);
+                }
+            }
+            return changed;
+        }
+
+        throw new IllegalStateException("Unknown write step: " + step);
+    }
+
+    private static boolean creationBlockedByWildcard(List<WriteStep> steps, int start) {
+        for (int index = start; index < steps.size(); index++) {
+            WriteStep step = steps.get(index);
+            if (step instanceof AppendStep) {
+                return false;
+            }
+            if (step instanceof WildcardStep) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static JsonNode containerFor(WriteStep step) {
+        return step instanceof IndexStep || step instanceof AppendStep || step instanceof WildcardStep
+                ? MAPPER.createArrayNode()
+                : MAPPER.createObjectNode();
+    }
+
+    private static boolean accepts(JsonNode node, WriteStep step) {
+        if (isMissing(node)) {
+            return false;
+        }
+        if (step instanceof IndexStep || step instanceof AppendStep || step instanceof WildcardStep) {
+            return node instanceof ArrayNode;
+        }
+        return node instanceof ObjectNode;
+    }
+
+    private static int resolveIndex(ArrayNode array, int requested) {
+        return requested < 0 ? array.size() + requested : requested;
+    }
+
+    private static void ensureIndex(ArrayNode array, int index) {
         while (array.size() <= index) {
             array.add(NullNode.instance);
         }
-
-        return array.get(index);
     }
 
+    private static IllegalArgumentException typeError(
+            String location,
+            String expected,
+            JsonNode actual) {
 
-
-    private static void setExistingWildcardPath(JsonNode currentNode, List<String> tokenList, int tokenIndex, Object value) {
-        if (currentNode == null || currentNode.isNull() || tokenIndex >= tokenList.size()) {
-            return;
-        }
-
-        String token = tokenList.get(tokenIndex);
-        boolean lastToken = tokenIndex == tokenList.size() - 1;
-
-        if (token.equals("[*]")) {
-            if (!(currentNode instanceof ArrayNode arrayNode)) {
-                return;
-            }
-
-            if (lastToken) {
-                JsonNode valueNode = toSafeJsonNode(value);
-                for (int i = 0; i < arrayNode.size(); i++) {
-                    arrayNode.set(i, valueNode.deepCopy());
-                }
-                return;
-            }
-
-            for (JsonNode child : arrayNode) {
-                setExistingWildcardPath(child, tokenList, tokenIndex + 1, value);
-            }
-            return;
-        }
-
-        if (token.equals("*")) {
-            if (currentNode instanceof ObjectNode objectNode) {
-                if (lastToken) {
-                    JsonNode valueNode = toSafeJsonNode(value);
-                    List<String> fieldNames = new ArrayList<>();
-                    objectNode.fieldNames().forEachRemaining(fieldNames::add);
-
-                    for (String fieldName : fieldNames) {
-                        objectNode.set(fieldName, valueNode.deepCopy());
-                    }
-                    return;
-                }
-
-                List<JsonNode> children = new ArrayList<>();
-                objectNode.elements().forEachRemaining(children::add);
-
-                for (JsonNode child : children) {
-                    setExistingWildcardPath(child, tokenList, tokenIndex + 1, value);
-                }
-                return;
-            }
-
-            if (currentNode instanceof ArrayNode arrayNode) {
-                if (lastToken) {
-                    JsonNode valueNode = toSafeJsonNode(value);
-                    for (int i = 0; i < arrayNode.size(); i++) {
-                        arrayNode.set(i, valueNode.deepCopy());
-                    }
-                    return;
-                }
-
-                for (JsonNode child : arrayNode) {
-                    setExistingWildcardPath(child, tokenList, tokenIndex + 1, value);
-                }
-            }
-
-            return;
-        }
-
-        if (token.startsWith("[")) {
-            if (!(currentNode instanceof ArrayNode arrayNode)) {
-                return;
-            }
-
-            if (token.equals("[]")) {
-                return;
-            }
-
-            int index = Integer.parseInt(token.substring(1, token.length() - 1));
-
-            if (index < 0) {
-                index = arrayNode.size() + index;
-            }
-
-            if (index < 0 || index >= arrayNode.size()) {
-                return;
-            }
-
-            if (lastToken) {
-                arrayNode.set(index, toSafeJsonNode(value));
-            } else {
-                setExistingWildcardPath(arrayNode.get(index), tokenList, tokenIndex + 1, value);
-            }
-
-            return;
-        }
-
-        if (!(currentNode instanceof ObjectNode objectNode)) {
-            return;
-        }
-
-        // CHANGE: wildcard traversal also needs raw Jackson field names when tokens were backticked for JSONata.
-        String fieldName = unquoteBacktickedProperty(token);
-
-        if (lastToken) {
-            objectNode.set(fieldName, toSafeJsonNode(value));
-            return;
-        }
-
-        JsonNode child = objectNode.get(fieldName);
-        setExistingWildcardPath(child, tokenList, tokenIndex + 1, value);
+        String actualType = actual == null ? "missing" : actual.getNodeType().name();
+        return new IllegalArgumentException(
+                "Cannot write through " + location + ": expected " + expected + " but found " + actualType);
     }
 
+    private static boolean isMissing(JsonNode node) {
+        return node == null || node.isNull() || node.isMissingNode();
+    }
 
+    private static JsonNode copy(JsonNode value) {
+        return value == null ? NullNode.instance : value.deepCopy();
+    }
 
+    /* ------------------------------------------------------------------
+       Lexical helpers
+       ------------------------------------------------------------------ */
 
+    private static int balancedBracketEnd(String input, int start) {
+        int depth = 0;
+        for (int index = start; index < input.length();) {
+            int protectedEnd = protectedEnd(input, index);
+            if (protectedEnd > index) {
+                index = protectedEnd;
+                continue;
+            }
 
+            char current = input.charAt(index++);
+            if (current == '[') {
+                depth++;
+            } else if (current == ']' && --depth == 0) {
+                return index;
+            }
+        }
+        return -1;
+    }
 
+    private static int protectedEnd(String input, int index) {
+        char current = input.charAt(index);
+        if (current == '\'' || current == '"' || current == '`') {
+            int end = quotedEnd(input, index, current);
+            return end < 0 ? input.length() : end;
+        }
+        if (current == '/' && index + 1 < input.length() && input.charAt(index + 1) == '*') {
+            int end = input.indexOf("*/", index + 2);
+            return end < 0 ? input.length() : end + 2;
+        }
+        if (current == '/' && isRegexStart(input, index)) {
+            int end = regexEnd(input, index);
+            return end < 0 ? index : end;
+        }
+        return index;
+    }
 
+    private static int quotedEnd(String input, int start, char quote) {
+        for (int index = start + 1; index < input.length(); index++) {
+            char current = input.charAt(index);
+            if (quote == '`' && current == '`'
+                    && index + 1 < input.length() && input.charAt(index + 1) == '`') {
+                index++;
+                continue;
+            }
+            if (current == '\\') {
+                index++;
+            } else if (current == quote) {
+                return index + 1;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean isRegexStart(String input, int slashIndex) {
+        int previous = slashIndex - 1;
+        while (previous >= 0 && Character.isWhitespace(input.charAt(previous))) {
+            previous--;
+        }
+        return previous < 0 || "([{:;,=!?&|~<>+-*%".indexOf(input.charAt(previous)) >= 0;
+    }
+
+    private static int regexEnd(String input, int start) {
+        boolean characterClass = false;
+        for (int index = start + 1; index < input.length(); index++) {
+            char current = input.charAt(index);
+            if (current == '\\') {
+                index++;
+            } else if (current == '[') {
+                characterClass = true;
+            } else if (current == ']') {
+                characterClass = false;
+            } else if (current == '/' && !characterClass) {
+                index++;
+                while (index < input.length() && Character.isLetter(input.charAt(index))) {
+                    index++;
+                }
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private static String unquoteProperty(String token) {
+        return token.substring(1, token.length() - 1).replace("``", "`");
+    }
+
+    private static int skipWhitespace(String input, int start) {
+        int cursor = start;
+        while (cursor < input.length() && Character.isWhitespace(input.charAt(cursor))) {
+            cursor++;
+        }
+        return cursor;
+    }
+
+    private static boolean isTokenBoundary(String input, int index) {
+        return index >= input.length()
+                || (!Character.isLetterOrDigit(input.charAt(index)) && input.charAt(index) != '_');
+    }
+
+    /* ------------------------------------------------------------------
+       Internal model
+       ------------------------------------------------------------------ */
+
+    private sealed interface WritePlan permits Direct, Selected, ReadOnly { }
+    private record Direct(List<WriteStep> steps) implements WritePlan { }
+    private record Selected(String selector, List<WriteStep> suffix) implements WritePlan { }
+    private enum ReadOnly implements WritePlan { INSTANCE }
+
+    private sealed interface WriteStep permits PropertyStep, IndexStep, AppendStep, WildcardStep { }
+    private record PropertyStep(String name) implements WriteStep { }
+    private record IndexStep(int index) implements WriteStep { }
+    private enum AppendStep implements WriteStep { INSTANCE }
+    private enum WildcardStep implements WriteStep { INSTANCE }
+
+    private record DirectPath(List<WriteStep> steps) { }
+    private record DirectProperty(WriteStep step, int end) { }
+    private record BracketStep(WriteStep step, int end) { }
+    private record SimplePath(
+            String expression,
+            int rootEnd,
+            String rootName,
+            boolean rootIndexed,
+            boolean rootFunction) { }
+    private record Property(String expression, String name, int end) { }
+    private record Selector(String replacement, int end) { }
+    private record NumberToken(long value, int end) { }
 }

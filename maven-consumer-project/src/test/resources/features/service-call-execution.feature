@@ -1,72 +1,126 @@
-@all @service-calls
-Feature: Execute reusable REST and SOAP service calls
+@service-call @local-api
+Feature: Service call orchestration with generic request mappings
 
-  Scenario: Read an item through REST
-    When SERVICE CALL: %rest-get-item
-      | name         | itemId | include   | traceId          |
-      | readItemCall | 73     | inventory | get-feature-test |
+  Scenario: Select by inline percent tag and save under the quoted object name
+    When "inlineRead" SERVICE CALL: %inspect-get
+      | endpoint                  | client      | traceId     | include   | mode |
+      | http://127.0.0.1:8765     | caller-test | trace-get-1 | inventory | full |
 
-    Then , ensure "<readItemCall.response.statusCode>" equals 200
-    And , ensure "<readItemCall.response.method>" equals "GET"
-    And , ensure "<readItemCall.response.body.id>" equals "73"
-    And , ensure "<readItemCall.response.body.include>" equals "inventory"
-    And , ensure "<readItemCall.response.body.traceId>" equals "get-feature-test"
+    Then , verify "<inlineRead.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/inspect"
+    And , verify "<inlineRead.REQUEST.method>" equals "GET"
+    And , verify "<inlineRead.REQUEST.headers.X-Test-Client>" equals "caller-test"
+    And , verify "<inlineRead.REQUEST.queryParams.include>" equals "inventory"
+    And , verify "<inlineRead.CONFIGURATION.urlEncodingEnabled>" equals "true"
+    And , verify "<inlineRead.RESPONSE.method>" equals "GET"
+    And , verify "<inlineRead.RESPONSE.statusCode>" equals "200"
+    And , verify "<inlineRead.RESPONSE.body.client>" equals "caller-test"
+    And , verify "<inlineRead.RESPONSE.body.traceId>" equals "trace-get-1"
+    And , verify "<inlineRead.RESPONSE.body.include>" equals "inventory"
+    And , verify "<inlineRead.RESPONSE.body.mode>" equals "full"
 
-  Scenario: Create an item with a JSON body
-    When SERVICE CALL: %rest-create-item
-      | name           | itemName     | quantity | traceId             |
-      | createItemCall | Consumer item | 4        | create-feature-test |
 
-    Then , ensure "<createItemCall.response.statusCode>" equals 201
-    And , ensure "<createItemCall.response.method>" equals "POST"
-    And , ensure "<createItemCall.response.body.id>" equals "created-100"
-    And , ensure "<createItemCall.response.body.name>" equals "Consumer item"
-    And , ensure "<createItemCall.response.body.quantity>" equals 4
+  Scenario: Select with Run Tags and save under an exact Call Key header
+    When SERVICE CALLS
+      | Run Tags     | Call Key | endpoint                  | client     | traceId     | cookieValue | mode   | status | name   | quantity |
+      | %inspect-post | tablePost | http://127.0.0.1:8765     | table-test | trace-post-1 | cookie-42   | create | 201    | Widget | 3        |
 
-  Scenario: Patch an item with a JSON body
-    When SERVICE CALL: %rest-update-item
-      | name           | itemId | itemName              | traceId             |
-      | updateItemCall | 88     | Consumer patched item | update-feature-test |
+    Then , verify "<tablePost.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/inspect"
+    And , verify "<tablePost.REQUEST.method>" equals "POST"
+    And , verify "<tablePost.REQUEST.headers.X-Test-Trace>" equals "trace-post-1"
+    And , verify "<tablePost.REQUEST.cookies.serviceCookie>" equals "cookie-42"
+    And , verify "<tablePost.REQUEST.queryParams.status>" equals "201"
+    And , verify "<tablePost.REQUEST.body.name>" equals "Widget"
+    And , verify "<tablePost.REQUEST.body.quantity>" equals "3"
+    And , verify "<tablePost.REQUEST.body.active>" equals "true"
+    And , verify "<tablePost.RESPONSE.method>" equals "POST"
+    And , verify "<tablePost.RESPONSE.statusCode>" equals "201"
+    And , verify "<tablePost.RESPONSE.body.client>" equals "table-test"
+    And , verify "<tablePost.RESPONSE.body.traceId>" equals "trace-post-1"
+    And , verify "<tablePost.RESPONSE.body.cookie>" equals "serviceCookie=cookie-42"
+    And , verify "<tablePost.RESPONSE.body.body.name>" equals "Widget"
+    And , verify "<tablePost.RESPONSE.body.body.quantity>" equals "3"
+    And , verify "<tablePost.RESPONSE.body.body.active>" equals "true"
 
-    Then , ensure "<updateItemCall.response.statusCode>" equals 200
-    And , ensure "<updateItemCall.response.method>" equals "PATCH"
-    And , ensure "<updateItemCall.response.body.id>" equals "88"
-    And , ensure "<updateItemCall.response.body.name>" equals "Consumer patched item"
 
-  Scenario: Delete an item
-    When SERVICE CALL: %rest-delete-item
-      | name           | itemId | traceId             |
-      | deleteItemCall | 91     | delete-feature-test |
+  Scenario: Call Key takes precedence over the quoted inline object name
+    When "inlineMustLose" SERVICE CALL: %status-call
+      | Call Key  | endpoint                  | status |
+      | tableWins | http://127.0.0.1:8765     | 422    |
 
-    Then , ensure "<deleteItemCall.response.statusCode>" equals 204
-    And , ensure "<deleteItemCall.response.method>" equals "DELETE"
-    And , ensure "<deleteItemCall.response.headers.X-deleted-item>" equals "91"
-    And , ensure "<deleteItemCall.response.headers.X-test-trace>" equals "delete-feature-test"
+    Then , verify "<tableWins.REQUEST.queryParams.status>" equals "422"
+    And , verify "<tableWins.RESPONSE.statusCode>" equals "422"
+    And , verify "<tableWins.RESPONSE.body.status>" equals "422"
+    And , verify "<tableWins.RESPONSE.body.method>" equals "GET"
 
-  Scenario: Add two values through SOAP using Run Tags
+
+  Scenario: Fall back to the resolved component scenario name when no object key is supplied
     When SERVICE CALL
-      | Run Tags | name        | left | right | traceId          |
-      | %soap-add | soapAddCall | 11   | 6     | soap-feature-test |
+      | Run Tags         | endpoint                  |
+      | %health-full-url | http://127.0.0.1:8765     |
 
-    Then , ensure "<soapAddCall.response.statusCode>" equals 200
-    And , ensure "<soapAddCall.response.method>" equals "POST"
-    And , ensure "<soapAddCall.response.body>" contains "Add"
-    And , ensure "<soapAddCall.response.body>" contains "17"
+    Then , verify "<HealthCall.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/health"
+    And , verify "<HealthCall.RESPONSE.method>" equals "GET"
+    And , verify "<HealthCall.RESPONSE.statusCode>" equals "200"
+    And , verify "<HealthCall.RESPONSE.body.status>" equals "UP"
+    And , verify "<HealthCall.RESPONSE.body.service>" equals "pickleball-local"
 
-  Scenario: Map literal and resolved values
-    When SERVICE CALL: %rest-get-item
-      | name          | itemId | include | traceId         |
-      | mappedGetCall | 25     | details | map-values-test |
 
-    And MAP VALUES
-      | copiedStatus     | <mappedGetCall.response.statusCode> |
-      | expectedStatus   | 200                                 |
-      | expectedText     | "200"                               |
-      | enabled          | true                                |
-      | description      | item lookup                         |
+  Scenario: Treat an HTTP 500 response as a normal service response
+    When "serverFailure" SERVICE CALL
+      | Run Tags    | endpoint                  | status |
+      | %status-call | http://127.0.0.1:8765     | 500    |
 
-    Then , ensure "<copiedStatus>" equals 200
-    And , ensure "<expectedStatus>" equals 200
-    And , ensure "<expectedText>" equals "200"
-    And , ensure "<enabled>" equals "true"
-    And , ensure "<description>" equals "item lookup"
+    Then , verify "<serverFailure.RESPONSE.method>" equals "GET"
+    And , verify "<serverFailure.RESPONSE.statusCode>" equals "500"
+    And , verify "<serverFailure.RESPONSE.body.status>" equals "500"
+
+
+  Scenario: Reusing a Call Key follows ordinary NodeMap replacement behavior
+    When SERVICE CALL
+      | Run Tags    | Call Key     | endpoint                  | status |
+      | %status-call | latestStatus | http://127.0.0.1:8765     | 404    |
+    And SERVICE CALL
+      | Run Tags    | Call Key     | endpoint                  | status |
+      | %status-call | latestStatus | http://127.0.0.1:8765     | 503    |
+
+    Then , verify "<latestStatus.RESPONSE.statusCode>" equals "503"
+    And , verify "<latestStatus.RESPONSE.body.status>" equals "503"
+
+
+  Scenario: Preserve a no-content response and its response headers
+    When "deletedItem" SERVICE CALL: %delete-call
+      | endpoint                  | itemId |
+      | http://127.0.0.1:8765     | 55     |
+
+    Then , verify "<deletedItem.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/no-content/55"
+    And , verify "<deletedItem.REQUEST.method>" equals "DELETE"
+    And , verify "<deletedItem.RESPONSE.method>" equals "DELETE"
+    And , verify "<deletedItem.RESPONSE.statusCode>" equals "204"
+    And , verify "<deletedItem.RESPONSE.headers.X-deleted-item>" equals "55"
+    And , verify "<deletedItem.RESPONSE.body>" equals ""
+
+
+  Scenario: Map a raw XML request body with the TEXT DocString mapper
+    When "soapAdd" SERVICE CALL: %soap-add
+      | endpoint                  | traceId       | left | right |
+      | http://127.0.0.1:8765     | soap-map-test | 11   | 6     |
+
+    Then , verify "<soapAdd.REQUEST.endpoint>" equals "http://127.0.0.1:8765/soap/calculator"
+    And , verify "<soapAdd.REQUEST.method>" equals "POST"
+    And , verify "<soapAdd.REQUEST.contentType>" equals "text/xml"
+    And , verify "<soapAdd.REQUEST.headers.SOAPAction>" equals "urn:pickleball:calculator#Add"
+    And , verify "<soapAdd.REQUEST.body>" contains "urn:pickleball:calculator"
+    And , verify "<soapAdd.REQUEST.body>" contains "11"
+    And , verify "<soapAdd.RESPONSE.method>" equals "POST"
+    And , verify "<soapAdd.RESPONSE.statusCode>" equals "200"
+    And , verify "<soapAdd.RESPONSE.body>" contains "17"
+
+
+  Scenario: Finalize a component that ends before sending an HTTP request
+    When "earlyExit" SERVICE CALL: %early-exit
+      | endpoint                  |
+      | http://127.0.0.1:8765     |
+
+    Then , verify "<earlyExit.REQUEST.method>" equals "GET"
+    And , verify "<earlyExit.REQUEST.queryParams.mode>" equals "must-not-run"
+    And , verify "<earlyExit.RESPONSE>" equals "{}"

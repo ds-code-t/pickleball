@@ -14,197 +14,184 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static tools.dscode.common.GlobalConstants.META_FLAG;
 
+/** A mutable JSON-backed map with JSONata reads and writable path queries. */
+public class NodeMap extends ValueFormatting {
+    public static final String MAP_TYPE_KEY = META_FLAG + "_MapType";
 
-public class NodeMap  extends ValueFormatting{
-
-    public void clearValues(String... keys) {
-        if (keys == null || keys.length == 0) {
-            root.removeAll();
-            return;
-        }
-
-        for (String key : keys) {
-            if (key != null) {
-                root.remove(key);
-            }
-        }
-    }
-
-    public ObjectNode getRoot() {
-        return root;
-    }
-
-
-    @Override
-    public String toString() {
-        return "Type: " + mapType + " Source: " + dataSources + "\nroot:" + root.toString();
-    }
-
-    public Set<MapConfigurations.DataSource> getDataSources() {
-        return dataSources;
-    }
-
-    public void setDataSource(MapConfigurations.DataSource... dataSources) {
-        this.dataSources.addAll(Arrays.stream(dataSources)
-                .filter(Objects::nonNull)
-                .toList());
-    }
-
-    public void setDataSource(String... dataSources) {
-        this.dataSources.addAll(Arrays.stream(dataSources)
-                .filter(Objects::nonNull)
-                .map(MapConfigurations.DataSource::fromString)
-                .toList());
-    }
-
-    private Set<MapConfigurations.DataSource> dataSources = new HashSet<>();
-
-    public MapConfigurations.MapType getMapType() {
-        return mapType;
-    }
-
-    public final static String MapTypeKey = META_FLAG + "_MapType";
-    // public final static String DataSourceKey = META_FLAG + "_DataSource";
-
-    public void setMapType(MapConfigurations.MapType mapType) {
-        this.mapType = mapType;
-        this.root.set(MapTypeKey, toSafeJsonNode(mapType));
-    }
-
+    private final Set<MapConfigurations.DataSource> dataSources = new HashSet<>();
     private MapConfigurations.MapType mapType = MapConfigurations.MapType.DEFAULT;
 
-    public NodeMap(String path) {
-        super((ObjectNode) FileAndDataParsing.buildJsonFromPath(path));
+    public NodeMap() {
+        this(MapConfigurations.MapType.DEFAULT);
     }
-
-    public NodeMap(MapConfigurations.MapType mapType, ObjectNode objectNode) {
-        super(objectNode);
-        setMapType(mapType);
-    }
-
-    public NodeMap(ObjectNode objectNode) {
-        super(objectNode);
-        setMapType(MapConfigurations.MapType.DEFAULT);
-    }
-
-    public NodeMap(MapConfigurations.MapType mapType, MapConfigurations.DataSource... dataSources) {
-        this(mapType);
-        this.dataSources = Arrays.stream(dataSources).collect(Collectors.toSet());
-    }
-
 
     public NodeMap(MapConfigurations.MapType mapType) {
         super(MAPPER.createObjectNode());
         setMapType(mapType);
     }
 
-    public NodeMap() {
-        super(MAPPER.createObjectNode());
+    public NodeMap(ObjectNode root) {
+        super(root);
+        setMapType(MapConfigurations.MapType.DEFAULT);
+    }
+
+    public NodeMap(MapConfigurations.MapType mapType, ObjectNode root) {
+        super(root);
         setMapType(mapType);
+    }
+
+    public NodeMap(MapConfigurations.MapType mapType, MapConfigurations.DataSource... sources) {
+        this(mapType);
+        setDataSource(sources);
+    }
+
+    public NodeMap(String path) {
+        super((ObjectNode) FileAndDataParsing.buildJsonFromPath(path));
     }
 
     public NodeMap(Map<?, ?> map) {
-        super(toObjectNode(map));
-        setMapType(mapType);
+        this(toObjectNode(map));
     }
 
     public NodeMap(LinkedListMultimap<?, ?> multimap) {
-        super(toObjectNode(multimap));
-        setMapType(mapType);
+        this(toObjectNode(multimap));
     }
 
-    public ObjectNode objectNode() {
+    public ObjectNode getRoot() {
         return root;
     }
 
-    public List<JsonNode> getAsList(Tokenized tokenized) {
-        return tokenized.getList(root);
+    public Object get(String query) {
+        return new Tokenized(query).get(root);
     }
 
-    public List<JsonNode> getAsList(String key) {
-        return (new Tokenized(key).getList(root));
+    public Object get(Tokenized query) {
+        return query.get(root);
     }
 
-    public Object get(Tokenized tokenized) {
-        return tokenized.get(root);
+    public List<JsonNode> getAsList(String query) {
+        return new Tokenized(query).getList(root);
     }
 
-    public Object get(String key) {
-        return (new Tokenized(key)).get(root);
+    public List<JsonNode> getAsList(Tokenized query) {
+        return query.getList(root);
     }
 
-    public void putAsSingleton(String key, Object value) {
-        put(new Tokenized("-" + key), value);
+    public void put(String query, Object value) {
+        new Tokenized(query).put(root, value);
     }
 
-    public void put(String key, Object value) {
-        put(new Tokenized(key), value);
+    public void put(Tokenized query, Object value) {
+        query.put(root, value);
     }
 
-    public void put(Tokenized key, Object value) {
-        key.setWithPath(root, value);
+    public void putAsSingleton(String query, Object value) {
+        Tokenized.singletonWrite(query).put(root, value);
     }
 
-    // ---- Merge (ObjectNode, Map, LinkedListMultimap) ----
+    public void clearValues(String... keys) {
+        if (keys == null || keys.length == 0) {
+            root.removeAll();
+            return;
+        }
+        Arrays.stream(keys)
+                .filter(Objects::nonNull)
+                .forEach(root::remove);
+    }
+
+    public MapConfigurations.MapType getMapType() {
+        return mapType;
+    }
+
+    public void setMapType(MapConfigurations.MapType mapType) {
+        this.mapType = Objects.requireNonNullElse(mapType, MapConfigurations.MapType.DEFAULT);
+        root.set(MAP_TYPE_KEY, toSafeJsonNode(this.mapType));
+    }
+
+    public Set<MapConfigurations.DataSource> getDataSources() {
+        return Set.copyOf(dataSources);
+    }
+
+    public void setDataSource(MapConfigurations.DataSource... sources) {
+        if (sources == null) {
+            return;
+        }
+        Arrays.stream(sources)
+                .filter(Objects::nonNull)
+                .forEach(dataSources::add);
+    }
+
+    public void setDataSource(String... sources) {
+        if (sources == null) {
+            return;
+        }
+        Arrays.stream(sources)
+                .filter(Objects::nonNull)
+                .map(MapConfigurations.DataSource::fromString)
+                .forEach(dataSources::add);
+    }
+
     public void merge(ObjectNode other) {
-        if (other != null)
+        if (other != null) {
             root.setAll(other);
+        }
+    }
+
+    public void merge(Map<?, ?> other) {
+        if (other != null) {
+            root.setAll(toObjectNode(other));
+        }
+    }
+
+    public void merge(LinkedListMultimap<?, ?> other) {
+        if (other != null) {
+            root.setAll(toObjectNode(other));
+        }
     }
 
     public void merge(List<?> keys, List<?> values) {
         if (keys == null || values == null) {
-            return; // or throw, depending on your desired behavior
+            return;
         }
-
         if (keys.size() != values.size()) {
             throw new IllegalArgumentException("Keys and values must have the same size");
         }
 
         LinkedListMultimap<Object, Object> multimap = LinkedListMultimap.create();
         IntStream.range(0, keys.size())
-                .forEach(i -> multimap.put(keys.get(i), values.get(i)));
-
+                .forEach(index -> multimap.put(keys.get(index), values.get(index)));
         merge(multimap);
     }
 
-
-    public void merge(Map<?, ?> other) {
-        if (other != null)
-            root.setAll(toObjectNode(other));
+    @Override
+    public String toString() {
+        return "Type: " + mapType + " Source: " + dataSources + "\nroot:" + root;
     }
 
-    public void merge(LinkedListMultimap<?, ?> other) {
-        if (other != null)
-            root.setAll(toObjectNode(other));
-    }
-
-    // ---- Normalize constructor/merge inputs ----
     private static ObjectNode toObjectNode(Map<?, ?> map) {
-        if (map == null)
-            return MAPPER.createObjectNode();
-        JsonNode n = toSafeJsonNode(map);
-        if (n != null && n.isObject())
-            return (ObjectNode) n;
-        throw new IllegalArgumentException("Map did not serialize to an ObjectNode");
+        return requireObjectNode(map == null ? Map.of() : map, "Map");
     }
 
-    private static ObjectNode toObjectNode(LinkedListMultimap<?, ?> mm) {
-        if (mm == null)
+    private static ObjectNode toObjectNode(LinkedListMultimap<?, ?> multimap) {
+        if (multimap == null) {
             return MAPPER.createObjectNode();
-        Map<Object, Collection<Object>> tmp = new LinkedHashMap<>();
-        mm.asMap().forEach((k, coll) -> tmp.put(k, new ArrayList<>(coll)));
-        JsonNode n = toSafeJsonNode(tmp);
-        if (n != null && n.isObject())
-            return (ObjectNode) n;
-        throw new IllegalArgumentException("Multimap did not serialize to an ObjectNode");
+        }
+
+        Map<Object, Collection<Object>> values = new LinkedHashMap<>();
+        multimap.asMap().forEach(
+                (key, collection) -> values.put(key, new ArrayList<>(collection)));
+        return requireObjectNode(values, "Multimap");
     }
 
-
-
-
+    private static ObjectNode requireObjectNode(Object value, String description) {
+        JsonNode node = toSafeJsonNode(value);
+        if (node instanceof ObjectNode object) {
+            return object;
+        }
+        throw new IllegalArgumentException(description + " did not serialize to an ObjectNode");
+    }
 }

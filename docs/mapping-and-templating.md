@@ -102,76 +102,181 @@ Continue a dot-separated path for as many named levels as needed:
 <response.account.profile.contact.address.city>
 ```
 
-## Array positions
+## NodeMap query behavior
 
-### Standard zero-based positions
+Pickleball uses JSONata for reads and a closely related writable-path syntax for saved values. Ordinary top-level names are collection roots. Top-level names beginning with `_` are singleton roots.
 
-Square-bracket positions begin at zero:
+### Default collection roots
+
+A read that begins directly with an ordinary property implicitly selects the last item in that top-level collection:
+
+```text
+orders.id
+```
+
+is evaluated as:
+
+```jsonata
+orders[][-1].id
+```
+
+This matches write behavior:
+
+```java
+nodeMap.put("orders", order);
+```
+
+appends `order` to the top-level `orders` array, while:
+
+```java
+nodeMap.put("orders.status", "ready");
+```
+
+sets `status` on the last `orders` entry.
+
+The implicit `[][-1]` is not added when the first property already has square brackets or when the expression is parenthesized:
+
+```jsonata
+orders[0].id
+(orders.id)[]
+```
+
+### Singleton roots beginning with `_`
+
+A top-level property beginning with `_` is read and written directly rather than as an implicit array:
+
+```java
+nodeMap.put("_CONFIG.endpoint", "/service");
+```
+
+creates or updates:
+
+```json
+{
+  "_CONFIG": {
+    "endpoint": "/service"
+  }
+}
+```
+
+The corresponding read remains normal JSONata:
+
+```jsonata
+_CONFIG.endpoint
+```
+
+An underscore is a default-storage convention, not a permanent type restriction. Explicit array syntax such as `_VALUES[0]` or `_VALUES[*]` still works when that property contains an array.
+
+## Array positions and Pickleball selectors
+
+Standard JSONata indexes are zero-based:
 
 ```text
 orders[0]   first order
 orders[1]   second order
-orders[2]   third order
+orders[-1]  last order
 ```
 
-```gherkin
-* print "First order: <orders[0].id>"
-* print "First item in the second order: <orders[1].items[0].sku>"
-```
+Pickleball also preprocesses `#` selectors by subtracting one from every supplied position:
 
-### Business-readable one-based positions
+| Pickleball input | JSONata expression |
+|---|---|
+| `orders #1` | `orders[0]` |
+| `orders #2` | `orders[1]` |
+| `orders #0` | `orders[-1]` |
+| `orders #-1` | `orders[-2]` |
+| `orders #first` | `orders[0]` |
+| `orders #last` | `orders[-1]` |
+| `orders #1-3` | `orders[[0..2]]` |
+| `orders #1,3` | `orders[[0,2]]` |
 
-Pickleball also supports `#` followed by a one-based position:
-
-```text
-orders #1   first order
-orders #2   second order
-orders #3   third order
-```
-
-These are equivalent:
-
-```text
-<orders[0].id>
-<orders #1.id>
-```
-
-The one-based form can be used at several levels:
+The conversion can be used at several path levels:
 
 ```gherkin
 * print "First item in the second order: <orders #2.items #1.sku>"
 ```
 
-Use `#1` for the first item, `#2` for the second, and so on.
+Text inside quoted strings, regular expressions, comments, and backticked property names is not changed. For example, `[1..3]` remains a JSONata range and a string containing `"#1"` remains a string.
 
-## Wildcards and lists
+## Returning collections with JSONata
 
-Use `[*]` to select every item in an array:
+`as:LIST` is no longer needed. Use normal JSONata grouping and array syntax when the complete result is required.
 
-```gherkin
-* print "Order IDs: <orders[*].id as:LIST>"
-```
+Given an `orders` array:
 
-Continue through nested arrays by adding another wildcard:
+| Need | Query |
+|---|---|
+| Last order | `orders` |
+| First order | `orders[0]` |
+| Complete orders array | `(orders)` or `orders[]` |
+| Last order ID | `orders.id` |
+| Every order ID | `(orders.id)[]` |
+| Every item SKU | `(orders.items.sku)[]` |
+| Last active order | `(orders[status = "active"])[-1]` |
+| Every active order ID | `(orders[status = "active"].id)[]` |
 
-```gherkin
-* print "All item SKUs: <orders[*].items[*].sku as:LIST>"
-```
+Parentheses also provide an explicit way to suppress the implicit top-level last-item selection.
 
-A numbered position can be combined with a wildcard:
+## Property names containing spaces
 
-```gherkin
-* print "Every SKU in the first order: <orders #1.items[*].sku as:LIST>"
-```
-
-Append `as:LIST` when the complete set of matches is needed:
+Simple path property names containing spaces are automatically converted to JSONata backtick syntax:
 
 ```text
-<orders[*].id as:LIST>
-<orders[*].items[*].sku as:LIST>
+Customer Requests.Endpoint Name
 ```
 
-The query style is based on familiar JSONata concepts, with Pickleball’s `#1`, `#2`, and similar one-based positions added for business readability. Ordinary feature files usually need only property paths, positions, and array wildcards.
+is normalized to:
+
+```jsonata
+`Customer Requests`[][-1].`Endpoint Name`
+```
+
+Already backticked properties remain unchanged. In complex predicates or function expressions, use explicit JSONata backticks so the expression is unambiguous:
+
+```jsonata
+`Customer Requests`[`Customer Name` = "Ava"].`Endpoint Name`
+```
+
+Dots inside backticks, strings, regular expressions, and bracket expressions are not treated as path delimiters.
+
+## Writable NodeMap paths
+
+`NodeMap.put` supports direct paths made from:
+
+- properties and backticked properties;
+- numeric indexes such as `[0]` and `[-1]`;
+- `[]` to append;
+- `[*]` to update every existing array element; and
+- `*` to update every existing child value.
+
+### Direct write examples
+
+| Query | Effect |
+|---|---|
+| `orders` | Append a new value to the top-level `orders` array |
+| `orders.status` | Set or create `status` on the last order |
+| `orders[0].status` | Set or create `status` on the first order |
+| `orders[].status` | Append a new order object and set its `status` |
+| `orders[*].status` | Set or create `status` on every existing order |
+| `orders[*].items[*].status` | Update every existing item in every existing order |
+| `_CONFIG.endpoint` | Set or create a singleton configuration property |
+| `Customer Requests.Endpoint Name` | Use collection behavior with spaced property names |
+
+A wildcard updates existing entries only. It does not append an entry to an empty array. Missing descendants after a selected object may be created, but a wildcard does not replace an existing scalar with an object or array.
+
+### JSONata-selected writes
+
+When a write is not a direct path, Pickleball finds the earliest selector boundary that leaves a complete direct writable suffix. This keeps as much of the trailing property path as possible so missing descendants can be created.
+
+```java
+nodeMap.put("orders[status = \"active\"].result.code", "OK");
+```
+
+This selects every attached order whose `status` is `active`, then creates or updates `result.code` on each selected order.
+
+The selector must return objects or arrays that are attached to the original `NodeMap`. Computed scalars and newly constructed JSONata objects are not writable targets.
+
+All assigned values still pass through Pickleball's safe JSON conversion. Values that cannot be safely serialized continue to be stored by unique reference ID before the resulting JSON node is assigned.
 
 ## Templates that use the return value of a Cucumber step
 
@@ -207,7 +312,7 @@ Use this form only with a Cucumber step that is intended to return a value.
 | Nested property | `<parent.child.value>` |
 | Zero-based array position | `<items[0]>` |
 | One-based business position | `<items #1>` |
-| Every array item | `<items[*] as:LIST>` |
+| Complete array result | `<(items)[]>` |
 | Return value from a Cucumber step | `<$step text>` |
 
 ## Rules to remember
@@ -217,10 +322,12 @@ Use this form only with a Cucumber step that is intended to return a value.
 3. Pickleball replaces runtime values while the step runs.
 4. Use periods for nested named properties.
 5. Square-bracket positions are zero-based.
-6. `#` positions are one-based.
-7. Use `[*]` for every item in an array.
-8. Add `as:LIST` when several matching values should be kept as a list.
-9. A key beginning with `$` uses the returned value of a matching Cucumber step.
+6. `#` positions are converted by subtracting one; `#first`, `#last`, ranges, and lists are supported.
+7. Use parentheses or native JSONata `[]` when a complete collection should be returned.
+8. `[*]` is a writable-path wildcard that updates existing array entries.
+9. Ordinary top-level names are collection roots; names beginning with `_` are singleton roots.
+10. Use backticks explicitly for spaced property names inside complex JSONata expressions.
+11. A key beginning with `$` uses the returned value of a matching Cucumber step.
 
 ---
 

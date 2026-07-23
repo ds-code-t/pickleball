@@ -14,75 +14,72 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 
-public class RestAssuredUtil {
+public final class RestAssuredUtil {
 
+    private static final Set<String> STANDARD_PROPERTIES = Set.of(
+            "baseUri",
+            "basePath",
+            "port",
+            "headers",
+            "cookies",
+            "params",
+            "queryParams",
+            "formParams",
+            "pathParams",
+            "body",
+            "contentType",
+            "accept",
+            "auth",
+            "proxy",
+            "urlEncodingEnabled"
+    );
+
+    private RestAssuredUtil() {
+    }
+
+    /**
+     * Builds a request from the service-call REQUEST object only.
+     * Kept for source compatibility with existing Java callers.
+     */
     public static RequestSpecification buildRequest(JsonNode request) {
+        return buildRequest(request, MAPPER.createObjectNode());
+    }
+
+    /**
+     * Builds a request from separate REQUEST and CONFIGURATION objects.
+     *
+     * <p>CONFIGURATION is applied first. REQUEST is applied second so explicit
+     * request values take precedence where REST Assured uses replacement
+     * semantics. Unknown CONFIGURATION properties are treated as REST Assured
+     * method paths and invoked reflectively.</p>
+     */
+    public static RequestSpecification buildRequest(
+            JsonNode request,
+            JsonNode configuration
+    ) {
+        ObjectNode requestObject = requireObject(request, "REQUEST");
+        ObjectNode configurationObject = optionalObject(configuration, "CONFIGURATION");
+
         RequestSpecification specification = RestAssured.given();
 
-        applyStandardConfiguration(specification, request);
+        applyStandardProperties(specification, configurationObject);
+        applyConfiguredMethods(specification, configurationObject);
+        applyStandardProperties(specification, requestObject);
 
-        if (request.has("config")) {
-            request.get("config").fields().forEachRemaining(entry ->
-                    apply(specification, entry.getKey(), entry.getValue())
-            );
+        // Compatibility for older request objects that nested reflective
+        // REST Assured calls under request.config.
+        JsonNode legacyConfiguration = requestObject.get("config");
+        if (legacyConfiguration != null && !legacyConfiguration.isNull()) {
+            ObjectNode legacyObject = requireObject(legacyConfiguration, "request.config");
+            applyStandardProperties(specification, legacyObject);
+            applyConfiguredMethods(specification, legacyObject);
         }
 
         return specification;
-    }
-
-    private static void applyStandardConfiguration(
-            RequestSpecification specification,
-            JsonNode request
-    ) {
-        if (request.has("baseUri")) {
-            specification.baseUri(request.get("baseUri").asText());
-        }
-        if (request.has("basePath")) {
-            specification.basePath(request.get("basePath").asText());
-        }
-        if (request.has("port")) {
-            specification.port(request.get("port").asInt());
-        }
-        if (request.has("headers")) {
-            specification.headers(asMap(request.get("headers")));
-        }
-        if (request.has("cookies")) {
-            specification.cookies(asMap(request.get("cookies")));
-        }
-        if (request.has("params")) {
-            specification.params(asMap(request.get("params")));
-        }
-        if (request.has("queryParams")) {
-            specification.queryParams(asMap(request.get("queryParams")));
-        }
-        if (request.has("formParams")) {
-            specification.formParams(asMap(request.get("formParams")));
-        }
-        if (request.has("pathParams")) {
-            specification.pathParams(asMap(request.get("pathParams")));
-        }
-        if (request.has("body")) {
-            JsonNode body = request.get("body");
-            specification.body(body.isTextual() ? body.asText() : body.toString());
-        }
-        if (request.has("contentType")) {
-            specification.contentType(request.get("contentType").asText());
-        }
-        if (request.has("accept")) {
-            specification.accept(request.get("accept").asText());
-        }
-        if (request.has("auth")) {
-            applyAuthentication(specification, request.get("auth"));
-        }
-        if (request.has("proxy")) {
-            applyProxy(specification, request.get("proxy"));
-        }
-        if (request.has("urlEncodingEnabled")) {
-            specification.urlEncodingEnabled(request.get("urlEncodingEnabled").asBoolean());
-        }
     }
 
     public static RequestSpecification logRequestAndResponse(
@@ -94,35 +91,43 @@ public class RestAssuredUtil {
                 .filter(new ResponseLoggingFilter(logStream));
     }
 
-    /**
-     * Executes a request using explicit method and endpoint values.
-     */
     public static Response execute(
             RequestSpecification specification,
             String method,
             String endpoint
     ) {
-        String requestMethod = method == null || method.isBlank() ? "GET" : method;
-        String requestEndpoint = endpoint == null ? "" : endpoint;
+        String requestMethod = method == null || method.isBlank()
+                ? "GET"
+                : method.trim().toUpperCase(java.util.Locale.ROOT);
+        String requestEndpoint = endpoint == null ? "" : endpoint.trim();
         return specification.request(requestMethod, requestEndpoint);
     }
 
     /**
-     * Backward-compatible overload used by CallMap.
+     * Kept for source compatibility with existing Java callers.
      */
     public static Response execute(
             RequestSpecification specification,
             JsonNode request
     ) {
+        ObjectNode requestObject = requireObject(request, "REQUEST");
         return execute(
                 specification,
-                request.path("method").asText("GET"),
-                request.path("endpoint").asText("")
+                requestObject.path("method").asText("GET"),
+                requestObject.path("endpoint").asText("")
         );
     }
 
-    public static JsonNode extractResponse(Response response) {
+    /**
+     * Converts a REST Assured response into a mapping-friendly ObjectNode.
+     * A null response produces an empty object rather than an execution error.
+     */
+    public static ObjectNode extractResponse(Response response) {
         ObjectNode result = MAPPER.createObjectNode();
+        if (response == null) {
+            return result;
+        }
+
         result.put("statusCode", response.getStatusCode());
         result.put("statusLine", response.getStatusLine());
         result.put("contentType", response.getContentType());
@@ -134,21 +139,95 @@ public class RestAssuredUtil {
         result.set("headers", headers);
 
         String body = response.asString();
-        if (response.getContentType() != null
-                && response.getContentType().contains("json")) {
+        String contentType = response.getContentType();
+        if (body != null
+                && !body.isBlank()
+                && contentType != null
+                && contentType.toLowerCase(java.util.Locale.ROOT).contains("json")) {
             try {
-                result.set("body", MAPPER.readTree(body));
+                JsonNode parsed = MAPPER.readTree(body);
+                if (parsed == null) {
+                    result.put("body", body);
+                } else {
+                    result.set("body", parsed);
+                }
             } catch (Exception ignored) {
                 result.put("body", body);
             }
         } else {
-            result.put("body", body);
+            result.put("body", body == null ? "" : body);
         }
 
         return result;
     }
 
+    private static void applyStandardProperties(
+            RequestSpecification specification,
+            ObjectNode values
+    ) {
+        if (values.has("baseUri")) {
+            specification.baseUri(values.get("baseUri").asText());
+        }
+        if (values.has("basePath")) {
+            specification.basePath(values.get("basePath").asText());
+        }
+        if (values.has("port")) {
+            specification.port(values.get("port").asInt());
+        }
+        if (values.has("headers")) {
+            specification.headers(asMap(values.get("headers")));
+        }
+        if (values.has("cookies")) {
+            specification.cookies(asMap(values.get("cookies")));
+        }
+        if (values.has("params")) {
+            specification.params(asMap(values.get("params")));
+        }
+        if (values.has("queryParams")) {
+            specification.queryParams(asMap(values.get("queryParams")));
+        }
+        if (values.has("formParams")) {
+            specification.formParams(asMap(values.get("formParams")));
+        }
+        if (values.has("pathParams")) {
+            specification.pathParams(asMap(values.get("pathParams")));
+        }
+        if (values.has("body")) {
+            JsonNode body = values.get("body");
+            specification.body(body.isTextual() ? body.asText() : body.toString());
+        }
+        if (values.has("contentType")) {
+            specification.contentType(values.get("contentType").asText());
+        }
+        if (values.has("accept")) {
+            specification.accept(values.get("accept").asText());
+        }
+        if (values.has("auth")) {
+            applyAuthentication(specification, values.get("auth"));
+        }
+        if (values.has("proxy")) {
+            applyProxy(specification, values.get("proxy"));
+        }
+        if (values.has("urlEncodingEnabled")) {
+            specification.urlEncodingEnabled(values.get("urlEncodingEnabled").asBoolean());
+        }
+    }
+
+    private static void applyConfiguredMethods(
+            RequestSpecification specification,
+            ObjectNode configuration
+    ) {
+        configuration.fields().forEachRemaining(entry -> {
+            if (!STANDARD_PROPERTIES.contains(entry.getKey())) {
+                apply(specification, entry.getKey(), entry.getValue());
+            }
+        });
+    }
+
     private static Map<String, ?> asMap(JsonNode value) {
+        if (value == null || !value.isObject()) {
+            throw new IllegalArgumentException("REST Assured map property must be an object");
+        }
         return MAPPER.convertValue(value, new TypeReference<>() { });
     }
 
@@ -156,6 +235,10 @@ public class RestAssuredUtil {
             RequestSpecification specification,
             JsonNode authentication
     ) {
+        if (authentication == null || !authentication.isObject()) {
+            throw new IllegalArgumentException("REST Assured auth must be an object");
+        }
+
         if (authentication.has("none")) {
             specification.auth().none();
         } else if (authentication.has("basic")) {
@@ -185,9 +268,17 @@ public class RestAssuredUtil {
             RequestSpecification specification,
             JsonNode proxy
     ) {
+        if (proxy == null || !proxy.isObject()) {
+            throw new IllegalArgumentException("REST Assured proxy must be an object");
+        }
+
         String host = proxy.path("host").asText();
         int port = proxy.path("port").asInt(-1);
         String scheme = proxy.path("scheme").asText("");
+
+        if (host.isBlank()) {
+            throw new IllegalArgumentException("REST Assured proxy.host cannot be blank");
+        }
 
         if (!scheme.isBlank()) {
             specification.proxy(host, port, scheme);
@@ -226,8 +317,7 @@ public class RestAssuredUtil {
 
             if (!method.getName().equals(methodName)
                     || values.size() < fixedArguments
-                    || (!method.isVarArgs()
-                    && values.size() != fixedArguments)) {
+                    || (!method.isVarArgs() && values.size() != fixedArguments)) {
                 continue;
             }
 
@@ -288,5 +378,19 @@ public class RestAssuredUtil {
             return Enum.valueOf((Class<? extends Enum>) type, value.asText());
         }
         return MAPPER.convertValue(value, type);
+    }
+
+    private static ObjectNode requireObject(JsonNode value, String description) {
+        if (value instanceof ObjectNode objectNode) {
+            return objectNode;
+        }
+        throw new IllegalArgumentException(description + " must be an object");
+    }
+
+    private static ObjectNode optionalObject(JsonNode value, String description) {
+        if (value == null || value.isNull() || value.isMissingNode()) {
+            return MAPPER.createObjectNode();
+        }
+        return requireObject(value, description);
     }
 }

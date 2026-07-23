@@ -11,30 +11,21 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
- * Loopback-only test server for the static site and the consumer project's
- * REST and SOAP service-call tests.
+ * Loopback-only server that serves the test site and exposes local JSON endpoints.
  */
 public final class LocalTestSite implements AutoCloseable {
 
     private static final String SITE_ROOT = "/site";
-    private static final String ITEMS_PATH = "/api/items";
-    private static final String SOAP_PATH = "/soap/calculator";
-    private static final Pattern JSON_STRING = Pattern.compile(
-            "\\\"%s\\\"\\s*:\\s*\\\"((?:\\\\.|[^\\\"])*)\\\""
-    );
-    private static final Pattern JSON_NUMBER = Pattern.compile(
-            "\\\"%s\\\"\\s*:\\s*(-?\\d+(?:\\.\\d+)?)"
-    );
+
     private static final Map<String, String> CONTENT_TYPES = Map.ofEntries(
             Map.entry(".html", "text/html; charset=UTF-8"),
             Map.entry(".css", "text/css; charset=UTF-8"),
@@ -57,18 +48,22 @@ public final class LocalTestSite implements AutoCloseable {
 
     public static LocalTestSite start(int port) {
         try {
-            InetSocketAddress address = new InetSocketAddress(
-                    InetAddress.getLoopbackAddress(),
-                    port
-            );
+            InetSocketAddress address =
+                    new InetSocketAddress(InetAddress.getLoopbackAddress(), port);
+
             HttpServer server = HttpServer.create(address, 0);
             ExecutorService executor = Executors.newFixedThreadPool(4, runnable -> {
                 Thread thread = new Thread(runnable, "pickleball-local-test-site");
                 thread.setDaemon(true);
                 return thread;
             });
+
             server.setExecutor(executor);
-            server.createContext("/", LocalTestSite::handleRequest);
+
+            // HttpServer uses the longest matching context.
+            server.createContext("/api/", LocalTestSite::handleApiRequest);
+            server.createContext("/", LocalTestSite::handleStaticRequest);
+
             server.start();
             return new LocalTestSite(server, executor);
         } catch (IOException exception) {
@@ -79,183 +74,354 @@ public final class LocalTestSite implements AutoCloseable {
         }
     }
 
-    private static void handleRequest(HttpExchange exchange) throws IOException {
+    private static void handleApiRequest(HttpExchange exchange) throws IOException {
         try (exchange) {
-            String path = Objects.requireNonNullElse(
-                    exchange.getRequestURI().getPath(),
-                    "/"
-            );
+            String method = exchange.getRequestMethod().toUpperCase(Locale.ROOT);
+            String path = Objects.requireNonNullElse(exchange.getRequestURI().getPath(), "");
 
-            if (path.equals(ITEMS_PATH) || path.startsWith(ITEMS_PATH + "/")) {
-                handleItems(exchange, path);
-                return;
-            }
-            if (SOAP_PATH.equals(path)) {
-                handleSoap(exchange);
-                return;
-            }
-            handleStaticSite(exchange);
-        }
-    }
-
-    private static void handleItems(HttpExchange exchange, String path) throws IOException {
-        String method = exchange.getRequestMethod().toUpperCase(Locale.ROOT);
-        String itemId = path.length() > ITEMS_PATH.length()
-                ? path.substring(ITEMS_PATH.length() + 1)
-                : "";
-        String traceId = firstHeader(exchange, "X-Test-Trace");
-        exchange.getResponseHeaders().set("X-Test-Trace", traceId);
-        exchange.getResponseHeaders().set(
-                "Allow",
-                "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS"
-        );
-
-        if ("OPTIONS".equals(method)) {
-            sendBytes(exchange, 204, new byte[0], "application/json; charset=UTF-8", method);
-            return;
-        }
-
-        switch (method) {
-            case "GET", "HEAD" -> {
-                if (itemId.isBlank()) {
-                    sendJson(exchange, 400, "{\"error\":\"An item id is required\"}", method);
+            if ("/api/service-calls/inspect".equals(path)) {
+                if (!allowMethods(exchange, method, "GET", "POST", "PUT", "PATCH")) {
                     return;
                 }
-                String include = queryParameters(exchange.getRequestURI()).getOrDefault(
-                        "include",
-                        "summary"
+
+                Map<String, String> query = parseQuery(exchange.getRequestURI());
+                int responseStatus = responseStatus(query.get("status"));
+                String requestBody = readRequestBody(exchange);
+                String client = Objects.requireNonNullElse(
+                        exchange.getRequestHeaders().getFirst("X-Test-Client"),
+                        ""
                 );
-                String response = "{"
-                        + "\"id\":" + json(itemId) + ","
-                        + "\"name\":" + json("Test item " + itemId) + ","
-                        + "\"include\":" + json(include) + ","
-                        + "\"method\":\"GET\","
-                        + "\"traceId\":" + json(traceId)
-                        + "}";
-                sendJson(exchange, 200, response, method);
+                String traceId = Objects.requireNonNullElse(
+                        exchange.getRequestHeaders().getFirst("X-Test-Trace"),
+                        ""
+                );
+                String cookie = Objects.requireNonNullElse(
+                        exchange.getRequestHeaders().getFirst("Cookie"),
+                        ""
+                );
+
+                String response = """
+                        {
+                          "status": %d,
+                          "method": %s,
+                          "include": %s,
+                          "mode": %s,
+                          "client": %s,
+                          "traceId": %s,
+                          "cookie": %s,
+                          "body": %s
+                        }
+                        """.formatted(
+                        responseStatus,
+                        jsonString(method),
+                        jsonString(query.getOrDefault("include", "")),
+                        jsonString(query.getOrDefault("mode", "")),
+                        jsonString(client),
+                        jsonString(traceId),
+                        jsonString(cookie),
+                        jsonBodyOrString(requestBody)
+                );
+
+                exchange.getResponseHeaders().set(
+                        "X-Service-Call-Test",
+                        "inspect"
+                );
+                sendJson(exchange, responseStatus, response, method);
+                return;
             }
-            case "POST" -> {
-                if (!itemId.isBlank()) {
-                    sendJson(exchange, 404, "{\"error\":\"POST uses /api/items\"}", method);
+
+            if (path.startsWith("/api/service-calls/no-content/")) {
+                if (!allowMethods(exchange, method, "DELETE")) {
                     return;
                 }
-                String body = readRequestBody(exchange);
-                String name = jsonString(body, "name", "Unnamed item");
-                String quantity = jsonNumber(body, "quantity", "0");
-                String response = "{"
-                        + "\"id\":\"created-100\","
-                        + "\"name\":" + json(name) + ","
-                        + "\"quantity\":" + quantity + ","
-                        + "\"method\":\"POST\","
-                        + "\"traceId\":" + json(traceId)
-                        + "}";
-                exchange.getResponseHeaders().set("Location", ITEMS_PATH + "/created-100");
-                sendJson(exchange, 201, response, method);
-            }
-            case "PUT", "PATCH" -> {
-                if (itemId.isBlank()) {
-                    sendJson(exchange, 400, "{\"error\":\"An item id is required\"}", method);
+
+                String itemId = path.substring(
+                        "/api/service-calls/no-content/".length()
+                );
+                if (itemId.isBlank() || itemId.contains("/")) {
+                    sendJson(exchange, 404, """
+                            {"error":"Item not found"}
+                            """, method);
                     return;
                 }
-                String body = readRequestBody(exchange);
-                String name = jsonString(body, "name", "Updated item");
-                String response = "{"
-                        + "\"id\":" + json(itemId) + ","
-                        + "\"name\":" + json(name) + ","
-                        + "\"method\":" + json(method) + ","
-                        + "\"traceId\":" + json(traceId)
-                        + "}";
-                sendJson(exchange, 200, response, method);
-            }
-            case "DELETE" -> {
-                if (itemId.isBlank()) {
-                    sendJson(exchange, 400, "{\"error\":\"An item id is required\"}", method);
-                    return;
-                }
+
+                exchange.getResponseHeaders().set(
+                        "X-Service-Call-Test",
+                        "no-content"
+                );
                 exchange.getResponseHeaders().set("X-Deleted-Item", itemId);
-                sendBytes(exchange, 204, new byte[0], "application/json; charset=UTF-8", method);
+                sendNoContent(exchange);
+                return;
             }
-            default -> sendJson(exchange, 405, "{\"error\":\"Method not allowed\"}", method);
+
+            if ("/api/health".equals(path)) {
+                if (!allowMethods(exchange, method, "GET", "HEAD")) {
+                    return;
+                }
+
+                sendJson(
+                        exchange,
+                        200,
+                        """
+                        {"status":"UP","service":"pickleball-local"}
+                        """,
+                        method
+                );
+                return;
+            }
+
+            if (path.startsWith("/api/users/")) {
+                if (!allowMethods(exchange, method, "GET")) {
+                    return;
+                }
+
+                String id = path.substring("/api/users/".length());
+                if (id.isBlank() || id.contains("/")) {
+                    sendJson(exchange, 404, """
+                            {"error":"User not found"}
+                            """, method);
+                    return;
+                }
+
+                Map<String, String> query = parseQuery(exchange.getRequestURI());
+                String include = query.getOrDefault("include", "");
+                String client = exchange.getRequestHeaders()
+                        .getFirst("X-Test-Client");
+
+                String response = """
+                        {
+                          "id": %s,
+                          "include": %s,
+                          "client": %s
+                        }
+                        """.formatted(
+                        jsonString(id),
+                        jsonString(include),
+                        jsonString(Objects.requireNonNullElse(client, ""))
+                );
+
+                sendJson(exchange, 200, response, method);
+                return;
+            }
+
+            if ("/api/echo".equals(path)) {
+                if (!allowMethods(exchange, method, "POST", "PUT", "PATCH")) {
+                    return;
+                }
+
+                String requestBody = readRequestBody(exchange);
+                String jsonBody = requestBody.isBlank() ? "null" : requestBody;
+
+                String response = """
+                        {
+                          "method": %s,
+                          "body": %s
+                        }
+                        """.formatted(jsonString(method), jsonBody);
+
+                sendJson(exchange, 200, response, method);
+                return;
+            }
+
+            if (path.startsWith("/api/status/")) {
+                if (!allowMethods(exchange, method, "GET")) {
+                    return;
+                }
+
+                String rawStatus = path.substring("/api/status/".length());
+                try {
+                    int status = Integer.parseInt(rawStatus);
+                    if (status < 100 || status > 599) {
+                        throw new NumberFormatException("Out of range");
+                    }
+
+                    sendJson(
+                            exchange,
+                            status,
+                            """
+                            {"status":%d}
+                            """.formatted(status),
+                            method
+                    );
+                } catch (NumberFormatException exception) {
+                    sendJson(exchange, 400, """
+                            {"error":"Invalid status code"}
+                            """, method);
+                }
+                return;
+            }
+
+            sendJson(exchange, 404, """
+                    {"error":"Endpoint not found"}
+                    """, method);
         }
     }
 
-    private static void handleSoap(HttpExchange exchange) throws IOException {
-        String method = exchange.getRequestMethod().toUpperCase(Locale.ROOT);
-        exchange.getResponseHeaders().set("Allow", "POST, OPTIONS");
-        if ("OPTIONS".equals(method)) {
-            sendBytes(exchange, 204, new byte[0], "text/xml; charset=UTF-8", method);
-            return;
-        }
-        if (!"POST".equals(method)) {
-            sendText(exchange, 405, "SOAP endpoint requires POST", method);
-            return;
-        }
+    private static void handleStaticRequest(HttpExchange exchange) throws IOException {
+        try (exchange) {
+            String method = exchange.getRequestMethod();
 
-        String request = readRequestBody(exchange);
-        String operation = firstXmlOperation(request);
-        int left = xmlInteger(request, "left");
-        int right = xmlInteger(request, "right");
-        int result = switch (operation) {
-            case "Subtract" -> left - right;
-            case "Multiply" -> left * right;
-            default -> left + right;
-        };
+            if (!"GET".equals(method) && !"HEAD".equals(method)) {
+                exchange.getResponseHeaders().set("Allow", "GET, HEAD");
+                exchange.sendResponseHeaders(405, -1);
+                return;
+            }
 
-        exchange.getResponseHeaders().set("X-SOAP-Operation", operation);
-        String response = """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-                                  xmlns:calc="urn:pickleball:calculator">
-                  <soapenv:Body>
-                    <calc:%sResponse>
-                      <calc:%sResult>%d</calc:%sResult>
-                    </calc:%sResponse>
-                  </soapenv:Body>
-                </soapenv:Envelope>
-                """.formatted(operation, operation, result, operation, operation);
-        sendBytes(
-                exchange,
-                200,
-                response.getBytes(StandardCharsets.UTF_8),
-                "text/xml; charset=UTF-8",
-                method
-        );
+            String requestPath = normalizedRequestPath(exchange.getRequestURI());
+            if (requestPath == null) {
+                sendText(exchange, 400, "Bad request", method);
+                return;
+            }
+
+            String classpathResource = SITE_ROOT + requestPath;
+            byte[] content = readResource(classpathResource);
+
+            if (content == null) {
+                sendText(exchange, 404, "Not found", method);
+                return;
+            }
+
+            exchange.getResponseHeaders().set("Content-Type", contentType(requestPath));
+            exchange.getResponseHeaders().set("Cache-Control", "no-store");
+            exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+            exchange.sendResponseHeaders(200, content.length);
+
+            if (!"HEAD".equals(method)) {
+                try (OutputStream responseBody = exchange.getResponseBody()) {
+                    responseBody.write(content);
+                }
+            }
+        }
     }
 
-    private static void handleStaticSite(HttpExchange exchange) throws IOException {
-        String method = exchange.getRequestMethod().toUpperCase(Locale.ROOT);
-        if (!"GET".equals(method) && !"HEAD".equals(method)) {
-            exchange.getResponseHeaders().set("Allow", "GET, HEAD");
-            exchange.sendResponseHeaders(405, -1);
-            return;
+    private static boolean allowMethods(
+            HttpExchange exchange,
+            String actualMethod,
+            String... allowedMethods
+    ) throws IOException {
+        boolean allowed = Arrays.stream(allowedMethods)
+                .anyMatch(actualMethod::equals);
+
+        if (allowed) {
+            return true;
         }
 
-        String requestPath = normalizedRequestPath(exchange.getRequestURI());
-        if (requestPath == null) {
-            sendText(exchange, 400, "Bad request", method);
-            return;
+        exchange.getResponseHeaders().set("Allow", String.join(", ", allowedMethods));
+        exchange.sendResponseHeaders(405, -1);
+        return false;
+    }
+
+    private static Map<String, String> parseQuery(URI uri) {
+        Map<String, String> values = new LinkedHashMap<>();
+        String rawQuery = uri.getRawQuery();
+
+        if (rawQuery == null || rawQuery.isBlank()) {
+            return values;
         }
 
-        byte[] content = readResource(SITE_ROOT + requestPath);
-        if (content == null) {
-            sendText(exchange, 404, "Not found", method);
-            return;
+        for (String pair : rawQuery.split("&")) {
+            String[] parts = pair.split("=", 2);
+            String key = decode(parts[0]);
+            String value = parts.length == 2 ? decode(parts[1]) : "";
+            values.put(key, value);
         }
 
-        sendBytes(exchange, 200, content, contentType(requestPath), method);
+        return values;
+    }
+
+    private static String decode(String value) {
+        return URLDecoder.decode(value, StandardCharsets.UTF_8);
+    }
+
+    private static int responseStatus(String rawStatus) {
+        if (rawStatus == null || rawStatus.isBlank()) {
+            return 200;
+        }
+
+        try {
+            int status = Integer.parseInt(rawStatus);
+            if (status < 100 || status > 599) {
+                throw new NumberFormatException("Out of range");
+            }
+            return status;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(
+                    "The service-call status query parameter must be between 100 and 599",
+                    exception
+            );
+        }
+    }
+
+    private static String jsonBodyOrString(String requestBody) {
+        if (requestBody == null || requestBody.isBlank()) {
+            return "null";
+        }
+
+        String trimmed = requestBody.trim();
+        boolean object = trimmed.startsWith("{") && trimmed.endsWith("}");
+        boolean array = trimmed.startsWith("[") && trimmed.endsWith("]");
+        return object || array ? trimmed : jsonString(trimmed);
+    }
+
+    private static String readRequestBody(HttpExchange exchange) throws IOException {
+        try (InputStream input = exchange.getRequestBody()) {
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    private static String jsonString(String value) {
+        String escaped = value
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("\b", "\\b")
+                .replace("\f", "\\f")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
+
+        return "\"" + escaped + "\"";
+    }
+
+    private static void sendJson(
+            HttpExchange exchange,
+            int status,
+            String json,
+            String method
+    ) throws IOException {
+        byte[] content = json.strip().getBytes(StandardCharsets.UTF_8);
+
+        exchange.getResponseHeaders()
+                .set("Content-Type", "application/json; charset=UTF-8");
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.sendResponseHeaders(status, content.length);
+
+        if (!"HEAD".equals(method)) {
+            try (OutputStream responseBody = exchange.getResponseBody()) {
+                responseBody.write(content);
+            }
+        }
+    }
+
+    private static void sendNoContent(HttpExchange exchange) throws IOException {
+        exchange.getResponseHeaders().set("Cache-Control", "no-store");
+        exchange.sendResponseHeaders(204, -1);
     }
 
     private static String normalizedRequestPath(URI requestUri) {
         String path = Objects.requireNonNullElse(requestUri.getPath(), "/");
+
         if (path.isBlank() || "/".equals(path)) {
             return "/index.html";
         }
+
         if (path.endsWith("/")) {
             path += "index.html";
         }
+
         if (!path.startsWith("/") || path.contains("..") || path.indexOf('\0') >= 0) {
             return null;
         }
+
         return path;
     }
 
@@ -265,129 +431,28 @@ public final class LocalTestSite implements AutoCloseable {
         }
     }
 
-    private static String readRequestBody(HttpExchange exchange) throws IOException {
-        try (InputStream input = exchange.getRequestBody()) {
-            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
-        }
-    }
-
-    private static void sendJson(
-            HttpExchange exchange,
-            int status,
-            String json,
-            String method
-    ) throws IOException {
-        sendBytes(
-                exchange,
-                status,
-                json.getBytes(StandardCharsets.UTF_8),
-                "application/json; charset=UTF-8",
-                method
-        );
-    }
-
     private static void sendText(
             HttpExchange exchange,
             int status,
             String text,
             String method
     ) throws IOException {
-        sendBytes(
-                exchange,
-                status,
-                text.getBytes(StandardCharsets.UTF_8),
-                "text/plain; charset=UTF-8",
-                method
-        );
-    }
+        byte[] content = text.getBytes(StandardCharsets.UTF_8);
 
-    private static void sendBytes(
-            HttpExchange exchange,
-            int status,
-            byte[] content,
-            String contentType,
-            String method
-    ) throws IOException {
-        exchange.getResponseHeaders().set("Content-Type", contentType);
-        exchange.getResponseHeaders().set("Cache-Control", "no-store");
-        exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+        exchange.getResponseHeaders()
+                .set("Content-Type", "text/plain; charset=UTF-8");
+        exchange.sendResponseHeaders(status, content.length);
 
-        boolean noBody = "HEAD".equals(method) || status == 204 || status == 304;
-        exchange.sendResponseHeaders(status, noBody ? -1 : content.length);
-        if (!noBody) {
+        if (!"HEAD".equals(method)) {
             try (OutputStream responseBody = exchange.getResponseBody()) {
                 responseBody.write(content);
             }
         }
     }
 
-    private static Map<String, String> queryParameters(URI uri) {
-        Map<String, String> result = new LinkedHashMap<>();
-        String query = uri.getRawQuery();
-        if (query == null || query.isBlank()) {
-            return result;
-        }
-        for (String pair : query.split("&")) {
-            String[] parts = pair.split("=", 2);
-            String key = URLDecoder.decode(parts[0], StandardCharsets.UTF_8);
-            String value = parts.length == 2
-                    ? URLDecoder.decode(parts[1], StandardCharsets.UTF_8)
-                    : "";
-            result.put(key, value);
-        }
-        return result;
-    }
-
-    private static String firstHeader(HttpExchange exchange, String name) {
-        return Objects.requireNonNullElse(exchange.getRequestHeaders().getFirst(name), "");
-    }
-
-    private static String jsonString(String body, String field, String defaultValue) {
-        Matcher matcher = Pattern.compile(JSON_STRING.pattern().formatted(Pattern.quote(field)))
-                .matcher(body);
-        return matcher.find() ? unescapeJson(matcher.group(1)) : defaultValue;
-    }
-
-    private static String jsonNumber(String body, String field, String defaultValue) {
-        Matcher matcher = Pattern.compile(JSON_NUMBER.pattern().formatted(Pattern.quote(field)))
-                .matcher(body);
-        return matcher.find() ? matcher.group(1) : defaultValue;
-    }
-
-    private static String firstXmlOperation(String body) {
-        Matcher matcher = Pattern.compile(
-                "<(?:[A-Za-z_][\\w.-]*:)?(Add|Subtract|Multiply)(?:\\s|>)"
-        ).matcher(body);
-        return matcher.find() ? matcher.group(1) : "Add";
-    }
-
-    private static int xmlInteger(String body, String localName) {
-        Matcher matcher = Pattern.compile(
-                "<(?:[A-Za-z_][\\w.-]*:)?" + Pattern.quote(localName)
-                        + "(?:\\s[^>]*)?>(-?\\d+)</(?:[A-Za-z_][\\w.-]*:)?"
-                        + Pattern.quote(localName) + ">"
-        ).matcher(body);
-        return matcher.find() ? Integer.parseInt(matcher.group(1)) : 0;
-    }
-
-    private static String json(String value) {
-        return "\"" + value
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                + "\"";
-    }
-
-    private static String unescapeJson(String value) {
-        return value.replace("\\\"", "\"")
-                .replace("\\n", "\n")
-                .replace("\\r", "\r")
-                .replace("\\\\", "\\");
-    }
-
     private static String contentType(String path) {
         String lowerPath = path.toLowerCase(Locale.ROOT);
+
         return CONTENT_TYPES.entrySet().stream()
                 .filter(entry -> lowerPath.endsWith(entry.getKey()))
                 .map(Map.Entry::getValue)

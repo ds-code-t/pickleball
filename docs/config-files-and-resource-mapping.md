@@ -132,11 +132,11 @@ Other examples:
 <configs.CHROME.driver.capabilities.browserName>
 <configs.URL.google>
 <configs.USER.usera>
-<configs.CALENDARS.DefaultCalendar.DateTimeFormats[*] as:LIST>
+<configs.CALENDARS.DefaultCalendar.DateTimeFormats[]>
 <configs.CHROME.driver.options.args #1>
 ```
 
-The same nested-path, wildcard, list, and one-based-position rules described in [Mapping and Templating](mapping-and-templating.md) apply after `configs`.
+The same JSONata path, collection, and Pickleball `#` selector rules described in [Mapping and Templating](mapping-and-templating.md) apply after `configs`. Ordinary top-level query names select their last collection entry by default; use parentheses or explicit square-bracket syntax when the complete collection is needed.
 
 ## Good uses for `configs`
 
@@ -227,7 +227,7 @@ Examples:
 <FILE:files/items #2.c>
 <FILE:files.items #2.c>
 <FILE:datasets/accounts.records #1.owner.name>
-<FILE:datasets/accounts.records[*].owner.name as:LIST>
+<FILE:datasets/accounts.records[].owner.name[]>
 ```
 
 ## Choosing the right source
@@ -237,7 +237,7 @@ Examples:
 | Values used by many scenarios | Put them under `src/test/resources/configs` and use `<configs...>` |
 | One known file needed only at that moment | Use a direct `/` template such as `<FILE:files/items #1.b>` |
 | Several files in one directory must be queried together | Load the directory and continue with a data path |
-| Every matching value is needed | Use `[*]` and append `as:LIST` |
+| Every matching value is needed | Use native JSONata grouping and array syntax, such as `<(items.a)[]>` |
 
 ---
 

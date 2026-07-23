@@ -18,20 +18,16 @@ import java.util.List;
 
 import static tools.dscode.common.mappings.MapConfigurations.MapType.STEP_MAP;
 
-
 public abstract class StepBase implements Cloneable {
 
     public Duration stepTimeoutSeconds; // 0 = no time limit
     public Integer stepMaxIterations;
-
     public Instant startTime;
     public int runCount = 0;
 
-
-
     public PhraseData overridePhrase;
-
     public PhraseData inheritancePhrase;
+
     public boolean dataArgumentStep = false;
     public boolean isDynamicStep;
     public boolean isStepMarker;
@@ -40,47 +36,59 @@ public abstract class StepBase implements Cloneable {
     public boolean logAndIgnore = false;
     public boolean isClone = false;
     public List<StepBase> clones = new ArrayList<>();
-
     protected boolean runMethodDirectly = false;
     public boolean debugStartStep = false;
-       //    public LineData inheritedLineData;
+
+    // public LineData inheritedLineData;
     public LineData lineData;
+
     public io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep;
     public io.cucumber.core.runner.PickleStepTestStep executingPickleStepTestStep;
     public TestCase testCase;
-    //    public Pickle pickle;
+
+    // public Pickle pickle;
     public List<StepBase> childSteps = new ArrayList<>();
     public List<StepBase> grandChildrenSteps = new ArrayList<>();
     public List<StepBase> attachedSteps = new ArrayList<>();
+
     public StepBase parentStep;
     public StepBase previousSibling;
     public StepBase nextSibling;
+
     public String overrideLoggingText = null;
+
     protected List<Argument> arguments;
     public Argument argument;
 
     protected final ParsingMap stepParsingMap = new ParsingMap();
     protected final NodeMap defaultStepNodeMap = new NodeMap(STEP_MAP);
     public NodeMap dataContextStepNodeMap;
+
     protected int nestingLevel = 0;
     public String codeLocation;
     public boolean isCoreStep;
+
     protected List<String> stepFlags = new ArrayList<>();
     protected List<DefinitionFlag> inheritableDefinitionFlags = new ArrayList<>();
     public List<DefinitionFlag> definitionFlags;
     protected List<DefinitionFlag> nextSiblingDefinitionFlags;
+
     public List<String> stepTags = new ArrayList<>();
     public List<String> bookmarks = new ArrayList<>();
+
     public Method method;
     public String methodName;
     public String stepMarkerText;
     public boolean isFlagStep = false;
-    public static final String corePackagePath = GeneralSteps.class.getPackageName() + ".";
+
+    public static final String corePackagePath =
+            GeneralSteps.class.getPackageName() + ".";
+
     public boolean hardFail = false;
     public boolean softFail = false;
     public boolean skipped = false;
-//    protected List<ConditionalStates> conditionalStates = new ArrayList<>();
 
+    // protected List<ConditionalStates> conditionalStates = new ArrayList<>();
     public DocString docString;
     public DataTable dataTable;
 
@@ -88,20 +96,38 @@ public abstract class StepBase implements Cloneable {
         return stepParsingMap;
     }
 
-//    public enum ConditionalStates {
-//        SKIP, FALSE, TRUE
-//    }
+    /**
+     * Adds one or more runtime execution flags to this step.
+     *
+     * <p>This is intentionally separate from DefinitionFlag because runtime
+     * flags such as ALWAYS RUN control scenario-state execution rather than
+     * Cucumber definition behavior.</p>
+     */
+    public void addStepFlags(String... flags) {
+        if (flags == null) {
+            return;
+        }
 
+        for (String flag : flags) {
+            if (flag != null
+                    && !flag.isBlank()
+                    && !stepFlags.contains(flag)) {
+                stepFlags.add(flag);
+            }
+        }
+    }
+
+    // public enum ConditionalStates {
+    //     SKIP, FALSE, TRUE
+    // }
 
     public abstract void setStepParsingMap(ParsingMap stepParsingMap);
 
     protected abstract DocString getDocString();
 
-
     protected abstract DataTable getDataTable();
 
-
-//    public abstract Collection<ConditionalStates> getConditionalStates();
+    // public abstract Collection<ConditionalStates> getConditionalStates();
 
     public static PhraseData getInheritancePhrase(StepBase stepBase) {
         if (stepBase == null) return null;
@@ -114,14 +140,15 @@ public abstract class StepBase implements Cloneable {
         return clone;
     }
 
-
     @Override
     public StepBase clone() {
         try {
             // 1. Shallow copy of this StepBase
             StepBase copy = (StepBase) super.clone();
+
             copy.clones = new ArrayList<>();
             copy.isClone = true;
+
             // Clone LineData shallowly (new instance)
             if (this.lineData != null) {
                 copy.lineData = this.lineData.clone();
@@ -131,17 +158,21 @@ public abstract class StepBase implements Cloneable {
             copy.childSteps = deepCloneSteps(this.childSteps);
             copy.grandChildrenSteps = deepCloneSteps(this.grandChildrenSteps);
             copy.attachedSteps = deepCloneSteps(this.attachedSteps);
-            // 3. Shallow-copy non-StepBase lists (new list, same elements)
-            copy.inheritableDefinitionFlags = shallowCopyList(this.inheritableDefinitionFlags);
-            copy.definitionFlags = shallowCopyList(this.definitionFlags);
-            copy.nextSiblingDefinitionFlags = shallowCopyList(this.nextSiblingDefinitionFlags);
 
+            // 3. Shallow-copy non-StepBase lists (new list, same elements)
+            copy.inheritableDefinitionFlags = shallowCopyList(
+                    this.inheritableDefinitionFlags
+            );
+            copy.definitionFlags = shallowCopyList(this.definitionFlags);
+            copy.nextSiblingDefinitionFlags = shallowCopyList(
+                    this.nextSiblingDefinitionFlags
+            );
             copy.stepTags = shallowCopyList(this.stepTags);
             copy.bookmarks = shallowCopyList(this.bookmarks);
             copy.arguments = shallowCopyList(this.arguments);
             copy.stepFlags = shallowCopyList(this.stepFlags);
-//            copy.conditionalStates = shallowCopyList(this.conditionalStates);
 
+            // copy.conditionalStates = shallowCopyList(this.conditionalStates);
             if (nextSibling != null) {
                 copy.nextSibling = nextSibling.clone();
                 copy.nextSibling.previousSibling = copy;
@@ -157,6 +188,7 @@ public abstract class StepBase implements Cloneable {
         if (source == null) {
             return null;
         }
+
         List<StepBase> result = new ArrayList<>(source.size());
         for (StepBase step : source) {
             result.add(step != null ? step.clone() : null);
@@ -165,8 +197,6 @@ public abstract class StepBase implements Cloneable {
     }
 
     private static <T> List<T> shallowCopyList(List<T> source) {
-        return (source == null) ? null : new ArrayList<>(source);
+        return source == null ? null : new ArrayList<>(source);
     }
-
-
 }

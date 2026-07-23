@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.ScenarioStep.createScenarioStep;
@@ -27,7 +28,6 @@ public class ModularScenarios extends CoreSteps {
     static final String TAGS = "Tags";
     static final String CUCUMBER_FEATURES = "cucumber.features";
 
-    // @DefinitionFlags(NO_LOGGING)
     @Given("^RUN SCENARIOS?:?(.*)?$")
     public static void runScenarios(String inlineTags, DataTable dataTable) {
         populateRunScenariosStep(getRunningStep(), inlineTags, dataTable);
@@ -49,12 +49,40 @@ public class ModularScenarios extends CoreSteps {
             String singleMatchType,
             BiConsumer<ScenarioStep, Map<String, String>> scenarioInitializer
     ) {
+        populateRunScenariosStep(
+                topStep,
+                inlineTags,
+                dataTable,
+                featuresPath,
+                singleMatchType,
+                scenarioInitializer,
+                null
+        );
+    }
+
+    /**
+     * Creates component ScenarioSteps and optionally inserts one synthetic step
+     * immediately after each component scenario.
+     *
+     * <p>The synthetic step is a sibling, not a descendant. This lets it run
+     * after a component scenario has completed or used END SCENARIO.</p>
+     */
+    public static void populateRunScenariosStep(
+            StepExtension topStep,
+            String inlineTags,
+            DataTable dataTable,
+            String featuresPath,
+            String singleMatchType,
+            BiConsumer<ScenarioStep, Map<String, String>> scenarioInitializer,
+            BiFunction<ScenarioStep, Map<String, String>, StepExtension> scenarioFinalizerFactory
+    ) {
         filterAndParsePickles(
                 topStep,
                 buildRunScenarioMaps(inlineTags, dataTable),
                 featuresPath,
                 singleMatchType,
-                scenarioInitializer
+                scenarioInitializer,
+                scenarioFinalizerFactory
         );
     }
 
@@ -93,7 +121,7 @@ public class ModularScenarios extends CoreSteps {
             List<Map<String, String>> maps,
             String... messageString
     ) {
-        filterAndParsePickles(topStep, maps, null, null, null);
+        filterAndParsePickles(topStep, maps, null, null, null, null);
     }
 
     static void filterAndParsePickles(
@@ -101,9 +129,10 @@ public class ModularScenarios extends CoreSteps {
             List<Map<String, String>> maps,
             String featuresPath,
             String singleMatchType,
-            BiConsumer<ScenarioStep, Map<String, String>> scenarioInitializer
+            BiConsumer<ScenarioStep, Map<String, String>> scenarioInitializer,
+            BiFunction<ScenarioStep, Map<String, String>, StepExtension> scenarioFinalizerFactory
     ) {
-        StepExtension lastScenarioNameStep = null;
+        StepExtension lastLinkedStep = null;
 
         for (Map<String, String> map : maps) {
             String runTags = map.getOrDefault(RUN_TAGS, map.getOrDefault(TAGS, "")).trim();
@@ -154,21 +183,41 @@ public class ModularScenarios extends CoreSteps {
                     scenarioStepParsingMap.addMaps(examples);
                 }
 
-                ScenarioStep currentScenarioNameStep =
-                        createScenarioStep(gherkinMessagesPickle, scenarioStepParsingMap);
+                ScenarioStep scenarioStep = createScenarioStep(
+                        gherkinMessagesPickle,
+                        scenarioStepParsingMap
+                );
 
                 if (scenarioInitializer != null) {
-                    scenarioInitializer.accept(currentScenarioNameStep, map);
+                    scenarioInitializer.accept(scenarioStep, map);
                 }
 
-                topStep.childSteps.add(currentScenarioNameStep);
+                lastLinkedStep = appendChild(topStep, lastLinkedStep, scenarioStep);
 
-                if (lastScenarioNameStep != null) {
-                    lastScenarioNameStep.nextSibling = currentScenarioNameStep;
-                    currentScenarioNameStep.previousSibling = lastScenarioNameStep;
+                if (scenarioFinalizerFactory != null) {
+                    StepExtension finalizer = scenarioFinalizerFactory.apply(scenarioStep, map);
+                    if (finalizer != null) {
+                        lastLinkedStep = appendChild(topStep, lastLinkedStep, finalizer);
+                    }
                 }
-                lastScenarioNameStep = currentScenarioNameStep;
             }
         }
+    }
+
+    private static StepExtension appendChild(
+            StepExtension parent,
+            StepExtension previous,
+            StepExtension child
+    ) {
+        child.parentStep = parent;
+        child.previousSibling = previous;
+        child.nextSibling = null;
+        parent.childSteps.add(child);
+
+        if (previous != null) {
+            previous.nextSibling = child;
+        }
+
+        return child;
     }
 }

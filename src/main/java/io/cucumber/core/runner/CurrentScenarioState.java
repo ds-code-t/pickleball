@@ -78,7 +78,8 @@ public class CurrentScenarioState extends ScenarioMapping {
     public List<Throwable> stepFailures = new ArrayList<>();
 
     private final List<Object> cleanupRegistry = new ArrayList<>();
-    private final Set<Object> cleanupRegistrySeen = Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Set<Object> cleanupRegistrySeen =
+            Collections.newSetFromMap(new IdentityHashMap<>());
 
     /**
      * Records a scenario object so that any {@code cleanup} steps declared in its
@@ -371,14 +372,15 @@ public class CurrentScenarioState extends ScenarioMapping {
                     && !ObjectRegistrationSteps.hasCleanupConfigured(candidate)) {
                 try {
                     driver.quit();
-                    CleanupTrace.print("[scenarioRunCleanUp] Backup quit for undeclared WebDriver: "
-                            + candidate.getClass().getName());
+                    CleanupTrace.print(
+                            "[scenarioRunCleanUp] Backup quit for undeclared WebDriver: "
+                                    + candidate.getClass().getName()
+                    );
                 } catch (Exception ignored) {
                 }
             }
         }
     }
-
 
     /**
      * Runs the {@code cleanup} steps declared in each registered scenario object's
@@ -388,7 +390,9 @@ public class CurrentScenarioState extends ScenarioMapping {
      */
     private void runConfiguredObjectCleanups() {
         if (debugBrowser) {
-            CleanupTrace.print("[scenarioRunCleanUp] Skipping configured cleanups (debugBrowser=true)");
+            CleanupTrace.print(
+                    "[scenarioRunCleanUp] Skipping configured cleanups (debugBrowser=true)"
+            );
             return;
         }
 
@@ -405,7 +409,8 @@ public class CurrentScenarioState extends ScenarioMapping {
                 CleanupTrace.printThrowable(
                         "[scenarioRunCleanUp] Cleanup failed for object of type "
                                 + (candidate == null ? "null" : candidate.getClass().getName()),
-                        t);
+                        t
+                );
             }
         }
     }
@@ -423,7 +428,6 @@ public class CurrentScenarioState extends ScenarioMapping {
         return primary;
     }
 
-
     public void runStep(StepExtension stepExtension) {
         if (runAndEndStep != null) {
             runAndEndStep.stepFlags.add(ALWAYS_RUN);
@@ -434,11 +438,9 @@ public class CurrentScenarioState extends ScenarioMapping {
         if (endCurrentScenario)
             return;
         currentStep = stepExtension;
-
         if (currentStep.startTime == null)
             currentStep.startTime = Instant.now();
         currentStep.runCount++;
-
         int lineConditionalMode = stepExtension.lineData == null ? 1 : stepExtension.lineData.lineConditionalMode;
         stepExtension.lineData = createParsedLine(stepExtension);
         stepExtension.lineData.lineConditionalMode = lineConditionalMode;
@@ -459,9 +461,7 @@ public class CurrentScenarioState extends ScenarioMapping {
 
         if (!shouldRun(stepExtension)) {
             stepExtension.skipped = true;
-            if (stepExtension.nextSibling != null) {
-                runStep((StepExtension) stepExtension.nextSibling);
-            }
+            runNextSibling(stepExtension);
             logSkip("Skipping Step: " + stepExtension.pickleStepTestStep.getStepText());
             return;
         }
@@ -539,9 +539,7 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
 
         if (stepExtension.lineData.lineConditionalMode < 1 && stepExtension.definitionFlags.contains(IGNORE_CHILDREN_IF_FALSE)) {
-            if (stepExtension.nextSibling != null) {
-                runStep((StepExtension) stepExtension.nextSibling);
-            }
+            runNextSibling(stepExtension);
             return;
         }
 
@@ -557,23 +555,33 @@ public class CurrentScenarioState extends ScenarioMapping {
                     int cloneRunCount = 0;
                     Instant cloneStartTime = null;
                     while (true) {
-                        StepExtension clonedStep = stepCloner(inheritancePhrase, stepExtension, IGNORE_CHILDREN_IF_FALSE).getFirst();
+                        StepExtension clonedStep = stepCloner(
+                                inheritancePhrase,
+                                stepExtension,
+                                IGNORE_CHILDREN_IF_FALSE
+                        ).getFirst();
                         clonedStep.runCount = cloneRunCount;
                         clonedStep.startTime = cloneStartTime;
-                        clonedStep.overridePhrase = inheritancePhrase.clonePhrase(inheritancePhrase.getPreviousPhrase());
-                        copyAssertionChainToNewPhrase(inheritancePhrase, clonedStep.overridePhrase);
+                        clonedStep.overridePhrase = inheritancePhrase.clonePhrase(
+                                inheritancePhrase.getPreviousPhrase()
+                        );
+                        copyAssertionChainToNewPhrase(
+                                inheritancePhrase,
+                                clonedStep.overridePhrase
+                        );
                         clonedStep.nextSibling = null;
-                        clonedStep.pickleStepTestStep.substituteStep = clonedStep.createNewStepExtension(", ---" + clonedStep.overridePhrase.assertionChain).pickleStepTestStep;
+                        clonedStep.pickleStepTestStep.substituteStep = clonedStep
+                                .createNewStepExtension(
+                                        ", ---" + clonedStep.overridePhrase.assertionChain
+                                )
+                                .pickleStepTestStep;
                         waitMilliseconds(400);
-
                         if (clonedStep.checkGlobalMax()) {
                             isScenarioHardFail = true;
                             isScenarioComplete = true;
                             return;
                         }
-
                         runStep(clonedStep);
-
                         cloneStartTime = clonedStep.startTime;
                         cloneRunCount = clonedStep.runCount;
                         if (clonedStep.overridePhrase.phraseConditionalMode > 0)
@@ -593,8 +601,21 @@ public class CurrentScenarioState extends ScenarioMapping {
         }
 
 
-        if (stepExtension.nextSibling != null) {
-            runStep((StepExtension) stepExtension.nextSibling);
+        runNextSibling(stepExtension);
+    }
+
+    /**
+     * A component ScenarioStep owns the END SCENARIO boundary. Clear that
+     * boundary before entering its sibling so synthetic finalizers and later
+     * component scenarios can execute normally.
+     */
+    private void runNextSibling(StepExtension completedStep) {
+        if (completedStep instanceof ScenarioStep) {
+            endCurrentScenario = false;
+        }
+
+        if (completedStep.nextSibling != null) {
+            runStep((StepExtension) completedStep.nextSibling);
         }
     }
 

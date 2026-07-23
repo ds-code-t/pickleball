@@ -141,7 +141,15 @@ public class MappingSteps extends CoreSteps {
             case null, default -> getRunMap();
         };
         final String keyPrefix = prefix == null || prefix.isBlank() ? "" : prefix;
-        dataTable.asLists().forEach(row -> nodeMap.put(keyPrefix + row.getFirst(), row.get(1)));
+        dataTable.asLists().forEach(row -> {
+            String key = row.getFirst();
+            if(key == null || key.isBlank())
+                key = "";
+            else
+                key =  "." + key.trim();
+
+            nodeMap.put(keyPrefix +key, row.get(1));
+        });
     }
 
     static void mapValues(NodeMap destination, List<List<String>> rows) {
