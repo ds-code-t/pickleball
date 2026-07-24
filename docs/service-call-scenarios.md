@@ -1,12 +1,16 @@
-# Service-call scenarios
+# Service-call Scenarios
 
-Service-call scenarios are reusable scenarios stored below:
+> **Working feature examples:** [`service-call-execution.feature`](../maven-consumer-project/src/test/resources/features/service-call-execution.feature) invokes the calls; [`service-call-definitions.feature`](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature) defines the reusable REST and SOAP call scenarios.
+
+Pickleball can define reusable REST and SOAP calls as feature scenarios and invoke them from ordinary test features.
+
+The working consumer stores its call definitions under:
 
 ```text
-maven-consumer-project/src/test/resources/calls
+maven-consumer-project/src/test/resources/calls/
 ```
 
-A normal feature invokes one call by tag:
+## Invoke a reusable call
 
 ```gherkin
 When SERVICE CALL: %rest-get-item
@@ -14,38 +18,51 @@ When SERVICE CALL: %rest-get-item
   | readItemCall | 73     | inventory | get-feature-test | getResult   |
 ```
 
-See:
+The first token identifies the reusable scenario. The table supplies call-specific values and the map key that will receive the response.
 
-- [Service-call definitions](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature)
-- [Features that invoke and verify the calls](../maven-consumer-project/src/test/resources/features/service-call-execution.feature)
-- [Local REST and SOAP endpoints](../maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java)
+A `Run Tags` column is also supported:
+
+```gherkin
+When SERVICE CALL
+  | Run Tags | name        | left | right | responseKey |
+  | %soap-add | soapAddCall | 11   | 6     | soapResult |
+```
+
+## Define a call
+
+```gherkin
+Scenario Outline: Read an item through REST
+  Given ENDPOINT:<endpoint>/api/items/<itemId>?include=<include>
+  And METHOD:<method>
+  And HEADERS
+    | Accept   | X-Test-Trace |
+    | <accept> | <traceId>    |
+  When EXECUTE SERVICE CALL
+  And MAP SERVICE RESPONSE
+    | .response | <responseKey> |
+
+Examples:
+  | Scenario Tags  | ?endpoint              | ?method | ?accept          | ?responseKey |
+  | %rest-get-item | http://127.0.0.1:8765 | GET     | application/json | getResponse  |
+```
+
+See the complete [service-call-definitions.feature](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature).
 
 ## Request steps
 
 ### Endpoint
 
-Use one complete endpoint value, including scheme, host, and port:
+Use a complete endpoint value containing the scheme, host, port, and path:
 
 ```gherkin
-Given ENDPOINT:<endpoint>/api/items/<itemId>?include=<include>
+Given ENDPOINT:<endpoint>/api/items/<itemId>
 ```
-
-The example default can contain the test-site address:
-
-```gherkin
-| ?endpoint             |
-| http://127.0.0.1:8765 |
-```
-
-REST Assured can configure `baseUri` and `port` separately, but that is not required. Passing a complete URI to `request(method, endpoint)` is simpler and avoids REST Assured's `http://localhost:8080` defaults when no base configuration is present.
 
 ### Method
 
 ```gherkin
 And METHOD:<method>
 ```
-
-The method is passed to REST Assured's generic `request(method, endpoint)` API.
 
 ### Headers
 
@@ -59,79 +76,55 @@ And HEADERS
 
 ```gherkin
 And BODY:json
-  """
-  {
-    "name": "<itemName>"
-  }
-  """
+"""
+{
+  "name": "<itemName>",
+  "quantity": <quantity>
+}
+"""
 ```
 
-For XML bodies, use `~[~` and `~]~` for literal angle brackets:
+For XML, use `BODY:xml`. In feature content that must preserve literal angle brackets through Pickleball templating, the working example uses `~[~` and `~]~` escape forms.
 
-```gherkin
-And BODY:xml
-  """
-  ~[~calc:Add~]~
-    ~[~calc:left~]~<left>~[~/calc:left~]~
-  ~[~/calc:Add~]~
-  """
-```
+### Optional request configuration
 
-### Other REST Assured settings
-
-`REQUEST CONFIGURATION` remains available for optional request-specification settings that are not represented by endpoint, method, headers, or body:
+`REQUEST CONFIGURATION` can set other REST Assured request-specification values:
 
 ```gherkin
 Given REQUEST CONFIGURATION
-  | relaxedHTTPSValidation |     |
+  | relaxedHTTPSValidation |       |
   | urlEncodingEnabled     | false |
 ```
 
-It is not needed merely to set the test-site host and port.
+It is not required merely to set a complete endpoint.
 
-## Execution and response
+## Execute and map the response
 
 ```gherkin
 When EXECUTE SERVICE CALL
-```
-
-The request and response are stored together below the service-call name:
-
-```text
-<Service call name>.request.endpoint
-<Service call name>.request.method
-<Service call name>.request.headers
-<Service call name>.request.body
-
-<Service call name>.response.method
-<Service call name>.response.statusCode
-<Service call name>.response.headers
-<Service call name>.response.body
-```
-
-The caller's nonblank `name` value is used as the service-call name. Otherwise, the called scenario name is used.
-
-`MAP SERVICE RESPONSE` copies values from the service-call scenario's default `NodeMap` into the running map:
-
-```gherkin
 And MAP SERVICE RESPONSE
-  | <SERVICE CALL NAME>.response | <responseKey> |
+  | .response | <responseKey> |
 ```
 
-## Request and response logging
-
-`EXECUTE SERVICE CALL` writes REST Assured request and response logging through Pickleball's `logInfo(...)` output.
-
-The execution step now reads the complete request with:
-
-```java
-nodeMap.get(callName + ".request")
-```
-
-If the endpoint is absent, it records an immediate error instead of allowing REST Assured to send a request to its default `http://localhost:8080/` URI.
-
-For the consumer test site, the request log should begin with a URI such as:
+The request and response are retained under the call name. Typical mapped paths include:
 
 ```text
-Request URI: http://127.0.0.1:8765/api/items/73?include=inventory
+<getResult.statusCode>
+<getResult.body.method>
+<getResult.body.itemId>
+<getResult.headers.Content-Type>
 ```
+
+The consumer verifies REST `GET`, `POST`, `PATCH`, and `DELETE` calls and a SOAP call in [service-call-execution.feature](../maven-consumer-project/src/test/resources/features/service-call-execution.feature).
+
+## Local endpoints in the consumer
+
+The consumer's [LocalTestSite.java](../maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java) starts a loopback-only server before the Cucumber run. It serves:
+
+- the HTML browser test site;
+- REST test endpoints below `/api/`; and
+- a SOAP calculator endpoint at `/soap/calculator`.
+
+This lets the same working project test Selenium DOM behavior and service calls without depending on an external environment.
+
+[Previous: Component Scenarios](component-scenarios.md) · [Documentation home](README.md) · [Next: Date and Time Utilities](date-time-utilities.md)

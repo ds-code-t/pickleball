@@ -1,62 +1,41 @@
 # Getting Started
 
-Adding Pickleball to an existing Java test project requires only two framework additions:
+> **Working feature example:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) — a small browser feature you can run after completing the setup on this page.
 
-1. Add the Pickleball test dependency.
-2. Add one Pickleball test runner.
+A consumer project normally needs only two Pickleball-specific additions:
 
-After that, most test work happens in `.feature` files.
+1. the Pickleball test dependency; and
+2. one test runner that extends `PickleballRunner`.
+
+Most test behavior can then be written in `.feature` files.
 
 ## Requirements
 
 - Java 21
-- Maven or Gradle
-- Feature files under `src/test/resources/features`, unless a different location is configured
+- Maven 3.9 or newer, or an equivalent Gradle setup
+- a Selenium-supported browser for browser scenarios
 
-## 1. Add the dependency
+## Maven dependency
 
-### Maven
-
-Add this dependency to `pom.xml`:
+The working consumer centralizes the version in a Maven property:
 
 ```xml
-<dependencies>
-    <dependency>
-        <groupId>tools.dscode</groupId>
-        <artifactId>pickleball</artifactId>
-        <version>2.1.0</version>
-        <scope>test</scope>
-    </dependency>
-</dependencies>
+<properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <pickleball.version>2.1.1</pickleball.version>
+</properties>
+
+<dependency>
+    <groupId>tools.dscode</groupId>
+    <artifactId>pickleball</artifactId>
+    <version>${pickleball.version}</version>
+    <scope>test</scope>
+</dependency>
 ```
 
-### Gradle — Groovy DSL
+Use the version selected by your project. See the complete [consumer `pom.xml`](../maven-consumer-project/pom.xml).
 
-Add this to `build.gradle`:
-
-```groovy
-dependencies {
-    testImplementation 'tools.dscode:pickleball:2.1.0'
-}
-```
-
-### Gradle — Kotlin DSL
-
-Add this to `build.gradle.kts`:
-
-```kotlin
-dependencies {
-    testImplementation("tools.dscode:pickleball:2.1.0")
-}
-```
-
-## 2. Add the test runner
-
-Create a test class such as:
-
-```text
-src/test/java/com/example/tests/PickleballTests.java
-```
+## Test runner
 
 ```java
 package com.example.tests;
@@ -64,71 +43,80 @@ package com.example.tests;
 import tools.dscode.testengine.PKB_props;
 import tools.dscode.testengine.PickleballRunner;
 
-public class PickleballTests extends PickleballRunner {
-
+public final class PickleballTests extends PickleballRunner {
     @Override
     public void globalTestDefaults() {
-        PKB_props.glue("com.example.tests.steps");
+        PKB_props.glue("com.example.tests");
         PKB_props.features("classpath:features");
         PKB_props.plugins("pretty");
+        PKB_props.browser("chrome");
     }
 }
 ```
 
-Use a name ending in `Tests` so normal Maven and Gradle test discovery can find the runner.
+Use a class name ending in `Tests` so normal Maven Surefire discovery can find it.
 
-That completes the required Pickleball setup.
+The working [PickleballTests.java](../maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java) also:
 
-## Suggested project layout
+- selects `@all` as its default tag expression;
+- registers project-specific element categories;
+- starts the local test server before Cucumber runs; and
+- stops the server after the run.
+
+The server setup is an example-project lifecycle hook, not a requirement for every Pickleball consumer. A real application suite can test an already-running application instead.
+
+## Suggested layout
 
 ```text
 your-project/
 ├── pom.xml
-│   or build.gradle
-└── src/
-    └── test/
-        ├── java/
-        │   └── com/example/tests/
-        │       ├── PickleballTests.java
-        │       └── steps/
-        │           └── ProjectSteps.java
-        └── resources/
-            ├── features/
-            │   └── example.feature
-            ├── configs/
-            └── pickleball_local.properties
+└── src/test/
+    ├── java/
+    │   └── com/example/tests/
+    │       ├── PickleballTests.java
+    │       └── ProjectSteps.java        # optional custom Cucumber steps
+    └── resources/
+        ├── features/
+        │   └── example.feature
+        ├── calls/                       # optional reusable service calls
+        ├── configs/                     # optional shared data
+        └── pickleball_local.properties  # optional local overrides
 ```
 
-The `configs` directory and local properties file are optional.
-
-## Run the scenarios
-
-### Maven
+## Run
 
 ```bash
 mvn test
 ```
 
-### Gradle
+The consumer also provides Maven profiles such as:
 
 ```bash
-./gradlew test
+mvn test -Psmoke
+mvn test -Pbrowser
+mvn test -Pdata
+mvn test -Pworkflow
 ```
 
-On Windows:
+Any Cucumber tag expression can be passed directly:
 
-```powershell
-gradlew.bat test
+```bash
+mvn test "-Dpkb_tags=@forms and not @dialogs"
 ```
 
-Scenarios may also be run from IntelliJ using the Cucumber plugin or the test runner.
+## First feature
 
-## Continue with feature files
+```gherkin
+Feature: Customer form
 
-- [Dynamic steps](dynamic-steps.md)
-- [Mapping and templating](mapping-and-templating.md)
-- [Local execution settings](configuration.md#local-overrides)
+  Scenario: Submit a customer
+    * navigate to: URL.forms
+    * , enter "Ava" in the "First Name" Textbox
+    * , select "Premium" in the "Account Type" Dropdown
+    * , click the "Submit Form" Button
+    * , ensure "Submitted: Ava" Text is displayed
+```
 
----
+See the working [browser feature files](../maven-consumer-project/src/test/resources/features) and continue with [Dynamic Steps](dynamic-steps.md).
 
-[Documentation home](README.md) · [Next: Dynamic steps](dynamic-steps.md)
+[Documentation home](README.md)

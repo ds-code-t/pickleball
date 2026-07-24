@@ -1,244 +1,125 @@
-# Shared Configuration Files and Resource Data
+# Configuration Files and Resource Mapping
 
-Feature files often need shared URLs, browser choices, calendars, regular expressions, users, or test data. Pickleball can turn files under `src/test/resources` into nested values that can be read with ordinary templates.
+> **Working feature example:** [`mapping-and-resources.feature`](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature) resolves values from the consumer project's YAML, JSON, CSV, text, and on-demand resource files.
 
-There are two ways to use resource data:
+Pickleball can expose files under `src/test/resources` as nested scenario data.
 
-1. Put commonly used data in `configs`, where it is available to every scenario.
-2. Load another file or directory only when a template beginning with `/` requests it.
+Use two approaches:
 
-## The shared `configs` directory
+1. place commonly used data under `configs`, where it is loaded for every scenario; or
+2. load a file or directory on demand with a template beginning with `/`.
 
-Place shared files under:
-
-```text
-src/test/resources/configs
-```
-
-At the start of a run, directory names and file names become property names in one nested `configs` structure:
-
-- directory names become nested groups;
-- file names become property names without the file extension;
-- the content of each supported file becomes objects, lists, numbers, Booleans, text, or null values; and
-- unsupported file types are ignored.
-
-Every scenario can use the resulting values without first running a loading step.
-
-## Supported file types
-
-| File type | How it is represented |
-|---|---|
-| `.yaml`, `.yml` | Nested properties, lists, and simple values |
-| `.json` | Nested properties, lists, and simple values |
-| `.xml` | A nested data structure based on the XML content |
-| `.csv` | A list of rows, with column headings used as property names |
-| `.txt` | One text value |
-
-## Example directory structure
+## Shared `configs` directory
 
 ```text
 src/test/resources/configs/
-├── CALENDARS.yaml
-├── CHROME.yaml
-├── REGEX.yaml
-├── REMOTE_CHROME.yaml
-├── URL.yaml
-├── USER.yaml
-├── jsonfiles/
-│   └── test.json
-└── otherfiles/
-    ├── test.feature
-    ├── testCSV.csv
-    └── textTest.txt
 ```
 
-The corresponding template paths include:
+Directory names become nested groups. File names become property names without their extensions.
 
-| Resource | Template path begins with |
+Supported resource types include:
+
+| Type | Result |
 |---|---|
-| `CALENDARS.yaml` | `configs.CALENDARS` |
-| `CHROME.yaml` | `configs.CHROME` |
-| `jsonfiles/test.json` | `configs.jsonfiles.test` |
-| `otherfiles/testCSV.csv` | `configs.otherfiles.testCSV` |
-| `otherfiles/textTest.txt` | `configs.otherfiles.textTest` |
-| `otherfiles/test.feature` | Not loaded |
+| YAML / YML | nested objects, arrays, and scalar values |
+| JSON | nested objects, arrays, and scalar values |
+| XML | nested data based on XML content |
+| CSV | an array of row objects using the header names |
+| TXT | one text value |
 
-If `jsonfiles/test.json` contains:
+Unsupported file types are ignored.
 
-```json
-{
-  "prop1": "value1",
-  "prop2": {
-    "prop3": "2"
-  },
-  "prop4": 5
-}
-```
-
-and `otherfiles/testCSV.csv` contains:
-
-```csv
-a,b,c
-1,2,3
-4,5,6
-```
-
-then feature files can read values through paths such as:
+The consumer project contains real examples:
 
 ```text
-<configs.jsonfiles.test.prop1>
-<configs.jsonfiles.test.prop2.prop3>
-<configs.otherfiles.testCSV #1.b>
-<configs.otherfiles.textTest>
+configs/
+├── CALENDARS.yaml
+├── CHROME.yaml
+├── CHROME_HEADLESS.yaml
+├── EDGE.yaml
+├── GRID_CHROME.yaml
+├── GRID_EDGE.yaml
+├── REGEX.yaml
+├── REMOTE_CHROME.yaml
+├── REMOTE_EDGE.yaml
+├── SAUCE_CHROME.yaml
+├── SAUCE_EDGE.yaml
+├── TEST_DATA.yaml
+├── URL.yaml
+├── jsonfiles/
+└── otherfiles/
 ```
 
 ## Reading shared values
 
-If `CALENDARS.yaml` contains:
+Given [`TEST_DATA.yaml`](../maven-consumer-project/src/test/resources/configs/TEST_DATA.yaml):
 
 ```yaml
-DefaultCalendar:
-  TimeZone: America/New_York
-  DefaultOutputPattern: yyyy-MM-dd HH:mm:ss VV
-  DateTimeFormats:
-    - M/d/yyyy
-    - uuuu-M-d
-    - uuuu-M-d H:m:s
-    - uuuu-MM-dd HH:mm:ss VV
+siteName: Pickleball Test Lab
+users:
+  - name: Ava
+    city: Phoenix
+    accountType: Premium
 ```
 
-then:
-
-```text
-<configs.CALENDARS.DefaultCalendar.TimeZone>
-```
-
-resolves to:
-
-```text
-America/New_York
-```
-
-It can be used directly in a feature:
+Feature files can use:
 
 ```gherkin
-* print "Configured time zone: <configs.CALENDARS.DefaultCalendar.TimeZone>"
+* , ensure "<configs.TEST_DATA.siteName>" equals "Pickleball Test Lab"
+* , ensure "<configs.TEST_DATA.users #1.name>" equals "Ava"
 ```
 
-Other examples:
+URLs can be placed in [`URL.yaml`](../maven-consumer-project/src/test/resources/configs/URL.yaml):
+
+```gherkin
+* navigate to: URL.forms
+```
+
+The URL shorthand and normal `<configs...>` templates are both available where their corresponding steps support them.
+
+## Loading one file on demand
+
+A template beginning with `/` loads a resource relative to `src/test/resources`:
 
 ```text
-<configs.CHROME.browser>
-<configs.CHROME.driver.capabilities.browserName>
-<configs.URL.google>
-<configs.USER.usera>
-<configs.CALENDARS.DefaultCalendar.DateTimeFormats[]>
-<configs.CHROME.driver.options.args #1>
+</files/customers #1.name>
+</files/customers #2.city>
 ```
 
-The same JSONata path, collection, and Pickleball `#` selector rules described in [Mapping and Templating](mapping-and-templating.md) apply after `configs`. Ordinary top-level query names select their last collection entry by default; use parentheses or explicit square-bracket syntax when the complete collection is needed.
+File extensions may be omitted.
 
-## Good uses for `configs`
+Given [`files/customers.yaml`](../maven-consumer-project/src/test/resources/files/customers.yaml), the first expression returns `Ava` and the second returns `Tempe`.
 
-Use the shared directory for values that many scenarios need:
+## Loading a directory
 
-- local and remote browser configurations;
+A `/` template can load a directory and continue with a nested query. Prefer loading a known file when possible because it avoids reading unrelated resources.
+
+```text
+</configs/jsonfiles.accounts #1.id>
+```
+
+Forward slashes identify physical resource paths. Dots, indexes, `#` positions, and wildcards query the loaded data.
+
+## Recommended use
+
+Use `configs` for data shared broadly across the suite:
+
 - application and service URLs;
-- date formats, time zones, and business calendars;
-- regular-expression patterns;
-- reusable users or test identities that do not contain secrets;
-- named environment settings; and
-- common constants used by feature files.
+- browser definitions;
+- environments and feature flags;
+- calendars and time zones;
+- regular expressions;
+- reusable non-secret test identities; and
+- common expected values.
 
-Do not commit passwords, access tokens, private keys, or other secrets. Supply sensitive values through local or CI secret settings.
+Use on-demand files for larger or specialized data needed by only a few scenarios.
 
-## Loading another resource with a `/` template
+Do not commit passwords, access tokens, private keys, or other secrets. Supply sensitive values through local or CI configuration.
 
-A template key beginning with `/` loads a file or directory relative to:
+## Working examples
 
-```text
-src/test/resources
-```
-
-Assume this file exists:
-
-```text
-src/test/resources/files/items.yaml
-```
-
-```yaml
-- a: 111
-  b: 112
-  c: 113
-- a: 221
-  b: 222
-  c: 223
-```
-
-This template loads the file, selects the first item, and reads `b`:
-
-```text
-</files/items #1.b>
-```
-
-The result is:
-
-```text
-112
-```
-
-The file extension may be omitted.
-
-## Loading a directory and then querying it
-
-This alternative also resolves to `112`:
-
-```text
-<FILE:files.items #1.b>
-```
-
-Here `files` identifies the resource directory. The remaining `.items #1.b` selects `items.yaml`, then its first row, then the `b` value.
-
-Both forms are valid:
-
-```text
-<FILE:files/items #1.b>
-<FILE:files.items #1.b>
-```
-
-Prefer the direct file path when the target file is known. It avoids loading an entire directory. Load a directory when one query needs to work across several files beneath it.
-
-## Physical paths and data paths
-
-Read a `/` template in two parts:
-
-```text
-/<resource path><data query>
-```
-
-- The `FILE:` means “start under `src/test/resources`.”
-- Forward slashes identify physical directories and files.
-- File extensions may be omitted.
-- After the chosen file or directory is loaded, periods, positions, and wildcards navigate its contents.
-
-Examples:
-
-```text
-<FILE:files/items #2.c>
-<FILE:files.items #2.c>
-<FILE:datasets/accounts.records #1.owner.name>
-<FILE:datasets/accounts.records[].owner.name[]>
-```
-
-## Choosing the right source
-
-| Need | Recommended approach |
-|---|---|
-| Values used by many scenarios | Put them under `src/test/resources/configs` and use `<configs...>` |
-| One known file needed only at that moment | Use a direct `/` template such as `<FILE:files/items #1.b>` |
-| Several files in one directory must be queried together | Load the directory and continue with a data path |
-| Every matching value is needed | Use native JSONata grouping and array syntax, such as `<(items.a)[]>` |
-
----
+- [Resource-mapping feature](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature)
+- [All shared configuration files](../maven-consumer-project/src/test/resources/configs)
+- [On-demand files](../maven-consumer-project/src/test/resources/files)
 
 [Previous: Mapping and Templating](mapping-and-templating.md) · [Documentation home](README.md) · [Next: Nested Steps](nested-steps.md)

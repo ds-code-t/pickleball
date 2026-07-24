@@ -1,46 +1,46 @@
 # Pickleball Documentation
 
-Pickleball feature files are written as executable business-language descriptions. Start with dynamic steps, then use the other pages as the scenario becomes more structured or data-driven.
+Pickleball extends Cucumber with a dynamic feature-file language while preserving normal Cucumber behavior. The pages below describe the supported authoring model and link to the real, executable examples in [`maven-consumer-project`](../maven-consumer-project/README.md).
 
-## Writing feature files
+Each functional guide begins with a prominent link to the specific consumer-project feature file that demonstrates the behavior.
 
-- [Dynamic steps](dynamic-steps.md)  
-  Write elements, values, actions, assertions, conditions, and context phrases.
-- [Mapping and templating](mapping-and-templating.md)  
-  Insert example values, saved scenario values, configuration values, and nested data.
-- [Nested steps and conditional flow](nested-steps.md)  
-  Organize dependent behavior into readable parent-and-child branches.
-- [Block conditionals](block-conditionals.md)  
-  Branch while keeping reports focused on the path that actually ran.
-- [Component scenarios](component-scenarios.md)  
-  Reuse scenario-sized business flows with `RUN SCENARIOS`.
-- [Reusable service-call scenarios](service-call-scenarios.md)  
-  Define REST and SOAP calls under `resources/calls`, invoke them with `%` identifiers, and verify their responses.
-- [Keyboard expressions](keyboard-expressions.md)  
-  Describe shortcuts, held keys, and simultaneous key presses.
+## Start here
 
-## Project data and execution settings
+- [Getting started](getting-started.md) — add the Maven dependency, create one runner, and run feature files.
+- [Cucumber compatibility](cucumber-compatibility.md) — mix Pickleball dynamic steps with standard Cucumber steps, hooks, tags, tables, and plugins.
 
-- [Shared configuration files and resource data](configuration-and-resources.md)  
-  Make YAML, JSON, XML, CSV, and text resources available to every scenario or load them when needed.
-- [Execution configuration and pkb_ properties](execution-configuration.md)  
-  Select tags, features, reports, browsers, log levels, and local overrides.
+## Browser scenarios
 
-## Initial project setup
+- [Dynamic steps](dynamic-steps.md) — describe Selenium elements, actions, assertions, values, contexts, and phrase chains directly in Gherkin.
+- [Custom element definitions](custom-element-definitions.md) — optionally add project-specific element names without placing selectors in feature files.
+- [Keyboard expressions](key-parser-dsl.md) — express sequential, simultaneous, and held-key input.
 
-- [Getting started](getting-started.md)  
-  Add the dependency and one test runner. These are the only two required framework additions.
+## Data and reusable behavior
 
-## Maintainer customization
+- [Mapping and templating](mapping-and-templating.md) — use Scenario Outline values, runtime values, nested data, JSONata reads, and writable NodeMap paths.
+- [Configuration files and resource mapping](config-files-and-resource-mapping.md) — load shared YAML, JSON, XML, CSV, and text resources.
+- [Component scenarios](component-scenarios.md) — invoke reusable scenario-sized flows with `RUN SCENARIOS`.
+- [Service-call scenarios](service-call-scenarios.md) — define and invoke reusable REST and SOAP calls.
+- [Date and time utilities](date-time-utilities.md) — create, adjust, format, and compare temporal values.
 
-- [Custom element and XPath definitions](custom-element-definitions.md)  
-  Add project-specific element words such as `Account Row`, `Results Frame`, or `Submit Button`.
+## Conditional structure
 
-## Copyable setup examples
+- [Nested steps](nested-steps.md) — arrange parent and child steps and pass conditions or page context downward.
+- [Block conditionals](block-conditionals.md) — choose one `IF:` / `ELSE-IF:` / `ELSE:` branch while keeping normal reports focused on executed business steps.
 
-- [PickleballTests.java](../maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java)
-- [pickleball_local.properties.example](../maven-consumer-project/src/test/resources/pickleball_local.properties.example)
+## Execution
 
----
+- [Execution configuration](configuration.md) — control tags, feature locations, browsers, parallelism, logging, reports, and local overrides.
+
+## Working consumer project
+
+The example project is not pseudocode. It contains a Maven dependency, a runner, a loopback server, browser pages, REST and SOAP endpoints, feature files, configuration data, and reusable call definitions.
+
+- [Consumer `pom.xml`](../maven-consumer-project/pom.xml)
+- [Pickleball test runner](../maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java)
+- [Local browser and service test server](../maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java)
+- [Executable feature files](../maven-consumer-project/src/test/resources/features)
+- [Shared configuration data](../maven-consumer-project/src/test/resources/configs)
+- [Reusable service calls](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature)
 
 [Return to the project README](../README.md)

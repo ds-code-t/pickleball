@@ -1,8 +1,8 @@
-# Execution Configuration and `pkb_` Properties
+# Execution Configuration
 
-`pkb_` properties control which scenarios run and how they run. They are execution settings rather than business steps, so they normally live in the test runner, a properties file, or the command line.
+> **Runnable feature for configuration examples:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) has browser and feature tags that can be selected while trying the execution settings described below.
 
-Examples:
+Pickleball execution properties select scenarios and control how they run. Property names are case-insensitive; this page uses lowercase `pkb_` names for consistency.
 
 ```properties
 pkb_tags=@smoke
@@ -10,45 +10,42 @@ pkb_browser=chrome
 pkb_loglevel=debug
 ```
 
-Property names are treated without regard to letter case. This documentation uses lowercase names for consistency.
+## Configuration sources
 
-## Where settings can be defined
-
-| Location | Best use |
+| Source | Typical use |
 |---|---|
-| `globalTestDefaults()` in the runner | Shared defaults that developers may override locally |
-| `src/test/resources/pickleball.properties` | Shared project properties committed to Git |
-| `src/test/resources/pickleball_local.properties` | Personal local settings; exclude from Git |
-| JVM `-Dpkb_...` properties | One-run, build-server, or CI overrides |
-| `globalTestProperties()` in the runner | Enforced values that local files should not replace |
+| `globalTestDefaults()` | shared defaults that may be overridden |
+| `src/test/resources/pickleball.properties` | committed project properties |
+| `src/test/resources/pickleball_local.properties` | developer-specific local settings |
+| JVM `-D...` properties | one-run or CI overrides |
+| `globalTestProperties()` | enforced runner values |
 
-## Which value wins
+## Precedence
 
-When the same property is defined in more than one place, the stronger source wins:
+When the same setting appears in several places, the stronger source wins:
 
-1. JVM system property, such as `-Dpkb_tags=@smoke`
-2. `globalTestProperties()` in the runner
-3. `pickleball_local.properties`
-4. `globalTestDefaults()` in the runner
-5. `pickleball.properties`, when the value has not already been supplied
+1. JVM system property;
+2. `globalTestProperties()`;
+3. `pickleball_local.properties`;
+4. `globalTestDefaults()`;
+5. `pickleball.properties`, when no stronger value has been supplied.
 
-Put normal team defaults in `globalTestDefaults()`. Reserve `globalTestProperties()` for values that must be enforced.
+Use `globalTestDefaults()` for normal team defaults. Reserve `globalTestProperties()` for values that must not be replaced locally.
 
-## Shared runner defaults
-
-A project maintainer can define defaults in the test runner:
+## Runner defaults
 
 ```java
 @Override
 public void globalTestDefaults() {
-    PKB_props.glue("com.example.tests.steps");
+    PKB_props.glue("com.example.pickleball");
     PKB_props.features("classpath:features");
     PKB_props.plugins("pretty");
+    PKB_props.tags("@all");
     PKB_props.browser("chrome");
 }
 ```
 
-Feature authors normally do not need to edit this file.
+See the working [consumer runner](../maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java).
 
 ## Local overrides
 
@@ -61,156 +58,76 @@ src/test/resources/pickleball_local.properties
 Example:
 
 ```properties
-# Run only the scenarios currently being developed.
-pkb_tags=@local
-
-# Use local browser and troubleshooting settings.
+pkb_tags=@forms
+pkb_environment=QA
 pkb_browser=chrome
 pkb_debugbrowser=true
 pkb_loglevel=debug
-pkb_debugargs=elementsnapshot
+pkb_parallel=4
 ```
 
-After saving the file, run:
+Do not include `-D` inside a properties file. Include it on the command line:
 
 ```bash
-mvn test
+mvn test "-Dpkb_tags=@forms and @state-assertions" -Dpkb_loglevel=debug
 ```
 
-The same local settings also apply when scenarios are launched from IntelliJ. This makes it possible to change tags or troubleshooting options without repeatedly editing run configurations.
+Exclude personal local settings from Git. The consumer contains a commented [pickleball_local.properties](../maven-consumer-project/src/test/resources/pickleball_local.properties) that documents the expected keys.
 
-### Keep local settings out of Git
-
-Add this line to `.gitignore`:
-
-```gitignore
-src/test/resources/pickleball_local.properties
-```
-
-Commit an example file instead:
-
-```text
-src/test/resources/pickleball_local.properties.example
-```
-
-A copyable example is included at [`examples/pickleball_local.properties.example`](examples/pickleball_local.properties.example).
-
-### Properties file versus command line
-
-Inside a `.properties` file, omit `-D`:
-
-```properties
-pkb_suppressjunitfilteredskips=false
-```
-
-On the Maven command line, include `-D`:
-
-```bash
-mvn test -Dpkb_suppressjunitfilteredskips=false
-```
-
-## Common selection and execution properties
+## Common properties
 
 | Property | Example | Purpose |
 |---|---|---|
-| `pkb_glue` | `com.example.tests.steps` | Packages containing project step definitions and hooks |
-| `pkb_features` | `classpath:features` | Feature-file location |
-| `pkb_featurename` | `Checkout` | Select or identify a feature by name |
+| `pkb_glue` | `com.example.tests` | Cucumber glue packages |
+| `pkb_features` | `classpath:features` | feature-file location |
 | `pkb_tags` | `@smoke and not @slow` | Cucumber tag expression |
-| `pkb_name` | `Checkout.*` | Scenario-name regular expression |
-| `pkb_profile` | `local` | Named project profile |
-| `pkb_plugins` | `pretty` | Cucumber output and plugin settings |
-| `pkb_parallel` | `4` | Fixed parallel worker count |
-| `pkb_environment` | `test` | Project environment identifier |
-| `pkb_browser` | `chrome` | Browser or browser configuration name |
-| `pkb_debugbrowser` | `true` | Enable browser troubleshooting behavior |
+| `pkb_name` | `Checkout.*` | scenario-name expression |
+| `pkb_environment` | `QA` | project environment name |
+| `pkb_browser` | `chrome` | browser configuration name |
+| `pkb_debugbrowser` | `true` | retain extra browser troubleshooting state |
+| `pkb_loglevel` | `debug` | `trace`, `debug`, `info`, `warn`, or `error` |
+| `pkb_parallel` | `4` | maximum parallel scenario count |
+| `pkb_compositeReport` | `true` or a path | combined HTML report |
+| `pkb_scenarioReport` | `true` or a path | individual scenario reports |
 
-## Logging and troubleshooting
-
-| Property | Example | Purpose |
-|---|---|---|
-| `pkb_loglevel` | `debug` | Controls Pickleball logging; normal runs use `info` |
-| `pkb_debugargs` | `elementsnapshot,rawxpaths` | Enables selected troubleshooting details |
-
-Examples of debug arguments used by the project include:
+Report paths may use placeholders such as `<TIME>` and `<SCENARIO_NAME>`:
 
 ```properties
-pkb_debugargs=elementsnapshot
-# pkb_debugargs=logallsteps,nobase,rawxpaths
+pkb_compositeReport=reports/composite-report-<TIME>.html
+pkb_scenarioReport=reports/<SCENARIO_NAME>-<TIME>.html
 ```
 
-Use `debug` or `trace` temporarily. These levels can produce much more output than a normal business-readable report.
+A composite report is generated by default when no report setting is supplied.
 
-## Waiting and report properties
+## Cucumber aliases
 
-| Property | Example | Purpose |
-|---|---|---|
-| `pkb_steprepeatmaxtime` | `20` | Maximum time allowed for repeating or waiting behavior |
-| `pkb_steprepeatmaxcount` | `300` | Maximum number of repeat attempts |
-| `pkb_suppressjunitfilteredskips` | `false` | Controls JUnit results for scenarios excluded by filters |
-| `pkb_htmlreportformat` | `scenarioReport,compositeReport` | Selects generated HTML report types |
-| `pkb_compositereport` | `reports/summary.html` | Composite report output path |
-| `pkb_scenarioreport` | `reports/<SCENARIO_NAME>-<TIME>.html` | Per-scenario report path template |
-
-Older projects may also contain longer report-path property names:
-
-```properties
-pkb_htmlcompositereportpathtemplate=reports/summary-<TIME>.html
-pkb_htmlcompositereportpath=reports/summary-<TIME>.html
-pkb_htmlscenarioreportpathtemplate=reports/<SCENARIO_NAME>-<TIME>.html
-```
-
-Use the shorter `pkb_compositereport` and `pkb_scenarioreport` forms when they meet the project’s needs.
-
-## Cucumber-compatible aliases
-
-These Pickleball properties correspond to standard Cucumber settings:
-
-| Pickleball property | Cucumber property |
+| Pickleball property | Cucumber equivalent |
 |---|---|
 | `pkb_glue` | `cucumber.glue` |
 | `pkb_features` | `cucumber.features` |
 | `pkb_tags` | `cucumber.filter.tags` |
 | `pkb_name` | `cucumber.filter.name` |
 
-## Command-line examples
+## ReportPortal
 
-Run smoke scenarios:
+ReportPortal integration is disabled unless one of its supported enable properties is explicitly set to `true`, case-insensitively:
+
+```properties
+rp.enable=true
+```
+
+Equivalent environment/property naming forms such as `rp_enable` and `RP_ENABLE` are also recognized where the environment supplies them.
+
+## Consumer Maven profiles
+
+The working [pom.xml](../maven-consumer-project/pom.xml) supplies profiles such as `all`, `smoke`, `browser`, `data`, `forms`, `mapping`, `workflow`, `conditionals`, `nested`, `keyboard`, `dialogs`, and `components`.
+
+Examples:
 
 ```bash
-mvn test -Dpkb_tags="@smoke"
+mvn test -Pall
+mvn test -Psmoke
+mvn test -Pworkflow
 ```
 
-Select scenarios by name:
-
-```bash
-mvn test -Dpkb_name="Checkout.*"
-```
-
-Use four parallel workers:
-
-```bash
-mvn test -Dpkb_parallel=4
-```
-
-Combine several overrides:
-
-```bash
-mvn test \
-  -Dpkb_tags="@smoke and not @slow" \
-  -Dpkb_browser=chrome \
-  -Dpkb_loglevel=debug
-```
-
-PowerShell:
-
-```powershell
-mvn test `
-  "-Dpkb_tags=@smoke and not @slow" `
-  -Dpkb_browser=chrome `
-  -Dpkb_loglevel=debug
-```
-
----
-
-[Previous: Keyboard Expressions](key-parser-dsl.md) · [Documentation home](README.md) · [Next: Maintainer Element Definitions](custom-element-definitions.md)
+[Previous: Keyboard Expressions](key-parser-dsl.md) · [Documentation home](README.md) · [Next: Custom Element Definitions](custom-element-definitions.md)

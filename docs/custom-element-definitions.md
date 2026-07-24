@@ -1,172 +1,103 @@
-# Custom Element and XPath Definitions
+# Custom Element Definitions
 
-> This page is for project maintainers. Feature authors normally use the element vocabulary that has already been configured for the project.
+> **Working feature example:** [`catalog-context.feature`](../maven-consumer-project/src/test/resources/features/catalog-context.feature) uses the project-specific `Product Card`, `Status Badge`, and `Test Panel` element categories registered by the consumer runner.
 
-A project can add business-specific element words so feature files describe the application in familiar terms:
+> This page is primarily for project maintainers. Feature authors normally use the element vocabulary already registered by the project.
+
+Pickleball's built-in element language handles common HTML controls. A project can optionally add business-specific categories so feature files use names such as `Test Panel`, `Product Card`, `Status Badge`, or `Account Row` without exposing selectors.
+
+## Register categories before Cucumber runs
+
+The consumer runner registers project vocabulary in a lifecycle hook:
+
+```java
+@LifecycleHook(Phase.BEFORE_CUCUMBER_RUN)
+public static void beforeRun() {
+    registerProjectElementVocabulary();
+    testSite = LocalTestSite.start(TEST_SITE_PORT);
+}
+```
+
+See the complete [PickleballTests.java](../maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java).
+
+## Simple category
+
+```java
+ExecutionDictionary dictionary = getExecutionDictionary();
+
+dictionary.category("Radio Button")
+        .addBase("//input[@type='radio']");
+```
+
+Feature files can then write:
 
 ```gherkin
-Then , in the "Top Panel", click the "Submit" Button
-Then , from the "Accounts" Table, verify the "Primary" Account Row is displayed
-Then , switch to the "Results Frame"
+* , click the "Email" Radio Button
 ```
 
-The feature file should describe the application. The test runner can define how words such as `Top Panel`, `Account Row`, or `Results Frame` locate real page elements.
-
-## Add definitions during project startup
-
-The initial dependency and test runner remain the only required setup. Custom definitions are optional additions to the runner.
+## Text-aware business category
 
 ```java
-package com.example.tests;
-
-import com.xpathy.XPathy;
-import tools.dscode.common.annotations.LifecycleHook;
-import tools.dscode.common.annotations.Phase;
-import tools.dscode.common.domoperations.ExecutionDictionary;
-import tools.dscode.testengine.PKB_props;
-import tools.dscode.testengine.PickleballRunner;
-
-import static com.xpathy.Attribute.type;
-import static com.xpathy.Tag.input;
-import static tools.dscode.common.treeparsing.DefinitionContext.getExecutionDictionary;
-import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.combineOr;
-
-public class PickleballTests extends PickleballRunner {
-
-    @Override
-    public void globalTestDefaults() {
-        PKB_props.glue("com.example.tests.steps");
-        PKB_props.features("classpath:features");
-        PKB_props.plugins("pretty");
-    }
-
-    @LifecycleHook(Phase.BEFORE_CUCUMBER_RUN)
-    public static void registerProjectDefinitions() {
-        ExecutionDictionary dictionary = getExecutionDictionary();
-
-        dictionary.category("Project Panel")
-            .addBase("//div");
-
-        dictionary.category("Submit Button")
-            .or((category, value, operator) ->
-                input.byAttribute(type).equals("submit"));
-
-        dictionary.category("Form Field")
-            .and((category, value, operator) ->
-                combineOr(
-                    new XPathy("//input"),
-                    new XPathy("//textarea"),
-                    new XPathy("//select")
-                ));
-    }
-}
+dictionary.category("Product Card")
+        .inheritsFrom(ExecutionDictionary.CONTAINS_TEXT)
+        .addBase(
+            "//article[contains(concat(' ', normalize-space(@class), ' '), ' product-card ')]"
+        );
 ```
 
-Register shared vocabulary before the Cucumber run so it is available to every feature.
-
-## Add a basic element category
-
-```java
-dictionary.category("Project Panel")
-    .addBase("//div");
-```
-
-Feature files can then use `Project Panel` as an element category.
-
-## Add another way to recognize an element
-
-```java
-dictionary.category("Submit Button")
-    .or((category, value, operator) ->
-        input.byAttribute(type).equals("submit"));
-```
-
-This lets the phrase `Submit Button` include an `<input type="submit">` element.
-
-## Combine several HTML element types
-
-```java
-dictionary.category("Form Field")
-    .and((category, value, operator) ->
-        combineOr(
-            new XPathy("//input"),
-            new XPathy("//textarea"),
-            new XPathy("//select")
-        ));
-```
-
-The business term `Form Field` can now represent inputs, text areas, or selects.
-
-## Reuse an existing category
-
-```java
-dictionary.category("Content Container")
-    .andAnyCategories("Project Panel")
-    .inheritsFrom(ExecutionDictionary.CONTAINS_TEXT)
-    .or("//section", "//div");
-```
-
-Reusing categories keeps the feature language consistent while allowing project-specific HTML structures.
-
-## Define a page or section context
-
-A category can establish the area in which child elements should be found:
-
-```java
-dictionary.category("Top Panel")
-    .startingContext((category, value, operator, webDriver, context) ->
-        context);
-```
-
-This supports feature language such as:
+Feature files can use visible text and state with that category:
 
 ```gherkin
-Then , in the "Top Panel", click the "Save" Button
+* , ensure the "Starter Plan" Product Card is displayed
+* , ensure the "Team Plan" Product Card is not displayed
 ```
 
-## Register an iframe
+## Page or section context
 
 ```java
-import com.xpathy.Tag;
-
-import static com.xpathy.Attribute.id;
-
-dictionary.registerTopLevelIframe("Results Frame")
-    .and((category, value, operator) ->
-        XPathy.from(Tag.iframe)
-            .byAttribute(id)
-            .equals("iframeResult"));
+dictionary.category("Test Panel")
+        .inheritsFrom(ExecutionDictionary.CONTAINS_TEXT)
+        .addBase(
+            "//section[contains(concat(' ', normalize-space(@class), ' '), ' test-panel ')]"
+        );
 ```
 
-A project can then describe the frame by its business name instead of repeating iframe-selection details in feature files.
+The category can scope another dynamic lookup:
 
-## Mark a page context
-
-```java
-dictionary.category("Results Frame")
-    .flags(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT);
+```gherkin
+* , in the "Secondary Queue" Test Panel, click the "Approve" Button
 ```
 
-A page-context category changes where later element searches begin rather than representing a normal clickable element.
+Only the custom category definition contains the technical selector. Scenario steps remain business-readable.
 
-## Other project lifecycle hooks
+## Combine or extend categories
 
-The runner may also contain project-specific setup, cleanup, or diagnostics:
+The execution dictionary can:
 
-```java
-@LifecycleHook(Phase.AFTER_CUCUMBER_RUN)
-public static void afterRun() {
-    // Project cleanup
-}
+- add one or more base selectors;
+- add `and` or `or` selector logic;
+- inherit text-matching behavior;
+- reuse existing categories;
+- register page contexts or frames; and
+- attach category flags that affect lookup behavior.
 
-@LifecycleHook(Phase.AFTER_SCENARIO_FAIL)
-public static void afterScenarioFailure() {
-    // Failure diagnostics
-}
-```
+Keep selectors centralized in startup configuration instead of repeating them across feature files.
 
-Keep technical setup in the runner so feature files remain focused on the business flow.
+## When to add a category
 
----
+Add one when:
+
+- the term is meaningful to feature authors;
+- it appears repeatedly across scenarios;
+- the application has a stable semantic structure; or
+- the built-in category is too broad for the project's UI.
+
+Do not create a separate category for every individual element. Dynamic text, state, ordinal, and context matching should continue to do most of the work.
+
+## Working examples
+
+- [Registered consumer categories](../maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java)
+- [Features using those categories](../maven-consumer-project/src/test/resources/features/catalog-context.feature)
+- [Catalog page DOM](../maven-consumer-project/src/test/resources/site/catalog.html)
 
 [Previous: Execution Configuration](configuration.md) · [Documentation home](README.md)

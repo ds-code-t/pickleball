@@ -1,54 +1,24 @@
-# Consumer service-call feature update
+# Pickleball
 
-Replace these two files in the consumer project:
+Pickleball is a Java 21 testing framework built on Cucumber. It keeps normal Gherkin and Cucumber behavior while adding a dynamic feature-file language for browser tests, service calls, data mapping, conditional flow, and reusable scenarios.
 
-- `maven-consumer-project/src/test/resources/calls/service-call-definitions.feature`
-- `maven-consumer-project/src/test/resources/features/service-call-execution.feature`
+## How Pickleball differs from standard Cucumber
 
-## What changed
+In a typical Cucumber project, each new Gherkin sentence must match a Java step definition. Pickleball includes reusable dynamic steps that can interpret elements, values, actions, assertions, conditions, and context directly from a feature file.
 
-The reusable component scenarios now build their service-call data entirely with:
+For most tests, feature authors can create new scenarios without adding Java code. A step can locate a Selenium element by its visible text, type, state, position, and surrounding page context instead of requiring a separate XPath, CSS selector, page-object field, or custom step definition for every interaction.
 
-```gherkin
-MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
-MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
-MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
-MAP "REQUEST.cookies" TABLE VALUES TO SCENARIO MAP
-MAP "CONFIGURATION" TABLE VALUES TO SCENARIO MAP
-MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
-MAP "REQUEST.body" TEXT VALUE TO SCENARIO MAP
-```
+Pickleball also adds:
 
-Every `REQUEST.endpoint` contains the complete URL, including scheme, host, port,
-and path. `CONFIGURATION` is therefore reserved for REST Assured behavior such
-as URL encoding and relaxed HTTPS validation.
+- Java Selenium integration for browser navigation, element selection, actions, and assertions;
+- nested steps that pass conditions and page context to child steps;
+- inline and block `if` / `else-if` / `else` flow;
+- mapping and templating for scenario values, saved values, JSON-like data, and resource files;
+- reusable component scenarios and REST or SOAP service-call scenarios; and
+- a small consumer setup consisting primarily of the Pickleball dependency and one test runner.
 
-## Coverage
+Pickleball remains compatible with standard Cucumber features such as tags, Scenario Outlines, Examples tables, DataTables, DocStrings, hooks, plugins, and custom Java step definitions. Dynamic Pickleball steps and ordinary project-specific Cucumber steps can be used together in the same suite.
 
-The calling feature exercises:
+The working [`maven-consumer-project`](maven-consumer-project/README.md) starts a loopback test server during the run. Its scenarios exercise both Selenium against a local HTML test site and service calls against local REST and SOAP endpoints.
 
-- inline `%` tag selection;
-- `Run Tags` selection;
-- quoted object names;
-- exact `Call Key` precedence;
-- scenario-name fallback;
-- nested header, query-parameter, and cookie mappings;
-- JSON bodies through the `OBJECT` DocString mapper;
-- XML bodies through the `TEXT` DocString mapper;
-- general REST Assured configuration;
-- normal handling of HTTP 4xx/5xx responses;
-- repeated-key replacement;
-- HTTP 204/no-content response capture;
-- `END SCENARIO` followed by the synthetic finalizer.
-
-## Prerequisite
-
-These tests expect the consumer project's local test server to expose the
-existing service-call test endpoints:
-
-- `/api/service-calls/inspect`
-- `/api/service-calls/no-content/{itemId}`
-- `/api/health`
-- `/soap/calculator`
-
-No Java file is included in this archive.
+[Read the Pickleball documentation](docs/README.md)

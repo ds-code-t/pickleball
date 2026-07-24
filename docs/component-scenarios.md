@@ -1,174 +1,70 @@
-# Component Scenarios and `RUN SCENARIOS`
+# Component Scenarios
 
-Component scenarios are reusable business flows. A calling scenario identifies a component with `RUN SCENARIOS`, supplies values, and runs the component’s steps as nested steps of the caller.
+> **Working feature example:** [`component-scenarios.feature`](../maven-consumer-project/src/test/resources/features/component-scenarios.feature) contains both the `RUN SCENARIOS` caller and the reusable `%save_customer` component definition.
 
-This is useful for behavior such as signing in, creating a customer, preparing an order, or checking a standard result without copying the same steps into many scenarios.
+Component scenarios are reusable, scenario-sized business flows. A caller uses `RUN SCENARIOS`, identifies a component with a `%` tag, and supplies values through a table.
 
-## Calling a component
-
-Use `RUN SCENARIOS` with a data table. The required `Run Tags` column names the component. Every other column supplies a value to that component.
+## Call a component
 
 ```gherkin
-Scenario: calling scenario
-  * RUN SCENARIOS
-    | Run Tags    | A | B | X  | Y  |
-    | %comp_scen1 | 1 |   | x1 | y1 |
-    | %comp_scen2 |   | 2 | x2 | y2 |
+* RUN SCENARIOS
+    | Run Tags      | customerName | tier     |
+    | %save_customer | Ava          | Premium  |
+    | %save_customer | Ben          | Standard |
 ```
 
-Each row is a separate component call. Pickleball:
+Each table row is a separate call. Pickleball finds the matching component, combines values, inserts its executable steps beneath the caller, and runs the component before continuing.
 
-1. finds component rows with the matching `%` identifier;
-2. combines the caller’s values with the component’s defaults;
-3. inserts the component steps beneath `RUN SCENARIOS`; and
-4. runs those steps before moving to the next table row.
+## Define a component
 
-Use unique component identifiers when one exact match is intended.
-
-## Defining a component
-
-Write the reusable flow as a `Scenario Outline`. Its `Examples` table includes a `Scenario Tags` column whose values begin with `%`:
+Use a `Scenario Outline` with a `Scenario Tags` column:
 
 ```gherkin
-Scenario Outline: Component Scenarios A: '<A>' , B:'<B>' , X:'<X>' , Y:'<Y>' , Z:'<Z>'
-  * print A: '<A>' , B:'<B>' , X:'<X>' , Y:'<Y>' , Z:'<Z>'
+Scenario Outline: Save customer component
+  * , enter "<customerName>" in the "Customer Name" Textbox
+  * , select "<tier>" in the "Customer Tier" Dropdown
+  * , click the "Save Customer" Button
 
-  Examples:
-    | Scenario Tags | ?A | B | Y  | Z  |
-    | %comp_scen1   | 3  | 4 | y3 | Z1 |
-    | %comp_scen2   | 5  | 6 | y4 | Z2 |
+Examples:
+  | Scenario Tags | ?customerName  | tier     |
+  | %save_customer | Default Customer | Standard |
 ```
 
-The component may be in the same feature file as the caller or anywhere else under the configured feature path.
+The `%` prefix identifies a reusable component rather than a normal Cucumber `@tag`.
 
-The `%` prefix distinguishes a component identifier from an ordinary Cucumber tag such as `@smoke`.
-
-## Combining caller values and component defaults
+## Caller values and defaults
 
 Values can come from:
 
-- the caller’s `RUN SCENARIOS` row; and
-- the matching component `Examples` row.
+- the caller's `RUN SCENARIOS` row; and
+- the component's matching `Examples` row.
 
-A caller-only value is passed into the component. A component-only value acts as a default. When both contain the same key, the caller normally has priority.
-
-### Normal default columns
-
-A normal component header such as `B` supplies a default only when the caller does not supply that key.
-
-If the caller includes `B` but leaves the cell blank, the blank is preserved:
-
-```gherkin
-| Run Tags    | B |
-| %comp_scen1 |   |
-```
-
-```gherkin
-| Scenario Tags | B |
-| %comp_scen1   | 4 |
-```
-
-The component receives a blank `B`.
-
-### Defaults that replace blanks
+A normal component header supplies a default only when the caller omits the key. If the caller includes the key with a blank value, the blank remains.
 
 Prefix a component header with `?` when the component default should also replace a blank caller value:
 
 ```gherkin
-| Scenario Tags | ?A |
-| %comp_scen1   | 3  |
+| Scenario Tags  | ?customerName  |
+| %save_customer | Default Customer |
 ```
 
-The key is still `A`:
-
-- caller passes `A=1` → component receives `1`;
-- caller includes `A` but leaves it blank → component receives `3`;
-- caller omits `A` → component receives `3`.
-
-## Value priority
-
-| Situation | Value used by component steps |
+| Situation | Value used |
 |---|---|
-| Caller supplies a nonblank value | Caller value |
-| Caller supplies blank and component header is normal | Blank caller value |
-| Caller supplies blank and component header begins with `?` | Component default |
-| Caller omits the key | Component default, when present |
-| Key exists only in caller | Caller value |
-| Key exists only in component | Component value |
+| caller supplies a nonblank value | caller value |
+| caller supplies blank; normal component header | blank caller value |
+| caller supplies blank; `?` component header | component default |
+| caller omits the key | component default, when present |
+| key exists only in caller | caller value |
+| key exists only in component | component value |
 
-## Complete example
+## Nesting and reports
 
-For the first call:
+`RUN SCENARIOS` remains the parent step. Each called component and its executable steps appear beneath it. Components can be called inside nested or block-conditional branches.
 
-```gherkin
-| %comp_scen1 | 1 |   | x1 | y1 |
-```
+Avoid component cycles that repeatedly call each other.
 
-and component row:
+## Working example
 
-```gherkin
-| %comp_scen1 | 3 | 4 | y3 | Z1 |
-```
+See [component-scenarios.feature](../maven-consumer-project/src/test/resources/features/component-scenarios.feature) and the page it tests, [components.html](../maven-consumer-project/src/test/resources/site/components.html).
 
-| Key | Final value | Reason |
-|---|---|---|
-| `A` | `1` | Nonblank caller value overrides `?A=3` |
-| `B` | blank | The caller explicitly supplied a blank and `B` is a normal header |
-| `X` | `x1` | Defined only by the caller |
-| `Y` | `y1` | Nonblank caller value overrides `y3` |
-| `Z` | `Z1` | Missing from the caller, so the component default is used |
-
-For the second call:
-
-```gherkin
-| %comp_scen2 |   | 2 | x2 | y2 |
-```
-
-| Key | Final value | Reason |
-|---|---|---|
-| `A` | `5` | Blank caller value is replaced because the component header is `?A` |
-| `B` | `2` | Nonblank caller value overrides `6` |
-| `X` | `x2` | Defined only by the caller |
-| `Y` | `y2` | Nonblank caller value overrides `y4` |
-| `Z` | `Z2` | Missing from the caller, so the component default is used |
-
-## Reports and logs
-
-`RUN SCENARIOS` remains the parent step. Each component appears beneath it, and the component’s executable steps appear one level deeper.
-
-```text
-1 STEP  “*  RUN SCENARIOS”
-- - - - - - - - - - -
-    2 STEP  “*  SCENARIO: Component Scenarios A: '1' , B:'4' , X:'x1' , Y:'y3' , Z:'Z1'”
-- - - - - - - - - - -
-      3 STEP  “*  print A: '1' , B:'' , X:'x1' , Y:'y1' , Z:'Z1'”
-        [INFO] PRINT:  A: '1' , B:'' , X:'x1' , Y:'y1' , Z:'Z1'
-```
-
-The nested scenario title may show values from the component’s examples row. The executable steps show the final values after caller values and component defaults have been combined.
-
-## Components inside branches
-
-A component call may be placed inside a nested or block branch:
-
-```gherkin
-* IF: "accountType" equals "business":
-: * RUN SCENARIOS
-    | Run Tags          | accountId |
-    | %business_account | <id>      |
-```
-
-A component can contain its own nested steps, conditions, and data tables. Keep component calls understandable and avoid cycles where components call each other indefinitely.
-
-## Recommended practices
-
-1. Use descriptive, unique `%` identifiers.
-2. Keep the exact headings `Run Tags` and `Scenario Tags` consistent.
-3. Use normal headers when an explicitly blank caller value should remain blank.
-4. Use `?` headers only when blank should mean “use the component default.”
-5. Keep each component focused on one reusable business behavior.
-6. Review nested reports to confirm the final values used by the component steps.
-
----
-
-[Previous: Block Conditionals](block-conditionals.md) · [Documentation home](README.md) · [Next: Keyboard Expressions](key-parser-dsl.md)
+[Previous: Block Conditionals](block-conditionals.md) · [Documentation home](README.md) · [Next: Service-call Scenarios](service-call-scenarios.md)
