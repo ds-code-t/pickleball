@@ -11,7 +11,6 @@ import java.time.Duration;
 import java.util.*;
 
 import static tools.dscode.common.assertions.ValueWrapper.createValueWrapper;
-import static tools.dscode.common.domoperations.HumanInteractions.centerScroll;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForElementReady;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.domoperations.SeleniumUtils.intersection;
@@ -28,9 +27,10 @@ import static tools.dscode.common.treeparsing.parsedComponents.ElementMatch.ELEM
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 import static tools.dscode.common.util.debug.DebugUtils.debugFlags;
 
-
-
 public class ElementWrapper implements WebElement, WrapsElement {
+
+    private static final String CENTER_SCROLL_SCRIPT =
+            "arguments[0].scrollIntoView({block:'center',inline:'center'});";
 
     private final WebDriver driver;
     public WebElement element;
@@ -68,7 +68,6 @@ public class ElementWrapper implements WebElement, WrapsElement {
         return elementWrappers;
     }
 
-
     ElementWrapper(WebElement element, ElementMatch elementMatch, Integer matchIndex) {
         this.driver = elementMatch.parentPhrase.getDriver();
         this.matchIndex = matchIndex;
@@ -78,13 +77,12 @@ public class ElementWrapper implements WebElement, WrapsElement {
         takeSnapshot(this.element);
         if (debugFlags.contains("elementsnapshot"))
             System.out.println(attributeSnapshot.toPrettyString());
-
-        // Build the persistent locating XPath (no JS).
-        // Uses default attribute priority when varargs are omitted.
-        this.xpath1 = buildXPathForElement(driver, element, 10, 30, List.of("id", "data-user-id"), List.of("name", "title"), List.of("role", "aria-label", "class"));
-        this.xpath2 = buildXPathForElement(driver, element, 10, 15, List.of("href", "target", "src", "index"));
-
-
+        this.xpath1 = buildXPathForElement(driver, element, 10, 30,
+                List.of("id", "data-user-id"),
+                List.of("name", "title"),
+                List.of("role", "aria-label", "class"));
+        this.xpath2 = buildXPathForElement(driver, element, 10, 15,
+                List.of("href", "target", "src", "index"));
     }
 
     public void takeSnapshot() {
@@ -99,11 +97,9 @@ public class ElementWrapper implements WebElement, WrapsElement {
         ObjectNode snapshot = MAPPER.createObjectNode();
         JavascriptExecutor js = javascriptExecutor();
 
-        // tagName
         String tagName = safeTagName(snapshotElement);
         snapshot.put("tagName", tagName);
 
-        // textContent (DOM text, not just visible text)
         String textContent;
         if ("textarea".equals(tagName) || "input".equals(tagName)) {
             textContent = safeDomAttribute(snapshotElement, "value");
@@ -136,7 +132,6 @@ public class ElementWrapper implements WebElement, WrapsElement {
             snapshot.put("childValue", childValue.toString());
         }
 
-        // all attributes as name:value
         Map<String, String> attrs = (Map<String, String>) js.executeScript(
                 "var el = arguments[0];" +
                         "var out = {}; " +
@@ -147,7 +142,6 @@ public class ElementWrapper implements WebElement, WrapsElement {
                         "return out;",
                 snapshotElement
         );
-
         ObjectNode attrNode = snapshot.putObject("attributes");
         if (attrs != null) {
             attrs.forEach(attrNode::put);
@@ -177,15 +171,8 @@ public class ElementWrapper implements WebElement, WrapsElement {
                 snapshotElement
         )).intValue();
         snapshot.put("sameTagIndex", sameTagIndex);
-
         this.attributeSnapshot = snapshot;
     }
-
-
-    // -------------------------
-    // Public API
-    // -------------------------
-
 
     public ObjectNode getAttributeSnapshot() {
         return attributeSnapshot;
@@ -196,10 +183,12 @@ public class ElementWrapper implements WebElement, WrapsElement {
             return createValueWrapper(attributeSnapshot.get(ELEMENT_RETURN_VALUE).asText());
 
         scrollIntoView();
-
         switch (elementMatch.category) {
             case "Field":
-                List<WebElement> valueElements = withoutImplicitWait(driver, () -> findElements(By.xpath("descendant::*[contains(@class,'Read')]")));
+                List<WebElement> valueElements = withoutImplicitWait(
+                        driver,
+                        () -> findElements(By.xpath("descendant::*[contains(@class,'Read')]"))
+                );
                 if (!valueElements.isEmpty()) {
                     String returnVal = valueElements.getLast().getText();
                     attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
@@ -210,7 +199,10 @@ public class ElementWrapper implements WebElement, WrapsElement {
                     attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
                     return createValueWrapper(returnVal);
                 }
-                valueElements = withoutImplicitWait(driver, () -> findElements(By.xpath("*[normalize-space(.)][1]/following-sibling::*[descendant-or-self::*[text()]]")));
+                valueElements = withoutImplicitWait(
+                        driver,
+                        () -> findElements(By.xpath("*[normalize-space(.)][1]/following-sibling::*[descendant-or-self::*[text()]]"))
+                );
                 if (valueElements.size() == 1) {
                     String returnVal = valueElements.getLast().getText();
                     attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
@@ -218,6 +210,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
                 }
                 break;
         }
+
         for (String key : elementMatch.defaultValueKeys) {
             ObjectNode node;
             if (key.startsWith("attributes.")) {
@@ -245,17 +238,8 @@ public class ElementWrapper implements WebElement, WrapsElement {
         return createValueWrapper("");
     }
 
-
-    // -------------------------
-    // Internal helpers
-    // -------------------------
-
-    /**
-     * Use this only for internal/probe searches where "not found" is expected.
-     * This prevents Selenium implicit-wait polling from turning optional lookups
-     * into multi-second delays.
-     */
-    private static <T> T withoutImplicitWait(WebDriver driver, java.util.function.Supplier<T> action) {
+    private static <T> T withoutImplicitWait(WebDriver driver,
+                                             java.util.function.Supplier<T> action) {
         Duration original = driver.manage().timeouts().getImplicitWaitTimeout();
         try {
             driver.manage().timeouts().implicitlyWait(Duration.ZERO);
@@ -308,7 +292,6 @@ public class ElementWrapper implements WebElement, WrapsElement {
     }
 
     private WebElement refindUniqueElement() {
-
         List<WebElement> elementList1 = getElementList(driver, xpath1);
         if (elementList1.size() == 1) {
             return elementList1.getFirst();
@@ -324,11 +307,13 @@ public class ElementWrapper implements WebElement, WrapsElement {
             return elementList3.getFirst();
         }
 
-        List<WebElement> elementList4 = getElementList(driver, elementMatch.contextWrapper.elementPath.getXpath());
+        List<WebElement> elementList4 = getElementList(
+                driver,
+                elementMatch.contextWrapper.elementPath.getXpath()
+        );
         if (elementList4.size() == 1) {
             return elementList4.getFirst();
         }
-
 
         if (elementList4.isEmpty()) {
             List<WebElement> elementList5 = union(elementList1, elementList2);
@@ -352,21 +337,24 @@ public class ElementWrapper implements WebElement, WrapsElement {
             return elementList6.getFirst();
         }
 
-        List<WebElement> elementList7 = getElementList(driver, elementMatch.contextWrapper.elementTerminalXPath.getXpath());
+        List<WebElement> elementList7 = getElementList(
+                driver,
+                elementMatch.contextWrapper.elementTerminalXPath.getXpath()
+        );
         if (elementList7.size() == 1) {
             return elementList7.getFirst();
         }
-
         if (elementList7.size() > 1 && matchIndex != null) {
-            List<WebElement> elementList8 = getElementList(driver, "(" + elementMatch.contextWrapper.elementTerminalXPath.getXpath() + ")[" + matchIndex + "]");
+            List<WebElement> elementList8 = getElementList(
+                    driver,
+                    "(" + elementMatch.contextWrapper.elementTerminalXPath.getXpath() + ")[" + matchIndex + "]"
+            );
             if (elementList8.size() == 1) {
                 return elementList8.getFirst();
             }
         }
 
         throw new RuntimeException("Failed to relocate " + elementMatch);
-
-
     }
 
     private static String buildXPathForElement(
@@ -376,22 +364,17 @@ public class ElementWrapper implements WebElement, WrapsElement {
             int maxDescendantNodes,
             String... attrPriority
     ) {
-
         String tag = safeTagName(element);
 
-        // default attribute priority if none supplied
         String[] effectiveAttrs = (attrPriority == null || attrPriority.length == 0)
                 ? new String[]{"id", "data-user-id"}
                 : attrPriority;
 
-        // 1) Find closest self-or-descendant match for any of these attributes
         String descAttrName = null;
         String descAttrValue = null;
 
         outerDesc:
         for (String attr : effectiveAttrs) {
-
-            // check self first
             String selfVal = getAttrOrEmpty(element, attr);
             if (!selfVal.isEmpty()) {
                 descAttrName = attr;
@@ -399,18 +382,17 @@ public class ElementWrapper implements WebElement, WrapsElement {
                 break;
             }
 
-            // then any descendant (RELATIVE to element), limited by node-position cap if configured
             try {
-                // NOTE: This is a node-count/position limit, NOT a true depth limit.
-                // It caps the number of matching nodes considered in document order.
                 String xpathExpr;
                 if (maxDescendantNodes > 0) {
                     xpathExpr = "(.//*[@" + attr + "])[position() <= " + maxDescendantNodes + "]";
                 } else {
                     xpathExpr = ".//*[@" + attr + "]";
                 }
-
-                WebElement d = withoutImplicitWait(driver, () -> element.findElement(By.xpath(xpathExpr)));
+                WebElement d = withoutImplicitWait(
+                        driver,
+                        () -> element.findElement(By.xpath(xpathExpr))
+                );
                 String v = getAttrOrEmpty(d, attr);
                 if (!v.isEmpty()) {
                     descAttrName = attr;
@@ -421,7 +403,6 @@ public class ElementWrapper implements WebElement, WrapsElement {
             }
         }
 
-        // 2) Build descendant-or-self predicate OR fallback to children-shape predicate
         String mainPredicate;
         if (descAttrName != null) {
             mainPredicate = "descendant-or-self::*[@" + descAttrName + "="
@@ -430,42 +411,33 @@ public class ElementWrapper implements WebElement, WrapsElement {
             mainPredicate = buildChildrenShapePredicate(driver, element);
         }
 
-        // 3) Build ancestor-or-self predicate using closest ancestor with prioritized attributes
         String ancAttrName = null;
         String ancAttrValue = null;
 
         outerAnc:
         for (String attr : effectiveAttrs) {
             WebElement current = element;
-
-            // Walk up via parent::* but cap the number of nodes checked if configured.
             int checkedAncestors = 0;
-
             while (true) {
                 if (maxAncestorNodes > 0 && checkedAncestors >= maxAncestorNodes) {
                     break;
                 }
-
                 WebElement parent;
                 try {
-                    // move up to the parent element first
                     final WebElement currentForParentLookup = current;
                     parent = withoutImplicitWait(
                             driver,
                             () -> currentForParentLookup.findElement(By.xpath("parent::*"))
                     );
                 } catch (NoSuchElementException | InvalidSelectorException e) {
-                    break; // hit the top (e.g. <html> or document boundary)
+                    break;
                 }
-
                 if (parent.equals(current)) {
                     break;
                 }
 
                 current = parent;
                 checkedAncestors++;
-
-                // NOW check the ancestor's attribute (self is never checked here)
                 String v = getAttrOrEmpty(current, attr);
                 if (!v.isEmpty()) {
                     ancAttrName = attr;
@@ -477,7 +449,6 @@ public class ElementWrapper implements WebElement, WrapsElement {
 
         StringBuilder predicateBuilder = new StringBuilder();
         predicateBuilder.append(mainPredicate);
-
         if (ancAttrName != null) {
             predicateBuilder.append(" and ancestor-or-self::*[@")
                     .append(ancAttrName)
@@ -497,10 +468,7 @@ public class ElementWrapper implements WebElement, WrapsElement {
             int maxDescendantNodes,
             List<String>... attrPriorityGroups
     ) {
-
         String tag = safeTagName(element);
-
-        // Default attribute groups if none supplied
         List<List<String>> effectiveGroups =
                 (attrPriorityGroups == null || attrPriorityGroups.length == 0)
                         ? List.of(List.of("id", "data-user-id"))
@@ -509,13 +477,8 @@ public class ElementWrapper implements WebElement, WrapsElement {
         String descAttrName = null;
         String descAttrValue = null;
 
-        // ------------------------------------------------------------
-        // 1) Descendant-or-self search (single XPath per group)
-        // ------------------------------------------------------------
         outerDesc:
         for (List<String> group : effectiveGroups) {
-
-            // ---- self check first (priority preserved)
             for (String attr : group) {
                 String selfVal = getAttrOrEmpty(element, attr);
                 if (!selfVal.isEmpty()) {
@@ -525,7 +488,6 @@ public class ElementWrapper implements WebElement, WrapsElement {
                 }
             }
 
-            // ---- descendant search (single XPath using OR)
             try {
                 String orPredicate = group.stream()
                         .map(a -> "@" + a)
@@ -543,9 +505,10 @@ public class ElementWrapper implements WebElement, WrapsElement {
                     xpathExpr = ".//*[" + orPredicate + "]";
                 }
 
-                WebElement d = withoutImplicitWait(driver, () -> element.findElement(By.xpath(xpathExpr)));
-
-                // pick first attribute in group priority order
+                WebElement d = withoutImplicitWait(
+                        driver,
+                        () -> element.findElement(By.xpath(xpathExpr))
+                );
                 for (String attr : group) {
                     String v = getAttrOrEmpty(d, attr);
                     if (!v.isEmpty()) {
@@ -558,9 +521,6 @@ public class ElementWrapper implements WebElement, WrapsElement {
             }
         }
 
-        // ------------------------------------------------------------
-        // 2) Main predicate
-        // ------------------------------------------------------------
         String mainPredicate;
         if (descAttrName != null) {
             mainPredicate = "descendant-or-self::*[@" + descAttrName + "="
@@ -569,9 +529,6 @@ public class ElementWrapper implements WebElement, WrapsElement {
             mainPredicate = buildChildrenShapePredicate(driver, element);
         }
 
-        // ------------------------------------------------------------
-        // 3) Ancestor search (grouped attributes, depth-limited)
-        // ------------------------------------------------------------
         String ancAttrName = null;
         String ancAttrValue = null;
 
@@ -579,16 +536,17 @@ public class ElementWrapper implements WebElement, WrapsElement {
         for (List<String> group : effectiveGroups) {
             WebElement current = element;
             int checkedAncestors = 0;
-
             while (true) {
                 if (maxAncestorNodes > 0 && checkedAncestors >= maxAncestorNodes) {
                     break;
                 }
-
                 WebElement parent;
                 try {
                     final WebElement currentForParentLookup = current;
-                    parent = withoutImplicitWait(driver, () -> currentForParentLookup.findElement(By.xpath("parent::*")));
+                    parent = withoutImplicitWait(
+                            driver,
+                            () -> currentForParentLookup.findElement(By.xpath("parent::*"))
+                    );
                 } catch (NoSuchElementException | InvalidSelectorException e) {
                     break;
                 }
@@ -596,7 +554,6 @@ public class ElementWrapper implements WebElement, WrapsElement {
                 if (parent.equals(current)) {
                     break;
                 }
-
                 current = parent;
                 checkedAncestors++;
 
@@ -611,12 +568,8 @@ public class ElementWrapper implements WebElement, WrapsElement {
             }
         }
 
-        // ------------------------------------------------------------
-        // 4) Assemble final XPath
-        // ------------------------------------------------------------
         StringBuilder predicateBuilder = new StringBuilder();
         predicateBuilder.append(mainPredicate);
-
         if (ancAttrName != null) {
             predicateBuilder.append(" and ancestor-or-self::*[@")
                     .append(ancAttrName)
@@ -628,27 +581,29 @@ public class ElementWrapper implements WebElement, WrapsElement {
         return "//" + tag + "[" + predicateBuilder + "]";
     }
 
-
-    // Convenience overload: uses default attr priority
     private static String buildXPathForElement(
             WebDriver driver,
             WebElement element,
             int maxAncestorDepth,
             int maxDescendantDepth) {
-        return buildXPathForElement(driver, element, maxAncestorDepth, maxDescendantDepth, (String[]) null);
+        return buildXPathForElement(
+                driver,
+                element,
+                maxAncestorDepth,
+                maxDescendantDepth,
+                (String[]) null
+        );
     }
 
-    /**
-     * If we don't have any good attributes in the subtree, describe the shape of the direct
-     * children: either [not(*)] for no children, or [child::tag1 and child::tag2 ...].
-     */
     private static String buildChildrenShapePredicate(WebDriver driver, WebElement element) {
-        List<WebElement> children = withoutImplicitWait(driver, () -> element.findElements(By.xpath("./*")));
+        List<WebElement> children = withoutImplicitWait(
+                driver,
+                () -> element.findElements(By.xpath("./*"))
+        );
         if (children.isEmpty()) {
             return "not(*)";
         }
 
-        // Use a LinkedHashSet to keep insertion order and avoid duplicates
         Set<String> tags = new LinkedHashSet<>();
         for (WebElement child : children) {
             tags.add(safeTagName(child));
@@ -686,7 +641,6 @@ public class ElementWrapper implements WebElement, WrapsElement {
         if (value == null) return "''";
         if (!value.contains("'")) return "'" + value + "'";
         if (!value.contains("\"")) return "\"" + value + "\"";
-
         StringBuilder sb = new StringBuilder("concat(");
         boolean first = true;
         for (char c : value.toCharArray()) {
@@ -700,15 +654,27 @@ public class ElementWrapper implements WebElement, WrapsElement {
         return sb.toString();
     }
 
-
     private List<WebElement> getElementList(WebDriver driver, String xpathyWithId) {
         logTrace("getElementList.xpathyWithId: " + xpathyWithId);
-        return withoutImplicitWait(driver, () -> elementMatch.contextWrapper.getFinalSearchContext().findElements(new By.ByXPath(xpathyWithId)));
+        return withoutImplicitWait(
+                driver,
+                () -> elementMatch.contextWrapper
+                        .getFinalSearchContext()
+                        .findElements(new By.ByXPath(xpathyWithId))
+        );
     }
 
     @Override
     public WebElement getWrappedElement() {
         return element;
+    }
+
+    /**
+     * Compatibility alias for callers using the original ElementWrapper API.
+     * New framework code should normally use the wrapper directly.
+     */
+    public WebElement getElement() {
+        return getWrappedElement();
     }
 
     /**
@@ -830,17 +796,25 @@ public class ElementWrapper implements WebElement, WrapsElement {
         return executeWithStaleRetry(currentElement -> currentElement.getScreenshotAs(target));
     }
 
+    /**
+     * Best-effort element-scoped center scrolling. Stale-element failures are relocated and the
+     * complete script is retried once by executeScript. A second stale failure is propagated;
+     * other WebDriver scrolling failures remain non-fatal.
+     */
     public void scrollIntoView() {
         try {
-            executeVoidWithStaleRetry(currentElement -> centerScroll(driver, currentElement));
-        } catch (RuntimeException ignored) {
-            // Best-effort scroll.
+            executeScript(CENTER_SCROLL_SCRIPT);
+        } catch (StaleElementReferenceException stale) {
+            throw stale;
+        } catch (WebDriverException ignored) {
+            // Preserve best-effort scrolling for non-stale WebDriver failures.
         }
     }
 
     @Override
     public boolean isDisplayed() {
-        if (elementMatch.categoryFlags.contains(ExecutionDictionary.CategoryFlags.NON_DISPLAY_ELEMENT))
+        if (elementMatch.categoryFlags.contains(
+                ExecutionDictionary.CategoryFlags.NON_DISPLAY_ELEMENT))
             return true;
         scrollIntoView();
         return executeWithStaleRetry(WebElement::isDisplayed);
@@ -857,10 +831,14 @@ public class ElementWrapper implements WebElement, WrapsElement {
         if (snapshotContainsAnyAttribute("aria-live", "aria-atomic", "aria-relevant")) {
             return true;
         }
-        if (snapshotAttributeEqualsIgnoreCase("role", "status", "alert", "log", "timer", "marquee")) {
-            return true;
-        }
-        return false;
+        return snapshotAttributeEqualsIgnoreCase(
+                "role",
+                "status",
+                "alert",
+                "log",
+                "timer",
+                "marquee"
+        );
     }
 
     @Override
@@ -912,9 +890,11 @@ public class ElementWrapper implements WebElement, WrapsElement {
         return !getElementReturnValue().isBlank();
     }
 
-
     public void close() {
-        String closeXpath = getExecutionDictionary().getCategoryXPathy("Close Button").getXpath().replaceFirst("^//\\*", "descendant-or-self::*");
+        String closeXpath = getExecutionDictionary()
+                .getCategoryXPathy("Close Button")
+                .getXpath()
+                .replaceFirst("^//\\*", "descendant-or-self::*");
         executeVoidWithStaleRetry(currentElement -> {
             WebElement closeButton = currentElement.findElement(new By.ByXPath(closeXpath));
             closeButton.click();
@@ -929,7 +909,6 @@ public class ElementWrapper implements WebElement, WrapsElement {
                 .asText(null);
     }
 
-
     public boolean snapshotAttributeEqualsIgnoreCase(String name, String... candidates) {
         if (attributeSnapshot == null || candidates == null) {
             return false;
@@ -938,7 +917,6 @@ public class ElementWrapper implements WebElement, WrapsElement {
                 .path("attributes")
                 .path(name)
                 .asText(null);
-
         if (value == null) {
             return false;
         }
@@ -955,7 +933,6 @@ public class ElementWrapper implements WebElement, WrapsElement {
             return false;
         }
         var attributesNode = attributeSnapshot.path("attributes");
-
         for (String key : keys) {
             if (key != null && attributesNode.has(key)) {
                 return true;
@@ -963,7 +940,6 @@ public class ElementWrapper implements WebElement, WrapsElement {
         }
         return false;
     }
-
 
     public String getSnapshotValue(String key) {
         if (attributeSnapshot == null) return null;
@@ -989,5 +965,4 @@ public class ElementWrapper implements WebElement, WrapsElement {
     public int getSameTagIndex() {
         return attributeSnapshot.get("sameTagIndex").intValue();
     }
-
 }
