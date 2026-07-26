@@ -9,6 +9,7 @@ import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.Actions;
 import org.openqa.selenium.support.ui.Select;
 import tools.dscode.common.assertions.ValueWrapper;
+import tools.dscode.common.seleniumextensions.ElementWrapper;
 
 import java.time.Duration;
 import java.util.List;

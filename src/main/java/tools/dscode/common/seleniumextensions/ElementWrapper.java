@@ -30,7 +30,7 @@ import static tools.dscode.common.util.debug.DebugUtils.debugFlags;
 
 
 
-public class ElementWrapper {
+public class ElementWrapper implements WebElement, WrapsElement {
 
     private final WebDriver driver;
     public WebElement element;
@@ -75,7 +75,7 @@ public class ElementWrapper {
         this.elementMatch = elementMatch;
         this.element = Objects.requireNonNull(element, "element must not be null");
 
-        takeSnapshot();
+        takeSnapshot(this.element);
         if (debugFlags.contains("elementsnapshot"))
             System.out.println(attributeSnapshot.toPrettyString());
 
@@ -88,44 +88,53 @@ public class ElementWrapper {
     }
 
     public void takeSnapshot() {
-        this.attributeSnapshot = MAPPER.createObjectNode();
-        if (!(driver instanceof JavascriptExecutor js)) {
-            throw new IllegalArgumentException(
-                    "WebDriver must implement JavascriptExecutor to use ElementWrapper");
-        }
+        executeWithStaleRetry(currentElement -> {
+            takeSnapshot(currentElement);
+            return null;
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private void takeSnapshot(WebElement snapshotElement) {
+        ObjectNode snapshot = MAPPER.createObjectNode();
+        JavascriptExecutor js = javascriptExecutor();
+
         // tagName
-        String tagName = safeTagName(element);
-        attributeSnapshot.put("tagName", tagName);
+        String tagName = safeTagName(snapshotElement);
+        snapshot.put("tagName", tagName);
 
         // textContent (DOM text, not just visible text)
         String textContent;
         if ("textarea".equals(tagName) || "input".equals(tagName)) {
-            textContent = safeDomAttribute(element, "value");
+            textContent = safeDomAttribute(snapshotElement, "value");
         } else if ("select".equals(tagName)) {
             textContent = (String) js.executeScript(
-                    "var sel = arguments[0]; return sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';", element
+                    "var sel = arguments[0]; return sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';",
+                    snapshotElement
             );
         } else {
             textContent = (String) js.executeScript(
-                    "return arguments[0].innerText;", element
+                    "return arguments[0].innerText;",
+                    snapshotElement
             );
             if (textContent == null || textContent.isEmpty()) {
-                textContent = safeDomAttribute(element, "value");
+                textContent = safeDomAttribute(snapshotElement, "value");
             }
         }
-        attributeSnapshot.put("textContent", textContent == null ? "" : textContent);
+        snapshot.put("textContent", textContent == null ? "" : textContent);
 
-        List<WebElement> children = withoutImplicitWait(driver, () -> element.findElements(By.xpath("./*[@selected]")));
-        String childValue = "";
+        List<WebElement> children = withoutImplicitWait(
+                driver,
+                () -> snapshotElement.findElements(By.xpath("./*[@selected]"))
+        );
+        StringBuilder childValue = new StringBuilder();
+        for (WebElement child : children) {
+            String value = safeDomAttribute(child, "value");
+            childValue.append(value == null ? child.getText() : value);
+        }
         if (!children.isEmpty()) {
-            for (WebElement child : children) {
-                String temp = safeDomAttribute(child, "value");
-
-                childValue += temp == null ? child.getText() : temp;
-            }
-            attributeSnapshot.put("childValue", childValue);
+            snapshot.put("childValue", childValue.toString());
         }
-
 
         // all attributes as name:value
         Map<String, String> attrs = (Map<String, String>) js.executeScript(
@@ -136,13 +145,13 @@ public class ElementWrapper {
                         "  out[a.name] = a.value;" +
                         "}" +
                         "return out;",
-                element
+                snapshotElement
         );
 
-        ObjectNode attrNode = attributeSnapshot.putObject("attributes");
-        attrs.forEach(attrNode::put);
-
-        // ---- added: sibling indexes ----
+        ObjectNode attrNode = snapshot.putObject("attributes");
+        if (attrs != null) {
+            attrs.forEach(attrNode::put);
+        }
 
         int siblingIndex = ((Number) js.executeScript(
                 "var el = arguments[0];" +
@@ -152,9 +161,9 @@ public class ElementWrapper {
                         "  i++;" +
                         "}" +
                         "return i;",
-                element
+                snapshotElement
         )).intValue();
-        attributeSnapshot.put("siblingIndex", siblingIndex);
+        snapshot.put("siblingIndex", siblingIndex);
 
         int sameTagIndex = ((Number) js.executeScript(
                 "var el = arguments[0];" +
@@ -165,9 +174,11 @@ public class ElementWrapper {
                         "  if (el.tagName === tag) i++;" +
                         "}" +
                         "return i;",
-                element
+                snapshotElement
         )).intValue();
-        attributeSnapshot.put("sameTagIndex", sameTagIndex);
+        snapshot.put("sameTagIndex", sameTagIndex);
+
+        this.attributeSnapshot = snapshot;
     }
 
 
@@ -175,12 +186,6 @@ public class ElementWrapper {
     // Public API
     // -------------------------
 
-    public WebElement getElement() {
-        if (isStale(this.element)) {
-            this.element = refindElement();
-        }
-        return this.element;
-    }
 
     public ObjectNode getAttributeSnapshot() {
         return attributeSnapshot;
@@ -194,18 +199,18 @@ public class ElementWrapper {
 
         switch (elementMatch.category) {
             case "Field":
-                List<WebElement> valueElements = withoutImplicitWait(driver, () -> element.findElements(By.xpath("descendant::*[contains(@class,'Read')]")));
+                List<WebElement> valueElements = withoutImplicitWait(driver, () -> findElements(By.xpath("descendant::*[contains(@class,'Read')]")));
                 if (!valueElements.isEmpty()) {
                     String returnVal = valueElements.getLast().getText();
                     attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
                     return createValueWrapper(returnVal);
                 }
-                if (element.getTagName().equals("td")) {
-                    String returnVal = element.getText();
+                if (getTagName().equals("td")) {
+                    String returnVal = getText();
                     attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
                     return createValueWrapper(returnVal);
                 }
-                valueElements = withoutImplicitWait(driver, () -> element.findElements(By.xpath("*[normalize-space(.)][1]/following-sibling::*[descendant-or-self::*[text()]]")));
+                valueElements = withoutImplicitWait(driver, () -> findElements(By.xpath("*[normalize-space(.)][1]/following-sibling::*[descendant-or-self::*[text()]]")));
                 if (valueElements.size() == 1) {
                     String returnVal = valueElements.getLast().getText();
                     attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
@@ -226,7 +231,9 @@ public class ElementWrapper {
                 attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
                 return createValueWrapper(returnVal);
             } else if (DOM_PROPERTY_FALLBACK_KEYS.contains(key)) {
-                String returnVal = safeDomProperty(getElement(), key);
+                String fallbackKey = key;
+                String returnVal = executeWithStaleRetry(
+                        currentElement -> safeDomProperty(currentElement, fallbackKey));
                 if (returnVal != null) {
                     node.put(key, returnVal);
                     attributeSnapshot.put(ELEMENT_RETURN_VALUE, returnVal);
@@ -258,24 +265,47 @@ public class ElementWrapper {
         }
     }
 
-    private boolean isStale(WebElement el) {
-        if (el == null) return true;
+    private <T> T executeWithStaleRetry(java.util.function.Function<WebElement, T> operation) {
+        WebElement currentElement = this.element;
         try {
-            el.isEnabled(); // simple touch; throws if stale
-            return false;
-        } catch (WebDriverException e) {
-            return true;
+            return operation.apply(currentElement);
+        } catch (StaleElementReferenceException stale) {
+            WebElement refreshedElement = refindElement();
+            return operation.apply(refreshedElement);
         }
+    }
+
+    private void executeVoidWithStaleRetry(java.util.function.Consumer<WebElement> operation) {
+        executeWithStaleRetry(currentElement -> {
+            operation.accept(currentElement);
+            return null;
+        });
+    }
+
+    private JavascriptExecutor javascriptExecutor() {
+        if (driver instanceof JavascriptExecutor js) {
+            return js;
+        }
+        throw new IllegalArgumentException(
+                "WebDriver must implement JavascriptExecutor to use ElementWrapper");
+    }
+
+    private static Object[] prependElement(WebElement currentElement, Object[] arguments) {
+        Object[] additionalArguments = arguments == null ? new Object[0] : arguments;
+        Object[] combinedArguments = new Object[additionalArguments.length + 1];
+        combinedArguments[0] = currentElement;
+        System.arraycopy(additionalArguments, 0, combinedArguments, 1, additionalArguments.length);
+        return combinedArguments;
     }
 
     private WebElement refindElement() {
         safeWaitForPageReady(driver, Duration.ofSeconds(60));
-        element = refindUniqueElement();
-        safeWaitForElementReady(driver, element, Duration.ofSeconds(60));
-        takeSnapshot();
-        return element;
+        WebElement refreshedElement = refindUniqueElement();
+        safeWaitForElementReady(driver, refreshedElement, Duration.ofSeconds(60));
+        this.element = refreshedElement;
+        takeSnapshot(refreshedElement);
+        return refreshedElement;
     }
-
 
     private WebElement refindUniqueElement() {
 
@@ -303,7 +333,7 @@ public class ElementWrapper {
         if (elementList4.isEmpty()) {
             List<WebElement> elementList5 = union(elementList1, elementList2);
             if (elementList5.size() == 1) {
-                return elementList3.getFirst();
+                return elementList5.getFirst();
             }
         }
 
@@ -330,7 +360,7 @@ public class ElementWrapper {
         if (elementList7.size() > 1 && matchIndex != null) {
             List<WebElement> elementList8 = getElementList(driver, "(" + elementMatch.contextWrapper.elementTerminalXPath.getXpath() + ")[" + matchIndex + "]");
             if (elementList8.size() == 1) {
-                return elementList7.getFirst();
+                return elementList8.getFirst();
             }
         }
 
@@ -459,6 +489,7 @@ public class ElementWrapper {
         return "//" + tag + "[" + predicateBuilder + "]";
     }
 
+    @SafeVarargs
     private static String buildXPathForElement(
             WebDriver driver,
             WebElement element,
@@ -473,7 +504,7 @@ public class ElementWrapper {
         List<List<String>> effectiveGroups =
                 (attrPriorityGroups == null || attrPriorityGroups.length == 0)
                         ? List.of(List.of("id", "data-user-id"))
-                        : List.of(attrPriorityGroups);
+                        : Arrays.asList(attrPriorityGroups);
 
         String descAttrName = null;
         String descAttrValue = null;
@@ -675,24 +706,149 @@ public class ElementWrapper {
         return withoutImplicitWait(driver, () -> elementMatch.contextWrapper.getFinalSearchContext().findElements(new By.ByXPath(xpathyWithId)));
     }
 
+    @Override
+    public WebElement getWrappedElement() {
+        return element;
+    }
+
+    /**
+     * Executes JavaScript with this wrapper's current element supplied as arguments[0].
+     * Any additional arguments begin at arguments[1].
+     */
+    public Object executeScript(String script, Object... arguments) {
+        Objects.requireNonNull(script, "script must not be null");
+        JavascriptExecutor js = javascriptExecutor();
+        return executeWithStaleRetry(currentElement ->
+                js.executeScript(script, prependElement(currentElement, arguments)));
+    }
+
+    /**
+     * Executes asynchronous JavaScript with this wrapper's current element supplied as arguments[0].
+     * Any additional arguments begin at arguments[1].
+     */
+    public Object executeAsyncScript(String script, Object... arguments) {
+        Objects.requireNonNull(script, "script must not be null");
+        JavascriptExecutor js = javascriptExecutor();
+        return executeWithStaleRetry(currentElement ->
+                js.executeAsyncScript(script, prependElement(currentElement, arguments)));
+    }
+
+    @Override
+    public void click() {
+        executeVoidWithStaleRetry(WebElement::click);
+    }
+
+    @Override
+    public void submit() {
+        executeVoidWithStaleRetry(WebElement::submit);
+    }
+
+    @Override
+    public void sendKeys(CharSequence... keysToSend) {
+        executeVoidWithStaleRetry(currentElement -> currentElement.sendKeys(keysToSend));
+    }
+
+    @Override
+    public void clear() {
+        executeVoidWithStaleRetry(WebElement::clear);
+    }
+
+    @Override
+    public String getDomProperty(String name) {
+        return executeWithStaleRetry(currentElement -> currentElement.getDomProperty(name));
+    }
+
+    @Override
+    public String getDomAttribute(String name) {
+        return executeWithStaleRetry(currentElement -> currentElement.getDomAttribute(name));
+    }
+
+    @Override
+    public String getAttribute(String name) {
+        return executeWithStaleRetry(currentElement -> currentElement.getAttribute(name));
+    }
+
+    @Override
+    public String getAriaRole() {
+        return executeWithStaleRetry(WebElement::getAriaRole);
+    }
+
+    @Override
+    public String getAccessibleName() {
+        return executeWithStaleRetry(WebElement::getAccessibleName);
+    }
+
+    @Override
+    public boolean isSelected() {
+        return executeWithStaleRetry(WebElement::isSelected);
+    }
+
+    @Override
+    public String getText() {
+        return executeWithStaleRetry(WebElement::getText);
+    }
+
+    @Override
+    public List<WebElement> findElements(By by) {
+        Objects.requireNonNull(by, "by must not be null");
+        return executeWithStaleRetry(currentElement -> currentElement.findElements(by));
+    }
+
+    @Override
+    public WebElement findElement(By by) {
+        Objects.requireNonNull(by, "by must not be null");
+        return executeWithStaleRetry(currentElement -> currentElement.findElement(by));
+    }
+
+    @Override
+    public SearchContext getShadowRoot() {
+        return executeWithStaleRetry(WebElement::getShadowRoot);
+    }
+
+    @Override
+    public Point getLocation() {
+        return executeWithStaleRetry(WebElement::getLocation);
+    }
+
+    @Override
+    public Dimension getSize() {
+        return executeWithStaleRetry(WebElement::getSize);
+    }
+
+    @Override
+    public Rectangle getRect() {
+        return executeWithStaleRetry(WebElement::getRect);
+    }
+
+    @Override
+    public String getCssValue(String propertyName) {
+        return executeWithStaleRetry(currentElement -> currentElement.getCssValue(propertyName));
+    }
+
+    @Override
+    public <X> X getScreenshotAs(OutputType<X> target) throws WebDriverException {
+        return executeWithStaleRetry(currentElement -> currentElement.getScreenshotAs(target));
+    }
+
     public void scrollIntoView() {
         try {
-            centerScroll(driver, element);
+            executeVoidWithStaleRetry(currentElement -> centerScroll(driver, currentElement));
         } catch (RuntimeException ignored) {
-            // Best-effort scroll;
+            // Best-effort scroll.
         }
     }
 
+    @Override
     public boolean isDisplayed() {
         if (elementMatch.categoryFlags.contains(ExecutionDictionary.CategoryFlags.NON_DISPLAY_ELEMENT))
             return true;
         scrollIntoView();
-        return getElement().isDisplayed();
+        return executeWithStaleRetry(WebElement::isDisplayed);
     }
 
     public boolean screenReaderOnlyCheck() {
         if (possibleScreenReaderElement()) {
-            return !getElement().isDisplayed();
+            return !executeWithStaleRetry(WebElement::isDisplayed);
         }
         return false;
     }
@@ -707,28 +863,45 @@ public class ElementWrapper {
         return false;
     }
 
+    @Override
     public boolean isEnabled() {
-        return getElement().isEnabled();
+        return executeWithStaleRetry(WebElement::isEnabled);
+    }
+
+    private static boolean isRequiredElement(WebElement currentElement) {
+        return isElementRequired(currentElement);
+    }
+
+    private static boolean isExpandedElement(WebElement currentElement) {
+        return isExpandedState(currentElement);
+    }
+
+    private static boolean isCollapsedElement(WebElement currentElement) {
+        return isCollapsedState(currentElement);
+    }
+
+    private static boolean isOnElement(WebElement currentElement) {
+        return isCheckedSelectedOrOn(currentElement);
     }
 
     public boolean isRequired() {
-        return isElementRequired(getElement());
+        return executeWithStaleRetry(ElementWrapper::isRequiredElement);
     }
 
     public boolean isExpanded() {
-        return isExpandedState(getElement());
+        return executeWithStaleRetry(ElementWrapper::isExpandedElement);
     }
 
     public boolean isCollapsed() {
-        return isCollapsedState(getElement());
+        return executeWithStaleRetry(ElementWrapper::isCollapsedElement);
     }
 
     public boolean isOn() {
-        return isCheckedSelectedOrOn(getElement());
+        return executeWithStaleRetry(ElementWrapper::isOnElement);
     }
 
     public boolean isOff() {
-        return !isCheckedSelectedOrOn(getElement());
+        return !executeWithStaleRetry(ElementWrapper::isOnElement);
     }
 
     public boolean isBlank() {
@@ -742,8 +915,10 @@ public class ElementWrapper {
 
     public void close() {
         String closeXpath = getExecutionDictionary().getCategoryXPathy("Close Button").getXpath().replaceFirst("^//\\*", "descendant-or-self::*");
-        WebElement closeButton = getElement().findElement(new By.ByXPath(closeXpath));
-        closeButton.click();
+        executeVoidWithStaleRetry(currentElement -> {
+            WebElement closeButton = currentElement.findElement(new By.ByXPath(closeXpath));
+            closeButton.click();
+        });
     }
 
     public String getSnapshotAttribute(String name) {
@@ -802,6 +977,7 @@ public class ElementWrapper {
                 .asText(null);
     }
 
+    @Override
     public String getTagName() {
         return attributeSnapshot.get("tagName").asText("");
     }

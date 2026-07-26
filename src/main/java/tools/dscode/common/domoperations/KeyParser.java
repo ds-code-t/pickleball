@@ -5,6 +5,7 @@ import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.interactions.Actions;
+import tools.dscode.common.seleniumextensions.ElementWrapper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -85,7 +86,7 @@ public final class KeyParser {
     /**
      * Sends to a specific element. Focus/click is NOT forced.
      */
-    public static void sendComplexKeys(WebDriver driver, WebElement element, String input) {
+    public static void sendComplexKeys(WebDriver driver, ElementWrapper element, String input) {
         if (element == null) {
             sendComplexKeys(driver, input);
             return;

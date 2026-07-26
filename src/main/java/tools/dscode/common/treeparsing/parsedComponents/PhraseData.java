@@ -98,11 +98,9 @@ public abstract class PhraseData extends PassedData {
     public SearchContext getSearchContext() {
 
         if (contextElement != null) {
-            WebElement element = contextElement.getElement();
-
-            if (element == null)
+            if (contextElement.element == null)
                 throw new RuntimeException("Element not found: " + contextElement.elementMatch + " at " + contextElement.elementMatch.xPathy);
-            return element;
+            return contextElement;
         }
         if (searchContext == null) {
             return getDriver();

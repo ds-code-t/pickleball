@@ -67,7 +67,7 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch filePathElement = phraseData.resultElements.get(1);
 
             phraseData.result = Attempt.run(repetition, 500, () -> {
-                WebElement inputElement = fileInputElement.getElementWrappers().getFirst().getElement();
+                WebElement inputElement = fileInputElement.getElementWrappers().getFirst();
                 FileUploadUtil.createTempAndUpload(getCurrentDriver(), inputElement, filePathElement.getValue().toString());
                 return true;
             });
@@ -90,7 +90,7 @@ public enum ActionOperations implements OperationsInterface {
             ElementMatch filePathElement = phraseData.resultElements.get(1);
 
             phraseData.result = Attempt.run(repetition, 500, () -> {
-                WebElement inputElement = fileInputElement.getElementWrappers().getFirst().getElement();
+                ElementWrapper inputElement = fileInputElement.getElementWrappers().getFirst();
                 FileUploadUtil.upload(getCurrentDriver(), inputElement, filePathElement.getValue().toString());
                 return true;
             });
@@ -247,12 +247,12 @@ public enum ActionOperations implements OperationsInterface {
                         ElementWrapper optionElement = selection.getElementWrappers().getFirst();
 
                         if (optionElement.getTagName().equalsIgnoreCase("option")) {
-                            selectDropdownByIndex(getCurrentDriver(), dropDownWrapper.getElement(), optionElement.getSameTagIndex());
+                            selectDropdownByIndex(getCurrentDriver(), dropDownWrapper, optionElement.getSameTagIndex());
                         } else {
-                            click(getCurrentDriver(), optionElement.getElement());
+                            click(getCurrentDriver(), optionElement);
                         }
                     } else {
-                        selectDropdownByVisibleText(getCurrentDriver(), dropDownWrapper.getElement(), selection.getValue());
+                        selectDropdownByVisibleText(getCurrentDriver(), dropDownWrapper, selection.getValue());
                     }
                     count++;
                 }
@@ -281,7 +281,7 @@ public enum ActionOperations implements OperationsInterface {
                     if (waitOnPageLoad && count > 0) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
-                    hover(getCurrentDriver(), elementWrapper.getElement());
+                    hover(getCurrentDriver(), elementWrapper);
                     count++;
                 }
                 return true;
@@ -309,7 +309,7 @@ public enum ActionOperations implements OperationsInterface {
                     if (waitOnPageLoad && count > 0) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
-                    click(getCurrentDriver(), elementWrapper.getElement());
+                    click(getCurrentDriver(), elementWrapper);
                     count++;
                 }
                 return true;
@@ -339,7 +339,7 @@ public enum ActionOperations implements OperationsInterface {
                     if (waitOnPageLoad && count > 0) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
-                    doubleClick(getCurrentDriver(), elementWrapper.getElement());
+                    doubleClick(getCurrentDriver(), elementWrapper);
                     count++;
                 }
                 return true;
@@ -365,7 +365,7 @@ public enum ActionOperations implements OperationsInterface {
                     if (waitOnPageLoad && count > 0) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
-                    contextClick(getCurrentDriver(), elementWrapper.getElement());
+                    contextClick(getCurrentDriver(), elementWrapper);
                     count++;
                 }
                 return true;
@@ -419,7 +419,7 @@ public enum ActionOperations implements OperationsInterface {
                     if (waitOnPageLoad && count > 0) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
                     }
-                    wheelScrollBy(getCurrentDriver(), elementWrapper.getElement());
+                    wheelScrollBy(getCurrentDriver(), elementWrapper);
                     count++;
                 }
                 return true;
@@ -594,7 +594,7 @@ public enum ActionOperations implements OperationsInterface {
                 }
 
                 for (ElementWrapper wrapper : wrappers) {
-                    WebElement webElement = (wrapper == null) ? null : wrapper.getElement();
+                    ElementWrapper webElement = (wrapper == null) ? null : wrapper;
 
                     if (waitOnPageLoad && count > 0) {
                         safeWaitForPageReady(getCurrentDriver(), Duration.ofSeconds(60), 300);
@@ -609,7 +609,7 @@ public enum ActionOperations implements OperationsInterface {
         });
     }
 
-    private void applyTextOps(WebElement webElement,
+    private void applyTextOps(ElementWrapper webElement,
                               List<ValueWrapper> valuesToEnter,
                               boolean shouldClear,
                               boolean shouldEnterText,
