@@ -36,7 +36,7 @@ public final class HumanInteractions {
     // =======================
 
     public static void selectDropdownByIndex(WebDriver driver,
-                                             WebElement element,
+                                             ElementWrapper element,
                                              int index) {
 
         if (index < 0) {
@@ -57,7 +57,7 @@ public final class HumanInteractions {
     }
 
     public static void selectDropdownByVisibleText(WebDriver driver,
-                                                   WebElement container,
+                                                   ElementWrapper container,
                                                    ValueWrapper valueWrapper) {
 
         String text = valueWrapper.asNormalizedText();
@@ -105,7 +105,7 @@ public final class HumanInteractions {
      * <p>
      * IMPORTANT: Use element-targeted click(el) to avoid "active element" ambiguity.
      */
-    public static void click(WebDriver driver, WebElement el) {
+    public static void click(WebDriver driver, ElementWrapper el) {
         Objects.requireNonNull(el);
         try {
             centerScroll(driver, el);
@@ -128,7 +128,7 @@ public final class HumanInteractions {
     /**
      * Move and double-click (user-like). JS fallback dispatches dblclick.
      */
-    public static void doubleClick(WebDriver driver, WebElement el) {
+    public static void doubleClick(WebDriver driver, ElementWrapper el) {
         Objects.requireNonNull(el);
         try {
             centerScroll(driver, el);
@@ -149,7 +149,7 @@ public final class HumanInteractions {
     /**
      * Move and context-click. JS fallback dispatches contextmenu.
      */
-    public static void contextClick(WebDriver driver, WebElement el) {
+    public static void contextClick(WebDriver driver, ElementWrapper el) {
         Objects.requireNonNull(el);
         try {
             centerScroll(driver, el);
@@ -170,7 +170,7 @@ public final class HumanInteractions {
     /**
      * Just hover; useful to open menus/tooltips. JS fallback dispatches mouseover/mouseenter.
      */
-    public static void hover(WebDriver driver, WebElement el) {
+    public static void hover(WebDriver driver, ElementWrapper el) {
         Objects.requireNonNull(el);
         try {
             centerScroll(driver, el);
@@ -185,7 +185,7 @@ public final class HumanInteractions {
     /**
      * Drag source element onto target. JS fallback uses HTML5 drag/drop dispatch.
      */
-    public static void dragAndDrop(WebDriver driver, WebElement source, WebElement target) {
+    public static void dragAndDrop(WebDriver driver, ElementWrapper source, ElementWrapper target) {
         Objects.requireNonNull(source);
         Objects.requireNonNull(target);
         try {
@@ -207,7 +207,7 @@ public final class HumanInteractions {
     /**
      * Drag by an x/y offset. JS fallback tries HTML5 drag with offset.
      */
-    public static void dragByOffset(WebDriver driver, WebElement source, int xOffset, int yOffset) {
+    public static void dragByOffset(WebDriver driver, ElementWrapper source, int xOffset, int yOffset) {
         Objects.requireNonNull(source);
         try {
             centerScroll(driver, source);
@@ -227,11 +227,11 @@ public final class HumanInteractions {
     /**
      * Wheel-scroll the element into view center, then nudge by deltaY pixels.
      */
-    public static void wheelScrollBy(WebDriver driver, WebElement el) {
+    public static void wheelScrollBy(WebDriver driver, ElementWrapper el) {
         wheelScrollBy(driver, el, 0);
     }
 
-    public static void wheelScrollBy(WebDriver driver, WebElement el, int deltaY) {
+    public static void wheelScrollBy(WebDriver driver, ElementWrapper el, int deltaY) {
         Objects.requireNonNull(el);
         try {
             centerScroll(driver, el);
@@ -251,9 +251,9 @@ public final class HumanInteractions {
      * Focus element, clear (Ctrl/Cmd+A + Delete), then type text.
      * JS fallback sets value + events.
      * <p>
-     * IMPORTANT: Use element-targeted sendKeys via WebElement to avoid "active element" bleed.
+     * IMPORTANT: Use element-targeted sendKeys via ElementWrapper to avoid "active element" bleed.
      */
-    public static void clearAndType(WebDriver driver, WebElement el, CharSequence text) {
+    public static void clearAndType(WebDriver driver, ElementWrapper el, CharSequence text) {
         Objects.requireNonNull(el);
         final String s = text == null ? "" : text.toString();
         try {
@@ -271,7 +271,7 @@ public final class HumanInteractions {
     }
 
 
-    public static void clear(WebDriver driver, WebElement el) {
+    public static void clear(WebDriver driver, ElementWrapper el) {
         Objects.requireNonNull(el);
         focus(driver, el);
         el.sendKeys(Keys.chord(osControlKey(), "a"));
@@ -284,7 +284,7 @@ public final class HumanInteractions {
      * <p>
      * IMPORTANT: Use element-targeted sendKeys via WebElement to avoid "active element" bleed.
      */
-    public static void typeText(WebDriver driver, WebElement el, CharSequence text) {
+    public static void typeText(WebDriver driver, ElementWrapper el, CharSequence text) {
         if (el == null) {
             typeText(driver, text);
             return;
@@ -345,9 +345,9 @@ public final class HumanInteractions {
     /**
      * Press ENTER on an element (focus first).
      * <p>
-     * IMPORTANT: Use element-targeted sendKeys via WebElement to avoid "active element" bleed.
+     * IMPORTANT: Use element-targeted sendKeys via ElementWrapper to avoid "active element" bleed.
      */
-    public static void pressEnter(WebDriver driver, WebElement el) {
+    public static void pressEnter(WebDriver driver, ElementWrapper el) {
         Objects.requireNonNull(el);
         try {
             focus(driver, el);
@@ -385,7 +385,7 @@ public final class HumanInteractions {
      * Ensure element is scrolled into view and is actually the active element.
      * This prevents Actions.sendKeys(...) style "bleed" across fields when focus is stolen.
      */
-    private static void focus(WebDriver driver, WebElement el) {
+    private static void focus(WebDriver driver, ElementWrapper el) {
         centerScroll(driver, el);
 
         // First attempt: element-targeted click via Actions (more "human" than JS focus alone)
@@ -404,7 +404,7 @@ public final class HumanInteractions {
         }
     }
 
-    private static boolean isActiveElement(WebDriver driver, WebElement el) {
+    private static boolean isActiveElement(WebDriver driver, ElementWrapper el) {
         try {
             Object result = ((JavascriptExecutor) driver).executeScript(
                     "return document.activeElement === arguments[0];", el);
@@ -415,7 +415,7 @@ public final class HumanInteractions {
         }
     }
 
-    private static void jsFocus(WebDriver driver, WebElement el) {
+    private static void jsFocus(WebDriver driver, ElementWrapper el) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const el = arguments[0];
@@ -427,7 +427,7 @@ public final class HumanInteractions {
         );
     }
 
-    private static void jsClick(WebDriver driver, WebElement el) {
+    private static void jsClick(WebDriver driver, ElementWrapper el) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const el = arguments[0];
@@ -438,7 +438,7 @@ public final class HumanInteractions {
                         """, el);
     }
 
-    private static void jsDispatchMouse(WebDriver driver, WebElement el, String type) {
+    private static void jsDispatchMouse(WebDriver driver, ElementWrapper el, String type) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const el = arguments[0], type = arguments[1];
@@ -447,7 +447,7 @@ public final class HumanInteractions {
                         """, el, type);
     }
 
-    private static void jsHover(WebDriver driver, WebElement el) {
+    private static void jsHover(WebDriver driver, ElementWrapper el) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const el = arguments[0];
@@ -457,7 +457,7 @@ public final class HumanInteractions {
                         """, el);
     }
 
-    private static void jsSetValue(WebDriver driver, WebElement el, String value, boolean clear) {
+    private static void jsSetValue(WebDriver driver, ElementWrapper el, String value, boolean clear) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const el = arguments[0], val = arguments[1], clr = arguments[2];
@@ -469,7 +469,7 @@ public final class HumanInteractions {
                         """, el, value, clear);
     }
 
-    private static void jsAppendValue(WebDriver driver, WebElement el, String value) {
+    private static void jsAppendValue(WebDriver driver, ElementWrapper el, String value) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const el = arguments[0], val = arguments[1];
@@ -479,7 +479,7 @@ public final class HumanInteractions {
                         """, el, value);
     }
 
-    private static void jsDispatchKeyboard(WebDriver driver, WebElement el, String key) {
+    private static void jsDispatchKeyboard(WebDriver driver, ElementWrapper el, String key) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const el = arguments[0], key = arguments[1];
@@ -492,7 +492,7 @@ public final class HumanInteractions {
                         """, el, key);
     }
 
-    private static void jsScrollBy(WebDriver driver, WebElement el, int dy) {
+    private static void jsScrollBy(WebDriver driver, ElementWrapper el, int dy) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const el = arguments[0], dy = arguments[1];
@@ -503,7 +503,7 @@ public final class HumanInteractions {
     /**
      * HTML5 drag/drop via DataTransfer; works for many modern UIs when Actions fails.
      */
-    private static void jsHtml5DragDrop(WebDriver driver, WebElement source, WebElement target) {
+    private static void jsHtml5DragDrop(WebDriver driver, ElementWrapper source, ElementWrapper target) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const src = arguments[0], tgt = arguments[1];
@@ -522,7 +522,7 @@ public final class HumanInteractions {
                         """, source, target);
     }
 
-    private static void jsHtml5DragBy(WebDriver driver, WebElement source, int dx, int dy) {
+    private static void jsHtml5DragBy(WebDriver driver, ElementWrapper source, int dx, int dy) {
         ((JavascriptExecutor) driver).executeScript(
                 """
                         const src = arguments[0], dx = arguments[1], dy = arguments[2];
@@ -556,7 +556,7 @@ public final class HumanInteractions {
      * JS fallback for selecting an option by visible text in a native <select>.
      */
     private static void jsSelectByVisibleText(WebDriver driver,
-                                              WebElement selectEl,
+                                              ElementWrapper selectEl,
                                               String visibleText) {
         ((JavascriptExecutor) driver).executeScript(
                 """
