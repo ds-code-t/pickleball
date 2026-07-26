@@ -69,6 +69,7 @@ public class MappingSteps extends CoreSteps {
         logInfo("Setting Data Table" + tableNameText + ":" + dataTable);
     }
 
+
     @Given("^SET \"(.*)\" DATA TABLE$")
     public static void setDataTable(String tableName, DataTable dataTable) {
         getDataTableMap().put(
@@ -78,7 +79,7 @@ public class MappingSteps extends CoreSteps {
         logInfo("Setting Data Table" + tableName + ":" + dataTable);
     }
 
-    // TODO convert to comma steps
+    // TODO deprecate
     @Given("^FOR EVERY (\".*\" )?DATA ROW IN THE (\".*\" )?DATA TABLE:$")
     public static void forEveryRow(String rowName, String tableName) {
         tableName = tableName == null || tableName.isBlank() ? "" : tableName;
@@ -90,6 +91,7 @@ public class MappingSteps extends CoreSteps {
         currentStep.addReplacementStep(modifiedStep);
     }
 
+    // TODO deprecate
     @Given("^SET (?:(DEFAULT|OVERRIDE|SINGLETON) )?VALUES$")
     public static void setValues(String mapType, DataTable dataTable) {
         NodeMap nodeMap = switch (mapType) {
@@ -139,15 +141,21 @@ public class MappingSteps extends CoreSteps {
             case "RUN" -> getRunMap();
             case null, default -> getRunMap();
         };
-        final String keyPrefix = prefix == null || prefix.isBlank() ? "" : prefix;
-        dataTable.asLists().forEach(row -> {
-            String key = row.getFirst();
-            if(key == null || key.isBlank())
-                key = "";
-            else
-                key =  "." + key.trim();
+        final String keyPrefix =
+                prefix == null || prefix.isBlank()
+                        ? ""
+                        : prefix.trim() + ".";
 
-            nodeMap.put(keyPrefix +key, row.get(1));
+        dataTable.asLists().forEach(row -> {
+            String rowKey = row.getFirst() == null
+                    ? ""
+                    : row.getFirst().trim();
+
+            if (rowKey.isBlank()) {
+                return;
+            }
+
+            nodeMap.put(keyPrefix + rowKey, row.get(1));
         });
     }
 
@@ -163,6 +171,7 @@ public class MappingSteps extends CoreSteps {
     public static Object getArgValue() {
         return getRunningStep().argument.getValue();
     }
+
 
     @Given("^PATH:(.*)$")
     public static Object getFromPath(String path) {

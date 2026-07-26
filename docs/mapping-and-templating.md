@@ -1,42 +1,197 @@
 # Mapping and Templating
 
-> **Working feature example:** [`mapping-and-resources.feature`](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature) demonstrates Scenario Outline templates, shared configuration values, and on-demand resource mapping.
+> **Working feature examples:** [`mapping-and-resources.feature`](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature) tests the supported mapping definitions, saved-value clearing, and comma-step `save` actions. [`service-call-definitions.feature`](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature) uses the same mapping definitions to assemble REST and SOAP request objects.
 
-Templates allow feature files to reuse Scenario Outline values, saved runtime values, configuration data, loaded resources, and service responses.
-
-All template forms use angle brackets:
-
-```text
-<value>
-```
-
-## Scenario Outline values
-
-Cucumber resolves `Examples` values first:
+Pickleball maps values into `NodeMap` scopes and resolves them later through templates such as `<customer.name>`. This guide intentionally documents only these supported definitions from `MappingSteps.java`:
 
 ```gherkin
-Scenario Outline: Submit a customer
-  * , enter "<name>" in the "Customer Name" Textbox
-  * , select "<tier>" in the "Customer Tier" Dropdown
-
-Examples:
-  | name | tier     |
-  | Ava  | Premium  |
-  | Ben  | Standard |
+CLEAR SAVED VALUES
+MAP "key" TEXT VALUE
+MAP "key" OBJECT VALUE
+MAP "prefix" TABLE VALUES
 ```
 
-## Runtime values
+Other definitions currently present in `MappingSteps.java` are intentionally omitted from this guide and from the consumer mapping feature.
+
+## Supported mapping steps
+
+| Step | Purpose |
+|---|---|
+| `MAP "key" TEXT VALUE` | Store an attached DocString as raw text. |
+| `MAP "key" OBJECT VALUE` | Parse an attached JSON, XML, or YAML DocString into a Jackson tree. |
+| `MAP "prefix" TABLE VALUES` | Map two-column table rows beneath an optional prefix. |
+| `CLEAR SAVED VALUES` | Clear the complete run map. |
+| `CLEAR SAVED VALUES:key1,key2` | Remove selected top-level keys from the run map. |
+
+Each `MAP` step can optionally end with `TO DEFAULT MAP`, `TO OVERRIDE MAP`, `TO SINGLETON MAP`, `TO STEP MAP`, `TO ROOT SCENARIO MAP`, `TO SCENARIO MAP`, or `TO RUN MAP`. Omitting the target uses the run map.
+
+## Map table values
+
+Each table row contains a property path followed by its value. The table has no header row.
+
+```gherkin
+Given MAP "customer" TABLE VALUES TO RUN MAP
+  | name         | Ava     |
+  | address.city | Phoenix |
+  | tier         | Premium |
+```
+
+The values can then be resolved as:
+
+```text
+<customer.name>
+<customer.address.city>
+<customer.tier>
+```
+
+The prefix is optional. Without one, the first column supplies the complete key:
+
+```gherkin
+Given MAP TABLE VALUES TO RUN MAP
+  | status  | ready |
+  | retries | 2     |
+```
+
+Nested request sections use nested prefixes:
+
+```gherkin
+Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
+  | endpoint | http://127.0.0.1:8765/api/health |
+  | method   | GET                               |
+
+And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
+  | Accept        | application/json |
+  | X-Test-Client | consumer-test    |
+```
+
+These general mapping steps are the supported way to prepare values used by reusable service-call scenarios.
+
+## Map raw text
+
+`TEXT` stores the DocString content without parsing it:
+
+```gherkin
+Given MAP "REQUEST.body" TEXT VALUE TO SCENARIO MAP
+  """xml
+  <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+    <soapenv:Body/>
+  </soapenv:Envelope>
+  """
+```
+
+A DocString content type may still be supplied for editor formatting, but it does not change how `TEXT` is stored.
+
+## Map JSON, XML, or YAML objects
+
+`OBJECT` parses the DocString into a Jackson `JsonNode`:
+
+```gherkin
+Given MAP "customer" OBJECT VALUE TO RUN MAP
+  """json
+  {
+    "name": "Ava",
+    "active": true,
+    "orders": [
+      { "id": "A-100" },
+      { "id": "A-200" }
+    ]
+  }
+  """
+```
+
+The DocString content type is required for `OBJECT`.
+
+| Format | Accepted content types |
+|---|---|
+| JSON | `json`, `application/json`, `text/json` |
+| XML | `xml`, `application/xml`, `text/xml` |
+| YAML | `yaml`, `yml`, `application/yaml`, `application/x-yaml`, `text/yaml`, `text/x-yaml` |
+
+Examples:
+
+```gherkin
+Given MAP "yamlCustomer" OBJECT VALUE
+  """yaml
+  name: Ben
+  address:
+    city: Tempe
+  """
+
+And MAP "xmlCustomer" OBJECT VALUE
+  """xml
+  <customer>
+    <name>Cara</name>
+    <city>Mesa</city>
+  </customer>
+  """
+```
+
+## Map targets
+
+| Target | Selected map |
+|---|---|
+| omitted or `RUN` | Run map |
+| `DEFAULT` | Default/fallback map |
+| `OVERRIDE` | Override map |
+| `SINGLETON` | Singleton map |
+| `STEP` | Current step map |
+| `SCENARIO` | Closest scenario-step map |
+| `ROOT SCENARIO` | Root scenario-step map |
+
+`SCENARIO` is useful for reusable component scenarios because the mapped request stays associated with that scenario while its child steps execute.
+
+> **Current implementation note:** the Cucumber expressions accept `ROOT SCENARIO`, but the map-selection switch currently checks `SCENARIO ROOT`. Do not rely on this target until those two forms are made consistent.
+
+## Save values from comma dynamic steps
+
+The comma dynamic-step parser has a `save` action. It stores a resolved value under a named key so later steps can retrieve it through the normal template syntax.
+
+Save text or a number:
 
 ```gherkin
 * , save "Ava" as "customerName"
-* print "Customer: <customerName>"
+* , save 3 as "retryCount"
 ```
 
-Runtime values may also come from component tables, shared resource files, loaded files, service calls, or custom steps.
+Save a value already supplied by a mapping:
 
-## Nested paths
+```gherkin
+Given MAP "customer" TABLE VALUES
+  | city | Phoenix |
 
-Structured values are queried like JSON:
+When , save "<customer.city>" as "savedCity"
+Then , ensure "<savedCity>" equals "Phoenix"
+```
+
+Saving another value under the same key adds a newer value. A normal template lookup returns the latest value:
+
+```gherkin
+* , save "draft" as "status"
+* , save "ready" as "status"
+* , ensure "<status>" equals "ready"
+```
+
+The save action is part of the comma dynamic-step language rather than a separate `MappingSteps` Cucumber definition. See [Dynamic Steps](dynamic-steps.md) for the general comma-step syntax.
+
+## Clear saved run values
+
+Clear the complete run map:
+
+```gherkin
+Given CLEAR SAVED VALUES
+```
+
+Clear selected top-level keys while leaving other run-map values intact:
+
+```gherkin
+Given CLEAR SAVED VALUES:temporaryToken,customerDraft
+```
+
+Only the run map is cleared. Default, override, singleton, step, and scenario maps are not cleared by this definition.
+
+## Templates and nested paths
+
+Use angle brackets to resolve saved or mapped values:
 
 ```text
 <customer.name>
@@ -45,114 +200,29 @@ Structured values are queried like JSON:
 <orders #2.items #1.sku>
 ```
 
-Square-bracket indexes are normal zero-based JSONata indexes. `#` selectors are Pickleball's one-based-friendly selectors.
-
-## Top-level collection behavior
-
-Ordinary top-level properties are treated as histories or collections. A read without explicit array syntax selects the last entry:
-
-| Query | Meaning |
-|---|---|
-| `REQUEST` | last entry in `REQUEST` |
-| `REQUEST.endpoint` | `endpoint` on the last `REQUEST` object |
-| `REQUEST[]` | complete `REQUEST` array |
-| `REQUEST[*]` | complete `REQUEST` array |
-| `REQUEST[].endpoint` | the last object in `REQUEST` that has `endpoint` |
-| `REQUEST[*].endpoint` | an array of all existing `endpoint` values |
-
-The same rules apply to nested arrays:
+XML-safe bookends are also available where ordinary angle brackets would conflict with XML markup:
 
 ```text
-<orders[].products[*].id>
+~[~customer.name~]~
 ```
 
-A top-level name beginning with `_` is a singleton and does not receive automatic last-entry behavior:
+Square-bracket indexes use normal zero-based JSONata indexing. Pickleball `#` selectors provide one-based-friendly access:
 
-```text
-<_CONFIG.endpoint>
-```
-
-## `#` selectors
-
-Pickleball converts each `#` position by subtracting one:
-
-| Pickleball selector | Effective JSONata selector |
+| Pickleball selector | Effective selector |
 |---|---|
 | `#1` | `[0]` |
 | `#2` | `[1]` |
-| `#0` | `[-1]` |
-| `#-1` | `[-2]` |
 | `#first` | `[0]` |
 | `#last` | `[-1]` |
 | `#1-3` | `[0..2]` |
 | `#1,3` | `[0,2]` |
 
-Examples:
-
-```text
-<orders #first.id>
-<orders #last.id>
-<orders #1-3.id>
-<orders #1,3.id>
-```
-
-`..` remains valid native JSONata range syntax. The `#` conversion is not applied inside quoted strings, regular expressions, comments, or backticked property names.
-
-## Property names with spaces or dashes
-
-Simple path properties containing spaces are backtick-wrapped automatically. A dash is treated as part of a property name when it is surrounded by non-whitespace characters:
-
-```text
-<Customer Requests.Endpoint Name>
-<order-items.product-id>
-```
-
-These normalize to JSONata backtick property names. For complicated predicates or functions, write explicit backticks:
-
-```jsonata
-`Customer Requests`[`Customer Name` = "Ava"].`Endpoint Name`
-```
-
-## Writable NodeMap paths
-
-Pickleball uses related path rules when a step or Java call stores data.
-
-| Write path | Effect |
-|---|---|
-| `REQUEST` | append a new value to the top-level `REQUEST` array |
-| `REQUEST.method` | set `method` on the last request; create the object if needed |
-| `REQUEST[].id` | append a new object when needed and set its `id` |
-| `REQUEST[*].status` | update `status` on every existing request object |
-| `orders[*].products[*].status` | update existing products in existing orders |
-| `_CONFIG.endpoint` | set a singleton value without top-level array behavior |
-
-Wildcards update existing arrays only. They do not create a missing array or replace an existing scalar with an array.
-
-A JSONata selector can choose writable attached objects:
-
-```java
-nodeMap.put("orders[status = \"active\"].result.code", "OK");
-```
-
-Computed scalars and newly constructed JSONata objects are not writable targets.
-
-## Return values from Cucumber steps
-
-A template beginning with `$` executes a Cucumber step that returns a value:
-
-```gherkin
-* , save "<$DateTime:now>" as "currentDateTime"
-* IF: `<$string:"Assa" contains: "ss">`:
-  : Then , save "matched" as "result"
-```
-
-Use this only with steps designed to return a value.
+Ordinary top-level mapped properties retain Pickleball's history behavior, so an unqualified lookup returns the latest entry. Use `[]` or `[*]` where the complete array is required.
 
 ## Working examples
 
-- [Scenario Outline values and shared resources](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature)
-- [Shared YAML test data](../maven-consumer-project/src/test/resources/configs/TEST_DATA.yaml)
-- [On-demand customer data](../maven-consumer-project/src/test/resources/files/customers.yaml)
-- [Service responses mapped into the caller](../maven-consumer-project/src/test/resources/features/service-call-execution.feature)
+- [Supported mapping and save-action tests](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature)
+- [Generic mappings in reusable service calls](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature)
+- [Service-call caller feature](../maven-consumer-project/src/test/resources/features/service-call-execution.feature)
 
 [Previous: Dynamic Steps](dynamic-steps.md) · [Documentation home](README.md) · [Next: Configuration Files and Resource Mapping](config-files-and-resource-mapping.md)

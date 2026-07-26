@@ -17,10 +17,10 @@ Each functional guide begins with a prominent link to the specific consumer-proj
 
 ## Data and reusable behavior
 
-- [Mapping and templating](mapping-and-templating.md) — use Scenario Outline values, runtime values, nested data, JSONata reads, and writable NodeMap paths.
+- [Mapping and templating](mapping-and-templating.md) — use supported `MAP ... TABLE VALUES`, `MAP ... TEXT/OBJECT VALUE`, and `CLEAR SAVED VALUES` steps together with comma-step `save` actions.
 - [Configuration files and resource mapping](config-files-and-resource-mapping.md) — load shared YAML, JSON, XML, CSV, and text resources.
 - [Component scenarios](component-scenarios.md) — invoke reusable scenario-sized flows with `RUN SCENARIOS`.
-- [Service-call scenarios](service-call-scenarios.md) — define and invoke reusable REST and SOAP calls.
+- [Service-call scenarios](service-call-scenarios.md) — locate reusable REST and SOAP component scenarios, build requests with generic mappings, and execute them.
 - [Date and time utilities](date-time-utilities.md) — create, adjust, format, and compare temporal values.
 
 ## Conditional structure

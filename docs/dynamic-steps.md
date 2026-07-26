@@ -1,6 +1,6 @@
 # Dynamic Steps
 
-> **Working feature examples:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) covers core element selection, actions, assertions, ordinals, and chained steps; [`forms-dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature) covers form controls, state assertions, clearing, resetting, and pointer actions.
+> **Working feature examples:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) covers core element selection, actions, assertions, ordinals, and chained steps; [`forms-dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature) covers form controls and pointer actions; [`mapping-and-resources.feature`](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature) covers comma-step `save` actions.
 
 Dynamic steps let a feature describe browser behavior directly without adding one Java method for every Gherkin sentence.
 
@@ -88,7 +88,7 @@ Frequently used actions include:
 | `select` | choose a dropdown or selectable value |
 | `scroll` | bring an element into view |
 | `wait` | wait for a duration or condition |
-| `save` | store a value for later mapping |
+| `save` | store a value under a key for later template resolution |
 | `attach` | attach a file where supported |
 | `switch`, `close` | change or close a supported browser target |
 | `accept`, `dismiss` | handle browser dialogs |
@@ -103,6 +103,35 @@ Examples:
 * , double click the "Interaction Target" Button
 * , accept the Alert
 ```
+
+## Save actions
+
+Use `save ... as ...` to place a resolved value into the active parsing map:
+
+```gherkin
+* , save "Ava" as "customerName"
+* , save 3 as "retryCount"
+```
+
+Mapped values can be resolved first and then saved under another key:
+
+```gherkin
+Given MAP "customer" TABLE VALUES
+  | city | Phoenix |
+
+When , save "<customer.city>" as "savedCity"
+Then , ensure "<savedCity>" equals "Phoenix"
+```
+
+Saving the same key again adds a newer value, and a normal lookup resolves the latest one:
+
+```gherkin
+* , save "draft" as "status"
+* , save "ready" as "status"
+* , ensure "<status>" equals "ready"
+```
+
+Use `CLEAR SAVED VALUES` or `CLEAR SAVED VALUES:key1,key2` when those run-map values should be removed. See [Mapping and Templating](mapping-and-templating.md).
 
 ## Assertions
 
@@ -184,6 +213,7 @@ For child steps, use [Nested Steps](nested-steps.md). For report-focused branch 
 
 - [Core dynamic-step playground](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature)
 - [Form actions, state assertions, chains, and pointer actions](../maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature)
+- [Saved values and supported mapping steps](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature)
 - [Contexts, ordinals, and project-specific elements](../maven-consumer-project/src/test/resources/features/catalog-context.feature)
 - [Dialogs](../maven-consumer-project/src/test/resources/features/dialogs.feature)
 - [Browser test pages](../maven-consumer-project/src/test/resources/site)
