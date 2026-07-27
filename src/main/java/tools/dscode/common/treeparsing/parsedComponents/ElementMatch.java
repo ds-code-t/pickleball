@@ -591,6 +591,8 @@ public class ElementMatch {
                 wrappedElements = Collections.singletonList(parentPhrase.contextElement);
             else if (parentPhrase.skipPageSync()) {
                 findWrappedElements();
+                if(wrappedElements == null)
+                    findWrappedElements();
             } else {
                 parentPhrase.syncWithDOM();
             }
