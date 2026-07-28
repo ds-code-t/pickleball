@@ -26,7 +26,8 @@ import static tools.dscode.common.mappings.MappingProcessor.getDataTableMap;
 import static tools.dscode.common.mappings.MappingProcessor.getRunMap;
 import static tools.dscode.common.mappings.ParsingMap.getClosestScenarioStepAncestorNodeMap;
 import static tools.dscode.common.mappings.ParsingMap.getRootScenarioStepNodeMap;
-import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+import static tools.dscode.common.mappings.ParsingMap.resolveFromParsingMap;
+import static tools.dscode.common.mappings.ParsingMap.resolveToStringWithRunningParsingMap;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.variables.RunVars.resolveFromVars;
 
@@ -117,7 +118,7 @@ public class MappingSteps extends CoreSteps {
             case "RUN" -> getRunMap();
             case null, default -> getRunMap();
         };
-        String content = docString.getContent();
+        String content = resolveToStringWithRunningParsingMap(docString.getContent());
 
         Object value = switch (dataType == null ? "TEXT" : dataType) {
             case "TEXT" -> content;
@@ -155,7 +156,7 @@ public class MappingSteps extends CoreSteps {
                 return;
             }
 
-            nodeMap.put(keyPrefix + rowKey, row.get(1));
+            nodeMap.put(keyPrefix + rowKey, resolveFromParsingMap(row.get(1)));
         });
     }
 

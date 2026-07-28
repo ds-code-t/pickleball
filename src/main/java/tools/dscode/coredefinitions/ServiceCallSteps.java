@@ -18,13 +18,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Base64;
 import java.util.Locale;
 import java.util.Map;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
-import static tools.dscode.common.GlobalConstants.ALWAYS_RUN;
 import static tools.dscode.common.mappings.MappingProcessor.getRunMap;
+import static tools.dscode.common.mappings.ParsingMap.getClosestScenarioStepAncestorNodeMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.variables.RunVars.resolveFromVars;
@@ -34,8 +33,9 @@ import static tools.dscode.common.variables.RunVars.resolveFromVars;
  *
  * <p>Reusable service-call scenarios build their complete working object in
  * their default ScenarioStep NodeMap. REQUEST and CONFIGURATION are inputs;
- * RESPONSE is written by EXECUTE SERVICE CALL. A synthetic finalizer sibling
- * copies the completed root object into the calling scenario's RunMap.</p>
+ * RESPONSE is written by EXECUTE SERVICE CALL. The scenario root is registered
+ * by reference in the calling scenario's RunMap before execution, so later
+ * mutations are immediately visible through the RunMap entry.</p>
  */
 public class ServiceCallSteps extends CoreSteps {
 
@@ -46,9 +46,7 @@ public class ServiceCallSteps extends CoreSteps {
     static final String REQUEST = "REQUEST";
     static final String CONFIGURATION = "CONFIGURATION";
     static final String RESPONSE = "RESPONSE";
-
-    private static final String FINALIZER_STEP_PREFIX =
-            "_RUN_SERVICE_CALL_FINALIZER key64:";
+    static final String PARENT = "PARENT";
 
     @Given("^(?:\"([^\"]+)\"\\s+)?SERVICE CALLS?:?(.*)?$")
     public static void serviceCalls(
@@ -64,14 +62,46 @@ public class ServiceCallSteps extends CoreSteps {
                 dataTable,
                 callsPath(),
                 "service call",
-                null,
-                (scenarioStep, passedValues) -> createFinalizer(
-                        triggerStep,
+                (scenarioStep, passedValues) -> registerServiceCallReference(
                         scenarioStep,
                         passedValues,
                         inlineServiceCallObjectName
                 )
         );
+    }
+
+    /**
+     * Runs one service-call scenario selected by inline tags and returns the
+     * ObjectNode root of its default NodeMap. The calling scenario root is
+     * exposed to the nested scenario by reference under {@link #PARENT}.
+     */
+    @Given("^CALL:(.*)$")
+    public static ObjectNode inlineCall(String inlineTags) {
+        StepExtension triggerStep = getRunningStep();
+        NodeMap parentScenarioMap = getClosestScenarioStepAncestorNodeMap();
+        NodeMap[] inlineCallMap = new NodeMap[1];
+
+        ModularScenarios.populateRunScenariosStep(
+                triggerStep,
+                inlineTags,
+                null,
+                callsPath(),
+                "service call",
+                (scenarioStep, passedValues) -> {
+                    NodeMap scenarioMap = scenarioStep.getDefaultStepNodeMap();
+                    scenarioMap.putReference(PARENT, parentScenarioMap.getRoot());
+                    inlineCallMap[0] = scenarioMap;
+                }
+        );
+
+        if (inlineCallMap[0] == null) {
+            throw new IllegalStateException(
+                    "No service-call scenario was created for CALL tags: "
+                            + normalize(inlineTags)
+            );
+        }
+
+        return inlineCallMap[0].getRoot();
     }
 
     @Given("^EXECUTE SERVICE CALL$")
@@ -80,7 +110,9 @@ public class ServiceCallSteps extends CoreSteps {
         NodeMap serviceCallMap = scenarioStep.getDefaultStepNodeMap();
         ObjectNode serviceCallObject = serviceCallMap.getRoot();
 
-        // This empty object remains available if validation/execution throws or
+        // This same ObjectNode is already stored by reference in the caller's
+        // RunMap. Replacing RESPONSE here is therefore visible to the caller.
+        // The empty object remains available if validation/execution throws or
         // REST Assured returns no Response instance.
         serviceCallObject.set(RESPONSE, MAPPER.createObjectNode());
 
@@ -145,42 +177,6 @@ public class ServiceCallSteps extends CoreSteps {
         }
     }
 
-    /**
-     * Internal synthetic step. It is inserted immediately after its component
-     * ScenarioStep and marked ALWAYS_RUN.
-     */
-    @Given("^_RUN_SERVICE_CALL_FINALIZER key64:([A-Za-z0-9_-]+)$")
-    public static void finalizeServiceCall(String encodedCallKey) {
-        StepExtension finalizerStep = getRunningStep();
-
-        if (!(finalizerStep.previousSibling instanceof ScenarioStep serviceCallScenario)) {
-            throw new IllegalStateException(
-                    "The service-call finalizer must immediately follow a ScenarioStep"
-            );
-        }
-
-        String callKey = decodeKey(encodedCallKey).trim();
-        if (callKey.isBlank()) {
-            throw new IllegalStateException("The service-call finalizer has no object key");
-        }
-
-        ObjectNode serviceCallObject = serviceCallScenario
-                .getDefaultStepNodeMap()
-                .getRoot();
-
-        JsonNode response = serviceCallObject.get(RESPONSE);
-        if (response == null || response.isNull()) {
-            serviceCallObject.set(RESPONSE, MAPPER.createObjectNode());
-        } else if (!response.isObject()) {
-            throw new IllegalStateException(
-                    "The service-call RESPONSE property must be an object"
-            );
-        }
-
-        // Ordinary NodeMap put behavior intentionally handles repeated keys.
-        getRunMap().put(callKey, serviceCallObject);
-    }
-
     public static ScenarioStep scenarioStep(StepBase step) {
         if (step instanceof ScenarioStep scenarioStep) {
             return scenarioStep;
@@ -195,8 +191,11 @@ public class ServiceCallSteps extends CoreSteps {
         return scenarioStep(step.parentStep);
     }
 
-    private static StepExtension createFinalizer(
-            StepExtension triggerStep,
+    /**
+     * Resolves the service-call key and registers the ScenarioStep's root
+     * ObjectNode by reference in the calling scenario's RunMap.
+     */
+    private static void registerServiceCallReference(
             ScenarioStep scenarioStep,
             Map<String, String> passedValues,
             String inlineServiceCallObjectName
@@ -216,16 +215,11 @@ public class ServiceCallSteps extends CoreSteps {
             );
         }
 
-        StepExtension finalizer = triggerStep.modifyStepExtension(
-                FINALIZER_STEP_PREFIX + encodeKey(resolvedCallKey)
-        );
-        finalizer.childSteps.clear();
-        finalizer.attachedSteps.clear();
-        finalizer.previousSibling = null;
-        finalizer.nextSibling = null;
-        finalizer.setNestingLevel(scenarioStep.getNestingLevel());
-        finalizer.addStepFlags(ALWAYS_RUN);
-        return finalizer;
+        ObjectNode serviceCallObject = scenarioStep
+                .getDefaultStepNodeMap()
+                .getRoot();
+
+        getRunMap().putReference(resolvedCallKey, serviceCallObject);
     }
 
     private static ObjectNode requiredObject(NodeMap parent, String fieldName) {
@@ -235,15 +229,18 @@ public class ServiceCallSteps extends CoreSteps {
                     "The service-call object is missing the " + fieldName + " object"
             );
         }
+
         JsonNode node = asJsonNode(value);
         if (node instanceof ObjectNode objectNode) {
             return objectNode;
         }
+
         if (node == null || node.isNull()) {
             throw new IllegalStateException(
                     "The service-call object is missing the " + fieldName + " object"
             );
         }
+
         throw new IllegalStateException(
                 "The service-call " + fieldName
                         + " property must be an object but was "
@@ -260,13 +257,16 @@ public class ServiceCallSteps extends CoreSteps {
         if (value == null) {
             return MAPPER.createObjectNode();
         }
+
         JsonNode node = asJsonNode(value);
         if (node == null || node.isNull()) {
             return MAPPER.createObjectNode();
         }
+
         if (node instanceof ObjectNode objectNode) {
             return objectNode;
         }
+
         throw new IllegalStateException(
                 "The service-call " + fieldName + " property must be an object"
         );
@@ -277,6 +277,7 @@ public class ServiceCallSteps extends CoreSteps {
         if (value instanceof JsonNode jsonNode) {
             return jsonNode;
         }
+
         return MAPPER.valueToTree(value);
     }
 
@@ -285,6 +286,7 @@ public class ServiceCallSteps extends CoreSteps {
         if (normalized.isBlank()) {
             return "";
         }
+
         return normalize(
                 scenarioStep.getStepParsingMap().resolveWholeText(normalized)
         );
@@ -305,6 +307,7 @@ public class ServiceCallSteps extends CoreSteps {
         if (value instanceof JsonNode node) {
             return normalize(node.asText(""));
         }
+
         return value == null ? "" : normalize(String.valueOf(value));
     }
 
@@ -315,6 +318,7 @@ public class ServiceCallSteps extends CoreSteps {
                 return normalized;
             }
         }
+
         return "";
     }
 
@@ -323,29 +327,6 @@ public class ServiceCallSteps extends CoreSteps {
         return configuredPath == null || configuredPath.toString().isBlank()
                 ? DEFAULT_CALLS_PATH
                 : configuredPath.toString().trim();
-    }
-
-    private static String encodeKey(String key) {
-        return Base64.getUrlEncoder()
-                .withoutPadding()
-                .encodeToString(key.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private static String decodeKey(String encodedKey) {
-        if (encodedKey == null || encodedKey.isBlank()) {
-            throw new IllegalArgumentException("Encoded service-call key cannot be blank");
-        }
-        try {
-            return new String(
-                    Base64.getUrlDecoder().decode(encodedKey),
-                    StandardCharsets.UTF_8
-            );
-        } catch (IllegalArgumentException exception) {
-            throw new IllegalArgumentException(
-                    "Invalid encoded service-call key: " + encodedKey,
-                    exception
-            );
-        }
     }
 
     private static String normalize(String value) {

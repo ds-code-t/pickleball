@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -258,4 +259,15 @@ public abstract class ValueFormatting {
         }
         return sb.toString().trim();
     }
+
+    public void putReference(String key, JsonNode value) {
+        Objects.requireNonNull(key, "Key cannot be null");
+
+        if (value == null) {
+            root.putNull(key);
+        } else {
+            root.set(key, value);
+        }
+    }
+
 }

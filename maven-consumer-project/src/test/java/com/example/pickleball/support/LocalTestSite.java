@@ -22,7 +22,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Loopback-only server that serves the test site and exposes local REST and SOAP endpoints.
+ * Loopback-only server that serves the test site and exposes local REST and
+ * SOAP endpoints used by the consumer-project feature tests.
  */
 public final class LocalTestSite implements AutoCloseable {
 
@@ -50,9 +51,10 @@ public final class LocalTestSite implements AutoCloseable {
 
     public static LocalTestSite start(int port) {
         try {
-            InetSocketAddress address =
-                    new InetSocketAddress(InetAddress.getLoopbackAddress(), port);
-
+            InetSocketAddress address = new InetSocketAddress(
+                    InetAddress.getLoopbackAddress(),
+                    port
+            );
             HttpServer server = HttpServer.create(address, 0);
             ExecutorService executor = Executors.newFixedThreadPool(4, runnable -> {
                 Thread thread = new Thread(runnable, "pickleball-local-test-site");
@@ -83,77 +85,22 @@ public final class LocalTestSite implements AutoCloseable {
             String path = Objects.requireNonNullElse(exchange.getRequestURI().getPath(), "");
 
             if ("/api/service-calls/inspect".equals(path)) {
-                if (!allowMethods(exchange, method, "GET", "POST", "PUT", "PATCH")) {
-                    return;
-                }
+                handleInspect(exchange, method);
+                return;
+            }
 
-                Map<String, String> query = parseQuery(exchange.getRequestURI());
-                int responseStatus = responseStatus(query.get("status"));
-                String requestBody = readRequestBody(exchange);
-                String client = Objects.requireNonNullElse(
-                        exchange.getRequestHeaders().getFirst("X-Test-Client"),
-                        ""
-                );
-                String traceId = Objects.requireNonNullElse(
-                        exchange.getRequestHeaders().getFirst("X-Test-Trace"),
-                        ""
-                );
-                String cookie = Objects.requireNonNullElse(
-                        exchange.getRequestHeaders().getFirst("Cookie"),
-                        ""
-                );
+            if ("/api/service-calls/token".equals(path)) {
+                handleToken(exchange, method);
+                return;
+            }
 
-                String response = """
-                        {
-                          "status": %d,
-                          "method": %s,
-                          "include": %s,
-                          "mode": %s,
-                          "client": %s,
-                          "traceId": %s,
-                          "cookie": %s,
-                          "body": %s
-                        }
-                        """.formatted(
-                        responseStatus,
-                        jsonString(method),
-                        jsonString(query.getOrDefault("include", "")),
-                        jsonString(query.getOrDefault("mode", "")),
-                        jsonString(client),
-                        jsonString(traceId),
-                        jsonString(cookie),
-                        jsonBodyOrString(requestBody)
-                );
-
-                exchange.getResponseHeaders().set(
-                        "X-Service-Call-Test",
-                        "inspect"
-                );
-                sendJson(exchange, responseStatus, response, method);
+            if ("/api/service-calls/protected".equals(path)) {
+                handleProtected(exchange, method);
                 return;
             }
 
             if (path.startsWith("/api/service-calls/no-content/")) {
-                if (!allowMethods(exchange, method, "DELETE")) {
-                    return;
-                }
-
-                String itemId = path.substring(
-                        "/api/service-calls/no-content/".length()
-                );
-                if (itemId.isBlank() || itemId.contains("/")) {
-                    sendJson(exchange, 404, """
-                            {"error":"Item not found"}
-                            """, method);
-                    return;
-                }
-
-                exchange.getResponseHeaders().set(
-                        "X-Service-Call-Test",
-                        "no-content"
-                );
-                exchange.getResponseHeaders().set("X-Deleted-Item", itemId);
-                sendNoContent(exchange);
+                handleNoContent(exchange, method, path);
                 return;
             }
 
@@ -161,7 +108,6 @@ public final class LocalTestSite implements AutoCloseable {
                 if (!allowMethods(exchange, method, "GET", "HEAD")) {
                     return;
                 }
-
                 sendJson(
                         exchange,
                         200,
@@ -174,36 +120,7 @@ public final class LocalTestSite implements AutoCloseable {
             }
 
             if (path.startsWith("/api/users/")) {
-                if (!allowMethods(exchange, method, "GET")) {
-                    return;
-                }
-
-                String id = path.substring("/api/users/".length());
-                if (id.isBlank() || id.contains("/")) {
-                    sendJson(exchange, 404, """
-                            {"error":"User not found"}
-                            """, method);
-                    return;
-                }
-
-                Map<String, String> query = parseQuery(exchange.getRequestURI());
-                String include = query.getOrDefault("include", "");
-                String client = exchange.getRequestHeaders()
-                        .getFirst("X-Test-Client");
-
-                String response = """
-                        {
-                          "id": %s,
-                          "include": %s,
-                          "client": %s
-                        }
-                        """.formatted(
-                        jsonString(id),
-                        jsonString(include),
-                        jsonString(Objects.requireNonNullElse(client, ""))
-                );
-
-                sendJson(exchange, 200, response, method);
+                handleUser(exchange, method, path);
                 return;
             }
 
@@ -214,52 +131,244 @@ public final class LocalTestSite implements AutoCloseable {
 
                 String requestBody = readRequestBody(exchange);
                 String jsonBody = requestBody.isBlank() ? "null" : requestBody;
-
                 String response = """
                         {
                           "method": %s,
                           "body": %s
                         }
                         """.formatted(jsonString(method), jsonBody);
-
                 sendJson(exchange, 200, response, method);
                 return;
             }
 
             if (path.startsWith("/api/status/")) {
-                if (!allowMethods(exchange, method, "GET")) {
-                    return;
-                }
-
-                String rawStatus = path.substring("/api/status/".length());
-                try {
-                    int status = Integer.parseInt(rawStatus);
-                    if (status < 100 || status > 599) {
-                        throw new NumberFormatException("Out of range");
-                    }
-
-                    sendJson(
-                            exchange,
-                            status,
-                            """
-                            {"status":%d}
-                            """.formatted(status),
-                            method
-                    );
-                } catch (NumberFormatException exception) {
-                    sendJson(exchange, 400, """
-                            {"error":"Invalid status code"}
-                            """, method);
-                }
+                handleStatus(exchange, method, path);
                 return;
             }
 
-            sendJson(exchange, 404, """
-                    {"error":"Endpoint not found"}
-                    """, method);
+            sendJson(exchange, 404, "{\"error\":\"Endpoint not found\"}", method);
         }
     }
 
+    private static void handleInspect(HttpExchange exchange, String method) throws IOException {
+        if (!allowMethods(exchange, method, "GET", "POST", "PUT", "PATCH")) {
+            return;
+        }
+
+        Map<String, String> query = parseQuery(exchange.getRequestURI());
+        int responseStatus = responseStatus(query.get("status"));
+        String requestBody = readRequestBody(exchange);
+        String client = Objects.requireNonNullElse(
+                exchange.getRequestHeaders().getFirst("X-Test-Client"),
+                ""
+        );
+        String traceId = Objects.requireNonNullElse(
+                exchange.getRequestHeaders().getFirst("X-Test-Trace"),
+                ""
+        );
+        String cookie = Objects.requireNonNullElse(
+                exchange.getRequestHeaders().getFirst("Cookie"),
+                ""
+        );
+
+        String response = """
+                {
+                  "status": %d,
+                  "method": %s,
+                  "include": %s,
+                  "mode": %s,
+                  "client": %s,
+                  "traceId": %s,
+                  "cookie": %s,
+                  "body": %s
+                }
+                """.formatted(
+                responseStatus,
+                jsonString(method),
+                jsonString(query.getOrDefault("include", "")),
+                jsonString(query.getOrDefault("mode", "")),
+                jsonString(client),
+                jsonString(traceId),
+                jsonString(cookie),
+                jsonBodyOrString(requestBody)
+        );
+
+        exchange.getResponseHeaders().set("X-Service-Call-Test", "inspect");
+        sendJson(exchange, responseStatus, response, method);
+    }
+
+    /**
+     * Issues a deterministic token for inline-call tests.
+     */
+    private static void handleToken(HttpExchange exchange, String method) throws IOException {
+        if (!allowMethods(exchange, method, "POST")) {
+            return;
+        }
+
+        Map<String, String> query = parseQuery(exchange.getRequestURI());
+        String client = Objects.requireNonNullElse(
+                exchange.getRequestHeaders().getFirst("X-Test-Client"),
+                ""
+        );
+        String scope = query.getOrDefault("scope", "default");
+        String token = issuedToken(client, scope);
+        String requestBody = readRequestBody(exchange);
+
+        String response = """
+                {
+                  "accessToken": %s,
+                  "tokenType": "Bearer",
+                  "scope": %s,
+                  "client": %s,
+                  "request": %s
+                }
+                """.formatted(
+                jsonString(token),
+                jsonString(scope),
+                jsonString(client),
+                jsonBodyOrString(requestBody)
+        );
+
+        exchange.getResponseHeaders().set("X-Service-Call-Test", "inline-token");
+        exchange.getResponseHeaders().set("X-Issued-Token", token);
+        sendJson(exchange, 200, response, method);
+    }
+
+    /**
+     * Validates the token generated by {@link #handleToken(HttpExchange, String)}.
+     */
+    private static void handleProtected(HttpExchange exchange, String method) throws IOException {
+        if (!allowMethods(exchange, method, "GET")) {
+            return;
+        }
+
+        Map<String, String> query = parseQuery(exchange.getRequestURI());
+        String client = Objects.requireNonNullElse(
+                exchange.getRequestHeaders().getFirst("X-Test-Client"),
+                ""
+        );
+        String scope = query.getOrDefault("scope", "default");
+        String authorization = Objects.requireNonNullElse(
+                exchange.getRequestHeaders().getFirst("Authorization"),
+                ""
+        );
+        String token = issuedToken(client, scope);
+        String expectedAuthorization = "Bearer " + token;
+
+        if (!expectedAuthorization.equals(authorization)) {
+            String response = """
+                    {
+                      "authorized": false,
+                      "client": %s,
+                      "scope": %s,
+                      "authorization": %s
+                    }
+                    """.formatted(
+                    jsonString(client),
+                    jsonString(scope),
+                    jsonString(authorization)
+            );
+            sendJson(exchange, 401, response, method);
+            return;
+        }
+
+        String response = """
+                {
+                  "authorized": true,
+                  "client": %s,
+                  "scope": %s,
+                  "authorization": %s,
+                  "token": %s
+                }
+                """.formatted(
+                jsonString(client),
+                jsonString(scope),
+                jsonString(authorization),
+                jsonString(token)
+        );
+
+        exchange.getResponseHeaders().set("X-Service-Call-Test", "inline-protected");
+        sendJson(exchange, 200, response, method);
+    }
+
+    private static void handleNoContent(
+            HttpExchange exchange,
+            String method,
+            String path
+    ) throws IOException {
+        if (!allowMethods(exchange, method, "DELETE")) {
+            return;
+        }
+
+        String itemId = path.substring("/api/service-calls/no-content/".length());
+        if (itemId.isBlank() || itemId.contains("/")) {
+            sendJson(exchange, 404, "{\"error\":\"Item not found\"}", method);
+            return;
+        }
+
+        exchange.getResponseHeaders().set("X-Service-Call-Test", "no-content");
+        exchange.getResponseHeaders().set("X-Deleted-Item", itemId);
+        sendNoContent(exchange);
+    }
+
+    private static void handleUser(
+            HttpExchange exchange,
+            String method,
+            String path
+    ) throws IOException {
+        if (!allowMethods(exchange, method, "GET")) {
+            return;
+        }
+
+        String id = path.substring("/api/users/".length());
+        if (id.isBlank() || id.contains("/")) {
+            sendJson(exchange, 404, "{\"error\":\"User not found\"}", method);
+            return;
+        }
+
+        Map<String, String> query = parseQuery(exchange.getRequestURI());
+        String include = query.getOrDefault("include", "");
+        String client = exchange.getRequestHeaders().getFirst("X-Test-Client");
+        String response = """
+                {
+                  "id": %s,
+                  "include": %s,
+                  "client": %s
+                }
+                """.formatted(
+                jsonString(id),
+                jsonString(include),
+                jsonString(Objects.requireNonNullElse(client, ""))
+        );
+
+        sendJson(exchange, 200, response, method);
+    }
+
+    private static void handleStatus(
+            HttpExchange exchange,
+            String method,
+            String path
+    ) throws IOException {
+        if (!allowMethods(exchange, method, "GET")) {
+            return;
+        }
+
+        String rawStatus = path.substring("/api/status/".length());
+        try {
+            int status = Integer.parseInt(rawStatus);
+            if (status < 100 || status > 599) {
+                throw new NumberFormatException("Out of range");
+            }
+            sendJson(
+                    exchange,
+                    status,
+                    "{\"status\":%d}".formatted(status),
+                    method
+            );
+        } catch (NumberFormatException exception) {
+            sendJson(exchange, 400, "{\"error\":\"Invalid status code\"}", method);
+        }
+    }
 
     private static void handleSoapRequest(HttpExchange exchange) throws IOException {
         try (exchange) {
@@ -279,7 +388,6 @@ public final class LocalTestSite implements AutoCloseable {
             String operation = firstXmlOperation(requestBody);
             int left = xmlInteger(requestBody, "left");
             int right = xmlInteger(requestBody, "right");
-
             int result = switch (operation) {
                 case "Subtract" -> left - right;
                 case "Multiply" -> left * right;
@@ -287,16 +395,15 @@ public final class LocalTestSite implements AutoCloseable {
             };
 
             String response = """
-                    <?xml version="1.0" encoding="UTF-8"?>
                     <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
                                       xmlns:calc="urn:pickleball:calculator">
                       <soapenv:Body>
-                        <calc:%sResponse>
-                          <calc:%sResult>%d</calc:%sResult>
-                        </calc:%sResponse>
+                        <calc:%1$sResponse>
+                          <calc:result>%2$d</calc:result>
+                        </calc:%1$sResponse>
                       </soapenv:Body>
                     </soapenv:Envelope>
-                    """.formatted(operation, operation, result, operation, operation);
+                    """.formatted(operation, result);
 
             exchange.getResponseHeaders().set("X-SOAP-Operation", operation);
             sendXml(exchange, 200, response, method);
@@ -306,7 +413,6 @@ public final class LocalTestSite implements AutoCloseable {
     private static void handleStaticRequest(HttpExchange exchange) throws IOException {
         try (exchange) {
             String method = exchange.getRequestMethod();
-
             if (!"GET".equals(method) && !"HEAD".equals(method)) {
                 exchange.getResponseHeaders().set("Allow", "GET, HEAD");
                 exchange.sendResponseHeaders(405, -1);
@@ -321,7 +427,6 @@ public final class LocalTestSite implements AutoCloseable {
 
             String classpathResource = SITE_ROOT + requestPath;
             byte[] content = readResource(classpathResource);
-
             if (content == null) {
                 sendText(exchange, 404, "Not found", method);
                 return;
@@ -345,9 +450,7 @@ public final class LocalTestSite implements AutoCloseable {
             String actualMethod,
             String... allowedMethods
     ) throws IOException {
-        boolean allowed = Arrays.stream(allowedMethods)
-                .anyMatch(actualMethod::equals);
-
+        boolean allowed = Arrays.stream(allowedMethods).anyMatch(actualMethod::equals);
         if (allowed) {
             return true;
         }
@@ -360,7 +463,6 @@ public final class LocalTestSite implements AutoCloseable {
     private static Map<String, String> parseQuery(URI uri) {
         Map<String, String> values = new LinkedHashMap<>();
         String rawQuery = uri.getRawQuery();
-
         if (rawQuery == null || rawQuery.isBlank()) {
             return values;
         }
@@ -398,6 +500,19 @@ public final class LocalTestSite implements AutoCloseable {
         }
     }
 
+    private static String issuedToken(String client, String scope) {
+        return "inline-" + tokenPart(client) + "-" + tokenPart(scope);
+    }
+
+    private static String tokenPart(String value) {
+        String normalized = Objects.requireNonNullElse(value, "")
+                .trim()
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "-")
+                .replaceAll("^-+|-+$", "");
+        return normalized.isBlank() ? "none" : normalized;
+    }
+
     private static String jsonBodyOrString(String requestBody) {
         if (requestBody == null || requestBody.isBlank()) {
             return "null";
@@ -415,7 +530,6 @@ public final class LocalTestSite implements AutoCloseable {
         }
     }
 
-
     private static String firstXmlOperation(String body) {
         Matcher matcher = Pattern.compile(
                 "<(?:[A-Za-z_][\\w.-]*:)?(Add|Subtract|Multiply)(?:\\s|>)"
@@ -425,15 +539,15 @@ public final class LocalTestSite implements AutoCloseable {
 
     private static int xmlInteger(String body, String localName) {
         Matcher matcher = Pattern.compile(
-                "<(?:[A-Za-z_][\\w.-]*:)?" + Pattern.quote(localName)
-                        + "(?:\\s[^>]*)?>(-?\\d+)</(?:[A-Za-z_][\\w.-]*:)?"
-                        + Pattern.quote(localName) + ">"
+                "<(?:[A-Za-z_][\\w.-]*:)?"
+                        + Pattern.quote(localName)
+                        + "(?:\\s[^>]*)?>(-?\\d+)"
         ).matcher(body);
         return matcher.find() ? Integer.parseInt(matcher.group(1)) : 0;
     }
 
     private static String jsonString(String value) {
-        String escaped = value
+        String escaped = Objects.requireNonNullElse(value, "")
                 .replace("\\", "\\\\")
                 .replace("\"", "\\\"")
                 .replace("\b", "\\b")
@@ -441,7 +555,6 @@ public final class LocalTestSite implements AutoCloseable {
                 .replace("\n", "\\n")
                 .replace("\r", "\\r")
                 .replace("\t", "\\t");
-
         return "\"" + escaped + "\"";
     }
 
@@ -452,9 +565,7 @@ public final class LocalTestSite implements AutoCloseable {
             String method
     ) throws IOException {
         byte[] content = json.strip().getBytes(StandardCharsets.UTF_8);
-
-        exchange.getResponseHeaders()
-                .set("Content-Type", "application/json; charset=UTF-8");
+        exchange.getResponseHeaders().set("Content-Type", "application/json; charset=UTF-8");
         exchange.getResponseHeaders().set("Cache-Control", "no-store");
         exchange.sendResponseHeaders(status, content.length);
 
@@ -465,7 +576,6 @@ public final class LocalTestSite implements AutoCloseable {
         }
     }
 
-
     private static void sendXml(
             HttpExchange exchange,
             int status,
@@ -473,9 +583,7 @@ public final class LocalTestSite implements AutoCloseable {
             String method
     ) throws IOException {
         byte[] content = xml.strip().getBytes(StandardCharsets.UTF_8);
-
-        exchange.getResponseHeaders()
-                .set("Content-Type", "text/xml; charset=UTF-8");
+        exchange.getResponseHeaders().set("Content-Type", "text/xml; charset=UTF-8");
         exchange.getResponseHeaders().set("Cache-Control", "no-store");
         exchange.sendResponseHeaders(status, content.length);
 
@@ -493,7 +601,6 @@ public final class LocalTestSite implements AutoCloseable {
 
     private static String normalizedRequestPath(URI requestUri) {
         String path = Objects.requireNonNullElse(requestUri.getPath(), "/");
-
         if (path.isBlank() || "/".equals(path)) {
             return "/index.html";
         }
@@ -522,9 +629,7 @@ public final class LocalTestSite implements AutoCloseable {
             String method
     ) throws IOException {
         byte[] content = text.getBytes(StandardCharsets.UTF_8);
-
-        exchange.getResponseHeaders()
-                .set("Content-Type", "text/plain; charset=UTF-8");
+        exchange.getResponseHeaders().set("Content-Type", "text/plain; charset=UTF-8");
         exchange.sendResponseHeaders(status, content.length);
 
         if (!"HEAD".equals(method)) {
@@ -536,7 +641,6 @@ public final class LocalTestSite implements AutoCloseable {
 
     private static String contentType(String path) {
         String lowerPath = path.toLowerCase(Locale.ROOT);
-
         return CONTENT_TYPES.entrySet().stream()
                 .filter(entry -> lowerPath.endsWith(entry.getKey()))
                 .map(Map.Entry::getValue)

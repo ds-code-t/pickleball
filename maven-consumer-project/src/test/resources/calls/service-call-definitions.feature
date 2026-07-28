@@ -128,8 +128,8 @@ Feature: Reusable service call definitions
       | %soap-add | http://127.0.0.1:8765     | soap-default  | 5    | 7     |
 
 
-  # END SCENARIO must stop the remaining component steps while the synthetic
-  # ALWAYS_RUN finalizer still saves the partial object with RESPONSE: {}.
+  # END SCENARIO stops the remaining component steps. The caller already
+  # holds the component root by reference, so its partial REQUEST remains visible.
   Scenario Outline: EarlyExitCall
     Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
       | endpoint | <endpoint>/api/service-calls/inspect |
@@ -144,3 +144,47 @@ Feature: Reusable service call definitions
     Examples:
       | Scenario Tags | endpoint                  |
       | %early-exit | http://127.0.0.1:8765     |
+
+
+  # Inline CALL returns this component's live default scenario object. The
+  # caller's closest scenario map is available under PARENT before execution.
+  Scenario Outline: InlineTokenCall
+    Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
+      | endpoint    | <PARENT.serviceBaseUrl>/api/service-calls/token |
+      | method      | POST                                            |
+      | accept      | application/json                                |
+      | contentType | application/json                                |
+    And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
+      | X-Test-Client | <PARENT.inlineClient> |
+    And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
+      | scope | <PARENT.inlineScope> |
+    And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
+      """json
+      {
+        "grantType": "client_credentials"
+      }
+      """
+    When EXECUTE SERVICE CALL
+
+    Examples:
+      | Scenario Tags |
+      | %inline-token-call |
+
+
+  # This second inline component consumes the token object previously mapped
+  # into the caller's RunMap and combines it with values from PARENT.
+  Scenario Outline: InlineProtectedCall
+    Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
+      | endpoint | <PARENT.serviceBaseUrl>/api/service-calls/protected |
+      | method   | GET                                                 |
+      | accept   | application/json                                    |
+    And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
+      | X-Test-Client | <PARENT.inlineClient>                         |
+      | Authorization | Bearer <tokenReturn.RESPONSE.body.accessToken> |
+    And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
+      | scope | <PARENT.inlineScope> |
+    When EXECUTE SERVICE CALL
+
+    Examples:
+      | Scenario Tags |
+      | %inline-protected-call |

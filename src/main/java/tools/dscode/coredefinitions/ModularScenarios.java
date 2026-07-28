@@ -16,7 +16,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.ScenarioStep.createScenarioStep;
@@ -38,7 +37,13 @@ public class ModularScenarios extends CoreSteps {
             String inlineTags,
             DataTable dataTable
     ) {
-        filterAndParsePickles(topStep, buildRunScenarioMaps(inlineTags, dataTable));
+        filterAndParsePickles(
+                topStep,
+                buildRunScenarioMaps(inlineTags, dataTable),
+                null,
+                null,
+                null
+        );
     }
 
     public static void populateRunScenariosStep(
@@ -49,40 +54,12 @@ public class ModularScenarios extends CoreSteps {
             String singleMatchType,
             BiConsumer<ScenarioStep, Map<String, String>> scenarioInitializer
     ) {
-        populateRunScenariosStep(
-                topStep,
-                inlineTags,
-                dataTable,
-                featuresPath,
-                singleMatchType,
-                scenarioInitializer,
-                null
-        );
-    }
-
-    /**
-     * Creates component ScenarioSteps and optionally inserts one synthetic step
-     * immediately after each component scenario.
-     *
-     * <p>The synthetic step is a sibling, not a descendant. This lets it run
-     * after a component scenario has completed or used END SCENARIO.</p>
-     */
-    public static void populateRunScenariosStep(
-            StepExtension topStep,
-            String inlineTags,
-            DataTable dataTable,
-            String featuresPath,
-            String singleMatchType,
-            BiConsumer<ScenarioStep, Map<String, String>> scenarioInitializer,
-            BiFunction<ScenarioStep, Map<String, String>, StepExtension> scenarioFinalizerFactory
-    ) {
         filterAndParsePickles(
                 topStep,
                 buildRunScenarioMaps(inlineTags, dataTable),
                 featuresPath,
                 singleMatchType,
-                scenarioInitializer,
-                scenarioFinalizerFactory
+                scenarioInitializer
         );
     }
 
@@ -108,7 +85,8 @@ public class ModularScenarios extends CoreSteps {
             } else {
                 maps.forEach(map -> map.put(
                         RUN_TAGS,
-                        (inlineTags + " " + map.getOrDefault(RUN_TAGS, map.getOrDefault(TAGS, ""))).trim()
+                        (inlineTags + " "
+                                + map.getOrDefault(RUN_TAGS, map.getOrDefault(TAGS, ""))).trim()
                 ));
             }
         }
@@ -118,10 +96,9 @@ public class ModularScenarios extends CoreSteps {
 
     public static void filterAndParsePickles(
             StepExtension topStep,
-            List<Map<String, String>> maps,
-            String... messageString
+            List<Map<String, String>> maps
     ) {
-        filterAndParsePickles(topStep, maps, null, null, null, null);
+        filterAndParsePickles(topStep, maps, null, null, null);
     }
 
     static void filterAndParsePickles(
@@ -129,31 +106,38 @@ public class ModularScenarios extends CoreSteps {
             List<Map<String, String>> maps,
             String featuresPath,
             String singleMatchType,
-            BiConsumer<ScenarioStep, Map<String, String>> scenarioInitializer,
-            BiFunction<ScenarioStep, Map<String, String>, StepExtension> scenarioFinalizerFactory
+            BiConsumer<ScenarioStep, Map<String, String>> scenarioInitializer
     ) {
         StepExtension lastLinkedStep = null;
 
         for (Map<String, String> map : maps) {
-            String runTags = map.getOrDefault(RUN_TAGS, map.getOrDefault(TAGS, "")).trim();
+            String runTags = map.getOrDefault(
+                    RUN_TAGS,
+                    map.getOrDefault(TAGS, "")
+            ).trim();
+
             if (singleMatchType != null && runTags.isBlank()) {
                 continue;
             }
 
             Map<String, String> scanOptions = new HashMap<>(map);
+
             if (featuresPath != null && !featuresPath.isBlank()) {
                 scanOptions.put(CUCUMBER_FEATURES, featuresPath);
             }
 
             List<Pickle> pickles;
+
             try {
                 pickles = CucumberScanUtil.listPickles(scanOptions);
             } catch (IllegalArgumentException exception) {
                 if (singleMatchType == null) {
                     throw exception;
                 }
+
                 throw new IllegalArgumentException(
-                        "No " + singleMatchType + " matched Run Tags [" + runTags
+                        "No " + singleMatchType
+                                + " matched Run Tags [" + runTags
                                 + "] under [" + featuresPath + "]",
                         exception
                 );
@@ -161,9 +145,14 @@ public class ModularScenarios extends CoreSteps {
 
             if (singleMatchType != null && pickles.size() != 1) {
                 throw new IllegalArgumentException(
-                        "Run Tags [" + runTags + "] matched " + pickles.size() + " "
-                                + singleMatchType + " scenarios under [" + featuresPath + "]: "
-                                + pickles.stream().map(Pickle::getName).distinct().toList()
+                        "Run Tags [" + runTags + "] matched "
+                                + pickles.size() + " "
+                                + singleMatchType
+                                + " scenarios under [" + featuresPath + "]: "
+                                + pickles.stream()
+                                .map(Pickle::getName)
+                                .distinct()
+                                .toList()
                 );
             }
 
@@ -175,7 +164,10 @@ public class ModularScenarios extends CoreSteps {
                 scenarioStepParsingMap.addMaps(passedMap);
 
                 io.cucumber.messages.types.Pickle pickle =
-                        (io.cucumber.messages.types.Pickle) getProperty(gherkinMessagesPickle, "pickle");
+                        (io.cucumber.messages.types.Pickle) getProperty(
+                                gherkinMessagesPickle,
+                                "pickle"
+                        );
 
                 if (pickle.getValueRow() != null && !pickle.getValueRow().isEmpty()) {
                     NodeMap examples = new NodeMap(MapConfigurations.MapType.EXAMPLE_MAP);
@@ -192,14 +184,11 @@ public class ModularScenarios extends CoreSteps {
                     scenarioInitializer.accept(scenarioStep, map);
                 }
 
-                lastLinkedStep = appendChild(topStep, lastLinkedStep, scenarioStep);
-
-                if (scenarioFinalizerFactory != null) {
-                    StepExtension finalizer = scenarioFinalizerFactory.apply(scenarioStep, map);
-                    if (finalizer != null) {
-                        lastLinkedStep = appendChild(topStep, lastLinkedStep, finalizer);
-                    }
-                }
+                lastLinkedStep = appendChild(
+                        topStep,
+                        lastLinkedStep,
+                        scenarioStep
+                );
             }
         }
     }

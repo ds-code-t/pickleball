@@ -439,9 +439,41 @@ public abstract class MappingProcessor implements Map<String, Object> {
             boolean resolveEvaluations,
             String... delimiterReplacements
     ) {
+        return (String) resolveWhole(
+                input, resolveEvaluations, false, delimiterReplacements);
+    }
+
+    /**
+     * Resolves text exactly as {@link #resolveWholeText(String, String...)}, but
+     * preserves the resolved object when the complete input ultimately consists
+     * of one map/reference placeholder. Embedded replacements remain strings.
+     */
+    public Object resolveWholeValue(String input, String... delimiterReplacements) {
+        return resolveWholeValue(input, true, delimiterReplacements);
+    }
+
+    /**
+     * Same as {@link #resolveWholeValue(String, String...)}, with explicit
+     * control over expression and step-reference evaluation.
+     */
+    public Object resolveWholeValue(
+            String input,
+            boolean resolveEvaluations,
+            String... delimiterReplacements
+    ) {
+        return resolveWhole(
+                input, resolveEvaluations, true, delimiterReplacements);
+    }
+
+    private Object resolveWhole(
+            String input,
+            boolean resolveEvaluations,
+            boolean preserveWholeObject,
+            String... delimiterReplacements
+    ) {
         validateDelimiterReplacements(delimiterReplacements);
 
-        String resolvedText;
+        Object resolvedValue;
         if (usesDualDefaultOuterBookends(delimiterReplacements)
                 && looksLikeXml(input)) {
             Bookends xmlSafeBookends = createBookendsForOuter(
@@ -449,8 +481,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     SECONDARY_DEFAULT_CLOSE_BOOKEND,
                     delimiterReplacements);
 
-            resolvedText = resolveUsingBookends(
-                    input, xmlSafeBookends, resolveEvaluations);
+            resolvedValue = resolveUsingBookends(
+                    input, xmlSafeBookends, resolveEvaluations, preserveWholeObject);
         } else if (usesDualDefaultOuterBookends(delimiterReplacements)) {
             Bookends angleBookends = createBookendsForOuter(
                     DEFAULT_OPEN_BOOKEND,
@@ -462,20 +494,22 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     SECONDARY_DEFAULT_CLOSE_BOOKEND,
                     delimiterReplacements);
 
-            resolvedText = resolveUntilStable(
+            resolvedValue = resolveUntilStable(
                     input,
                     resolveEvaluations,
+                    preserveWholeObject,
                     angleBookends,
                     tildeSquareBookends);
         } else {
-            resolvedText = resolveUsingBookends(
+            resolvedValue = resolveUsingBookends(
                     input,
                     createBookends(delimiterReplacements),
-                    resolveEvaluations);
+                    resolveEvaluations,
+                    preserveWholeObject);
         }
 
-        logTrace("Resolved: '" + input + "' -> '" + resolvedText + "'");
-        return resolvedText;
+        logTrace("Resolved: '" + input + "' -> '" + resolvedValue + "'");
+        return resolvedValue;
     }
 
     /**
@@ -510,9 +544,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
      * pass. This preserves the original unresolved syntax because each pass
      * restores its own active bookends before the next dialect is attempted.
      */
-    private String resolveUntilStable(
+    private Object resolveUntilStable(
             String input,
             boolean resolveEvaluations,
+            boolean preserveWholeObject,
             Bookends... bookendStyles
     ) {
         Set<String> seenValues = new HashSet<>();
@@ -522,8 +557,15 @@ public abstract class MappingProcessor implements Map<String, Object> {
             String previous = current;
 
             for (Bookends bookends : bookendStyles) {
-                current = resolveUsingBookends(
-                        current, bookends, resolveEvaluations);
+                Object resolved = resolveUsingBookends(
+                        current,
+                        bookends,
+                        resolveEvaluations,
+                        preserveWholeObject);
+                if (!(resolved instanceof String resolvedText)) {
+                    return resolved;
+                }
+                current = resolvedText;
             }
 
             if (current.equals(previous)) {
@@ -540,30 +582,38 @@ public abstract class MappingProcessor implements Map<String, Object> {
      * Performs one complete quote, normalization, resolution, restoration, and
      * unquote-cleanup pass using exactly one bookend style.
      */
-    private String resolveUsingBookends(
+    private Object resolveUsingBookends(
             String input,
             Bookends bookends,
-            boolean resolveEvaluations
+            boolean resolveEvaluations,
+            boolean preserveWholeObject
     ) {
         QuoteParser parsedObj = new QuoteParser(input);
 
-        // Resolve quoted substring values first. This lets expression bookends
-        // restore quoted placeholders that have already been resolved.
+        // Quoted values are always embedded text, even when the surrounding
+        // input is eligible to preserve a whole-reference object.
         for (var entry : parsedObj.entrySetWithoutTripleSingle()) {
             parsedObj.put(
                     entry.getKey(),
-                    resolveAll(
+                    (String) resolveAll(
                             entry.getValue(),
                             parsedObj,
                             bookends,
-                            resolveEvaluations));
+                            resolveEvaluations,
+                            false));
         }
 
-        parsedObj.setMasked(resolveAll(
+        Object resolvedMasked = resolveAll(
                 parsedObj.masked(),
                 parsedObj,
                 bookends,
-                resolveEvaluations));
+                resolveEvaluations,
+                preserveWholeObject);
+        if (!(resolvedMasked instanceof String resolvedText)) {
+            return resolvedMasked;
+        }
+
+        parsedObj.setMasked(resolvedText);
         return cleanupUnquotedReplacements(parsedObj.restore());
     }
 
@@ -630,11 +680,12 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return replacement;
     }
 
-    private String resolveAll(
+    private Object resolveAll(
             String input,
             QuoteParser parsedObj,
             Bookends bookends,
-            boolean resolveEvaluations
+            boolean resolveEvaluations,
+            boolean preserveWholeObject
     ) {
         try {
             String originalInput;
@@ -645,11 +696,16 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 do {
                     previousInput = input;
                     if (input.contains(INTERNAL_MAP_OPEN)) {
-                        input = resolveByMap(
+                        Object resolved = resolveByMap(
                                 input,
                                 parsedObj,
                                 bookends,
-                                resolveEvaluations);
+                                resolveEvaluations,
+                                preserveWholeObject);
+                        if (!(resolved instanceof String resolvedText)) {
+                            return resolved;
+                        }
+                        input = resolvedText;
                     }
                     if (resolveEvaluations
                             && input.contains(INTERNAL_EXPRESSION_OPEN)) {
@@ -672,17 +728,21 @@ public abstract class MappingProcessor implements Map<String, Object> {
         }
     }
 
-    private String resolveByMap(
+    private Object resolveByMap(
             String input,
             QuoteParser parsedObj,
             Bookends bookends,
-            boolean resolveEvaluations
+            boolean resolveEvaluations,
+            boolean preserveWholeObject
     ) {
         String key = null;
         String matchedKey = null;
         boolean unquote = false;
         try {
             Matcher matcher = MAP_PLACEHOLDER.matcher(input);
+            boolean wholeReference = preserveWholeObject && matcher.matches();
+            matcher.reset();
+
             StringBuffer output = new StringBuffer();
             Object replacement = null;
 
@@ -728,6 +788,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
             if (replacement == null) {
                 return input;
+            }
+
+            if (wholeReference && !(replacement instanceof String)) {
+                return unwrapScalarJsonNode(replacement);
             }
 
             String stringReplacement = getStringValue(replacement);
@@ -1175,6 +1239,32 @@ public abstract class MappingProcessor implements Map<String, Object> {
     @Override
     public Set<Entry<String, Object>> entrySet() {
         return Set.of();
+    }
+
+    /**
+     * Converts a scalar Jackson node to its corresponding Java value while
+     * leaving container nodes and non-Jackson values unchanged.
+     */
+    private static Object unwrapScalarJsonNode(Object value) {
+        if (!(value instanceof JsonNode jsonNode) || jsonNode.isContainerNode()) {
+            return value;
+        }
+        if (jsonNode.isNull() || jsonNode.isMissingNode()) {
+            return null;
+        }
+        if (jsonNode.isTextual()) {
+            return jsonNode.textValue();
+        }
+        if (jsonNode.isBoolean()) {
+            return jsonNode.booleanValue();
+        }
+        if (jsonNode.isNumber()) {
+            return jsonNode.numberValue();
+        }
+        if (jsonNode.isPojo()) {
+            return ((com.fasterxml.jackson.databind.node.POJONode) jsonNode).getPojo();
+        }
+        return MAPPER.convertValue(jsonNode, Object.class);
     }
 
     public static String getStringValue(Object obj) {

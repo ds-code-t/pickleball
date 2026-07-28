@@ -113,11 +113,48 @@ Feature: Service call orchestration with generic request mappings
     And , verify "<soapAdd.RESPONSE.body>" contains "17"
 
 
-  Scenario: Finalize a component that ends before sending an HTTP request
+  Scenario: Preserve a component reference that ends before sending an HTTP request
     When "earlyExit" SERVICE CALL: %early-exit
       | endpoint                  |
       | http://127.0.0.1:8765     |
 
     Then , verify "<earlyExit.REQUEST.method>" equals "GET"
     And , verify "<earlyExit.REQUEST.queryParams.mode>" equals "must-not-run"
-    And , verify "<earlyExit.RESPONSE>" equals "{}"
+
+
+  Scenario: Map an inline service call result and reuse it in another inline call
+    Given MAP TABLE VALUES TO SCENARIO MAP
+      | serviceBaseUrl | http://127.0.0.1:8765 |
+      | inlineClient   | inline-client         |
+      | inlineScope    | catalog.read          |
+
+    When MAP TABLE VALUES
+      | tokenReturn | <$CALL:%inline-token-call> |
+
+    Then , verify "<tokenReturn.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/token"
+    And , verify "<tokenReturn.REQUEST.method>" equals "POST"
+    And , verify "<tokenReturn.REQUEST.headers.X-Test-Client>" equals "inline-client"
+    And , verify "<tokenReturn.REQUEST.queryParams.scope>" equals "catalog.read"
+    And , verify "<tokenReturn.REQUEST.body.grantType>" equals "client_credentials"
+    And , verify "<tokenReturn.RESPONSE.method>" equals "POST"
+    And , verify "<tokenReturn.RESPONSE.statusCode>" equals "200"
+    And , verify "<tokenReturn.RESPONSE.body.accessToken>" equals "inline-inline-client-catalog-read"
+    And , verify "<tokenReturn.RESPONSE.body.tokenType>" equals "Bearer"
+    And , verify "<tokenReturn.RESPONSE.body.scope>" equals "catalog.read"
+    And , verify "<tokenReturn.RESPONSE.body.client>" equals "inline-client"
+    And , verify "<tokenReturn.RESPONSE.body.request.grantType>" equals "client_credentials"
+
+    When MAP TABLE VALUES
+      | protectedReturn | <$CALL:%inline-protected-call> |
+
+    Then , verify "<protectedReturn.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/protected"
+    And , verify "<protectedReturn.REQUEST.method>" equals "GET"
+    And , verify "<protectedReturn.REQUEST.headers.X-Test-Client>" equals "inline-client"
+    And , verify "<protectedReturn.REQUEST.headers.Authorization>" equals "Bearer inline-inline-client-catalog-read"
+    And , verify "<protectedReturn.REQUEST.queryParams.scope>" equals "catalog.read"
+    And , verify "<protectedReturn.RESPONSE.method>" equals "GET"
+    And , verify "<protectedReturn.RESPONSE.statusCode>" equals "200"
+    And , verify "<protectedReturn.RESPONSE.body.authorized>" equals "true"
+    And , verify "<protectedReturn.RESPONSE.body.client>" equals "inline-client"
+    And , verify "<protectedReturn.RESPONSE.body.scope>" equals "catalog.read"
+    And , verify "<protectedReturn.RESPONSE.body.token>" equals "inline-inline-client-catalog-read"

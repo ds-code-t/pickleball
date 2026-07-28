@@ -55,6 +55,20 @@ public class ParsingMap extends MappingProcessor {
         }
     }
 
+
+    public static Object resolveFromParsingMap(Object input) {
+        if (input instanceof String inputString) {
+            return getRunningParsingMap().resolveWholeValue(inputString);
+        }
+
+        if (input instanceof JsonNode jsonNode && jsonNode.isTextual()) {
+            return getRunningParsingMap().resolveWholeValue(jsonNode.textValue());
+        }
+
+        return input;
+    }
+
+
     public static String resolveToStringWithRunningParsingMap(String input) {
         if (input == null) return null;
         return getRunningParsingMap().resolveWholeText(input);
