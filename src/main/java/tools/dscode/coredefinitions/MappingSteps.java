@@ -8,6 +8,7 @@ import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import io.cucumber.java.en.Given;
 import tools.dscode.common.CoreSteps;
+import tools.dscode.common.annotations.DefinitionFlags;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.mappings.NodeMap;
 
@@ -18,6 +19,8 @@ import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static io.cucumber.core.runner.util.TableUtils.toFlatStringMultimap;
 import static io.cucumber.core.runner.util.TableUtils.toRowsStringMultimap;
+import static tools.dscode.common.annotations.DefinitionFlag.NO_ARG_RESOLUTION;
+import static tools.dscode.common.annotations.DefinitionFlag._DEBUG_LOGGING;
 import static tools.dscode.common.mappings.FileAndDataParsing.JSON_MAPPER;
 import static tools.dscode.common.mappings.FileAndDataParsing.XML_MAPPER;
 import static tools.dscode.common.mappings.FileAndDataParsing.YAML_MAPPER;
@@ -106,6 +109,7 @@ public class MappingSteps extends CoreSteps {
     }
 
 
+    @DefinitionFlags(NO_ARG_RESOLUTION)
     @Given("^MAP \"(.*)\" (TEXT|OBJECT) VALUE(?: TO (DEFAULT|OVERRIDE|SINGLETON|STEP|ROOT SCENARIO|SCENARIO|RUN) MAP)?$")
     public static void mapDocString(String key, String dataType, String mapType, DocString docString) {
         NodeMap nodeMap = switch (mapType) {
@@ -130,6 +134,7 @@ public class MappingSteps extends CoreSteps {
         nodeMap.put(key, value);
     }
 
+    @DefinitionFlags(NO_ARG_RESOLUTION)
     @Given("^MAP (?:\"(.*)\" )?TABLE VALUES(?: TO (DEFAULT|OVERRIDE|SINGLETON|STEP|ROOT SCENARIO|SCENARIO|RUN) MAP)?$")
     public static void mapValues(String prefix, String mapType, DataTable dataTable) {
         NodeMap nodeMap = switch (mapType) {

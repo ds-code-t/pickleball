@@ -14,10 +14,14 @@ import java.util.List;
  * Adds (and populates) definitionFlags + method on PickleStepTestStep.
  * - method: underlying Java method of the bound step definition (if present)
  * - definitionFlags: values from @DefinitionFlags on that method (if present)
+ * - noStepTextResolution / noArgResolution: convenience booleans derived from flags
+ *   (NO_STEP_TEXT_RESOLUTION / NO_ARG_RESOLUTION; both true when NO_RESOLUTION)
  *
  * Safe defaults:
  * - method = null
  * - definitionFlags =  new ArrayList<>()
+ * - noStepTextResolution = false
+ * - noArgResolution = false
  */
 public privileged aspect PickleStepTestStep_DefFlags {
 
@@ -31,12 +35,30 @@ public privileged aspect PickleStepTestStep_DefFlags {
     public List<DefinitionFlag> io.cucumber.core.runner.PickleStepTestStep.definitionFlags =
             new ArrayList<>();
 
+    /**
+     * True when the bound step definition has {@link DefinitionFlag#NO_STEP_TEXT_RESOLUTION}
+     * or {@link DefinitionFlag#NO_RESOLUTION}.
+     */
+    public boolean io.cucumber.core.runner.PickleStepTestStep.noStepTextResolution = false;
+
+    /**
+     * True when the bound step definition has {@link DefinitionFlag#NO_ARG_RESOLUTION}
+     * or {@link DefinitionFlag#NO_RESOLUTION}.
+     */
+    public boolean io.cucumber.core.runner.PickleStepTestStep.noArgResolution = false;
+
     /* Optional convenience getters (remove if you don't want them) */
     public Method io.cucumber.core.runner.PickleStepTestStep.getMethod() {
         return this.method;
     }
     public List<DefinitionFlag> io.cucumber.core.runner.PickleStepTestStep.getDefinitionFlags() {
         return this.definitionFlags;
+    }
+    public boolean io.cucumber.core.runner.PickleStepTestStep.isNoStepTextResolution() {
+        return this.noStepTextResolution;
+    }
+    public boolean io.cucumber.core.runner.PickleStepTestStep.isNoArgResolution() {
+        return this.noArgResolution;
     }
 
     /* ===== Advice: run immediately after any PickleStepTestStep ctor ===== */
@@ -71,11 +93,27 @@ public privileged aspect PickleStepTestStep_DefFlags {
                     ? new ArrayList<>()
                     : new ArrayList<>(flags);
 
+            applyResolutionFlags(thiz, thiz.definitionFlags);
+
         } catch (Throwable t) {
             // Fail-safe defaults
             thiz.method = null;
             thiz.definitionFlags = new ArrayList<>();
+            thiz.noStepTextResolution = false;
+            thiz.noArgResolution = false;
         }
+    }
+
+    /**
+     * Derives the resolution boolean fields from the definition-flag list.
+     * {@link DefinitionFlag#NO_RESOLUTION} implies both flags.
+     */
+    private static void applyResolutionFlags(PickleStepTestStep thiz, List<DefinitionFlag> flags) {
+        boolean noResolution = flags != null && flags.contains(DefinitionFlag.NO_RESOLUTION);
+        thiz.noStepTextResolution = noResolution
+                || (flags != null && flags.contains(DefinitionFlag.NO_STEP_TEXT_RESOLUTION));
+        thiz.noArgResolution = noResolution
+                || (flags != null && flags.contains(DefinitionFlag.NO_ARG_RESOLUTION));
     }
 
     /* ===== Simple nested-field resolver used by the advice ===== */
