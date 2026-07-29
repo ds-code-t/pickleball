@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.LinkedListMultimap;
+import io.cucumber.core.runner.StepBase;
+import io.cucumber.core.runner.StepExtension;
 import tools.dscode.common.mappings.queries.Tokenized;
 
 import java.util.ArrayList;
@@ -12,11 +14,15 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.IntStream;
 
+import static io.cucumber.core.runner.GlobalState.getClosestScenarioStepAncestor;
+import static io.cucumber.core.runner.GlobalState.getRootScenarioStep;
+import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.GlobalConstants.META_FLAG;
 
 /** A mutable JSON-backed map with JSONata reads and writable path queries. */
@@ -213,4 +219,104 @@ public class NodeMap extends ValueFormatting {
         }
         throw new IllegalArgumentException(description + " did not serialize to an ObjectNode");
     }
+
+    public static NodeMap getNodeMap(String input) {
+        List<String> segments = input == null
+                ? List.of()
+                : Arrays.stream(input.split("\\."))
+                .map(String::trim)
+                .filter(segment -> !segment.isBlank())
+                .map(segment -> segment.toUpperCase(Locale.ROOT))
+                .toList();
+
+        if (segments.isEmpty()) {
+            return MappingProcessor.getRunMap();
+        }
+
+        String mapType = segments.getLast();
+
+        return switch (mapType) {
+            case "DEFAULT" -> MappingProcessor.getDefaultsMap();
+            case "OVERRIDE" -> MappingProcessor.getOverridesMap();
+            case "SINGLETON" -> MappingProcessor.getSingletonMap();
+            case "SCENARIO ROOT", "ROOT SCENARIO" ->
+                    getRootScenarioStep().getDefaultStepNodeMap();
+            case "RUN" -> MappingProcessor.getRunMap();
+
+            case "STEP" -> getStepNodeMap(input, segments);
+            case "SCENARIO" -> getScenarioNodeMap(input, segments);
+
+            default -> throw new IllegalArgumentException(
+                    "Unsupported NodeMap reference '" + input + "'. "
+                            + "The final segment must be DEFAULT, OVERRIDE, SINGLETON, "
+                            + "SCENARIO ROOT, ROOT SCENARIO, RUN, STEP, or SCENARIO."
+            );
+        };
+    }
+
+    private static NodeMap getStepNodeMap(
+            String input,
+            List<String> segments
+    ) {
+        validateParentPrefixes(input, segments);
+
+        StepBase step = getRunningStep();
+
+        for (int i = 0; i < segments.size() - 1; i++) {
+            step = step.parentStep;
+
+            if (step == null) {
+                return null;
+            }
+        }
+
+        return step.getDefaultStepNodeMap();
+    }
+
+    private static NodeMap getScenarioNodeMap(
+            String input,
+            List<String> segments
+    ) {
+        validateParentPrefixes(input, segments);
+
+        int parentCount = segments.size() - 1;
+        int ancestorCalls = Math.max(1, parentCount);
+
+        StepExtension scenarioStep = getClosestScenarioStepAncestor();
+
+        if (scenarioStep == null) {
+            return null;
+        }
+
+        for (int i = 1; i < ancestorCalls; i++) {
+            scenarioStep = scenarioStep.getClosestScenarioStepAncestor();
+
+            if (scenarioStep == null) {
+                return null;
+            }
+        }
+
+        return scenarioStep.getDefaultStepNodeMap();
+    }
+
+    private static void validateParentPrefixes(
+            String input,
+            List<String> segments
+    ) {
+        List<String> invalidPrefixes = segments
+                .subList(0, segments.size() - 1)
+                .stream()
+                .filter(segment -> !segment.equals("PARENT"))
+                .toList();
+
+        if (!invalidPrefixes.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Invalid NodeMap reference '" + input + "'. "
+                            + "Only PARENT segments may precede STEP or SCENARIO. "
+                            + "Invalid segment(s): " + invalidPrefixes
+            );
+        }
+    }
+
+
 }

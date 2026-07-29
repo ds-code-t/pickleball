@@ -2,7 +2,7 @@
  * MappingProcessor delimiter rewrite — revision v6
  *
  * Supports both <...> and ~[~...~]~ as built-in default bookend styles,
- * while retaining custom delimiters, comparison handling, FILE:, and ~unquote.
+ * while retaining custom delimiters, comparison handling, file:, and ~unquote.
  * XML-like input automatically uses only the XML-safe ~[~...~]~ bookends when
  * no custom outer delimiters are supplied.
  */
@@ -47,6 +47,7 @@ import static tools.dscode.common.evaluations.AviatorUtil.eval;
 import static tools.dscode.common.evaluations.AviatorUtil.evalToBoolean;
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
+import static tools.dscode.common.mappings.NodeMap.getNodeMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 import static tools.dscode.common.util.StringUtilities.decodeBackToText;
@@ -57,7 +58,7 @@ import static tools.dscode.testengine.PKB_props.PKB_PREFIX;
 
 public abstract class MappingProcessor implements Map<String, Object> {
 
-    private static final String FILE_REFERENCE_PREFIX = "FILE:";
+    private static final String FILE_REFERENCE_PREFIX = "file:";
     protected final LinkedListMultimap<MapConfigurations.MapType, NodeMap> maps = LinkedListMultimap.create();
     protected final List<MapConfigurations.MapType> keyOrder = new ArrayList<>();
     protected final List<MapConfigurations.MapType> singletonOrder = new ArrayList<>();
@@ -275,6 +276,27 @@ public abstract class MappingProcessor implements Map<String, Object> {
             out.addAll(maps.get(key));
         }
         return out;
+    }
+
+    public List<NodeMap> getMapsForResolution(String mapTypes) {
+        List<String> segments = mapTypes == null
+                ? List.of()
+                : Arrays.stream(mapTypes.split("\\s+"))
+                .map(String::trim)
+                .filter(segment -> !segment.isBlank())
+                .toList();
+
+        if (segments.isEmpty()) {
+            return getMapsForResolution();
+        }
+
+        List<NodeMap> nodeMaps = new ArrayList<>(segments.size());
+
+        for (String segment : segments) {
+            nodeMaps.add(getNodeMap(segment));
+        }
+
+        return nodeMaps;
     }
 
     public List<NodeMap> getMapsForSingletonResolution() {
@@ -939,13 +961,12 @@ public abstract class MappingProcessor implements Map<String, Object> {
         if (key.contains("_") && key.toLowerCase().startsWith(PKB_PREFIX)) {
             return resolveFromVars(key);
         }
-
-        Tokenized tokenized = new Tokenized(key);
-        for (NodeMap map : getMapsForResolution()) {
+        ParsedMapPrefix parsed = extractMapPrefix(key);
+        for (NodeMap map : getMapsForResolution(parsed.prefix)) {
             if (map == null) {
                 continue;
             }
-            Object replacement = map.getByNormalizedPath(key);
+            Object replacement = map.getByNormalizedPath(parsed.key);
             if (replacement != null) {
                 return replacement;
             }
@@ -1006,6 +1027,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     public Object get(String key) {
+        ParsedMapPrefix parsed = extractMapPrefix(key);
+        key = parsed.key;
         boolean directGet = key.startsWith("`") && key.endsWith("`");
         if (directGet) {
             key = key.substring(1, key.length() - 1);
@@ -1021,7 +1044,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
         Tokenized tokenized = new Tokenized(key);
         Object returnReplacement = null;
         while (true) {
-            for (NodeMap map : getMapsForResolution()) {
+            for (NodeMap map : getMapsForResolution(parsed.prefix)) {
                 if (map == null) {
                     continue;
                 }
@@ -1283,5 +1306,31 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 + stream.map(String::valueOf)
                 .collect(Collectors.joining(System.lineSeparator()))
                 + "\n---\n";
+    }
+
+
+    private static final Pattern MAP_PREFIX_PATTERN = Pattern.compile(
+            "^([A-Z](?:[A-Z. ]*[A-Z])?):(.*)$",
+            Pattern.DOTALL
+    );
+
+    public record ParsedMapPrefix(String prefix, String key) {
+    }
+
+    public static ParsedMapPrefix extractMapPrefix(String input) {
+        if (input == null) {
+            return new ParsedMapPrefix(null, null);
+        }
+
+        Matcher matcher = MAP_PREFIX_PATTERN.matcher(input);
+
+        if (!matcher.matches()) {
+            return new ParsedMapPrefix(null, input);
+        }
+
+        return new ParsedMapPrefix(
+                matcher.group(1),
+                matcher.group(2)
+        );
     }
 }

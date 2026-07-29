@@ -13,10 +13,6 @@ import static tools.dscode.common.evaluations.AviatorUtil.eval;
 
 public abstract class StepMapping extends StepBase {
 
-    public NodeMap getDefaultStepNodeMap() {
-        return defaultStepNodeMap;
-    }
-
     public void mergeToStepNodeMap(LinkedListMultimap<?, ?> obj) {
         defaultStepNodeMap.merge(obj);
     }

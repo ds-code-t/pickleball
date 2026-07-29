@@ -27,6 +27,7 @@ import static tools.dscode.common.mappings.FileAndDataParsing.YAML_MAPPER;
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
 import static tools.dscode.common.mappings.MappingProcessor.getDataTableMap;
 import static tools.dscode.common.mappings.MappingProcessor.getRunMap;
+import static tools.dscode.common.mappings.NodeMap.getNodeMap;
 import static tools.dscode.common.mappings.ParsingMap.getClosestScenarioStepAncestorNodeMap;
 import static tools.dscode.common.mappings.ParsingMap.getRootScenarioStepNodeMap;
 import static tools.dscode.common.mappings.ParsingMap.resolveFromParsingMap;
@@ -111,18 +112,16 @@ public class MappingSteps extends CoreSteps {
 
     @DefinitionFlags(NO_ARG_RESOLUTION)
     @Given("^MAP \"(.*)\" (TEXT|OBJECT) VALUE(?: TO (DEFAULT|OVERRIDE|SINGLETON|STEP|ROOT SCENARIO|SCENARIO|RUN) MAP)?$")
-    public static void mapDocString(String key, String dataType, String mapType, DocString docString) {
-        NodeMap nodeMap = switch (mapType) {
-            case "DEFAULT" -> MappingProcessor.getDefaultsMap();
-            case "OVERRIDE" -> MappingProcessor.getOverridesMap();
-            case "SINGLETON" -> MappingProcessor.getSingletonMap();
-            case "STEP" -> getRunningStep().getDefaultStepNodeMap();
-            case "SCENARIO" -> getClosestScenarioStepAncestorNodeMap();
-            case "SCENARIO ROOT" -> getRootScenarioStepNodeMap();
-            case "RUN" -> getRunMap();
-            case null, default -> getRunMap();
-        };
-        String content = resolveToStringWithRunningParsingMap(docString.getContent());
+    public static void mapDocString(
+            String key,
+            String dataType,
+            String mapType,
+            DocString docString
+    ) {
+        NodeMap nodeMap = getNodeMap(mapType);
+
+        String content =
+                resolveToStringWithRunningParsingMap(docString.getContent());
 
         Object value = switch (dataType == null ? "TEXT" : dataType) {
             case "TEXT" -> content;
@@ -131,22 +130,20 @@ public class MappingSteps extends CoreSteps {
                     "Unsupported map value type: " + dataType
             );
         };
+
         nodeMap.put(key, value);
     }
 
     @DefinitionFlags(NO_ARG_RESOLUTION)
+
     @Given("^MAP (?:\"(.*)\" )?TABLE VALUES(?: TO (DEFAULT|OVERRIDE|SINGLETON|STEP|ROOT SCENARIO|SCENARIO|RUN) MAP)?$")
-    public static void mapValues(String prefix, String mapType, DataTable dataTable) {
-        NodeMap nodeMap = switch (mapType) {
-            case "DEFAULT" -> MappingProcessor.getDefaultsMap();
-            case "OVERRIDE" -> MappingProcessor.getOverridesMap();
-            case "SINGLETON" -> MappingProcessor.getSingletonMap();
-            case "STEP" -> getRunningStep().getDefaultStepNodeMap();
-            case "SCENARIO" -> getClosestScenarioStepAncestorNodeMap();
-            case "SCENARIO ROOT" -> getRootScenarioStepNodeMap();
-            case "RUN" -> getRunMap();
-            case null, default -> getRunMap();
-        };
+    public static void mapValues(
+            String prefix,
+            String mapType,
+            DataTable dataTable
+    ) {
+        NodeMap nodeMap = getNodeMap(mapType);
+
         final String keyPrefix =
                 prefix == null || prefix.isBlank()
                         ? ""
@@ -161,7 +158,10 @@ public class MappingSteps extends CoreSteps {
                 return;
             }
 
-            nodeMap.put(keyPrefix + rowKey, resolveFromParsingMap(row.get(1)));
+            nodeMap.put(
+                    keyPrefix + rowKey,
+                    resolveFromParsingMap(row.get(1))
+            );
         });
     }
 

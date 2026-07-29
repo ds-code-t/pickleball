@@ -62,6 +62,23 @@ public abstract class StepBase implements Cloneable {
 
     protected final ParsingMap stepParsingMap = new ParsingMap();
     protected final NodeMap defaultStepNodeMap = new NodeMap(STEP_MAP);
+
+    public NodeMap getDefaultStepNodeMap() {
+        return defaultStepNodeMap;
+    }
+
+    public ScenarioStep getClosestScenarioStepAncestor() {
+        StepBase currentStep = parentStep;
+        while ((currentStep != null )) {
+            if (currentStep instanceof ScenarioStep scenarioStep) {
+                return scenarioStep;
+            }
+            currentStep = currentStep.parentStep;
+        }
+        return null;
+    }
+
+
     public NodeMap dataContextStepNodeMap;
     protected int nestingLevel = 0;
     public String codeLocation;
