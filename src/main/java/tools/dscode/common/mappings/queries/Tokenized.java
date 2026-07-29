@@ -406,7 +406,7 @@ public final class Tokenized {
     }
 
     private static boolean isAutoBacktickedProperty(String property) {
-        boolean needsBackticks = false;
+        boolean needsBackticks = !property.isEmpty() && Character.isDigit(property.charAt(0));
 
         for (int index = 0; index < property.length(); index++) {
             char current = property.charAt(index);
