@@ -122,6 +122,36 @@ Feature: Service call orchestration with generic request mappings
     And , verify "<earlyExit.REQUEST.queryParams.mode>" equals "must-not-run"
 
 
+  Scenario: Use a regular nested service call through the shared RunMap
+    When "nestedCall" SERVICE CALL: %nestedComponent
+      | url                      | client        | scope          |
+      | http://127.0.0.1:8765    | nested-client | inventory.read |
+
+    Then , verify "<TOKEN.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/token"
+    And , verify "<TOKEN.REQUEST.method>" equals "POST"
+    And , verify "<TOKEN.REQUEST.headers.X-Test-Client>" equals "nested-client"
+    And , verify "<TOKEN.REQUEST.queryParams.scope>" equals "inventory.read"
+    And , verify "<TOKEN.REQUEST.body.grantType>" equals "client_credentials"
+    And , verify "<TOKEN.RESPONSE.method>" equals "POST"
+    And , verify "<TOKEN.RESPONSE.statusCode>" equals "200"
+    And , verify "<TOKEN.RESPONSE.body.accessToken>" equals "inline-nested-client-inventory-read"
+    And , verify "<TOKEN.RESPONSE.body.tokenType>" equals "Bearer"
+    And , verify "<TOKEN.RESPONSE.body.scope>" equals "inventory.read"
+    And , verify "<TOKEN.RESPONSE.body.client>" equals "nested-client"
+    And , verify "<TOKEN.RESPONSE.body.request.grantType>" equals "client_credentials"
+    And , verify "<nestedCall.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/protected"
+    And , verify "<nestedCall.REQUEST.method>" equals "GET"
+    And , verify "<nestedCall.REQUEST.headers.X-Test-Client>" equals "nested-client"
+    And , verify "<nestedCall.REQUEST.headers.Authorization>" equals "Bearer inline-nested-client-inventory-read"
+    And , verify "<nestedCall.REQUEST.queryParams.scope>" equals "inventory.read"
+    And , verify "<nestedCall.RESPONSE.method>" equals "GET"
+    And , verify "<nestedCall.RESPONSE.statusCode>" equals "200"
+    And , verify "<nestedCall.RESPONSE.body.authorized>" equals "true"
+    And , verify "<nestedCall.RESPONSE.body.client>" equals "nested-client"
+    And , verify "<nestedCall.RESPONSE.body.scope>" equals "inventory.read"
+    And , verify "<nestedCall.RESPONSE.body.token>" equals "inline-nested-client-inventory-read"
+
+
   Scenario: Use inline CALL without RETURN to receive the completed child root
     When "inlineCall" SERVICE CALL: %serviceCallA
       | url                      | client        | scope        |
@@ -171,31 +201,3 @@ Feature: Service call orchestration with generic request mappings
     And , verify "<inlineReturn.RESPONSE.body.token>" equals "inline-return-client-orders-write"
 
 
-  Scenario: Use a regular nested service call through the shared RunMap
-    When "nestedCall" SERVICE CALL: %nestedComponent
-      | url                      | client        | scope          |
-      | http://127.0.0.1:8765    | nested-client | inventory.read |
-
-    Then , verify "<TOKEN.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/token"
-    And , verify "<TOKEN.REQUEST.method>" equals "POST"
-    And , verify "<TOKEN.REQUEST.headers.X-Test-Client>" equals "nested-client"
-    And , verify "<TOKEN.REQUEST.queryParams.scope>" equals "inventory.read"
-    And , verify "<TOKEN.REQUEST.body.grantType>" equals "client_credentials"
-    And , verify "<TOKEN.RESPONSE.method>" equals "POST"
-    And , verify "<TOKEN.RESPONSE.statusCode>" equals "200"
-    And , verify "<TOKEN.RESPONSE.body.accessToken>" equals "inline-nested-client-inventory-read"
-    And , verify "<TOKEN.RESPONSE.body.tokenType>" equals "Bearer"
-    And , verify "<TOKEN.RESPONSE.body.scope>" equals "inventory.read"
-    And , verify "<TOKEN.RESPONSE.body.client>" equals "nested-client"
-    And , verify "<TOKEN.RESPONSE.body.request.grantType>" equals "client_credentials"
-    And , verify "<nestedCall.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/protected"
-    And , verify "<nestedCall.REQUEST.method>" equals "GET"
-    And , verify "<nestedCall.REQUEST.headers.X-Test-Client>" equals "nested-client"
-    And , verify "<nestedCall.REQUEST.headers.Authorization>" equals "Bearer inline-nested-client-inventory-read"
-    And , verify "<nestedCall.REQUEST.queryParams.scope>" equals "inventory.read"
-    And , verify "<nestedCall.RESPONSE.method>" equals "GET"
-    And , verify "<nestedCall.RESPONSE.statusCode>" equals "200"
-    And , verify "<nestedCall.RESPONSE.body.authorized>" equals "true"
-    And , verify "<nestedCall.RESPONSE.body.client>" equals "nested-client"
-    And , verify "<nestedCall.RESPONSE.body.scope>" equals "inventory.read"
-    And , verify "<nestedCall.RESPONSE.body.token>" equals "inline-nested-client-inventory-read"
