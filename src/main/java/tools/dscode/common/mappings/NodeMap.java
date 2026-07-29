@@ -72,11 +72,23 @@ public class NodeMap extends ValueFormatting {
 
     public Object get(Tokenized query) {
         Object obj = query.get(root);
-        if(obj instanceof ArrayNode arrayNode)
-            return arrayNode.isEmpty() ? null : arrayNode.get(arrayNode.size() - 1);
 
-        if(obj instanceof List<?> list )
-            return list.isEmpty() ? null : list.getLast();
+        if (query.returnsWholeCollection) {
+            return obj;
+        }
+
+        if (obj instanceof ArrayNode arrayNode) {
+            return arrayNode.isEmpty()
+                    ? null
+                    : arrayNode.get(arrayNode.size() - 1);
+        }
+
+        if (obj instanceof List<?> list) {
+            return list.isEmpty()
+                    ? null
+                    : list.getLast();
+        }
+
         return obj;
     }
 

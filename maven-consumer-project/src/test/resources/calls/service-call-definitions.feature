@@ -146,18 +146,18 @@ Feature: Reusable service call definitions
       | %early-exit | http://127.0.0.1:8765     |
 
 
-  # Inline CALL returns this component's live default scenario object. The
-  # caller's closest scenario map is available under PARENT before execution.
-  Scenario Outline: InlineTokenCall
+  # CALL returns this component's live default scenario object. The caller's
+  # closest scenario map is available under PARENT before execution.
+  Scenario Outline: TokenCall
     Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
-      | endpoint    | <PARENT.serviceBaseUrl>/api/service-calls/token |
-      | method      | POST                                            |
-      | accept      | application/json                                |
-      | contentType | application/json                                |
+      | endpoint    | <PARENT.endpoint>/api/service-calls/token |
+      | method      | POST                                      |
+      | accept      | application/json                          |
+      | contentType | application/json                          |
     And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
-      | X-Test-Client | <PARENT.inlineClient> |
+      | X-Test-Client | <PARENT.client> |
     And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
-      | scope | <PARENT.inlineScope> |
+      | scope | <PARENT.scope> |
     And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
       """json
       {
@@ -168,23 +168,77 @@ Feature: Reusable service call definitions
 
     Examples:
       | Scenario Tags |
-      | %inline-token-call |
+      | %TokenCall    |
 
 
-  # This second inline component consumes the token object previously mapped
-  # into the caller's RunMap and combines it with values from PARENT.
-  Scenario Outline: InlineProtectedCall
-    Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
-      | endpoint | <PARENT.serviceBaseUrl>/api/service-calls/protected |
-      | method   | GET                                                 |
-      | accept   | application/json                                    |
+  # This component owns the protected request, but obtains its authentication
+  # token through the inline CALL value expression.
+  Scenario Outline: ServiceCallA
+    Given MAP TABLE VALUES TO SCENARIO MAP
+      | endpoint | <endpoint> |
+      | client   | <client>   |
+      | scope    | <scope>    |
+    And MAP TABLE VALUES TO SCENARIO MAP
+      | TOKEN | <$CALL:%TokenCall> |
+    And MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
+      | endpoint | <endpoint>/api/service-calls/protected |
+      | method   | GET                                    |
+      | accept   | application/json                       |
     And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
-      | X-Test-Client | <PARENT.inlineClient>                         |
-      | Authorization | Bearer <tokenReturn.RESPONSE.body.accessToken> |
+      | X-Test-Client | <client>                                    |
+      | Authorization | Bearer <TOKEN.RESPONSE.body.accessToken>    |
     And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
-      | scope | <PARENT.inlineScope> |
+      | scope | <scope> |
     When EXECUTE SERVICE CALL
 
     Examples:
-      | Scenario Tags |
-      | %inline-protected-call |
+      | Scenario Tags | endpoint                  | client         | scope        |
+      | %serviceCallA | http://127.0.0.1:8765     | default-client | catalog.read |
+
+
+  # This token component receives its values through an ordinary nested
+  # SERVICE CALL invocation rather than through PARENT.
+  Scenario Outline: NestedTokenComponent
+    Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
+      | endpoint    | <endpoint>/api/service-calls/token |
+      | method      | POST                                |
+      | accept      | application/json                    |
+      | contentType | application/json                    |
+    And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
+      | X-Test-Client | <client> |
+    And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
+      | scope | <scope> |
+    And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
+      """json
+      {
+        "grantType": "client_credentials"
+      }
+      """
+    When EXECUTE SERVICE CALL
+
+    Examples:
+      | Scenario Tags         | endpoint                  | client         | scope          |
+      | %nestedTokenComponent | http://127.0.0.1:8765     | default-client | inventory.read |
+
+
+  # This component performs an ordinary nested SERVICE CALL. The nested result
+  # is registered as TOKEN in this component's scenario map before the protected
+  # request is assembled.
+  Scenario Outline: NestedComponent
+    Given "TOKEN" SERVICE CALL: %nestedTokenComponent
+      | endpoint   | client   | scope   |
+      | <endpoint> | <client> | <scope> |
+    And MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
+      | endpoint | <endpoint>/api/service-calls/protected |
+      | method   | GET                                    |
+      | accept   | application/json                       |
+    And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
+      | X-Test-Client | <client>                                 |
+      | Authorization | Bearer <TOKEN.RESPONSE.body.accessToken> |
+    And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
+      | scope | <scope> |
+    When EXECUTE SERVICE CALL
+
+    Examples:
+      | Scenario Tags    | endpoint                  | client         | scope          |
+      | %nestedComponent | http://127.0.0.1:8765     | default-client | inventory.read |

@@ -122,39 +122,61 @@ Feature: Service call orchestration with generic request mappings
     And , verify "<earlyExit.REQUEST.queryParams.mode>" equals "must-not-run"
 
 
-  Scenario: Map an inline service call result and reuse it in another inline call
-    Given MAP TABLE VALUES TO SCENARIO MAP
-      | serviceBaseUrl | http://127.0.0.1:8765 |
-      | inlineClient   | inline-client         |
-      | inlineScope    | catalog.read          |
+  Scenario: Use an inline CALL inside a service-call component
+    When "inlineCall" SERVICE CALL: %serviceCallA
+      | endpoint                  | client        | scope        |
+      | http://127.0.0.1:8765     | inline-client | catalog.read |
 
-    When MAP TABLE VALUES
-      | tokenReturn | <$CALL:%inline-token-call> |
+    Then , verify "<inlineCall.TOKEN.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/token"
+    And , verify "<inlineCall.TOKEN.REQUEST.method>" equals "POST"
+    And , verify "<inlineCall.TOKEN.REQUEST.headers.X-Test-Client>" equals "inline-client"
+    And , verify "<inlineCall.TOKEN.REQUEST.queryParams.scope>" equals "catalog.read"
+    And , verify "<inlineCall.TOKEN.REQUEST.body.grantType>" equals "client_credentials"
+    And , verify "<inlineCall.TOKEN.RESPONSE.method>" equals "POST"
+    And , verify "<inlineCall.TOKEN.RESPONSE.statusCode>" equals "200"
+    And , verify "<inlineCall.TOKEN.RESPONSE.body.accessToken>" equals "inline-inline-client-catalog-read"
+    And , verify "<inlineCall.TOKEN.RESPONSE.body.tokenType>" equals "Bearer"
+    And , verify "<inlineCall.TOKEN.RESPONSE.body.scope>" equals "catalog.read"
+    And , verify "<inlineCall.TOKEN.RESPONSE.body.client>" equals "inline-client"
+    And , verify "<inlineCall.TOKEN.RESPONSE.body.request.grantType>" equals "client_credentials"
+    And , verify "<inlineCall.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/protected"
+    And , verify "<inlineCall.REQUEST.method>" equals "GET"
+    And , verify "<inlineCall.REQUEST.headers.X-Test-Client>" equals "inline-client"
+    And , verify "<inlineCall.REQUEST.headers.Authorization>" equals "Bearer inline-inline-client-catalog-read"
+    And , verify "<inlineCall.REQUEST.queryParams.scope>" equals "catalog.read"
+    And , verify "<inlineCall.RESPONSE.method>" equals "GET"
+    And , verify "<inlineCall.RESPONSE.statusCode>" equals "200"
+    And , verify "<inlineCall.RESPONSE.body.authorized>" equals "true"
+    And , verify "<inlineCall.RESPONSE.body.client>" equals "inline-client"
+    And , verify "<inlineCall.RESPONSE.body.scope>" equals "catalog.read"
+    And , verify "<inlineCall.RESPONSE.body.token>" equals "inline-inline-client-catalog-read"
 
-    Then , verify "<tokenReturn.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/token"
-    And , verify "<tokenReturn.REQUEST.method>" equals "POST"
-    And , verify "<tokenReturn.REQUEST.headers.X-Test-Client>" equals "inline-client"
-    And , verify "<tokenReturn.REQUEST.queryParams.scope>" equals "catalog.read"
-    And , verify "<tokenReturn.REQUEST.body.grantType>" equals "client_credentials"
-    And , verify "<tokenReturn.RESPONSE.method>" equals "POST"
-    And , verify "<tokenReturn.RESPONSE.statusCode>" equals "200"
-    And , verify "<tokenReturn.RESPONSE.body.accessToken>" equals "inline-inline-client-catalog-read"
-    And , verify "<tokenReturn.RESPONSE.body.tokenType>" equals "Bearer"
-    And , verify "<tokenReturn.RESPONSE.body.scope>" equals "catalog.read"
-    And , verify "<tokenReturn.RESPONSE.body.client>" equals "inline-client"
-    And , verify "<tokenReturn.RESPONSE.body.request.grantType>" equals "client_credentials"
 
-    When MAP TABLE VALUES
-      | protectedReturn | <$CALL:%inline-protected-call> |
+  Scenario: Use a regular nested service call inside a service-call component
+    When "nestedCall" SERVICE CALL: %nestedComponent
+      | endpoint                  | client        | scope         |
+      | http://127.0.0.1:8765     | nested-client | inventory.read |
 
-    Then , verify "<protectedReturn.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/protected"
-    And , verify "<protectedReturn.REQUEST.method>" equals "GET"
-    And , verify "<protectedReturn.REQUEST.headers.X-Test-Client>" equals "inline-client"
-    And , verify "<protectedReturn.REQUEST.headers.Authorization>" equals "Bearer inline-inline-client-catalog-read"
-    And , verify "<protectedReturn.REQUEST.queryParams.scope>" equals "catalog.read"
-    And , verify "<protectedReturn.RESPONSE.method>" equals "GET"
-    And , verify "<protectedReturn.RESPONSE.statusCode>" equals "200"
-    And , verify "<protectedReturn.RESPONSE.body.authorized>" equals "true"
-    And , verify "<protectedReturn.RESPONSE.body.client>" equals "inline-client"
-    And , verify "<protectedReturn.RESPONSE.body.scope>" equals "catalog.read"
-    And , verify "<protectedReturn.RESPONSE.body.token>" equals "inline-inline-client-catalog-read"
+    Then , verify "<nestedCall.TOKEN.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/token"
+    And , verify "<nestedCall.TOKEN.REQUEST.method>" equals "POST"
+    And , verify "<nestedCall.TOKEN.REQUEST.headers.X-Test-Client>" equals "nested-client"
+    And , verify "<nestedCall.TOKEN.REQUEST.queryParams.scope>" equals "inventory.read"
+    And , verify "<nestedCall.TOKEN.REQUEST.body.grantType>" equals "client_credentials"
+    And , verify "<nestedCall.TOKEN.RESPONSE.method>" equals "POST"
+    And , verify "<nestedCall.TOKEN.RESPONSE.statusCode>" equals "200"
+    And , verify "<nestedCall.TOKEN.RESPONSE.body.accessToken>" equals "inline-nested-client-inventory-read"
+    And , verify "<nestedCall.TOKEN.RESPONSE.body.tokenType>" equals "Bearer"
+    And , verify "<nestedCall.TOKEN.RESPONSE.body.scope>" equals "inventory.read"
+    And , verify "<nestedCall.TOKEN.RESPONSE.body.client>" equals "nested-client"
+    And , verify "<nestedCall.TOKEN.RESPONSE.body.request.grantType>" equals "client_credentials"
+    And , verify "<nestedCall.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/protected"
+    And , verify "<nestedCall.REQUEST.method>" equals "GET"
+    And , verify "<nestedCall.REQUEST.headers.X-Test-Client>" equals "nested-client"
+    And , verify "<nestedCall.REQUEST.headers.Authorization>" equals "Bearer inline-nested-client-inventory-read"
+    And , verify "<nestedCall.REQUEST.queryParams.scope>" equals "inventory.read"
+    And , verify "<nestedCall.RESPONSE.method>" equals "GET"
+    And , verify "<nestedCall.RESPONSE.statusCode>" equals "200"
+    And , verify "<nestedCall.RESPONSE.body.authorized>" equals "true"
+    And , verify "<nestedCall.RESPONSE.body.client>" equals "nested-client"
+    And , verify "<nestedCall.RESPONSE.body.scope>" equals "inventory.read"
+    And , verify "<nestedCall.RESPONSE.body.token>" equals "inline-nested-client-inventory-read"

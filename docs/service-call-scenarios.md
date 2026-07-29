@@ -13,9 +13,10 @@ The public service-call steps are:
 | Step | Purpose |
 |---|---|
 | `SERVICE CALL` / `SERVICE CALLS` | Locate and execute one or more component scenarios from the call-feature directory. |
+| `CALL:%tag` | Run one service-call component inline as a value and return its live root object. The calling scenario map is exposed to it as `PARENT`. |
 | `EXECUTE SERVICE CALL` | Read the component scenario's mapped `REQUEST` and optional `CONFIGURATION`, perform the HTTP request, and populate `RESPONSE`. |
 
-An internal always-run finalizer saves the completed component object into the caller's run map. It is framework plumbing and is not written manually in feature files.
+The selected component root is registered by reference in the caller's run map before the component executes. This makes its mapped `REQUEST`, nested calls, and later `RESPONSE` updates visible through the selected call key.
 
 The default call-feature directory is:
 
@@ -48,6 +49,72 @@ The saved object key is chosen in this order:
 1. `Call Key` from the invocation table;
 2. the quoted name before `SERVICE CALL`; or
 3. the resolved component scenario name.
+
+## Nested service-call components
+
+A service-call component can obtain data from another service-call component before it assembles and executes its own request.
+
+### Inline `CALL` value
+
+`CALL:%tag` is useful when the nested call should be returned directly into a mapped value. The outer feature still invokes only the owning service-call component:
+
+```gherkin
+When "inlineCall" SERVICE CALL: %serviceCallA
+  | endpoint              | client        | scope        |
+  | http://127.0.0.1:8765 | inline-client | catalog.read |
+```
+
+The owning component first puts the values needed by the child into its scenario map, then maps the returned child object:
+
+```gherkin
+Scenario Outline: ServiceCallA
+  Given MAP TABLE VALUES TO SCENARIO MAP
+    | endpoint | <endpoint> |
+    | client   | <client>   |
+    | scope    | <scope>    |
+  And MAP TABLE VALUES TO SCENARIO MAP
+    | TOKEN | <$CALL:%TokenCall> |
+  And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
+    | X-Test-Client | <client>                                 |
+    | Authorization | Bearer <TOKEN.RESPONSE.body.accessToken> |
+```
+
+The inline child reads those caller values through `PARENT`:
+
+```gherkin
+Scenario Outline: TokenCall
+  Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
+    | endpoint | <PARENT.endpoint>/api/service-calls/token |
+    | method   | POST                                      |
+  And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
+    | X-Test-Client | <PARENT.client> |
+```
+
+`CALL` returns the child component's live root `ObjectNode`, so later child mutations such as `RESPONSE` remain visible through the mapped `TOKEN` reference.
+
+### Ordinary nested `SERVICE CALL`
+
+Use an ordinary nested `SERVICE CALL` when the child should appear as a named nested call in the component flow:
+
+```gherkin
+Scenario Outline: NestedComponent
+  Given "TOKEN" SERVICE CALL: %nestedTokenComponent
+    | endpoint   | client   | scope   |
+    | <endpoint> | <client> | <scope> |
+  And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
+    | X-Test-Client | <client>                                 |
+    | Authorization | Bearer <TOKEN.RESPONSE.body.accessToken> |
+```
+
+The outer feature invokes that owner in the same way as any other service-call component:
+
+```gherkin
+When "nestedCall" SERVICE CALL: %nestedComponent
+  | endpoint              | client        | scope          |
+  | http://127.0.0.1:8765 | nested-client | inventory.read |
+```
+
+In both forms, the owning result contains the nested `TOKEN` object together with its own `REQUEST` and `RESPONSE`, for example `<nestedCall.TOKEN.RESPONSE.body.accessToken>` and `<nestedCall.RESPONSE.statusCode>`.
 
 ## Define a service-call component
 
@@ -190,6 +257,8 @@ The consumer's [`LocalTestSite.java`](../maven-consumer-project/src/test/java/co
 
 - `/api/service-calls/inspect`;
 - `/api/service-calls/no-content/{itemId}`;
+- `/api/service-calls/token`;
+- `/api/service-calls/protected`;
 - `/api/health`; and
 - `/soap/calculator`.
 

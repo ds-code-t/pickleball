@@ -35,6 +35,17 @@ import static tools.dscode.common.mappings.ValueFormatting.fromSafeJsonNode;
  * arrays; underscore-prefixed root properties are stored as singleton values.</p>
  */
 public final class Tokenized {
+
+    /** Exact query text supplied to the constructor, before normalization. */
+    public final String originalQuery;
+
+    /**
+     * True when the trimmed original query ends with an explicit empty-array
+     * selector ([]), meaning the caller requested the complete collection
+     * rather than the normal last-item result.
+     */
+    public final boolean returnsWholeCollection;
+
     private static final Pattern IDENTIFIER = Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_]*");
     private static final Set<String> ROOT_LITERALS = Set.of("true", "false", "null");
     private static final Set<String> WORD_OPERATORS = Set.of("and", "or", "in");
@@ -53,7 +64,11 @@ public final class Tokenized {
             throw new IllegalArgumentException("Query cannot be null");
         }
 
+        this.originalQuery = query;
+
         String source = query.strip();
+        this.returnsWholeCollection = source.endsWith("[]");
+
         this.readExpression = normalizeRead(source, true);
         this.listExpression = normalizeRead(source, false);
         this.writePlan = parseWritePlan(listExpression);

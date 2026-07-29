@@ -427,7 +427,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
      * <ul>
      *     <li>expression placeholders ({@code <{...}>} / bookend-equivalent)</li>
      *     <li>embedded step references ({@code <$...>} / keys that start with
-     *     {@code $}), executed via {@code resolveStepFromString}</li>
+     *     {@code $}), executed while preserving their original return objects</li>
      * </ul>
      *
      * <p>When {@code resolveEvaluations} is {@code false}, map (and {@code &})
@@ -765,7 +765,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
                         continue;
                     }
                     key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
-                    replacement = getRunningStep().resolveStepFromString(key.substring(1));
+                    replacement = getRunningStep()
+                            .createNewStepExtension(key.substring(1))
+                            .runAndGetReturnValue();
                     break;
                 }
 
@@ -791,7 +793,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
             }
 
             if (wholeReference && !(replacement instanceof String)) {
-                return unwrapScalarJsonNode(replacement);
+                return replacement;
             }
 
             String stringReplacement = getStringValue(replacement);
@@ -1239,32 +1241,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
     @Override
     public Set<Entry<String, Object>> entrySet() {
         return Set.of();
-    }
-
-    /**
-     * Converts a scalar Jackson node to its corresponding Java value while
-     * leaving container nodes and non-Jackson values unchanged.
-     */
-    private static Object unwrapScalarJsonNode(Object value) {
-        if (!(value instanceof JsonNode jsonNode) || jsonNode.isContainerNode()) {
-            return value;
-        }
-        if (jsonNode.isNull() || jsonNode.isMissingNode()) {
-            return null;
-        }
-        if (jsonNode.isTextual()) {
-            return jsonNode.textValue();
-        }
-        if (jsonNode.isBoolean()) {
-            return jsonNode.booleanValue();
-        }
-        if (jsonNode.isNumber()) {
-            return jsonNode.numberValue();
-        }
-        if (jsonNode.isPojo()) {
-            return ((com.fasterxml.jackson.databind.node.POJONode) jsonNode).getPojo();
-        }
-        return MAPPER.convertValue(jsonNode, Object.class);
     }
 
     public static String getStringValue(Object obj) {
