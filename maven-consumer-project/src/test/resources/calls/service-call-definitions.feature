@@ -221,9 +221,9 @@ Feature: Reusable service call definitions
       | %nestedTokenComponent | http://127.0.0.1:8765     | default-client | inventory.read |
 
 
-  # This component performs an ordinary nested SERVICE CALL. The nested result
-  # is registered as TOKEN in this component's scenario map before the protected
-  # request is assembled.
+  # This component performs an ordinary nested SERVICE CALL. The child root is
+  # registered by reference under TOKEN in the single shared RunMap before the
+  # protected request is assembled. It is not inserted into this component root.
   Scenario Outline: NestedComponent
     Given "TOKEN" SERVICE CALL: %nestedTokenComponent
       | endpoint   | client   | scope   |

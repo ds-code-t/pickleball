@@ -127,6 +127,7 @@ Feature: Service call orchestration with generic request mappings
       | endpoint                  | client        | scope        |
       | http://127.0.0.1:8765     | inline-client | catalog.read |
 
+    Then , save "<inlineCall>"
     Then , verify "<inlineCall.TOKEN.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/token"
     And , verify "<inlineCall.TOKEN.REQUEST.method>" equals "POST"
     And , verify "<inlineCall.TOKEN.REQUEST.headers.X-Test-Client>" equals "inline-client"
@@ -152,23 +153,23 @@ Feature: Service call orchestration with generic request mappings
     And , verify "<inlineCall.RESPONSE.body.token>" equals "inline-inline-client-catalog-read"
 
 
-  Scenario: Use a regular nested service call inside a service-call component
+  Scenario: Use a regular nested service call through the shared RunMap
     When "nestedCall" SERVICE CALL: %nestedComponent
       | endpoint                  | client        | scope         |
       | http://127.0.0.1:8765     | nested-client | inventory.read |
 
-    Then , verify "<nestedCall.TOKEN.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/token"
-    And , verify "<nestedCall.TOKEN.REQUEST.method>" equals "POST"
-    And , verify "<nestedCall.TOKEN.REQUEST.headers.X-Test-Client>" equals "nested-client"
-    And , verify "<nestedCall.TOKEN.REQUEST.queryParams.scope>" equals "inventory.read"
-    And , verify "<nestedCall.TOKEN.REQUEST.body.grantType>" equals "client_credentials"
-    And , verify "<nestedCall.TOKEN.RESPONSE.method>" equals "POST"
-    And , verify "<nestedCall.TOKEN.RESPONSE.statusCode>" equals "200"
-    And , verify "<nestedCall.TOKEN.RESPONSE.body.accessToken>" equals "inline-nested-client-inventory-read"
-    And , verify "<nestedCall.TOKEN.RESPONSE.body.tokenType>" equals "Bearer"
-    And , verify "<nestedCall.TOKEN.RESPONSE.body.scope>" equals "inventory.read"
-    And , verify "<nestedCall.TOKEN.RESPONSE.body.client>" equals "nested-client"
-    And , verify "<nestedCall.TOKEN.RESPONSE.body.request.grantType>" equals "client_credentials"
+    Then , verify "<TOKEN.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/token"
+    And , verify "<TOKEN.REQUEST.method>" equals "POST"
+    And , verify "<TOKEN.REQUEST.headers.X-Test-Client>" equals "nested-client"
+    And , verify "<TOKEN.REQUEST.queryParams.scope>" equals "inventory.read"
+    And , verify "<TOKEN.REQUEST.body.grantType>" equals "client_credentials"
+    And , verify "<TOKEN.RESPONSE.method>" equals "POST"
+    And , verify "<TOKEN.RESPONSE.statusCode>" equals "200"
+    And , verify "<TOKEN.RESPONSE.body.accessToken>" equals "inline-nested-client-inventory-read"
+    And , verify "<TOKEN.RESPONSE.body.tokenType>" equals "Bearer"
+    And , verify "<TOKEN.RESPONSE.body.scope>" equals "inventory.read"
+    And , verify "<TOKEN.RESPONSE.body.client>" equals "nested-client"
+    And , verify "<TOKEN.RESPONSE.body.request.grantType>" equals "client_credentials"
     And , verify "<nestedCall.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/protected"
     And , verify "<nestedCall.REQUEST.method>" equals "GET"
     And , verify "<nestedCall.REQUEST.headers.X-Test-Client>" equals "nested-client"

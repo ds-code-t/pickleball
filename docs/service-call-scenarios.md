@@ -2,7 +2,7 @@
 
 > **Working feature examples:** [`service-call-execution.feature`](../maven-consumer-project/src/test/resources/features/service-call-execution.feature) locates and invokes calls; [`service-call-definitions.feature`](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature) builds each request with the general mapping steps and executes it.
 
-Pickleball treats service calls as reusable component scenarios. `ServiceCallSteps.java` is responsible for locating those scenarios, running them, executing the assembled request, and saving the completed call object. It does **not** provide separate mapping steps for endpoints, methods, headers, bodies, configuration, or responses.
+Pickleball treats service calls as reusable component scenarios. `ServiceCallSteps.java` locates those scenarios, registers their live root objects by reference when appropriate, runs them, and executes the assembled requests. It does **not** provide separate mapping steps for endpoints, methods, headers, bodies, configuration, or responses.
 
 All request data is built with the general steps from `MappingSteps.java`.
 
@@ -12,11 +12,11 @@ The public service-call steps are:
 
 | Step | Purpose |
 |---|---|
-| `SERVICE CALL` / `SERVICE CALLS` | Locate and execute one or more component scenarios from the call-feature directory. |
-| `CALL:%tag` | Run one service-call component inline as a value and return its live root object. The calling scenario map is exposed to it as `PARENT`. |
-| `EXECUTE SERVICE CALL` | Read the component scenario's mapped `REQUEST` and optional `CONFIGURATION`, perform the HTTP request, and populate `RESPONSE`. |
+| `SERVICE CALL` / `SERVICE CALLS` | Locate component scenarios, register each live root by reference under its resolved key in the shared `RunMap`, and execute the component. |
+| `CALL:%tag` | Run one service-call component inline as a value and return its live root object. The calling scenario map is exposed to it as `PARENT`; the caller decides where to map the returned object. |
+| `EXECUTE SERVICE CALL` | Read the component scenario's mapped `REQUEST` and optional `CONFIGURATION`, perform the HTTP request, and populate `RESPONSE` on that same live root object. |
 
-The selected component root is registered by reference in the caller's run map before the component executes. This makes its mapped `REQUEST`, nested calls, and later `RESPONSE` updates visible through the selected call key.
+There is one shared `RunMap` for the scenario run. `SERVICE CALL` registers the selected component root there by reference before the component executes. Its mapped `REQUEST` and later `RESPONSE` mutations therefore remain visible through the resolved call key. A separate nested `SERVICE CALL` registers its own root under its own key in that same `RunMap`; it does not automatically become a property of the owning component root.
 
 The default call-feature directory is:
 
@@ -54,9 +54,9 @@ The saved object key is chosen in this order:
 
 A service-call component can obtain data from another service-call component before it assembles and executes its own request.
 
-### Inline `CALL` value
+### Inline `CALL` value: explicitly nested result
 
-`CALL:%tag` is useful when the nested call should be returned directly into a mapped value. The outer feature still invokes only the owning service-call component:
+`CALL:%tag` is useful when the child result should be explicitly stored inside another mapped object. The outer feature still invokes only the owning service-call component:
 
 ```gherkin
 When "inlineCall" SERVICE CALL: %serviceCallA
@@ -90,11 +90,11 @@ Scenario Outline: TokenCall
     | X-Test-Client | <PARENT.client> |
 ```
 
-`CALL` returns the child component's live root `ObjectNode`, so later child mutations such as `RESPONSE` remain visible through the mapped `TOKEN` reference.
+`CALL` returns the child component's live root `ObjectNode`. Because the owning component explicitly maps that return value under `TOKEN`, later child mutations such as `RESPONSE` remain visible through paths such as `<inlineCall.TOKEN.RESPONSE.statusCode>`.
 
-### Ordinary nested `SERVICE CALL`
+### Ordinary nested `SERVICE CALL`: separate shared-RunMap entry
 
-Use an ordinary nested `SERVICE CALL` when the child should appear as a named nested call in the component flow:
+Use an ordinary nested `SERVICE CALL` when the child should execute as another named service call and be available through its own key in the shared `RunMap`:
 
 ```gherkin
 Scenario Outline: NestedComponent
@@ -114,7 +114,18 @@ When "nestedCall" SERVICE CALL: %nestedComponent
   | http://127.0.0.1:8765 | nested-client | inventory.read |
 ```
 
-In both forms, the owning result contains the nested `TOKEN` object together with its own `REQUEST` and `RESPONSE`, for example `<nestedCall.TOKEN.RESPONSE.body.accessToken>` and `<nestedCall.RESPONSE.statusCode>`.
+While `NestedComponent` runs, `<TOKEN.RESPONSE.body.accessToken>` resolves from the child call's separate `TOKEN` entry in the shared `RunMap`. The outer component is independently registered under `nestedCall`.
+
+After both calls complete, test them separately:
+
+```text
+<TOKEN.REQUEST.endpoint>
+<TOKEN.RESPONSE.body.accessToken>
+<nestedCall.REQUEST.endpoint>
+<nestedCall.RESPONSE.statusCode>
+```
+
+An ordinary nested `SERVICE CALL` does **not** automatically create `<nestedCall.TOKEN...>`. That nested path exists only when the child object is explicitly mapped into the owning component, as in the inline `CALL` example.
 
 ## Define a service-call component
 
@@ -211,7 +222,7 @@ And MAP "CONFIGURATION" TABLE VALUES TO SCENARIO MAP
 When EXECUTE SERVICE CALL
 ```
 
-The framework creates `RESPONSE` and the finalizer saves the whole component object into the caller. The caller can inspect both the request and response:
+`SERVICE CALL` registers the component root by reference in the shared `RunMap` before execution. `EXECUTE SERVICE CALL` then creates or replaces `RESPONSE` on that same object, so the caller can inspect both the request and response:
 
 ```text
 <inlineRead.REQUEST.endpoint>
@@ -224,7 +235,7 @@ The framework creates `RESPONSE` and the finalizer saves the whole component obj
 
 HTTP `4xx` and `5xx` responses are retained as normal service responses rather than being treated as missing call results. A no-content response is also retained with its status and headers.
 
-`EXECUTE SERVICE CALL` initializes `RESPONSE` before attempting the request. Consequently, an early component exit can still be finalized and saved with an empty response object.
+`EXECUTE SERVICE CALL` initializes `RESPONSE` immediately before request validation and execution. If `END SCENARIO` stops the component before that step, the already-registered partial root and its mapped `REQUEST` remain visible, but the service-call executor has not added `RESPONSE`.
 
 ## No custom REST mapping steps
 
