@@ -21,6 +21,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
 
+import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.mappings.MappingProcessor.getRunMap;
 import static tools.dscode.common.mappings.ParsingMap.getClosestScenarioStepAncestorNodeMap;
@@ -70,16 +71,10 @@ public class ServiceCallSteps extends CoreSteps {
         );
     }
 
-    /**
-     * Runs one service-call scenario selected by inline tags and returns the
-     * ObjectNode root of its default NodeMap. The calling scenario root is
-     * exposed to the nested scenario by reference under {@link #PARENT}.
-     */
     @Given("^CALL:(.*)$")
-    public static ObjectNode inlineCall(String inlineTags) {
+    public static Object inlineCall(String inlineTags) {
         StepExtension triggerStep = getRunningStep();
-        NodeMap parentScenarioMap = getClosestScenarioStepAncestorNodeMap();
-        NodeMap[] inlineCallMap = new NodeMap[1];
+        ScenarioStep[] nestedScenarioHolder = new ScenarioStep[1];
 
         ModularScenarios.populateRunScenariosStep(
                 triggerStep,
@@ -87,21 +82,40 @@ public class ServiceCallSteps extends CoreSteps {
                 null,
                 callsPath(),
                 "service call",
-                (scenarioStep, passedValues) -> {
-                    NodeMap scenarioMap = scenarioStep.getDefaultStepNodeMap();
-                    scenarioMap.putReference(PARENT, parentScenarioMap.getRoot());
-                    inlineCallMap[0] = scenarioMap;
-                }
+                (scenarioStep, passedValues) ->
+                        nestedScenarioHolder[0] = scenarioStep
         );
 
-        if (inlineCallMap[0] == null) {
+        ScenarioStep nestedScenarioStep = nestedScenarioHolder[0];
+
+        if (nestedScenarioStep == null) {
             throw new IllegalStateException(
                     "No service-call scenario was created for CALL tags: "
                             + normalize(inlineTags)
             );
         }
 
-        return inlineCallMap[0].getRoot();
+        /*
+         * populateRunScenariosStep attached this scenario for deferred execution.
+         * CALL executes it synchronously instead, so remove it from that queue.
+         *
+         * Keep parentStep intact because PARENT.SCENARIO MAP resolution uses the
+         * parent ancestry.
+         */
+        triggerStep.childSteps.remove(nestedScenarioStep);
+        nestedScenarioStep.previousSibling = null;
+        nestedScenarioStep.nextSibling = null;
+
+        getCurrentScenarioState().runStep(nestedScenarioStep);
+
+        NodeMap nestedScenarioMap =
+                nestedScenarioStep.getDefaultStepNodeMap();
+
+        Object explicitReturn = nestedScenarioMap.get("RETURN");
+
+        return explicitReturn != null
+                ? explicitReturn
+                : nestedScenarioMap.getRoot();
     }
 
     @Given("^EXECUTE SERVICE CALL$")

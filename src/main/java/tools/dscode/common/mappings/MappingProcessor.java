@@ -1310,7 +1310,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
 
     private static final Pattern MAP_PREFIX_PATTERN = Pattern.compile(
-            "^([A-Z](?:[A-Z. ]*[A-Z])?):(.*)$",
+            "^([A-Z](?:[A-Z., ]*[A-Z])?):(.*)$",
             Pattern.DOTALL
     );
 
@@ -1329,8 +1329,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
         }
 
         return new ParsedMapPrefix(
-                matcher.group(1),
-                matcher.group(2)
+                matcher.group(1).replaceAll("\\s+", " ").trim(),
+                matcher.group(2).trim()
         );
     }
 }

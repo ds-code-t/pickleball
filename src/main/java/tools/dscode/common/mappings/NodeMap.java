@@ -280,7 +280,6 @@ public class NodeMap extends ValueFormatting {
         validateParentPrefixes(input, segments);
 
         int parentCount = segments.size() - 1;
-        int ancestorCalls = Math.max(1, parentCount);
 
         StepExtension scenarioStep = getClosestScenarioStepAncestor();
 
@@ -288,7 +287,7 @@ public class NodeMap extends ValueFormatting {
             return null;
         }
 
-        for (int i = 1; i < ancestorCalls; i++) {
+        for (int i = 0; i < parentCount; i++) {
             scenarioStep = scenarioStep.getClosestScenarioStepAncestor();
 
             if (scenarioStep == null) {

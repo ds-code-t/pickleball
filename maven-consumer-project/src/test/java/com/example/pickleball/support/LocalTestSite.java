@@ -7,17 +7,27 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
+import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URLDecoder;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -28,6 +38,13 @@ import java.util.regex.Pattern;
 public final class LocalTestSite implements AutoCloseable {
 
     private static final String SITE_ROOT = "/site";
+    private static final Object LOCAL_COORDINATION_LOCK = new Object();
+    private static final Path COORDINATION_DIRECTORY = Path.of(
+            System.getProperty("java.io.tmpdir"),
+            "pickleball-local-test-site"
+    );
+    private static final long LEASE_POLL_MILLIS = 50L;
+    private static final int PROBE_TIMEOUT_MILLIS = 500;
 
     private static final Map<String, String> CONTENT_TYPES = Map.ofEntries(
             Map.entry(".html", "text/html; charset=UTF-8"),
@@ -43,40 +60,202 @@ public final class LocalTestSite implements AutoCloseable {
 
     private final HttpServer server;
     private final ExecutorService executor;
+    private final int port;
+    private final String leaseId;
+    private final boolean owner;
+    private final AtomicBoolean closed = new AtomicBoolean();
+    private final AtomicBoolean serverStopped = new AtomicBoolean();
 
-    private LocalTestSite(HttpServer server, ExecutorService executor) {
+    private LocalTestSite(
+            HttpServer server,
+            ExecutorService executor,
+            int port,
+            String leaseId,
+            boolean owner
+    ) {
         this.server = server;
         this.executor = executor;
+        this.port = port;
+        this.leaseId = leaseId;
+        this.owner = owner;
     }
 
+    /**
+     * Starts the site or borrows the already-running site on the same port.
+     * Coordination is file-based so this also works across separate JVMs.
+     */
     public static LocalTestSite start(int port) {
+        String leaseId = ProcessHandle.current().pid() + "|" + UUID.randomUUID();
+
         try {
-            InetSocketAddress address = new InetSocketAddress(
-                    InetAddress.getLoopbackAddress(),
-                    port
-            );
-            HttpServer server = HttpServer.create(address, 0);
-            ExecutorService executor = Executors.newFixedThreadPool(4, runnable -> {
-                Thread thread = new Thread(runnable, "pickleball-local-test-site");
-                thread.setDaemon(true);
-                return thread;
+            return withPortLock(port, () -> {
+                LinkedHashSet<String> leases = readLiveLeases(port);
+
+                if (isExpectedSiteRunning(port)) {
+                    leases.add(leaseId);
+                    writeLeases(port, leases);
+                    return new LocalTestSite(null, null, port, leaseId, false);
+                }
+
+                LocalTestSite site = startOwnedSite(port, leaseId);
+
+                try {
+                    writeLeases(port, Set.of(leaseId));
+                } catch (IOException exception) {
+                    site.stopOwnedServer();
+                    throw exception;
+                }
+
+                return site;
             });
-
-            server.setExecutor(executor);
-
-            // HttpServer uses the longest matching context.
-            server.createContext("/api/", LocalTestSite::handleApiRequest);
-            server.createContext("/soap/calculator", LocalTestSite::handleSoapRequest);
-            server.createContext("/", LocalTestSite::handleStaticRequest);
-
-            server.start();
-            return new LocalTestSite(server, executor);
         } catch (IOException exception) {
             throw new IllegalStateException(
                     "Could not start the local test site at http://127.0.0.1:" + port,
                     exception
             );
         }
+    }
+
+    private static LocalTestSite startOwnedSite(
+            int port,
+            String leaseId
+    ) throws IOException {
+        InetSocketAddress address = new InetSocketAddress(
+                InetAddress.getLoopbackAddress(),
+                port
+        );
+        HttpServer server = HttpServer.create(address, 0);
+        ExecutorService executor = Executors.newFixedThreadPool(4, runnable -> {
+            Thread thread = new Thread(runnable, "pickleball-local-test-site");
+            thread.setDaemon(true);
+            return thread;
+        });
+
+        server.setExecutor(executor);
+
+        // HttpServer uses the longest matching context.
+        server.createContext("/api/", LocalTestSite::handleApiRequest);
+        server.createContext("/soap/calculator", LocalTestSite::handleSoapRequest);
+        server.createContext("/", LocalTestSite::handleStaticRequest);
+
+        server.start();
+        return new LocalTestSite(server, executor, port, leaseId, true);
+    }
+
+    private static boolean isExpectedSiteRunning(int port) {
+        HttpURLConnection connection = null;
+
+        try {
+            connection = (HttpURLConnection) URI.create(
+                    "http://127.0.0.1:" + port + "/api/health"
+            ).toURL().openConnection();
+            connection.setConnectTimeout(PROBE_TIMEOUT_MILLIS);
+            connection.setReadTimeout(PROBE_TIMEOUT_MILLIS);
+            connection.setRequestMethod("GET");
+            connection.setRequestProperty("Connection", "close");
+
+            if (connection.getResponseCode() != 200) {
+                return false;
+            }
+
+            try (InputStream input = connection.getInputStream()) {
+                String body = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+                return body.contains("\"service\":\"pickleball-local\"");
+            }
+        } catch (IOException ignored) {
+            return false;
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    private static <T> T withPortLock(
+            int port,
+            IoCallable<T> callable
+    ) throws IOException {
+        synchronized (LOCAL_COORDINATION_LOCK) {
+            Files.createDirectories(COORDINATION_DIRECTORY);
+
+            try (FileChannel channel = FileChannel.open(
+                    lockFile(port),
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.WRITE
+            ); FileLock ignored = channel.lock()) {
+                return callable.call();
+            }
+        }
+    }
+
+    private static LinkedHashSet<String> readLiveLeases(int port) throws IOException {
+        Path file = leaseFile(port);
+        LinkedHashSet<String> leases = new LinkedHashSet<>();
+
+        if (!Files.exists(file)) {
+            return leases;
+        }
+
+        long currentPid = ProcessHandle.current().pid();
+
+        for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
+            String lease = line.trim();
+            int separator = lease.indexOf('|');
+
+            if (separator <= 0) {
+                continue;
+            }
+
+            try {
+                long pid = Long.parseLong(lease.substring(0, separator));
+                boolean alive = pid == currentPid
+                        || ProcessHandle.of(pid)
+                        .map(ProcessHandle::isAlive)
+                        .orElse(false);
+
+                if (alive) {
+                    leases.add(lease);
+                }
+            } catch (NumberFormatException ignored) {
+                // Ignore malformed or stale lease records.
+            }
+        }
+
+        return leases;
+    }
+
+    private static void writeLeases(
+            int port,
+            Set<String> leases
+    ) throws IOException {
+        Path file = leaseFile(port);
+
+        if (leases.isEmpty()) {
+            Files.deleteIfExists(file);
+            return;
+        }
+
+        Files.write(
+                file,
+                leases,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.WRITE
+        );
+    }
+
+    private static Path lockFile(int port) {
+        return COORDINATION_DIRECTORY.resolve("site-" + port + ".lock");
+    }
+
+    private static Path leaseFile(int port) {
+        return COORDINATION_DIRECTORY.resolve("site-" + port + ".leases");
+    }
+
+    @FunctionalInterface
+    private interface IoCallable<T> {
+        T call() throws IOException;
     }
 
     private static void handleApiRequest(HttpExchange exchange) throws IOException {
@@ -650,6 +829,75 @@ public final class LocalTestSite implements AutoCloseable {
 
     @Override
     public void close() {
+        if (!closed.compareAndSet(false, true)) {
+            return;
+        }
+
+        try {
+            removeLease();
+
+            if (owner) {
+                waitForBorrowersAndStop();
+            }
+        } catch (IOException exception) {
+            stopOwnedServer();
+            throw new IllegalStateException(
+                    "Could not stop the local test site at http://127.0.0.1:" + port,
+                    exception
+            );
+        }
+    }
+
+    private void removeLease() throws IOException {
+        withPortLock(port, () -> {
+            LinkedHashSet<String> leases = readLiveLeases(port);
+            leases.remove(leaseId);
+            writeLeases(port, leases);
+            return null;
+        });
+    }
+
+    private void waitForBorrowersAndStop() throws IOException {
+        boolean interrupted = false;
+
+        try {
+            while (true) {
+                boolean stopped = withPortLock(port, () -> {
+                    LinkedHashSet<String> leases = readLiveLeases(port);
+                    leases.remove(leaseId);
+
+                    if (!leases.isEmpty()) {
+                        writeLeases(port, leases);
+                        return false;
+                    }
+
+                    stopOwnedServer();
+                    Files.deleteIfExists(leaseFile(port));
+                    return true;
+                });
+
+                if (stopped) {
+                    return;
+                }
+
+                try {
+                    Thread.sleep(LEASE_POLL_MILLIS);
+                } catch (InterruptedException exception) {
+                    interrupted = true;
+                }
+            }
+        } finally {
+            if (interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    private void stopOwnedServer() {
+        if (!owner || !serverStopped.compareAndSet(false, true)) {
+            return;
+        }
+
         server.stop(0);
         executor.shutdownNow();
     }

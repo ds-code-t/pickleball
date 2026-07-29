@@ -122,12 +122,11 @@ Feature: Service call orchestration with generic request mappings
     And , verify "<earlyExit.REQUEST.queryParams.mode>" equals "must-not-run"
 
 
-  Scenario: Use an inline CALL inside a service-call component
+  Scenario: Use inline CALL without RETURN to receive the completed child root
     When "inlineCall" SERVICE CALL: %serviceCallA
-      | endpoint                  | client        | scope        |
-      | http://127.0.0.1:8765     | inline-client | catalog.read |
+      | url                      | client        | scope        |
+      | http://127.0.0.1:8765    | inline-client | catalog.read |
 
-    Then , save "<inlineCall>"
     Then , verify "<inlineCall.TOKEN.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/token"
     And , verify "<inlineCall.TOKEN.REQUEST.method>" equals "POST"
     And , verify "<inlineCall.TOKEN.REQUEST.headers.X-Test-Client>" equals "inline-client"
@@ -153,10 +152,29 @@ Feature: Service call orchestration with generic request mappings
     And , verify "<inlineCall.RESPONSE.body.token>" equals "inline-inline-client-catalog-read"
 
 
+  Scenario: Use inline CALL with RETURN to receive only the token value
+    When "inlineReturn" SERVICE CALL: %serviceCallB
+      | url                      | client        | scope        |
+      | http://127.0.0.1:8765    | return-client | orders.write |
+
+    Then , verify "<inlineReturn.TOKEN>" equals "inline-return-client-orders-write"
+    And , verify "<inlineReturn.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/protected"
+    And , verify "<inlineReturn.REQUEST.method>" equals "GET"
+    And , verify "<inlineReturn.REQUEST.headers.X-Test-Client>" equals "return-client"
+    And , verify "<inlineReturn.REQUEST.headers.Authorization>" equals "Bearer inline-return-client-orders-write"
+    And , verify "<inlineReturn.REQUEST.queryParams.scope>" equals "orders.write"
+    And , verify "<inlineReturn.RESPONSE.method>" equals "GET"
+    And , verify "<inlineReturn.RESPONSE.statusCode>" equals "200"
+    And , verify "<inlineReturn.RESPONSE.body.authorized>" equals "true"
+    And , verify "<inlineReturn.RESPONSE.body.client>" equals "return-client"
+    And , verify "<inlineReturn.RESPONSE.body.scope>" equals "orders.write"
+    And , verify "<inlineReturn.RESPONSE.body.token>" equals "inline-return-client-orders-write"
+
+
   Scenario: Use a regular nested service call through the shared RunMap
     When "nestedCall" SERVICE CALL: %nestedComponent
-      | endpoint                  | client        | scope         |
-      | http://127.0.0.1:8765     | nested-client | inventory.read |
+      | url                      | client        | scope          |
+      | http://127.0.0.1:8765    | nested-client | inventory.read |
 
     Then , verify "<TOKEN.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/token"
     And , verify "<TOKEN.REQUEST.method>" equals "POST"
