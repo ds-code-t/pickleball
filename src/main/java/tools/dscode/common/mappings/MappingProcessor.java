@@ -281,7 +281,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
     public List<NodeMap> getMapsForResolution(String mapTypes) {
         List<String> segments = mapTypes == null
                 ? List.of()
-                : Arrays.stream(mapTypes.split("\\s+"))
+                : Arrays.stream(mapTypes.split(","))
                 .map(String::trim)
                 .filter(segment -> !segment.isBlank())
                 .toList();
