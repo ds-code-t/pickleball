@@ -56,6 +56,124 @@ Feature: Reusable service call definitions
       | Scenario Tags | endpoint                  | client         | traceId     | cookieValue | mode   | status | name    | quantity |
       | %inspect-post | http://127.0.0.1:8765     | default-client | post-default | default     | create | 201    | default | 1        |
 
+  # These components validate runtime template resolution rather than only
+  # Cucumber Scenario Outline substitution. JSON can use the ordinary <...>
+  # reference bookends. Unquoted numeric/boolean references preserve JSON types,
+  # embedded references build a larger string, and nested object fields are
+  # resolved individually before the completed JSON text is parsed.
+  Scenario Outline: MappedJsonBodyCall
+    Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
+      | endpoint    | <endpoint>/api/service-calls/inspect |
+      | method      | POST                                 |
+      | accept      | application/json                     |
+      | contentType | application/json                     |
+    And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
+      | X-Test-Client | <PARENT.SCENARIO:jsonTemplate.client>             |
+      | X-Test-Trace  | <PARENT.SCENARIO:jsonTemplate.metadata.requestId> |
+    And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
+      | mode   | mapped-json |
+      | status | 202         |
+    And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
+      """json
+      {
+        "name": "<PARENT.SCENARIO:jsonTemplate.item.name>",
+        "quantity": <PARENT.SCENARIO:jsonTemplate.item.quantity>,
+        "active": <PARENT.SCENARIO:jsonTemplate.item.active>,
+        "description": "<PARENT.SCENARIO:jsonTemplate.item.name> from <PARENT.SCENARIO:jsonTemplate.metadata.source>",
+        "metadata": {
+          "requestId": "<PARENT.SCENARIO:jsonTemplate.metadata.requestId>",
+          "source": "<PARENT.SCENARIO:jsonTemplate.metadata.source>"
+        }
+      }
+      """
+    And MAP "CONFIGURATION" TABLE VALUES TO SCENARIO MAP
+      | urlEncodingEnabled | true |
+    When EXECUTE SERVICE CALL
+
+    Examples:
+      | Scenario Tags     | endpoint                  |
+      | %mapped-json-body | http://127.0.0.1:8765     |
+
+
+
+  # ~unquote allows the template itself to remain valid JSON while inserting
+  # resolved numbers, booleans, objects, or arrays as raw JSON values. String
+  # references remain normally quoted. The suffix is part of the Pickleball
+  # runtime reference and is removed before the lookup is performed.
+  Scenario Outline: UnquotedJsonBodyCall
+    Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
+      | endpoint    | <endpoint>/api/service-calls/inspect |
+      | method      | POST                                 |
+      | accept      | application/json                     |
+      | contentType | application/json                     |
+    And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
+      | X-Test-Client | <PARENT.SCENARIO:unquoteTemplate.client>    |
+      | X-Test-Trace  | <PARENT.SCENARIO:unquoteTemplate.requestId> |
+    And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
+      | mode   | unquote-json |
+      | status | 200          |
+    And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
+      """json
+      {
+        "name": "<PARENT.SCENARIO:unquoteTemplate.name>",
+        "quantity": "<PARENT.SCENARIO:unquoteTemplate.quantity~unquote>",
+        "active": "<PARENT.SCENARIO:unquoteTemplate.active~unquote>",
+        "unitPrice": "<PARENT.SCENARIO:unquoteTemplate.unitPrice~unquote>",
+        "metadata": "<PARENT.SCENARIO:unquoteTemplate.metadata~unquote>",
+        "items": "<PARENT.SCENARIO:unquoteTemplate.items[]~unquote>",
+        "description": "<PARENT.SCENARIO:unquoteTemplate.name> has <PARENT.SCENARIO:unquoteTemplate.items[0].count> first-item units"
+      }
+      """
+    And MAP "CONFIGURATION" TABLE VALUES TO SCENARIO MAP
+      | urlEncodingEnabled | true |
+    When EXECUTE SERVICE CALL
+
+    Examples:
+      | Scenario Tags       | endpoint              |
+      | %unquoted-json-body | http://127.0.0.1:8765 |
+
+  # This component resolves values that were produced and mapped by an earlier
+  # service call in the caller. Completed service calls are registered in the
+  # shared RunMap, so those references are intentionally not PARENT.SCENARIO
+  # references. The body covers scalar, embedded, nested-object, and status values.
+  Scenario Outline: PreviousResponseJsonBodyCall
+    Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
+      | endpoint    | <endpoint>/api/service-calls/inspect |
+      | method      | POST                                 |
+      | accept      | application/json                     |
+      | contentType | application/json                     |
+    And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
+      | X-Test-Client | <PARENT.SCENARIO:jsonChain.client>    |
+      | X-Test-Trace  | <PARENT.SCENARIO:jsonChain.requestId> |
+    And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
+      | mode   | previous-response-json |
+      | status | 203                    |
+    And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
+      """json
+      {
+        "name": "<seedJson.RESPONSE.body.body.name>",
+        "quantity": <seedJson.RESPONSE.body.body.quantity>,
+        "active": <seedJson.RESPONSE.body.body.active>,
+        "description": "copied <seedJson.RESPONSE.body.body.name> at quantity <seedJson.RESPONSE.body.body.quantity>",
+        "original": {
+          "name": "<seedJson.RESPONSE.body.body.name>",
+          "quantity": <seedJson.RESPONSE.body.body.quantity>,
+          "active": <seedJson.RESPONSE.body.body.active>
+        },
+        "metadata": {
+          "requestId": "<PARENT.SCENARIO:jsonChain.requestId>",
+          "sourceStatus": <seedJson.RESPONSE.statusCode>
+        }
+      }
+      """
+    And MAP "CONFIGURATION" TABLE VALUES TO SCENARIO MAP
+      | urlEncodingEnabled | true |
+    When EXECUTE SERVICE CALL
+
+    Examples:
+      | Scenario Tags                | endpoint                  |
+      | %previous-response-json-body | http://127.0.0.1:8765     |
+
 
   Scenario Outline: StatusCall
     Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
@@ -126,6 +244,40 @@ Feature: Reusable service call definitions
     Examples:
       | Scenario Tags | endpoint                  | traceId       | left | right |
       | %soap-add | http://127.0.0.1:8765     | soap-default  | 5    | 7     |
+
+  # XML-looking input deliberately uses only the XML-safe ~[~...~]~ reference
+  # bookends. The left operand comes from the parent scenario map. The completed
+  # earlier service call is registered in the shared RunMap, so the right operand
+  # uses an unqualified RunMap reference rather than PARENT.SCENARIO.
+  Scenario Outline: MappedSoapAddCall
+    Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
+      | endpoint    | <endpoint>/soap/calculator |
+      | method      | POST                       |
+      | accept      | text/xml                   |
+      | contentType | text/xml                   |
+    And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
+      | SOAPAction   | urn:pickleball:calculator#Add             |
+      | X-Test-Trace | <PARENT.SCENARIO:soapTemplate.traceId>    |
+    And MAP "REQUEST.body" TEXT VALUE TO SCENARIO MAP
+      """xml
+      <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                        xmlns:calc="urn:pickleball:calculator">
+        <soapenv:Header/>
+        <soapenv:Body>
+          <calc:Add>
+            <calc:left>~[~PARENT.SCENARIO:soapTemplate.left~]~</calc:left>
+            <calc:right>~[~soapSeed.RESPONSE.body.body.quantity~]~</calc:right>
+          </calc:Add>
+        </soapenv:Body>
+      </soapenv:Envelope>
+      """
+    And MAP "CONFIGURATION" TABLE VALUES TO SCENARIO MAP
+      | urlEncodingEnabled | true |
+    When EXECUTE SERVICE CALL
+
+    Examples:
+      | Scenario Tags     | endpoint                  |
+      | %mapped-soap-body | http://127.0.0.1:8765     |
 
 
   # END SCENARIO stops the remaining component steps. The caller already

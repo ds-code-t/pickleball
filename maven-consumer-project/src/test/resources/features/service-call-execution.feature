@@ -40,6 +40,181 @@ Feature: Service call orchestration with generic request mappings
     And , verify "<tablePost.RESPONSE.body.body.quantity>" equals "3"
     And , verify "<tablePost.RESPONSE.body.body.active>" equals "true"
 
+  Scenario: Resolve nested scenario-map values inside a JSON service request body
+    Given MAP "jsonTemplate" OBJECT VALUE TO SCENARIO MAP
+      """json
+      {
+        "client": "json-template-client",
+        "item": {
+          "name": "Mapped Widget",
+          "quantity": 4,
+          "active": true
+        },
+        "metadata": {
+          "requestId": "json-template-42",
+          "source": "scenario-map"
+        }
+      }
+      """
+
+    When "mappedJson" SERVICE CALL: %mapped-json-body
+      | endpoint                  |
+      | http://127.0.0.1:8765     |
+
+    Then , verify "<mappedJson.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/inspect"
+    And , verify "<mappedJson.REQUEST.headers.X-Test-Client>" equals "json-template-client"
+    And , verify "<mappedJson.REQUEST.headers.X-Test-Trace>" equals "json-template-42"
+    And , verify "<mappedJson.REQUEST.queryParams.mode>" equals "mapped-json"
+    And , verify "<mappedJson.REQUEST.body.name>" equals "Mapped Widget"
+    And , verify "<mappedJson.REQUEST.body.quantity>" equals "4"
+    And , verify "<mappedJson.REQUEST.body.active>" equals "true"
+    And , verify "<mappedJson.REQUEST.body.description>" equals "Mapped Widget from scenario-map"
+    And , verify "<mappedJson.REQUEST.body.metadata.requestId>" equals "json-template-42"
+    And , verify "<mappedJson.REQUEST.body.metadata.source>" equals "scenario-map"
+    And , verify "<mappedJson.RESPONSE.statusCode>" equals "202"
+    And , verify "<mappedJson.RESPONSE.body.client>" equals "json-template-client"
+    And , verify "<mappedJson.RESPONSE.body.traceId>" equals "json-template-42"
+    And , verify "<mappedJson.RESPONSE.body.body.name>" equals "Mapped Widget"
+    And , verify "<mappedJson.RESPONSE.body.body.quantity>" equals "4"
+    And , verify "<mappedJson.RESPONSE.body.body.active>" equals "true"
+    And , verify "<mappedJson.RESPONSE.body.body.description>" equals "Mapped Widget from scenario-map"
+    And , verify "<mappedJson.RESPONSE.body.body.metadata.requestId>" equals "json-template-42"
+    And , verify "<mappedJson.RESPONSE.body.body.metadata.source>" equals "scenario-map"
+
+
+
+  Scenario: Preserve JSON scalar and container types with quoted ~unquote references
+    Given MAP "unquoteTemplate" OBJECT VALUE TO SCENARIO MAP
+      """json
+      {
+        "client": "unquote-client",
+        "requestId": "unquote-73",
+        "name": "Unquoted Widget",
+        "quantity": 12,
+        "active": false,
+        "unitPrice": 19.95,
+        "metadata": {
+          "source": "scenario-map",
+          "priority": 3
+        },
+        "items": [
+          {
+            "sku": "A-1",
+            "count": 2
+          },
+          {
+            "sku": "B-2",
+            "count": 5
+          }
+        ]
+      }
+      """
+
+    When "unquotedJson" SERVICE CALL: %unquoted-json-body
+      | endpoint              |
+      | http://127.0.0.1:8765 |
+
+    Then , verify "<unquotedJson.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/inspect"
+    And , verify "<unquotedJson.REQUEST.headers.X-Test-Client>" equals "unquote-client"
+    And , verify "<unquotedJson.REQUEST.headers.X-Test-Trace>" equals "unquote-73"
+    And , verify "<unquotedJson.REQUEST.queryParams.mode>" equals "unquote-json"
+
+    And , verify "<unquotedJson.REQUEST.body.name>" equals "Unquoted Widget"
+    And , verify "<unquotedJson.REQUEST.body.quantity>" equals "12"
+    And , verify "<unquotedJson.REQUEST.body.active>" equals "false"
+    And , verify "<unquotedJson.REQUEST.body.unitPrice>" equals "19.95"
+    And , verify "<unquotedJson.REQUEST.body.metadata.source>" equals "scenario-map"
+    And , verify "<unquotedJson.REQUEST.body.metadata.priority>" equals "3"
+    And , verify "<unquotedJson.REQUEST.body.items[0].sku>" equals "A-1"
+    And , verify "<unquotedJson.REQUEST.body.items[0].count>" equals "2"
+    And , verify "<unquotedJson.REQUEST.body.items[1].sku>" equals "B-2"
+    And , verify "<unquotedJson.REQUEST.body.items[1].count>" equals "5"
+    And , verify "<unquotedJson.REQUEST.body.description>" equals "Unquoted Widget has 2 first-item units"
+
+    And , verify "<unquotedJson.RESPONSE.statusCode>" equals "200"
+    And , verify "<unquotedJson.RESPONSE.body.body.name>" equals "Unquoted Widget"
+    And , verify "<unquotedJson.RESPONSE.body.body.quantity>" equals "12"
+    And , verify "<unquotedJson.RESPONSE.body.body.active>" equals "false"
+    And , verify "<unquotedJson.RESPONSE.body.body.unitPrice>" equals "19.95"
+    And , verify "<unquotedJson.RESPONSE.body.body.metadata.source>" equals "scenario-map"
+    And , verify "<unquotedJson.RESPONSE.body.body.metadata.priority>" equals "3"
+    And , verify "<unquotedJson.RESPONSE.body.body.items[0].sku>" equals "A-1"
+    And , verify "<unquotedJson.RESPONSE.body.body.items[0].count>" equals "2"
+    And , verify "<unquotedJson.RESPONSE.body.body.items[1].sku>" equals "B-2"
+    And , verify "<unquotedJson.RESPONSE.body.body.items[1].count>" equals "5"
+    And , verify "<unquotedJson.RESPONSE.body.body.description>" equals "Unquoted Widget has 2 first-item units"
+
+  Scenario: Resolve values from a previous service response inside a JSON request body
+    Given MAP "jsonChain" OBJECT VALUE TO SCENARIO MAP
+      """json
+      {
+        "client": "json-chain-client",
+        "requestId": "json-chain-9"
+      }
+      """
+
+    And "seedJson" SERVICE CALL: %inspect-post
+      | endpoint                  | client      | traceId        | cookieValue | mode | status | name        | quantity |
+      | http://127.0.0.1:8765     | seed-client | seed-json-call | seed-cookie | seed | 201    | Seed Widget | 8        |
+
+    When "chainedJson" SERVICE CALL: %previous-response-json-body
+      | endpoint                  |
+      | http://127.0.0.1:8765     |
+
+    Then , verify "<seedJson.RESPONSE.statusCode>" equals "201"
+    And , verify "<seedJson.RESPONSE.body.body.name>" equals "Seed Widget"
+    And , verify "<seedJson.RESPONSE.body.body.quantity>" equals "8"
+    And , verify "<chainedJson.REQUEST.headers.X-Test-Client>" equals "json-chain-client"
+    And , verify "<chainedJson.REQUEST.headers.X-Test-Trace>" equals "json-chain-9"
+    And , verify "<chainedJson.REQUEST.queryParams.mode>" equals "previous-response-json"
+    And , verify "<chainedJson.REQUEST.body.name>" equals "Seed Widget"
+    And , verify "<chainedJson.REQUEST.body.quantity>" equals "8"
+    And , verify "<chainedJson.REQUEST.body.active>" equals "true"
+    And , verify "<chainedJson.REQUEST.body.description>" equals "copied Seed Widget at quantity 8"
+    And , verify "<chainedJson.REQUEST.body.original.name>" equals "Seed Widget"
+    And , verify "<chainedJson.REQUEST.body.original.quantity>" equals "8"
+    And , verify "<chainedJson.REQUEST.body.original.active>" equals "true"
+    And , verify "<chainedJson.REQUEST.body.metadata.requestId>" equals "json-chain-9"
+    And , verify "<chainedJson.REQUEST.body.metadata.sourceStatus>" equals "201"
+    And , verify "<chainedJson.RESPONSE.statusCode>" equals "203"
+    And , verify "<chainedJson.RESPONSE.body.body.name>" equals "Seed Widget"
+    And , verify "<chainedJson.RESPONSE.body.body.quantity>" equals "8"
+    And , verify "<chainedJson.RESPONSE.body.body.description>" equals "copied Seed Widget at quantity 8"
+    And , verify "<chainedJson.RESPONSE.body.body.original.name>" equals "Seed Widget"
+    And , verify "<chainedJson.RESPONSE.body.body.metadata.sourceStatus>" equals "201"
+
+
+  Scenario: Resolve mapped and previous-response values in XML with XML-safe bookends
+    Given MAP "soapTemplate" OBJECT VALUE TO SCENARIO MAP
+      """json
+      {
+        "left": 11,
+        "traceId": "soap-template-17"
+      }
+      """
+
+    And "soapSeed" SERVICE CALL: %inspect-post
+      | endpoint                  | client      | traceId       | cookieValue | mode      | status | name         | quantity |
+      | http://127.0.0.1:8765     | soap-client | soap-seed-call | soap-cookie | soap-seed | 200    | Right Operand | 6        |
+
+    When "mappedSoap" SERVICE CALL: %mapped-soap-body
+      | endpoint                  |
+      | http://127.0.0.1:8765     |
+
+    Then , verify "<soapSeed.RESPONSE.statusCode>" equals "200"
+    And , verify "<soapSeed.RESPONSE.body.body.quantity>" equals "6"
+    And , verify "<mappedSoap.REQUEST.endpoint>" equals "http://127.0.0.1:8765/soap/calculator"
+    And , verify "<mappedSoap.REQUEST.method>" equals "POST"
+    And , verify "<mappedSoap.REQUEST.contentType>" equals "text/xml"
+    And , verify "<mappedSoap.REQUEST.headers.SOAPAction>" equals "urn:pickleball:calculator#Add"
+    And , verify "<mappedSoap.REQUEST.headers.X-Test-Trace>" equals "soap-template-17"
+    And , verify "<mappedSoap.REQUEST.body>" contains "<soapenv:Header/>"
+    And , verify "<mappedSoap.REQUEST.body>" contains "<calc:left>11</calc:left>"
+    And , verify "<mappedSoap.REQUEST.body>" contains "<calc:right>6</calc:right>"
+    And , verify "<mappedSoap.RESPONSE.method>" equals "POST"
+    And , verify "<mappedSoap.RESPONSE.statusCode>" equals "200"
+    And , verify "<mappedSoap.RESPONSE.body>" contains "17"
+
 
   Scenario: Call Key takes precedence over the quoted inline object name
     When "inlineMustLose" SERVICE CALL: %status-call
