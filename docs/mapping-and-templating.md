@@ -9,6 +9,8 @@ CLEAR SAVED VALUES
 MAP "key" TEXT VALUE
 MAP "key" OBJECT VALUE
 MAP "prefix" TABLE VALUES
+MAP "prefix" NON-BLANK TABLE VALUES
+MAP "prefix" NON-NULL TABLE VALUES
 ```
 
 Other definitions currently present in `MappingSteps.java` are intentionally omitted from this guide and from the consumer mapping feature.
@@ -17,17 +19,25 @@ Other definitions currently present in `MappingSteps.java` are intentionally omi
 
 | Step | Purpose |
 |---|---|
-| `MAP "key" TEXT VALUE` | Store an attached DocString as raw text. |
-| `MAP "key" OBJECT VALUE` | Parse an attached JSON, XML, or YAML DocString into a Jackson tree. |
-| `MAP "prefix" TABLE VALUES` | Map two-column table rows beneath an optional prefix. |
+| `MAP "key" TEXT VALUE` | Resolve templates in an attached DocString and store the result as text without structured parsing. |
+| `MAP "key" OBJECT VALUE` | Resolve templates and parse an attached JSON, XML, or YAML DocString into a Jackson tree. |
+| `MAP "prefix" TABLE VALUES` | Map the first resolved nonblank candidate value in each row beneath an optional prefix. |
+| `MAP "prefix" NON-BLANK TABLE VALUES` | Explicit form of the default table-mapping behavior. |
+| `MAP "prefix" NON-NULL TABLE VALUES` | Map the first resolved candidate value that is not null or an unresolved template. Blank values are allowed. |
 | `CLEAR SAVED VALUES` | Clear the complete run map. |
 | `CLEAR SAVED VALUES:key1,key2` | Remove selected top-level keys from the run map. |
 
-Each `MAP` step can optionally end with `TO DEFAULT MAP`, `TO OVERRIDE MAP`, `TO SINGLETON MAP`, `TO STEP MAP`, `TO ROOT SCENARIO MAP`, `TO SCENARIO MAP`, or `TO RUN MAP`. Omitting the target uses the run map.
+The prefix is optional for table mappings. Each `MAP` step can optionally end with `TO DEFAULT MAP`, `TO OVERRIDE MAP`, `TO SINGLETON MAP`, `TO STEP MAP`, `TO ROOT SCENARIO MAP`, `TO SCENARIO MAP`, or `TO RUN MAP`. Omitting the target uses the run map.
 
 ## Map table values
 
-Each table row contains a property path followed by its value. The table has no header row.
+The first cell in each row contains the property path. Every remaining cell is a candidate value. Candidate values are resolved from left to right, and only the first value that satisfies the selected requirement is mapped.
+
+If no candidate value qualifies, nothing is mapped for that row. A row with a blank key is also ignored. The table has no header row.
+
+### Default and `NON-BLANK` behavior
+
+When no requirement is written, table mapping defaults to `NON-BLANK`:
 
 ```gherkin
 Given MAP "customer" TABLE VALUES TO RUN MAP
@@ -36,15 +46,57 @@ Given MAP "customer" TABLE VALUES TO RUN MAP
   | tier         | Premium |
 ```
 
+This is equivalent to:
+
+```gherkin
+Given MAP "customer" NON-BLANK TABLE VALUES TO RUN MAP
+  | name         | Ava     |
+  | address.city | Phoenix |
+  | tier         | Premium |
+```
+
+`NON-BLANK` skips blank values, unresolved templates, and empty object or array values. It continues across the row until it finds the first qualifying value:
+
+```gherkin
+Given MAP "customer" TABLE VALUES TO RUN MAP
+  | name  | <preferredName> |         | Ava     |
+  | city  |                 | Phoenix |         |
+  | phone | <missingPhone>  |         |         |
+  |       | ignored         |         |         |
+```
+
+In this example:
+
+- `customer.name` is set to `Ava` if `<preferredName>` remains unresolved.
+- `customer.city` is set to `Phoenix`.
+- `customer.phone` is not set because none of its candidate values qualify.
+- The last row is ignored because its key is blank.
+
 The values can then be resolved as:
 
 ```text
 <customer.name>
-<customer.address.city>
-<customer.tier>
+<customer.city>
 ```
 
-The prefix is optional. Without one, the first column supplies the complete key:
+### `NON-NULL` behavior
+
+Use `NON-NULL` when a blank value should count as a supplied value. It still skips null values and unresolved templates, but it does not skip blank text or empty object or array values.
+
+```gherkin
+Given MAP "customer" NON-NULL TABLE VALUES TO RUN MAP
+  | nickname |             | Ava |
+  | id       | <missingId> | 123 |
+```
+
+In this example:
+
+- `customer.nickname` is set to a blank value. Because that value qualifies for `NON-NULL`, the mapper does not continue to `Ava`.
+- `customer.id` is set to `123` if `<missingId>` remains unresolved.
+
+### Optional prefixes
+
+Without a prefix, the first column supplies the complete key:
 
 ```gherkin
 Given MAP TABLE VALUES TO RUN MAP
@@ -68,7 +120,7 @@ These general mapping steps are the supported way to prepare values used by reus
 
 ## Map raw text
 
-`TEXT` stores the DocString content without parsing it:
+`TEXT` resolves templates in the DocString and stores the result as text without parsing it as JSON, XML, or YAML:
 
 ```gherkin
 Given MAP "REQUEST.body" TEXT VALUE TO SCENARIO MAP
@@ -83,11 +135,11 @@ A DocString content type may still be supplied for editor formatting, but it doe
 
 ## Map JSON, XML, or YAML objects
 
-`OBJECT` parses the DocString into a Jackson `JsonNode`:
+`OBJECT` resolves templates in the DocString and then parses the result into a Jackson `JsonNode`:
 
 ```gherkin
 Given MAP "customer" OBJECT VALUE TO RUN MAP
-  """json
+"""json
   {
     "name": "Ava",
     "active": true,
@@ -111,14 +163,14 @@ Examples:
 
 ```gherkin
 Given MAP "yamlCustomer" OBJECT VALUE
-  """yaml
+"""yaml
   name: Ben
   address:
     city: Tempe
   """
 
 And MAP "xmlCustomer" OBJECT VALUE
-  """xml
+"""xml
   <customer>
     <name>Cara</name>
     <city>Mesa</city>
@@ -157,7 +209,7 @@ Save a value already supplied by a mapping:
 
 ```gherkin
 Given MAP "customer" TABLE VALUES
-  | city | Phoenix |
+| city | Phoenix |
 
 When , save "<customer.city>" as "savedCity"
 Then , ensure "<savedCity>" equals "Phoenix"

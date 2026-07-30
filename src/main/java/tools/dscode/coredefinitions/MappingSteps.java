@@ -135,13 +135,17 @@ public class MappingSteps extends CoreSteps {
     }
 
     @DefinitionFlags(NO_ARG_RESOLUTION)
-
-    @Given("^MAP (?:\"(.*)\" )?TABLE VALUES(?: TO (DEFAULT|OVERRIDE|SINGLETON|STEP|ROOT SCENARIO|SCENARIO|RUN) MAP)?$")
+    @Given("^MAP (?:\"(.*)\" )?(?:(NON-BLANK|NON-NULL) )?TABLE VALUES(?: TO (DEFAULT|OVERRIDE|SINGLETON|STEP|ROOT SCENARIO|SCENARIO|RUN) MAP)?$")
     public static void mapValues(
             String prefix,
+            String valueRequirement,
             String mapType,
             DataTable dataTable
     ) {
+        valueRequirement = valueRequirement == null || valueRequirement.isBlank()
+                ? "NON-BLANK"
+                : valueRequirement;
+
         NodeMap nodeMap = getNodeMap(mapType);
 
         final String keyPrefix =
@@ -149,20 +153,36 @@ public class MappingSteps extends CoreSteps {
                         ? ""
                         : prefix.trim() + ".";
 
-        dataTable.asLists().forEach(row -> {
+        for (var row : dataTable.asLists()) {
+            if (row.isEmpty()) {
+                continue;
+            }
+
             String rowKey = row.getFirst() == null
                     ? ""
                     : row.getFirst().trim();
 
             if (rowKey.isBlank()) {
-                return;
+                continue;
             }
 
-            nodeMap.put(
-                    keyPrefix + rowKey,
-                    resolveFromParsingMap(row.get(1))
-            );
-        });
+            for (int cellIndex = 1; cellIndex < row.size(); cellIndex++) {
+                Object value = resolveFromParsingMap(row.get(cellIndex));
+
+                boolean hasRequiredValue = switch (valueRequirement) {
+                    case "NON-BLANK" -> hasNonBlankValue(value);
+                    case "NON-NULL" -> hasNonNullValue(value);
+                    default -> throw new IllegalArgumentException(
+                            "Unsupported table value requirement: " + valueRequirement
+                    );
+                };
+
+                if (hasRequiredValue) {
+                    nodeMap.put(keyPrefix + rowKey, value);
+                    break;
+                }
+            }
+        }
     }
 
 
@@ -230,6 +250,81 @@ public class MappingSteps extends CoreSteps {
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
+    }
+
+
+    /**
+     * Returns false when:
+     * - input is null
+     * - input is a String or textual JsonNode whose trimmed value is enclosed
+     *   by either <...> or ~[~...~]~
+     *
+     * Blank strings, empty arrays, and empty objects still return true here.
+     */
+    public static boolean hasNonNullValue(Object input) {
+        if (input == null) {
+            return false;
+        }
+
+        String text = getTextValue(input);
+
+        if (text == null) {
+            return true;
+        }
+
+        String trimmed = text.trim();
+
+        if (trimmed.startsWith("<") && trimmed.endsWith(">")) {
+            return false;
+        }
+
+        if (trimmed.startsWith("~[~") && trimmed.endsWith("~]~")) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Returns false when:
+     * - hasNonNullValue returns false
+     * - input is a blank String or blank textual JsonNode
+     * - input is an empty Jackson object or array node
+     */
+    public static boolean hasNonBlankValue(Object input) {
+        if (!hasNonNullValue(input)) {
+            return false;
+        }
+
+        String text = getTextValue(input);
+
+        if (text != null && text.trim().isEmpty()) {
+            return false;
+        }
+
+        if (input instanceof JsonNode node
+                && (node.isObject() || node.isArray())
+                && node.isEmpty()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Gets the plain text from a String or Jackson textual node.
+     * Returns null for all other value types.
+     */
+    private static String getTextValue(Object input) {
+        if (input instanceof String string) {
+            return string;
+        }
+
+        if (input instanceof JsonNode node && node.isTextual()) {
+            return node.textValue();
+        }
+
+        return null;
     }
 
 }
