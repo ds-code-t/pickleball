@@ -41,28 +41,28 @@ When no requirement is written, table mapping defaults to `NON-BLANK`:
 
 ```gherkin
 Given MAP "customer" TABLE VALUES TO RUN MAP
-  | name         | Ava     |
-  | address.city | Phoenix |
-  | tier         | Premium |
+| name         | Ava     |
+| address.city | Phoenix |
+| tier         | Premium |
 ```
 
 This is equivalent to:
 
 ```gherkin
 Given MAP "customer" NON-BLANK TABLE VALUES TO RUN MAP
-  | name         | Ava     |
-  | address.city | Phoenix |
-  | tier         | Premium |
+| name         | Ava     |
+| address.city | Phoenix |
+| tier         | Premium |
 ```
 
 `NON-BLANK` skips blank values, unresolved templates, and empty object or array values. It continues across the row until it finds the first qualifying value:
 
 ```gherkin
 Given MAP "customer" TABLE VALUES TO RUN MAP
-  | name  | <preferredName> |         | Ava     |
-  | city  |                 | Phoenix |         |
-  | phone | <missingPhone>  |         |         |
-  |       | ignored         |         |         |
+| name  | <preferredName> |         | Ava     |
+| city  |                 | Phoenix |         |
+| phone | <missingPhone>  |         |         |
+|       | ignored         |         |         |
 ```
 
 In this example:
@@ -85,8 +85,8 @@ Use `NON-NULL` when a blank value should count as a supplied value. It still ski
 
 ```gherkin
 Given MAP "customer" NON-NULL TABLE VALUES TO RUN MAP
-  | nickname |             | Ava |
-  | id       | <missingId> | 123 |
+| nickname |             | Ava |
+| id       | <missingId> | 123 |
 ```
 
 In this example:
@@ -100,20 +100,19 @@ Without a prefix, the first column supplies the complete key:
 
 ```gherkin
 Given MAP TABLE VALUES TO RUN MAP
-  | status  | ready |
-  | retries | 2     |
+| status  | ready |
+| retries | 2     |
 ```
 
 Nested request sections use nested prefixes:
 
 ```gherkin
 Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
-  | endpoint | http://127.0.0.1:8765/api/health |
-  | method   | GET                               |
-
+| endpoint | http://127.0.0.1:8765/api/health |
+| method   | GET                               |
 And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
-  | Accept        | application/json |
-  | X-Test-Client | consumer-test    |
+| Accept        | application/json |
+| X-Test-Client | consumer-test    |
 ```
 
 These general mapping steps are the supported way to prepare values used by reusable service-call scenarios.
@@ -135,11 +134,11 @@ A DocString content type may still be supplied for editor formatting, but it doe
 
 ## Map JSON, XML, or YAML objects
 
-`OBJECT` resolves templates in the DocString and then parses the result into a Jackson `JsonNode`:
+`OBJECT` resolves templates in the complete DocString text and then parses the resolved result into a Jackson `JsonNode`:
 
 ```gherkin
 Given MAP "customer" OBJECT VALUE TO RUN MAP
-"""json
+  """json
   {
     "name": "Ava",
     "active": true,
@@ -150,6 +149,8 @@ Given MAP "customer" OBJECT VALUE TO RUN MAP
   }
   """
 ```
+
+The resolved text must be valid for the selected format when parsing occurs. This matters for JSON templates containing runtime references; see [`~unquote` for raw values](#unquote-for-raw-values).
 
 The DocString content type is required for `OBJECT`.
 
@@ -163,14 +164,14 @@ Examples:
 
 ```gherkin
 Given MAP "yamlCustomer" OBJECT VALUE
-"""yaml
+  """yaml
   name: Ben
   address:
     city: Tempe
   """
 
 And MAP "xmlCustomer" OBJECT VALUE
-"""xml
+  """xml
   <customer>
     <name>Cara</name>
     <city>Mesa</city>
@@ -209,7 +210,7 @@ Save a value already supplied by a mapping:
 
 ```gherkin
 Given MAP "customer" TABLE VALUES
-| city | Phoenix |
+  | city | Phoenix |
 
 When , save "<customer.city>" as "savedCity"
 Then , ensure "<savedCity>" equals "Phoenix"
@@ -252,11 +253,138 @@ Use angle brackets to resolve saved or mapped values:
 <orders #2.items #1.sku>
 ```
 
-XML-safe bookends are also available where ordinary angle brackets would conflict with XML markup:
+XML-safe bookends are available where ordinary angle brackets would conflict with XML markup:
 
 ```text
 ~[~customer.name~]~
 ```
+
+For example:
+
+```xml
+<customer>
+  <name>~[~customer.name~]~</name>
+</customer>
+```
+
+When the input looks like XML and custom outer delimiters are not supplied, Pickleball resolves the XML-safe `~[~...~]~` form and does not interpret XML element tags as angle-bracket references.
+
+### Scenario and run-map references in reusable components
+
+A reusable component scenario has its own scenario map. Use an explicit map prefix when a reference must come from the caller:
+
+```text
+<PARENT.SCENARIO:requestTemplate.client>
+<PARENT.SCENARIO:requestTemplate.body.quantity>
+```
+
+The same pattern with XML-safe bookends is:
+
+```text
+~[~PARENT.SCENARIO:requestTemplate.body.quantity~]~
+```
+
+A completed named service call is saved in the shared run map under its call key. Reference that saved call directly, without `PARENT.SCENARIO`:
+
+```text
+<seedCall.RESPONSE.statusCode>
+<seedCall.RESPONSE.body.body.quantity>
+```
+
+For XML:
+
+```text
+~[~seedCall.RESPONSE.body.body.quantity~]~
+```
+
+This distinction is important:
+
+- Caller-owned values mapped with `TO SCENARIO MAP` are reached through `PARENT.SCENARIO:` from inside the component.
+- Completed named service-call objects are reached through their run-map call key.
+- `<columnName>` tokens that match a `Scenario Outline` Examples header are Cucumber substitutions. Cucumber performs those substitutions before Pickleball runtime template resolution.
+
+### `~unquote` for raw values
+
+Append `~unquote` to a map reference when the reference is directly surrounded by quotes but its resolved value must be inserted without those quotes:
+
+```text
+"<order.quantity~unquote>"
+"<order.active~unquote>"
+"<order.metadata~unquote>"
+"<order.items~unquote>"
+```
+
+`~unquote` is removed from the lookup key. After a value resolves, Pickleball removes one directly surrounding matching quote pair from that replacement. Double quotes, single quotes, and backticks are supported; JSON templates should use double quotes.
+
+This pattern is especially useful with `MAP ... OBJECT VALUE` because the template remains valid JSON before resolution:
+
+```gherkin
+Given MAP "requestTemplate" OBJECT VALUE TO SCENARIO MAP
+  """json
+  {
+    "name": "Mapped Widget",
+    "quantity": 4,
+    "active": false,
+    "unitPrice": 19.95,
+    "metadata": {
+      "source": "scenario-map",
+      "priority": 3
+    },
+    "items": [
+      { "sku": "A-1", "count": 2 }
+    ]
+  }
+  """
+
+And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
+  """json
+  {
+    "name": "<requestTemplate.name>",
+    "quantity": "<requestTemplate.quantity~unquote>",
+    "active": "<requestTemplate.active~unquote>",
+    "unitPrice": "<requestTemplate.unitPrice~unquote>",
+    "metadata": "<requestTemplate.metadata~unquote>",
+    "items": "<requestTemplate.items~unquote>"
+  }
+  """
+```
+
+After resolution, Jackson parses values with their JSON types:
+
+```json
+{
+  "name": "Mapped Widget",
+  "quantity": 4,
+  "active": false,
+  "unitPrice": 19.95,
+  "metadata": {
+    "source": "scenario-map",
+    "priority": 3
+  },
+  "items": [
+    { "sku": "A-1", "count": 2 }
+  ]
+}
+```
+
+Use ordinary quoted references for string values. Use quoted `~unquote` references for a complete number, boolean, object, or array value.
+
+`~unquote` is raw insertion, not general type conversion:
+
+- The resolved text must be valid in the surrounding format.
+- A normal text value such as `Widget` is not valid raw JSON; keep string references quoted without `~unquote`.
+- Jackson `JsonNode` objects and arrays are serialized as JSON before insertion.
+- If the reference does not resolve, Pickleball does not add the internal unquote markers, so the original quoted placeholder remains a valid JSON string.
+
+The XML-safe spelling is also supported when that delimiter style is active:
+
+```text
+"~[~order.quantity~unquote~]~"
+```
+
+It is usually unnecessary for XML text content because XML element text does not need JSON scalar typing. Its main use is preserving raw structured syntax in formats where quoting changes the value.
+
+### Index selectors
 
 Square-bracket indexes use normal zero-based JSONata indexing. Pickleball `#` selectors provide one-based-friendly access:
 

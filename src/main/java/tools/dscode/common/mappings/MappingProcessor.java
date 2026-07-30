@@ -818,7 +818,14 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 return replacement;
             }
 
-            String stringReplacement = getStringValue(replacement);
+//            String stringReplacement = getStringValue(replacement);
+            String stringReplacement = unquote
+                    && !(replacement instanceof JsonNode)
+                    && (replacement instanceof Map<?, ?>
+                    || replacement instanceof Collection<?>
+                    || replacement.getClass().isArray())
+                    ? encodeToPlaceHolders(MAPPER.valueToTree(replacement).toString())
+                    : getStringValue(replacement);
             String wrappedKey = bookends.wrap(matchedKey);
             if (stringReplacement.contains(bookends.open())
                     && !matchedKey.contains(MATCH_BREAK)
@@ -940,7 +947,11 @@ public abstract class MappingProcessor implements Map<String, Object> {
         Matcher matcher = pattern.matcher(input);
         StringBuffer output = new StringBuffer();
         while (matcher.find()) {
-            matcher.appendReplacement(output, Matcher.quoteReplacement(matcher.group(1)));
+            matcher.appendReplacement(
+                    output,
+                    Matcher.quoteReplacement(
+                            matcher.group(1).replace("\\" + quoteText, quoteText)));
+//            matcher.appendReplacement(output, Matcher.quoteReplacement(matcher.group(1)));
         }
         matcher.appendTail(output);
         return output.toString();

@@ -2,17 +2,20 @@
 
 > **Working feature examples:** [`service-call-execution.feature`](../maven-consumer-project/src/test/resources/features/service-call-execution.feature) locates and invokes calls; [`service-call-definitions.feature`](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature) builds each request with the general mapping steps and executes it.
 
-Pickleball treats service calls as reusable component scenarios. `ServiceCallSteps.java` locates those scenarios, registers their scenario-root objects when appropriate, runs them, and executes the assembled requests. It does **not** provide separate mapping steps for endpoints, methods, headers, bodies, configuration, or responses.
+Pickleball treats service calls as reusable component scenarios. `ServiceCallSteps.java` is responsible for locating those scenarios, running them, executing the assembled request, and saving the completed call object. It does **not** provide separate mapping steps for endpoints, methods, headers, bodies, configuration, or responses.
 
-All request and response data is built or inspected with the general mapping syntax from `MappingSteps.java`.
+All request data is built with the general steps from `MappingSteps.java`.
 
-## Current public steps
+## Responsibilities of `ServiceCallSteps.java`
+
+The public service-call steps are:
 
 | Step | Purpose |
 |---|---|
-| `SERVICE CALL` / `SERVICE CALLS` | Locate one or more service-call component scenarios, register each selected component root under its resolved key in the shared `RunMap`, and allow the normal modular-scenario runner to execute it. |
-| `CALL:%tag` | Locate exactly one service-call component, execute it synchronously as an inline value, and return either its explicit `RETURN` value or its completed scenario root. |
-| `EXECUTE SERVICE CALL` | Read the current component scenario's mapped `REQUEST` and optional `CONFIGURATION`, perform the HTTP request, and create or replace `RESPONSE` on that same scenario root. |
+| `SERVICE CALL` / `SERVICE CALLS` | Locate and execute one or more component scenarios from the call-feature directory. |
+| `EXECUTE SERVICE CALL` | Read the component scenario's mapped `REQUEST` and optional `CONFIGURATION`, perform the HTTP request, and populate `RESPONSE`. |
+
+An internal always-run finalizer saves the completed component object into the caller's run map. It is framework plumbing and is not written manually in feature files.
 
 The default call-feature directory is:
 
@@ -22,31 +25,7 @@ src/test/resources/calls
 
 It can be changed with `pkb_callspath`.
 
-## Shared `RunMap` behavior
-
-There is one shared `RunMap` for a scenario run.
-
-An ordinary `SERVICE CALL` registers the selected component root by reference in that `RunMap` before the component executes. The component's later `REQUEST` and `RESPONSE` changes are therefore visible through the selected call key.
-
-For example:
-
-```gherkin
-When "inspectCall" SERVICE CALL: %inspect-get
-  | endpoint              | client      |
-  | http://127.0.0.1:8765 | caller-test |
-```
-
-The completed call can be inspected through:
-
-```text
-<inspectCall.REQUEST.endpoint>
-<inspectCall.RESPONSE.statusCode>
-<inspectCall.RESPONSE.body>
-```
-
-An ordinary nested `SERVICE CALL` also registers its child root in this same shared `RunMap`. It does not automatically place that child beneath the owning component's scenario root.
-
-## Invoke a reusable service call
+## Invoke a reusable call
 
 Select a component scenario with an inline percent tag:
 
@@ -64,17 +43,15 @@ When SERVICE CALLS
   | %status-call | tableWins | http://127.0.0.1:8765 | 422    |
 ```
 
-The saved object key is selected in this order:
+The saved object key is chosen in this order:
 
 1. `Call Key` from the invocation table;
 2. the quoted name before `SERVICE CALL`; or
 3. the resolved component scenario name.
 
-Use unique keys when multiple nested calls must remain independently available in the same scenario run.
-
 ## Define a service-call component
 
-A service-call component maps `REQUEST`, optionally maps `CONFIGURATION`, and then executes the request:
+A component scenario maps a `REQUEST`, optionally maps `CONFIGURATION`, and then executes the call:
 
 ```gherkin
 Scenario Outline: InspectGetCall
@@ -96,303 +73,30 @@ Scenario Outline: InspectGetCall
     | %inspect-get  | http://127.0.0.1:8765 | default-client | get-default | none    | summary |
 ```
 
-`TO SCENARIO MAP` is the mapping target. It keeps the request data on the reusable component scenario while the component's child steps run.
+The `SCENARIO MAP` target keeps the request data on the reusable component scenario while its child steps run.
 
-Do not confuse that mapping phrase with a reference selector. In angle-bracket references, the selector is `SCENARIO`, not `SCENARIO MAP`.
+### Cucumber substitutions and Pickleball references
 
-## Scenario-map ancestry references
+In a `Scenario Outline`, a token such as `<endpoint>` that matches an Examples header is substituted by Cucumber before the component executes.
 
-Nested and inline components can read values from the scenario that contains them without explicitly passing or copying a `PARENT` object.
-
-Use these map selectors:
+A Pickleball runtime reference is resolved later by `MappingProcessor`. Runtime references are useful when the request body depends on mapped caller values or an earlier service response:
 
 ```text
-<SCENARIO:key>
-<PARENT.SCENARIO:key>
-<PARENT.PARENT.SCENARIO:key>
+<PARENT.SCENARIO:jsonTemplate.item.quantity>
+<seedCall.RESPONSE.body.body.quantity>
 ```
 
-They mean:
+From inside the component:
 
-| Selector | Meaning |
-|---|---|
-| `<SCENARIO:key>` | Read `key` from the closest current scenario map. |
-| `<PARENT.SCENARIO:key>` | Read `key` from the immediately containing scenario map. |
-| `<PARENT.PARENT.SCENARIO:key>` | Move up one additional scenario ancestor and read `key`. |
+- Use `PARENT.SCENARIO:` for values the caller mapped to its scenario map.
+- Use the unqualified call key for a completed named service call because the finalizer saves that object in the shared run map.
 
-The value after the colon may be a nested path:
-
-```gherkin
-<PARENT.SCENARIO:url>
-<PARENT.SCENARIO:client>
-<PARENT.SCENARIO:authentication.scope>
-<SCENARIO:RESPONSE.body.accessToken>
-```
-
-The ancestry is structural. Pickleball does not insert a property named `PARENT` into the child scenario map.
-
-### Invalid or obsolete parent forms
-
-Do not use:
+For XML runtime references, use the XML-safe bookends:
 
 ```text
-<PARENT.url>
-<PARENT.client>
-<PARENT.SCENARIO MAP:url>
-<PARENT.SCENARIO MAP:client>
+~[~PARENT.SCENARIO:soapTemplate.left~]~
+~[~seedCall.RESPONSE.body.body.quantity~]~
 ```
-
-Use:
-
-```text
-<PARENT.SCENARIO:url>
-<PARENT.SCENARIO:client>
-```
-
-`PARENT.SCENARIO MAP` is invalid because `SCENARIO MAP` is not a supported map selector. `SCENARIO MAP` is only wording used by mapping steps such as `MAP ... TO SCENARIO MAP`.
-
-## Inline `CALL`
-
-Inline `CALL` is used inside a resolvable value such as:
-
-```gherkin
-| TOKEN | <$CALL:%TokenCall> |
-```
-
-It has different execution and storage behavior from an ordinary `SERVICE CALL`:
-
-1. exactly one matching component scenario is selected;
-2. that child component executes synchronously before the mapping step continues;
-3. the child can use `<PARENT.SCENARIO:...>` while it runs;
-4. after execution, the inline child is detached from deferred child execution so it is not run a second time;
-5. `CALL` returns the child's `RETURN` value when available, otherwise it returns the completed child scenario root.
-
-The returned root is the child's actual scenario-root object, but the child has already completed by the time `CALL` returns. Do not describe inline execution as waiting for later deferred child mutations.
-
-### Inline `CALL` without `RETURN`
-
-When the child does not set `RETURN`, the complete child scenario root is returned.
-
-The owning component first stores values in its own scenario map and then maps the inline result:
-
-```gherkin
-Scenario Outline: ServiceCallA
-  Given MAP TABLE VALUES TO SCENARIO MAP
-    | url    | <url>    |
-    | client | <client> |
-    | scope  | <scope>  |
-
-  And MAP TABLE VALUES TO SCENARIO MAP
-    | TOKEN | <$CALL:%TokenCall> |
-
-  And MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
-    | endpoint | <url>/api/service-calls/protected |
-    | method   | GET                                |
-    | accept   | application/json                   |
-  And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
-    | X-Test-Client | <client>                                 |
-    | Authorization | Bearer <TOKEN.RESPONSE.body.accessToken> |
-  And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
-    | scope | <scope> |
-  When EXECUTE SERVICE CALL
-
-  Examples:
-    | Scenario Tags | url                   | client         | scope        |
-    | %serviceCallA | http://127.0.0.1:8765 | default-client | catalog.read |
-```
-
-The inline child implicitly reads the containing `ServiceCallA` scenario map:
-
-```gherkin
-Scenario Outline: TokenCall
-  Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
-    | endpoint    | <PARENT.SCENARIO:url>/api/service-calls/token |
-    | method      | POST                                         |
-    | accept      | application/json                             |
-    | contentType | application/json                             |
-  And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
-    | X-Test-Client | <PARENT.SCENARIO:client> |
-  And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
-    | scope | <PARENT.SCENARIO:scope> |
-  And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
-    """json
-    {
-      "grantType": "client_credentials"
-    }
-    """
-  When EXECUTE SERVICE CALL
-
-  Examples:
-    | Scenario Tags |
-    | %TokenCall    |
-```
-
-Because `TokenCall` does not set `RETURN`, `TOKEN` receives the completed root:
-
-```text
-TOKEN.REQUEST
-TOKEN.RESPONSE
-```
-
-After the owner is registered as `inlineCall`, callers can inspect paths such as:
-
-```text
-<inlineCall.TOKEN.REQUEST.endpoint>
-<inlineCall.TOKEN.RESPONSE.statusCode>
-<inlineCall.REQUEST.endpoint>
-<inlineCall.RESPONSE.statusCode>
-```
-
-### Inline `CALL` with explicit `RETURN`
-
-A child can set the special `RETURN` property when the owner needs only one value rather than the entire child root.
-
-Use an explicit current-scenario selector when reading the child's own response:
-
-```gherkin
-Scenario Outline: TokenValueCall
-  Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
-    | endpoint    | <PARENT.SCENARIO:url>/api/service-calls/token |
-    | method      | POST                                         |
-    | accept      | application/json                             |
-    | contentType | application/json                             |
-  And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
-    | X-Test-Client | <PARENT.SCENARIO:client> |
-  And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
-    | scope | <PARENT.SCENARIO:scope> |
-  And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
-    """json
-    {
-      "grantType": "client_credentials"
-    }
-    """
-  When EXECUTE SERVICE CALL
-  And MAP TABLE VALUES TO SCENARIO MAP
-    | RETURN | <SCENARIO:RESPONSE.body.accessToken> |
-
-  Examples:
-    | Scenario Tags   |
-    | %TokenValueCall |
-```
-
-The owner receives only the returned token:
-
-```gherkin
-Scenario Outline: ServiceCallB
-  Given MAP TABLE VALUES TO SCENARIO MAP
-    | url    | <url>    |
-    | client | <client> |
-    | scope  | <scope>  |
-
-  And MAP TABLE VALUES TO SCENARIO MAP
-    | TOKEN | <$CALL:%TokenValueCall> |
-
-  And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
-    | X-Test-Client | <client>       |
-    | Authorization | Bearer <TOKEN> |
-```
-
-In this form, `TOKEN` is the explicit return value. It is not an object containing `REQUEST` and `RESPONSE`.
-
-Do not use the ambiguous old assignment:
-
-```gherkin
-| RETURN | <RESPONSE.body.accessToken> |
-```
-
-Use:
-
-```gherkin
-| RETURN | <SCENARIO:RESPONSE.body.accessToken> |
-```
-
-The explicit selector makes it clear that `RESPONSE` belongs to the inline child component's own scenario map.
-
-## Ordinary nested `SERVICE CALL`
-
-Use an ordinary nested `SERVICE CALL` when the child should be registered as another named service call in the shared `RunMap`.
-
-### Preferred implicit-parent form
-
-The owner stores its inputs in its scenario map and invokes the child without duplicating an invocation table:
-
-```gherkin
-Scenario Outline: NestedComponent
-  Given MAP TABLE VALUES TO SCENARIO MAP
-    | url    | <url>    |
-    | client | <client> |
-    | scope  | <scope>  |
-
-  And "TOKEN" SERVICE CALL: %nestedTokenComponent
-
-  And MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
-    | endpoint | <url>/api/service-calls/protected |
-    | method   | GET                                |
-    | accept   | application/json                   |
-  And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
-    | X-Test-Client | <client>                                 |
-    | Authorization | Bearer <TOKEN.RESPONSE.body.accessToken> |
-  And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
-    | scope | <scope> |
-  When EXECUTE SERVICE CALL
-```
-
-The nested child implicitly retrieves those values from the owner:
-
-```gherkin
-Scenario Outline: NestedTokenComponent
-  Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
-    | endpoint    | <PARENT.SCENARIO:url>/api/service-calls/token |
-    | method      | POST                                         |
-    | accept      | application/json                             |
-    | contentType | application/json                             |
-  And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
-    | X-Test-Client | <PARENT.SCENARIO:client> |
-  And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
-    | scope | <PARENT.SCENARIO:scope> |
-  When EXECUTE SERVICE CALL
-
-  Examples:
-    | Scenario Tags         |
-    | %nestedTokenComponent |
-```
-
-The outer feature invokes the owner normally:
-
-```gherkin
-When "nestedCall" SERVICE CALL: %nestedComponent
-  | url                   | client        | scope          |
-  | http://127.0.0.1:8765 | nested-client | inventory.read |
-```
-
-The resulting keys are separate shared-`RunMap` entries:
-
-```text
-<TOKEN.REQUEST.endpoint>
-<TOKEN.RESPONSE.body.accessToken>
-<nestedCall.REQUEST.endpoint>
-<nestedCall.RESPONSE.statusCode>
-```
-
-An ordinary nested call does **not** automatically create:
-
-```text
-<nestedCall.TOKEN...>
-```
-
-That nested path exists only when a value is explicitly mapped beneath the owner's scenario root, as with the inline `CALL` examples.
-
-### Invocation-table form remains supported
-
-Passing values explicitly through the nested `SERVICE CALL` invocation table is still valid and is not deprecated:
-
-```gherkin
-Given "TOKEN" SERVICE CALL: %nestedTokenComponent
-  | endpoint   | client   | scope   |
-  | <endpoint> | <client> | <scope> |
-```
-
-Use this form when the child should receive values different from the owner's scenario-map values. Use `<PARENT.SCENARIO:...>` when the child should naturally inherit values already stored by its containing component.
 
 ## Request object
 
@@ -400,16 +104,14 @@ The working consumer uses these `REQUEST` properties:
 
 | Property | Purpose |
 |---|---|
-| `REQUEST.endpoint` | Complete URL, including scheme, host, optional port, and path. |
-| `REQUEST.method` | HTTP method such as `GET`, `POST`, or `DELETE`. The executor defaults a missing or blank method to `GET`. |
+| `REQUEST.endpoint` | Complete URL, including scheme, host, port, and path. |
+| `REQUEST.method` | HTTP method such as `GET`, `POST`, or `DELETE`. |
 | `REQUEST.accept` | Accept media type. |
 | `REQUEST.contentType` | Request-body media type. |
 | `REQUEST.headers` | Header name/value object. |
 | `REQUEST.queryParams` | Query-parameter object. |
 | `REQUEST.cookies` | Cookie name/value object. |
 | `REQUEST.body` | Parsed object or raw text body. |
-
-A port in `REQUEST.endpoint`, such as `http://127.0.0.1:8765/...`, is a normal part of the complete URL. It is not special service-call syntax.
 
 ### JSON request body
 
@@ -426,26 +128,107 @@ And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
   """
 ```
 
-### XML or another raw body
+In this example, `<name>` and `<quantity>` are Cucumber `Scenario Outline` placeholders. Cucumber replaces them before Pickleball resolves and parses the body.
 
-Use the generic `TEXT` mapper:
+For Pickleball runtime references, prefer a JSON template that is valid before resolution. Quote each reference and add `~unquote` when the resolved value must be a non-string JSON value:
+
+```gherkin
+And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
+  """json
+  {
+    "name": "<PARENT.SCENARIO:unquoteTemplate.name>",
+    "quantity": "<PARENT.SCENARIO:unquoteTemplate.quantity~unquote>",
+    "active": "<PARENT.SCENARIO:unquoteTemplate.active~unquote>",
+    "unitPrice": "<PARENT.SCENARIO:unquoteTemplate.unitPrice~unquote>",
+    "metadata": "<PARENT.SCENARIO:unquoteTemplate.metadata~unquote>",
+    "items": "<PARENT.SCENARIO:unquoteTemplate.items~unquote>"
+  }
+  """
+```
+
+`MAP ... OBJECT VALUE` resolves the complete DocString and then parses the resulting JSON. A bare unresolved reference in a value position is not valid JSON:
+
+```json
+{
+  "quantity": <PARENT.SCENARIO:unquoteTemplate.quantity>
+}
+```
+
+The quoted `~unquote` pattern avoids that parsing problem while preserving the resolved type:
+
+```json
+{
+  "quantity": "<PARENT.SCENARIO:unquoteTemplate.quantity~unquote>"
+}
+```
+
+When the mapped value is `12`, the resolved JSON is:
+
+```json
+{
+  "quantity": 12
+}
+```
+
+Use:
+
+- `"<reference>"` for JSON strings;
+- `"<reference~unquote>"` for complete numbers, booleans, objects, or arrays.
+
+`~unquote` removes only a directly surrounding matching quote pair after a successful replacement. It inserts the resolved value as raw JSON and does not convert arbitrary text into a JSON type. A raw value must therefore be valid JSON. Mapped Jackson object and array nodes are serialized as JSON before insertion.
+
+The working `%unquoted-json-body` component and its execution scenario test integer, decimal, boolean, object, and array insertion.
+
+### Values from an earlier service response
+
+A previous named service call can provide data for a later request. The earlier result is stored under its call key:
+
+```gherkin
+And "seedJson" SERVICE CALL: %inspect-post
+  | endpoint              | client      | traceId        | cookieValue | mode | status | name        | quantity |
+  | http://127.0.0.1:8765 | seed-client | seed-json-call | seed-cookie | seed | 201    | Seed Widget | 8        |
+```
+
+A later component can reference that completed call directly:
+
+```gherkin
+And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
+  """json
+  {
+    "name": "<seedJson.RESPONSE.body.body.name>",
+    "quantity": "<seedJson.RESPONSE.body.body.quantity~unquote>",
+    "sourceStatus": "<seedJson.RESPONSE.statusCode~unquote>"
+  }
+  """
+```
+
+Do not add `PARENT.SCENARIO:` to `seedJson` in this situation. `PARENT.SCENARIO` addresses the caller's scenario map, while the completed named call is registered in the shared run map.
+
+### XML or other raw body
+
+Use the generic `TEXT` mapper. Pickleball runtime references inside XML should use `~[~...~]~` so XML element tags are not confused with template bookends:
 
 ```gherkin
 And MAP "REQUEST.body" TEXT VALUE TO SCENARIO MAP
   """xml
   <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
                     xmlns:calc="urn:pickleball:calculator">
+    <soapenv:Header/>
     <soapenv:Body>
       <calc:Add>
-        <calc:left><left></calc:left>
-        <calc:right><right></calc:right>
+        <calc:left>~[~PARENT.SCENARIO:soapTemplate.left~]~</calc:left>
+        <calc:right>~[~soapSeed.RESPONSE.body.body.quantity~]~</calc:right>
       </calc:Add>
     </soapenv:Body>
   </soapenv:Envelope>
   """
 ```
 
+The left value above comes from the caller's scenario map. The right value comes from an earlier named service call in the run map.
+
 The `xml` media type is useful for IntelliJ formatting, while `TEXT` preserves the content as a string.
+
+A plain `<left>` token can still be a Cucumber `Scenario Outline` placeholder when `left` is an Examples column. It is not the recommended syntax for a Pickleball runtime map reference inside XML.
 
 ## REST Assured configuration
 
@@ -457,7 +240,7 @@ And MAP "CONFIGURATION" TABLE VALUES TO SCENARIO MAP
   | relaxedHTTPSValidation |      |
 ```
 
-`CONFIGURATION` is not required merely to provide the host, port, or base URL. The current consumer definitions place the complete URL in `REQUEST.endpoint`.
+`CONFIGURATION` is not needed merely to provide the host or base URL. The working definitions put the complete URL in `REQUEST.endpoint`.
 
 ## Execute and inspect the result
 
@@ -465,9 +248,7 @@ And MAP "CONFIGURATION" TABLE VALUES TO SCENARIO MAP
 When EXECUTE SERVICE CALL
 ```
 
-`EXECUTE SERVICE CALL` initializes `RESPONSE` before request validation and execution. It then replaces that object with the extracted REST Assured response when a response is available.
-
-The caller can inspect both request and response data:
+The framework creates `RESPONSE` and the finalizer saves the whole component object into the caller. The caller can inspect both the request and response:
 
 ```text
 <inlineRead.REQUEST.endpoint>
@@ -478,13 +259,13 @@ The caller can inspect both request and response data:
 <inlineRead.RESPONSE.body.status>
 ```
 
-HTTP `4xx` and `5xx` responses are retained as normal service responses rather than being treated as missing results. A no-content response is also retained with its status and headers.
+HTTP `4xx` and `5xx` responses are retained as normal service responses rather than being treated as missing call results. A no-content response is also retained with its status and headers.
 
-If `END SCENARIO` stops a component before `EXECUTE SERVICE CALL`, the already-registered partial root and mapped `REQUEST` remain visible, but the executor has not added `RESPONSE`.
+`EXECUTE SERVICE CALL` initializes `RESPONSE` before attempting the request. Consequently, an early component exit can still be finalized and saved with an empty response object.
 
-## Removed and deprecated service-call patterns
+## No custom REST mapping steps
 
-Do not use the removed custom REST-mapping forms:
+Do not use the removed forms:
 
 ```text
 ENDPOINT:...
@@ -507,25 +288,12 @@ MAP "REQUEST.body" TEXT VALUE TO SCENARIO MAP
 MAP "CONFIGURATION" TABLE VALUES TO SCENARIO MAP
 ```
 
-Also remove or update these obsolete nested-call patterns:
-
-| Obsolete pattern | Current replacement |
-|---|---|
-| Child receives an explicitly inserted `PARENT` object | Child reads its containing scenario through `<PARENT.SCENARIO:key>`. |
-| `<PARENT.key>` | `<PARENT.SCENARIO:key>` |
-| `<PARENT.SCENARIO MAP:key>` | `<PARENT.SCENARIO:key>` |
-| Documentation says inline `CALL` always returns the child root | Document `RETURN` first, completed root as fallback. |
-| `RETURN` mapped from bare `<RESPONSE...>` | Use `<SCENARIO:RESPONSE...>` for the child's own scenario map. |
-| Inline child described as remaining queued for later execution | Inline `CALL` executes synchronously and is detached from deferred execution afterward. |
-
 ## Local endpoints in the consumer
 
-The consumer's [`LocalTestSite.java`](../maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java) starts a loopback-only server for the Cucumber run. The current call definitions exercise:
+The consumer's [`LocalTestSite.java`](../maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java) starts a loopback-only server before the Cucumber run. The current call definitions exercise:
 
 - `/api/service-calls/inspect`;
 - `/api/service-calls/no-content/{itemId}`;
-- `/api/service-calls/token`;
-- `/api/service-calls/protected`;
 - `/api/health`; and
 - `/soap/calculator`.
 
