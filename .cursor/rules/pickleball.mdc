@@ -1,0 +1,10 @@
+---
+description: Persistent Pickleball architecture, compatibility, testing, and documentation contract
+alwaysApply: true
+---
+
+Read and follow `AGENTS.md`.
+
+For functionality changes, read `docs/agent/feature-map.md` and treat implementation, tests, Maven consumer scenarios, local test-site resources, configuration, and documentation as one change set.
+
+Apply the validation and definition of done from `AGENTS.md`. Do not require the user to repeat repository setup or goals documented there.
