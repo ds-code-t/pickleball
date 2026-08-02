@@ -24,7 +24,6 @@ import java.util.Map;
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.mappings.MappingProcessor.getRunMap;
-import static tools.dscode.common.mappings.ParsingMap.getClosestScenarioStepAncestorNodeMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.variables.RunVars.resolveFromVars;
@@ -39,7 +38,6 @@ import static tools.dscode.common.variables.RunVars.resolveFromVars;
  * mutations are immediately visible through the RunMap entry.</p>
  */
 public class ServiceCallSteps extends CoreSteps {
-
     static final String DEFAULT_CALLS_PATH = "src/test/resources/calls";
     static final String CALL_KEY = "Call Key";
     static final String SCENARIO_NAME = "SCENARIO NAME";
@@ -49,20 +47,22 @@ public class ServiceCallSteps extends CoreSteps {
     static final String RESPONSE = "RESPONSE";
     static final String PARENT = "PARENT";
 
-    @Given("^(?:\"([^\"]+)\"\\s+)?SERVICE CALLS?:?(.*)?$")
+    @Given("^(?:\"([^\"]+)\"\\s+)?SERVICE CALL(S)?:?(.*)?$")
     public static void serviceCalls(
             String inlineServiceCallObjectName,
-            String inlineTags,
+            String pluralFlag,
+            String inlineArgs,
             DataTable dataTable
     ) {
         StepExtension triggerStep = getRunningStep();
-
         ModularScenarios.populateRunScenariosStep(
                 triggerStep,
-                inlineTags,
+                pluralFlag,
+                inlineArgs,
                 dataTable,
                 callsPath(),
-                "service call",
+                "service-call scenario",
+                "SERVICE CALL",
                 (scenarioStep, passedValues) -> registerServiceCallReference(
                         scenarioStep,
                         passedValues,
@@ -72,13 +72,12 @@ public class ServiceCallSteps extends CoreSteps {
     }
 
     @Given("^CALL:(.*)$")
-    public static Object inlineCall(String inlineTags) {
+    public static Object inlineCall(String inlineArgs) {
         StepExtension triggerStep = getRunningStep();
         ScenarioStep[] nestedScenarioHolder = new ScenarioStep[1];
-
         ModularScenarios.populateRunScenariosStep(
                 triggerStep,
-                inlineTags,
+                inlineArgs,
                 null,
                 callsPath(),
                 "service call",
@@ -87,11 +86,10 @@ public class ServiceCallSteps extends CoreSteps {
         );
 
         ScenarioStep nestedScenarioStep = nestedScenarioHolder[0];
-
         if (nestedScenarioStep == null) {
             throw new IllegalStateException(
-                    "No service-call scenario was created for CALL tags: "
-                            + normalize(inlineTags)
+                    "No service-call scenario was created for CALL selector: "
+                            + normalize(inlineArgs)
             );
         }
 
@@ -105,7 +103,6 @@ public class ServiceCallSteps extends CoreSteps {
         triggerStep.childSteps.remove(nestedScenarioStep);
         nestedScenarioStep.previousSibling = null;
         nestedScenarioStep.nextSibling = null;
-
         getCurrentScenarioState().runStep(nestedScenarioStep);
 
         NodeMap nestedScenarioMap =
@@ -149,7 +146,6 @@ public class ServiceCallSteps extends CoreSteps {
         }
 
         long started = System.nanoTime();
-
         try (PrintStream restLog = new PrintStream(
                 new LogInfoOutputStream(),
                 true,
@@ -173,8 +169,8 @@ public class ServiceCallSteps extends CoreSteps {
             if (!responseNode.isEmpty()) {
                 responseNode.put("method", method);
             }
-            serviceCallObject.set(RESPONSE, responseNode);
 
+            serviceCallObject.set(RESPONSE, responseNode);
             logInfo(
                     "REST Assured service call completed in "
                             + elapsedMillis(started)
@@ -248,7 +244,6 @@ public class ServiceCallSteps extends CoreSteps {
         if (node instanceof ObjectNode objectNode) {
             return objectNode;
         }
-
         if (node == null || node.isNull()) {
             throw new IllegalStateException(
                     "The service-call object is missing the " + fieldName + " object"

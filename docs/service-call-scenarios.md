@@ -1,6 +1,6 @@
 # Service-call Scenarios
 
-> **Working feature examples:** [`service-call-execution.feature`](../maven-consumer-project/src/test/resources/features/service-call-execution.feature) locates and invokes calls; [`service-call-definitions.feature`](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature) builds each request with the general mapping steps and executes it.
+> **Working feature examples:** [`service-call-execution.feature`](../maven-consumer-project/src/test/resources/features/service-call-execution.feature) locates and invokes calls; [`reusable-scenario-selection.feature`](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature) covers name selection and singular/plural cardinality; [`service-call-definitions.feature`](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature) builds each request with the general mapping steps and executes it.
 
 Pickleball treats service calls as reusable component scenarios. `ServiceCallSteps.java` is responsible for locating those scenarios, running them, executing the assembled request, and saving the completed call object. It does **not** provide separate mapping steps for endpoints, methods, headers, bodies, configuration, or responses.
 
@@ -27,7 +27,7 @@ It can be changed with `pkb_callspath`.
 
 ## Invoke a reusable call
 
-Select a component scenario with an inline percent tag:
+Inline arguments beginning with `@` or `%` are treated as Cucumber tag expressions:
 
 ```gherkin
 When "inlineRead" SERVICE CALL: %inspect-get
@@ -35,19 +35,60 @@ When "inlineRead" SERVICE CALL: %inspect-get
   | http://127.0.0.1:8765 | caller-test | trace-get-1 | inventory | full |
 ```
 
-Or supply the selector through a `Run Tags` column:
+Any other inline argument is treated as an exact scenario name:
+
+```gherkin
+When "healthByName" SERVICE CALL: HealthCall
+  | endpoint              |
+  | http://127.0.0.1:8765 |
+```
+
+Include the exact feature name before the first `.` to restrict the match:
+
+```gherkin
+When "qualifiedHealth" SERVICE CALL: Reusable service call definitions.HealthCall
+  | endpoint              |
+  | http://127.0.0.1:8765 |
+```
+
+Both names must be present in the qualified `Feature name.Scenario name` form. Because the first `.` is the separator, use table options when a literal feature or scenario name itself contains a period.
+
+Selectors can also be supplied through invocation-table Cucumber options:
 
 ```gherkin
 When SERVICE CALLS
-  | Run Tags     | Call Key  | endpoint              | status |
-  | %status-call | tableWins | http://127.0.0.1:8765 | 422    |
+  | pkb_featurename                  | pkb_name                  | pkb_order | pkb_limit | endpoint              | status |
+  | Reusable service call definitions | ^(HealthCall\|StatusCall)$ | lexical   | 2         | http://127.0.0.1:8765 | 418    |
 ```
+
+Supported options include:
+
+| Purpose | Pickleball option | Cucumber option |
+|---|---|---|
+| Feature paths | `pkb_features` | `cucumber.features` |
+| Exact feature name | `pkb_featurename` | — |
+| Scenario-name regex | `pkb_name` | `cucumber.filter.name` |
+| Tag expression | `pkb_tags` or `Run Tags` | `cucumber.filter.tags` |
+| Result order | `pkb_order` | `cucumber.execution.order` |
+| Result limit | `pkb_limit` | `cucumber.execution.limit` |
+
+A nonblank tag, feature-name, or scenario-name filter must match at least one service-call scenario. Otherwise the step throws a descriptive no-match error.
+
+Feature paths, ordering, and limits do not select scenarios by themselves. When all tag, feature-name, and scenario-name filters are blank or absent, the step returns silently and executes no service calls.
+
+### Singular and plural cardinality
+
+`SERVICE CALL` allows zero or one returned scenario. `SERVICE CALLS` allows any number.
+
+Ordering and limit options are applied before cardinality is checked. If a singular call still returns more than one scenario, it throws an error naming the matches and instructing the caller to use `SERVICE CALLS`. Plural matches execute in the order returned by the existing Cucumber ordering and limit logic. Invocation-table row order is preserved.
 
 The saved object key is chosen in this order:
 
 1. `Call Key` from the invocation table;
 2. the quoted name before `SERVICE CALL`; or
 3. the resolved component scenario name.
+
+When a plural selector can return multiple scenarios, use distinct `Call Key` values per row or rely on distinct scenario names to avoid ordinary run-map replacement.
 
 ## Define a service-call component
 
@@ -67,7 +108,6 @@ Scenario Outline: InspectGetCall
     | include | <include> |
     | mode    | <mode>    |
   When EXECUTE SERVICE CALL
-
   Examples:
     | Scenario Tags | endpoint              | client         | traceId     | include | mode    |
     | %inspect-get  | http://127.0.0.1:8765 | default-client | get-default | none    | summary |
