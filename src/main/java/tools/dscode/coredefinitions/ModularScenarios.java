@@ -14,8 +14,10 @@ import tools.dscode.common.mappings.ParsingMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
@@ -28,6 +30,10 @@ public class ModularScenarios extends CoreSteps {
     static final String RUN_TAGS = "Run Tags";
     static final String TAGS = "Tags";
     static final String CUCUMBER_FEATURES = "cucumber.features";
+    static final String STEP_MARKER = "Step_Marker";
+    private static final Pattern INLINE_ARGUMENT_PATTERN = Pattern.compile(
+            "(?i)(?<!\\S)(FEATURE|SCENARIO|START):"
+    );
 
     @Given("^RUN SCENARIO(S)?:?(.*)?$")
     public static void runScenarios(
@@ -125,25 +131,27 @@ public class ModularScenarios extends CoreSteps {
                 })
                 .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
 
-        String normalizedArgs = normalize(inlineArgs);
-        if (normalizedArgs.isBlank()) {
+        InlineArguments arguments = parseInlineArguments(inlineArgs);
+        if (arguments.isEmpty()) {
             return maps;
         }
         if (maps.isEmpty()) {
             maps.add(new HashMap<>());
         }
 
-        if (isTagSelector(normalizedArgs)) {
-            maps.forEach(map -> addInlineTags(map, normalizedArgs));
-            return maps;
-        }
-
-        InlineSelector selector = parseInlineSelector(normalizedArgs);
         maps.forEach(map -> {
-            if (selector.featureName() != null) {
-                map.put(PKB_FEATURE_NAME, selector.featureName());
+            if (arguments.tags() != null) {
+                addInlineTags(map, arguments.tags());
             }
-            map.put(PKB_NAME, exactNameRegex(selector.scenarioName()));
+            if (arguments.featureName() != null) {
+                map.put(PKB_FEATURE_NAME, arguments.featureName());
+            }
+            if (arguments.scenarioName() != null) {
+                map.put(PKB_NAME, exactNameRegex(arguments.scenarioName()));
+            }
+            if (arguments.stepMarker() != null) {
+                map.put(STEP_MARKER, arguments.stepMarker());
+            }
         });
         return maps;
     }
@@ -169,6 +177,7 @@ public class ModularScenarios extends CoreSteps {
 
         for (Map<String, String> map : maps) {
             Map<String, String> scanOptions = new HashMap<>(map);
+            scanOptions.remove(STEP_MARKER);
             if (featuresPath != null && !featuresPath.isBlank()) {
                 scanOptions.put(CUCUMBER_FEATURES, featuresPath);
             }
@@ -247,7 +256,8 @@ public class ModularScenarios extends CoreSteps {
 
             ScenarioStep scenarioStep = createScenarioStep(
                     match.pickle(),
-                    scenarioStepParsingMap
+                    scenarioStepParsingMap,
+                    match.passedValues().get(STEP_MARKER)
             );
 
             if (scenarioInitializer != null) {
@@ -280,23 +290,102 @@ public class ModularScenarios extends CoreSteps {
         );
     }
 
-    private static InlineSelector parseInlineSelector(String inlineArgs) {
-        int separator = inlineArgs.indexOf('.');
-        if (separator < 0) {
-            return new InlineSelector(null, inlineArgs);
+    static InlineArguments parseInlineArguments(String inlineArgs) {
+        String arguments = normalize(inlineArgs);
+        if (arguments.isBlank()) {
+            return InlineArguments.EMPTY;
         }
 
-        String featureName = inlineArgs.substring(0, separator).trim();
-        String scenarioName = inlineArgs.substring(separator + 1).trim();
-        if (featureName.isBlank() || scenarioName.isBlank()) {
+        Matcher matcher = INLINE_ARGUMENT_PATTERN.matcher(arguments);
+        List<InlinePart> parts = new ArrayList<>();
+        while (matcher.find()) {
+            parts.add(new InlinePart(
+                    matcher.group(1).toUpperCase(Locale.ROOT),
+                    matcher.start(),
+                    matcher.end()
+            ));
+        }
+
+        if (parts.isEmpty()) {
+            if (isTagSelector(arguments)) {
+                return new InlineArguments(arguments, null, null, null);
+            }
+            throw invalidInlineArguments(arguments);
+        }
+
+        String leadingText = arguments.substring(0, parts.getFirst().start()).trim();
+        String tags = null;
+        if (!leadingText.isBlank()) {
+            if (!isTagSelector(leadingText)) {
+                throw invalidInlineArguments(arguments);
+            }
+            tags = leadingText;
+        }
+
+        String featureName = null;
+        String scenarioName = null;
+        String stepMarker = null;
+
+        for (int index = 0; index < parts.size(); index++) {
+            InlinePart part = parts.get(index);
+            int valueEnd = index + 1 < parts.size()
+                    ? parts.get(index + 1).start()
+                    : arguments.length();
+            String value = arguments.substring(part.end(), valueEnd).trim();
+            if (value.isBlank()) {
+                throw new IllegalArgumentException(
+                        part.name() + ": requires a nonblank value in inline arguments: ["
+                                + arguments + "]"
+                );
+            }
+
+            switch (part.name()) {
+                case "FEATURE" -> featureName = uniqueInlineValue(
+                        "FEATURE",
+                        featureName,
+                        value,
+                        arguments
+                );
+                case "SCENARIO" -> scenarioName = uniqueInlineValue(
+                        "SCENARIO",
+                        scenarioName,
+                        value,
+                        arguments
+                );
+                case "START" -> stepMarker = uniqueInlineValue(
+                        "START",
+                        stepMarker,
+                        value,
+                        arguments
+                );
+                default -> throw invalidInlineArguments(arguments);
+            }
+        }
+
+        return new InlineArguments(tags, featureName, scenarioName, stepMarker);
+    }
+
+    private static String uniqueInlineValue(
+            String argumentName,
+            String existingValue,
+            String newValue,
+            String inlineArgs
+    ) {
+        if (existingValue != null) {
             throw new IllegalArgumentException(
-                    "Inline scenario selection must use "
-                            + "Feature Name.Scenario Name with both names present: ["
+                    argumentName + ": may only be supplied once in inline arguments: ["
                             + inlineArgs + "]"
             );
         }
+        return newValue;
+    }
 
-        return new InlineSelector(featureName, scenarioName);
+    private static IllegalArgumentException invalidInlineArguments(String inlineArgs) {
+        return new IllegalArgumentException(
+                "Inline arguments must start with @ or % for a tag expression, "
+                        + "or use FEATURE:, SCENARIO:, and START: labels: ["
+                        + inlineArgs + "]"
+        );
     }
 
     private static boolean isTagSelector(String inlineArgs) {
@@ -327,7 +416,24 @@ public class ModularScenarios extends CoreSteps {
         return child;
     }
 
-    private record InlineSelector(String featureName, String scenarioName) {
+    record InlineArguments(
+            String tags,
+            String featureName,
+            String scenarioName,
+            String stepMarker
+    ) {
+        private static final InlineArguments EMPTY =
+                new InlineArguments(null, null, null, null);
+
+        boolean isEmpty() {
+            return tags == null
+                    && featureName == null
+                    && scenarioName == null
+                    && stepMarker == null;
+        }
+    }
+
+    private record InlinePart(String name, int start, int end) {
     }
 
     private record PickleMatch(

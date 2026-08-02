@@ -1,12 +1,12 @@
 # Component Scenarios
 
-> **Working feature examples:** [`component-scenarios.feature`](../maven-consumer-project/src/test/resources/features/component-scenarios.feature) contains the reusable `%save_customer` component. [`reusable-scenario-selection.feature`](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature) demonstrates tag, scenario-name, feature-name, ordering, limit, and singular/plural selection.
+> **Working feature examples:** [`component-scenarios.feature`](../maven-consumer-project/src/test/resources/features/component-scenarios.feature) contains the reusable `%save_customer` component. [`reusable-scenario-selection.feature`](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature) demonstrates tag, scenario-name, feature-name, ordering, limit, and singular/plural selection. [`scenario-step-markers.feature`](../maven-consumer-project/src/test/resources/features/scenario-step-markers.feature) covers default, custom, nested, and end markers.
 
 Component scenarios are reusable, scenario-sized business flows. A caller uses `RUN SCENARIO` or `RUN SCENARIOS`, selects one or more component scenarios, and optionally supplies values through a table.
 
 ## Select components inline
 
-Inline arguments beginning with `@` or `%` are Cucumber tag expressions:
+Inline arguments beginning with `@` or `%` remain Cucumber tag expressions:
 
 ```gherkin
 * RUN SCENARIO: %save_customer
@@ -14,23 +14,23 @@ Inline arguments beginning with `@` or `%` are Cucumber tag expressions:
     | Ava          | Premium |
 ```
 
-Any other inline argument is treated as an exact scenario name:
+Name selection is explicit. Prefix an exact scenario name with `SCENARIO:`:
 
 ```gherkin
-* RUN SCENARIO: Save customer component
+* RUN SCENARIO: SCENARIO: Save customer component
     | customerName | tier    |
     | Ava          | Premium |
 ```
 
-Include a feature name before the first `.` to restrict the exact scenario-name match:
+Prefix an exact feature name with `FEATURE:`. Feature and scenario selectors can be combined in either order:
 
 ```gherkin
-* RUN SCENARIO: Reuse a customer-saving business flow.Save customer component
+* RUN SCENARIO: FEATURE: Reuse a customer-saving business flow SCENARIO: Save customer component
     | customerName | tier    |
     | Ava          | Premium |
 ```
 
-Both names must be present in the qualified `Feature name.Scenario name` form. Because the first `.` is the separator, use table options when a literal feature or scenario name itself contains a period.
+Each labelled value continues until the next `FEATURE:`, `SCENARIO:`, or `START:` label. Unlabelled non-tag text is rejected rather than guessed as a feature or scenario name. This allows periods and other punctuation to remain part of either name.
 
 ## Select components with Cucumber options
 
@@ -64,6 +64,41 @@ Feature paths, ordering, and limits do not select scenarios by themselves. When 
 Ordering and limit options are applied before cardinality is checked. Therefore a broad selector may be used with `pkb_limit = 1` in a singular step. If a singular step still returns more than one scenario, it throws an error naming the matches and instructing the caller to use `RUN SCENARIOS`.
 
 Plural results execute in the order returned by the existing Cucumber ordering and limit logic. When the invocation table contains multiple rows, row order is preserved and each row's returned scenarios execute in their returned order.
+
+## Start and end markers
+
+A component can contain no-op marker steps defined by `---<marker text>`.
+
+Without an override, `---startstep` removes every component step that precedes it. `---endstep` includes the end marker and removes every step that follows it:
+
+```gherkin
+Scenario: Reusable section
+  * , verify "this failure" equals "is skipped"
+  : * ---startstep
+  : * , verify "selected body" equals "selected body"
+  * ---endstep
+  * , verify "this failure" equals "is also skipped"
+```
+
+A start marker may be nested. Pickleball retains the existing placeholder-padding behavior so the selected nested step tree remains valid after earlier ancestors are removed.
+
+Override the component start marker inline with `START:`:
+
+```gherkin
+* RUN SCENARIO: FEATURE: Reusable flows SCENARIO: Save customer START: submit section
+```
+
+The component then starts at `---submit section`. For that invocation, `---startstep` is no longer treated as the start marker. `---endstep` remains fixed.
+
+The same override can be supplied per invocation-table row:
+
+```gherkin
+* RUN SCENARIO
+    | pkb_featurename | pkb_name        | Step_Marker   |
+    | Reusable flows  | ^Save customer$ | submit section |
+```
+
+Inline `START:` overrides a `Step_Marker` value from the table. Marker text is resolved with the component parsing map before it is compared. Matching is exact after trimming and is case-insensitive.
 
 ## Call a component once per table row
 
@@ -129,7 +164,8 @@ Avoid component cycles that repeatedly call each other.
 See:
 
 - [component-scenarios.feature](../maven-consumer-project/src/test/resources/features/component-scenarios.feature);
-- [reusable-scenario-selection.feature](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature); and
+- [reusable-scenario-selection.feature](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature);
+- [scenario-step-markers.feature](../maven-consumer-project/src/test/resources/features/scenario-step-markers.feature); and
 - [components.html](../maven-consumer-project/src/test/resources/site/components.html).
 
 [Previous: Block Conditionals](block-conditionals.md) · [Documentation home](README.md) · [Next: Service-call Scenarios](service-call-scenarios.md)

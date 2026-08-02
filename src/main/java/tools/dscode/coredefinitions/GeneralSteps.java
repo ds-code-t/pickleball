@@ -135,7 +135,7 @@ public class GeneralSteps extends CoreSteps {
 
     }
 
-    @Given("\\|__")
+    @Given("^\\|__$")
     public static void placeHolder() {
 
     }

@@ -8,10 +8,10 @@ Feature: Reusable scenario selection
     * , verify "B" equals "B"
 
   Scenario: Select one component by inline scenario name
-    * RUN SCENARIO: Selection fixture A
+    * RUN SCENARIO: SCENARIO: Selection fixture A
 
   Scenario: Select one component by inline feature and scenario name
-    * RUN SCENARIO: Reusable scenario selection.Selection fixture B
+    * RUN SCENARIO: FEATURE: Reusable scenario selection SCENARIO: Selection fixture B
 
   Scenario: Apply ordering and limit before singular component validation
     * RUN SCENARIO
@@ -31,7 +31,7 @@ Feature: Reusable scenario selection
 
   @service-call @local-api
   Scenario: Select one service call by inline scenario name
-    * "healthByName" SERVICE CALL: HealthCall
+    * "healthByName" SERVICE CALL: SCENARIO: HealthCall
       | endpoint              |
       | http://127.0.0.1:8765 |
     * , verify "<healthByName.RESPONSE.statusCode>" equals "200"
@@ -39,7 +39,7 @@ Feature: Reusable scenario selection
 
   @service-call @local-api
   Scenario: Select one service call by inline feature and scenario name
-    * "qualifiedHealth" SERVICE CALL: Reusable service call definitions.HealthCall
+    * "qualifiedHealth" SERVICE CALL: FEATURE: Reusable service call definitions SCENARIO: HealthCall
       | endpoint              |
       | http://127.0.0.1:8765 |
     * , verify "<qualifiedHealth.RESPONSE.statusCode>" equals "200"

@@ -36,10 +36,11 @@ class ModularScenariosTest {
     }
 
     @Test
-    void inlineScenarioNameUsesAnExactCucumberNameFilter() {
+    void labelledFeatureAndScenarioUseExactFilters() {
         List<Map<String, String>> maps =
                 ModularScenarios.buildRunScenarioMaps(
-                        "Save customer.component (default)",
+                        "FEATURE: Save customer "
+                                + "SCENARIO: component (default)",
                         null
                 );
 
@@ -55,7 +56,36 @@ class ModularScenariosTest {
     }
 
     @Test
-    void inlineScenarioOnlyPreservesTableFeatureFilter() {
+    void labelledNamesPreservePeriodsAndInlineStartOverridesTheTable() {
+        DataTable table = DataTable.create(List.of(
+                List.of("Step_Marker"),
+                List.of("table marker")
+        ));
+
+        List<Map<String, String>> maps =
+                ModularScenarios.buildRunScenarioMaps(
+                        "SCENARIO: Save customer v2.1 "
+                                + "FEATURE: Reusable.flows "
+                                + "START: inline marker",
+                        table
+                );
+
+        assertEquals(
+                "^\\QSave customer v2.1\\E$",
+                maps.getFirst().get("pkb_name")
+        );
+        assertEquals(
+                "Reusable.flows",
+                maps.getFirst().get("pkb_featurename")
+        );
+        assertEquals(
+                "inline marker",
+                maps.getFirst().get("Step_Marker")
+        );
+    }
+
+    @Test
+    void labelledScenarioPreservesTableFeatureFilter() {
         DataTable table = DataTable.create(List.of(
                 List.of("pkb_featurename", "customerName"),
                 List.of("Reusable customer flows", "Ava")
@@ -63,7 +93,7 @@ class ModularScenariosTest {
 
         List<Map<String, String>> maps =
                 ModularScenarios.buildRunScenarioMaps(
-                        "Save customer component",
+                        "SCENARIO: Save customer component",
                         table
                 );
 
@@ -78,24 +108,115 @@ class ModularScenariosTest {
     }
 
     @Test
-    void qualifiedInlineSelectorRequiresBothNames() {
-        IllegalArgumentException missingFeature = assertThrows(
+    void featureOnlyInlineSelectorIsSupported() {
+        List<Map<String, String>> maps =
+                ModularScenarios.buildRunScenarioMaps(
+                        "FEATURE: Reusable customer flows",
+                        null
+                );
+
+        assertEquals(
+                "Reusable customer flows",
+                maps.getFirst().get("pkb_featurename")
+        );
+        assertNull(maps.getFirst().get("pkb_name"));
+    }
+
+    @Test
+    void inlineStartMarkerIsStoredWithTheInvocationRow() {
+        List<Map<String, String>> maps =
+                ModularScenarios.buildRunScenarioMaps(
+                        "SCENARIO: Save customer component "
+                                + "START: submit customer",
+                        null
+                );
+
+        assertEquals(
+                "^\\QSave customer component\\E$",
+                maps.getFirst().get("pkb_name")
+        );
+        assertEquals(
+                "submit customer",
+                maps.getFirst().get("Step_Marker")
+        );
+    }
+
+    @Test
+    void inlineTagExpressionCanBeCombinedWithAStartMarker() {
+        DataTable table = DataTable.create(List.of(
+                List.of("customerName"),
+                List.of("Ava")
+        ));
+
+        List<Map<String, String>> maps =
+                ModularScenarios.buildRunScenarioMaps(
+                        "%save_customer START: submit customer",
+                        table
+                );
+
+        assertEquals("%save_customer", maps.getFirst().get("Run Tags"));
+        assertEquals(
+                "submit customer",
+                maps.getFirst().get("Step_Marker")
+        );
+    }
+
+    @Test
+    void tableStepMarkerIsPreservedWithoutInlineArguments() {
+        DataTable table = DataTable.create(List.of(
+                List.of("pkb_name", "Step_Marker"),
+                List.of("^Save customer$", "submit customer")
+        ));
+
+        List<Map<String, String>> maps =
+                ModularScenarios.buildRunScenarioMaps(null, table);
+
+        assertEquals(
+                "submit customer",
+                maps.getFirst().get("Step_Marker")
+        );
+    }
+
+    @Test
+    void unlabelledNameSelectionIsRejected() {
+        IllegalArgumentException scenarioName = assertThrows(
                 IllegalArgumentException.class,
                 () -> ModularScenarios.buildRunScenarioMaps(
-                        ".Save customer component",
+                        "Save customer component",
                         null
                 )
         );
-        IllegalArgumentException missingScenario = assertThrows(
+        IllegalArgumentException qualifiedName = assertThrows(
                 IllegalArgumentException.class,
                 () -> ModularScenarios.buildRunScenarioMaps(
-                        "Reusable customer flows.",
+                        "Reusable customer flows.Save customer component",
                         null
                 )
         );
 
-        assertTrue(missingFeature.getMessage().contains("both names present"));
-        assertTrue(missingScenario.getMessage().contains("both names present"));
+        assertTrue(scenarioName.getMessage().contains("SCENARIO:"));
+        assertTrue(qualifiedName.getMessage().contains("FEATURE:"));
+    }
+
+    @Test
+    void labelledInlineArgumentsRequireValuesAndCannotRepeat() {
+        IllegalArgumentException blankValue = assertThrows(
+                IllegalArgumentException.class,
+                () -> ModularScenarios.buildRunScenarioMaps(
+                        "FEATURE: SCENARIO: Save customer component",
+                        null
+                )
+        );
+        IllegalArgumentException duplicateValue = assertThrows(
+                IllegalArgumentException.class,
+                () -> ModularScenarios.buildRunScenarioMaps(
+                        "SCENARIO: First SCENARIO: Second",
+                        null
+                )
+        );
+
+        assertTrue(blankValue.getMessage().contains("FEATURE: requires"));
+        assertTrue(duplicateValue.getMessage().contains("only be supplied once"));
     }
 
     @Test
@@ -138,10 +259,15 @@ class ModularScenariosTest {
         );
         Pattern pattern = Pattern.compile(method.getAnnotation(Given.class).value());
 
-        Matcher singular = pattern.matcher("RUN SCENARIO: Save customer component");
+        Matcher singular = pattern.matcher(
+                "RUN SCENARIO: SCENARIO: Save customer component"
+        );
         assertTrue(singular.matches());
         assertNull(singular.group(1));
-        assertEquals(" Save customer component", singular.group(2));
+        assertEquals(
+                " SCENARIO: Save customer component",
+                singular.group(2)
+        );
 
         Matcher plural = pattern.matcher("RUN SCENARIOS: %save_customer");
         assertTrue(plural.matches());
@@ -162,12 +288,12 @@ class ModularScenariosTest {
         Pattern pattern = Pattern.compile(method.getAnnotation(Given.class).value());
 
         Matcher singular = pattern.matcher(
-                "\"health\" SERVICE CALL: HealthCall"
+                "\"health\" SERVICE CALL: SCENARIO: HealthCall"
         );
         assertTrue(singular.matches());
         assertEquals("health", singular.group(1));
         assertNull(singular.group(2));
-        assertEquals(" HealthCall", singular.group(3));
+        assertEquals(" SCENARIO: HealthCall", singular.group(3));
 
         Matcher plural = pattern.matcher("SERVICE CALLS: %health");
         assertTrue(plural.matches());

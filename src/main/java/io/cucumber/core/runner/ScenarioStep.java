@@ -9,6 +9,7 @@ import tools.dscode.common.mappings.ParsingMap;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
@@ -22,15 +23,33 @@ import static tools.dscode.common.util.Reflect.setProperty;
 
 public class ScenarioStep extends StepExtension {
 
+    private static final String DEFAULT_START_STEP_MARKER = "startstep";
+    private static final String END_STEP_MARKER = "endstep";
 
-    public static ScenarioStep createRootScenarioStep(io.cucumber.core.runner.TestCase testCase) {
+    public static ScenarioStep createRootScenarioStep(
+            io.cucumber.core.runner.TestCase testCase
+    ) {
         String pickleName = testCase.getName();
-        if (pickleName == null || pickleName.isBlank())
+        if (pickleName == null || pickleName.isBlank()) {
             pickleName = "UNNAMED SCENARIO";
-        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = getPickleStepTestStepFromStrings((Pickle) getProperty(testCase, "pickle"), getGivenKeyword(), SCENARIO_STEP + pickleName, null);
-        ScenarioStep scenarioStep = new ScenarioStep(testCase, scenarioPickleStepTestStep);
+        }
+        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep =
+                getPickleStepTestStepFromStrings(
+                        (Pickle) getProperty(testCase, "pickle"),
+                        getGivenKeyword(),
+                        SCENARIO_STEP + pickleName,
+                        null
+                );
+        ScenarioStep scenarioStep = new ScenarioStep(
+                testCase,
+                scenarioPickleStepTestStep
+        );
         setProperty(testCase, "rootScenarioStep", scenarioStep);
-        scenarioStep.initializeScenarioSteps((List<StepExtension>) getProperty(testCase, "stepExtensions"), null);
+        scenarioStep.initializeScenarioSteps(
+                (List<StepExtension>) getProperty(testCase, "stepExtensions"),
+                null,
+                DEFAULT_START_STEP_MARKER
+        );
         scenarioStep.getDefaultStepNodeMap().put("SCENARIO NAME", pickleName);
         scenarioStep.getDefaultStepNodeMap().put("ROOT SCENARIO NAME", pickleName);
         return scenarioStep;
@@ -40,52 +59,104 @@ public class ScenarioStep extends StepExtension {
         return createScenarioStep(pickle, null);
     }
 
-    public static ScenarioStep createScenarioStep(Pickle pickle, ParsingMap parsingMap) {
+    public static ScenarioStep createScenarioStep(
+            Pickle pickle,
+            ParsingMap parsingMap
+    ) {
+        return createScenarioStep(
+                pickle,
+                parsingMap,
+                DEFAULT_START_STEP_MARKER
+        );
+    }
+
+    public static ScenarioStep createScenarioStep(
+            Pickle pickle,
+            ParsingMap parsingMap,
+            String startStepMarker
+    ) {
         io.cucumber.core.runner.TestCase topLevel = GlobalState.getTestCase();
-        String pickleName = (parsingMap == null ? pickle.getName() : parsingMap.resolveWholeText(pickle.getName()));
-        if (pickleName == null || pickleName.isBlank())
+        String pickleName = parsingMap == null
+                ? pickle.getName()
+                : parsingMap.resolveWholeText(pickle.getName());
+        if (pickleName == null || pickleName.isBlank()) {
             pickleName = "UNNAMED SCENARIO";
+        }
         String scenarioName = SCENARIO_STEP + pickleName;
-        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep = getPickleStepTestStepFromStrings(pickle, getGivenKeyword(), scenarioName, null);
-        ScenarioStep scenarioStep = new ScenarioStep(topLevel, scenarioPickleStepTestStep);
+        io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep =
+                getPickleStepTestStepFromStrings(
+                        pickle,
+                        getGivenKeyword(),
+                        scenarioName,
+                        null
+                );
+        ScenarioStep scenarioStep = new ScenarioStep(
+                topLevel,
+                scenarioPickleStepTestStep
+        );
         if (parsingMap != null) {
             scenarioStep.stepParsingMap.clear();
             scenarioStep.stepParsingMap.getMaps().putAll(parsingMap.getMaps());
         }
-        scenarioStep.initializeScenarioSteps(createPickleStepTestStepsFromPickle(pickle).stream().map(step -> new StepExtension(getTestCase(), step)).toList(), parsingMap);
+        scenarioStep.initializeScenarioSteps(
+                createPickleStepTestStepsFromPickle(pickle).stream()
+                        .map(step -> new StepExtension(getTestCase(), step))
+                        .toList(),
+                parsingMap,
+                startStepMarker
+        );
         scenarioStep.getDefaultStepNodeMap().put("SCENARIO NAME", pickleName);
         return scenarioStep;
     }
 
-
-    private ScenarioStep(TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
+    private ScenarioStep(
+            TestCase testCase,
+            io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep
+    ) {
         super(testCase, pickleStepTestStep);
 //        Pickle gherkinMessagesPickle = (Pickle) getProperty(testCase, "pickle");
-//        io.cucumber.messages.types.Pickle pickle = (io.cucumber.messages.types.Pickle) getProperty(gherkinMessagesPickle, "pickle");
+//        io.cucumber.messages.types.Pickle pickle =
+//                (io.cucumber.messages.types.Pickle) getProperty(
+//                        gherkinMessagesPickle,
+//                        "pickle"
+//                );
 //        getStepNodeMap().merge(pickle.getHeaderRow(), pickle.getValueRow());
     }
 
-    private void initializeScenarioSteps(List<StepExtension> inputSteps, ParsingMap parsingMap) {
+    private void initializeScenarioSteps(
+            List<StepExtension> inputSteps,
+            ParsingMap parsingMap,
+            String startStepMarker
+    ) {
         List<StepExtension> steps = new ArrayList<>();
+        String resolvedStartMarker = normalizeStartMarker(
+                resolveMarkerText(startStepMarker, parsingMap)
+        );
         boolean endStep = false;
         for (StepExtension step : inputSteps) {
             if (step.isStepMarker) {
-                String markerText = (parsingMap == null ? step.stepMarkerText : parsingMap.resolveWholeText(step.stepMarkerText)).toLowerCase();
-                if (markerText.matches("^startstep\\b")) {
+                String markerText = resolveMarkerText(
+                        step.stepMarkerText,
+                        parsingMap
+                );
+                if (matchesStepMarker(markerText, resolvedStartMarker)) {
                     steps.clear();
-                } else if (markerText.matches("^endstep\\b")) {
+                } else if (matchesStepMarker(markerText, END_STEP_MARKER)) {
                     endStep = true;
                 }
             }
             if (steps.isEmpty()) {
                 for (int i = 1; i < step.getNestingLevel() + 1; i++) {
-                    StepExtension nestingPlaceholder = step.modifyStepExtension("\\|__");
+                    StepExtension nestingPlaceholder =
+                            step.modifyStepExtension("|__");
                     nestingPlaceholder.setNestingLevel(i - 1);
                     steps.add(nestingPlaceholder);
                 }
             }
             steps.add(step);
-            if (endStep) break;
+            if (endStep) {
+                break;
+            }
         }
 
         int size = steps.size();
@@ -95,25 +166,34 @@ public class ScenarioStep extends StepExtension {
         int startingNesting = getNestingLevel() + 1;
         for (int s = 0; s < size; s++) {
             StepExtension currentStep = steps.get(s);
-            currentStep.setNestingLevel(currentStep.getNestingLevel() + startingNesting);
+            currentStep.setNestingLevel(
+                    currentStep.getNestingLevel() + startingNesting
+            );
             int currentNesting = currentStep.getNestingLevel();
             StepExtension parentStep = nestingMap.get(currentNesting - 1);
-            StepExtension previousSibling = currentNesting > lastNestingLevel ? null : nestingMap.get(currentNesting);
+            StepExtension previousSibling = currentNesting > lastNestingLevel
+                    ? null
+                    : nestingMap.get(currentNesting);
             if (currentStep.dataArgumentStep) {
                 if (previousSibling != null) {
                     previousSibling.dataTable = currentStep.dataTable;
                     previousSibling.docString = currentStep.docString;
-                    previousSibling.dataContextStepNodeMap = currentStep.dataContextStepNodeMap;
-//                    previousSibling.getStepParsingMap().addMaps(currentStep.dataContextStepNodeMap);
+                    previousSibling.dataContextStepNodeMap =
+                            currentStep.dataContextStepNodeMap;
+//                    previousSibling.getStepParsingMap()
+//                            .addMaps(currentStep.dataContextStepNodeMap);
                 }
                 continue;
             }
             if (previousSibling != null) {
                 currentStep.previousSibling = previousSibling;
                 previousSibling.nextSibling = currentStep;
-
                 if (previousSibling.nextSiblingDefinitionFlags != null) {
-                    currentStep.addDefinitionFlag(previousSibling.nextSiblingDefinitionFlags.toArray(new DefinitionFlag[0]));
+                    currentStep.addDefinitionFlag(
+                            previousSibling.nextSiblingDefinitionFlags.toArray(
+                                    new DefinitionFlag[0]
+                            )
+                    );
                 }
             }
             if (parentStep != null) {
@@ -126,27 +206,45 @@ public class ScenarioStep extends StepExtension {
 
         for (int s = 0; s < size; s++) {
             StepExtension currentStep = steps.get(s);
-            if (currentStep.isDynamicStep &&
-                    currentStep.nextSibling != null &&
-                    currentStep.nextSibling.isDynamicStep &&
-                    currentStep.getUnmodifiedText().trim().endsWith(",")
-            ) {
+            if (currentStep.isDynamicStep
+                    && currentStep.nextSibling != null
+                    && currentStep.nextSibling.isDynamicStep
+                    && currentStep.getUnmodifiedText().trim().endsWith(",")) {
                 StepExtension nextStep = currentStep;
                 String newStepText = ",";
                 List<StepBase> childList = new ArrayList<>();
-                int indexOfCurrentStep = currentStep.parentStep.childSteps.indexOf(currentStep);
-                while (newStepText.endsWith(",") && nextStep != null && nextStep.isDynamicStep) {
+                int indexOfCurrentStep =
+                        currentStep.parentStep.childSteps.indexOf(currentStep);
+                while (newStepText.endsWith(",")
+                        && nextStep != null
+                        && nextStep.isDynamicStep) {
                     currentStep.parentStep.childSteps.remove(nextStep);
                     s++;
-                    newStepText += nextStep.getUnmodifiedText().trim().substring(1);
+                    newStepText += nextStep
+                            .getUnmodifiedText()
+                            .trim()
+                            .substring(1);
                     childList.addAll(nextStep.childSteps);
                     nextStep = (StepExtension) nextStep.nextSibling;
                 }
                 s--;
-                StepExtension newStep = new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep, pickleStepTestStep.getStep().getKeyword(), newStepText, getGherkinArgumentText(pickleStepTestStep.getStep())));
+                StepExtension newStep = new StepExtension(
+                        testCase,
+                        getPickleStepTestStepFromStrings(
+                                pickleStepTestStep,
+                                pickleStepTestStep.getStep().getKeyword(),
+                                newStepText,
+                                getGherkinArgumentText(
+                                        pickleStepTestStep.getStep()
+                                )
+                        )
+                );
                 newStep.setStepParsingMap(getStepParsingMap());
                 newStep.parentStep = currentStep.parentStep;
-                currentStep.parentStep.childSteps.add(indexOfCurrentStep, newStep);
+                currentStep.parentStep.childSteps.add(
+                        indexOfCurrentStep,
+                        newStep
+                );
                 newStep.childSteps.addAll(childList);
                 if (currentStep.previousSibling != null) {
                     newStep.previousSibling = currentStep.previousSibling;
@@ -157,8 +255,39 @@ public class ScenarioStep extends StepExtension {
                     nextStep.previousSibling = newStep;
                 }
             }
-
         }
     }
 
+    static boolean matchesStepMarker(
+            String markerText,
+            String expectedMarkerText
+    ) {
+        String marker = normalizeMarker(markerText);
+        String expected = normalizeMarker(expectedMarkerText);
+        return !expected.isBlank() && marker.equals(expected);
+    }
+
+    static String resolveMarkerText(
+            String markerText,
+            ParsingMap parsingMap
+    ) {
+        if (markerText == null || markerText.isBlank()) {
+            return "";
+        }
+        String resolved = parsingMap == null
+                ? markerText
+                : parsingMap.resolveWholeText(markerText);
+        return normalizeMarker(resolved);
+    }
+
+    private static String normalizeStartMarker(String markerText) {
+        String normalized = normalizeMarker(markerText);
+        return normalized.isBlank() ? DEFAULT_START_STEP_MARKER : normalized;
+    }
+
+    private static String normalizeMarker(String markerText) {
+        return markerText == null
+                ? ""
+                : markerText.trim().toLowerCase(Locale.ROOT);
+    }
 }

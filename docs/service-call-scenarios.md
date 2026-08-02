@@ -1,6 +1,6 @@
 # Service-call Scenarios
 
-> **Working feature examples:** [`service-call-execution.feature`](../maven-consumer-project/src/test/resources/features/service-call-execution.feature) locates and invokes calls; [`reusable-scenario-selection.feature`](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature) covers name selection and singular/plural cardinality; [`service-call-definitions.feature`](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature) builds each request with the general mapping steps and executes it.
+> **Working feature examples:** [`service-call-execution.feature`](../maven-consumer-project/src/test/resources/features/service-call-execution.feature) locates and invokes calls; [`reusable-scenario-selection.feature`](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature) covers name selection and singular/plural cardinality; [`scenario-step-markers.feature`](../maven-consumer-project/src/test/resources/features/scenario-step-markers.feature) covers reusable-scenario start and end markers; [`service-call-definitions.feature`](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature) builds each request with the general mapping steps and executes it.
 
 Pickleball treats service calls as reusable component scenarios. `ServiceCallSteps.java` is responsible for locating those scenarios, running them, executing the assembled request, and saving the completed call object. It does **not** provide separate mapping steps for endpoints, methods, headers, bodies, configuration, or responses.
 
@@ -35,23 +35,23 @@ When "inlineRead" SERVICE CALL: %inspect-get
   | http://127.0.0.1:8765 | caller-test | trace-get-1 | inventory | full |
 ```
 
-Any other inline argument is treated as an exact scenario name:
+Name selection is explicit. Prefix the exact scenario name with `SCENARIO:`:
 
 ```gherkin
-When "healthByName" SERVICE CALL: HealthCall
+When "healthByName" SERVICE CALL: SCENARIO: HealthCall
   | endpoint              |
   | http://127.0.0.1:8765 |
 ```
 
-Include the exact feature name before the first `.` to restrict the match:
+Prefix the exact feature name with `FEATURE:` and combine it with `SCENARIO:` when both are needed:
 
 ```gherkin
-When "qualifiedHealth" SERVICE CALL: Reusable service call definitions.HealthCall
+When "qualifiedHealth" SERVICE CALL: FEATURE: Reusable service call definitions SCENARIO: HealthCall
   | endpoint              |
   | http://127.0.0.1:8765 |
 ```
 
-Both names must be present in the qualified `Feature name.Scenario name` form. Because the first `.` is the separator, use table options when a literal feature or scenario name itself contains a period.
+Each labelled value continues until the next `FEATURE:`, `SCENARIO:`, or `START:` label. Unlabelled non-tag text is rejected rather than guessed as a feature or scenario name.
 
 Selectors can also be supplied through invocation-table Cucumber options:
 
@@ -89,6 +89,20 @@ The saved object key is chosen in this order:
 3. the resolved component scenario name.
 
 When a plural selector can return multiple scenarios, use distinct `Call Key` values per row or rely on distinct scenario names to avoid ordinary run-map replacement.
+
+### Start and end markers
+
+Service-call scenarios use the same marker behavior as other component scenarios. `---startstep` removes preceding steps, and `---endstep` removes following steps.
+
+Override the start marker inline with `START:`:
+
+```gherkin
+When "health" SERVICE CALL: SCENARIO: HealthCall START: execute health
+```
+
+The selected service-call scenario then starts at `---execute health`. The override may instead be supplied in the invocation table with a `Step_Marker` column. Inline `START:` takes precedence over the table value. The fixed `---endstep` marker remains active for every invocation.
+
+See [`scenario-step-markers.feature`](../maven-consumer-project/src/test/resources/features/scenario-step-markers.feature) and the [component-scenario marker documentation](component-scenarios.md#start-and-end-markers) for the nested-marker behavior.
 
 ## Define a service-call component
 
