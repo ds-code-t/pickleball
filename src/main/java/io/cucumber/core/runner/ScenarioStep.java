@@ -25,6 +25,11 @@ public class ScenarioStep extends StepExtension {
 
     private static final String DEFAULT_START_STEP_MARKER = "startstep";
     private static final String END_STEP_MARKER = "endstep";
+    private StepExtension startStepMarkerStep;
+
+    public StepExtension getStartStepMarkerStep() {
+        return startStepMarkerStep;
+    }
 
     public static ScenarioStep createRootScenarioStep(
             io.cucumber.core.runner.TestCase testCase
@@ -132,6 +137,7 @@ public class ScenarioStep extends StepExtension {
         String resolvedStartMarker = normalizeStartMarker(
                 resolveMarkerText(startStepMarker, parsingMap)
         );
+        startStepMarkerStep = null;
         boolean endStep = false;
         for (StepExtension step : inputSteps) {
             if (step.isStepMarker) {
@@ -140,6 +146,7 @@ public class ScenarioStep extends StepExtension {
                         parsingMap
                 );
                 if (matchesStepMarker(markerText, resolvedStartMarker)) {
+                    startStepMarkerStep = step;
                     steps.clear();
                 } else if (matchesStepMarker(markerText, END_STEP_MARKER)) {
                     endStep = true;

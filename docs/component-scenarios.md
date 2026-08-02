@@ -1,6 +1,6 @@
 # Component Scenarios
 
-> **Working feature examples:** [`component-scenarios.feature`](../maven-consumer-project/src/test/resources/features/component-scenarios.feature) contains the reusable `%save_customer` component. [`reusable-scenario-selection.feature`](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature) demonstrates tag, scenario-name, feature-name, ordering, limit, and singular/plural selection. [`scenario-step-markers.feature`](../maven-consumer-project/src/test/resources/features/scenario-step-markers.feature) covers default, custom, nested, and end markers.
+> **Working feature examples:** [`component-scenarios.feature`](../maven-consumer-project/src/test/resources/features/component-scenarios.feature) contains the reusable `%save_customer` component. [`reusable-scenario-selection.feature`](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature) demonstrates tag, scenario-name, feature-name, ordering, limit, and singular/plural selection. [`scenario-step-markers.feature`](../maven-consumer-project/src/test/resources/features/scenario-step-markers.feature) covers default, custom, nested, and end markers. [`scenario-marker-data.feature`](../maven-consumer-project/src/test/resources/features/scenario-marker-data.feature) demonstrates reading marker data without executing the selected component.
 
 Component scenarios are reusable, scenario-sized business flows. A caller uses `RUN SCENARIO` or `RUN SCENARIOS`, selects one or more component scenarios, and optionally supplies values through a table.
 
@@ -99,6 +99,50 @@ The same override can be supplied per invocation-table row:
 ```
 
 Inline `START:` overrides a `Step_Marker` value from the table. Marker text is resolved with the component parsing map before it is compared. Matching is exact after trimming and is case-insensitive.
+
+
+## Read marker data without execution
+
+Java utilities can select a component with the same inline arguments and optional
+`DataTable` used by `RUN SCENARIO`, then read the selected start-marker step
+without attaching or executing the component:
+
+```java
+ScenarioStepData data = ModularScenarios.getScenarioStepData(
+        "FEATURE: Reusable flows SCENARIO: Save customer START: request data",
+        invocationTable
+);
+```
+
+The lookup uses the existing component scan, ordering, limit, passed-map,
+Examples-map, and marker-selection behavior. It must return at most one
+component scenario. A missing or blank `START:`/`Step_Marker` returns `null`.
+A selector that returns multiple scenarios throws a descriptive ambiguity
+error.
+
+`ScenarioStepData` exposes the marker step text, marker text, step expression,
+DocString argument value, DataTable argument value, stored passed map, and
+stored Examples map. No getter executes the selected step.
+
+Unresolved getters preserve Pickleball template references that remain after
+Cucumber expands Scenario Outline Examples values. Resolved getter overloads
+accept an additional passed `NodeMap`:
+
+```java
+NodeMap overrides = new NodeMap(MapConfigurations.MapType.PASSED_MAP);
+overrides.put("customerName", "Ava");
+
+String marker = data.getStepMarkerText(overrides);
+Object table = data.getDataTableValue(overrides);
+```
+
+Resolved getters create a fresh parsing map when called. They inherit only the
+running context's `STEP_MAP` and `PHRASE_MAP`, matching component
+`ScenarioStep` inheritance. Data precedence is:
+
+1. The getter's passed `NodeMap`
+2. The stored component passed map
+3. The selected Scenario Outline Examples map
 
 ## Call a component once per table row
 

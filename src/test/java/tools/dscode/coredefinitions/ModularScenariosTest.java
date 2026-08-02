@@ -301,4 +301,13 @@ class ModularScenariosTest {
         assertEquals("S", plural.group(2));
         assertEquals(" %health", plural.group(3));
     }
+
+
+    @Test
+    void scenarioDataLookupReturnsNullWhenNoMarkerIsSupplied() {
+        assertNull(ModularScenarios.getScenarioStepData(
+                "SCENARIO: Save customer component",
+                null
+        ));
+    }
 }

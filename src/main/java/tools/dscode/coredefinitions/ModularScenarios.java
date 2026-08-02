@@ -2,6 +2,7 @@ package tools.dscode.coredefinitions;
 
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.runner.ScenarioStep;
+import io.cucumber.core.runner.ScenarioStepData;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.core.runner.modularexecutions.CucumberScanUtil;
 import io.cucumber.datatable.DataTable;
@@ -51,6 +52,46 @@ public class ModularScenarios extends CoreSteps {
                 "RUN SCENARIO",
                 null
         );
+    }
+
+    /**
+     * Selects one component scenario with the same inline arguments and
+     * invocation table used by {@code RUN SCENARIO}, without attaching or
+     * executing it, and returns the selected start-marker data.
+     *
+     * @return marker data, or {@code null} when no nonblank Step_Marker was supplied
+     */
+    public static ScenarioStepData getScenarioStepData(
+            String inlineArgs,
+            DataTable dataTable
+    ) {
+        List<Map<String, String>> maps =
+                buildRunScenarioMaps(inlineArgs, dataTable);
+
+        if (maps.isEmpty() || maps.stream().allMatch(
+                map -> normalize(map.get(STEP_MARKER)).isBlank()
+        )) {
+            return null;
+        }
+
+        List<PickleMatch> matches = collectMatches(
+                maps,
+                null,
+                "component scenario",
+                false
+        );
+        validateDataMatchCount(matches);
+
+        if (matches.isEmpty()) {
+            return null;
+        }
+
+        PickleMatch match = matches.getFirst();
+        if (normalize(match.passedValues().get(STEP_MARKER)).isBlank()) {
+            return null;
+        }
+
+        return new ScenarioStepData(prepareScenarioStep(match, null));
     }
 
     public static void populateRunScenariosStep(
@@ -237,39 +278,63 @@ public class ModularScenarios extends CoreSteps {
         StepExtension lastLinkedStep = null;
 
         for (PickleMatch match : matches) {
-            ParsingMap scenarioStepParsingMap = new ParsingMap();
-
-            NodeMap passedMap = new NodeMap(MapConfigurations.MapType.PASSED_MAP);
-            passedMap.merge(match.passedValues());
-            scenarioStepParsingMap.addMaps(passedMap);
-
-            io.cucumber.messages.types.Pickle pickle =
-                    (io.cucumber.messages.types.Pickle) getProperty(
-                            match.pickle(),
-                            "pickle"
-                    );
-            if (pickle.getValueRow() != null && !pickle.getValueRow().isEmpty()) {
-                NodeMap examples = new NodeMap(MapConfigurations.MapType.EXAMPLE_MAP);
-                examples.merge(pickle.getHeaderRow(), pickle.getValueRow());
-                scenarioStepParsingMap.addMaps(examples);
-            }
-
-            ScenarioStep scenarioStep = createScenarioStep(
-                    match.pickle(),
-                    scenarioStepParsingMap,
-                    match.passedValues().get(STEP_MARKER)
+            ScenarioStep scenarioStep = prepareScenarioStep(
+                    match,
+                    scenarioInitializer
             );
-
-            if (scenarioInitializer != null) {
-                scenarioInitializer.accept(scenarioStep, match.passedValues());
-            }
-
             lastLinkedStep = appendChild(
                     topStep,
                     lastLinkedStep,
                     scenarioStep
             );
         }
+    }
+
+    private static ScenarioStep prepareScenarioStep(
+            PickleMatch match,
+            BiConsumer<ScenarioStep, Map<String, String>> scenarioInitializer
+    ) {
+        ParsingMap scenarioStepParsingMap = new ParsingMap();
+
+        NodeMap passedMap = new NodeMap(MapConfigurations.MapType.PASSED_MAP);
+        passedMap.merge(match.passedValues());
+        scenarioStepParsingMap.addMaps(passedMap);
+
+        io.cucumber.messages.types.Pickle pickle =
+                (io.cucumber.messages.types.Pickle) getProperty(
+                        match.pickle(),
+                        "pickle"
+                );
+        if (pickle.getValueRow() != null && !pickle.getValueRow().isEmpty()) {
+            NodeMap examples = new NodeMap(MapConfigurations.MapType.EXAMPLE_MAP);
+            examples.merge(pickle.getHeaderRow(), pickle.getValueRow());
+            scenarioStepParsingMap.addMaps(examples);
+        }
+
+        ScenarioStep scenarioStep = createScenarioStep(
+                match.pickle(),
+                scenarioStepParsingMap,
+                match.passedValues().get(STEP_MARKER)
+        );
+        if (scenarioInitializer != null) {
+            scenarioInitializer.accept(scenarioStep, match.passedValues());
+        }
+        return scenarioStep;
+    }
+
+    private static void validateDataMatchCount(List<PickleMatch> matches) {
+        if (matches.size() <= 1) {
+            return;
+        }
+
+        throw new IllegalArgumentException(
+                "Scenario data lookup matched " + matches.size()
+                        + " component scenarios after ordering and limit were applied: "
+                        + matches.stream()
+                        .map(match -> match.pickle().getName())
+                        .toList()
+                        + ". Refine the filters to return exactly one scenario."
+        );
     }
 
     private static boolean isNoMatchException(IllegalArgumentException exception) {
