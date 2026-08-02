@@ -79,7 +79,7 @@ public class ScenarioStep extends StepExtension {
             }
             if (steps.isEmpty()) {
                 for (int i = 1; i < step.getNestingLevel() + 1; i++) {
-                    StepExtension nestingPlaceholder = step.modifyStepExtension("___");
+                    StepExtension nestingPlaceholder = step.modifyStepExtension("\\|__");
                     nestingPlaceholder.setNestingLevel(i - 1);
                     steps.add(nestingPlaceholder);
                 }
