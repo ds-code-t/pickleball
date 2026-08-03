@@ -9,9 +9,6 @@ Feature: Scenario marker data extraction
 
   @component-definition
   Scenario Outline: Marker data component
-    * ^^^
-      | A |
-      | 1 |
     * ---marker <passedValue> <exampleValue>
     * , verify "this component must not execute" equals "data extraction only"
 

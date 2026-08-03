@@ -5,7 +5,6 @@ Feature: Scenario data references
     * VERIFY DATA ADDRESS "Customer record.payload" HAS MARKER "payload"
     * VERIFY EMBEDDED DATA ADDRESS "Customer record.payload" HAS MARKER "payload"
 
-
   @all @regression @scenario-data
   Scenario: Use RUN SCENARIO options for marker data lookup
     * VERIFY DATA ADDRESS "payload" HAS MARKER "payload"
@@ -16,3 +15,10 @@ Feature: Scenario data references
   Scenario: Resolve a marker from the closest current scenario
     * ---local payload
     * VERIFY EMBEDDED DATA ADDRESS "local payload" HAS MARKER "local payload"
+
+  @all @regression @scenario-data
+  Scenario: Cache every marker before execution filtering
+    * VERIFY CURRENT SCENARIO MARKER CACHE HAS NAMED "after end" AND UNNAMED STEP 3
+    * ---endstep
+    * ------
+    * ---after end

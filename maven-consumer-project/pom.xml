@@ -13,7 +13,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>21</maven.compiler.release>
-        <pickleball.version>2.1.1</pickleball.version>
+        <pickleball.version>2.1.2</pickleball.version>
         <!-- Empty by default. A Maven suite profile supplies a -Dpkb_tags argument. -->
         <tagArgLine></tagArgLine>
     </properties>
