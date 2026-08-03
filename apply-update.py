@@ -37,18 +37,28 @@ replace_once(
     '''                if (key.startsWith("&")) {
                     key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
                     String reference = key.substring(1);
-                    replacement = reference.startsWith(DATA_REFERENCE_PREFIX)
-                            ? getScenarioMarkerData(
-                                    reference.substring(
-                                            DATA_REFERENCE_PREFIX.length()
-                                    )
-                            )
-                            : getReturnValue(reference);
+                    replacement = getReturnValue(reference);
                     break;
                 }
 ''',
 )
 
+replace_once(
+    "src/main/java/tools/dscode/common/mappings/MappingProcessor.java",
+    '''            if (key.startsWith(FILE_REFERENCE_PREFIX)) {
+                return buildJsonFromPath(key.substring(FILE_REFERENCE_PREFIX.length()));
+            }
+            if (key.contains("_") && key.toLowerCase().startsWith(PKB_PREFIX)) {
+''',
+    '''            if (key.startsWith(FILE_REFERENCE_PREFIX)) {
+                return buildJsonFromPath(key.substring(FILE_REFERENCE_PREFIX.length()));
+            }
+            if (key.startsWith(DATA_REFERENCE_PREFIX)) {
+                return getScenarioMarkerData(key.substring(DATA_REFERENCE_PREFIX.length()));
+            }
+            if (key.contains("_") && key.toLowerCase().startsWith(PKB_PREFIX)) {
+''',
+)
 replace_once(
     "src/main/java/tools/dscode/coredefinitions/ServiceCallSteps.java",
     '''    @Given("^CALL:(.*)$")
@@ -136,7 +146,7 @@ replace_once(
     "maven-consumer-project/src/test/resources/pickleball_local.properties",
     "#pkb_tags=@all\n",
     "#pkb_tags=@all\n\n"
-    "# Optional feature path for <&data:...> scenario-marker lookups.\n"
+    "# Optional feature path for <data:...> scenario-marker lookups.\n"
     "#pkb_datapath=src/test/resources/data\n",
 )
 

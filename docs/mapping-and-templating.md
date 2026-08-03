@@ -269,6 +269,23 @@ For example:
 
 When the input looks like XML and custom outer delimiters are not supplied, Pickleball resolves the XML-safe `~[~...~]~` form and does not interpret XML element tags as angle-bracket references.
 
+### Source-qualified references
+
+Recognized lowercase source prefixes are resolved before ordinary map lookup:
+
+```text
+<file:files/customers #1.name>
+<data:Customer record.payload>
+```
+
+`file:` loads and queries a classpath resource through the file parser. `data:`
+retrieves scenario marker data.
+
+Source prefixes are separate from leading reference sigils. `<&reference>`
+always resolves a step return value. Only recognized source prefixes are
+reserved; an arbitrary lowercase key containing `:` is not automatically
+treated as a source reference.
+
 ### Scenario and run-map references in reusable components
 
 A reusable component scenario has its own scenario map. Use an explicit map prefix when a reference must come from the caller:

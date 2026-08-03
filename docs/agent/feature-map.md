@@ -55,9 +55,10 @@ Do not update it for a purely internal refactor when all listed ownership and pu
   - `src/main/java/io/cucumber/core/runner/ScenarioStepData.java`
   - `src/main/java/tools/dscode/common/mappings/MappingProcessor.java`
 - Public syntax:
-  - `<&data:marker>`
-  - `<&data:scenario.marker>`
-  - `<&data:feature.scenario.marker>`
+  - `<data:marker>`
+  - `<data:scenario.marker>`
+  - `<data:feature.scenario.marker>`
+  - `<&reference>` remains exclusively a step-return lookup
   - `pkb_datapath`, defaulting to `src/test/resources/data` for named-scenario lookups
 - Consumer coverage:
   - `maven-consumer-project/src/test/resources/features/scenario-data-references.feature`

@@ -178,17 +178,22 @@ arguments when those names contain periods.
 - a `pkb_features` or `cucumber.features` option supplied in that table remains
   in effect.
 
-Mapping references use the existing `&` namespace with a `data:` qualifier:
+Mapping references use the lowercase `data:` source prefix. This prefix is
+resolved alongside other source prefixes, such as `file:`, before ordinary map
+lookup:
 
 ```gherkin
-<&data:payload>
-<&data:Customer record.payload>
-<&data:Data reference records.Customer record.payload>
+<data:payload>
+<data:Customer record.payload>
+<data:Data reference records.Customer record.payload>
 ```
+A complete data reference resolves to `ScenarioStepData`; embedded use converts
+the object to text in the same way as other non-string reference values.
 
-Other `<&...>` references retain their existing step-return behavior. A complete
-data reference resolves to `ScenarioStepData`; embedded use converts the object
-to text in the same way as other non-string reference values.
+The `&` namespace is separate and always resolves a step return value through
+`getReturnValue(reference)`. `<&data:...>` therefore addresses a step return
+named `data:...`; it no longer performs scenario-marker lookup.
+
 The data snapshot retains the marker step's unresolved values plus defensive
 copies of its passed and Examples maps. Resolved getters use this precedence:
 

@@ -1,7 +1,7 @@
 # 2.1.2 surgical fixes
 
-Copy the three repository-relative files over the matching files in the
-`2.1.2` checkout.
+Copy the repository-relative files over the matching files in the `2.1.2`
+checkout.
 
 Changes:
 
@@ -11,6 +11,9 @@ Changes:
   URI at construction time.
 - `ScenarioDataSteps` expects unresolved Examples placeholders from unresolved
   getters.
+- `MappingProcessor` resolves `file:` and `data:` source prefixes independently
+  from the `&` step-return prefix.
+- Scenario-data consumer checks and documentation use `<data:...>`.
 
 Validation commands:
 

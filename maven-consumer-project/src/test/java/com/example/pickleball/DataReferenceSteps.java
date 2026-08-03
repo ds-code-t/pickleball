@@ -52,7 +52,7 @@ public final class DataReferenceSteps {
     private static ScenarioStepData embeddedData(String address) {
         Object value = GlobalState.getRunningStep()
                 .getStepParsingMap()
-                .resolveWholeValue("<&data:" + address + ">");
+                .resolveWholeValue("<data:" + address + ">");
         return assertInstanceOf(ScenarioStepData.class, value);
     }
 }

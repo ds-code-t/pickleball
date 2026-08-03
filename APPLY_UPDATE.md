@@ -1,5 +1,8 @@
 # Apply the 2.1.2 data-reference update
 
+Scenario marker mappings use `<data:...>`. The `<&...>` namespace remains exclusively
+a step-return lookup.
+
 1. Extract this archive at the Pickleball repository root.
 2. Run:
 

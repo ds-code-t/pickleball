@@ -781,13 +781,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 if (key.startsWith("&")) {
                     key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
                     String reference = key.substring(1);
-                    replacement = reference.startsWith(DATA_REFERENCE_PREFIX)
-                            ? getScenarioMarkerData(
-                                    reference.substring(
-                                            DATA_REFERENCE_PREFIX.length()
-                                    )
-                            )
-                            : getReturnValue(reference);
+                    replacement = getReturnValue(reference);
                     break;
                 }
 
@@ -1055,6 +1049,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
         } else {
             if (key.startsWith(FILE_REFERENCE_PREFIX)) {
                 return buildJsonFromPath(key.substring(FILE_REFERENCE_PREFIX.length()));
+            }
+            if (key.startsWith(DATA_REFERENCE_PREFIX)) {
+                return getScenarioMarkerData(key.substring(DATA_REFERENCE_PREFIX.length()));
             }
             if (key.contains("_") && key.toLowerCase().startsWith(PKB_PREFIX)) {
                 return resolveFromVars(key);
