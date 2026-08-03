@@ -32,7 +32,7 @@ Ask for clarification only when the requested product behavior remains materiall
 Use all relevant evidence rather than trusting one file in isolation:
 
 - Current implementation under `src/main/java` and `src/main/aspectj`
-- Framework tests under `src/test`
+- Consumer-hosted internal Java checks under `maven-consumer-project/src/test/java`
 - Executable consumer examples under `maven-consumer-project/src/test`
 - `README.md` and the guides under `docs`
 - Build and dependency configuration in `build.gradle` and `maven-consumer-project/pom.xml`
@@ -51,14 +51,14 @@ When implementation, tests, examples, and documentation disagree:
 - `src/main/java` — framework implementation and Cucumber integrations
 - `src/main/aspectj` — AspectJ integrations and weaving behavior
 - `src/main/resources` — framework resources
-- `src/test` — focused framework tests
+- `src/test` — reserved for tests that must run inside the framework build
 - `docs` — detailed user-facing documentation
 - `maven-consumer-project` — executable Maven consumer example
 - `maven-consumer-project/src/test/resources/features` — consumer acceptance scenarios
 - `maven-consumer-project/src/test/resources/calls` — service-call definitions
 - `maven-consumer-project/src/test/resources/configs` — example configuration
 - `maven-consumer-project/src/test/resources/site` — local browser/service test site
-- `maven-consumer-project/src/test/java` — runner, local server, and support code
+- `maven-consumer-project/src/test/java` — runner, local server, support code, and internal framework checks compiled against the locally published dependency
 
 ## Public contracts
 
@@ -96,7 +96,7 @@ Do not make a behavior change based only on a method or class name.
 For externally observable functionality, update all applicable areas:
 
 - Framework implementation
-- Focused framework tests
+- Consumer-hosted internal Java checks
 - Maven consumer feature scenarios
 - Service-call definitions
 - Local test-site endpoints or pages
@@ -126,6 +126,8 @@ Prefer updating the existing canonical guide over creating a competing guide.
 Use the narrowest useful test first, then run broader validation.
 
 For consumer-visible behavior, add or update an executable scenario in `maven-consumer-project` whenever practical. A consumer scenario is preferred over a prose-only example.
+
+Internal Java checks should normally live in `maven-consumer-project` and be exercised by the dedicated Cucumber feature so they compile and run against the locally published Pickleball dependency. Keep a test under root `src/test` only when it must execute inside the framework build itself.
 
 Tests must cover the requested behavior and meaningful compatibility or edge cases. Do not weaken or delete assertions merely to make a change pass.
 
@@ -216,7 +218,7 @@ A functionality change is complete only when:
 
 - The requested behavior is implemented.
 - Applicable compatibility has been preserved or a breaking change is clearly identified.
-- Relevant framework tests exist and pass.
+- Relevant consumer-hosted internal Java checks exist and pass.
 - Relevant consumer scenarios exist and pass when applicable.
 - Documentation matches the resulting behavior.
 - The feature map remains accurate.

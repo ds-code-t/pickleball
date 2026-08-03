@@ -16,6 +16,7 @@ public final class PKB_props {
     public static final String PKB_GLUE = PKB_PREFIX + "glue";
     public static final String PKB_FEATURES = PKB_PREFIX + "features";
     public static final String PKB_FEATURE_NAME = PKB_PREFIX + "featurename";
+    public static final String PKB_DATA_PATH = PKB_PREFIX + "datapath";
     public static final String PKB_TAGS = PKB_PREFIX + "tags";
     public static final String PKB_NAME = PKB_PREFIX + "name";
     public static final String PKB_ORDER = PKB_PREFIX + "order";
@@ -82,6 +83,14 @@ public final class PKB_props {
 
     public static void features(String featurePaths) {
         put(PKB_FEATURES, featurePaths);
+    }
+
+    public static String dataPath() {
+        return get(PKB_DATA_PATH);
+    }
+
+    public static void dataPath(String dataPath) {
+        put(PKB_DATA_PATH, dataPath);
     }
 
     // -- feature name filter --

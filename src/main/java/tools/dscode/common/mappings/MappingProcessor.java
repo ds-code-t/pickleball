@@ -54,11 +54,13 @@ import static tools.dscode.common.util.StringUtilities.decodeBackToText;
 import static tools.dscode.common.util.StringUtilities.encodeToPlaceHolders;
 import static tools.dscode.common.variables.RunVars.resolveFromVars;
 import static tools.dscode.coredefinitions.GeneralSteps.getReturnValue;
+import static tools.dscode.coredefinitions.ModularScenarios.getScenarioMarkerData;
 import static tools.dscode.testengine.PKB_props.PKB_PREFIX;
 
 public abstract class MappingProcessor implements Map<String, Object> {
 
     private static final String FILE_REFERENCE_PREFIX = "file:";
+    private static final String DATA_REFERENCE_PREFIX = "data:";
     protected final LinkedListMultimap<MapConfigurations.MapType, NodeMap> maps = LinkedListMultimap.create();
     protected final List<MapConfigurations.MapType> keyOrder = new ArrayList<>();
     protected final List<MapConfigurations.MapType> singletonOrder = new ArrayList<>();
@@ -778,7 +780,14 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
                 if (key.startsWith("&")) {
                     key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
-                    replacement = getReturnValue(key.substring(1));
+                    String reference = key.substring(1);
+                    replacement = reference.startsWith(DATA_REFERENCE_PREFIX)
+                            ? getScenarioMarkerData(
+                                    reference.substring(
+                                            DATA_REFERENCE_PREFIX.length()
+                                    )
+                            )
+                            : getReturnValue(reference);
                     break;
                 }
 

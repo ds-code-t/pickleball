@@ -80,6 +80,7 @@ Exclude personal local settings from Git. The consumer contains a commented [pic
 |---|---|---|
 | `pkb_glue` | `com.example.tests` | Cucumber glue packages |
 | `pkb_features` | `classpath:features` | feature-file location |
+| `pkb_datapath` | `src/test/resources/data` | scenario-marker data feature location |
 | `pkb_tags` | `@smoke and not @slow` | Cucumber tag expression |
 | `pkb_name` | `Checkout.*` | scenario-name expression |
 | `pkb_environment` | `QA` | project environment name |

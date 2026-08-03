@@ -53,6 +53,8 @@ When "qualifiedHealth" SERVICE CALL: FEATURE: Reusable service call definitions 
 
 Each labelled value continues until the next `FEATURE:`, `SCENARIO:`, or `START:` label. Unlabelled non-tag text is rejected rather than guessed as a feature or scenario name.
 
+The return-value `CALL:` form accepts the same optional invocation DataTable, so selection options and passed values can be supplied when the call is evaluated dynamically.
+
 Selectors can also be supplied through invocation-table Cucumber options:
 
 ```gherkin

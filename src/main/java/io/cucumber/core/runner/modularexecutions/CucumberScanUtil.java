@@ -130,6 +130,25 @@ public final class CucumberScanUtil {
         FEATURE_CACHE.clear();
     }
 
+    public static String getFeatureName(Pickle pickle) {
+        Objects.requireNonNull(pickle, "pickle");
+        if (pickle.getUri() == null) {
+            return "";
+        }
+
+        Map<String, String> properties = new HashMap<>();
+        properties.put(FEATURES_PROPERTY_NAME, pickle.getUri().toString());
+        RuntimeOptions options = new CucumberPropertiesParser()
+                .parse(properties)
+                .build();
+
+        return parseFeatures(options).stream()
+                .map(CucumberScanUtil::getFeatureName)
+                .flatMap(Optional::stream)
+                .findFirst()
+                .orElse("");
+    }
+
     /**
      * Finds exactly one Pickle by optional literal Gherkin feature name and literal scenario name.
      * <p>

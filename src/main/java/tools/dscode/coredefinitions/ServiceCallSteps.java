@@ -72,7 +72,10 @@ public class ServiceCallSteps extends CoreSteps {
     }
 
     @Given("^CALL:(.*)$")
-    public static Object inlineCall(String inlineArgs) {
+    public static Object inlineCall(
+            String inlineArgs,
+            DataTable dataTable
+    ) {
         StepExtension triggerStep = getRunningStep();
         ScenarioStep[] nestedScenarioHolder = new ScenarioStep[1];
         ModularScenarios.populateRunScenariosStep(
