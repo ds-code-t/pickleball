@@ -31,6 +31,22 @@ public class ScenarioStep extends StepExtension {
         return startStepMarkerStep;
     }
 
+    public Pickle getSourcePickle() {
+        return GlobalState.getPickleFromPickleTestStep(pickleStepTestStep);
+    }
+
+    public String getSourceScenarioName() {
+        Pickle pickle = getSourcePickle();
+        return pickle == null ? "" : pickle.getName();
+    }
+
+    public String getSourceFeaturePath() {
+        Pickle pickle = getSourcePickle();
+        return pickle == null || pickle.getUri() == null
+                ? ""
+                : pickle.getUri().toString();
+    }
+
     public static ScenarioStep createRootScenarioStep(
             io.cucumber.core.runner.TestCase testCase
     ) {

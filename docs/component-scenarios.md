@@ -144,6 +144,63 @@ running context's `STEP_MAP` and `PHRASE_MAP`, matching component
 2. The stored component passed map
 3. The selected Scenario Outline Examples map
 
+
+## Scenario marker data references
+
+Scenario marker data can be retrieved without attaching or executing the selected
+component scenario:
+
+```java
+ScenarioStepData data = ModularScenarios.getScenarioMarkerData(
+        "Customer record.payload"
+);
+```
+
+Supported addresses are:
+
+```text
+marker
+scenario.marker
+feature.scenario.marker
+```
+
+Periods separate address components, so feature names, scenario names, and marker
+names used by this convenience syntax cannot contain periods. Use
+`getScenarioStepData(...)` with explicit `FEATURE:`, `SCENARIO:`, and `START:`
+arguments when those names contain periods.
+
+`pkb_datapath` overrides the lookup feature path. When it is not configured:
+
+- an explicitly named scenario defaults to `src/test/resources/data`;
+- a marker-only address with no table selector uses the source feature and
+  scenario of the closest running component scenario or root scenario;
+- scenario, tag, feature, ordering, and limit options supplied in the optional
+  DataTable are passed through to the existing `RUN SCENARIO` filtering logic;
+- a `pkb_features` or `cucumber.features` option supplied in that table remains
+  in effect.
+
+Mapping references use the existing `&` namespace with a `data:` qualifier:
+
+```gherkin
+<&data:payload>
+<&data:Customer record.payload>
+<&data:Data reference records.Customer record.payload>
+```
+
+Other `<&...>` references retain their existing step-return behavior. A complete
+data reference resolves to `ScenarioStepData`; embedded use converts the object
+to text in the same way as other non-string reference values.
+
+The data snapshot retains the marker step's unresolved values plus defensive
+copies of its passed and Examples maps. Resolved getters use this precedence:
+
+1. the getter-supplied passed `NodeMap`;
+2. the stored passed `NodeMap`;
+3. the stored Examples `NodeMap`.
+
+At getter time, `STEP_MAP` and `PHRASE_MAP` are inherited from the currently
+running parsing map, matching ScenarioStep child inheritance.
+
 ## Call a component once per table row
 
 ```gherkin
@@ -209,7 +266,8 @@ See:
 
 - [component-scenarios.feature](../maven-consumer-project/src/test/resources/features/component-scenarios.feature);
 - [reusable-scenario-selection.feature](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature);
-- [scenario-step-markers.feature](../maven-consumer-project/src/test/resources/features/scenario-step-markers.feature); and
+- [scenario-step-markers.feature](../maven-consumer-project/src/test/resources/features/scenario-step-markers.feature);
+- [scenario-data-references.feature](../maven-consumer-project/src/test/resources/features/scenario-data-references.feature); and
 - [components.html](../maven-consumer-project/src/test/resources/site/components.html).
 
 [Previous: Block Conditionals](block-conditionals.md) · [Documentation home](README.md) · [Next: Service-call Scenarios](service-call-scenarios.md)

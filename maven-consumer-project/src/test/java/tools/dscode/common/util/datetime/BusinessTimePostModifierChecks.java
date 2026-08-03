@@ -10,14 +10,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class BusinessTimePostModifierTest {
+public class BusinessTimePostModifierChecks {
 
     private static final ZoneId PHOENIX = ZoneId.of("America/Phoenix");
 
     @Test
     void stateSeekersReturnCurrentTimeWhenAlreadyInRequestedState() {
         BusinessCalendar calendar = weekdayCalendar();
-
         assertEquals(zdt(2025, 12, 18, 10, 0, 0), businessTime(calendar, zdt(2025, 12, 18, 10, 0, 0), "| next open").value());
         assertEquals(zdt(2025, 12, 18, 10, 0, 0), businessTime(calendar, zdt(2025, 12, 18, 10, 0, 0), "| previous open").value());
         assertEquals(zdt(2025, 12, 18, 18, 0, 0), businessTime(calendar, zdt(2025, 12, 18, 18, 0, 0), "| next closed").value());
@@ -27,7 +26,6 @@ class BusinessTimePostModifierTest {
     @Test
     void stateSeekersMoveToClosestRequestedState() {
         BusinessCalendar calendar = weekdayCalendar();
-
         assertEquals(zdt(2025, 12, 19, 9, 0, 0), businessTime(calendar, zdt(2025, 12, 18, 18, 30, 0), "| next open").value());
         assertEquals(zdt(2025, 12, 19, 16, 59, 59, 999_999_999), businessTime(calendar, zdt(2025, 12, 22, 8, 0, 0), "| previous open").value());
         assertEquals(zdt(2025, 12, 18, 17, 0, 0), businessTime(calendar, zdt(2025, 12, 18, 10, 0, 0), "| next closed").value());
@@ -37,7 +35,6 @@ class BusinessTimePostModifierTest {
     @Test
     void transitionBoundariesFindOpenAndCloseTransitions() {
         BusinessCalendar calendar = weekdayCalendar();
-
         assertEquals(zdt(2025, 12, 19, 9, 0, 0), businessTime(calendar, zdt(2025, 12, 18, 10, 0, 0), "| next opening").value());
         assertEquals(zdt(2025, 12, 18, 9, 0, 0), businessTime(calendar, zdt(2025, 12, 18, 10, 0, 0), "| previous opening").value());
         assertEquals(zdt(2025, 12, 19, 17, 0, 0), businessTime(calendar, zdt(2025, 12, 18, 18, 0, 0), "| next closing").value());
@@ -60,10 +57,8 @@ class BusinessTimePostModifierTest {
                   "Open": ["MON 22:00-02:00", "TUE 09:00-11:00"]
                 }
                 """);
-
         assertEquals(zdt(2025, 12, 15, 22, 0, 0), businessTime(calendar, zdt(2025, 12, 15, 10, 0, 0), "| opening time").value());
         assertEquals(zdt(2025, 12, 16, 2, 0, 0), businessTime(calendar, zdt(2025, 12, 15, 10, 0, 0), "| closing time").value());
-
         assertEquals(zdt(2025, 12, 15, 22, 0, 0), businessTime(calendar, zdt(2025, 12, 16, 1, 0, 0), "| opening time").value());
         assertEquals(zdt(2025, 12, 16, 11, 0, 0), businessTime(calendar, zdt(2025, 12, 16, 1, 0, 0), "| closing time").value());
     }
@@ -71,7 +66,6 @@ class BusinessTimePostModifierTest {
     @Test
     void dailyBoundariesReturnNullForDatesWithNoOpenIntervals() {
         BusinessCalendar calendar = weekdayCalendar();
-
         assertNull(BusinessTime.evaluate(calendar, spec(zdt(2025, 12, 20, 10, 0, 0)) + " | opening time"));
         assertEquals(TemporalValue.Kind.NULL, TemporalValue.dateTime(calendar, spec(zdt(2025, 12, 20, 10, 0, 0)) + " | closing time").kind());
     }
@@ -79,14 +73,12 @@ class BusinessTimePostModifierTest {
     @Test
     void scalarQueriesReturnTextAndBooleans() {
         BusinessCalendar calendar = weekdayCalendar();
-
         TemporalValue openStatus = TemporalValue.dateTime(calendar, spec(zdt(2025, 12, 18, 10, 0, 0)) + " | status");
         TemporalValue closedStatus = TemporalValue.dateTime(calendar, spec(zdt(2025, 12, 18, 18, 0, 0)) + " | status");
         TemporalValue isOpen = TemporalValue.dateTime(calendar, spec(zdt(2025, 12, 18, 10, 0, 0)) + " | is open");
         TemporalValue isClosed = TemporalValue.dateTime(calendar, spec(zdt(2025, 12, 18, 18, 0, 0)) + " | is closed");
         TemporalValue isBusinessDay = TemporalValue.dateTime(calendar, spec(zdt(2025, 12, 18, 18, 0, 0)) + " | is business day");
         TemporalValue isNonBusinessDay = TemporalValue.dateTime(calendar, spec(zdt(2025, 12, 20, 18, 0, 0)) + " | is non-business day");
-
         assertEquals("open", openStatus.requireText());
         assertEquals("closed", closedStatus.requireText());
         assertEquals(true, isOpen.requireBoolean());
@@ -100,21 +92,37 @@ class BusinessTimePostModifierTest {
     void businessTimeEvaluateRejectsScalarPipeResults() {
         BusinessCalendar calendar = weekdayCalendar();
 
-        assertThrows(IllegalArgumentException.class, () -> BusinessTime.evaluate(calendar, spec(zdt(2025, 12, 18, 10, 0, 0)) + " | status"));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> BusinessTime.evaluate(
+                        calendar,
+                        spec(zdt(2025, 12, 18, 10, 0, 0)) + " | status"
+                )
+        );
     }
 
     @Test
     void scalarPipeResultsCannotBeChainedFurther() {
         BusinessCalendar calendar = weekdayCalendar();
-
-        assertThrows(IllegalArgumentException.class, () -> TemporalValue.dateTime(calendar, spec(zdt(2025, 12, 18, 10, 0, 0)) + " | status | next open"));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> TemporalValue.dateTime(
+                        calendar,
+                        spec(zdt(2025, 12, 18, 10, 0, 0))
+                                + " | status | next open"
+                )
+        );
     }
 
     @Test
     void dateReturningPipeModifiersCanBeChained() {
         BusinessCalendar calendar = weekdayCalendar();
 
-        BusinessTime result = BusinessTime.evaluate(calendar, spec(zdt(2025, 12, 18, 18, 0, 0)) + " | next open | next closed | previous opening");
+        BusinessTime result = BusinessTime.evaluate(
+                calendar,
+                spec(zdt(2025, 12, 18, 18, 0, 0))
+                        + " | next open | next closed | previous opening"
+        );
 
         assertEquals(zdt(2025, 12, 19, 9, 0, 0), result.value());
     }
@@ -123,9 +131,16 @@ class BusinessTimePostModifierTest {
     void pipeModifiersWorkAfterBusinessDeltasAndPreserveOutputFormatting() {
         BusinessCalendar calendar = weekdayCalendar();
 
-        TemporalValue status = TemporalValue.dateTime(calendar, spec(zdt(2025, 12, 18, 16, 0, 0)) + " + 2 business hours | status");
-        BusinessTime formatted = BusinessTime.evaluate(calendar, spec(zdt(2025, 12, 18, 18, 0, 0)) + " format: yyyy-MM-dd HH:mm | next open");
-
+        TemporalValue status = TemporalValue.dateTime(
+                calendar,
+                spec(zdt(2025, 12, 18, 16, 0, 0))
+                        + " + 2 business hours | status"
+        );
+        BusinessTime formatted = BusinessTime.evaluate(
+                calendar,
+                spec(zdt(2025, 12, 18, 18, 0, 0))
+                        + " format: yyyy-MM-dd HH:mm | next open"
+        );
         assertEquals("open", status.requireText());
         assertEquals("2025-12-19 09:00", formatted.toString());
     }
@@ -139,7 +154,11 @@ class BusinessTimePostModifierTest {
                 """);
     }
 
-    private static BusinessTime businessTime(BusinessCalendar calendar, ZonedDateTime start, String modifier) {
+    private static BusinessTime businessTime(
+            BusinessCalendar calendar,
+            ZonedDateTime start,
+            String modifier
+    ) {
         return BusinessTime.evaluate(calendar, spec(start) + " " + modifier);
     }
 
@@ -147,11 +166,35 @@ class BusinessTimePostModifierTest {
         return zdt.toString();
     }
 
-    private static ZonedDateTime zdt(int year, int month, int day, int hour, int minute, int second) {
+    private static ZonedDateTime zdt(
+            int year,
+            int month,
+            int day,
+            int hour,
+            int minute,
+            int second
+    ) {
         return zdt(year, month, day, hour, minute, second, 0);
     }
 
-    private static ZonedDateTime zdt(int year, int month, int day, int hour, int minute, int second, int nano) {
-        return ZonedDateTime.of(year, month, day, hour, minute, second, nano, PHOENIX);
+    private static ZonedDateTime zdt(
+            int year,
+            int month,
+            int day,
+            int hour,
+            int minute,
+            int second,
+            int nano
+    ) {
+        return ZonedDateTime.of(
+                year,
+                month,
+                day,
+                hour,
+                minute,
+                second,
+                nano,
+                PHOENIX
+        );
     }
 }

@@ -21,17 +21,25 @@ import java.util.function.BiConsumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static io.cucumber.core.options.Constants.FILTER_NAME_PROPERTY_NAME;
+import static io.cucumber.core.options.Constants.FILTER_TAGS_PROPERTY_NAME;
+import static io.cucumber.core.runner.GlobalState.getClosestScenarioStepAncestor;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.ScenarioStep.createScenarioStep;
 import static tools.dscode.common.util.Reflect.getProperty;
+import static tools.dscode.testengine.PKB_props.PKB_DATA_PATH;
+import static tools.dscode.testengine.PKB_props.PKB_FEATURES;
 import static tools.dscode.testengine.PKB_props.PKB_FEATURE_NAME;
 import static tools.dscode.testengine.PKB_props.PKB_NAME;
+import static tools.dscode.testengine.PKB_props.PKB_TAGS;
+import static tools.dscode.common.variables.RunVars.resolveFromVars;
 
 public class ModularScenarios extends CoreSteps {
     static final String RUN_TAGS = "Run Tags";
     static final String TAGS = "Tags";
     static final String CUCUMBER_FEATURES = "cucumber.features";
     static final String STEP_MARKER = "Step_Marker";
+    static final String DEFAULT_DATA_PATH = "src/test/resources/data";
     private static final Pattern INLINE_ARGUMENT_PATTERN = Pattern.compile(
             "(?i)(?<!\\S)(FEATURE|SCENARIO|START):"
     );
@@ -65,6 +73,14 @@ public class ModularScenarios extends CoreSteps {
             String inlineArgs,
             DataTable dataTable
     ) {
+        return getScenarioStepData(inlineArgs, dataTable, null);
+    }
+
+    public static ScenarioStepData getScenarioStepData(
+            String inlineArgs,
+            DataTable dataTable,
+            String featuresPath
+    ) {
         List<Map<String, String>> maps =
                 buildRunScenarioMaps(inlineArgs, dataTable);
 
@@ -76,7 +92,7 @@ public class ModularScenarios extends CoreSteps {
 
         List<PickleMatch> matches = collectMatches(
                 maps,
-                null,
+                featuresPath,
                 "component scenario",
                 false
         );
@@ -92,6 +108,151 @@ public class ModularScenarios extends CoreSteps {
         }
 
         return new ScenarioStepData(prepareScenarioStep(match, null));
+    }
+
+    public static ScenarioStepData getScenarioMarkerData(String dataAddress) {
+        return getScenarioMarkerData(dataAddress, null);
+    }
+
+    /**
+     * Retrieves marker data using {@code marker}, {@code scenario.marker}, or
+     * {@code feature.scenario.marker} address syntax.
+     */
+    public static ScenarioStepData getScenarioMarkerData(
+            String dataAddress,
+            DataTable options
+    ) {
+        DataAddress address = parseDataAddress(dataAddress);
+        if (address == null) {
+            return null;
+        }
+
+        String featureName = address.featureName();
+        String scenarioName = address.scenarioName();
+        String featuresPath = configuredDataPath();
+        boolean tableHasFeaturePath = hasOption(
+                options,
+                PKB_FEATURES,
+                CUCUMBER_FEATURES
+        );
+        boolean tableHasFeatureName = hasOption(options, PKB_FEATURE_NAME);
+        boolean tableHasScenarioSelector = hasOption(
+                options,
+                PKB_NAME,
+                FILTER_NAME_PROPERTY_NAME,
+                RUN_TAGS,
+                TAGS,
+                PKB_TAGS,
+                FILTER_TAGS_PROPERTY_NAME
+        );
+
+        if (scenarioName.isBlank() && !tableHasScenarioSelector) {
+            ScenarioStep currentScenario = getClosestScenarioStepAncestor();
+            if (currentScenario == null) {
+                throw new IllegalStateException(
+                        "A marker-only data address requires a running root or component scenario."
+                );
+            }
+
+            scenarioName = normalize(currentScenario.getSourceScenarioName());
+            if (scenarioName.isBlank()) {
+                throw new IllegalStateException(
+                        "The current scenario does not expose a source scenario name."
+                );
+            }
+
+            if (featuresPath.isBlank()
+                    && !tableHasFeaturePath
+                    && featureName.isBlank()
+                    && !tableHasFeatureName) {
+                featuresPath = normalize(currentScenario.getSourceFeaturePath());
+                featureName = normalize(
+                        CucumberScanUtil.getFeatureName(
+                                currentScenario.getSourcePickle()
+                        )
+                );
+                if (featuresPath.isBlank()) {
+                    throw new IllegalStateException(
+                            "The current scenario does not expose a source feature path."
+                    );
+                }
+            }
+        }
+
+        if (featuresPath.isBlank() && !tableHasFeaturePath) {
+            featuresPath = DEFAULT_DATA_PATH;
+        }
+
+        String inlineArgs = buildDataInlineArguments(
+                featureName,
+                scenarioName,
+                address.stepMarker()
+        );
+        return getScenarioStepData(inlineArgs, options, featuresPath);
+    }
+
+    static DataAddress parseDataAddress(String dataAddress) {
+        String normalized = normalize(dataAddress);
+        if (normalized.isBlank()) {
+            return null;
+        }
+
+        String[] parts = normalized.split("\\.", -1);
+        if (parts.length > 3) {
+            throw new IllegalArgumentException(
+                    "Data addresses support marker, scenario.marker, or "
+                            + "feature.scenario.marker. Feature names, scenario names, "
+                            + "and step markers used for data retrieval cannot contain "
+                            + "period characters because periods separate the address."
+            );
+        }
+
+        if (normalize(parts[parts.length - 1]).isBlank()) {
+            return null;
+        }
+
+        String[] padded = new String[3];
+        java.util.Arrays.fill(padded, "");
+        System.arraycopy(parts, 0, padded, 3 - parts.length, parts.length);
+
+        return new DataAddress(
+                normalize(padded[0]),
+                normalize(padded[1]),
+                normalize(padded[2])
+        );
+    }
+
+    private static String buildDataInlineArguments(
+            String featureName,
+            String scenarioName,
+            String stepMarker
+    ) {
+        StringBuilder inlineArgs = new StringBuilder();
+        if (!normalize(featureName).isBlank()) {
+            inlineArgs.append("FEATURE: ").append(featureName).append(' ');
+        }
+        if (!normalize(scenarioName).isBlank()) {
+            inlineArgs.append("SCENARIO: ").append(scenarioName).append(' ');
+        }
+        inlineArgs.append("START: ").append(stepMarker);
+        return inlineArgs.toString();
+    }
+
+    private static String configuredDataPath() {
+        Object configured = resolveFromVars(PKB_DATA_PATH);
+        return configured == null ? "" : normalize(configured.toString());
+    }
+
+    private static boolean hasOption(DataTable options, String... names) {
+        if (options == null) {
+            return false;
+        }
+
+        return options.asMaps().stream().anyMatch(row ->
+                java.util.Arrays.stream(names).anyMatch(name ->
+                        !normalize(row.get(name)).isBlank()
+                )
+        );
     }
 
     public static void populateRunScenariosStep(
@@ -219,9 +380,7 @@ public class ModularScenarios extends CoreSteps {
         for (Map<String, String> map : maps) {
             Map<String, String> scanOptions = new HashMap<>(map);
             scanOptions.remove(STEP_MARKER);
-            if (featuresPath != null && !featuresPath.isBlank()) {
-                scanOptions.put(CUCUMBER_FEATURES, featuresPath);
-            }
+            applyFeaturesPathOverride(scanOptions, featuresPath);
 
             List<Pickle> pickles;
             try {
@@ -249,6 +408,18 @@ public class ModularScenarios extends CoreSteps {
         }
 
         return matches;
+    }
+
+    static void applyFeaturesPathOverride(
+            Map<String, String> scanOptions,
+            String featuresPath
+    ) {
+        if (featuresPath == null || featuresPath.isBlank()) {
+            return;
+        }
+
+        scanOptions.remove(PKB_FEATURES);
+        scanOptions.put(CUCUMBER_FEATURES, featuresPath);
     }
 
     static void validateMatchCount(
@@ -499,6 +670,13 @@ public class ModularScenarios extends CoreSteps {
     }
 
     private record InlinePart(String name, int start, int end) {
+    }
+
+    record DataAddress(
+            String featureName,
+            String scenarioName,
+            String stepMarker
+    ) {
     }
 
     private record PickleMatch(

@@ -8,7 +8,7 @@ import tools.dscode.common.mappings.ParsingMap;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-class ScenarioStepDataTest {
+public class ScenarioStepDataChecks {
 
     @Test
     void resolutionMapUsesExternalPassedStoredPassedThenExamples() {

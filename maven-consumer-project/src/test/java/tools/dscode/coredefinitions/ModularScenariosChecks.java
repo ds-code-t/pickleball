@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class ModularScenariosTest {
+public class ModularScenariosChecks {
 
     @Test
     void inlineTagSelectorIsAddedToEveryInvocationRow() {
@@ -304,10 +304,80 @@ class ModularScenariosTest {
 
 
     @Test
+    void explicitDataPathOverridesTableFeaturePath() {
+        Map<String, String> options = new java.util.HashMap<>();
+        options.put("pkb_features", "table/path");
+        options.put("cucumber.features", "other/path");
+
+        ModularScenarios.applyFeaturesPathOverride(
+                options,
+                "configured/data/path"
+        );
+
+        assertNull(options.get("pkb_features"));
+        assertEquals(
+                "configured/data/path",
+                options.get("cucumber.features")
+        );
+    }
+
+    @Test
+    void inlineCallAcceptsAnOptionalDataTable()
+            throws ReflectiveOperationException {
+        Method method = ServiceCallSteps.class.getDeclaredMethod(
+                "inlineCall",
+                String.class,
+                DataTable.class
+        );
+
+        assertEquals(Object.class, method.getReturnType());
+    }
+
+    @Test
     void scenarioDataLookupReturnsNullWhenNoMarkerIsSupplied() {
         assertNull(ModularScenarios.getScenarioStepData(
                 "SCENARIO: Save customer component",
                 null
         ));
     }
+    @Test
+    void dataAddressesAreLeftPaddedAndPreservePositions() {
+        ModularScenarios.DataAddress marker =
+                ModularScenarios.parseDataAddress("payload");
+        ModularScenarios.DataAddress scenario =
+                ModularScenarios.parseDataAddress("Customer data.payload");
+        ModularScenarios.DataAddress feature =
+                ModularScenarios.parseDataAddress(
+                        "Data records.Customer data.payload"
+                );
+
+        assertEquals("", marker.featureName());
+        assertEquals("", marker.scenarioName());
+        assertEquals("payload", marker.stepMarker());
+
+        assertEquals("", scenario.featureName());
+        assertEquals("Customer data", scenario.scenarioName());
+        assertEquals("payload", scenario.stepMarker());
+
+        assertEquals("Data records", feature.featureName());
+        assertEquals("Customer data", feature.scenarioName());
+        assertEquals("payload", feature.stepMarker());
+    }
+
+    @Test
+    void invalidOrBlankDataAddressesAreHandledDescriptively() {
+        assertNull(ModularScenarios.parseDataAddress(null));
+        assertNull(ModularScenarios.parseDataAddress(""));
+        assertNull(ModularScenarios.parseDataAddress("Scenario."));
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> ModularScenarios.parseDataAddress("a.b.c.d")
+        );
+        assertTrue(exception.getMessage().contains(
+                "cannot contain period characters"
+        ));
+    }
+
+
 }

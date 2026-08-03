@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-class BusinessTemporalDeltaTest {
+public class BusinessTemporalDeltaChecks {
 
     private static final ZoneId PHOENIX = ZoneId.of("America/Phoenix");
 
@@ -27,7 +27,6 @@ class BusinessTemporalDeltaTest {
     @Test
     void businessDaysSkipClosedDateOverrides() {
         BusinessCalendar calendar = weekdayCalendar("22 DEC 2025");
-
         BusinessTime result = at(calendar, 2025, 12, 18, 19, 11, 2)
                 .add("+ 3 business days");
 
@@ -57,7 +56,6 @@ class BusinessTemporalDeltaTest {
     @Test
     void businessHoursUseOpenElapsedTime() {
         BusinessCalendar calendar = weekdayCalendar();
-
         BusinessTime result = at(calendar, 2025, 12, 18, 16, 0, 0)
                 .add("+ 2 business hours");
 
@@ -87,7 +85,6 @@ class BusinessTemporalDeltaTest {
     @Test
     void fractionalBusinessTimeUnitsAreAllowed() {
         BusinessCalendar calendar = weekdayCalendar();
-
         BusinessTime result = at(calendar, 2025, 12, 18, 16, 0, 0)
                 .add("+ .5 business hours");
 
@@ -99,7 +96,10 @@ class BusinessTemporalDeltaTest {
         BusinessCalendar calendar = weekdayCalendar();
         BusinessTime start = at(calendar, 2025, 12, 18, 19, 11, 2);
 
-        assertThrows(IllegalArgumentException.class, () -> start.add("+ 1.5 business days"));
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> start.add("+ 1.5 business days")
+        );
     }
 
     private static BusinessCalendar weekdayCalendar(String... closed) {
@@ -125,10 +125,29 @@ class BusinessTemporalDeltaTest {
             int minute,
             int second
     ) {
-        return new BusinessTime(calendar, zdt(year, month, day, hour, minute, second));
+        return new BusinessTime(
+                calendar,
+                zdt(year, month, day, hour, minute, second)
+        );
     }
 
-    private static ZonedDateTime zdt(int year, int month, int day, int hour, int minute, int second) {
-        return ZonedDateTime.of(year, month, day, hour, minute, second, 0, PHOENIX);
+    private static ZonedDateTime zdt(
+            int year,
+            int month,
+            int day,
+            int hour,
+            int minute,
+            int second
+    ) {
+        return ZonedDateTime.of(
+                year,
+                month,
+                day,
+                hour,
+                minute,
+                second,
+                0,
+                PHOENIX
+        );
     }
 }
