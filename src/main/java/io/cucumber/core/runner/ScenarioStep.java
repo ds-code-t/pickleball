@@ -6,6 +6,7 @@ import io.cucumber.core.gherkin.Pickle;
 import tools.dscode.common.annotations.DefinitionFlag;
 import tools.dscode.common.mappings.ParsingMap;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -25,6 +26,9 @@ public class ScenarioStep extends StepExtension {
 
     private static final String DEFAULT_START_STEP_MARKER = "startstep";
     private static final String END_STEP_MARKER = "endstep";
+    private final Pickle sourcePickle;
+    private final String sourceScenarioName;
+    private final URI sourceFeatureUri;
     private StepExtension startStepMarkerStep;
 
     public StepExtension getStartStepMarkerStep() {
@@ -32,19 +36,15 @@ public class ScenarioStep extends StepExtension {
     }
 
     public Pickle getSourcePickle() {
-        return GlobalState.getPickleFromPickleTestStep(pickleStepTestStep);
+        return sourcePickle;
     }
 
     public String getSourceScenarioName() {
-        Pickle pickle = getSourcePickle();
-        return pickle == null ? "" : pickle.getName();
+        return sourceScenarioName;
     }
 
     public String getSourceFeaturePath() {
-        Pickle pickle = getSourcePickle();
-        return pickle == null || pickle.getUri() == null
-                ? ""
-                : pickle.getUri().toString();
+        return sourceFeatureUri == null ? "" : sourceFeatureUri.toString();
     }
 
     public static ScenarioStep createRootScenarioStep(
@@ -54,16 +54,18 @@ public class ScenarioStep extends StepExtension {
         if (pickleName == null || pickleName.isBlank()) {
             pickleName = "UNNAMED SCENARIO";
         }
+        Pickle sourcePickle = (Pickle) getProperty(testCase, "pickle");
         io.cucumber.core.runner.PickleStepTestStep scenarioPickleStepTestStep =
                 getPickleStepTestStepFromStrings(
-                        (Pickle) getProperty(testCase, "pickle"),
+                        sourcePickle,
                         getGivenKeyword(),
                         SCENARIO_STEP + pickleName,
                         null
                 );
         ScenarioStep scenarioStep = new ScenarioStep(
                 testCase,
-                scenarioPickleStepTestStep
+                scenarioPickleStepTestStep,
+                sourcePickle
         );
         setProperty(testCase, "rootScenarioStep", scenarioStep);
         scenarioStep.initializeScenarioSteps(
@@ -113,7 +115,8 @@ public class ScenarioStep extends StepExtension {
                 );
         ScenarioStep scenarioStep = new ScenarioStep(
                 topLevel,
-                scenarioPickleStepTestStep
+                scenarioPickleStepTestStep,
+                pickle
         );
         if (parsingMap != null) {
             scenarioStep.stepParsingMap.clear();
@@ -132,16 +135,17 @@ public class ScenarioStep extends StepExtension {
 
     private ScenarioStep(
             TestCase testCase,
-            io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep
+            io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep,
+            Pickle sourcePickle
     ) {
         super(testCase, pickleStepTestStep);
-//        Pickle gherkinMessagesPickle = (Pickle) getProperty(testCase, "pickle");
-//        io.cucumber.messages.types.Pickle pickle =
-//                (io.cucumber.messages.types.Pickle) getProperty(
-//                        gherkinMessagesPickle,
-//                        "pickle"
-//                );
-//        getStepNodeMap().merge(pickle.getHeaderRow(), pickle.getValueRow());
+        this.sourcePickle = sourcePickle;
+        this.sourceScenarioName = sourcePickle == null
+                ? ""
+                : sourcePickle.getName();
+        this.sourceFeatureUri = sourcePickle == null
+                ? null
+                : sourcePickle.getUri();
     }
 
     private void initializeScenarioSteps(

@@ -24,31 +24,43 @@ public final class ScenarioDataSteps {
 
         assertNotNull(data);
         assertNotNull(data.getStepExpression());
+
         assertEquals(
-                "---marker <passedValue> example-row",
+                "---marker <passedValue> <exampleValue>",
                 data.getStepText()
         );
+
         assertEquals(
-                "marker <passedValue> example-row",
+                "marker <passedValue> <exampleValue>",
                 data.getStepMarkerText()
         );
+
         assertEquals(
                 "stored",
-                data.getPassedNodeMap().getRoot().path("passedValue").asText()
+                data.getPassedNodeMap()
+                        .getRoot()
+                        .path("passedValue")
+                        .asText()
         );
+
         assertEquals(
                 "example-row",
-                data.getExampleNodeMap().getRoot().path("exampleValue").asText()
+                data.getExampleNodeMap()
+                        .getAsList("exampleValue")
+                        .getLast()
+                        .asText()
         );
 
         NodeMap externalPassed =
                 new NodeMap(MapConfigurations.MapType.PASSED_MAP);
+
         externalPassed.put("passedValue", "external");
 
         assertEquals(
                 "---marker external example-row",
                 data.getStepText(externalPassed)
         );
+
         assertEquals(
                 "marker external example-row",
                 data.getStepMarkerText(externalPassed)

@@ -244,11 +244,7 @@ public class ModularScenarios extends CoreSteps {
     }
 
     private static boolean hasOption(DataTable options, String... names) {
-        if (options == null) {
-            return false;
-        }
-
-        return options.asMaps().stream().anyMatch(row ->
+        return dataTableRows(options).stream().anyMatch(row ->
                 java.util.Arrays.stream(names).anyMatch(name ->
                         !normalize(row.get(name)).isBlank()
                 )
@@ -323,14 +319,18 @@ public class ModularScenarios extends CoreSteps {
             String inlineArgs,
             DataTable dataTable
     ) {
-        List<Map<String, String>> maps = dataTable == null
-                ? new ArrayList<>()
-                : dataTable.asMaps().stream()
-                .map(row -> {
-                    Map<String, String> copy = new HashMap<>();
-                    row.forEach((key, value) -> copy.put(key, value == null ? "" : value));
-                    return copy;
-                })
+        return buildRunScenarioMapsFromRows(
+                inlineArgs,
+                dataTableRows(dataTable)
+        );
+    }
+
+    static List<Map<String, String>> buildRunScenarioMapsFromRows(
+            String inlineArgs,
+            List<Map<String, String>> rows
+    ) {
+        List<Map<String, String>> maps = rows.stream()
+                .map(HashMap::new)
                 .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
 
         InlineArguments arguments = parseInlineArguments(inlineArgs);
@@ -356,6 +356,32 @@ public class ModularScenarios extends CoreSteps {
             }
         });
         return maps;
+    }
+
+    static List<Map<String, String>> dataTableRows(DataTable dataTable) {
+        if (dataTable == null) {
+            return new ArrayList<>();
+        }
+
+        List<List<String>> cells = dataTable.cells();
+        if (cells.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<String> headers = cells.getFirst();
+        List<Map<String, String>> rows = new ArrayList<>();
+        for (int rowIndex = 1; rowIndex < cells.size(); rowIndex++) {
+            List<String> values = cells.get(rowIndex);
+            Map<String, String> row = new HashMap<>();
+            for (int column = 0; column < headers.size(); column++) {
+                String value = column < values.size()
+                        ? values.get(column)
+                        : "";
+                row.put(headers.get(column), value == null ? "" : value);
+            }
+            rows.add(row);
+        }
+        return rows;
     }
 
     public static void filterAndParsePickles(
