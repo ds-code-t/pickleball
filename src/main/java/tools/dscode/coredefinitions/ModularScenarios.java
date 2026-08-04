@@ -1,4 +1,5 @@
 package tools.dscode.coredefinitions;
+import com.fasterxml.jackson.databind.JsonNode;
 import io.cucumber.core.gherkin.Pickle;
 import io.cucumber.core.runner.ScenarioStep;
 import io.cucumber.core.runner.ScenarioStepData;
@@ -21,41 +22,192 @@ import java.util.regex.Pattern;
 import static io.cucumber.core.options.Constants.FILTER_NAME_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.FILTER_TAGS_PROPERTY_NAME;
 import static io.cucumber.core.runner.GlobalState.getClosestScenarioStepAncestor;
+import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.ScenarioStep.createScenarioStep;
+import static tools.dscode.common.mappings.MappingProcessor.getRunMap;
 import static tools.dscode.common.util.Reflect.getProperty;
+import static tools.dscode.common.variables.RunVars.resolveFromVars;
+import static tools.dscode.testengine.PKB_props.PKB_CALL_PATH;
+import static tools.dscode.testengine.PKB_props.PKB_COMPONENT_PATH;
 import static tools.dscode.testengine.PKB_props.PKB_DATA_PATH;
 import static tools.dscode.testengine.PKB_props.PKB_FEATURES;
 import static tools.dscode.testengine.PKB_props.PKB_FEATURE_NAME;
 import static tools.dscode.testengine.PKB_props.PKB_NAME;
 import static tools.dscode.testengine.PKB_props.PKB_TAGS;
-import static tools.dscode.common.variables.RunVars.resolveFromVars;
+
 public class ModularScenarios extends CoreSteps {
     static final String RUN_TAGS = "Run Tags";
+    static final String RUN_KEY = "RunKey";
     static final String TAGS = "Tags";
     static final String CUCUMBER_FEATURES = "cucumber.features";
     static final String STEP_MARKER = "Step_Marker";
+    static final String RETURN = "RETURN";
     static final String DEFAULT_DATA_PATH = "src/test/resources/data";
+    static final String DEFAULT_CALLS_PATH = "src/test/resources/calls";
+    static final String DEFAULT_COMPONENT_PATH = "src/test/resources/component";
     private static final Pattern INLINE_ARGUMENT_PATTERN = Pattern.compile(
             "(?i)(?<!\\S)(FEATURE|SCENARIO|START):"
     );
-    @Given("^RUN SCENARIO(S)?:?(.*)?$")
+    @Given("^RUN\\s+(?:\"([^\"]+)\"\\s+)?(SCENARIO|COMPONENT SCENARIO|SERVICE CALL)(S)?:?(.*)?$")
     public static void runScenarios(
+            String inlineRunKey,
+            String runTypeText,
             String pluralFlag,
             String inlineArgs,
             DataTable dataTable
     ) {
+        RunType runType = RunType.fromStepText(runTypeText);
         populateRunScenariosStep(
                 getRunningStep(),
                 pluralFlag,
                 inlineArgs,
                 dataTable,
-                null,
-                "component scenario",
-                "RUN SCENARIO",
-                null
+                runType,
+                runType.matchType(),
+                "RUN " + runType.stepText(),
+                (scenarioStep, passedValues) -> registerRunReference(
+                        scenarioStep,
+                        passedValues,
+                        inlineRunKey
+                )
         );
     }
+
+    @Given("^SCENARIO:(.*)$")
+    public static Object inlineScenario(
+            String inlineArgs,
+            DataTable dataTable
+    ) {
+        return runSingleScenario(inlineArgs, dataTable, RunType.SCENARIO);
+    }
+
+    @Given("^COMPONENT:(.*)$")
+    public static Object inlineComponent(
+            String inlineArgs,
+            DataTable dataTable
+    ) {
+        return runSingleScenario(inlineArgs, dataTable, RunType.COMPONENT_SCENARIO);
+    }
+
+    static Object runSingleScenario(
+            String inlineArgs,
+            DataTable dataTable,
+            RunType runType
+    ) {
+        StepExtension triggerStep = getRunningStep();
+        ScenarioStep[] scenarioHolder = new ScenarioStep[1];
+        @SuppressWarnings("unchecked")
+        Map<String, String>[] passedValuesHolder = new Map[1];
+
+        populateRunScenariosStep(
+                triggerStep,
+                null,
+                inlineArgs,
+                dataTable,
+                runType,
+                runType.matchType(),
+                runType.convenienceStepText(),
+                (scenarioStep, passedValues) -> {
+                    scenarioHolder[0] = scenarioStep;
+                    passedValuesHolder[0] = passedValues;
+                }
+        );
+
+        ScenarioStep nestedScenarioStep = scenarioHolder[0];
+        if (nestedScenarioStep == null) {
+            throw new IllegalStateException(
+                    "No " + runType.matchType() + " was created for "
+                            + runType.convenienceStepText() + " selector: "
+                            + normalize(inlineArgs)
+            );
+        }
+
+        nestedScenarioStep.setNestingLevel(triggerStep.getNestingLevel() + 1);
+        detachChild(triggerStep, nestedScenarioStep);
+        getCurrentScenarioState().runStep(nestedScenarioStep);
+
+        NodeMap nestedScenarioMap = nestedScenarioStep.getDefaultStepNodeMap();
+        Object returnedValue = scenarioReturnValue(nestedScenarioMap);
+
+        String runKey = resolve(
+                nestedScenarioStep,
+                passedValuesHolder[0].get(RUN_KEY)
+        );
+        if (!runKey.isBlank()) {
+            saveRunValue(runKey, returnedValue);
+        }
+        return returnedValue;
+    }
+
+    static Object scenarioReturnValue(NodeMap scenarioMap) {
+        JsonNode returnNode = scenarioMap.getRoot().get(RETURN);
+        if (returnNode == null) {
+            return scenarioMap.getRoot();
+        }
+        return returnNode.isNull() ? null : scenarioMap.get(RETURN);
+    }
+
+    private static void registerRunReference(
+            ScenarioStep scenarioStep,
+            Map<String, String> passedValues,
+            String inlineRunKey
+    ) {
+        String runKey = firstNonBlank(
+                resolve(scenarioStep, passedValues.get(RUN_KEY)),
+                resolve(scenarioStep, inlineRunKey)
+        );
+        if (!runKey.isBlank()) {
+            getRunMap().putReference(
+                    runKey,
+                    scenarioStep.getDefaultStepNodeMap().getRoot()
+            );
+        }
+    }
+
+    private static void saveRunValue(String runKey, Object value) {
+        if (value instanceof JsonNode jsonNode) {
+            getRunMap().putReference(runKey, jsonNode);
+        } else {
+            getRunMap().put(runKey, value);
+        }
+    }
+
+    private static void detachChild(
+            StepExtension parent,
+            ScenarioStep child
+    ) {
+        parent.childSteps.remove(child);
+        if (child.previousSibling != null) {
+            child.previousSibling.nextSibling = child.nextSibling;
+        }
+        if (child.nextSibling != null) {
+            child.nextSibling.previousSibling = child.previousSibling;
+        }
+        child.previousSibling = null;
+        child.nextSibling = null;
+    }
+
+    private static String resolve(ScenarioStep scenarioStep, String value) {
+        String normalized = normalize(value);
+        if (normalized.isBlank()) {
+            return "";
+        }
+        return normalize(
+                scenarioStep.getStepParsingMap().resolveWholeText(normalized)
+        );
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String value : values) {
+            String normalized = normalize(value);
+            if (!normalized.isBlank()) {
+                return normalized;
+            }
+        }
+        return "";
+    }
+
     /**
      * Selects one component scenario with the same inline arguments and
      * invocation table used by {@code RUN SCENARIO}, without attaching or
@@ -76,7 +228,6 @@ public class ModularScenarios extends CoreSteps {
     ) {
         List<Map<String, String>> maps =
                 buildRunScenarioMaps(inlineArgs, dataTable);
-
         if (maps.isEmpty() || maps.stream().allMatch(
                 map -> normalize(map.get(STEP_MARKER)).isBlank()
         )) {
@@ -93,14 +244,12 @@ public class ModularScenarios extends CoreSteps {
         if (matches.isEmpty()) {
             return null;
         }
-
         PickleMatch match = matches.getFirst();
         if (normalize(match.passedValues().get(STEP_MARKER)).isBlank()) {
             return null;
         }
         return new ScenarioStepData(prepareScenarioStep(match, null));
     }
-
     public static ScenarioStepData getScenarioMarkerData(String dataAddress) {
         return getScenarioMarkerData(dataAddress, null);
     }
@@ -119,7 +268,6 @@ public class ModularScenarios extends CoreSteps {
         String featureName = address.featureName();
         String scenarioName = address.scenarioName();
         String featuresPath = configuredDataPath();
-
         if (featureName.isBlank()
                 && scenarioName.isBlank()
                 && featuresPath.isBlank()
@@ -132,7 +280,6 @@ public class ModularScenarios extends CoreSteps {
             }
             return currentScenario.getStepMarkerData(address.stepMarker());
         }
-
         boolean tableHasFeaturePath = hasOption(
                 options,
                 PKB_FEATURES,
@@ -181,7 +328,6 @@ public class ModularScenarios extends CoreSteps {
         if (featuresPath.isBlank() && !tableHasFeaturePath) {
             featuresPath = DEFAULT_DATA_PATH;
         }
-
         String inlineArgs = buildDataInlineArguments(
                 featureName,
                 scenarioName,
@@ -206,11 +352,9 @@ public class ModularScenarios extends CoreSteps {
         if (normalize(parts[parts.length - 1]).isBlank()) {
             return null;
         }
-
         String[] padded = new String[3];
         java.util.Arrays.fill(padded, "");
         System.arraycopy(parts, 0, padded, 3 - parts.length, parts.length);
-
         return new DataAddress(
                 normalize(padded[0]),
                 normalize(padded[1]),
@@ -236,7 +380,6 @@ public class ModularScenarios extends CoreSteps {
         Object configured = resolveFromVars(PKB_DATA_PATH);
         return configured == null ? "" : normalize(configured.toString());
     }
-
     private static boolean hasOption(DataTable options, String... names) {
         return dataTableRows(options).stream().anyMatch(row ->
                 java.util.Arrays.stream(names).anyMatch(name ->
@@ -253,7 +396,7 @@ public class ModularScenarios extends CoreSteps {
                 topStep,
                 collectMatches(
                         buildRunScenarioMaps(inlineArgs, dataTable),
-                        null,
+                        (String) null,
                         null,
                         false
                 ),
@@ -301,7 +444,31 @@ public class ModularScenarios extends CoreSteps {
                 singularStepText,
                 matchType
         );
+        appendMatches(topStep, matches, scenarioInitializer);
+    }
 
+    static void populateRunScenariosStep(
+            StepExtension topStep,
+            String pluralFlag,
+            String inlineArgs,
+            DataTable dataTable,
+            RunType runType,
+            String matchType,
+            String singularStepText,
+            BiConsumer<ScenarioStep, Map<String, String>> scenarioInitializer
+    ) {
+        List<PickleMatch> matches = collectMatches(
+                buildRunScenarioMaps(inlineArgs, dataTable),
+                runType,
+                matchType,
+                false
+        );
+        validateMatchCount(
+                matches.stream().map(match -> match.pickle().getName()).toList(),
+                "S".equals(pluralFlag),
+                singularStepText,
+                matchType
+        );
         appendMatches(topStep, matches, scenarioInitializer);
     }
     static List<Map<String, String>> buildRunScenarioMaps(
@@ -347,7 +514,6 @@ public class ModularScenarios extends CoreSteps {
         if (dataTable == null) {
             return new ArrayList<>();
         }
-
         List<List<String>> cells = dataTable.cells();
         if (cells.isEmpty()) {
             return new ArrayList<>();
@@ -373,7 +539,7 @@ public class ModularScenarios extends CoreSteps {
     ) {
         appendMatches(
                 topStep,
-                collectMatches(maps, null, null, false),
+                collectMatches(maps, (String) null, null, false),
                 null
         );
     }
@@ -383,12 +549,51 @@ public class ModularScenarios extends CoreSteps {
             String matchType,
             boolean requireSinglePerMap
     ) {
-        List<PickleMatch> matches = new ArrayList<>();
+        return collectMatches(
+                maps,
+                featuresPath,
+                null,
+                matchType,
+                requireSinglePerMap
+        );
+    }
 
+    private static List<PickleMatch> collectMatches(
+            List<Map<String, String>> maps,
+            RunType runType,
+            String matchType,
+            boolean requireSinglePerMap
+    ) {
+        return collectMatches(
+                maps,
+                null,
+                runType,
+                matchType,
+                requireSinglePerMap
+        );
+    }
+
+    private static List<PickleMatch> collectMatches(
+            List<Map<String, String>> maps,
+            String featuresPath,
+            RunType runType,
+            String matchType,
+            boolean requireSinglePerMap
+    ) {
+        List<PickleMatch> matches = new ArrayList<>();
         for (Map<String, String> map : maps) {
             Map<String, String> scanOptions = new HashMap<>(map);
             scanOptions.remove(STEP_MARKER);
-            applyFeaturesPathOverride(scanOptions, featuresPath);
+            scanOptions.remove(RUN_KEY);
+            removeBlankPathOption(scanOptions, PKB_FEATURES);
+            removeBlankPathOption(scanOptions, CUCUMBER_FEATURES);
+
+            if (runType == null) {
+                applyFeaturesPathOverride(scanOptions, featuresPath);
+            } else {
+                applyRunTypePathOverride(scanOptions, map, runType);
+            }
+
             List<Pickle> pickles;
             try {
                 pickles = CucumberScanUtil.listPickles(scanOptions);
@@ -409,12 +614,50 @@ public class ModularScenarios extends CoreSteps {
                                 + pickles.stream().map(Pickle::getName).toList()
                 );
             }
-
             pickles.forEach(pickle -> matches.add(new PickleMatch(pickle, map)));
         }
 
         return matches;
     }
+
+    private static void applyRunTypePathOverride(
+            Map<String, String> scanOptions,
+            Map<String, String> passedValues,
+            RunType runType
+    ) {
+        scanOptions.remove(PKB_CALL_PATH);
+        scanOptions.remove(PKB_COMPONENT_PATH);
+        if (runType.pathProperty() == null) {
+            return;
+        }
+
+        String rowPath = normalize(passedValues.get(runType.pathProperty()));
+        String configuredPath = rowPath.isBlank()
+                ? configuredRunPath(runType)
+                : rowPath;
+        applyFeaturesPathOverride(scanOptions, configuredPath);
+    }
+
+    private static String configuredRunPath(RunType runType) {
+        Object configured = resolveFromVars(runType.pathProperty());
+        String configuredPath = configured == null
+                ? ""
+                : normalize(configured.toString());
+        return configuredPath.isBlank()
+                ? runType.defaultPath()
+                : configuredPath;
+    }
+
+    private static void removeBlankPathOption(
+            Map<String, String> scanOptions,
+            String property
+    ) {
+        if (scanOptions.containsKey(property)
+                && normalize(scanOptions.get(property)).isBlank()) {
+            scanOptions.remove(property);
+        }
+    }
+
     static void applyFeaturesPathOverride(
             Map<String, String> scanOptions,
             String featuresPath
@@ -422,7 +665,6 @@ public class ModularScenarios extends CoreSteps {
         if (featuresPath == null || featuresPath.isBlank()) {
             return;
         }
-
         scanOptions.remove(PKB_FEATURES);
         scanOptions.put(CUCUMBER_FEATURES, featuresPath);
     }
@@ -466,7 +708,6 @@ public class ModularScenarios extends CoreSteps {
             BiConsumer<ScenarioStep, Map<String, String>> scenarioInitializer
     ) {
         ParsingMap scenarioStepParsingMap = new ParsingMap();
-
         NodeMap passedMap = new NodeMap(MapConfigurations.MapType.PASSED_MAP);
         passedMap.merge(match.passedValues());
         scenarioStepParsingMap.addMaps(passedMap);
@@ -485,12 +726,12 @@ public class ModularScenarios extends CoreSteps {
                 scenarioStepParsingMap,
                 match.passedValues().get(STEP_MARKER)
         );
+        scenarioStep.setStepParsingMap(ParsingMap.getRunningParsingMap());
         if (scenarioInitializer != null) {
             scenarioInitializer.accept(scenarioStep, match.passedValues());
         }
         return scenarioStep;
     }
-
     private static void validateDataMatchCount(List<PickleMatch> matches) {
         if (matches.size() <= 1) {
             return;
@@ -520,7 +761,6 @@ public class ModularScenarios extends CoreSteps {
                         + map.getOrDefault(RUN_TAGS, map.getOrDefault(TAGS, ""))).trim()
         );
     }
-
     static InlineArguments parseInlineArguments(String inlineArgs) {
         String arguments = normalize(inlineArgs);
         if (arguments.isBlank()) {
@@ -549,7 +789,6 @@ public class ModularScenarios extends CoreSteps {
             }
             tags = leadingText;
         }
-
         String featureName = null;
         String scenarioName = null;
         String stepMarker = null;
@@ -610,14 +849,12 @@ public class ModularScenarios extends CoreSteps {
                         + inlineArgs + "]"
         );
     }
-
     private static boolean isTagSelector(String inlineArgs) {
         return inlineArgs.startsWith("@") || inlineArgs.startsWith("%");
     }
     private static String exactNameRegex(String scenarioName) {
         return "^" + Pattern.quote(scenarioName) + "$";
     }
-
     private static String normalize(String value) {
         return value == null ? "" : value.trim();
     }
@@ -633,9 +870,76 @@ public class ModularScenarios extends CoreSteps {
         if (previous != null) {
             previous.nextSibling = child;
         }
-
         return child;
     }
+    enum RunType {
+        SCENARIO("SCENARIO", null, null, "scenario", "SCENARIO"),
+        COMPONENT_SCENARIO(
+                "COMPONENT SCENARIO",
+                PKB_COMPONENT_PATH,
+                DEFAULT_COMPONENT_PATH,
+                "component scenario",
+                "COMPONENT"
+        ),
+        SERVICE_CALL(
+                "SERVICE CALL",
+                PKB_CALL_PATH,
+                DEFAULT_CALLS_PATH,
+                "service-call scenario",
+                "CALL"
+        );
+
+        private final String stepText;
+        private final String pathProperty;
+        private final String defaultPath;
+        private final String matchType;
+        private final String convenienceStepText;
+
+        RunType(
+                String stepText,
+                String pathProperty,
+                String defaultPath,
+                String matchType,
+                String convenienceStepText
+        ) {
+            this.stepText = stepText;
+            this.pathProperty = pathProperty;
+            this.defaultPath = defaultPath;
+            this.matchType = matchType;
+            this.convenienceStepText = convenienceStepText;
+        }
+
+        static RunType fromStepText(String stepText) {
+            String normalized = normalize(stepText).toUpperCase(Locale.ROOT);
+            for (RunType type : values()) {
+                if (type.stepText.equals(normalized)) {
+                    return type;
+                }
+            }
+            throw new IllegalArgumentException("Unsupported RUN type: " + stepText);
+        }
+
+        String stepText() {
+            return stepText;
+        }
+
+        String pathProperty() {
+            return pathProperty;
+        }
+
+        String defaultPath() {
+            return defaultPath;
+        }
+
+        String matchType() {
+            return matchType;
+        }
+
+        String convenienceStepText() {
+            return convenienceStepText;
+        }
+    }
+
     record InlineArguments(
             String tags,
             String featureName,
@@ -644,7 +948,6 @@ public class ModularScenarios extends CoreSteps {
     ) {
         private static final InlineArguments EMPTY =
                 new InlineArguments(null, null, null, null);
-
         boolean isEmpty() {
             return tags == null
                     && featureName == null
@@ -661,7 +964,6 @@ public class ModularScenarios extends CoreSteps {
             String stepMarker
     ) {
     }
-
     private record PickleMatch(
             Pickle pickle,
             Map<String, String> passedValues

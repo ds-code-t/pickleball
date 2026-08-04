@@ -1,5 +1,4 @@
 package tools.dscode.common.treeparsing.parsedComponents.phraseoperations;
-
 import io.cucumber.core.runner.StepExtension;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.NoAlertPresentException;
@@ -12,13 +11,11 @@ import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementType;
 import tools.dscode.common.treeparsing.parsedComponents.PhraseData;
 import tools.dscode.common.util.FileUploadUtil;
-
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.MatchResult;
 import java.util.regex.Pattern;
-
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.browseroperations.BrowserAlerts.accept;
 import static tools.dscode.common.browseroperations.BrowserAlerts.dismiss;
@@ -39,6 +36,7 @@ import static tools.dscode.common.domoperations.SeleniumUtils.waitMilliseconds;
 import static tools.dscode.common.mappings.ParsingMap.configsRoot;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
 import static tools.dscode.common.mappings.ParsingMap.getRunningParsingMap;
+import static tools.dscode.common.mappings.custommappings.ValConverter.convertSpecialValues;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.seleniumextensions.ElementWrapper.getWrappedElements;
 import static tools.dscode.common.treeparsing.parsedComponents.ElementType.VALUE_TYPE;
@@ -47,14 +45,12 @@ import static tools.dscode.common.util.StringUtilities.limitText;
 import static tools.dscode.common.util.datetime.TemporalValue.delta;
 import static tools.dscode.coredefinitions.BrowserSteps.getCurrentDriver;
 
-
 public enum ActionOperations implements OperationsInterface {
     CREATE_AND_ATTACH {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
             int repetition = phraseData.getRepetition();
-
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT),
@@ -63,9 +59,7 @@ public enum ActionOperations implements OperationsInterface {
             );
             ElementMatch fileInputElement = phraseData.resultElements.getFirst();
 
-
             ElementMatch filePathElement = phraseData.resultElements.get(1);
-
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 WebElement inputElement = fileInputElement.getElementWrappers().getFirst();
                 FileUploadUtil.createTempAndUpload(getCurrentDriver(), inputElement, filePathElement.getValue().toString());
@@ -86,9 +80,7 @@ public enum ActionOperations implements OperationsInterface {
             );
             ElementMatch fileInputElement = phraseData.resultElements.getFirst();
 
-
             ElementMatch filePathElement = phraseData.resultElements.get(1);
-
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 ElementWrapper inputElement = fileInputElement.getElementWrappers().getFirst();
                 FileUploadUtil.upload(getCurrentDriver(), inputElement, filePathElement.getValue().toString());
@@ -101,19 +93,16 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
             int repetition = phraseData.getRepetition();
-
             ElementMatch regexMatchElement = phraseData.getElementMatches().stream().filter(e -> e.elementTypes.contains(ElementType.REGEX_MATCH)).findFirst().orElse(null);
             List<ElementMatch> valueElements = phraseData.getElementMatches().stream().filter(e -> e.elementTypes.contains(ElementType.RETURNS_VALUE) && !e.elementTypes.contains(ElementType.KEY_VALUE)).toList();
             ElementMatch firstValueElement = valueElements.isEmpty() ? null : valueElements.getFirst();
             ElementMatch keyElement = phraseData.getElementMatches().stream().filter(e -> e.elementTypes.contains(ElementType.KEY_VALUE)).findFirst().orElse(null);
-
             if (keyElement == null && regexMatchElement == null && valueElements.size() == 2) {
                 firstValueElement = valueElements.get(1);
                 keyElement = valueElements.get(0);
             }
 
             final ElementMatch valueElement = firstValueElement;
-
             boolean regexMatchSave = regexMatchElement != null;
             boolean regexMatchWithReference = regexMatchSave && regexMatchElement.defaultText.type != ValueWrapper.ValueTypes.BACK_TICKED;
             String regexReference = regexMatchWithReference ? regexMatchElement.defaultText.toString() : "";
@@ -128,7 +117,6 @@ public enum ActionOperations implements OperationsInterface {
                     );
             }
             final Pattern pattern = tempPattern;
-
             String keyName = keyElement == null ? (regexMatchWithReference ? regexReference : "saved") : keyElement.getValue().toString();
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 for (ValueWrapper valueWrapper : valueElement.getValues()) {
@@ -140,7 +128,6 @@ public enum ActionOperations implements OperationsInterface {
                                 .toList();
                         if (matches.isEmpty() && !regexMatchElement.selectionType.equalsIgnoreCase("any"))
                             throw new RuntimeException("No matches found for regex: " + pattern + " in value: " + value);
-
                         if (regexMatchElement.elementPosition.equalsIgnoreCase("first"))
                             value = matches.getFirst();
                         else if (regexMatchElement.elementPosition.equalsIgnoreCase("last"))
@@ -163,6 +150,7 @@ public enum ActionOperations implements OperationsInterface {
                             }
                         }
                     }
+                    value = convertSpecialValues(value);
                     logInfo("Saving '" + limitText(value, 10000) + "' to key: '" + keyName + "'");
                     getRunningParsingMap().put(keyName, value);
                 }
@@ -170,7 +158,6 @@ public enum ActionOperations implements OperationsInterface {
             });
         }
     },
-
     TAB {
         @Override
         public void execute(PhraseData phraseData) {
@@ -185,7 +172,6 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
             int repetition = phraseData.getRepetition();
-
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher().mustMatchAtLeastOne(ElementType.TIME_VALUE, ElementType.HTML_ELEMENT)
             );
@@ -215,25 +201,21 @@ public enum ActionOperations implements OperationsInterface {
             });
         }
     },
-
     SELECT {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
             int repetition = phraseData.getRepetition();
-
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAtLeastOne(ElementType.RETURNS_VALUE).mustNotMatchAny(ElementType.HTML_DROPDOWN),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT, ElementType.HTML_DROPDOWN)
             );
-
             ElementMatch selection = phraseData.resultElements.getFirst();
             ElementMatch dropDowns = phraseData.resultElements.get(1);
 
             boolean waitOnPageLoad = !phraseData.nextSemicolon();
-
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 int count = 0;
                 for (ElementWrapper dropDownWrapper : dropDowns.getElementThrowErrorIfEmptyWithNoModifier()) {
@@ -243,9 +225,7 @@ public enum ActionOperations implements OperationsInterface {
 
                     if (selection.elementTypes.contains(ElementType.HTML_TYPE)) {
 
-
                         ElementWrapper optionElement = selection.getElementWrappers().getFirst();
-
                         if (optionElement.getTagName().equalsIgnoreCase("option")) {
                             selectDropdownByIndex(getCurrentDriver(), dropDownWrapper, optionElement.getSameTagIndex());
                         } else {
@@ -256,7 +236,6 @@ public enum ActionOperations implements OperationsInterface {
                     }
                     count++;
                 }
-
                 return true;
             });
         }
@@ -267,14 +246,12 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
             int repetition = phraseData.getRepetition();
-
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
             ElementMatch element = phraseData.resultElements.getFirst();
             boolean waitOnPageLoad = !phraseData.nextSemicolon();
-
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
@@ -286,7 +263,6 @@ public enum ActionOperations implements OperationsInterface {
                 }
                 return true;
             });
-
         }
     },
 
@@ -295,14 +271,12 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
             int repetition = phraseData.getRepetition();
-
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
             ElementMatch element = phraseData.resultElements.getFirst();
             boolean waitOnPageLoad = !phraseData.nextSemicolon();
-
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
@@ -314,7 +288,6 @@ public enum ActionOperations implements OperationsInterface {
                 }
                 return true;
             });
-
         }
     },
 
@@ -328,11 +301,9 @@ public enum ActionOperations implements OperationsInterface {
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
-
             ElementMatch element = phraseData.resultElements.getFirst();
 
             boolean waitOnPageLoad = !phraseData.nextSemicolon();
-
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 int count = 0;
                 for (ElementWrapper elementWrapper : element.getElementThrowErrorIfEmptyWithNoModifier()) {
@@ -346,13 +317,11 @@ public enum ActionOperations implements OperationsInterface {
             });
         }
     },
-
     RIGHT_CLICK {
         @Override
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
             int repetition = phraseData.getRepetition();
-
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
@@ -405,12 +374,10 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
             int repetition = phraseData.getRepetition();
-
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
-
             ElementMatch element = phraseData.resultElements.getFirst();
             boolean waitOnPageLoad = !phraseData.nextSemicolon();
             phraseData.result = Attempt.run(repetition, 500, () -> {
@@ -431,7 +398,6 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
             int repetition = phraseData.getRepetition();
-
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.BROWSER_WINDOW)
@@ -441,13 +407,11 @@ public enum ActionOperations implements OperationsInterface {
             phraseData.result = Attempt.run(repetition, 500, () -> {
                 List<ValueWrapper> handleWrappers = element.getValues();
 
-
                 if (handleWrappers.isEmpty() && !element.selectionType.equals("any")) {
                     throw new RuntimeException("No matching Windows or Tabs found for " + element);
                 }
                 String windowHandle = element.category.toLowerCase().contains("new") || element.category.toLowerCase().contains("previous") ?
                         handleWrappers.getLast().getValue().toString() : handleWrappers.getFirst().getValue().toString();
-
                 WindowSwitch.switchToHandleOrThrow(phraseData.getDriver(), windowHandle);
                 return true;
             });
@@ -458,12 +422,10 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
             int repetition = phraseData.getRepetition();
-
             phraseData.resultElements = processElementMatches(phraseData, phraseData.getElementMatchesFollowingOperation(),
                     new ElementMatcher()
                             .mustMatchAll(ElementType.HTML_ELEMENT)
             );
-
 
             ElementMatch element = phraseData.resultElements.getFirst();
             boolean waitOnPageLoad = !phraseData.nextSemicolon();
@@ -478,7 +440,6 @@ public enum ActionOperations implements OperationsInterface {
                 }
                 return true;
             });
-
         }
     },
     ACCEPT {
@@ -487,7 +448,6 @@ public enum ActionOperations implements OperationsInterface {
             waitMilliseconds(2000);
             logInfo(phraseData + " : Executing Action " + this.name());
             int repetition = phraseData.getRepetition();
-
             phraseData.result = Attempt.runVoid(repetition, 500, () -> {
                 try {
                     if (!phraseData.getFirstElement().category.startsWith("Alert"))
@@ -505,7 +465,6 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
             int repetition = phraseData.getRepetition();
-
             phraseData.result = Attempt.runVoid(repetition, 500, () ->
                     dismiss(getCurrentDriver())
             );
@@ -516,7 +475,6 @@ public enum ActionOperations implements OperationsInterface {
         public void execute(PhraseData phraseData) {
             logInfo(phraseData + " : Executing Action " + this.name());
             int repetition = phraseData.getRepetition();
-
             phraseData.result = Attempt.runVoid(repetition, 500, () -> {
                 ElementMatch firstElement = phraseData.getElementMatchAfterOperation(VALUE_TYPE);
                 StepExtension newStepExtension = getRunningStep().createNewStepExtension(firstElement.getValue().toString());
@@ -524,7 +482,6 @@ public enum ActionOperations implements OperationsInterface {
             });
         }
     };
-
 
     public static ActionOperations fromString(String input) {
         return OperationsInterface.requireOperationEnum(ActionOperations.class, input);
@@ -534,20 +491,17 @@ public enum ActionOperations implements OperationsInterface {
     public void textOperation(PhraseData phraseData, boolean shouldClear, boolean shouldEnterText) {
         textOperation(phraseData, shouldClear, shouldEnterText, false);
     }
-
     public void textOperation(PhraseData phraseData,
                               boolean shouldClear,
                               boolean shouldEnterText,
                               boolean enterKeys) {
         int repetition = phraseData.getRepetition();
         boolean waitOnPageLoad = !phraseData.nextSemicolon();
-
         // Keep your original semantics:
         // - if browserElement != null -> act once with null element
         // - else -> use htmlElementMatches; if empty -> act once with null element
         List<ElementMatch> elementMatches =
                 (phraseData.getBrowserElement() != null) ? List.of() : phraseData.getClosestWebElementMatches();
-
         // Precompute values once (so we don't re-walk value matches per input)
         List<ValueWrapper> valuesToEnter = phraseData.getValueTypeEntryElementMatches()
                 .stream()
@@ -556,7 +510,6 @@ public enum ActionOperations implements OperationsInterface {
 
         phraseData.result = Attempt.run(repetition, 500, () -> {
             int count = 0;
-
             if (elementMatches == null || elementMatches.isEmpty()) {
                 if (phraseData.getElementMatches().size() > 1 && phraseData.getElementMatches().get(1) instanceof PlaceHolderMatch placeHolderMatch) {
                     placeHolderMatch.elementMatcher = new ElementMatcher().mustMatchAll(ElementType.HTML_ELEMENT);
@@ -571,7 +524,6 @@ public enum ActionOperations implements OperationsInterface {
                 }
             }
 
-
             for (ElementMatch inputMatch : elementMatches) {
                 // If match is null, do the operation once with null and continue.
                 if (inputMatch == null) {
@@ -581,9 +533,7 @@ public enum ActionOperations implements OperationsInterface {
                     }
                     continue;
                 }
-
                 List<ElementWrapper> wrappers = inputMatch.getElementThrowErrorIfEmptyWithNoModifier();
-
                 // If wrappers empty, do the operation once with null (matches your prior behavior).
                 if (wrappers == null || wrappers.isEmpty()) {
                     applyTextOps(null, valuesToEnter, shouldClear, shouldEnterText, enterKeys);
@@ -592,7 +542,6 @@ public enum ActionOperations implements OperationsInterface {
                     }
                     continue;
                 }
-
                 for (ElementWrapper wrapper : wrappers) {
                     ElementWrapper webElement = (wrapper == null) ? null : wrapper;
 
@@ -604,7 +553,6 @@ public enum ActionOperations implements OperationsInterface {
                     count++;
                 }
             }
-
             return true;
         });
     }
@@ -622,7 +570,6 @@ public enum ActionOperations implements OperationsInterface {
         if (!shouldEnterText) {
             return;
         }
-
         for (ValueWrapper value : valuesToEnter) {
             String text = value.toString();
 

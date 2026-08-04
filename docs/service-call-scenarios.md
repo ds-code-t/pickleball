@@ -1,114 +1,137 @@
 # Service-call Scenarios
 
-> **Working feature examples:** [`service-call-execution.feature`](../maven-consumer-project/src/test/resources/features/service-call-execution.feature) locates and invokes calls; [`reusable-scenario-selection.feature`](../maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature) covers name selection and singular/plural cardinality; [`scenario-step-markers.feature`](../maven-consumer-project/src/test/resources/features/scenario-step-markers.feature) covers reusable-scenario start and end markers; [`service-call-definitions.feature`](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature) builds each request with the general mapping steps and executes it.
+> **Working feature examples:** [`service-call-execution.feature`](../maven-consumer-project/src/test/resources/features/service-call-execution.feature) invokes reusable calls. [`service-call-definitions.feature`](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature) builds requests with the general mapping steps and executes them.
 
-Pickleball treats service calls as reusable component scenarios. `ServiceCallSteps.java` is responsible for locating those scenarios, running them, executing the assembled request, and saving the completed call object. It does **not** provide separate mapping steps for endpoints, methods, headers, bodies, configuration, or responses.
+Pickleball treats service calls as reusable scenarios. `ModularScenarios.java` owns selection and nested-scenario execution. `ServiceCallSteps.java` owns the service-call convenience wrapper and HTTP execution. Request data is built with the general steps from `MappingSteps.java`.
 
-All request data is built with the general steps from `MappingSteps.java`.
-
-## Responsibilities of `ServiceCallSteps.java`
-
-The public service-call steps are:
+## Public service-call steps
 
 | Step | Purpose |
 |---|---|
-| `SERVICE CALL` / `SERVICE CALLS` | Locate and execute one or more component scenarios from the call-feature directory. |
-| `EXECUTE SERVICE CALL` | Read the component scenario's mapped `REQUEST` and optional `CONFIGURATION`, perform the HTTP request, and populate `RESPONSE`. |
+| `RUN ["key"] SERVICE CALL` / `RUN ["key"] SERVICE CALLS` | Select one or more call scenarios for deferred nested execution. |
+| `CALL:` | Select exactly one call scenario, execute it synchronously, and return its result. |
+| `EXECUTE SERVICE CALL` | Execute the mapped `REQUEST` with optional `CONFIGURATION` and populate `RESPONSE`. |
 
-An internal always-run finalizer saves the completed component object into the caller's run map. It is framework plumbing and is not written manually in feature files.
-
-The default call-feature directory is:
+Call lookup uses `pkb_callpath`. When it is not configured, the path defaults to:
 
 ```text
 src/test/resources/calls
 ```
 
-It can be changed with `pkb_callspath`.
+A nonblank `pkb_callpath` value in an invocation table overrides the global value for that row. A blank table value is ignored.
 
-## Invoke a reusable call
+## Invoke a call
 
-Inline arguments beginning with `@` or `%` are treated as Cucumber tag expressions:
+Select by reusable tag:
 
 ```gherkin
-When "inlineRead" SERVICE CALL: %inspect-get
+When RUN "inlineRead" SERVICE CALL: %inspect-get
   | endpoint              | client      | traceId     | include   | mode |
   | http://127.0.0.1:8765 | caller-test | trace-get-1 | inventory | full |
 ```
 
-Name selection is explicit. Prefix the exact scenario name with `SCENARIO:`:
+Select by exact scenario name:
 
 ```gherkin
-When "healthByName" SERVICE CALL: SCENARIO: HealthCall
+When RUN "healthByName" SERVICE CALL: SCENARIO: HealthCall
   | endpoint              |
   | http://127.0.0.1:8765 |
 ```
 
-Prefix the exact feature name with `FEATURE:` and combine it with `SCENARIO:` when both are needed:
+Select by feature and scenario name:
 
 ```gherkin
-When "qualifiedHealth" SERVICE CALL: FEATURE: Reusable service call definitions SCENARIO: HealthCall
+When RUN "qualifiedHealth" SERVICE CALL: FEATURE: Reusable service call definitions SCENARIO: HealthCall
   | endpoint              |
   | http://127.0.0.1:8765 |
 ```
 
-Each labelled value continues until the next `FEATURE:`, `SCENARIO:`, or `START:` label. Unlabelled non-tag text is rejected rather than guessed as a feature or scenario name.
+The inline argument syntax and invocation-table selectors are shared with regular and component scenario runs.
 
-The return-value `CALL:` form accepts the same optional invocation DataTable, so selection options and passed values can be supplied when the call is evaluated dynamically.
+## Synchronous `CALL:`
 
-Selectors can also be supplied through invocation-table Cucumber options:
+`CALL:` accepts the same inline arguments and optional DataTable:
 
 ```gherkin
-When SERVICE CALLS
-  | pkb_featurename                  | pkb_name                  | pkb_order | pkb_limit | endpoint              | status |
-  | Reusable service call definitions | ^(HealthCall\|StatusCall)$ | lexical   | 2         | http://127.0.0.1:8765 | 418    |
+When CALL: SCENARIO: HealthCall
+  | RunKey | endpoint              |
+  | health | http://127.0.0.1:8765 |
 ```
 
-Supported options include:
+It uses the same active parsing map, inline `DT:::` conversion, passed-map construction, selected Scenario Outline Examples row, marker selection, and template resolution as `RUN SERVICE CALL`.
+
+It differs only in execution behavior:
+
+- exactly one scenario must match;
+- the selected scenario executes synchronously;
+- when the scenario root contains `RETURN`, that field is returned;
+- otherwise the complete scenario root is returned;
+- a nonblank `RunKey` saves the same returned value;
+- without `RunKey`, the value is returned but not saved.
+
+Inline DataTables work identically:
+
+```gherkin
+When CALL: %inspect-get DT::: | "RunKey":"health", "endpoint":"http://127.0.0.1:8765" |
+```
+
+## Invocation-table options
 
 | Purpose | Pickleball option | Cucumber option |
 |---|---|---|
-| Feature paths | `pkb_features` | `cucumber.features` |
+| Call feature path | `pkb_callpath` | — |
 | Exact feature name | `pkb_featurename` | — |
 | Scenario-name regex | `pkb_name` | `cucumber.filter.name` |
 | Tag expression | `pkb_tags` or `Run Tags` | `cucumber.filter.tags` |
 | Result order | `pkb_order` | `cucumber.execution.order` |
 | Result limit | `pkb_limit` | `cucumber.execution.limit` |
 
-A nonblank tag, feature-name, or scenario-name filter must match at least one service-call scenario. Otherwise the step throws a descriptive no-match error.
-
-Feature paths, ordering, and limits do not select scenarios by themselves. When all tag, feature-name, and scenario-name filters are blank or absent, the step returns silently and executes no service calls.
-
-### Singular and plural cardinality
-
-`SERVICE CALL` allows zero or one returned scenario. `SERVICE CALLS` allows any number.
-
-Ordering and limit options are applied before cardinality is checked. If a singular call still returns more than one scenario, it throws an error naming the matches and instructing the caller to use `SERVICE CALLS`. Plural matches execute in the order returned by the existing Cucumber ordering and limit logic. Invocation-table row order is preserved.
-
-The saved object key is chosen in this order:
-
-1. `Call Key` from the invocation table;
-2. the quoted name before `SERVICE CALL`; or
-3. the resolved component scenario name.
-
-When a plural selector can return multiple scenarios, use distinct `Call Key` values per row or rely on distinct scenario names to avoid ordinary run-map replacement.
-
-### Start and end markers
-
-Service-call scenarios use the same marker behavior as other component scenarios. `---startstep` removes preceding steps, and `---endstep` removes following steps.
-
-Override the start marker inline with `START:`:
-
 ```gherkin
-When "health" SERVICE CALL: SCENARIO: HealthCall START: execute health
+When RUN SERVICE CALLS
+  | pkb_featurename                   | pkb_name     | RunKey | endpoint              |
+  | Reusable service call definitions | ^HealthCall$ | health | http://127.0.0.1:8765 |
+  | Reusable service call definitions | ^StatusCall$ | status | http://127.0.0.1:8765 |
 ```
 
-The selected service-call scenario then starts at `---execute health`. The override may instead be supplied in the invocation table with a `Step_Marker` column. Inline `START:` takes precedence over the table value. The fixed `---endstep` marker remains active for every invocation.
+## Singular and plural behavior
 
-See [`scenario-step-markers.feature`](../maven-consumer-project/src/test/resources/features/scenario-step-markers.feature) and the [component-scenario marker documentation](component-scenarios.md#start-and-end-markers) for the nested-marker behavior.
+`RUN SERVICE CALL` permits zero or one result. `RUN SERVICE CALLS` permits multiple results. `CALL:` requires exactly one result.
 
-## Define a service-call component
+Ordering and limit options are applied before cardinality is checked. Invocation-table row order is preserved.
 
-A component scenario maps a `REQUEST`, optionally maps `CONFIGURATION`, and then executes the call:
+## RunMap keys
+
+For deferred `RUN` execution, key precedence is:
+
+1. nonblank `RunKey`;
+2. quoted key;
+3. no save.
+
+Only one key is used. For example:
+
+```gherkin
+When RUN "quotedName" SERVICE CALL: %status-call
+  | RunKey   | endpoint              | status |
+  | tableKey | http://127.0.0.1:8765 | 422    |
+```
+
+Only `tableKey` is registered. The selected scenario root is registered by reference before its child steps execute, so later `REQUEST` and `RESPONSE` changes are visible through that entry.
+
+For `CALL:`, only `RunKey` is available. It saves the value returned by the synchronous call rather than always saving the root.
+
+## Start markers
+
+Reusable call scenarios support the same start-marker syntax:
+
+```gherkin
+When RUN "health" SERVICE CALL: SCENARIO: HealthCall START: execute health
+```
+
+The invocation table can also provide `Step_Marker`.
+
+## Define a service-call scenario
+
+A reusable call maps `REQUEST`, optionally maps `CONFIGURATION`, and then executes the request:
 
 ```gherkin
 Scenario Outline: InspectGetCall
@@ -129,182 +152,82 @@ Scenario Outline: InspectGetCall
     | %inspect-get  | http://127.0.0.1:8765 | default-client | get-default | none    | summary |
 ```
 
-The `SCENARIO MAP` target keeps the request data on the reusable component scenario while its child steps run.
+`SCENARIO MAP` keeps the request data on the reusable scenario while its child steps run.
 
-### Cucumber substitutions and Pickleball references
+## Template resolution
 
-In a `Scenario Outline`, a token such as `<endpoint>` that matches an Examples header is substituted by Cucumber before the component executes.
+Cucumber replaces matching Scenario Outline Examples tokens first. Pickleball runtime references are resolved later through the active parsing map.
 
-A Pickleball runtime reference is resolved later by `MappingProcessor`. Runtime references are useful when the request body depends on mapped caller values or an earlier service response:
+From inside a reusable call:
 
 ```text
 <PARENT.SCENARIO:jsonTemplate.item.quantity>
 <seedCall.RESPONSE.body.body.quantity>
 ```
 
-From inside the component:
+Use `PARENT.SCENARIO:` for values mapped by the caller. Use a RunMap key for a completed keyed deferred call.
 
-- Use `PARENT.SCENARIO:` for values the caller mapped to its scenario map.
-- Use the unqualified call key for a completed named service call because the finalizer saves that object in the shared run map.
-
-For XML runtime references, use the XML-safe bookends:
+For XML content, use the XML-safe reference bookends:
 
 ```text
 ~[~PARENT.SCENARIO:soapTemplate.left~]~
 ~[~seedCall.RESPONSE.body.body.quantity~]~
 ```
 
-## Request object
+## JSON body types
 
-The working consumer uses these `REQUEST` properties:
-
-| Property | Purpose |
-|---|---|
-| `REQUEST.endpoint` | Complete URL, including scheme, host, port, and path. |
-| `REQUEST.method` | HTTP method such as `GET`, `POST`, or `DELETE`. |
-| `REQUEST.accept` | Accept media type. |
-| `REQUEST.contentType` | Request-body media type. |
-| `REQUEST.headers` | Header name/value object. |
-| `REQUEST.queryParams` | Query-parameter object. |
-| `REQUEST.cookies` | Cookie name/value object. |
-| `REQUEST.body` | Parsed object or raw text body. |
-
-### JSON request body
-
-Use the generic `OBJECT` mapper:
+A quoted `~unquote` reference preserves resolved numbers, booleans, objects, and arrays as JSON values:
 
 ```gherkin
 And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
   """json
   {
-    "name": "<name>",
-    "quantity": <quantity>,
-    "active": true
+    "name": "<PARENT.SCENARIO:template.name>",
+    "quantity": "<PARENT.SCENARIO:template.quantity~unquote>",
+    "active": "<PARENT.SCENARIO:template.active~unquote>",
+    "metadata": "<PARENT.SCENARIO:template.metadata~unquote>"
   }
   """
 ```
 
-In this example, `<name>` and `<quantity>` are Cucumber `Scenario Outline` placeholders. Cucumber replaces them before Pickleball resolves and parses the body.
+Use a normal quoted reference for a JSON string and `~unquote` for a complete raw JSON value.
 
-For Pickleball runtime references, prefer a JSON template that is valid before resolution. Quote each reference and add `~unquote` when the resolved value must be a non-string JSON value:
+## Request structure
 
-```gherkin
-And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
-  """json
-  {
-    "name": "<PARENT.SCENARIO:unquoteTemplate.name>",
-    "quantity": "<PARENT.SCENARIO:unquoteTemplate.quantity~unquote>",
-    "active": "<PARENT.SCENARIO:unquoteTemplate.active~unquote>",
-    "unitPrice": "<PARENT.SCENARIO:unquoteTemplate.unitPrice~unquote>",
-    "metadata": "<PARENT.SCENARIO:unquoteTemplate.metadata~unquote>",
-    "items": "<PARENT.SCENARIO:unquoteTemplate.items~unquote>"
-  }
-  """
+`EXECUTE SERVICE CALL` reads:
+
+```text
+REQUEST.endpoint
+REQUEST.method
+REQUEST.accept
+REQUEST.contentType
+REQUEST.headers
+REQUEST.queryParams
+REQUEST.cookies
+REQUEST.body
+CONFIGURATION
 ```
 
-`MAP ... OBJECT VALUE` resolves the complete DocString and then parses the resulting JSON. A bare unresolved reference in a value position is not valid JSON:
+`endpoint` must be nonblank. `method` defaults to `GET`.
 
-```json
-{
-  "quantity": <PARENT.SCENARIO:unquoteTemplate.quantity>
-}
+The response is written beneath:
+
+```text
+RESPONSE.method
+RESPONSE.statusCode
+RESPONSE.headers
+RESPONSE.body
 ```
 
-The quoted `~unquote` pattern avoids that parsing problem while preserving the resolved type:
+HTTP `4xx` and `5xx` responses are retained as normal results. No-content responses retain status and headers.
 
-```json
-{
-  "quantity": "<PARENT.SCENARIO:unquoteTemplate.quantity~unquote>"
-}
-```
-
-When the mapped value is `12`, the resolved JSON is:
-
-```json
-{
-  "quantity": 12
-}
-```
-
-Use:
-
-- `"<reference>"` for JSON strings;
-- `"<reference~unquote>"` for complete numbers, booleans, objects, or arrays.
-
-`~unquote` removes only a directly surrounding matching quote pair after a successful replacement. It inserts the resolved value as raw JSON and does not convert arbitrary text into a JSON type. A raw value must therefore be valid JSON. Mapped Jackson object and array nodes are serialized as JSON before insertion.
-
-The working `%unquoted-json-body` component and its execution scenario test integer, decimal, boolean, object, and array insertion.
-
-### Values from an earlier service response
-
-A previous named service call can provide data for a later request. The earlier result is stored under its call key:
-
-```gherkin
-And "seedJson" SERVICE CALL: %inspect-post
-  | endpoint              | client      | traceId        | cookieValue | mode | status | name        | quantity |
-  | http://127.0.0.1:8765 | seed-client | seed-json-call | seed-cookie | seed | 201    | Seed Widget | 8        |
-```
-
-A later component can reference that completed call directly:
-
-```gherkin
-And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
-  """json
-  {
-    "name": "<seedJson.RESPONSE.body.body.name>",
-    "quantity": "<seedJson.RESPONSE.body.body.quantity~unquote>",
-    "sourceStatus": "<seedJson.RESPONSE.statusCode~unquote>"
-  }
-  """
-```
-
-Do not add `PARENT.SCENARIO:` to `seedJson` in this situation. `PARENT.SCENARIO` addresses the caller's scenario map, while the completed named call is registered in the shared run map.
-
-### XML or other raw body
-
-Use the generic `TEXT` mapper. Pickleball runtime references inside XML should use `~[~...~]~` so XML element tags are not confused with template bookends:
-
-```gherkin
-And MAP "REQUEST.body" TEXT VALUE TO SCENARIO MAP
-  """xml
-  <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-                    xmlns:calc="urn:pickleball:calculator">
-    <soapenv:Header/>
-    <soapenv:Body>
-      <calc:Add>
-        <calc:left>~[~PARENT.SCENARIO:soapTemplate.left~]~</calc:left>
-        <calc:right>~[~soapSeed.RESPONSE.body.body.quantity~]~</calc:right>
-      </calc:Add>
-    </soapenv:Body>
-  </soapenv:Envelope>
-  """
-```
-
-The left value above comes from the caller's scenario map. The right value comes from an earlier named service call in the run map.
-
-The `xml` media type is useful for IntelliJ formatting, while `TEXT` preserves the content as a string.
-
-A plain `<left>` token can still be a Cucumber `Scenario Outline` placeholder when `left` is an Examples column. It is not the recommended syntax for a Pickleball runtime map reference inside XML.
-
-## REST Assured configuration
-
-Map optional REST Assured behavior beneath `CONFIGURATION`:
-
-```gherkin
-And MAP "CONFIGURATION" TABLE VALUES TO SCENARIO MAP
-  | urlEncodingEnabled     | true |
-  | relaxedHTTPSValidation |      |
-```
-
-`CONFIGURATION` is not needed merely to provide the host or base URL. The working definitions put the complete URL in `REQUEST.endpoint`.
-
-## Execute and inspect the result
+## Execute and inspect
 
 ```gherkin
 When EXECUTE SERVICE CALL
 ```
 
-The framework creates `RESPONSE` and the finalizer saves the whole component object into the caller. The caller can inspect both the request and response:
+For a keyed deferred run, the registered root exposes the completed request and response:
 
 ```text
 <inlineRead.REQUEST.endpoint>
@@ -315,24 +238,9 @@ The framework creates `RESPONSE` and the finalizer saves the whole component obj
 <inlineRead.RESPONSE.body.status>
 ```
 
-HTTP `4xx` and `5xx` responses are retained as normal service responses rather than being treated as missing call results. A no-content response is also retained with its status and headers.
+## Generic mappings only
 
-`EXECUTE SERVICE CALL` initializes `RESPONSE` before attempting the request. Consequently, an early component exit can still be finalized and saved with an empty response object.
-
-## No custom REST mapping steps
-
-Do not use the removed forms:
-
-```text
-ENDPOINT:...
-METHOD:...
-HEADERS
-BODY:...
-REQUEST CONFIGURATION
-MAP SERVICE RESPONSE
-```
-
-Use the generic mappings instead:
+Build service calls with the shared mapping syntax:
 
 ```gherkin
 MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
@@ -343,16 +251,5 @@ MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
 MAP "REQUEST.body" TEXT VALUE TO SCENARIO MAP
 MAP "CONFIGURATION" TABLE VALUES TO SCENARIO MAP
 ```
-
-## Local endpoints in the consumer
-
-The consumer's [`LocalTestSite.java`](../maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java) starts a loopback-only server before the Cucumber run. The current call definitions exercise:
-
-- `/api/service-calls/inspect`;
-- `/api/service-calls/no-content/{itemId}`;
-- `/api/health`; and
-- `/soap/calculator`.
-
-This lets the example project test both Selenium DOM behavior and service calls without an external test environment.
 
 [Previous: Component Scenarios](component-scenarios.md) · [Documentation home](README.md) · [Next: Date and Time Utilities](date-time-utilities.md)

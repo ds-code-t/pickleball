@@ -1,10 +1,8 @@
 package tools.dscode.coredefinitions;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.cucumber.core.runner.ScenarioStep;
 import io.cucumber.core.runner.StepBase;
-import io.cucumber.core.runner.StepExtension;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Given;
 import io.restassured.response.Response;
@@ -12,7 +10,6 @@ import io.restassured.specification.RequestSpecification;
 import tools.dscode.common.CoreSteps;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.servicecalls.RestAssuredUtil;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -20,33 +17,27 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
-
-import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.mappings.MappingProcessor.getRunMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
-import static tools.dscode.common.variables.RunVars.resolveFromVars;
-
 /**
  * Cucumber-facing service-call definitions.
  *
- * <p>Reusable service-call scenarios build their complete working object in
- * their default ScenarioStep NodeMap. REQUEST and CONFIGURATION are inputs;
- * RESPONSE is written by EXECUTE SERVICE CALL. The scenario root is registered
- * by reference in the calling scenario's RunMap before execution, so later
- * mutations are immediately visible through the RunMap entry.</p>
+ * <p>{@link ModularScenarios} owns reusable-scenario selection and execution.
+ * This class retains the service-call convenience wrapper and executes the
+ * REQUEST assembled in the selected ScenarioStep.</p>
  */
 public class ServiceCallSteps extends CoreSteps {
-    static final String DEFAULT_CALLS_PATH = "src/test/resources/calls";
-    static final String CALL_KEY = "Call Key";
     static final String SCENARIO_NAME = "SCENARIO NAME";
-
     static final String REQUEST = "REQUEST";
     static final String CONFIGURATION = "CONFIGURATION";
     static final String RESPONSE = "RESPONSE";
     static final String PARENT = "PARENT";
-
+    /**
+     * @deprecated Use {@code RUN ["key"] SERVICE CALL(S):...}.
+     */
+    @Deprecated(forRemoval = true)
     @Given("^(?:\"([^\"]+)\"\\s+)?SERVICE CALL(S)?:?(.*)?$")
     public static void serviceCalls(
             String inlineServiceCallObjectName,
@@ -54,13 +45,12 @@ public class ServiceCallSteps extends CoreSteps {
             String inlineArgs,
             DataTable dataTable
     ) {
-        StepExtension triggerStep = getRunningStep();
         ModularScenarios.populateRunScenariosStep(
-                triggerStep,
+                getRunningStep(),
                 pluralFlag,
                 inlineArgs,
                 dataTable,
-                callsPath(),
+                ModularScenarios.RunType.SERVICE_CALL,
                 "service-call scenario",
                 "SERVICE CALL",
                 (scenarioStep, passedValues) -> registerServiceCallReference(
@@ -76,60 +66,21 @@ public class ServiceCallSteps extends CoreSteps {
             String inlineArgs,
             DataTable dataTable
     ) {
-        StepExtension triggerStep = getRunningStep();
-        ScenarioStep[] nestedScenarioHolder = new ScenarioStep[1];
-        ModularScenarios.populateRunScenariosStep(
-                triggerStep,
+        return ModularScenarios.runSingleScenario(
                 inlineArgs,
-                null,
-                callsPath(),
-                "service call",
-                (scenarioStep, passedValues) ->
-                        nestedScenarioHolder[0] = scenarioStep
+                dataTable,
+                ModularScenarios.RunType.SERVICE_CALL
         );
-
-        ScenarioStep nestedScenarioStep = nestedScenarioHolder[0];
-        if (nestedScenarioStep == null) {
-            throw new IllegalStateException(
-                    "No service-call scenario was created for CALL selector: "
-                            + normalize(inlineArgs)
-            );
-        }
-
-        /*
-         * populateRunScenariosStep attached this scenario for deferred execution.
-         * CALL executes it synchronously instead, so remove it from that queue.
-         *
-         * Keep parentStep intact because PARENT.SCENARIO MAP resolution uses the
-         * parent ancestry.
-         */
-        triggerStep.childSteps.remove(nestedScenarioStep);
-        nestedScenarioStep.previousSibling = null;
-        nestedScenarioStep.nextSibling = null;
-        getCurrentScenarioState().runStep(nestedScenarioStep);
-
-        NodeMap nestedScenarioMap =
-                nestedScenarioStep.getDefaultStepNodeMap();
-
-        Object explicitReturn = nestedScenarioMap.get("RETURN");
-
-        return explicitReturn != null
-                ? explicitReturn
-                : nestedScenarioMap.getRoot();
     }
-
     @Given("^EXECUTE SERVICE CALL$")
     public static void executeServiceCall() {
         ScenarioStep scenarioStep = scenarioStep(getRunningStep());
         NodeMap serviceCallMap = scenarioStep.getDefaultStepNodeMap();
         ObjectNode serviceCallObject = serviceCallMap.getRoot();
-
-        // This same ObjectNode is already stored by reference in the caller's
-        // RunMap. Replacing RESPONSE here is therefore visible to the caller.
-        // The empty object remains available if validation/execution throws or
-        // REST Assured returns no Response instance.
+        // Deferred RUN execution may already expose this root by reference.
+        // A synchronous CALL may instead save its selected return value after
+        // completion. In both cases, initialize RESPONSE before validation.
         serviceCallObject.set(RESPONSE, MAPPER.createObjectNode());
-
         ObjectNode request = requiredObject(serviceCallMap, REQUEST);
         ObjectNode configuration = optionalObject(serviceCallMap, CONFIGURATION);
 
@@ -140,14 +91,12 @@ public class ServiceCallSteps extends CoreSteps {
         if (method.isBlank()) {
             method = "GET";
         }
-
         String endpoint = request.path("endpoint").asText("").trim();
         if (endpoint.isBlank()) {
             throw new IllegalArgumentException(
                     "The service-call REQUEST must contain a non-blank endpoint"
             );
         }
-
         long started = System.nanoTime();
         try (PrintStream restLog = new PrintStream(
                 new LogInfoOutputStream(),
@@ -158,7 +107,6 @@ public class ServiceCallSteps extends CoreSteps {
             if (!configuration.isEmpty()) {
                 logInfo("REST Assured service call configuration: " + configuration);
             }
-
             RequestSpecification specification = RestAssuredUtil.buildRequest(
                     request,
                     configuration
@@ -167,12 +115,10 @@ public class ServiceCallSteps extends CoreSteps {
 
             Response response = RestAssuredUtil.execute(specification, method, endpoint);
             ObjectNode responseNode = RestAssuredUtil.extractResponse(response);
-
             // Preserve {} when there was no Response at all.
             if (!responseNode.isEmpty()) {
                 responseNode.put("method", method);
             }
-
             serviceCallObject.set(RESPONSE, responseNode);
             logInfo(
                     "REST Assured service call completed in "
@@ -189,7 +135,6 @@ public class ServiceCallSteps extends CoreSteps {
             throw exception;
         }
     }
-
     public static ScenarioStep scenarioStep(StepBase step) {
         if (step instanceof ScenarioStep scenarioStep) {
             return scenarioStep;
@@ -203,7 +148,6 @@ public class ServiceCallSteps extends CoreSteps {
 
         return scenarioStep(step.parentStep);
     }
-
     /**
      * Resolves the service-call key and registers the ScenarioStep's root
      * ObjectNode by reference in the calling scenario's RunMap.
@@ -214,17 +158,19 @@ public class ServiceCallSteps extends CoreSteps {
             String inlineServiceCallObjectName
     ) {
         String scenarioName = scenarioName(scenarioStep.getDefaultStepNodeMap());
-        String tableCallKey = resolve(scenarioStep, passedValues.get(CALL_KEY));
+        String tableRunKey = resolve(
+                scenarioStep,
+                passedValues.get(ModularScenarios.RUN_KEY)
+        );
         String inlineCallKey = resolve(scenarioStep, inlineServiceCallObjectName);
         String resolvedCallKey = firstNonBlank(
-                tableCallKey,
+                tableRunKey,
                 inlineCallKey,
                 scenarioName
         );
-
         if (resolvedCallKey.isBlank()) {
             throw new IllegalStateException(
-                    "No Call Key, inline service-call object name, or scenario name is available"
+                    "No RunKey, inline service-call object name, or scenario name is available"
             );
         }
 
@@ -234,7 +180,6 @@ public class ServiceCallSteps extends CoreSteps {
 
         getRunMap().putReference(resolvedCallKey, serviceCallObject);
     }
-
     private static ObjectNode requiredObject(NodeMap parent, String fieldName) {
         Object value = parent.get(fieldName);
         if (value == null) {
@@ -242,7 +187,6 @@ public class ServiceCallSteps extends CoreSteps {
                     "The service-call object is missing the " + fieldName + " object"
             );
         }
-
         JsonNode node = asJsonNode(value);
         if (node instanceof ObjectNode objectNode) {
             return objectNode;
@@ -252,7 +196,6 @@ public class ServiceCallSteps extends CoreSteps {
                     "The service-call object is missing the " + fieldName + " object"
             );
         }
-
         throw new IllegalStateException(
                 "The service-call " + fieldName
                         + " property must be an object but was "
@@ -263,7 +206,6 @@ public class ServiceCallSteps extends CoreSteps {
                         + parent.getRoot()
         );
     }
-
     private static ObjectNode optionalObject(NodeMap parent, String fieldName) {
         Object value = parent.get(fieldName);
         if (value == null) {
@@ -278,7 +220,6 @@ public class ServiceCallSteps extends CoreSteps {
         if (node instanceof ObjectNode objectNode) {
             return objectNode;
         }
-
         throw new IllegalStateException(
                 "The service-call " + fieldName + " property must be an object"
         );
@@ -292,7 +233,6 @@ public class ServiceCallSteps extends CoreSteps {
 
         return MAPPER.valueToTree(value);
     }
-
     private static String resolve(ScenarioStep scenarioStep, String value) {
         String normalized = normalize(value);
         if (normalized.isBlank()) {
@@ -303,7 +243,6 @@ public class ServiceCallSteps extends CoreSteps {
                 scenarioStep.getStepParsingMap().resolveWholeText(normalized)
         );
     }
-
     private static String scenarioName(NodeMap scenarioMap) {
         JsonNode direct = scenarioMap.getRoot().get(SCENARIO_NAME);
         if (direct != null && !direct.isNull()) {
@@ -314,7 +253,6 @@ public class ServiceCallSteps extends CoreSteps {
             }
             return normalize(direct.asText(""));
         }
-
         Object value = scenarioMap.get(SCENARIO_NAME);
         if (value instanceof JsonNode node) {
             return normalize(node.asText(""));
@@ -333,14 +271,6 @@ public class ServiceCallSteps extends CoreSteps {
 
         return "";
     }
-
-    private static String callsPath() {
-        Object configuredPath = resolveFromVars("pkb_callspath");
-        return configuredPath == null || configuredPath.toString().isBlank()
-                ? DEFAULT_CALLS_PATH
-                : configuredPath.toString().trim();
-    }
-
     private static String normalize(String value) {
         return value == null ? "" : value.trim();
     }
@@ -348,7 +278,6 @@ public class ServiceCallSteps extends CoreSteps {
     private static long elapsedMillis(long started) {
         return (System.nanoTime() - started) / 1_000_000;
     }
-
     private static final class LogInfoOutputStream extends OutputStream {
         private final ByteArrayOutputStream line = new ByteArrayOutputStream();
 
@@ -365,7 +294,6 @@ public class ServiceCallSteps extends CoreSteps {
         public void flush() {
             logLine();
         }
-
         @Override
         public void close() throws IOException {
             logLine();

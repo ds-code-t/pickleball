@@ -1,5 +1,4 @@
 package tools.dscode.coredefinitions;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,10 +10,8 @@ import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.DefinitionFlags;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.mappings.NodeMap;
-
 import java.util.Locale;
 import java.util.Map;
-
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static io.cucumber.core.runner.util.TableUtils.toFlatStringMultimap;
@@ -32,9 +29,10 @@ import static tools.dscode.common.mappings.ParsingMap.getClosestScenarioStepAnce
 import static tools.dscode.common.mappings.ParsingMap.getRootScenarioStepNodeMap;
 import static tools.dscode.common.mappings.ParsingMap.resolveFromParsingMap;
 import static tools.dscode.common.mappings.ParsingMap.resolveToStringWithRunningParsingMap;
+import static tools.dscode.common.mappings.custommappings.ValConverter.convertSpecialValues;
+import static tools.dscode.common.mappings.custommappings.ValConverter.convertSpecialValuesToTree;
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 import static tools.dscode.common.variables.RunVars.resolveFromVars;
-
 public class MappingSteps extends CoreSteps {
 
     @Given("^CLEAR SAVED VALUES(:.*)?$")
@@ -47,7 +45,6 @@ public class MappingSteps extends CoreSteps {
                 .toArray(String[]::new);
 
         getRunMap().clearValues(keyArray);
-
         if (keyArray.length == 0) {
             logInfo("Clearing Scenario Run Map");
         } else {
@@ -57,7 +54,6 @@ public class MappingSteps extends CoreSteps {
             );
         }
     }
-
     @Given("^(:?\"(.*)\"\\s+)?DOC STRING$")
     public static void docString(String docStringName, DocString docString) {
         String docStringNameText = docStringName == null || docStringName.isBlank()
@@ -65,7 +61,6 @@ public class MappingSteps extends CoreSteps {
                 : " " + docStringName;
         logInfo("Setting Doc String" + docStringNameText + ":" + docString);
     }
-
     @Given("^(:?\"(.*)\"\\s+)?DATA TABLE$")
     public static void dataTable(String tableName, DataTable dataTable) {
         String tableNameText = tableName == null || tableName.isBlank()
@@ -73,7 +68,6 @@ public class MappingSteps extends CoreSteps {
                 : " " + tableName;
         logInfo("Setting Data Table" + tableNameText + ":" + dataTable);
     }
-
 
     @Given("^SET \"(.*)\" DATA TABLE$")
     public static void setDataTable(String tableName, DataTable dataTable) {
@@ -83,7 +77,6 @@ public class MappingSteps extends CoreSteps {
         );
         logInfo("Setting Data Table" + tableName + ":" + dataTable);
     }
-
     // TODO deprecate
     @Given("^FOR EVERY (\".*\" )?DATA ROW IN THE (\".*\" )?DATA TABLE:$")
     public static void forEveryRow(String rowName, String tableName) {
@@ -95,7 +88,6 @@ public class MappingSteps extends CoreSteps {
         );
         currentStep.addReplacementStep(modifiedStep);
     }
-
     // TODO deprecate
     @Given("^SET (?:(DEFAULT|OVERRIDE|SINGLETON) )?VALUES$")
     public static void setValues(String mapType, DataTable dataTable) {
@@ -105,7 +97,6 @@ public class MappingSteps extends CoreSteps {
             case "SINGLETON" -> MappingProcessor.getSingletonMap();
             case null, default -> getRunMap();
         };
-
         nodeMap.merge(toFlatStringMultimap(dataTable.asLists()));
     }
 
@@ -119,12 +110,11 @@ public class MappingSteps extends CoreSteps {
             DocString docString
     ) {
         NodeMap nodeMap = getNodeMap(mapType);
-
         String content =
                 resolveToStringWithRunningParsingMap(docString.getContent());
 
         Object value = switch (dataType == null ? "TEXT" : dataType) {
-            case "TEXT" -> content;
+            case "TEXT" -> convertSpecialValues(content);
             case "OBJECT" -> parseData(content, docString.getContentType());
             default -> throw new IllegalArgumentException(
                     "Unsupported map value type: " + dataType
@@ -133,7 +123,6 @@ public class MappingSteps extends CoreSteps {
 
         nodeMap.put(key, value);
     }
-
     @DefinitionFlags(NO_ARG_RESOLUTION)
     @Given("^MAP (?:\"(.*)\" )?(?:(NON-BLANK|NON-NULL) )?TABLE VALUES(?: TO (DEFAULT|OVERRIDE|SINGLETON|STEP|ROOT SCENARIO|SCENARIO|RUN) MAP)?$")
     public static void mapValues(
@@ -145,7 +134,6 @@ public class MappingSteps extends CoreSteps {
         valueRequirement = valueRequirement == null || valueRequirement.isBlank()
                 ? "NON-BLANK"
                 : valueRequirement;
-
         NodeMap nodeMap = getNodeMap(mapType);
 
         final String keyPrefix =
@@ -161,14 +149,14 @@ public class MappingSteps extends CoreSteps {
             String rowKey = row.getFirst() == null
                     ? ""
                     : row.getFirst().trim();
-
             if (rowKey.isBlank()) {
                 continue;
             }
 
             for (int cellIndex = 1; cellIndex < row.size(); cellIndex++) {
-                Object value = resolveFromParsingMap(row.get(cellIndex));
-
+                Object value = convertSpecialValues(
+                        resolveFromParsingMap(row.get(cellIndex))
+                );
                 boolean hasRequiredValue = switch (valueRequirement) {
                     case "NON-BLANK" -> hasNonBlankValue(value);
                     case "NON-NULL" -> hasNonNullValue(value);
@@ -176,7 +164,6 @@ public class MappingSteps extends CoreSteps {
                             "Unsupported table value requirement: " + valueRequirement
                     );
                 };
-
                 if (hasRequiredValue) {
                     nodeMap.put(keyPrefix + rowKey, value);
                     break;
@@ -184,6 +171,7 @@ public class MappingSteps extends CoreSteps {
             }
         }
     }
+
 
 
 
@@ -198,7 +186,6 @@ public class MappingSteps extends CoreSteps {
         return getRunningStep().argument.getValue();
     }
 
-
     @Given("^PATH:(.*)$")
     public static Object getFromPath(String path) {
         if (path == null || path.isBlank()) {
@@ -212,7 +199,6 @@ public class MappingSteps extends CoreSteps {
             String content,
             String contentType
     ) {
-
         if (contentType == null || contentType.isBlank()) {
             throw new IllegalArgumentException(
                     "MAP DATA VALUE requires a DocString content type, "
@@ -223,7 +209,6 @@ public class MappingSteps extends CoreSteps {
         String normalizedType = contentType
                 .toLowerCase(Locale.ROOT)
                 .trim();
-
         ObjectMapper mapper = switch (normalizedType) {
             case "json",
                  "application/json",
@@ -239,19 +224,17 @@ public class MappingSteps extends CoreSteps {
                  "application/x-yaml",
                  "text/yaml",
                  "text/x-yaml" -> YAML_MAPPER;
-
             default -> throw new IllegalArgumentException(
                     "Unsupported DocString content type: " + contentType
             );
         };
 
         try {
-            return mapper.readTree(content);
+            return convertSpecialValuesToTree(mapper.readTree(content));
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
     }
-
 
     /**
      * Returns false when:
@@ -271,7 +254,6 @@ public class MappingSteps extends CoreSteps {
         if (text == null) {
             return true;
         }
-
         String trimmed = text.trim();
 
         if (trimmed.startsWith("<") && trimmed.endsWith(">")) {
@@ -284,7 +266,6 @@ public class MappingSteps extends CoreSteps {
 
         return true;
     }
-
     /**
      * Returns false when:
      * - hasNonNullValue returns false
@@ -301,7 +282,6 @@ public class MappingSteps extends CoreSteps {
         if (text != null && text.trim().isEmpty()) {
             return false;
         }
-
         if (input instanceof JsonNode node
                 && (node.isObject() || node.isArray())
                 && node.isEmpty()) {
@@ -319,7 +299,6 @@ public class MappingSteps extends CoreSteps {
         if (input instanceof String string) {
             return string;
         }
-
         if (input instanceof JsonNode node && node.isTextual()) {
             return node.textValue();
         }

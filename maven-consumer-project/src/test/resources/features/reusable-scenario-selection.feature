@@ -7,63 +7,89 @@ Feature: Reusable scenario selection
   Scenario: Selection fixture B
     * , verify "B" equals "B"
 
-  Scenario: Select one component by inline scenario name
+  Scenario: Select one regular scenario by inline scenario name
     * RUN SCENARIO: SCENARIO: Selection fixture A
 
-  Scenario: Select one component by inline feature and scenario name
+  Scenario: Select one regular scenario by inline feature and scenario name
     * RUN SCENARIO: FEATURE: Reusable scenario selection SCENARIO: Selection fixture B
 
-  Scenario: Apply ordering and limit before singular component validation
+  Scenario: Select a component scenario from its configured path
+    * RUN COMPONENT SCENARIO: SCENARIO: Selection fixture A
+      | pkb_componentpath                 |
+      | src/test/resources/features       |
+
+  Scenario: Apply ordering and limit before singular scenario validation
     * RUN SCENARIO
-      | pkb_featurename             | pkb_name                    | pkb_order | pkb_limit |
-      | Reusable scenario selection | ^Selection fixture [AB]$    | lexical   | 1         |
+      | pkb_featurename             | pkb_name                 | pkb_order | pkb_limit |
+      | Reusable scenario selection | ^Selection fixture [AB]$ | lexical   | 1         |
 
-  Scenario: Execute multiple component matches in returned order
+  Scenario: Execute multiple regular scenario matches in returned order
     * RUN SCENARIOS
-      | pkb_featurename             | pkb_name                    | pkb_order |
-      | Reusable scenario selection | ^Selection fixture [AB]$    | reverse   |
+      | pkb_featurename             | pkb_name                 | pkb_order |
+      | Reusable scenario selection | ^Selection fixture [AB]$ | reverse   |
 
-  Scenario: Return silently when no component selector is supplied
+  Scenario: Return silently when no regular scenario selector is supplied
     * RUN SCENARIO
       | pkb_features |
       |              |
-    * , verify "no component was required" equals "no component was required"
+    * , verify "no scenario was required" equals "no scenario was required"
+
+  Scenario: Execute the singular scenario convenience form with RunKey
+    * SCENARIO: SCENARIO: Selection fixture A
+      | RunKey        |
+      | inlineScenario |
+    * , verify "<inlineScenario.SCENARIO NAME>" equals "Selection fixture A"
+
+  Scenario: Execute the singular component convenience form with RunKey
+    * COMPONENT: SCENARIO: Selection fixture B
+      | pkb_componentpath           | RunKey         |
+      | src/test/resources/features | inlineComponent |
+    * , verify "<inlineComponent.SCENARIO NAME>" equals "Selection fixture B"
 
   @service-call @local-api
   Scenario: Select one service call by inline scenario name
-    * "healthByName" SERVICE CALL: SCENARIO: HealthCall
+    * RUN "healthByName" SERVICE CALL: SCENARIO: HealthCall
       | endpoint              |
       | http://127.0.0.1:8765 |
     * , verify "<healthByName.RESPONSE.statusCode>" equals "200"
     * , verify "<healthByName.RESPONSE.body.status>" equals "UP"
 
   @service-call @local-api
-  Scenario: Select one service call by inline feature and scenario name
-    * "qualifiedHealth" SERVICE CALL: FEATURE: Reusable service call definitions SCENARIO: HealthCall
-      | endpoint              |
-      | http://127.0.0.1:8765 |
+  Scenario: RunKey overrides the quoted service-call key
+    * RUN "quotedMustLose" SERVICE CALL: SCENARIO: HealthCall
+      | RunKey         | endpoint              |
+      | qualifiedHealth | http://127.0.0.1:8765 |
     * , verify "<qualifiedHealth.RESPONSE.statusCode>" equals "200"
     * , verify "<qualifiedHealth.RESPONSE.body.status>" equals "UP"
 
   @service-call @local-api
   Scenario: Apply ordering and limit before singular service-call validation
-    * "limitedCall" SERVICE CALL
-      | pkb_featurename                  | pkb_name                    | pkb_order | pkb_limit | endpoint              | status |
-      | Reusable service call definitions | ^(HealthCall\|StatusCall)$   | lexical   | 1         | http://127.0.0.1:8765 | 200    |
+    * RUN "limitedCall" SERVICE CALL
+      | pkb_featurename                   | pkb_name                  | pkb_order | pkb_limit | endpoint              | status |
+      | Reusable service call definitions | ^(HealthCall\|StatusCall)$ | lexical   | 1         | http://127.0.0.1:8765 | 200    |
     * , verify "<limitedCall.RESPONSE.statusCode>" equals "200"
 
   @service-call @local-api
   Scenario: Execute multiple service-call matches in returned order
-    * SERVICE CALLS
-      | pkb_featurename                  | pkb_name                    | pkb_order | pkb_limit | endpoint              | status |
-      | Reusable service call definitions | ^(HealthCall\|StatusCall)$   | lexical   | 2         | http://127.0.0.1:8765 | 418    |
-    * , verify "<HealthCall.RESPONSE.statusCode>" equals "200"
-    * , verify "<HealthCall.RESPONSE.body.status>" equals "UP"
-    * , verify "<StatusCall.RESPONSE.statusCode>" equals "418"
-    * , verify "<StatusCall.RESPONSE.body.status>" equals "418"
+    * RUN SERVICE CALLS
+      | pkb_featurename                   | pkb_name      | RunKey      | endpoint              | status |
+      | Reusable service call definitions | ^HealthCall$  | pluralHealth | http://127.0.0.1:8765 | 200    |
+      | Reusable service call definitions | ^StatusCall$  | pluralStatus | http://127.0.0.1:8765 | 418    |
+    * , verify "<pluralHealth.RESPONSE.statusCode>" equals "200"
+    * , verify "<pluralHealth.RESPONSE.body.status>" equals "UP"
+    * , verify "<pluralStatus.RESPONSE.statusCode>" equals "418"
+    * , verify "<pluralStatus.RESPONSE.body.status>" equals "418"
+
+  @service-call @local-api
+  Scenario: Execute the singular CALL convenience form with RunKey
+    * CALL: SCENARIO: HealthCall
+      | RunKey      | endpoint              |
+      | inlineHealth | http://127.0.0.1:8765 |
+    * , verify "<inlineHealth.RESPONSE.statusCode>" equals "200"
+    * , verify "<inlineHealth.RESPONSE.body.status>" equals "UP"
 
   Scenario: Return silently when no service-call selector is supplied
-    * SERVICE CALL
-      | pkb_features |
+    * RUN SERVICE CALL
+      | pkb_callpath |
       |              |
     * , verify "no service call was required" equals "no service call was required"

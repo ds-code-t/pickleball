@@ -1,23 +1,26 @@
 package tools.dscode.coredefinitions;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.en.Given;
 import org.junit.jupiter.api.Test;
+import tools.dscode.common.mappings.MapConfigurations;
+import tools.dscode.common.mappings.NodeMap;
+import tools.dscode.common.mappings.custommappings.ValConverter;
 
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ModularScenariosChecks {
-
     @Test
     void inlineTagSelectorIsAddedToEveryInvocationRow() {
         DataTable table = DataTable.create(List.of(
@@ -28,7 +31,6 @@ public class ModularScenariosChecks {
 
         List<Map<String, String>> maps =
                 ModularScenarios.buildRunScenarioMaps("%save_customer", table);
-
         assertEquals(
                 List.of("%save_customer @existing", "%save_customer"),
                 maps.stream().map(map -> map.get("Run Tags")).toList()
@@ -43,7 +45,6 @@ public class ModularScenariosChecks {
                                 + "SCENARIO: component (default)",
                         null
                 );
-
         assertEquals(1, maps.size());
         assertEquals(
                 "^\\Qcomponent (default)\\E$",
@@ -54,14 +55,12 @@ public class ModularScenariosChecks {
                 maps.getFirst().get("pkb_featurename")
         );
     }
-
     @Test
     void labelledNamesPreservePeriodsAndInlineStartOverridesTheTable() {
         DataTable table = DataTable.create(List.of(
                 List.of("Step_Marker"),
                 List.of("table marker")
         ));
-
         List<Map<String, String>> maps =
                 ModularScenarios.buildRunScenarioMaps(
                         "SCENARIO: Save customer v2.1 "
@@ -69,7 +68,6 @@ public class ModularScenariosChecks {
                                 + "START: inline marker",
                         table
                 );
-
         assertEquals(
                 "^\\QSave customer v2.1\\E$",
                 maps.getFirst().get("pkb_name")
@@ -83,7 +81,6 @@ public class ModularScenariosChecks {
                 maps.getFirst().get("Step_Marker")
         );
     }
-
     @Test
     void labelledScenarioPreservesTableFeatureFilter() {
         DataTable table = DataTable.create(List.of(
@@ -96,7 +93,6 @@ public class ModularScenariosChecks {
                         "SCENARIO: Save customer component",
                         table
                 );
-
         assertEquals(
                 "Reusable customer flows",
                 maps.getFirst().get("pkb_featurename")
@@ -106,7 +102,6 @@ public class ModularScenariosChecks {
                 maps.getFirst().get("pkb_name")
         );
     }
-
     @Test
     void featureOnlyInlineSelectorIsSupported() {
         List<Map<String, String>> maps =
@@ -121,7 +116,6 @@ public class ModularScenariosChecks {
         );
         assertNull(maps.getFirst().get("pkb_name"));
     }
-
     @Test
     void inlineStartMarkerIsStoredWithTheInvocationRow() {
         List<Map<String, String>> maps =
@@ -130,7 +124,6 @@ public class ModularScenariosChecks {
                                 + "START: submit customer",
                         null
                 );
-
         assertEquals(
                 "^\\QSave customer component\\E$",
                 maps.getFirst().get("pkb_name")
@@ -147,7 +140,6 @@ public class ModularScenariosChecks {
                 List.of("customerName"),
                 List.of("Ava")
         ));
-
         List<Map<String, String>> maps =
                 ModularScenarios.buildRunScenarioMaps(
                         "%save_customer START: submit customer",
@@ -160,7 +152,6 @@ public class ModularScenariosChecks {
                 maps.getFirst().get("Step_Marker")
         );
     }
-
     @Test
     void tableStepMarkerIsPreservedWithoutInlineArguments() {
         DataTable table = DataTable.create(List.of(
@@ -176,7 +167,6 @@ public class ModularScenariosChecks {
                 maps.getFirst().get("Step_Marker")
         );
     }
-
     @Test
     void unlabelledNameSelectionIsRejected() {
         IllegalArgumentException scenarioName = assertThrows(
@@ -193,11 +183,9 @@ public class ModularScenariosChecks {
                         null
                 )
         );
-
         assertTrue(scenarioName.getMessage().contains("SCENARIO:"));
         assertTrue(qualifiedName.getMessage().contains("FEATURE:"));
     }
-
     @Test
     void labelledInlineArgumentsRequireValuesAndCannotRepeat() {
         IllegalArgumentException blankValue = assertThrows(
@@ -214,11 +202,9 @@ public class ModularScenariosChecks {
                         null
                 )
         );
-
         assertTrue(blankValue.getMessage().contains("FEATURE: requires"));
         assertTrue(duplicateValue.getMessage().contains("only be supplied once"));
     }
-
     @Test
     void singularSelectionRejectsMultipleOrderedAndLimitedMatches() {
         IllegalArgumentException exception = assertThrows(
@@ -230,12 +216,10 @@ public class ModularScenariosChecks {
                         "component scenario"
                 )
         );
-
         assertTrue(exception.getMessage().contains("matched 2 component scenarios"));
         assertTrue(exception.getMessage().contains("after ordering and limit"));
         assertTrue(exception.getMessage().contains("Use RUN SCENARIOS"));
     }
-
     @Test
     void pluralSelectionAllowsMultipleMatches() {
         assertDoesNotThrow(
@@ -247,12 +231,13 @@ public class ModularScenariosChecks {
                 )
         );
     }
-
     @Test
-    void runScenarioPatternCapturesThePluralFlagAndInlineArguments()
+    void runScenarioPatternCapturesKeyTypePluralFlagAndInlineArguments()
             throws ReflectiveOperationException {
         Method method = ModularScenarios.class.getDeclaredMethod(
                 "runScenarios",
+                String.class,
+                String.class,
                 String.class,
                 String.class,
                 DataTable.class
@@ -264,17 +249,31 @@ public class ModularScenariosChecks {
         );
         assertTrue(singular.matches());
         assertNull(singular.group(1));
+        assertEquals("SCENARIO", singular.group(2));
+        assertNull(singular.group(3));
         assertEquals(
                 " SCENARIO: Save customer component",
-                singular.group(2)
+                singular.group(4)
         );
 
-        Matcher plural = pattern.matcher("RUN SCENARIOS: %save_customer");
-        assertTrue(plural.matches());
-        assertEquals("S", plural.group(1));
-        assertEquals(" %save_customer", plural.group(2));
-    }
+        Matcher keyedCall = pattern.matcher(
+                "RUN \"health\" SERVICE CALL: SCENARIO: HealthCall"
+        );
+        assertTrue(keyedCall.matches());
+        assertEquals("health", keyedCall.group(1));
+        assertEquals("SERVICE CALL", keyedCall.group(2));
+        assertNull(keyedCall.group(3));
+        assertEquals(" SCENARIO: HealthCall", keyedCall.group(4));
 
+        Matcher plural = pattern.matcher(
+                "RUN COMPONENT SCENARIOS: %save_customer"
+        );
+        assertTrue(plural.matches());
+        assertNull(plural.group(1));
+        assertEquals("COMPONENT SCENARIO", plural.group(2));
+        assertEquals("S", plural.group(3));
+        assertEquals(" %save_customer", plural.group(4));
+    }
     @Test
     void serviceCallPatternCapturesThePluralFlagAndInlineArguments()
             throws ReflectiveOperationException {
@@ -286,7 +285,6 @@ public class ModularScenariosChecks {
                 DataTable.class
         );
         Pattern pattern = Pattern.compile(method.getAnnotation(Given.class).value());
-
         Matcher singular = pattern.matcher(
                 "\"health\" SERVICE CALL: SCENARIO: HealthCall"
         );
@@ -294,7 +292,6 @@ public class ModularScenariosChecks {
         assertEquals("health", singular.group(1));
         assertNull(singular.group(2));
         assertEquals(" SCENARIO: HealthCall", singular.group(3));
-
         Matcher plural = pattern.matcher("SERVICE CALLS: %health");
         assertTrue(plural.matches());
         assertNull(plural.group(1));
@@ -308,7 +305,6 @@ public class ModularScenariosChecks {
         Map<String, String> options = new java.util.HashMap<>();
         options.put("pkb_features", "table/path");
         options.put("cucumber.features", "other/path");
-
         ModularScenarios.applyFeaturesPathOverride(
                 options,
                 "configured/data/path"
@@ -320,19 +316,81 @@ public class ModularScenariosChecks {
                 options.get("cucumber.features")
         );
     }
-
     @Test
-    void inlineCallAcceptsAnOptionalDataTable()
+    void convenienceMethodsAcceptAnOptionalDataTableAndReturnObject()
             throws ReflectiveOperationException {
-        Method method = ServiceCallSteps.class.getDeclaredMethod(
+        Method inlineCall = ServiceCallSteps.class.getDeclaredMethod(
                 "inlineCall",
                 String.class,
                 DataTable.class
         );
+        Method inlineScenario = ModularScenarios.class.getDeclaredMethod(
+                "inlineScenario",
+                String.class,
+                DataTable.class
+        );
+        Method inlineComponent = ModularScenarios.class.getDeclaredMethod(
+                "inlineComponent",
+                String.class,
+                DataTable.class
+        );
 
-        assertEquals(Object.class, method.getReturnType());
+        assertEquals(Object.class, inlineCall.getReturnType());
+        assertEquals(Object.class, inlineScenario.getReturnType());
+        assertEquals(Object.class, inlineComponent.getReturnType());
     }
 
+    @Test
+    void legacyServiceCallStepIsExplicitlyDeprecated()
+            throws ReflectiveOperationException {
+        Method method = ServiceCallSteps.class.getDeclaredMethod(
+                "serviceCalls",
+                String.class,
+                String.class,
+                String.class,
+                DataTable.class
+        );
+
+        assertTrue(method.isAnnotationPresent(Deprecated.class));
+    }
+
+    @Test
+    void scenarioReturnValueDistinguishesMissingAndExplicitNull() {
+        NodeMap missingReturn = new NodeMap(MapConfigurations.MapType.STEP_MAP);
+        assertSame(
+                missingReturn.getRoot(),
+                ModularScenarios.scenarioReturnValue(missingReturn)
+        );
+
+        NodeMap explicitNull = new NodeMap(MapConfigurations.MapType.STEP_MAP);
+        explicitNull.put("RETURN", null);
+        assertNull(ModularScenarios.scenarioReturnValue(explicitNull));
+
+        NodeMap explicitValue = new NodeMap(MapConfigurations.MapType.STEP_MAP);
+        explicitValue.put("RETURN", "selected");
+        assertEquals(
+                "selected",
+                ModularScenarios.scenarioReturnValue(explicitValue)
+        );
+    }
+
+    @Test
+    void explicitNullMarkersProduceNullNodesWithoutChangingEmbeddedText() {
+        Object direct = ValConverter.convertSpecialValues("<^~NULL~^>");
+        assertTrue(direct instanceof JsonNode);
+        assertTrue(((JsonNode) direct).isNull());
+        assertTrue(MappingSteps.hasNonBlankValue(direct));
+
+        JsonNode structured = ValConverter.convertSpecialValuesToTree(Map.of(
+                "A", "^~NULL~^",
+                "B", "prefix ^~NULL~^ suffix"
+        ));
+        assertTrue(structured.path("A").isNull());
+        assertEquals(
+                "prefix ^~NULL~^ suffix",
+                structured.path("B").asText()
+        );
+    }
     @Test
     void scenarioDataLookupReturnsNullWhenNoMarkerIsSupplied() {
         assertNull(ModularScenarios.getScenarioStepData(
@@ -350,7 +408,6 @@ public class ModularScenariosChecks {
                 ModularScenarios.parseDataAddress(
                         "Data records.Customer data.payload"
                 );
-
         assertEquals("", marker.featureName());
         assertEquals("", marker.scenarioName());
         assertEquals("payload", marker.stepMarker());
@@ -363,13 +420,11 @@ public class ModularScenariosChecks {
         assertEquals("Customer data", feature.scenarioName());
         assertEquals("payload", feature.stepMarker());
     }
-
     @Test
     void invalidOrBlankDataAddressesAreHandledDescriptively() {
         assertNull(ModularScenarios.parseDataAddress(null));
         assertNull(ModularScenarios.parseDataAddress(""));
         assertNull(ModularScenarios.parseDataAddress("Scenario."));
-
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
                 () -> ModularScenarios.parseDataAddress("a.b.c.d")

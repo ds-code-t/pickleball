@@ -12,11 +12,12 @@ import java.util.LinkedHashMap;
 public final class PKB_props {
 
     public static final String PKB_PREFIX = "pkb_";
-
     public static final String PKB_GLUE = PKB_PREFIX + "glue";
     public static final String PKB_FEATURES = PKB_PREFIX + "features";
     public static final String PKB_FEATURE_NAME = PKB_PREFIX + "featurename";
     public static final String PKB_DATA_PATH = PKB_PREFIX + "datapath";
+    public static final String PKB_CALL_PATH = PKB_PREFIX + "callpath";
+    public static final String PKB_COMPONENT_PATH = PKB_PREFIX + "componentpath";
     public static final String PKB_TAGS = PKB_PREFIX + "tags";
     public static final String PKB_NAME = PKB_PREFIX + "name";
     public static final String PKB_ORDER = PKB_PREFIX + "order";
@@ -26,7 +27,6 @@ public final class PKB_props {
     public static final String PKB_PARALLEL = PKB_PREFIX + "parallel";
     public static final String PKB_ENVIRONMENT = PKB_PREFIX + "environment";
     public static final String PKB_BROWSER = PKB_PREFIX + "browser";
-
     public static final String PKB_OPTIONS = PKB_PREFIX + "options";
     public static final String PKB_CUCUMBER_CLI_ARGS = PKB_PREFIX + "cucumber_cli_args";
     public static final String PKB_CUCUMBER_CLI_FEATURE_SELECTORS =  PKB_PREFIX + "cucumber_cli_feature_selectors";
@@ -34,7 +34,6 @@ public final class PKB_props {
 
     public static final String PKB_DEBUG_BROWSER = PKB_PREFIX + "debugBrowser";
     public static final String PKB_DEBUG_ARGS = PKB_PREFIX + "debugargs";
-
     private PKB_props() {
     }
 
@@ -50,7 +49,6 @@ public final class PKB_props {
     public static void put(String key, String value) {
         values().put(PickleballRunner.normalizePkbKey(key), value);
     }
-
     public static String browser() {
         return get(PKB_BROWSER);
     }
@@ -71,7 +69,6 @@ public final class PKB_props {
     public static String glue() {
         return get(PKB_GLUE);
     }
-
     public static void glue(String gluePaths) {
         put(PKB_GLUE, gluePaths);
     }
@@ -91,6 +88,22 @@ public final class PKB_props {
 
     public static void dataPath(String dataPath) {
         put(PKB_DATA_PATH, dataPath);
+    }
+
+    public static String callPath() {
+        return get(PKB_CALL_PATH);
+    }
+
+    public static void callPath(String callPath) {
+        put(PKB_CALL_PATH, callPath);
+    }
+
+    public static String componentPath() {
+        return get(PKB_COMPONENT_PATH);
+    }
+
+    public static void componentPath(String componentPath) {
+        put(PKB_COMPONENT_PATH, componentPath);
     }
 
     // -- feature name filter --
@@ -115,7 +128,6 @@ public final class PKB_props {
     public static String name() {
         return get(PKB_NAME);
     }
-
     public static void name(String nameRegex) {
         put(PKB_NAME, nameRegex);
     }
@@ -137,7 +149,6 @@ public final class PKB_props {
     public static void profile(String profileName) {
         put(PKB_PROFILE, profileName);
     }
-
     // -- parallel --
     public static String parallel() {
         return get(PKB_PARALLEL);
