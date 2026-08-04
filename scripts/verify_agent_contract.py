@@ -11,8 +11,10 @@ import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-
+TEMP_WORKSPACE = ".agent-work"
+TEMP_WORKSPACE_IGNORE = ".agent-work/"
 REQUIRED_FILES = (
+    ".gitignore",
     "AGENTS.md",
     "CLAUDE.md",
     "GEMINI.md",
@@ -41,9 +43,7 @@ REQUIRED_FILES = (
     "maven-consumer-project/mvnw",
     "maven-consumer-project/mvnw.cmd",
     "maven-consumer-project/.mvn/wrapper/maven-wrapper.properties",
-    "setup-agent.ps1",
 )
-
 ADAPTER_FILES = (
     "CLAUDE.md",
     "GEMINI.md",
@@ -56,7 +56,6 @@ ADAPTER_FILES = (
     ".clinerules/01-pickleball.md",
     ".windsurf/rules/pickleball.md",
 )
-
 SKILL_FILES = (
     ".agents/skills/pickleball-functionality-change/SKILL.md",
     ".claude/skills/pickleball-functionality-change/SKILL.md",
@@ -64,7 +63,6 @@ SKILL_FILES = (
     ".cursor/skills/pickleball-functionality-change/SKILL.md",
     ".windsurf/skills/pickleball-functionality-change/SKILL.md",
 )
-
 BEHAVIOR_PREFIXES = (
     "src/main/java/",
     "src/main/aspectj/",
@@ -120,6 +118,20 @@ def git_changed_files(base_ref: str) -> list[str] | None:
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
+def git_tracked_temp_files() -> list[str]:
+    result = subprocess.run(
+        ["git", "ls-files", "--", TEMP_WORKSPACE],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode != 0:
+        return []
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
 def starts_with_any(path: str, prefixes: tuple[str, ...]) -> bool:
     return any(path.startswith(prefix) for prefix in prefixes)
 
@@ -136,7 +148,6 @@ def main() -> int:
         help="Treat change-coverage warnings as errors.",
     )
     args = parser.parse_args()
-
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -149,6 +160,25 @@ def main() -> int:
     for relative in REQUIRED_FILES:
         if not (ROOT / relative).is_file():
             errors.append(f"Missing required agent file: {relative}")
+
+    gitignore = ROOT / ".gitignore"
+    if gitignore.is_file():
+        ignore_lines = {
+            line.strip()
+            for line in gitignore.read_text(encoding="utf-8").splitlines()
+        }
+        if TEMP_WORKSPACE_IGNORE not in ignore_lines:
+            errors.append(
+                f".gitignore must contain the temporary workspace entry: "
+                f"{TEMP_WORKSPACE_IGNORE}"
+            )
+
+    tracked_temp_files = git_tracked_temp_files()
+    if tracked_temp_files:
+        errors.append(
+            "Temporary agent workspace files are tracked by Git: "
+            + ", ".join(tracked_temp_files)
+        )
 
     for relative in SKILL_FILES:
         if not (ROOT / relative).is_file():
@@ -180,7 +210,6 @@ def main() -> int:
                 starts_with_any(path, DOC_PREFIXES) or path in DOC_FILES
                 for path in changed
             )
-
             if behavior_changed and not tests_changed and not env_true("AGENT_CONTRACT_ALLOW_NO_TESTS"):
                 warnings.append(
                     "Framework/build behavior changed but no framework or Maven "

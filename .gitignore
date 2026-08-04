@@ -35,10 +35,14 @@ bin/
 /dist/
 /nbdist/
 /.nb-gradle/
-
 ### VS Code ###
 .vscode/
 
 ### Mac OS ###
 .DS_Store
+
+### Temporary agent and migration work ###
+.agent-work/
 .agent-bootstrap-backup-*/
+.datetime-update-backup/
+ajcore.*.txt

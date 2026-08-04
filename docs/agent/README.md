@@ -1,40 +1,29 @@
 # Repository Agent Context
 
-This directory supports repository-native AI coding agents. It is not a runtime dependency of Pickleball and is not included to change framework behavior.
-
-
-## One-command setup
-
-After extracting the drop-in ZIP into the Pickleball repository root, run:
-
-```powershell
-.\setup-agent.ps1
-```
-
-This merges the supplied ignore entry into `.gitignore`, removes the temporary example file, generates the repository index, verifies the agent contract, and runs full framework and Maven consumer validation.
-
-The Maven consumer uses its committed Maven Wrapper, so a separate Maven installation and IntelliJ bundled-Maven path are not required. The first wrapper run downloads the pinned Maven version into the user Maven cache.
-
-Optional modes:
-
-```powershell
-.\setup-agent.ps1 -Quick       # Contract checks plus Gradle framework tests
-.\setup-agent.ps1 -SkipTests   # Configure and verify only
-.\setup-agent.ps1 -StageGit    # Full setup, then stage the shared files
-```
-
-The script never commits or pushes changes.
+This directory supports repository-native AI coding agents. It is not a runtime dependency of Pickleball and does not change framework behavior.
 
 ## Canonical files
 
-- `/AGENTS.md` — project contract, workflow, compatibility rules, validation, and definition of done
+- `/AGENTS.md` — project contract, workflow, compatibility rules, validation, temporary-work rules, and definition of done
 - `/docs/agent/feature-map.md` — living map from capabilities to implementation, tests, consumer examples, and documentation
 - `/docs/agent/change-checklist.md` — explicit change-completion checklist
 - `/docs/agent/repository-index.md` — generated inventory of relevant files
-- `/REVIEW.md` — review-time checks for compatibility, test, consumer-example, and documentation omissions
+- `/REVIEW.md` — review-time checks for compatibility, tests, consumer examples, and documentation omissions
 - `/.agents/skills/pickleball-functionality-change/SKILL.md` — reusable functionality-change workflow for agents supporting Agent Skills
 
 Agent-specific files are intentionally small adapters that point back to the canonical contract. Avoid copying the full project description into every adapter.
+
+## Temporary agent work
+
+Disposable scripts, patches, generated bundles, migration utilities, investigation output, and intermediate files belong under:
+
+```text
+.agent-work/
+```
+
+The directory is ignored by Git and excluded from the generated repository index. Delete temporary files after use. Do not force-add files from `.agent-work/`.
+
+The committed `scripts/` directory is reserved for reusable project-maintenance tooling that is reviewed and intended to remain in the repository.
 
 ## Expected behavior
 
@@ -46,11 +35,12 @@ should cause the agent to:
 
 1. Load the repository contract.
 2. Locate the capability in the feature map.
-3. Inspect related source, tests, consumer scenarios, and guides.
+3. Inspect related source, tests, Maven consumer scenarios, and guides.
 4. Implement the change.
 5. Update executable examples and documentation when applicable.
 6. Run validation.
-7. Report results.
+7. Remove disposable working files.
+8. Report results.
 
 This is task-time automation, not a passive background documentation watcher. Manual code edits do not automatically update documentation.
 
@@ -83,7 +73,7 @@ Windows:
 
 ## Enforcement levels
 
-By default, `verify_agent_contract.py` treats missing setup files as errors and change-coverage findings as warnings.
+By default, `verify_agent_contract.py` treats missing agent files and an invalid temporary-workspace configuration as errors. Change-coverage findings remain warnings.
 
 Use strict mode in CI when the team is comfortable with the heuristics:
 
@@ -100,7 +90,7 @@ Do not use overrides to bypass genuinely missing documentation or tests.
 
 ## Supported adapters included
 
-The bundle includes adapters for:
+The repository includes adapters for:
 
 - JetBrains AI Assistant project rules
 - JetBrains Junie (`AGENTS.md` plus `.junie/guidelines.md` compatibility adapter)

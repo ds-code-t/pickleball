@@ -23,6 +23,7 @@ else {
 
 function Invoke-Python {
     param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments)
+
     $CommandArgs = @($script:PythonPrefix) + @($Arguments)
     & $script:PythonExe @CommandArgs
     if ($LASTEXITCODE -ne 0) {
@@ -94,7 +95,6 @@ function Find-IntelliJBundledMaven {
             Where-Object { $_.FullName -match '[\\/]plugins[\\/]maven[\\/]lib[\\/]maven3[\\/]bin[\\/]mvn\.cmd$' } |
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 1
-
         if ($null -ne $match) {
             return $match.FullName
         }
@@ -134,7 +134,7 @@ function Get-MavenExecutable {
     throw @"
 The Maven consumer wrapper is missing, and no fallback Maven executable was found.
 Expected wrapper: maven-consumer-project\mvnw.cmd
-Re-extract the turnkey drop-in bundle, then rerun setup-agent.ps1.
+Restore the committed Maven wrapper files, then rerun validation.
 "@
 }
 

@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "docs" / "agent" / "repository-index.md"
 
 EXCLUDED_PARTS = {
+    ".agent-work",
     ".git",
     ".gradle",
     ".idea",
@@ -20,7 +21,6 @@ EXCLUDED_PARTS = {
     "node_modules",
     "__pycache__",
 }
-
 GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("Top-level project files", (
         "README.md",
@@ -87,7 +87,6 @@ GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
         ".clinerules/**/*",
         ".windsurf/rules/**/*",
         ".windsurf/skills/**/*",
-        "setup-agent.ps1",
         "scripts/agent_validate.*",
         "scripts/verify_agent_contract.py",
         "scripts/refresh_agent_index.py",
@@ -120,7 +119,6 @@ def render() -> str:
         "This inventory helps coding agents discover relevant files. It does not replace source inspection or `docs/agent/feature-map.md`.",
         "",
     ]
-
     for title, patterns in GROUPS:
         paths = collect(patterns)
         lines.extend((f"## {title}", ""))
@@ -143,7 +141,6 @@ def main() -> int:
     args = parser.parse_args()
 
     content = render()
-
     if args.check:
         if not OUTPUT.exists():
             print(f"ERROR: Missing {OUTPUT.relative_to(ROOT)}", file=sys.stderr)

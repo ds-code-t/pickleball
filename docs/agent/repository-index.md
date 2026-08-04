@@ -80,6 +80,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/io/cucumber/core/runner/PickleStepDefinitionMatches.java`
 - `src/main/java/io/cucumber/core/runner/PredefinedSteps.java`
 - `src/main/java/io/cucumber/core/runner/ScenarioStep.java`
+- `src/main/java/io/cucumber/core/runner/ScenarioStepData.java`
 - `src/main/java/io/cucumber/core/runner/StepBase.java`
 - `src/main/java/io/cucumber/core/runner/StepData.java`
 - `src/main/java/io/cucumber/core/runner/StepExtension.java`
@@ -290,15 +291,23 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 ## Framework tests
 
-- `src/test/java/tools/dscode/common/util/datetime/BusinessTemporalDeltaTest.java`
-- `src/test/java/tools/dscode/common/util/datetime/BusinessTimePostModifierTest.java`
+- _No matching files found._
 
 ## Maven consumer Java support
 
+- `maven-consumer-project/src/test/java/com/example/pickleball/DataReferenceSteps.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/InternalFrameworkTestSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/MappingTypeSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/ScenarioDataSteps.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/support/InternalJavaTestRunner.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/tests/TokenizedQueryTest.java`
+- `maven-consumer-project/src/test/java/io/cucumber/core/runner/ScenarioStepChecks.java`
+- `maven-consumer-project/src/test/java/io/cucumber/core/runner/ScenarioStepDataChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/common/util/datetime/BusinessTemporalDeltaChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/common/util/datetime/BusinessTimePostModifierChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/ModularScenariosChecks.java`
 
 ## Maven consumer feature scenarios
 
@@ -308,11 +317,16 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/dialogs.feature`
 - `maven-consumer-project/src/test/resources/features/dynamic-steps.feature`
 - `maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature`
+- `maven-consumer-project/src/test/resources/features/internal-framework-java-checks.feature`
 - `maven-consumer-project/src/test/resources/features/keyboard.feature`
 - `maven-consumer-project/src/test/resources/features/mapping-and-resources.feature`
 - `maven-consumer-project/src/test/resources/features/mapping-value-type-preservation.feature`
 - `maven-consumer-project/src/test/resources/features/navigation.feature`
 - `maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature`
+- `maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature`
+- `maven-consumer-project/src/test/resources/features/scenario-data-references.feature`
+- `maven-consumer-project/src/test/resources/features/scenario-marker-data.feature`
+- `maven-consumer-project/src/test/resources/features/scenario-step-markers.feature`
 - `maven-consumer-project/src/test/resources/features/service-call-execution.feature`
 
 ## Maven consumer service-call definitions
@@ -337,8 +351,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/configs/SAUCE_EDGE.yaml`
 - `maven-consumer-project/src/test/resources/configs/TEST_DATA.yaml`
 - `maven-consumer-project/src/test/resources/configs/URL.yaml`
+- `maven-consumer-project/src/test/resources/data/data-reference-records.feature`
 - `maven-consumer-project/src/test/resources/files/customers.yaml`
 - `maven-consumer-project/src/test/resources/pickleball_local.properties`
+- `maven-consumer-project/src/test/resources/pickleball_local2.properties`
 
 ## Maven consumer test site
 
@@ -380,4 +396,3 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `scripts/agent_validate.sh`
 - `scripts/refresh_agent_index.py`
 - `scripts/verify_agent_contract.py`
-- `setup-agent.ps1`

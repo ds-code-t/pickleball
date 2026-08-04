@@ -184,6 +184,21 @@ If a required validation cannot run, state exactly what was not run and why. Nev
 - Follow existing code style and patterns before introducing new abstractions.
 - Do not replace executable examples with prose.
 - Never store secrets, credentials, machine-specific paths, or private data in agent instruction files.
+
+### Temporary agent workspace
+
+Use `.agent-work/` for disposable scripts, patches, generated bundles,
+intermediate files, migration utilities, investigation output, and other
+agent-created artifacts that are not maintained project code.
+
+Do not place temporary automation in the repository root, `scripts/`, source
+directories, test directories, or documentation directories. The committed
+`scripts/` directory is only for reusable project-maintenance tooling intended
+to remain part of the repository.
+
+Delete temporary files after they have served their purpose. Before completing
+a task, confirm that `.agent-work/` contains no files that need to be retained.
+Never force-add `.agent-work/` content to Git.
 ## Agent-maintained context
 
 `docs/agent/feature-map.md` is a living navigation map. Update it when:
