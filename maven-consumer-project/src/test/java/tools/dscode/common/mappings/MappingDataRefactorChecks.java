@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
+import static tools.dscode.common.mappings.custommappings.ValConverter.convertSpecialValues;
 
 public class MappingDataRefactorChecks {
 
@@ -64,6 +65,25 @@ public class MappingDataRefactorChecks {
     }
 
     @Test
+    void indexedReadsAddressTheLatestStoredArrayValue() {
+        NodeMap map = runMap();
+        ArrayNode rows = MAPPER.createArrayNode()
+                .add(MAPPER.createObjectNode().put("rowName", "first"))
+                .add(MAPPER.createObjectNode().put("rowName", "last"));
+
+        map.put("rows", rows);
+
+        assertEquals(rows, assertInstanceOf(ArrayNode.class, map.get("rows")));
+        assertEquals("first", map.get("rows[0].rowName"));
+        assertEquals("last", map.get("rows[1].rowName"));
+        assertEquals(
+                "rows[][-1][0].rowName",
+                Tokenized.preprocessReadQuery("rows[0].rowName")
+        );
+        assertEquals("rows[]", Tokenized.preprocessReadQuery("rows[]"));
+    }
+
+    @Test
     void nativeCucumberValuesUseTheNormalNodeMapReferenceRegistry() {
         NodeMap map = runMap();
         DataTable table = DataTable.create(List.of(
@@ -85,6 +105,39 @@ public class MappingDataRefactorChecks {
                 processor.resolveWholeText("<docString>")));
     }
 
+
+    @Test
+    void valueWrappersPreserveNativeCucumberValues() {
+        DataTable table = DataTable.create(List.of(
+                List.of("key", "value"),
+                List.of("a", "b")
+        ));
+        DocString docString = DocString.create("{\"name\":\"Alice\"}", "json");
+
+        assertSame(table, ValueWrapper.createValueWrapper(table).getValue());
+        assertSame(docString, ValueWrapper.createValueWrapper(docString).getValue());
+        assertSame(table, convertSpecialValues(table));
+        assertSame(docString, convertSpecialValues(docString));
+    }
+
+    @Test
+    void quotedJsonTextDropsParserEscapesBeforeItIsSaved() {
+        ValueWrapper objectText = ValueWrapper.createValueWrapper(
+                "\"{\\\"active\\\":true,\\\"meta\\\":{\\\"score\\\":2}}\""
+        );
+        ValueWrapper arrayText = ValueWrapper.createValueWrapper(
+                "\"[\\\"compiler\\\",2,{\\\"stable\\\":true}]\""
+        );
+
+        assertEquals(
+                "{\"active\":true,\"meta\":{\"score\":2}}",
+                objectText.getValue()
+        );
+        assertEquals(
+                "[\"compiler\",2,{\"stable\":true}]",
+                arrayText.getValue()
+        );
+    }
 
     @Test
     void setDataTableStoresTheNativeTableInTheRunMap() {
@@ -212,13 +265,44 @@ public class MappingDataRefactorChecks {
     }
 
     @Test
+    void structuredValuesCanBeEmbeddedAsJsonValuesAndStrings() throws Exception {
+        TestProcessor processor = processor();
+        ObjectNode object = MAPPER.createObjectNode()
+                .put("name", "Alice")
+                .set("metadata", MAPPER.createObjectNode().put("active", true));
+        ArrayNode array = MAPPER.createArrayNode()
+                .add("a")
+                .add(MAPPER.createObjectNode().put("nested", true));
+        processor.put("object", object);
+        processor.put("array", array);
+
+        JsonNode resolved = MAPPER.readTree(processor.resolveWholeText(
+                """
+                {
+                  "object": "<object~unquote>",
+                  "array": "<array~unquote>",
+                  "objectText": "<object>",
+                  "arrayText": "<array>"
+                }
+                """));
+
+        assertEquals(object, resolved.get("object"));
+        assertEquals(array, resolved.get("array"));
+        assertEquals(object.toString(), resolved.get("objectText").textValue());
+        assertEquals(array.toString(), resolved.get("arrayText").textValue());
+    }
+
+    @Test
     void assertionWrappersRetainAndCompareJacksonContainers() throws Exception {
         JsonNode first = MAPPER.readTree("{\"name\":\"Alice\",\"tags\":[\"a\"]}");
         JsonNode same = MAPPER.readTree("{\"name\":\"Alice\",\"tags\":[\"a\"]}");
         JsonNode different = MAPPER.readTree("{\"name\":\"Bob\",\"tags\":[\"a\"]}");
 
         ValueWrapper wrapped = ValueWrapper.createValueWrapper(first);
+        ArrayNode array = MAPPER.createArrayNode().add(first);
 
+        assertSame(first, convertSpecialValues(first));
+        assertSame(array, convertSpecialValues(array));
         assertSame(first, wrapped.getValue());
         assertEquals(first.toString(), wrapped.asNormalizedText());
         assertEquals(wrapped, same);

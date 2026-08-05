@@ -2,6 +2,8 @@ package tools.dscode.common.assertions;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.LinkedListMultimap;
+import io.cucumber.datatable.DataTable;
+import io.cucumber.docstring.DocString;
 import com.google.common.collect.ListMultimap;
 
 import java.math.BigDecimal;
@@ -133,6 +135,8 @@ public class ValueWrapper {
                 return new ValueWrapper(node.decimalValue(), ValueTypes.NUMERIC);
             return new ValueWrapper(node, ValueTypes.DEFAULT, node.toString());
         }
+        if (obj instanceof DataTable || obj instanceof DocString)
+            return new ValueWrapper(obj, ValueTypes.DEFAULT, obj.toString());
         return new ValueWrapper(obj.toString());
     }
 
@@ -160,25 +164,29 @@ public class ValueWrapper {
                 switch (first) {
                     case '"' -> {
                         type = ValueTypes.DOUBLE_QUOTED;
-                        value = raw.substring(1, raw.length() - 1);
+                        value = unescapeMatchingQuote(
+                                raw.substring(1, raw.length() - 1), first);
                         normalizedText = normalizeText((String) value);
                         return;
                     }
                     case '\'' -> {
                         type = ValueTypes.SINGLE_QUOTED;
-                        value = raw.substring(1, raw.length() - 1);
+                        value = unescapeMatchingQuote(
+                                raw.substring(1, raw.length() - 1), first);
                         normalizedText = normalizeText((String) value);
                         return;
                     }
                     case '`' -> {
                         type = ValueTypes.BACK_TICKED;
-                        value = raw.substring(1, raw.length() - 1);
+                        value = unescapeMatchingQuote(
+                                raw.substring(1, raw.length() - 1), first);
                         normalizedText = normalizeText((String) value);
                         return;
                     }
                     case '~' -> {
                         type = ValueTypes.TILDE_QUOTED;
-                        value = raw.substring(1, raw.length() - 1);
+                        value = unescapeMatchingQuote(
+                                raw.substring(1, raw.length() - 1), first);
                         normalizedText = normalizeText((String) value);
                         return;
                     }
@@ -208,6 +216,10 @@ public class ValueWrapper {
 
     private static String durationSyntax(Duration duration) {
         return DurationFormattingUtils.format(duration, null);
+    }
+
+    private static String unescapeMatchingQuote(String value, char quote) {
+        return value.replace("\\" + quote, String.valueOf(quote));
     }
 
     public BigInteger asForcedSimpleNumber() {

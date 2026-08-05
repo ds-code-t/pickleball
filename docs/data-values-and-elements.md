@@ -1,6 +1,6 @@
 # Data Values and Data Elements
 
-> **Working feature examples:** [`mapping-value-type-preservation.feature`](../maven-consumer-project/src/test/resources/features/mapping-value-type-preservation.feature) verifies Jackson container preservation through normal mapping reads. [`internal-framework-java-checks.feature`](../maven-consumer-project/src/test/resources/features/internal-framework-java-checks.feature) runs focused DataTable and mapping conversion checks against the locally published dependency.
+> **Working feature examples:** [`mapping-value-type-preservation.feature`](../maven-consumer-project/src/test/resources/features/mapping-value-type-preservation.feature) verifies Jackson container preservation, native and JSON-converted DataTable iteration, Data Row context resolution, explicit `Data`/`Data Table` conversion, and compact JSON string embedding. [`internal-framework-java-checks.feature`](../maven-consumer-project/src/test/resources/features/internal-framework-java-checks.feature) runs focused DataTable and mapping conversion checks against the locally published dependency.
 
 ## Normal storage and retrieval
 
@@ -19,6 +19,8 @@
 
 Explicit Java `Map` and `List` conversion belongs to the Data Element or converter that requests it. Normal retrieval does not convert Jackson objects and arrays into Java maps and lists.
 
+Normal indexed and nested reads apply to the latest value stored under the root key. For example, when `rows` contains an `ArrayNode`, `rows[0].name` reads the first object in that stored array rather than indexing the internal root-key history wrapper. An explicit trailing `[]` still requests the complete root-key collection.
+
 ## Template rendering
 
 A structured Jackson value embedded in text is rendered as compact JSON:
@@ -29,6 +31,8 @@ items=<order.items>
 ```
 
 For an object such as `{"name":"Alice"}`, `<customer>` renders as `{"name":"Alice"}`. For an array such as `["a","b"]`, `<order.items>` renders as `["a","b"]`. Scalar values retain their normal text form.
+
+When compact JSON text is placed inside a quoted dynamic-step argument, parser escaping protects the surrounding phrase but is removed before the value is saved. The stored string therefore contains normal JSON quotes, not literal backslashes before each quote.
 
 Resolving a template that consists only of one reference preserves the underlying structured value for callers that request the whole value rather than text.
 

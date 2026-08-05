@@ -180,7 +180,7 @@ public final class Tokenized {
         }
         String expression = path.expression();
         if (!selectLastRoot
-                || path.rootIndexed()
+                || path.rootCollectionExplicit()
                 || path.rootFunction()
                 || path.rootName().startsWith("_")) {
             return expression;
@@ -303,7 +303,7 @@ public final class Tokenized {
         int cursor = 0;
         int rootEnd = -1;
         String rootName = null;
-        boolean rootIndexed = false;
+        boolean rootCollectionExplicit = false;
         boolean rootFunction = false;
         boolean directPropertyPath = true;
         boolean root = true;
@@ -320,7 +320,7 @@ public final class Tokenized {
                         output.toString(),
                         rootEnd,
                         rootName,
-                        rootIndexed,
+                        rootCollectionExplicit,
                         rootFunction,
                         List.copyOf(properties),
                         false
@@ -335,6 +335,7 @@ public final class Tokenized {
                 rootEnd = output.length();
             }
             int next = skipWhitespace(input, cursor);
+            int rootBracketIndex = 0;
             while (next < input.length() && input.charAt(next) == '[') {
                 directPropertyPath = false;
                 int bracketEnd = balancedBracketEnd(input, next);
@@ -344,14 +345,17 @@ public final class Tokenized {
                             output.toString(),
                             rootEnd,
                             rootName,
-                            rootIndexed,
+                            rootCollectionExplicit,
                             rootFunction,
                             List.copyOf(properties),
                             false
                     );
                 }
                 if (root) {
-                    rootIndexed = true;
+                    if (rootBracketIndex++ == 0
+                            && input.substring(next + 1, bracketEnd - 1).isBlank()) {
+                        rootCollectionExplicit = true;
+                    }
                 }
                 output.append(input, next, bracketEnd);
                 cursor = bracketEnd;
@@ -366,7 +370,7 @@ public final class Tokenized {
                         output.toString(),
                         rootEnd,
                         rootName,
-                        rootIndexed,
+                        rootCollectionExplicit,
                         rootFunction,
                         List.copyOf(properties),
                         directPropertyPath
@@ -379,7 +383,7 @@ public final class Tokenized {
                         output.toString(),
                         rootEnd,
                         rootName,
-                        rootIndexed,
+                        rootCollectionExplicit,
                         rootFunction,
                         List.copyOf(properties),
                         false
@@ -1078,7 +1082,7 @@ public final class Tokenized {
             String expression,
             int rootEnd,
             String rootName,
-            boolean rootIndexed,
+            boolean rootCollectionExplicit,
             boolean rootFunction,
             List<String> properties,
             boolean directPropertyPath) { }

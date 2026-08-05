@@ -1,7 +1,10 @@
 package com.example.pickleball;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.cucumber.datatable.DataTable;
+import io.cucumber.docstring.DocString;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import tools.dscode.common.mappings.queries.Tokenized;
@@ -23,7 +26,8 @@ import static tools.dscode.common.mappings.ValueFormatting.fromSafeJsonNode;
  *
  * <p>"RUN MAP QUERY ... RETURNS TYPE" exercises the public NodeMap/Tokenized
  * read behavior. Structured results remain Jackson ObjectNode/ArrayNode values,
- * including explicit terminal {@code []} collection queries.</p>
+ * including JSONata array subtypes returned by explicit terminal
+ * {@code []} collection queries.</p>
  */
 public final class MappingTypeSteps {
     public MappingTypeSteps() {
@@ -91,6 +95,24 @@ public final class MappingTypeSteps {
         }
     }
 
+    @Then("^RUN MAP PATH \"([^\"]+)\" HAS TEXT VALUE$")
+    public static void assertRunMapPathTextValue(
+            String path,
+            DocString expectedText
+    ) {
+        Object value = queriedRunMapValue(path);
+        String expectedValue = expectedText.getContent().strip();
+        if (!(value instanceof String actualValue)
+                || !expectedValue.equals(actualValue)) {
+            throw new AssertionError(
+                    "Expected RUN map path '" + path
+                            + "' to contain exact text '" + expectedValue
+                            + "', but was '" + value + "' of type '"
+                            + typeName(value) + "'."
+            );
+        }
+    }
+
     /**
      * Returns the value as it is stored in the Jackson-backed RUN map.
      * Container nodes remain ObjectNode/ArrayNode. Scalar nodes become their
@@ -127,6 +149,11 @@ public final class MappingTypeSteps {
 
     private static boolean matchesType(Object value, String expectedType) {
         return switch (expectedType) {
+            case "JsonNode" -> value instanceof JsonNode;
+            case "ObjectNode" -> value instanceof ObjectNode;
+            case "ArrayNode" -> value instanceof ArrayNode;
+            case "DataTable" -> value instanceof DataTable;
+            case "DocString" -> value instanceof DocString;
             case "Map" -> value instanceof Map<?, ?>;
             case "List" -> value instanceof List<?>;
             default -> value != null

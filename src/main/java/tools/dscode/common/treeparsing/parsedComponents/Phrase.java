@@ -4,6 +4,7 @@ package tools.dscode.common.treeparsing.parsedComponents;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.datatable.DataTable;
+import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.domoperations.ExecutionDictionary;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
@@ -174,9 +175,23 @@ public final class Phrase extends PhraseData {
         });
 
         if (isOperationPhrase) {
+            prepareDataElementValues();
             runOperation();
         } else if (phraseType == PhraseType.CONTEXT) {
             processContextPhrase();
+        }
+    }
+
+    private void prepareDataElementValues() {
+        for (ElementMatch element : getElementMatches()) {
+            if (!element.elementTypes.contains(ElementType.DATA_TYPE)) {
+                continue;
+            }
+            element.nonHTMLValues.clear();
+            for (Object value : getPhraseParsingMap().get(element)) {
+                element.nonHTMLValues.add(ValueWrapper.createValueWrapper(value));
+            }
+            element.elementTypes.add(ElementType.RETURNS_VALUE);
         }
     }
 
