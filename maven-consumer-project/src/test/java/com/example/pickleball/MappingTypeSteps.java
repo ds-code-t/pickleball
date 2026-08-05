@@ -22,12 +22,10 @@ import static tools.dscode.common.mappings.ValueFormatting.fromSafeJsonNode;
  * normal Java values before their types are asserted.</p>
  *
  * <p>"RUN MAP QUERY ... RETURNS TYPE" exercises the public NodeMap/Tokenized
- * read behavior. This is used separately to verify that a terminal [] returns
- * the whole collection while the same query without [] returns its normal
- * last-item result.</p>
+ * read behavior. Structured results remain Jackson ObjectNode/ArrayNode values,
+ * including explicit terminal {@code []} collection queries.</p>
  */
 public final class MappingTypeSteps {
-
     public MappingTypeSteps() {
     }
 
@@ -47,7 +45,6 @@ public final class MappingTypeSteps {
             String expectedType
     ) {
         Object value = storedRunMapValue(path);
-
         if (!matchesType(value, expectedType)) {
             JsonNode rawValue = rawRunMapValue(path);
             throw new AssertionError(
@@ -68,7 +65,6 @@ public final class MappingTypeSteps {
             String expectedType
     ) {
         Object value = queriedRunMapValue(query);
-
         if (!matchesType(value, expectedType)) {
             throw new AssertionError(
                     "Expected RUN map query '" + query + "' to return type '"
@@ -87,7 +83,6 @@ public final class MappingTypeSteps {
     ) {
         Object value = queriedRunMapValue(path);
         String actualValue = String.valueOf(value);
-
         if (!expectedValue.equals(actualValue)) {
             throw new AssertionError(
                     "Expected RUN map path '" + path + "' to have value '"
@@ -111,7 +106,6 @@ public final class MappingTypeSteps {
         if (rawValue.isContainerNode()) {
             return rawValue;
         }
-
         return fromSafeJsonNode(rawValue);
     }
 

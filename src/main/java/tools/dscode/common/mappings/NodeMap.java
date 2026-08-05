@@ -73,29 +73,54 @@ public class NodeMap extends ValueFormatting {
     }
 
     public Object get(String query) {
-        return new Tokenized(query).get(root);
+        return get(new Tokenized(query));
     }
 
     public Object get(Tokenized query) {
-        Object obj = query.get(root);
-
-        if (query.returnsWholeCollection) {
-            return obj;
+        Object value = query.get(root);
+        if (query.returnsWholeCollection || !(value instanceof ArrayNode)) {
+            return value;
         }
 
-        if (obj instanceof ArrayNode arrayNode) {
-            return arrayNode.isEmpty()
-                    ? null
-                    : arrayNode.get(arrayNode.size() - 1);
+        CollectionValue collectionValue = getCollectionValue(query.simplePropertyPath());
+        return collectionValue.matched() ? collectionValue.value() : value;
+    }
+
+    private CollectionValue getCollectionValue(List<String> properties) {
+        if (properties.isEmpty()) {
+            return CollectionValue.NO_MATCH;
         }
 
-        if (obj instanceof List<?> list) {
-            return list.isEmpty()
-                    ? null
-                    : list.getLast();
+        JsonNode current = root;
+        boolean finalPropertyIsCollection = false;
+        for (int index = 0; index < properties.size(); index++) {
+            if (!(current instanceof ObjectNode object)) {
+                return CollectionValue.NO_MATCH;
+            }
+
+            JsonNode child = object.get(properties.get(index));
+            if (child == null) {
+                return CollectionValue.NO_MATCH;
+            }
+
+            boolean collection = object.has(MAP_TYPE_KEY) && child instanceof ArrayNode;
+            if (collection) {
+                ArrayNode values = (ArrayNode) child;
+                child = values.isEmpty() ? null : values.get(values.size() - 1);
+            }
+            if (index == properties.size() - 1) {
+                finalPropertyIsCollection = collection;
+            }
+            current = child;
         }
 
-        return obj;
+        return finalPropertyIsCollection
+                ? new CollectionValue(true, fromSafeJsonNode(current))
+                : CollectionValue.NO_MATCH;
+    }
+
+    private record CollectionValue(boolean matched, Object value) {
+        private static final CollectionValue NO_MATCH = new CollectionValue(false, null);
     }
 
     public List<JsonNode> getAsList(String query) {
@@ -185,7 +210,6 @@ public class NodeMap extends ValueFormatting {
         if (keys.size() != values.size()) {
             throw new IllegalArgumentException("Keys and values must have the same size");
         }
-
         LinkedListMultimap<Object, Object> multimap = LinkedListMultimap.create();
         IntStream.range(0, keys.size())
                 .forEach(index -> multimap.put(keys.get(index), values.get(index)));
@@ -205,7 +229,6 @@ public class NodeMap extends ValueFormatting {
         if (multimap == null) {
             return MAPPER.createObjectNode();
         }
-
         Map<Object, Collection<Object>> values = new LinkedHashMap<>();
         multimap.asMap().forEach(
                 (key, collection) -> values.put(key, new ArrayList<>(collection)));
@@ -234,7 +257,6 @@ public class NodeMap extends ValueFormatting {
         }
 
         String mapType = segments.getLast();
-
         return switch (mapType) {
             case "DEFAULT" -> MappingProcessor.getDefaultsMap();
             case "OVERRIDE" -> MappingProcessor.getOverridesMap();
@@ -242,80 +264,54 @@ public class NodeMap extends ValueFormatting {
             case "SCENARIO ROOT", "ROOT SCENARIO" ->
                     getRootScenarioStep().getDefaultStepNodeMap();
             case "RUN" -> MappingProcessor.getRunMap();
-
             case "STEP" -> getStepNodeMap(input, segments);
             case "SCENARIO" -> getScenarioNodeMap(input, segments);
-
             default -> throw new IllegalArgumentException(
                     "Unsupported NodeMap reference '" + input + "'. "
                             + "The final segment must be DEFAULT, OVERRIDE, SINGLETON, "
-                            + "SCENARIO ROOT, ROOT SCENARIO, RUN, STEP, or SCENARIO."
-            );
+                            + "SCENARIO ROOT, ROOT SCENARIO, RUN, STEP, or SCENARIO.");
         };
     }
 
-    private static NodeMap getStepNodeMap(
-            String input,
-            List<String> segments
-    ) {
+    private static NodeMap getStepNodeMap(String input, List<String> segments) {
         validateParentPrefixes(input, segments);
-
         StepBase step = getRunningStep();
-
         for (int i = 0; i < segments.size() - 1; i++) {
             step = step.parentStep;
-
             if (step == null) {
                 return null;
             }
         }
-
         return step.getDefaultStepNodeMap();
     }
 
-    private static NodeMap getScenarioNodeMap(
-            String input,
-            List<String> segments
-    ) {
+    private static NodeMap getScenarioNodeMap(String input, List<String> segments) {
         validateParentPrefixes(input, segments);
-
         int parentCount = segments.size() - 1;
-
         StepExtension scenarioStep = getClosestScenarioStepAncestor();
-
         if (scenarioStep == null) {
             return null;
         }
-
         for (int i = 0; i < parentCount; i++) {
             scenarioStep = scenarioStep.getClosestScenarioStepAncestor();
-
             if (scenarioStep == null) {
                 return null;
             }
         }
-
         return scenarioStep.getDefaultStepNodeMap();
     }
 
-    private static void validateParentPrefixes(
-            String input,
-            List<String> segments
-    ) {
+    private static void validateParentPrefixes(String input, List<String> segments) {
         List<String> invalidPrefixes = segments
                 .subList(0, segments.size() - 1)
                 .stream()
                 .filter(segment -> !segment.equals("PARENT"))
                 .toList();
-
         if (!invalidPrefixes.isEmpty()) {
             throw new IllegalArgumentException(
                     "Invalid NodeMap reference '" + input + "'. "
                             + "Only PARENT segments may precede STEP or SCENARIO. "
-                            + "Invalid segment(s): " + invalidPrefixes
-            );
+                            + "Invalid segment(s): " + invalidPrefixes);
         }
     }
-
-
 }

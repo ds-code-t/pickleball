@@ -3,7 +3,11 @@ package tools.dscode.common.treeparsing.parsedComponents;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.cucumber.core.runner.StepExtension;
+import io.cucumber.datatable.DataTable;
 import tools.dscode.common.domoperations.ExecutionDictionary;
+import tools.dscode.common.mappings.MapConfigurations;
+import tools.dscode.common.mappings.NodeMap;
+import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
@@ -13,15 +17,17 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
+import static io.cucumber.core.runner.util.TableUtils.toRowsStringMultimap;
 import static tools.dscode.common.assertions.AssertionChain.copyAssertionChainToNewPhrase;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
+import static tools.dscode.common.mappings.MapConfigurations.MapType.PHRASE_MAP;
+import static tools.dscode.common.mappings.StepMapping.copytoNewParsingMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
 import static tools.dscode.common.reporting.logging.LogForwarder.logSkip;
 import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLevel;
 import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry;
-
-
 
 public final class Phrase extends PhraseData {
 
@@ -44,7 +50,6 @@ public final class Phrase extends PhraseData {
 
 
     boolean shouldRun() {
-
         if (assertionChainMembership != null)
             return true;
         if (getConditional().startsWith("else")) {
@@ -64,15 +69,12 @@ public final class Phrase extends PhraseData {
                 phraseConditionalMode = 1;
             }
 
-
             if (getConditional().trim().equals("else")) {
-
-                if(parsedLine.isBlockConditionalStep && phraseConditionalMode > 0)
-                {
+                if (parsedLine.isBlockConditionalStep && phraseConditionalMode > 0) {
                     PhraseData nextPhrase = this;
-                    String emitText =  " , " + nextPhrase.getText().replaceFirst("else","") + nextPhrase.termination + " ";
+                    String emitText = " , " + nextPhrase.getText().replaceFirst("else", "") + nextPhrase.termination + " ";
                     PhraseData lastPhrase = nextPhrase;
-                    while ((nextPhrase= nextPhrase.getNextPhrase()) != null) {
+                    while ((nextPhrase = nextPhrase.getNextPhrase()) != null) {
                         if (nextPhrase.metaTextPrefix.contains("BLOCK_CONDITIONAL")) {
                             lastPhrase.setNextPhrase(null);
                             break;
@@ -85,7 +87,6 @@ public final class Phrase extends PhraseData {
                     setNextPhrase(null);
                     return false;
                 }
-
 
             }
 
@@ -105,7 +106,6 @@ public final class Phrase extends PhraseData {
         setDefaultEntry(getRunningStep().stepEntry);
         PhraseData nextResolvedPhrase = getNextResolvedPhrase();
 
-
         if (isContextTermination()) {
             if (termination.equals(':') || termination.equals('?')) {
                 parsedLine.lineConditionalMode = phraseConditionalMode;
@@ -116,7 +116,6 @@ public final class Phrase extends PhraseData {
         return nextResolvedPhrase;
     }
 
-
     public void executePhrase() {
         if ((phraseType == null || phraseType == PhraseType.ELEMENT_ONLY) && (templatePhrase != null && templatePhrase.phraseType != null)) {
             if (!templatePhrase.getAction().isBlank()) {
@@ -125,7 +124,6 @@ public final class Phrase extends PhraseData {
                 if (!templatePhrase.getConditional().isBlank() && getConditional().isBlank()) {
                     setConditional(templatePhrase.getConditional());
                 }
-
                 if (!templatePhrase.getAssertionType().isBlank() && getAssertionType().isBlank()) {
                     setAssertionType(templatePhrase.getAssertionType());
                 }
@@ -135,7 +133,6 @@ public final class Phrase extends PhraseData {
                 }
             }
         }
-
         if (phraseType == null && !getConditional().isBlank()) {
             phraseType = PhraseType.CONDITIONAL;
         }
@@ -149,7 +146,6 @@ public final class Phrase extends PhraseData {
         }
 
         StepExtension currentStep = getRunningStep();
-
         if (shouldRun()) {
             if (assertionChain == null) {
                 phraseEntry = currentStep.stepEntry.logWithType("PHRASE", toString(), currentStep.stepLogLevel).tags("phrase").start();
@@ -167,9 +163,6 @@ public final class Phrase extends PhraseData {
             assertionChain = null;
             return;
         }
-
-
-
         if (noExecution) {
             logDebug("Context branch set");
             return;
@@ -187,12 +180,10 @@ public final class Phrase extends PhraseData {
         }
     }
 
-
     void processContextPhrase() {
         ElementMatch firstElement = getFirstElement();
         if (firstElement.elementTypes.contains(ElementType.DATA_TYPE)) {
             categoryFlags.add(ExecutionDictionary.CategoryFlags.DATA_CONTEXT);
-//            String categoryName = firstElement.category.replaceFirst("(?i:s)$", "");
             String key = null;
             List obj;
             try {
@@ -202,7 +193,6 @@ public final class Phrase extends PhraseData {
             }
             if (obj == null)
                 throw new RuntimeException("Failed to find Data element for: " + firstElement);
-
             if (firstElement.selectionType.isEmpty()) {
                 if (obj == null || obj.isEmpty())
                     phraseConditionalMode = 0;
@@ -235,7 +225,6 @@ public final class Phrase extends PhraseData {
         }
     }
 
-
     public PhraseData cloneWithElementContext(ElementWrapper elementWrapper) {
         PhraseData clone = clonePhrase(getPreviousPhrase());
         clone.contextElement = elementWrapper;
@@ -258,6 +247,11 @@ public final class Phrase extends PhraseData {
     }
 
     public void saveToPhraseParsingMap(PhraseData phraseData, String key, Object object) {
+        if (key == null && object instanceof DataTable dataTable) {
+            phraseData.setPhraseParsingMap(dataTableContext(phraseData, dataTable));
+            return;
+        }
+
         if (key == null) {
             if (object instanceof ObjectNode objectNode) {
                 phraseData.setPhraseParsingMap(objectNode);
@@ -269,6 +263,17 @@ public final class Phrase extends PhraseData {
         }
     }
 
+    private ParsingMap dataTableContext(PhraseData phraseData, DataTable dataTable) {
+        ParsingMap parsingMap = copytoNewParsingMap(phraseData.getPhraseParsingMap());
+        parsingMap.removeMaps(MapConfigurations.MapType.PHRASE_MAP);
+
+        NodeMap phraseNodeMap = new NodeMap(PHRASE_MAP);
+        phraseNodeMap.put(TABLE_KEY, dataTable);
+        phraseNodeMap.merge(toRowsStringMultimap(dataTable));
+        phraseNodeMap.setDataSource(TABLE_KEY);
+        parsingMap.addMapsToStart(phraseNodeMap);
+        return parsingMap;
+    }
 
     @Override
     public PhraseData cloneInheritedPhrase() {
@@ -282,7 +287,6 @@ public final class Phrase extends PhraseData {
     public PhraseData clonePhrase(PhraseData previous) {
         return clonePhrase(previous, null);
     }
-
 
     @Override
     public PhraseData clonePhrase(PhraseData previous, Character newTermination) {
@@ -301,7 +305,6 @@ public final class Phrase extends PhraseData {
         getResolvedPhrase().setNextPhrase(getNextPhrase());
         return getResolvedPhrase();
     }
-
 
     public PhraseData getNextResolvedPhrase() {
         if (getNextPhrase() == null) return null;
@@ -345,7 +348,6 @@ public final class Phrase extends PhraseData {
             clonePhrase.setNextPhrase(phrase.getNextPhrase().clonePhrase(clonePhrase));
             clonePhrase.getNextPhrase().setPreviousPhrase(clonePhrase);
         }
-
         return clonePhrase;
 
     }

@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.IdentityHashMap;
@@ -26,7 +25,8 @@ import static tools.dscode.common.mappings.ValueFormatting.fromSafeJsonNode;
  * <p>Read queries are normal JSONata with three small conveniences:</p>
  * <ul>
  *   <li>{@code #N} uses one-based indexes and is converted to JSONata indexes.</li>
- *   <li>Unambiguous path properties containing spaces or compact internal dashes are backticked.</li>
+ *   <li>Unambiguous path properties containing spaces, compact internal dashes,
+ *       or a leading {@code ?} are backticked.</li>
  *   <li>A plain non-underscore root property selects its last collection item.</li>
  * </ul>
  *
@@ -35,7 +35,6 @@ import static tools.dscode.common.mappings.ValueFormatting.fromSafeJsonNode;
  * arrays; underscore-prefixed root properties are stored as singleton values.</p>
  */
 public final class Tokenized {
-
     /** Exact query text supplied to the constructor, before normalization. */
     public final String originalQuery;
 
@@ -45,7 +44,6 @@ public final class Tokenized {
      * rather than the normal last-item result.
      */
     public final boolean returnsWholeCollection;
-
     private static final Pattern IDENTIFIER = Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_]*");
     private static final Set<String> ROOT_LITERALS = Set.of("true", "false", "null");
     private static final Set<String> WORD_OPERATORS = Set.of("and", "or", "in");
@@ -54,6 +52,7 @@ public final class Tokenized {
     private final String listExpression;
     private final WritePlan writePlan;
     private final boolean singletonRoot;
+    private final List<String> simplePropertyPath;
 
     public Tokenized(String query) {
         this(query, false);
@@ -67,12 +66,15 @@ public final class Tokenized {
         this.originalQuery = query;
 
         String source = query.strip();
+        SimplePath simplePath = parseSimplePath(rewriteCustomIndexes(source));
         this.returnsWholeCollection = source.endsWith("[]");
-
         this.readExpression = normalizeRead(source, true);
         this.listExpression = normalizeRead(source, false);
         this.writePlan = parseWritePlan(listExpression);
         this.singletonRoot = singletonRoot;
+        this.simplePropertyPath = simplePath != null && simplePath.directPropertyPath()
+                ? simplePath.properties()
+                : List.of();
     }
 
     /** Creates an explicit singleton write without encoding it in query punctuation. */
@@ -83,6 +85,35 @@ public final class Tokenized {
     /** Returns the JSONata expression used by a normal read. */
     public static String preprocessReadQuery(String query) {
         return normalizeRead(query, true);
+    }
+
+    /** Returns the literal properties when the complete query is a direct property path. */
+    public List<String> simplePropertyPath() {
+        return simplePropertyPath;
+    }
+
+    /** Quotes one complete literal JSONata property name. */
+    public static String quoteLiteralProperty(String property) {
+        if (property == null) {
+            throw new IllegalArgumentException("Property cannot be null");
+        }
+        if (property.indexOf('`') >= 0) {
+            return "$lookup($, " + MAPPER.valueToTree(property) + ")";
+        }
+        return "`" + property + "`";
+    }
+
+    /** Returns the literal name when the complete expression is one backticked property. */
+    public static String unquoteLiteralProperty(String query) {
+        if (query == null) {
+            return null;
+        }
+        String source = query.strip();
+        return source.length() >= 2
+                && source.charAt(0) == '`'
+                && quotedEnd(source, 0, '`') == source.length()
+                ? unquoteProperty(source)
+                : query;
     }
 
     public Object get(JsonNode root) {
@@ -111,7 +142,6 @@ public final class Tokenized {
             throw new IllegalArgumentException(
                     "The expression is readable but is not a writable NodeMap path: " + listExpression);
         }
-
         JsonNode safeValue = toSafeJsonNode(value);
         safeValue = safeValue == null ? NullNode.instance : safeValue;
 
@@ -148,7 +178,6 @@ public final class Tokenized {
         if (path == null) {
             return indexed;
         }
-
         String expression = path.expression();
         if (!selectLastRoot
                 || path.rootIndexed()
@@ -172,7 +201,6 @@ public final class Tokenized {
                 index = protectedEnd;
                 continue;
             }
-
             Selector selector = input.charAt(index) == '#' ? parseSelector(input, index) : null;
             if (selector == null) {
                 result.append(input.charAt(index++));
@@ -186,7 +214,6 @@ public final class Tokenized {
 
     private static Selector parseSelector(String input, int hashIndex) {
         int start = hashIndex + 1;
-
         if (input.regionMatches(true, start, "first", 0, 5)
                 && isTokenBoundary(input, start + 5)) {
             return new Selector("[0]", start + 5);
@@ -200,12 +227,10 @@ public final class Tokenized {
         if (first == null) {
             return null;
         }
-
         int cursor = skipWhitespace(input, first.end());
         if (cursor < input.length() && input.charAt(cursor) == ',') {
             List<Long> positions = new ArrayList<>();
             positions.add(toJsonataIndex(first.value()));
-
             while (cursor < input.length() && input.charAt(cursor) == ',') {
                 NumberToken next = parseSignedInteger(input, skipWhitespace(input, cursor + 1));
                 if (next == null) {
@@ -214,7 +239,6 @@ public final class Tokenized {
                 positions.add(toJsonataIndex(next.value()));
                 cursor = skipWhitespace(input, next.end());
             }
-
             if (!isTokenBoundary(input, cursor)) {
                 return null;
             }
@@ -223,7 +247,6 @@ public final class Tokenized {
                     .collect(Collectors.joining(","));
             return new Selector("[[" + values + "]]", cursor);
         }
-
         if (cursor < input.length() && input.charAt(cursor) == '-') {
             NumberToken last = parseSignedInteger(input, skipWhitespace(input, cursor + 1));
             if (last == null || !isTokenBoundary(input, last.end())) {
@@ -233,7 +256,6 @@ public final class Tokenized {
                     "[[" + toJsonataIndex(first.value()) + ".." + toJsonataIndex(last.value()) + "]]",
                     last.end());
         }
-
         if (!isTokenBoundary(input, first.end())) {
             return null;
         }
@@ -245,7 +267,6 @@ public final class Tokenized {
         if (cursor < input.length() && (input.charAt(cursor) == '-' || input.charAt(cursor) == '+')) {
             cursor++;
         }
-
         int digits = cursor;
         while (cursor < input.length() && Character.isDigit(input.charAt(cursor))) {
             cursor++;
@@ -277,15 +298,15 @@ public final class Tokenized {
         if (input.isEmpty() || input.charAt(0) == '(') {
             return null;
         }
-
         StringBuilder output = new StringBuilder(input.length());
+        List<String> properties = new ArrayList<>();
         int cursor = 0;
         int rootEnd = -1;
         String rootName = null;
         boolean rootIndexed = false;
         boolean rootFunction = false;
+        boolean directPropertyPath = true;
         boolean root = true;
-
         while (true) {
             cursor = skipWhitespace(input, cursor);
             int propertyStart = cursor;
@@ -295,22 +316,39 @@ public final class Tokenized {
                     return null;
                 }
                 output.append(input.substring(propertyStart));
-                return new SimplePath(output.toString(), rootEnd, rootName, rootIndexed, rootFunction);
+                return new SimplePath(
+                        output.toString(),
+                        rootEnd,
+                        rootName,
+                        rootIndexed,
+                        rootFunction,
+                        List.copyOf(properties),
+                        false
+                );
             }
-
             output.append(property.expression());
+            properties.add(property.name());
+            directPropertyPath &= !Set.of("*", "**", "%").contains(property.name());
             cursor = property.end();
             if (root) {
                 rootName = property.name();
                 rootEnd = output.length();
             }
-
             int next = skipWhitespace(input, cursor);
             while (next < input.length() && input.charAt(next) == '[') {
+                directPropertyPath = false;
                 int bracketEnd = balancedBracketEnd(input, next);
                 if (bracketEnd < 0) {
                     output.append(input.substring(cursor));
-                    return new SimplePath(output.toString(), rootEnd, rootName, rootIndexed, rootFunction);
+                    return new SimplePath(
+                            output.toString(),
+                            rootEnd,
+                            rootName,
+                            rootIndexed,
+                            rootFunction,
+                            List.copyOf(properties),
+                            false
+                    );
                 }
                 if (root) {
                     rootIndexed = true;
@@ -319,19 +357,34 @@ public final class Tokenized {
                 cursor = bracketEnd;
                 next = skipWhitespace(input, cursor);
             }
-
             if (root && next < input.length() && input.charAt(next) == '(') {
                 rootFunction = true;
+                directPropertyPath = false;
             }
             if (next == input.length()) {
-                return new SimplePath(output.toString(), rootEnd, rootName, rootIndexed, rootFunction);
+                return new SimplePath(
+                        output.toString(),
+                        rootEnd,
+                        rootName,
+                        rootIndexed,
+                        rootFunction,
+                        List.copyOf(properties),
+                        directPropertyPath
+                );
             }
             if (input.charAt(next) != '.'
                     || (next + 1 < input.length() && input.charAt(next + 1) == '.')) {
                 output.append(input.substring(cursor));
-                return new SimplePath(output.toString(), rootEnd, rootName, rootIndexed, rootFunction);
+                return new SimplePath(
+                        output.toString(),
+                        rootEnd,
+                        rootName,
+                        rootIndexed,
+                        rootFunction,
+                        List.copyOf(properties),
+                        false
+                );
             }
-
             output.append('.');
             cursor = next + 1;
             root = false;
@@ -342,7 +395,6 @@ public final class Tokenized {
         if (start >= input.length()) {
             return null;
         }
-
         if (input.charAt(start) == '`') {
             int end = quotedEnd(input, start, '`');
             if (end < 0) {
@@ -351,7 +403,15 @@ public final class Tokenized {
             String expression = input.substring(start, end);
             return new Property(expression, unquoteProperty(expression), end);
         }
-
+        if (input.charAt(start) == '?') {
+            int end = findReadablePropertyEnd(input, start + 1);
+            String property = input.substring(start + 1, end).strip();
+            if (IDENTIFIER.matcher(property).matches() || isAutoBacktickedProperty(property)) {
+                String name = "?" + property;
+                return new Property(quoteLiteralProperty(name), name, end);
+            }
+            return null;
+        }
         int end = findReadablePropertyEnd(input, start);
         String property = input.substring(start, end).strip();
         if (property.isEmpty()) {
@@ -367,7 +427,7 @@ public final class Tokenized {
             return new Property(property, property, end);
         }
         if (isAutoBacktickedProperty(property)) {
-            return new Property("`" + property + "`", property, end);
+            return new Property(quoteLiteralProperty(property), property, end);
         }
         return null;
     }
@@ -383,7 +443,6 @@ public final class Tokenized {
             if (".[](){};,?:=<>!&|~+*/%^@#'\"`".indexOf(current) >= 0) {
                 break;
             }
-
             if (Character.isWhitespace(current)) {
                 int wordStart = skipWhitespace(input, cursor);
                 int wordEnd = wordStart;
@@ -400,13 +459,11 @@ public final class Tokenized {
             }
             cursor++;
         }
-
         while (cursor > start && Character.isWhitespace(input.charAt(cursor - 1))) {
             cursor--;
         }
         return cursor;
     }
-
 
     /**
      * A compact dash belongs to a property name when it has non-whitespace
@@ -422,7 +479,6 @@ public final class Tokenized {
 
     private static boolean isAutoBacktickedProperty(String property) {
         boolean needsBackticks = !property.isEmpty() && Character.isDigit(property.charAt(0));
-
         for (int index = 0; index < property.length(); index++) {
             char current = property.charAt(index);
             if (Character.isLetterOrDigit(current) || current == '_') {
@@ -454,7 +510,6 @@ public final class Tokenized {
         if (completePath != null) {
             return new Direct(completePath.steps());
         }
-
         for (int dot : topLevelDots(expression)) {
             String selector = expression.substring(0, dot).stripTrailing();
             DirectPath suffix = parseDirectPath(expression.substring(dot + 1).stripLeading());
@@ -479,7 +534,6 @@ public final class Tokenized {
             if (cursor >= expression.length()) {
                 break;
             }
-
             if (needProperty) {
                 DirectProperty property = parseWritableProperty(expression, cursor);
                 if (property == null) {
@@ -489,7 +543,6 @@ public final class Tokenized {
                 cursor = property.end();
                 needProperty = false;
             }
-
             cursor = skipWhitespace(expression, cursor);
             while (cursor < expression.length() && expression.charAt(cursor) == '[') {
                 BracketStep bracket = parseWritableBracket(expression, cursor);
@@ -499,7 +552,6 @@ public final class Tokenized {
                 steps.add(bracket.step());
                 cursor = skipWhitespace(expression, bracket.end());
             }
-
             if (cursor >= expression.length()) {
                 break;
             }
@@ -527,7 +579,14 @@ public final class Tokenized {
             return new DirectProperty(
                     new PropertyStep(unquoteProperty(expression.substring(start, end))), end);
         }
-
+        if (expression.charAt(start) == '?') {
+            int end = findWritablePropertyEnd(expression, start + 1);
+            String property = expression.substring(start + 1, end).strip();
+            if (IDENTIFIER.matcher(property).matches() || isAutoBacktickedProperty(property)) {
+                return new DirectProperty(new PropertyStep("?" + property), end);
+            }
+            return null;
+        }
         int end = findWritablePropertyEnd(expression, start);
         String property = expression.substring(start, end).strip();
         if (IDENTIFIER.matcher(property).matches() || isAutoBacktickedProperty(property)) {
@@ -563,7 +622,6 @@ public final class Tokenized {
         if (end < 0) {
             return null;
         }
-
         String content = expression.substring(start + 1, end - 1).strip();
         if (content.isEmpty()) {
             return new BracketStep(AppendStep.INSTANCE, end);
@@ -574,7 +632,6 @@ public final class Tokenized {
         if (!content.matches("[+-]?\\d+")) {
             return null;
         }
-
         try {
             return new BracketStep(new IndexStep(Integer.parseInt(content)), end);
         } catch (NumberFormatException ex) {
@@ -588,14 +645,12 @@ public final class Tokenized {
         int brackets = 0;
         int parentheses = 0;
         int braces = 0;
-
         for (int index = 0; index < expression.length();) {
             int protectedEnd = protectedEnd(expression, index);
             if (protectedEnd > index) {
                 index = protectedEnd;
                 continue;
             }
-
             switch (expression.charAt(index)) {
                 case '[' -> brackets++;
                 case ']' -> brackets--;
@@ -625,7 +680,6 @@ public final class Tokenized {
         if (steps.isEmpty() || !(steps.getFirst() instanceof PropertyStep property)) {
             throw new IllegalArgumentException("A writable NodeMap path must start with a property name");
         }
-
         List<WriteStep> remaining = steps.subList(1, steps.size());
         if (singletonRoot || property.name().startsWith("_")) {
             applySingletonRoot(root, property.name(), remaining, value);
@@ -639,7 +693,6 @@ public final class Tokenized {
             String name,
             List<WriteStep> remaining,
             JsonNode value) {
-
         if (remaining.isEmpty()) {
             root.set(name, copy(value));
             return;
@@ -669,7 +722,6 @@ public final class Tokenized {
             collection.add(copy(value));
             return;
         }
-
         WriteStep first = remaining.getFirst();
         ArrayNode collection;
         if (current instanceof ArrayNode existingCollection) {
@@ -681,7 +733,6 @@ public final class Tokenized {
             collection = MAPPER.createArrayNode();
             root.set(name, collection);
         }
-
         if (first instanceof IndexStep || first instanceof AppendStep || first instanceof WildcardStep) {
             applySteps(collection, remaining, 0, value);
             return;
@@ -693,7 +744,6 @@ public final class Tokenized {
             }
             collection.add(containerFor(first));
         }
-
         int lastIndex = collection.size() - 1;
         JsonNode selected = collection.get(lastIndex);
         if (isMissing(selected) || !accepts(selected, first)) {
@@ -727,11 +777,9 @@ public final class Tokenized {
 
         IdentityHashMap<JsonNode, Boolean> attached = new IdentityHashMap<>();
         collectAttached(root, attached);
-
         List<JsonNode> matches = result instanceof ArrayNode array && !attached.containsKey(result)
                 ? array.valueStream().toList()
                 : List.of(result);
-
         WriteStep first = selected.suffix().getFirst();
         for (JsonNode match : matches) {
             if (isMissing(match)) {
@@ -766,7 +814,6 @@ public final class Tokenized {
 
         WriteStep step = steps.get(index);
         boolean last = index == steps.size() - 1;
-
         if (step instanceof PropertyStep property) {
             if (!(current instanceof ObjectNode object)) {
                 throw typeError(property.name(), "ObjectNode", current);
@@ -775,7 +822,6 @@ public final class Tokenized {
                 object.set(property.name(), copy(value));
                 return true;
             }
-
             WriteStep next = steps.get(index + 1);
             JsonNode child = object.get(property.name());
             if (isMissing(child) || !accepts(child, next)) {
@@ -787,12 +833,10 @@ public final class Tokenized {
             }
             return applySteps(child, steps, index + 1, value);
         }
-
         if (step instanceof IndexStep arrayIndex) {
             if (!(current instanceof ArrayNode array)) {
                 throw typeError("[" + arrayIndex.index() + "]", "ArrayNode", current);
             }
-
             int resolved = resolveIndex(array, arrayIndex.index());
             if (last) {
                 if (resolved < 0) {
@@ -802,7 +846,6 @@ public final class Tokenized {
                 array.set(resolved, copy(value));
                 return true;
             }
-
             if (resolved < 0 || resolved >= array.size()) {
                 if (creationBlockedByWildcard(steps, index + 1)) {
                     return false;
@@ -810,7 +853,6 @@ public final class Tokenized {
                 resolved = arrayIndex.index() < 0 ? 0 : arrayIndex.index();
                 ensureIndex(array, resolved);
             }
-
             WriteStep next = steps.get(index + 1);
             JsonNode child = array.get(resolved);
             if (isMissing(child) || !accepts(child, next)) {
@@ -822,7 +864,6 @@ public final class Tokenized {
             }
             return applySteps(child, steps, index + 1, value);
         }
-
         if (step instanceof AppendStep) {
             if (!(current instanceof ArrayNode array)) {
                 throw typeError("[]", "ArrayNode", current);
@@ -836,7 +877,6 @@ public final class Tokenized {
             array.add(child);
             return applySteps(child, steps, index + 1, value);
         }
-
         if (step instanceof WildcardStep) {
             if (!(current instanceof ArrayNode array) || array.isEmpty()) {
                 return false;
@@ -847,7 +887,6 @@ public final class Tokenized {
                 }
                 return true;
             }
-
             boolean changed = false;
             WriteStep next = steps.get(index + 1);
             for (JsonNode child : array) {
@@ -904,7 +943,6 @@ public final class Tokenized {
             String location,
             String expected,
             JsonNode actual) {
-
         String actualType = actual == null ? "missing" : actual.getNodeType().name();
         return new IllegalArgumentException(
                 "Cannot write through " + location + ": expected " + expected + " but found " + actualType);
@@ -930,7 +968,6 @@ public final class Tokenized {
                 index = protectedEnd;
                 continue;
             }
-
             char current = input.charAt(index++);
             if (current == '[') {
                 depth++;
@@ -1029,13 +1066,11 @@ public final class Tokenized {
     private record Direct(List<WriteStep> steps) implements WritePlan { }
     private record Selected(String selector, List<WriteStep> suffix) implements WritePlan { }
     private enum ReadOnly implements WritePlan { INSTANCE }
-
     private sealed interface WriteStep permits PropertyStep, IndexStep, AppendStep, WildcardStep { }
     private record PropertyStep(String name) implements WriteStep { }
     private record IndexStep(int index) implements WriteStep { }
     private enum AppendStep implements WriteStep { INSTANCE }
     private enum WildcardStep implements WriteStep { INSTANCE }
-
     private record DirectPath(List<WriteStep> steps) { }
     private record DirectProperty(WriteStep step, int end) { }
     private record BracketStep(WriteStep step, int end) { }
@@ -1044,7 +1079,9 @@ public final class Tokenized {
             int rootEnd,
             String rootName,
             boolean rootIndexed,
-            boolean rootFunction) { }
+            boolean rootFunction,
+            List<String> properties,
+            boolean directPropertyPath) { }
     private record Property(String expression, String name, int end) { }
     private record Selector(String replacement, int end) { }
     private record NumberToken(long value, int end) { }
