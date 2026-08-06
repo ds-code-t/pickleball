@@ -1,33 +1,34 @@
 package io.cucumber.core.runner;
 
 import io.cucumber.core.backend.StepDefinition;
-import io.cucumber.core.stepexpression.Argument;
-import io.cucumber.core.stepexpression.DataTableArgument;
-import io.cucumber.core.stepexpression.DocStringArgument;
 import io.cucumber.core.stepexpression.StepExpression;
+import io.cucumber.datatable.DataTable;
+import io.cucumber.docstring.DocString;
+import io.cucumber.messages.types.PickleStepArgument;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
 
 import java.util.List;
 import java.util.Objects;
-import static io.cucumber.core.runner.NPickleStepTestStepFactory.resolvePickleStepTestStep;
+
 import static tools.dscode.common.mappings.MapConfigurations.MapType.EXAMPLE_MAP;
 import static tools.dscode.common.mappings.MapConfigurations.MapType.PASSED_MAP;
 import static tools.dscode.common.mappings.MapConfigurations.MapType.PHRASE_MAP;
 import static tools.dscode.common.mappings.MapConfigurations.MapType.STEP_MAP;
+
 /**
  * Immutable data snapshot for a selected scenario marker step.
  */
 public final class ScenarioStepData {
-    private final StepExtension sourceStep;
     private final String stepText;
     private final String stepMarkerText;
     private final StepExpression stepExpression;
-    private final DocStringArgument docStringArgument;
-    private final DataTableArgument dataTableArgument;
+    private final DocString docString;
+    private final DataTable dataTable;
     private final NodeMap passedNodeMap;
     private final NodeMap exampleNodeMap;
+
     public ScenarioStepData(StepExtension stepExtension) {
         this(
                 Objects.requireNonNull(
@@ -59,16 +60,23 @@ public final class ScenarioStepData {
             ParsingMap sourceParsingMap,
             StepExtension sourceStep
     ) {
-        this.sourceStep = sourceStep;
         passedNodeMap = firstCopy(sourceParsingMap, PASSED_MAP);
         exampleNodeMap = firstCopy(sourceParsingMap, EXAMPLE_MAP);
         stepText = sourceStep.getUnmodifiedText();
         stepMarkerText = sourceStep.stepMarkerText;
         stepExpression = findStepExpression(sourceStep);
 
-        List<Argument> arguments = List.copyOf(sourceStep.arguments);
-        docStringArgument = firstArgument(arguments, DocStringArgument.class);
-        dataTableArgument = firstArgument(arguments, DataTableArgument.class);
+        PickleStepArgument pickleArgument = sourceStep.pickleStepTestStep
+                .getPickleStep()
+                .getArgument()
+                .orElse(null);
+
+        dataTable = sourceStep.dataTable != null
+                ? sourceStep.dataTable
+                : dataTableFromPickleArgument(pickleArgument);
+        docString = sourceStep.docString != null
+                ? sourceStep.docString
+                : docStringFromPickleArgument(pickleArgument);
     }
 
     private static StepExtension selectedSourceStep(
@@ -95,6 +103,7 @@ public final class ScenarioStepData {
     public String getStepText() {
         return stepText;
     }
+
     public String getStepText(NodeMap passedNodeMap) {
         return resolveText(stepText, passedNodeMap);
     }
@@ -110,23 +119,49 @@ public final class ScenarioStepData {
     public StepExpression getStepExpression() {
         return stepExpression;
     }
+
     public Object getDocStringValue() {
-        return docStringArgument == null ? null : docStringArgument.getValue();
+        return docString;
     }
 
     public Object getDocStringValue(NodeMap passedNodeMap) {
-        return docStringArgument == null
-                ? null
-                : resolvedArgumentValue(DocStringArgument.class, passedNodeMap);
+        if (docString == null) {
+            return null;
+        }
+
+        ParsingMap parsingMap = resolutionParsingMap(passedNodeMap);
+        String resolvedContent =
+                parsingMap.resolveWholeText(docString.getContent());
+        return resolvedContent.equals(docString.getContent())
+                ? docString
+                : DocString.create(
+                        resolvedContent,
+                        docString.getContentType()
+                );
     }
 
     public Object getDataTableValue() {
-        return dataTableArgument == null ? null : dataTableArgument.getValue();
+        return dataTable;
     }
+
     public Object getDataTableValue(NodeMap passedNodeMap) {
-        return dataTableArgument == null
-                ? null
-                : resolvedArgumentValue(DataTableArgument.class, passedNodeMap);
+        if (dataTable == null) {
+            return null;
+        }
+
+        ParsingMap parsingMap = resolutionParsingMap(passedNodeMap);
+        List<List<String>> resolvedCells = dataTable.cells().stream()
+                .map(row -> row.stream()
+                        .map(parsingMap::resolveWholeText)
+                        .toList())
+                .toList();
+
+        return resolvedCells.equals(dataTable.cells())
+                ? dataTable
+                : DataTable.create(
+                        resolvedCells,
+                        dataTable.getTableConverter()
+                );
     }
 
     public NodeMap getPassedNodeMap() {
@@ -136,25 +171,47 @@ public final class ScenarioStepData {
     public NodeMap getExampleNodeMap() {
         return copyNodeMap(exampleNodeMap, EXAMPLE_MAP);
     }
+
+    static DataTable dataTableFromPickleArgument(
+            PickleStepArgument argument
+    ) {
+        if (argument == null || argument.getDataTable().isEmpty()) {
+            return null;
+        }
+
+        List<List<String>> cells = argument.getDataTable()
+                .orElseThrow()
+                .getRows()
+                .stream()
+                .map(row -> row.getCells()
+                        .stream()
+                        .map(cell -> cell.getValue())
+                        .toList())
+                .toList();
+        return DataTable.create(cells);
+    }
+
+    static DocString docStringFromPickleArgument(
+            PickleStepArgument argument
+    ) {
+        if (argument == null || argument.getDocString().isEmpty()) {
+            return null;
+        }
+
+        var value = argument.getDocString().orElseThrow();
+        return DocString.create(
+                value.getContent(),
+                value.getMediaType().orElse("")
+        );
+    }
+
     private String resolveText(String text, NodeMap externalPassedNodeMap) {
         return text == null
                 ? null
-                : resolutionParsingMap(externalPassedNodeMap).resolveWholeText(text);
+                : resolutionParsingMap(externalPassedNodeMap)
+                        .resolveWholeText(text);
     }
-    private Object resolvedArgumentValue(
-            Class<? extends Argument> argumentType,
-            NodeMap externalPassedNodeMap
-    ) {
-        PickleStepTestStep resolvedStep = resolvePickleStepTestStep(
-                sourceStep.pickleStepTestStep,
-                resolutionParsingMap(externalPassedNodeMap)
-        );
-        Argument resolvedArgument = firstArgument(
-                resolvedStep.getDefinitionMatch().getArguments(),
-                argumentType
-        );
-        return resolvedArgument == null ? null : resolvedArgument.getValue();
-    }
+
     private ParsingMap resolutionParsingMap(NodeMap externalPassedNodeMap) {
         return buildResolutionParsingMap(
                 ParsingMap.getRunningParsingMap(),
@@ -163,6 +220,7 @@ public final class ScenarioStepData {
                 exampleNodeMap
         );
     }
+
     static ParsingMap buildResolutionParsingMap(
             ParsingMap parentParsingMap,
             NodeMap externalPassedNodeMap,
@@ -170,11 +228,11 @@ public final class ScenarioStepData {
             NodeMap storedExampleNodeMap
     ) {
         ParsingMap parsingMap = new ParsingMap();
-
         if (parentParsingMap != null) {
             parsingMap.addMaps(parentParsingMap.getNodeMaps(STEP_MAP));
             parsingMap.addMaps(parentParsingMap.getNodeMaps(PHRASE_MAP));
         }
+
         NodeMap external = copyNodeMap(externalPassedNodeMap, PASSED_MAP);
         NodeMap storedPassed = copyNodeMap(storedPassedNodeMap, PASSED_MAP);
         NodeMap storedExample = copyNodeMap(storedExampleNodeMap, EXAMPLE_MAP);
@@ -191,23 +249,29 @@ public final class ScenarioStepData {
         return parsingMap;
     }
 
-    private static StepExpression findStepExpression(StepExtension stepExtension) {
+    private static StepExpression findStepExpression(
+            StepExtension stepExtension
+    ) {
         PickleStepDefinitionMatch definitionMatch =
                 stepExtension.pickleStepTestStep.getDefinitionMatch();
         if (definitionMatch == null) {
             return null;
         }
+
         StepDefinition stepDefinition = definitionMatch.getStepDefinition();
         return stepDefinition instanceof CoreStepDefinition coreStepDefinition
                 ? coreStepDefinition.getExpression()
                 : null;
     }
+
     private static NodeMap firstCopy(
             ParsingMap parsingMap,
             MapConfigurations.MapType mapType
     ) {
         List<NodeMap> maps = parsingMap.getNodeMaps(mapType);
-        return maps.isEmpty() ? null : copyNodeMap(maps.getFirst(), mapType);
+        return maps.isEmpty()
+                ? null
+                : copyNodeMap(maps.getFirst(), mapType);
     }
 
     private static NodeMap copyNodeMap(
@@ -217,20 +281,15 @@ public final class ScenarioStepData {
         if (source == null) {
             return null;
         }
-        NodeMap copy = new NodeMap(mapType, source.getRoot().deepCopy());
+
+        NodeMap copy = new NodeMap(
+                mapType,
+                source.getRoot().deepCopy()
+        );
         copy.setDataSource(
-                source.getDataSources().toArray(MapConfigurations.DataSource[]::new)
+                source.getDataSources()
+                        .toArray(MapConfigurations.DataSource[]::new)
         );
         return copy;
-    }
-    private static <T extends Argument> T firstArgument(
-            List<Argument> arguments,
-            Class<T> argumentType
-    ) {
-        return arguments.stream()
-                .filter(argumentType::isInstance)
-                .map(argumentType::cast)
-                .findFirst()
-                .orElse(null);
     }
 }

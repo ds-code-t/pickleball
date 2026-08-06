@@ -1,15 +1,22 @@
 package io.cucumber.core.runner;
 
+import io.cucumber.datatable.DataTable;
+import io.cucumber.messages.types.PickleStepArgument;
+import io.cucumber.messages.types.PickleTable;
+import io.cucumber.messages.types.PickleTableCell;
+import io.cucumber.messages.types.PickleTableRow;
 import org.junit.jupiter.api.Test;
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 public class ScenarioStepDataChecks {
-
     @Test
     void resolutionMapUsesExternalPassedStoredPassedThenExamples() {
         ParsingMap parent = new ParsingMap();
@@ -24,7 +31,6 @@ public class ScenarioStepDataChecks {
                 "not inherited"
         );
         parent.addMaps(parentStep, callerPassed);
-
         NodeMap externalPassed = nodeMap(
                 MapConfigurations.MapType.PASSED_MAP,
                 "value",
@@ -40,7 +46,6 @@ public class ScenarioStepDataChecks {
                 "value",
                 "example"
         );
-
         ParsingMap result = ScenarioStepData.buildResolutionParsingMap(
                 parent,
                 externalPassed,
@@ -65,7 +70,6 @@ public class ScenarioStepDataChecks {
                 "value",
                 "example"
         );
-
         ParsingMap storedResult = ScenarioStepData.buildResolutionParsingMap(
                 new ParsingMap(),
                 null,
@@ -78,7 +82,6 @@ public class ScenarioStepDataChecks {
                 null,
                 examples
         );
-
         assertEquals("stored", storedResult.resolveWholeText("<value>"));
         assertEquals("example", exampleResult.resolveWholeText("<value>"));
     }
@@ -90,7 +93,6 @@ public class ScenarioStepDataChecks {
                 "value",
                 "before"
         );
-
         ParsingMap result = ScenarioStepData.buildResolutionParsingMap(
                 new ParsingMap(),
                 externalPassed,
@@ -104,6 +106,38 @@ public class ScenarioStepDataChecks {
                 .stream()
                 .findFirst()
                 .orElse(null));
+    }
+
+    @Test
+    void convertsTheRawPickleTableRetainedByAMarkerStep() {
+        PickleStepArgument argument = PickleStepArgument.of(
+                new PickleTable(List.of(
+                        row("Key1", "Key2"),
+                        row("qq", "ww"),
+                        row("ee", "rr")
+                ))
+        );
+
+        DataTable table =
+                ScenarioStepData.dataTableFromPickleArgument(argument);
+
+        assertNotNull(table);
+        assertEquals(
+                List.of(
+                        List.of("Key1", "Key2"),
+                        List.of("qq", "ww"),
+                        List.of("ee", "rr")
+                ),
+                table.cells()
+        );
+    }
+
+    private static PickleTableRow row(String... values) {
+        return new PickleTableRow(
+                List.of(values).stream()
+                        .map(PickleTableCell::new)
+                        .toList()
+        );
     }
 
     private static NodeMap nodeMap(
