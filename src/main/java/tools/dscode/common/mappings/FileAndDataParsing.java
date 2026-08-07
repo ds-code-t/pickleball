@@ -94,6 +94,36 @@ public final class FileAndDataParsing {
         return attemptBuildJsonFromPath(resourcePath, resolveTemplates);
     }
 
+    public static JsonNode buildJsonFromPathUnderRoot(String rootPath, String resourcePath) {
+        return buildJsonFromPathUnderRoot(rootPath, resourcePath, true);
+    }
+
+    public static JsonNode buildJsonFromPathUnderRoot(
+            String rootPath,
+            String resourcePath,
+            boolean resolveTemplates
+    ) {
+        SplitResourcePath split = splitResourcePath(resourcePath);
+        if (split == null) {
+            return null;
+        }
+
+        JsonNode resolved = buildJsonFromSuffixAgnosticPathUnderRoot(
+                rootPath,
+                split.lookupPath(),
+                resolveTemplates
+        );
+        if (resolved == null) {
+            return null;
+        }
+
+        ObjectNode wrapper = JSON_MAPPER.createObjectNode();
+        wrapper.set(split.boundarySegment(), resolved);
+
+        Object value = new NodeMap(wrapper).get(split.queryPath());
+        return toJsonNodeResult(value);
+    }
+
     public static JsonNode attemptBuildJsonFromPath(String resourcePath) {
         return attemptBuildJsonFromPath(resourcePath, true);
     }
@@ -224,6 +254,118 @@ public final class FileAndDataParsing {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    private static JsonNode buildJsonFromSuffixAgnosticPathUnderRoot(
+            String rootPath,
+            String resourcePath,
+            boolean resolveTemplates
+    ) {
+        String normalizedResource = normalizeResourcePath(resourcePath);
+        if (normalizedResource.isBlank()) {
+            return null;
+        }
+
+        String normalizedRoot = normalizeRootPath(rootPath);
+        if (normalizedRoot.isBlank()) {
+            return buildJsonFromSuffixAgnosticPath(
+                    normalizedResource,
+                    resolveTemplates
+            );
+        }
+
+        if (normalizedRoot.startsWith("classpath:")) {
+            return buildJsonFromSuffixAgnosticPath(
+                    joinResourcePaths(
+                            normalizedRoot.substring("classpath:".length()),
+                            normalizedResource
+                    ),
+                    resolveTemplates
+            );
+        }
+
+        Path physicalRoot = physicalRootPath(normalizedRoot);
+        if (physicalRoot != null && Files.exists(physicalRoot)) {
+            JsonNode fromFilesystem = buildJsonFromSuffixAgnosticFilePath(
+                    physicalRoot,
+                    normalizedResource,
+                    resolveTemplates
+            );
+            if (fromFilesystem != null) {
+                return fromFilesystem;
+            }
+        }
+
+        return buildJsonFromSuffixAgnosticPath(
+                joinResourcePaths(normalizedRoot, normalizedResource),
+                resolveTemplates
+        );
+    }
+
+    private static JsonNode buildJsonFromSuffixAgnosticFilePath(
+            Path root,
+            String resourcePath,
+            boolean resolveTemplates
+    ) {
+        String normalized = normalizeResourcePath(resourcePath);
+        if (normalized.isBlank()) {
+            return null;
+        }
+
+        int slash = normalized.lastIndexOf('/');
+        String parentResourcePath = slash >= 0 ? normalized.substring(0, slash) : "";
+        String requestedName = slash >= 0 ? normalized.substring(slash + 1) : normalized;
+
+        try {
+            Path normalizedRoot = root.toAbsolutePath().normalize();
+            Path parent = parentResourcePath.isBlank()
+                    ? normalizedRoot
+                    : normalizedRoot.resolve(parentResourcePath).normalize();
+            Path matched = findSuffixAgnosticChild(parent, requestedName);
+            return matched == null ? null : buildFromRoot(matched, resolveTemplates);
+        } catch (ParseFailureException e) {
+            throw e;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String normalizeRootPath(String rootPath) {
+        if (rootPath == null) {
+            return "";
+        }
+        String normalized = rootPath.trim().replace('\\', '/');
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized;
+    }
+
+    private static Path physicalRootPath(String rootPath) {
+        try {
+            if (rootPath.startsWith("file:")) {
+                try {
+                    return Paths.get(URI.create(rootPath));
+                } catch (Exception ignored) {
+                    return Paths.get(rootPath.substring("file:".length()));
+                }
+            }
+            return Paths.get(rootPath);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static String joinResourcePaths(String root, String child) {
+        String left = normalizeResourcePath(root);
+        String right = normalizeResourcePath(child);
+        if (left.isBlank()) {
+            return right;
+        }
+        if (right.isBlank()) {
+            return left;
+        }
+        return left + "/" + right;
     }
 
     private static Path findSuffixAgnosticChild(Path parent, String requestedName) throws IOException {

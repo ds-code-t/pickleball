@@ -45,6 +45,7 @@ import static tools.dscode.common.dataoperations.TableQueries.findRows;
 import static tools.dscode.common.evaluations.AviatorUtil.eval;
 import static tools.dscode.common.evaluations.AviatorUtil.evalToBoolean;
 import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPath;
+import static tools.dscode.common.mappings.FileAndDataParsing.buildJsonFromPathUnderRoot;
 import static tools.dscode.common.mappings.GlobalMappings.GLOBALS;
 import static tools.dscode.common.mappings.NodeMap.getNodeMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
@@ -56,6 +57,7 @@ import static tools.dscode.coredefinitions.DataTableDefinitions.dataTableToJsonN
 import static tools.dscode.coredefinitions.DataTableDefinitions.jsonNodeToDataTable;
 import static tools.dscode.coredefinitions.DocStringDefinitions.docStringtoJsonNode;
 import static tools.dscode.coredefinitions.GeneralSteps.getReturnValue;
+import static tools.dscode.coredefinitions.ModularScenarios.configuredOrDefaultDataPath;
 import static tools.dscode.coredefinitions.ModularScenarios.getScenarioMarkerData;
 import static tools.dscode.testengine.PKB_props.PKB_PREFIX;
 
@@ -806,7 +808,14 @@ public abstract class MappingProcessor implements Map<String, Object> {
             return buildJsonFromPath(query.substring(FILE_REFERENCE_PREFIX.length()));
         }
         if (query.startsWith(DATA_REFERENCE_PREFIX)) {
-            return getScenarioMarkerData(query.substring(DATA_REFERENCE_PREFIX.length()));
+            String dataReference = query.substring(DATA_REFERENCE_PREFIX.length());
+            if (dataReference.startsWith("/")) {
+                return buildJsonFromPathUnderRoot(
+                        configuredOrDefaultDataPath(),
+                        dataReference.substring(1)
+                );
+            }
+            return getScenarioMarkerData(dataReference);
         }
         if (query.contains("_") && query.toLowerCase().startsWith(PKB_PREFIX)) {
             return resolveFromVars(query);

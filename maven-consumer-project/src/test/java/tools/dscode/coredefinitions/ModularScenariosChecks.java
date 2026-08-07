@@ -38,11 +38,10 @@ public class ModularScenariosChecks {
     }
 
     @Test
-    void labelledFeatureAndScenarioUseExactFilters() {
+    void featureAndScenarioPathUseExactFilters() {
         List<Map<String, String>> maps =
                 ModularScenarios.buildRunScenarioMaps(
-                        "FEATURE: Save customer "
-                                + "SCENARIO: component (default)",
+                        "Save customer.component (default)",
                         null
                 );
         assertEquals(1, maps.size());
@@ -56,16 +55,14 @@ public class ModularScenariosChecks {
         );
     }
     @Test
-    void labelledNamesPreservePeriodsAndInlineStartOverridesTheTable() {
+    void escapedPathNamesPreservePeriodsAndBackslashesAndInlineMarkerOverridesTheTable() {
         DataTable table = DataTable.create(List.of(
                 List.of("Step_Marker"),
                 List.of("table marker")
         ));
         List<Map<String, String>> maps =
                 ModularScenarios.buildRunScenarioMaps(
-                        "SCENARIO: Save customer v2.1 "
-                                + "FEATURE: Reusable.flows "
-                                + "START: inline marker",
+                        "Reusable\\.flows.Save customer v2\\.1.inline\\\\marker",
                         table
                 );
         assertEquals(
@@ -77,12 +74,12 @@ public class ModularScenariosChecks {
                 maps.getFirst().get("pkb_featurename")
         );
         assertEquals(
-                "inline marker",
+                "inline\\marker",
                 maps.getFirst().get("Step_Marker")
         );
     }
     @Test
-    void labelledScenarioPreservesTableFeatureFilter() {
+    void scenarioPathPreservesTableFeatureFilter() {
         DataTable table = DataTable.create(List.of(
                 List.of("pkb_featurename", "customerName"),
                 List.of("Reusable customer flows", "Ava")
@@ -90,7 +87,7 @@ public class ModularScenariosChecks {
 
         List<Map<String, String>> maps =
                 ModularScenarios.buildRunScenarioMaps(
-                        "SCENARIO: Save customer component",
+                        "Save customer component",
                         table
                 );
         assertEquals(
@@ -103,27 +100,44 @@ public class ModularScenariosChecks {
         );
     }
     @Test
-    void featureOnlyInlineSelectorIsSupported() {
+    void scenarioOnlyPathSelectsScenarioName() {
         List<Map<String, String>> maps =
                 ModularScenarios.buildRunScenarioMaps(
-                        "FEATURE: Reusable customer flows",
+                        "Save customer component",
                         null
                 );
 
         assertEquals(
-                "Reusable customer flows",
-                maps.getFirst().get("pkb_featurename")
+                "^\\QSave customer component\\E$",
+                maps.getFirst().get("pkb_name")
         );
-        assertNull(maps.getFirst().get("pkb_name"));
+        assertNull(maps.getFirst().get("pkb_featurename"));
+    }
+    @Test
+    void oldLabelTextIsNotParsedAsSelectorLabels() {
+        List<Map<String, String>> maps =
+                ModularScenarios.buildRunScenarioMaps(
+                        "FEATURE: Reusable customer flows SCENARIO: Save customer component",
+                        null
+                );
+
+        assertEquals(
+                "^\\QFEATURE: Reusable customer flows SCENARIO: Save customer component\\E$",
+                maps.getFirst().get("pkb_name")
+        );
+        assertNull(maps.getFirst().get("pkb_featurename"));
     }
     @Test
     void inlineStartMarkerIsStoredWithTheInvocationRow() {
         List<Map<String, String>> maps =
                 ModularScenarios.buildRunScenarioMaps(
-                        "SCENARIO: Save customer component "
-                                + "START: submit customer",
+                        "Reusable customer flows.Save customer component.submit customer",
                         null
                 );
+        assertEquals(
+                "Reusable customer flows",
+                maps.getFirst().get("pkb_featurename")
+        );
         assertEquals(
                 "^\\QSave customer component\\E$",
                 maps.getFirst().get("pkb_name")
@@ -135,22 +149,19 @@ public class ModularScenariosChecks {
     }
 
     @Test
-    void inlineTagExpressionCanBeCombinedWithAStartMarker() {
+    void inlineTagSelectorCanStillBeAppliedToInvocationRows() {
         DataTable table = DataTable.create(List.of(
                 List.of("customerName"),
                 List.of("Ava")
         ));
         List<Map<String, String>> maps =
                 ModularScenarios.buildRunScenarioMaps(
-                        "%save_customer START: submit customer",
+                        "%save_customer",
                         table
                 );
 
         assertEquals("%save_customer", maps.getFirst().get("Run Tags"));
-        assertEquals(
-                "submit customer",
-                maps.getFirst().get("Step_Marker")
-        );
+        assertNull(maps.getFirst().get("Step_Marker"));
     }
     @Test
     void tableStepMarkerIsPreservedWithoutInlineArguments() {

@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.BiConsumer;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import static io.cucumber.core.options.Constants.FILTER_NAME_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.FILTER_TAGS_PROPERTY_NAME;
@@ -46,9 +45,6 @@ public class ModularScenarios extends CoreSteps {
     static final String DEFAULT_DATA_PATH = "src/test/resources/data";
     static final String DEFAULT_CALLS_PATH = "src/test/resources/calls";
     static final String DEFAULT_COMPONENT_PATH = "src/test/resources/component";
-    private static final Pattern INLINE_ARGUMENT_PATTERN = Pattern.compile(
-            "(?i)(?<!\\S)(FEATURE|SCENARIO|START):"
-    );
     @Given("^RUN\\s*(?:\"([^\"]+)\"\\s+)?(?:(SCENARIO|COMPONENT SCENARIO|SERVICE CALL)(S)?)?(?::(.*))?$")
     public static void runScenarios(
             String inlineRunKey,
@@ -294,7 +290,8 @@ public class ModularScenarios extends CoreSteps {
     }
     /**
      * Retrieves marker data using {@code marker}, {@code scenario.marker}, or
-     * {@code feature.scenario.marker} address syntax.
+     * {@code feature.scenario.marker} address syntax. Escape literal periods
+     * in path components as {@code \.}.
      */
     public static ScenarioStepData getScenarioMarkerData(
             String dataAddress,
@@ -379,25 +376,27 @@ public class ModularScenarios extends CoreSteps {
         if (normalized.isBlank()) {
             return null;
         }
-        String[] parts = normalized.split("\\.", -1);
-        if (parts.length > 3) {
-            throw new IllegalArgumentException(
-                    "Data addresses support marker, scenario.marker, or "
-                            + "feature.scenario.marker. Feature names, scenario names, "
-                            + "and step markers used for data retrieval cannot contain "
-                            + "period characters because periods separate the address."
-            );
+        List<String> parts = splitEscapedPath(normalized);
+        if (parts.size() > 3) {
+            throw invalidDataAddress(normalized);
         }
-        if (normalize(parts[parts.length - 1]).isBlank()) {
+        if (normalize(parts.getLast()).isBlank()) {
             return null;
+        }
+        for (int index = 0; index < parts.size() - 1; index++) {
+            if (normalize(parts.get(index)).isBlank()) {
+                throw invalidDataAddress(normalized);
+            }
         }
         String[] padded = new String[3];
         java.util.Arrays.fill(padded, "");
-        System.arraycopy(parts, 0, padded, 3 - parts.length, parts.length);
+        for (int index = 0; index < parts.size(); index++) {
+            padded[3 - parts.size() + index] = normalize(parts.get(index));
+        }
         return new DataAddress(
-                normalize(padded[0]),
-                normalize(padded[1]),
-                normalize(padded[2])
+                padded[0],
+                padded[1],
+                padded[2]
         );
     }
     private static String buildDataInlineArguments(
@@ -405,19 +404,23 @@ public class ModularScenarios extends CoreSteps {
             String scenarioName,
             String stepMarker
     ) {
-        StringBuilder inlineArgs = new StringBuilder();
+        List<String> components = new ArrayList<>(3);
         if (!normalize(featureName).isBlank()) {
-            inlineArgs.append("FEATURE: ").append(featureName).append(' ');
+            components.add(escapePathComponent(featureName));
         }
         if (!normalize(scenarioName).isBlank()) {
-            inlineArgs.append("SCENARIO: ").append(scenarioName).append(' ');
+            components.add(escapePathComponent(scenarioName));
         }
-        inlineArgs.append("START: ").append(stepMarker);
-        return inlineArgs.toString();
+        components.add(escapePathComponent(stepMarker));
+        return String.join(".", components);
     }
     private static String configuredDataPath() {
         Object configured = resolveFromVars(PKB_DATA_PATH);
         return configured == null ? "" : normalize(configured.toString());
+    }
+    public static String configuredOrDefaultDataPath() {
+        String configuredPath = configuredDataPath();
+        return configuredPath.isBlank() ? DEFAULT_DATA_PATH : configuredPath;
     }
     private static boolean hasOption(DataTable options, String... names) {
         return dataTableRows(options).stream().anyMatch(row ->
@@ -796,91 +799,96 @@ public class ModularScenarios extends CoreSteps {
         if (arguments.isBlank()) {
             return InlineArguments.EMPTY;
         }
-        Matcher matcher = INLINE_ARGUMENT_PATTERN.matcher(arguments);
-        List<InlinePart> parts = new ArrayList<>();
-        while (matcher.find()) {
-            parts.add(new InlinePart(
-                    matcher.group(1).toUpperCase(Locale.ROOT),
-                    matcher.start(),
-                    matcher.end()
-            ));
+        if (isTagSelector(arguments)) {
+            return new InlineArguments(arguments, null, null, null);
         }
-        if (parts.isEmpty()) {
-            if (isTagSelector(arguments)) {
-                return new InlineArguments(arguments, null, null, null);
-            }
+        List<String> parts = splitEscapedPath(arguments);
+        if (parts.size() > 3) {
             throw invalidInlineArguments(arguments);
         }
-        String leadingText = arguments.substring(0, parts.getFirst().start()).trim();
-        String tags = null;
-        if (!leadingText.isBlank()) {
-            if (!isTagSelector(leadingText)) {
+        for (String part : parts) {
+            if (normalize(part).isBlank()) {
                 throw invalidInlineArguments(arguments);
             }
-            tags = leadingText;
         }
-        String featureName = null;
-        String scenarioName = null;
-        String stepMarker = null;
-        for (int index = 0; index < parts.size(); index++) {
-            InlinePart part = parts.get(index);
-            int valueEnd = index + 1 < parts.size()
-                    ? parts.get(index + 1).start()
-                    : arguments.length();
-            String value = arguments.substring(part.end(), valueEnd).trim();
-            if (value.isBlank()) {
-                throw new IllegalArgumentException(
-                        part.name() + ": requires a nonblank value in inline arguments: ["
-                                + arguments + "]"
-                );
-            }
-            switch (part.name()) {
-                case "FEATURE" -> featureName = uniqueInlineValue(
-                        "FEATURE",
-                        featureName,
-                        value,
-                        arguments
-                );
-                case "SCENARIO" -> scenarioName = uniqueInlineValue(
-                        "SCENARIO",
-                        scenarioName,
-                        value,
-                        arguments
-                );
-                case "START" -> stepMarker = uniqueInlineValue(
-                        "START",
-                        stepMarker,
-                        value,
-                        arguments
-                );
-                default -> throw invalidInlineArguments(arguments);
-            }
-        }
-        return new InlineArguments(tags, featureName, scenarioName, stepMarker);
-    }
-    private static String uniqueInlineValue(
-            String argumentName,
-            String existingValue,
-            String newValue,
-            String inlineArgs
-    ) {
-        if (existingValue != null) {
-            throw new IllegalArgumentException(
-                    argumentName + ": may only be supplied once in inline arguments: ["
-                            + inlineArgs + "]"
+        return switch (parts.size()) {
+            case 1 -> new InlineArguments(
+                    null,
+                    null,
+                    normalize(parts.getFirst()),
+                    null
             );
-        }
-        return newValue;
+            case 2 -> new InlineArguments(
+                    null,
+                    normalize(parts.get(0)),
+                    normalize(parts.get(1)),
+                    null
+            );
+            case 3 -> new InlineArguments(
+                    null,
+                    normalize(parts.get(0)),
+                    normalize(parts.get(1)),
+                    normalize(parts.get(2))
+            );
+            default -> InlineArguments.EMPTY;
+        };
     }
     private static IllegalArgumentException invalidInlineArguments(String inlineArgs) {
         return new IllegalArgumentException(
                 "Inline arguments must start with @ or % for a tag expression, "
-                        + "or use FEATURE:, SCENARIO:, and START: labels: ["
+                        + "or use scenario, feature.scenario, or "
+                        + "feature.scenario.marker path syntax. Escape literal "
+                        + "periods as \\. and literal backslashes as \\\\: ["
                         + inlineArgs + "]"
+        );
+    }
+    private static IllegalArgumentException invalidDataAddress(String dataAddress) {
+        return new IllegalArgumentException(
+                "Data addresses support marker, scenario.marker, or "
+                        + "feature.scenario.marker. Escape literal periods as \\. "
+                        + "and literal backslashes as \\\\: ["
+                        + dataAddress + "]"
         );
     }
     private static boolean isTagSelector(String inlineArgs) {
         return inlineArgs.startsWith("@") || inlineArgs.startsWith("%");
+    }
+    static List<String> splitEscapedPath(String value) {
+        List<String> parts = new ArrayList<>();
+        StringBuilder part = new StringBuilder();
+        boolean escaping = false;
+        for (int index = 0; index < value.length(); index++) {
+            char character = value.charAt(index);
+            if (escaping) {
+                if (character == '.' || character == '\\') {
+                    part.append(character);
+                } else {
+                    part.append('\\').append(character);
+                }
+                escaping = false;
+                continue;
+            }
+            if (character == '\\') {
+                escaping = true;
+                continue;
+            }
+            if (character == '.') {
+                parts.add(part.toString());
+                part.setLength(0);
+                continue;
+            }
+            part.append(character);
+        }
+        if (escaping) {
+            part.append('\\');
+        }
+        parts.add(part.toString());
+        return parts;
+    }
+    private static String escapePathComponent(String value) {
+        return normalize(value)
+                .replace("\\", "\\\\")
+                .replace(".", "\\.");
     }
     private static String exactNameRegex(String scenarioName) {
         return "^" + Pattern.quote(scenarioName) + "$";
@@ -979,8 +987,6 @@ public class ModularScenarios extends CoreSteps {
                     && scenarioName == null
                     && stepMarker == null;
         }
-    }
-    private record InlinePart(String name, int start, int end) {
     }
     record DataAddress(
             String featureName,
