@@ -18,24 +18,67 @@ public final class DataElementRuntime {
                     DataElementKind.DATA_HEADER,
                     DataElementKind.DATA_VALUE
             );
+    private static final Set<DataElementKind> JAVA_KINDS =
+            EnumSet.of(
+                    DataElementKind.MAP,
+                    DataElementKind.LIST,
+                    DataElementKind.SET,
+                    DataElementKind.MULTIMAP
+            );
+    private static final Set<DataElementKind> FORMAT_KINDS =
+            EnumSet.of(
+                    DataElementKind.STRUCTURED_DATA,
+                    DataElementKind.JSON_DATA,
+                    DataElementKind.YAML_DATA,
+                    DataElementKind.XML_DATA,
+                    DataElementKind.DATA_STRING,
+                    DataElementKind.JSON_STRING,
+                    DataElementKind.YAML_STRING,
+                    DataElementKind.XML_STRING
+            );
 
-    private final DataQueryEngine queryEngine;
+    private final DataQueryEngine tabularQueryEngine;
+    private final CollectionQueryEngine collectionQueryEngine;
+    private final FormatQueryEngine formatQueryEngine;
     private final DataResultPolicy resultPolicy;
 
     public DataElementRuntime() {
-        this(new DataQueryEngine(), new DataResultPolicy());
+        this(
+                new DataQueryEngine(),
+                new CollectionQueryEngine(),
+                new FormatQueryEngine(),
+                new DataResultPolicy()
+        );
     }
 
     DataElementRuntime(
             DataQueryEngine queryEngine,
             DataResultPolicy resultPolicy
     ) {
-        this.queryEngine = queryEngine;
+        this(
+                queryEngine,
+                new CollectionQueryEngine(),
+                new FormatQueryEngine(),
+                resultPolicy
+        );
+    }
+
+    DataElementRuntime(
+            DataQueryEngine tabularQueryEngine,
+            CollectionQueryEngine collectionQueryEngine,
+            FormatQueryEngine formatQueryEngine,
+            DataResultPolicy resultPolicy
+    ) {
+        this.tabularQueryEngine = tabularQueryEngine;
+        this.collectionQueryEngine = collectionQueryEngine;
+        this.formatQueryEngine = formatQueryEngine;
         this.resultPolicy = resultPolicy;
     }
 
     public static boolean supports(DataElementKind kind) {
-        return TABULAR_KINDS.contains(kind);
+        return TABULAR_KINDS.contains(kind)
+                || JAVA_KINDS.contains(kind)
+                || FORMAT_KINDS.contains(kind);
     }
 
     public DataExecutionResult execute(
@@ -56,7 +99,23 @@ public final class DataElementRuntime {
             );
         }
 
-        DataContext context = DataContextFactory.table(source);
-        return resultPolicy.apply(queryEngine.query(context, query));
+        DataSelection selection;
+        if (TABULAR_KINDS.contains(query.kind())) {
+            selection = tabularQueryEngine.query(
+                    DataContextFactory.table(source),
+                    query
+            );
+        } else if (JAVA_KINDS.contains(query.kind())) {
+            selection = collectionQueryEngine.query(
+                    DataContextFactory.create(source, query.kind()),
+                    query
+            );
+        } else {
+            selection = formatQueryEngine.query(
+                    DataContextFactory.create(source, query.kind()),
+                    query
+            );
+        }
+        return resultPolicy.apply(selection);
     }
 }

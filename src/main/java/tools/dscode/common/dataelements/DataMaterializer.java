@@ -12,19 +12,28 @@ import java.util.Collections;
 import java.util.List;
 
 public final class DataMaterializer {
-    private static final ObjectMapper MAPPER = JsonMapper.builder().build();
+    private static final ObjectMapper MAPPER =
+            JsonMapper.builder().build();
 
     private DataMaterializer() {
     }
 
     public static Object materialize(DataCandidate candidate) {
         return switch (candidate.kind()) {
-            case DATA_TABLE -> candidate.context().materializeDeclaredType();
-            case DATA_ROW, DATA_COLUMN -> materializeEntries(candidate.entries());
-            case DATA_LIST, DATA_COLUMN_LIST -> immutableList(candidate.value());
+            case DATA_TABLE ->
+                    candidate.context().materializeDeclaredType();
+            case DATA_ROW, DATA_COLUMN ->
+                    materializeEntries(candidate.currentEntries());
+            case DATA_LIST, DATA_COLUMN_LIST ->
+                    immutableList(candidate.currentListValue());
             case DATA_ENTRY -> materializeEntry(candidate);
-            case DATA_CELL, DATA_HEADER, DATA_VALUE -> candidate.value();
-            default -> candidate.value();
+            case DATA_CELL, DATA_HEADER, DATA_VALUE ->
+                    candidate.currentValue();
+            case MAP, LIST, SET, MULTIMAP ->
+                    candidate.context().modified()
+                            ? candidate.currentValue()
+                            : candidate.value();
+            default -> candidate.currentValue();
         };
     }
 
@@ -34,7 +43,8 @@ public final class DataMaterializer {
     ) {
         if (query.returnAttribute() != null) {
             if (query.cardinality().many()) {
-                List<Object> values = new ArrayList<>(candidates.size());
+                List<Object> values =
+                        new ArrayList<>(candidates.size());
                 for (DataCandidate candidate : candidates) {
                     values.add(candidate.returnProjection(
                             query.returnAttribute()
@@ -46,20 +56,12 @@ public final class DataMaterializer {
                     query.returnAttribute()
             );
         }
-
         if (!query.cardinality().many()) {
             return materialize(candidates.getFirst());
         }
-
         return switch (query.kind()) {
             case DATA_ROW, DATA_COLUMN, DATA_ENTRY ->
                     materializeJsonArray(candidates);
-            case DATA_TABLE,
-                 DATA_LIST,
-                 DATA_COLUMN_LIST,
-                 DATA_CELL,
-                 DATA_HEADER,
-                 DATA_VALUE -> materializeJavaList(candidates);
             default -> materializeJavaList(candidates);
         };
     }
@@ -81,18 +83,15 @@ public final class DataMaterializer {
                     ? ""
                     : String.valueOf(entry.key());
             JsonNode value = toJsonNode(entry.value());
-
             JsonNode existing = result.get(key);
             if (existing == null) {
                 result.set(key, value);
                 continue;
             }
-
             if (existing instanceof ArrayNode arrayNode) {
                 arrayNode.add(value);
                 continue;
             }
-
             ArrayNode duplicates = MAPPER.createArrayNode();
             duplicates.add(existing);
             duplicates.add(value);
@@ -101,10 +100,18 @@ public final class DataMaterializer {
         return result;
     }
 
-    private static ObjectNode materializeEntry(DataCandidate candidate) {
+    private static ObjectNode materializeEntry(
+            DataCandidate candidate
+    ) {
         ObjectNode entry = MAPPER.createObjectNode();
-        entry.set("Data Header", toJsonNode(candidate.key()));
-        entry.set("Data Value", toJsonNode(candidate.value()));
+        entry.set(
+                "Data Header",
+                toJsonNode(candidate.currentKey())
+        );
+        entry.set(
+                "Data Value",
+                toJsonNode(candidate.currentValue())
+        );
         return entry;
     }
 
@@ -121,7 +128,8 @@ public final class DataMaterializer {
     private static List<Object> materializeJavaList(
             List<DataCandidate> candidates
     ) {
-        List<Object> result = new ArrayList<>(candidates.size());
+        List<Object> result =
+                new ArrayList<>(candidates.size());
         for (DataCandidate candidate : candidates) {
             result.add(materialize(candidate));
         }
@@ -132,7 +140,9 @@ public final class DataMaterializer {
         if (!(value instanceof List<?> list)) {
             return List.of();
         }
-        return Collections.unmodifiableList(new ArrayList<>(list));
+        return Collections.unmodifiableList(
+                new ArrayList<>(list)
+        );
     }
 
     private static JsonNode toJsonNode(Object value) {

@@ -31,6 +31,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/cucumber-compatibility.md`
 - `docs/custom-element-definitions.md`
 - `docs/data-element-query-runtime.md`
+- `docs/data-values-and-elements.md`
 - `docs/date-time-utilities.md`
 - `docs/dynamic-steps.md`
 - `docs/feature-status-notes.md`
@@ -118,6 +119,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/browseroperations/WindowSafeAccess.java`
 - `src/main/java/tools/dscode/common/browseroperations/WindowSwitch.java`
 - `src/main/java/tools/dscode/common/CoreSteps.java`
+- `src/main/java/tools/dscode/common/dataelements/CollectionDataAdapter.java`
+- `src/main/java/tools/dscode/common/dataelements/CollectionQueryEngine.java`
 - `src/main/java/tools/dscode/common/dataelements/ContextResult.java`
 - `src/main/java/tools/dscode/common/dataelements/DataAttribute.java`
 - `src/main/java/tools/dscode/common/dataelements/DataBoundary.java`
@@ -125,6 +128,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/dataelements/DataCardinality.java`
 - `src/main/java/tools/dscode/common/dataelements/DataContext.java`
 - `src/main/java/tools/dscode/common/dataelements/DataContextFactory.java`
+- `src/main/java/tools/dscode/common/dataelements/DataContextNodeMap.java`
 - `src/main/java/tools/dscode/common/dataelements/DataCoordinate.java`
 - `src/main/java/tools/dscode/common/dataelements/DataElementForm.java`
 - `src/main/java/tools/dscode/common/dataelements/DataElementGroup.java`
@@ -141,9 +145,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/dataelements/DataResultPolicy.java`
 - `src/main/java/tools/dscode/common/dataelements/DataResultUse.java`
 - `src/main/java/tools/dscode/common/dataelements/DataSelection.java`
+- `src/main/java/tools/dscode/common/dataelements/DataSelectionSupport.java`
 - `src/main/java/tools/dscode/common/dataelements/DataSourceMetadata.java`
 - `src/main/java/tools/dscode/common/dataelements/DataStringFormatter.java`
+- `src/main/java/tools/dscode/common/dataelements/FormatQueryEngine.java`
 - `src/main/java/tools/dscode/common/dataelements/IterationResult.java`
+- `src/main/java/tools/dscode/common/dataelements/StructuredDataConverter.java`
 - `src/main/java/tools/dscode/common/dataelements/TabularCell.java`
 - `src/main/java/tools/dscode/common/dataelements/TabularDataAdapter.java`
 - `src/main/java/tools/dscode/common/dataelements/TabularMatrix.java`
@@ -340,11 +347,15 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/com/example/pickleball/tests/TokenizedQueryTest.java`
 - `maven-consumer-project/src/test/java/io/cucumber/core/runner/ScenarioStepChecks.java`
 - `maven-consumer-project/src/test/java/io/cucumber/core/runner/ScenarioStepDataChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseFiveChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseFourAndSixChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseOneChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseThreeChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseTwoChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/common/mappings/MappingDataRefactorChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/util/datetime/BusinessTemporalDeltaChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/util/datetime/BusinessTimePostModifierChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/DataTableConversionChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/ModularScenariosChecks.java`
 
 ## Maven consumer feature scenarios

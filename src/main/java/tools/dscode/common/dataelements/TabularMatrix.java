@@ -10,9 +10,9 @@ public final class TabularMatrix {
     private final int width;
 
     private TabularMatrix(List<List<TabularCell>> rows) {
-        List<List<TabularCell>> copiedRows = new ArrayList<>(rows.size());
+        List<List<TabularCell>> copiedRows =
+                new ArrayList<>(rows.size());
         int maxWidth = 0;
-
         for (List<TabularCell> row : rows) {
             List<TabularCell> copiedRow = List.copyOf(
                     row == null ? List.of() : row
@@ -35,8 +35,8 @@ public final class TabularMatrix {
         if (sourceRows == null || sourceRows.isEmpty()) {
             return empty();
         }
-
-        List<List<TabularCell>> rows = new ArrayList<>(sourceRows.size());
+        List<List<TabularCell>> rows =
+                new ArrayList<>(sourceRows.size());
         for (List<?> sourceRow : sourceRows) {
             List<TabularCell> row = new ArrayList<>();
             if (sourceRow != null) {
@@ -49,7 +49,9 @@ public final class TabularMatrix {
         return new TabularMatrix(rows);
     }
 
-    static TabularMatrix fromCells(List<List<TabularCell>> sourceRows) {
+    static TabularMatrix fromCells(
+            List<List<TabularCell>> sourceRows
+    ) {
         return new TabularMatrix(
                 sourceRows == null ? List.of() : sourceRows
         );
@@ -93,7 +95,8 @@ public final class TabularMatrix {
     }
 
     public List<Object> physicalValues(int row) {
-        List<Object> values = new ArrayList<>(physicalRowLength(row));
+        List<Object> values =
+                new ArrayList<>(physicalRowLength(row));
         for (TabularCell cell : physicalRow(row)) {
             values.add(cell.externalValue());
         }
@@ -108,15 +111,44 @@ public final class TabularMatrix {
         return Collections.unmodifiableList(values);
     }
 
+    public TabularMatrix withCell(
+            int row,
+            int column,
+            Object value
+    ) {
+        if (!hasPhysicalCell(row, column)) {
+            throw new DataQueryException(
+                    "Cannot replace missing table cell at row "
+                            + row + ", column " + column + "."
+            );
+        }
+        List<List<TabularCell>> copiedRows =
+                new ArrayList<>(rows.size());
+        for (int rowIndex = 0;
+             rowIndex < rows.size();
+             rowIndex++) {
+            List<TabularCell> copiedRow =
+                    new ArrayList<>(rows.get(rowIndex));
+            if (rowIndex == row) {
+                copiedRow.set(column, TabularCell.of(value));
+            }
+            copiedRows.add(copiedRow);
+        }
+        return fromCells(copiedRows);
+    }
+
     public TabularMatrix transpose() {
         if (isEmpty() || width == 0) {
             return empty();
         }
-
-        List<List<TabularCell>> transposed = new ArrayList<>(width);
+        List<List<TabularCell>> transposed =
+                new ArrayList<>(width);
         for (int column = 0; column < width; column++) {
-            List<TabularCell> row = new ArrayList<>(rowCount());
-            for (int sourceRow = 0; sourceRow < rowCount(); sourceRow++) {
+            List<TabularCell> row =
+                    new ArrayList<>(rowCount());
+            for (int sourceRow = 0;
+                 sourceRow < rowCount();
+                 sourceRow++) {
                 row.add(cell(sourceRow, column));
             }
             transposed.add(row);
@@ -128,12 +160,15 @@ public final class TabularMatrix {
         if (isEmpty()) {
             return List.of();
         }
-
         int outputWidth = Math.max(width, 1);
-        List<List<String>> output = new ArrayList<>(rowCount());
+        List<List<String>> output =
+                new ArrayList<>(rowCount());
         for (int row = 0; row < rowCount(); row++) {
-            List<String> values = new ArrayList<>(outputWidth);
-            for (int column = 0; column < outputWidth; column++) {
+            List<String> values =
+                    new ArrayList<>(outputWidth);
+            for (int column = 0;
+                 column < outputWidth;
+                 column++) {
                 TabularCell cell = cell(row, column);
                 values.add(DataStringFormatter.tableCell(cell));
             }

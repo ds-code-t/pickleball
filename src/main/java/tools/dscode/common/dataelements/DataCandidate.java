@@ -1,5 +1,7 @@
 package tools.dscode.common.dataelements;
 
+import com.google.common.collect.Multimap;
+
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -103,11 +105,138 @@ public final class DataCandidate {
         return coordinate;
     }
 
-    public Object comparisonProjection(DataAttribute attribute) {
-        if (attribute == null) {
-            return defaultComparisonProjection();
+    public Object currentValue() {
+        if (coordinate != null) {
+            TabularMatrix matrix = context.workingMatrix();
+            if (kind == DataElementKind.DATA_HEADER) {
+                return matrix.cell(
+                        0,
+                        coordinate.column()
+                ).externalValue();
+            }
+            if (kind == DataElementKind.DATA_CELL
+                    || kind == DataElementKind.DATA_ENTRY
+                    || kind == DataElementKind.DATA_VALUE) {
+                return matrix.cell(
+                        coordinate.row(),
+                        coordinate.column()
+                ).externalValue();
+            }
         }
-        return attributeProjection(attribute);
+        return context.currentValue(value);
+    }
+
+    public Object currentKey() {
+        if (kind == DataElementKind.DATA_ENTRY
+                && coordinate != null) {
+            return context.workingMatrix().cell(
+                    0,
+                    coordinate.column()
+            ).externalValue();
+        }
+        return key;
+    }
+
+    public List<DataEntryValue> currentEntries() {
+        if (kind == DataElementKind.MAP
+                && currentValue() instanceof Map<?, ?> map) {
+            List<DataEntryValue> current =
+                    new ArrayList<>(map.size());
+            map.forEach((entryKey, entryValue) ->
+                    current.add(new DataEntryValue(
+                            entryKey,
+                            entryValue,
+                            null,
+                            false
+                    ))
+            );
+            return Collections.unmodifiableList(current);
+        }
+        if (kind == DataElementKind.MULTIMAP
+                && currentValue() instanceof Multimap<?, ?> multimap) {
+            List<DataEntryValue> current =
+                    new ArrayList<>(multimap.size());
+            multimap.entries().forEach(entry ->
+                    current.add(new DataEntryValue(
+                            entry.getKey(),
+                            entry.getValue(),
+                            null,
+                            false
+                    ))
+            );
+            return Collections.unmodifiableList(current);
+        }
+        if (entries.isEmpty()) {
+            return entries;
+        }
+
+        TabularMatrix matrix = context.workingMatrix();
+        List<DataEntryValue> current =
+                new ArrayList<>(entries.size());
+        for (DataEntryValue entry : entries) {
+            DataCoordinate entryCoordinate = entry.coordinate();
+            if (entryCoordinate == null) {
+                current.add(entry);
+                continue;
+            }
+            Object entryKey = switch (kind) {
+                case DATA_ROW -> matrix.cell(
+                        0,
+                        entryCoordinate.column()
+                ).externalValue();
+                case DATA_COLUMN -> matrix.cell(
+                        entryCoordinate.row(),
+                        0
+                ).externalValue();
+                case DATA_ENTRY -> matrix.cell(
+                        0,
+                        entryCoordinate.column()
+                ).externalValue();
+                default -> entry.key();
+            };
+            TabularCell cell = matrix.cell(
+                    entryCoordinate.row(),
+                    entryCoordinate.column()
+            );
+            current.add(new DataEntryValue(
+                    entryKey,
+                    cell.externalValue(),
+                    entryCoordinate,
+                    cell.missing()
+            ));
+        }
+        return Collections.unmodifiableList(current);
+    }
+
+    public List<?> currentListValue() {
+        if (kind == DataElementKind.DATA_LIST
+                && coordinate != null) {
+            return context.workingMatrix()
+                    .physicalValues(coordinate.row());
+        }
+        if (kind == DataElementKind.DATA_COLUMN_LIST
+                && coordinate != null) {
+            TabularMatrix matrix = context.workingMatrix();
+            List<Object> values =
+                    new ArrayList<>(matrix.rowCount());
+            for (int row = 0; row < matrix.rowCount(); row++) {
+                values.add(matrix.cell(
+                        row,
+                        coordinate.column()
+                ).externalValue());
+            }
+            return Collections.unmodifiableList(values);
+        }
+        Object current = currentValue();
+        return current instanceof List<?> list
+                ? list
+                : List.of();
+    }
+
+    public Object comparisonProjection(DataAttribute attribute) {
+        return attribute == null
+                ? defaultComparisonProjection()
+                : attributeProjection(attribute);
     }
 
     public Object returnProjection(DataAttribute attribute) {
@@ -116,27 +245,95 @@ public final class DataCandidate {
                 : attributeProjection(attribute);
     }
 
+    List<Object> associatedKeys() {
+        List<DataEntryValue> currentEntries = currentEntries();
+        if (!currentEntries.isEmpty()) {
+            List<Object> keys =
+                    new ArrayList<>(currentEntries.size());
+            currentEntries.forEach(entry -> keys.add(entry.key()));
+            return Collections.unmodifiableList(keys);
+        }
+        Object current = currentValue();
+        if (current instanceof Map<?, ?> map) {
+            return Collections.unmodifiableList(
+                    new ArrayList<>(map.keySet())
+            );
+        }
+        if (current instanceof Multimap<?, ?> multimap) {
+            return Collections.unmodifiableList(
+                    new ArrayList<>(multimap.keys())
+            );
+        }
+        Object currentKey = currentKey();
+        return currentKey == null
+                ? List.of()
+                : Collections.singletonList(currentKey);
+    }
+
+    List<Object> associatedValues() {
+        List<DataEntryValue> currentEntries = currentEntries();
+        if (!currentEntries.isEmpty()) {
+            List<Object> values =
+                    new ArrayList<>(currentEntries.size());
+            currentEntries.forEach(entry ->
+                    values.add(entry.value())
+            );
+            return Collections.unmodifiableList(values);
+        }
+        Object current = currentValue();
+        if (current instanceof Multimap<?, ?> multimap) {
+            return Collections.unmodifiableList(
+                    new ArrayList<>(multimap.values())
+            );
+        }
+        if (current instanceof Collection<?> collection) {
+            return Collections.unmodifiableList(
+                    new ArrayList<>(collection)
+            );
+        }
+        if (current != null && current.getClass().isArray()) {
+            int length = Array.getLength(current);
+            List<Object> values = new ArrayList<>(length);
+            for (int index = 0; index < length; index++) {
+                values.add(Array.get(current, index));
+            }
+            return Collections.unmodifiableList(values);
+        }
+        if (current instanceof Map<?, ?> map) {
+            return Collections.unmodifiableList(
+                    new ArrayList<>(map.values())
+            );
+        }
+        return Collections.singletonList(current);
+    }
+
     private Object defaultComparisonProjection() {
         return switch (kind) {
             case DATA_ROW,
                  DATA_COLUMN,
                  DATA_LIST,
                  DATA_COLUMN_LIST,
-                 DATA_ENTRY -> key;
+                 DATA_ENTRY -> currentKey();
             case DATA_CELL,
                  DATA_HEADER,
-                 DATA_VALUE -> value;
-            default -> value;
+                 DATA_VALUE -> currentValue();
+            case MAP, MULTIMAP -> associatedKeys();
+            case SET -> associatedValues();
+            default -> currentValue();
         };
     }
 
     private Object attributeProjection(DataAttribute attribute) {
         return switch (attribute) {
-            case VALUE -> kind == DataElementKind.DATA_ENTRY
-                    ? value
-                    : value;
+            case VALUE -> switch (kind) {
+                case MAP, MULTIMAP -> associatedValues();
+                default -> currentValue();
+            };
             case STRING -> DataStringFormatter.format(this);
-            case KEY -> key;
+            case KEY -> switch (kind) {
+                case MAP, MULTIMAP -> associatedKeys();
+                default -> currentKey();
+            };
             case VALUES -> associatedValues();
             case SIZE -> size();
             case COUNT -> count();
@@ -146,51 +343,31 @@ public final class DataCandidate {
         };
     }
 
-    private List<Object> associatedValues() {
-        if (!entries.isEmpty()) {
-            List<Object> values = new ArrayList<>(entries.size());
-            entries.forEach(entry -> values.add(entry.value()));
-            return Collections.unmodifiableList(values);
-        }
-        if (value instanceof Collection<?> collection) {
-            return Collections.unmodifiableList(
-                    new ArrayList<>(collection)
-            );
-        }
-        if (value != null && value.getClass().isArray()) {
-            int length = Array.getLength(value);
-            List<Object> values = new ArrayList<>(length);
-            for (int index = 0; index < length; index++) {
-                values.add(Array.get(value, index));
-            }
-            return Collections.unmodifiableList(values);
-        }
-        if (value instanceof Map<?, ?> map) {
-            return Collections.unmodifiableList(
-                    new ArrayList<>(map.values())
-            );
-        }
-        return Collections.singletonList(value);
-    }
-
     private int size() {
-        if (!entries.isEmpty()) {
-            return entries.size();
+        List<DataEntryValue> currentEntries = currentEntries();
+        if (!currentEntries.isEmpty()) {
+            return currentEntries.size();
         }
-        if (value instanceof Collection<?> collection) {
+        Object current = currentValue();
+        if (current instanceof Multimap<?, ?> multimap) {
+            return multimap.size();
+        }
+        if (current instanceof Collection<?> collection) {
             return collection.size();
         }
-        if (value instanceof Map<?, ?> map) {
+        if (current instanceof Map<?, ?> map) {
             return map.size();
         }
-        if (value != null && value.getClass().isArray()) {
-            return Array.getLength(value);
+        if (current != null && current.getClass().isArray()) {
+            return Array.getLength(current);
         }
-        return value == null ? 0 : 1;
+        return current == null ? 0 : 1;
     }
 
     private int count() {
-        return entries.isEmpty() ? size() : entries.size();
+        return currentEntries().isEmpty()
+                ? size()
+                : currentEntries().size();
     }
 
     private Object first() {
