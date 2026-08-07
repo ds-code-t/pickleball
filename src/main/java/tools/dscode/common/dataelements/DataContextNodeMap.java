@@ -106,7 +106,6 @@ public final class DataContextNodeMap extends NodeMap {
     ) {
         DataCandidate selected = writableCandidate();
         MutationPath path = MutationPath.from(query);
-
         switch (selected.kind()) {
             case DATA_TABLE -> replaceTableCell(
                     selected.context(),
@@ -451,6 +450,7 @@ public final class DataContextNodeMap extends NodeMap {
             );
             return requireObjectNode(grouped);
         }
+
         JsonNode node = toSafeJsonNode(value);
         if (node instanceof ObjectNode objectNode) {
             return objectNode.deepCopy();
@@ -458,7 +458,9 @@ public final class DataContextNodeMap extends NodeMap {
 
         ObjectNode result = MAPPER.createObjectNode();
         if (node instanceof ArrayNode arrayNode) {
-            result.set("value", arrayNode.deepCopy());
+            ArrayNode occurrences = MAPPER.createArrayNode();
+            occurrences.add(arrayNode.deepCopy());
+            result.set("value", occurrences);
         } else {
             result.set("value", node);
         }

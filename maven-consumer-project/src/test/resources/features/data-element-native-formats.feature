@@ -3,13 +3,11 @@ Feature: Native Data Element structured format conversion
 
   Scenario: Convert typed marker DocStrings through Structured JSON YAML and XML Data
     Given CLEAR SAVED VALUES
-
     When , save "<data:Data element native fixtures.Structured sources.jsonDocument>" Structured Data as "structuredJson"
     And , save "<data:Data element native fixtures.Structured sources.jsonDocument>" Data Object as "dataObject"
     And , save "<data:Data element native fixtures.Structured sources.jsonDocument>" JSON Data as "jsonData"
-
     Then , verify "<structuredJson.name>" equals "Ada"
-    And , verify "<structuredJson.active>" equals true
+    And , verify "<structuredJson.active>" equals "true"
     And , verify "<structuredJson.score>" equals 42
     And , verify "<structuredJson.address.city>" equals "Phoenix"
     And , verify "<structuredJson.roles[1]>" equals "author"
@@ -18,16 +16,14 @@ Feature: Native Data Element structured format conversion
 
     When , save "<data:Data element native fixtures.Structured sources.yamlDocument>" Structured Data as "structuredYaml"
     And , save "<data:Data element native fixtures.Structured sources.yamlDocument>" YAML Data as "yamlData"
-
     Then , verify "<structuredYaml.name>" equals "Grace"
-    And , verify "<structuredYaml.active>" equals true
+    And , verify "<structuredYaml.active>" equals "true"
     And , verify "<structuredYaml.address.city>" equals "Tempe"
     And , verify "<yamlData.roles[0]>" equals "reviewer"
     And , verify "<yamlData.roles[1]>" equals "editor"
 
     When , save "<data:Data element native fixtures.Structured sources.xmlDocument>" Structured Data as "structuredXml"
     And , save "<data:Data element native fixtures.Structured sources.xmlDocument>" XML Data as "xmlData"
-
     Then , verify "<structuredXml.id>" equals "7"
     And , verify "<structuredXml.name>" equals "Lin"
     And , verify "<xmlData.active>" equals "true"
@@ -39,7 +35,6 @@ Feature: Native Data Element structured format conversion
     # Doc String is the established compatibility alias for the native Cucumber object.
     When , save "<data:Data element native fixtures.Structured sources.jsonDocument>" Doc String as "nativeDocString"
     And , save "<nativeDocString>" Structured Data as "docStringData"
-
     Then , verify "<docStringData.name>" equals "Ada"
     And , verify "<docStringData.address.city>" equals "Phoenix"
     And , verify "<docStringData.roles[0]>" equals "admin"
@@ -71,8 +66,8 @@ Feature: Native Data Element structured format conversion
     And , verify "<yamlRoundTrip.address.city>" equals "Phoenix"
 
     When , save "<sourceJson>" XML String as "xmlString"
-    Then , verify "<xmlString>" contains "<Data>"
-    And , verify "<xmlString>" contains "<name>Ada</name>"
+    Then , verify "~[~xmlString~]~" contains "<Data>"
+    And , verify "~[~xmlString~]~" contains "<name>Ada</name>"
 
     When , save "<xmlString>" XML Data as "xmlRoundTrip"
     Then , verify "<xmlRoundTrip.name>" equals "Ada"
@@ -86,8 +81,7 @@ Feature: Native Data Element structured format conversion
     Given CLEAR SAVED VALUES
 
     When , save "<data:Data element native fixtures.Structured sources.mapCollection>" JSON Data as "objectArray"
-
-    When , save "<objectArray>" Data Objects as "dataObjects"
+    And , save "<objectArray>" Data Objects as "dataObjects"
     Then , verify "<dataObjects[0].id>" equals "one"
     And , verify "<dataObjects[1].code>" equals "two"
     And , verify "<dataObjects[2].status>" equals "complete"
@@ -103,7 +97,6 @@ Feature: Native Data Element structured format conversion
 
   Scenario: Convert a native DataTable to a Data String and back through JSON
     Given CLEAR SAVED VALUES
-
     When , save "<data:Data element native fixtures.Cucumber sources.roundtrip>" Data String as "tableJsonString"
     Then , verify "<tableJsonString>" contains '"id":"a1"'
     And , verify "<tableJsonString>" contains '"owner":"Cara"'
@@ -127,7 +120,6 @@ Feature: Native Data Element structured format conversion
       """
 
     When , save Data as "unnamedData"
-
     * ------
       """json
       {
@@ -149,7 +141,6 @@ Feature: Native Data Element structured format conversion
       | tableData  | selected above |
 
     When , save Data as "unnamedTableData"
-
     Then , verify "<unnamedTableData.captureKey>" equals "tableData"
     And , verify "<unnamedTableData.value>" equals "selected above"
 

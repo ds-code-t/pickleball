@@ -16,6 +16,7 @@ import tools.dscode.common.dataelements.DataElementGroup;
 import tools.dscode.common.dataelements.DataExecutionResult;
 import tools.dscode.common.dataelements.DataElementKind;
 import tools.dscode.common.dataelements.DataElementRuntime;
+import tools.dscode.common.dataelements.StructuredDataConverter;
 import tools.dscode.common.treeparsing.parsedComponents.DataElementMatch;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 import java.util.List;
@@ -36,7 +37,6 @@ public class ParsingMap extends MappingProcessor {
             new DataElementRuntime();
     private static final ParsingMap GLOBALS_PARSINGMAP =
             new ParsingMap(GLOBALS);
-
     public static final String configsRoot = "configs";
     static {
         JsonNode configsNode = FileAndDataParsing.buildJsonFromPath(
@@ -55,13 +55,11 @@ public class ParsingMap extends MappingProcessor {
     ) {
         return getMaps().get(mapType);
     }
-
     public ParsingMap() {
     }
     private ParsingMap(NodeMap nodeMap) {
         super(nodeMap);
     }
-
     @Override
     public Object get(String key) {
         Object value = super.get(key);
@@ -95,7 +93,6 @@ public class ParsingMap extends MappingProcessor {
                 element.category.replaceFirst("(?i:s)$", "");
         boolean noQuotedText = element.defaultText == null
                 || element.defaultText.isNullOrBlank();
-
         if (!noQuotedText) {
             return super.get(element);
         }
@@ -110,7 +107,6 @@ public class ParsingMap extends MappingProcessor {
                     ? List.of()
                     : List.of(dataTable);
         }
-
         if (DATA_OBJECT_KEY.equals(categoryName)) {
             Object data = nearestUnnamedMarkerData(false);
             if (data == null) {
@@ -118,28 +114,20 @@ public class ParsingMap extends MappingProcessor {
             }
             return List.of(toJsonData(data));
         }
-
         return super.get(element);
     }
     private Object resolveDataSource(
             DataElementMatch element
     ) {
         DataElementKind kind = element.registration().kind();
-        boolean noQuotedText = element.defaultText == null
-                || element.defaultText.isNullOrBlank();
-
+        if (element.hasExplicitSource()) {
+            return resolveExplicitDataSource(element);
+        }
         if (kind == DataElementKind.DATA_TABLE) {
-            if (!noQuotedText) {
-                return resolveExplicitDataSource(element);
-            }
             Object active = activeTable(element);
             return active != null
                     ? active
                     : nearestUnnamedMarkerData(true);
-        }
-        if (kind.group() != DataElementGroup.CUCUMBER
-                && !noQuotedText) {
-            return resolveExplicitDataSource(element);
         }
         if (kind.group() == DataElementGroup.FORMAT) {
             Object active = activeTable(element);
@@ -153,7 +141,6 @@ public class ParsingMap extends MappingProcessor {
             Object context = phraseContextSource();
             return context != null ? context : activeTable(element);
         }
-
         Object active = activeTable(element);
         return active != null ? active : phraseContextSource();
     }
@@ -161,12 +148,12 @@ public class ParsingMap extends MappingProcessor {
     private Object resolveExplicitDataSource(
             DataElementMatch element
     ) {
-        if (element.registration().kind() == DataElementKind.DATA_TABLE) {
-            List<?> values = super.get(element);
-            return firstRawValue(values);
+        ValueWrapper sourceOperand = element.defaultText;
+        if (sourceOperand == null) {
+            return null;
         }
+        String text = sourceOperand.toString();
 
-        String text = element.defaultText.toString();
         Object reference = ValueFormatting.fromReferenceText(text);
         if (reference != null) {
             return reference;
@@ -182,9 +169,33 @@ public class ParsingMap extends MappingProcessor {
         if (mapped != null) {
             return mapped;
         }
+
+        Object structuredLiteral = structuredLiteral(sourceOperand.getValue());
+        if (structuredLiteral != null) {
+            return structuredLiteral;
+        }
+
+        if (element.registration().kind() == DataElementKind.DATA_TABLE) {
+            return firstRawValue(super.get(element));
+        }
+
         return supportsLiteralFallback(element)
-                ? element.defaultText.getValue()
+                ? sourceOperand.getValue()
                 : null;
+    }
+
+    private static Object structuredLiteral(Object value) {
+        if (!(value instanceof String text)) {
+            return null;
+        }
+        String trimmed = text.trim();
+        if (!(trimmed.startsWith("{") || trimmed.startsWith("["))) {
+            return null;
+        }
+        return StructuredDataConverter.convert(
+                text,
+                DataElementKind.STRUCTURED_DATA
+        );
     }
 
     private static Object firstRawValue(List<?> values) {
@@ -210,7 +221,6 @@ public class ParsingMap extends MappingProcessor {
         if (root.isEmpty()) {
             return null;
         }
-
         JsonNode rows = root.get(ROW_KEY);
         return rows != null && root.size() == 1
                 ? rows
@@ -225,7 +235,6 @@ public class ParsingMap extends MappingProcessor {
                         element.registration().name()
                 );
     }
-
     private static boolean supportsLiteralFallback(
             DataElementMatch element
     ) {
@@ -233,7 +242,6 @@ public class ParsingMap extends MappingProcessor {
                 == DataElementGroup.FORMAT
                 && !usesLegacyDataAlias(element);
     }
-
     private Object activeTable(DataElementMatch element) {
         if (element.parentPhrase == null
                 || element.parentPhrase.getPhraseParsingMap() == null) {
@@ -294,7 +302,6 @@ public class ParsingMap extends MappingProcessor {
             return getRunningParsingMap()
                     .resolveWholeValue(inputString);
         }
-
         if (input instanceof JsonNode jsonNode
                 && jsonNode.isTextual()) {
             return getRunningParsingMap()
@@ -311,7 +318,6 @@ public class ParsingMap extends MappingProcessor {
         }
         return getRunningParsingMap().resolveWholeText(input);
     }
-
     public static Object getFromRunningParsingMapCaseInsensitive(
             String key
     ) {
@@ -362,7 +368,6 @@ public class ParsingMap extends MappingProcessor {
     public static NodeMap getRootScenarioStepNodeMap() {
         return getRootScenarioStep().getDefaultStepNodeMap();
     }
-
     public static NodeMap
     getClosestScenarioStepAncestorNodeMap() {
         return getClosestScenarioStepAncestor()

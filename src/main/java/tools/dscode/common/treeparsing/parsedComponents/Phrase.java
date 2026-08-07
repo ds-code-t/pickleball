@@ -1,6 +1,6 @@
 package tools.dscode.common.treeparsing.parsedComponents;
-
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.Multimap;
 import io.cucumber.core.runner.StepExtension;
 import io.cucumber.datatable.DataTable;
 import tools.dscode.common.assertions.ValueWrapper;
@@ -15,6 +15,8 @@ import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.preparsing.LineData;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
 import static io.cucumber.core.runner.util.TableUtils.toRowsStringMultimap;
@@ -29,12 +31,10 @@ import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLev
 import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry;
 public final class Phrase extends PhraseData {
 
-
     public Phrase(LineData parsedLine) {
         super(STARTING_CONTEXT, ',', parsedLine);
         isTopContext = true;
     }
-
     public Phrase(String inputText, Character delimiter, LineData parsedLine) {
         super(inputText, delimiter, parsedLine, null);
     }
@@ -44,7 +44,6 @@ public final class Phrase extends PhraseData {
             elementMatches = new ArrayList<>(elementMatches.stream().filter(e -> !e.isPlaceHolder()).toList());
         }
     }
-
     boolean shouldRun() {
         if (assertionChainMembership != null)
             return true;
@@ -84,14 +83,12 @@ public final class Phrase extends PhraseData {
                 }
             }
 
-
         } else {
             phraseConditionalMode = getPreviousPhrase() == null ? 1 : getPreviousPhrase().phraseConditionalMode;
         }
 
         return phraseConditionalMode > 0;
     }
-
 
     @Override
     public PhraseData runPhrase() {
@@ -105,7 +102,6 @@ public final class Phrase extends PhraseData {
                 parsedLine.inheritancePhrases.add(this);
             }
         }
-
         return nextResolvedPhrase;
     }
     public void executePhrase() {
@@ -127,7 +123,6 @@ public final class Phrase extends PhraseData {
         if (phraseType == null && !getConditional().isBlank()) {
             phraseType = PhraseType.CONDITIONAL;
         }
-
 
         if (assertionChain == null)
             parsedLine.executedPhrases.add(this);
@@ -156,11 +151,9 @@ public final class Phrase extends PhraseData {
             logDebug("Context branch set");
             return;
         }
-
         getElementMatches().forEach(e -> {
             if (e.elementTypes.contains(ElementType.HTML_TYPE)) e.contextWrapper = new ContextWrapper(e);
         });
-
         if (isOperationPhrase) {
             prepareDataElementValues();
             runOperation();
@@ -175,10 +168,37 @@ public final class Phrase extends PhraseData {
             }
             element.nonHTMLValues.clear();
             for (Object value : getPhraseParsingMap().get(element)) {
-                element.nonHTMLValues.add(ValueWrapper.createValueWrapper(value));
+                element.nonHTMLValues.add(wrapDataElementValue(value));
             }
             element.elementTypes.add(ElementType.RETURNS_VALUE);
         }
+    }
+    private static ValueWrapper wrapDataElementValue(Object value) {
+        if (value instanceof List<?>) {
+            return ValueWrapper.createValueWrapper(
+                    value,
+                    ValueWrapper.ValueTypes.LIST
+            );
+        }
+        if (value instanceof Set<?>) {
+            return ValueWrapper.createValueWrapper(
+                    value,
+                    ValueWrapper.ValueTypes.SET
+            );
+        }
+        if (value instanceof Map<?, ?>) {
+            return ValueWrapper.createValueWrapper(
+                    value,
+                    ValueWrapper.ValueTypes.MAP
+            );
+        }
+        if (value instanceof Multimap<?, ?>) {
+            return ValueWrapper.createValueWrapper(
+                    value,
+                    ValueWrapper.ValueTypes.MULTIMAP
+            );
+        }
+        return ValueWrapper.createValueWrapper(value);
     }
     void processContextPhrase() {
         ElementMatch firstElement = getFirstElement();
@@ -239,7 +259,6 @@ public final class Phrase extends PhraseData {
         return clone;
     }
 
-
     public void saveToPhraseParsingMap(String key, Object object) {
         saveToPhraseParsingMap(this, key, object);
     }
@@ -290,7 +309,6 @@ public final class Phrase extends PhraseData {
         clonedPhrase.setResolvedPhrase(clonedPhrase);
         return clonedPhrase;
     }
-
     @Override
     public PhraseData clonePhrase(PhraseData previous) {
         return clonePhrase(previous, null);
@@ -316,10 +334,8 @@ public final class Phrase extends PhraseData {
         PhraseData nextResolvedPhrase = getNextPhrase().resolvePhrase();
         nextResolvedPhrase.setPreviousPhrase(this);
         this.setNextPhrase(nextResolvedPhrase);
-
         return nextResolvedPhrase;
     }
-
 
     public static Phrase copyPhraseWithModifications(Phrase phrase) {
         return copyPhraseWithModifications(phrase, null, null, null);
@@ -354,6 +370,5 @@ public final class Phrase extends PhraseData {
         }
         return clonePhrase;
     }
-
 
 }

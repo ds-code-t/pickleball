@@ -42,6 +42,32 @@ Filtering occurs before ordinal, boundary, or stride selection.
 
 ## Source resolution
 
+### Explicit Data Element sources
+
+For Data Elements that accept an explicit source, the leading quoted operand is
+the source and is not a comparison predicate.
+
+```gherkin
+save "<mapsJson>" Map with key equaling "id" as "mapByKey"
+```
+
+This is compiled as:
+
+- source: `<mapsJson>`
+- candidate kind: `Map`
+- comparison attribute: `key`
+- predicate: `equaling "id"`
+- return projection: the whole matching Map
+
+The source operand is captured from the existing `ElementMatch` parse state.
+`DefinitionContext` does not require a special Data Element regex.
+
+Mappings and native object references are resolved before query execution.
+When template expansion renders a saved structured value as JSON text, JSON
+object/array text is rehydrated to structured data before Java collection or
+`Data Table` adaptation. Structured-format categories can continue to consume
+their literal text directly.
+
 ### Data tables
 
 Read-only tabular queries use the current phrase's native `DataTable` when one
@@ -54,7 +80,8 @@ An unquoted `Data Table` keeps the established resolution order:
 2. nearest qualifying unnamed marker `DataTable`.
 
 Quoted `Data Table` values continue to resolve through the existing mapping and
-native-reference mechanism.
+native-reference mechanism. JSON array/object text produced from a saved
+structured value is rehydrated before tabular adaptation.
 
 When a previous tabular projection has become the phrase context, the runtime
 adapts that local JSON projection as the source for the next query segment.
@@ -63,16 +90,15 @@ native table.
 
 ### Java collections and structured formats
 
-Quoted `Map`, `List`, `Set`, `Multimap`, and new structured-format categories
+Quoted `Map`, `List`, `Set`, `Multimap`, and structured-format categories
 resolve existing mappings and native references before query execution.
 
 Unquoted Java collection categories use the current phrase context. Structured
 format categories use an active table first, then the nearest unnamed marker
 `DataTable` or `DocString`, then the current phrase context.
 
-Unresolved quoted text is treated as a literal only for the new conversion
-categories. The legacy quoted `Data` and `Data Table` lookup behavior is not
-changed.
+Unresolved quoted text is treated as a literal only for structured conversion
+categories. The legacy quoted `Data` behavior is unchanged.
 
 ## Java collection projections
 
@@ -95,21 +121,43 @@ Discovery expands only one direct level per query segment.
 Nested values are not searched recursively. Select a nested value as a new
 context before querying its contents.
 
-### Collection comparison defaults
+### Explicit collection comparison attributes
 
-| Kind | Default comparison |
-|---|---|
-| `List` | equals/starts-with inspect the first element; ends-with inspects the last; contains/matches inspect any element |
-| `Set` | equals/contains/matches inspect members |
-| `Map` | keys |
-| `Multimap` | keys, retaining duplicate key encounter order |
+Collection predicates require an explicit comparison attribute. There is no
+implicit rule such as "Map compares keys" or "List equals compares the first
+member."
 
-Numeric collection comparisons require an explicit `size` or `count`
-attribute. `Set` does not support starts-with or ends-with unless the query
-uses an explicit ordered or string projection.
+Examples:
 
-Comparison and return attributes remain independent. Filtering a Map by a
-value still returns the original Map unless a return attribute is requested.
+```gherkin
+save "<mapsJson>" Map with key equaling "id" as "mapByKey"
+save "<mapsJson>" Map with value equaling "pending" as "mapByValue"
+
+save "<listsJson>" List with first equaling "alpha" as "firstList"
+save "<listsJson>" List with last equaling "tail" as "lastList"
+save "<listsJson>" List with values containing "middle" as "memberList"
+save "<listsJson>" List with size equaling 3 as "sizeList"
+
+save "<multimapJson>" Multimap with key equaling "status" as "statusMultimap"
+```
+
+The syntax reuses the existing generic `with <name> <predicate>` attribute
+channel used by DOM element matching. `DataElementMatch` resolves the name as a
+`DataAttribute`; no `DefinitionContext` regex change is required.
+
+Supported collection projections include `key`, `value`, `values`, `size`,
+`count`, `first`, `last`, `type`, and `string` where meaningful for the
+candidate kind.
+
+Comparison and return attributes are independent. For example:
+
+```gherkin
+save key of "<mapsJson>" Map with value equaling "pending" as "keys"
+```
+
+filters Maps by their values but returns the key projection from the selected
+Map. Without a return attribute, the whole matching collection candidate is
+returned.
 
 Encounter order is retained from the source. Duplicate Multimap keys and
 values remain duplicated and ordered.
@@ -142,6 +190,14 @@ Explicit JSON, YAML, and XML categories parse their declared format and report
 conversion errors as `DataQueryException`. JSON String output is compact.
 XML String output uses `Data` as the serialization root. Existing XML text is
 validated and preserved.
+
+When a phrase contains literal XML with a closing or self-closing tag, use the
+existing secondary mapping bookends for placeholders so XML markup is not
+parsed as mapping syntax. For example:
+
+```gherkin
+verify "~[~xmlString~]~" contains "<name>Ada</name>"
+```
 
 XML input containing `DOCTYPE` or `ENTITY` declarations is rejected.
 
@@ -216,5 +272,6 @@ The runtime retains:
 - legacy `Data` and `Doc String` conversion paths;
 - existing `NodeMap` latest-value retrieval.
 
-All six planned implementation phases are now represented. Structural mutation
-and `Tokenized` Data Element syntax remain explicitly out of scope.
+The collection comparison contract intentionally requires explicit
+`DataAttribute` syntax for predicates. Structural mutation and `Tokenized` Data
+Element syntax remain out of scope.

@@ -20,8 +20,12 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static tools.dscode.common.dataelements.DataAttribute.FIRST;
+import static tools.dscode.common.dataelements.DataAttribute.KEY;
+import static tools.dscode.common.dataelements.DataAttribute.LAST;
 import static tools.dscode.common.dataelements.DataAttribute.SIZE;
 import static tools.dscode.common.dataelements.DataAttribute.VALUE;
+import static tools.dscode.common.dataelements.DataAttribute.VALUES;
 import static tools.dscode.common.dataelements.DataElementForm.PLURAL;
 import static tools.dscode.common.dataelements.DataElementForm.SINGULAR;
 import static tools.dscode.common.dataelements.DataElementKind.DATA_STRING;
@@ -43,7 +47,7 @@ public final class DataElementPhaseFourAndSixChecks {
     private final DataElementRuntime runtime = new DataElementRuntime();
 
     @Test
-    void listsExpandOneLevelAndUseOperationSpecificProjections() {
+    void listsExpandOneLevelAndUseExplicitComparisonProjections() {
         List<List<String>> source = List.of(
                 List.of("alpha", "middle", "omega"),
                 List.of("beta", "tail")
@@ -54,6 +58,7 @@ public final class DataElementPhaseFourAndSixChecks {
                 List.of("alpha", "middle", "omega"),
                 queryLists(
                         source,
+                        FIRST,
                         TextOp.of(
                                 "alpha",
                                 ExecutionDictionary.Op.EQUALS
@@ -64,9 +69,10 @@ public final class DataElementPhaseFourAndSixChecks {
                 List.of("beta", "tail"),
                 queryLists(
                         source,
+                        LAST,
                         TextOp.of(
                                 "tail",
-                                ExecutionDictionary.Op.ENDS_WITH
+                                ExecutionDictionary.Op.EQUALS
                         )
                 ).first().value()
         );
@@ -74,6 +80,7 @@ public final class DataElementPhaseFourAndSixChecks {
                 List.of("alpha", "middle", "omega"),
                 queryLists(
                         source,
+                        VALUES,
                         TextOp.of(
                                 "middle",
                                 ExecutionDictionary.Op.CONTAINS
@@ -83,7 +90,62 @@ public final class DataElementPhaseFourAndSixChecks {
     }
 
     @Test
-    void listNumericComparisonsRequireSizeOrCount() {
+    void collectionPredicatesRequireExplicitComparisonAttributes() {
+        List<List<String>> lists = List.of(
+                List.of("alpha"),
+                List.of("beta")
+        );
+        Map<String, String> map = Map.of("id", "one");
+        Set<String> set = Set.of("alpha");
+        LinkedListMultimap<String, String> multimap =
+                LinkedListMultimap.create();
+        multimap.put("status", "ready");
+
+        TextOp equalsAlpha = TextOp.of(
+                "alpha",
+                ExecutionDictionary.Op.EQUALS
+        );
+
+        assertThrows(
+                DataQueryException.class,
+                () -> collectionEngine.query(
+                        DataContextFactory.create(lists, LIST),
+                        DataQuery.builder(LIST, PLURAL)
+                                .predicate(equalsAlpha)
+                                .build()
+                )
+        );
+        assertThrows(
+                DataQueryException.class,
+                () -> collectionEngine.query(
+                        DataContextFactory.create(map, MAP),
+                        DataQuery.builder(MAP, SINGULAR)
+                                .predicate(equalsAlpha)
+                                .build()
+                )
+        );
+        assertThrows(
+                DataQueryException.class,
+                () -> collectionEngine.query(
+                        DataContextFactory.create(set, SET),
+                        DataQuery.builder(SET, SINGULAR)
+                                .predicate(equalsAlpha)
+                                .build()
+                )
+        );
+        assertThrows(
+                DataQueryException.class,
+                () -> collectionEngine.query(
+                        DataContextFactory.create(multimap, MULTIMAP),
+                        DataQuery.builder(MULTIMAP, SINGULAR)
+                                .predicate(equalsAlpha)
+                                .build()
+                )
+        );
+    }
+
+    @Test
+    void listNumericComparisonsUseSizeOrCount() {
         List<List<String>> source = List.of(
                 List.of("a", "b", "c"),
                 List.of("d")
@@ -91,11 +153,6 @@ public final class DataElementPhaseFourAndSixChecks {
         TextOp greaterThanTwo = TextOp.of(
                 2,
                 ExecutionDictionary.Op.GT
-        );
-
-        assertThrows(
-                DataQueryException.class,
-                () -> queryLists(source, greaterThanTwo)
         );
 
         DataSelection selected = collectionEngine.query(
@@ -110,7 +167,7 @@ public final class DataElementPhaseFourAndSixChecks {
     }
 
     @Test
-    void mapsExpandOneLevelAndKeepKeyValueAndStringProjectionsSeparate() {
+    void mapsExpandOneLevelAndKeepComparisonAndReturnProjectionsSeparate() {
         Map<String, Object> first = linkedMap(
                 "id", "one",
                 "status", "ready"
@@ -124,6 +181,7 @@ public final class DataElementPhaseFourAndSixChecks {
         DataSelection keys = collectionEngine.query(
                 DataContextFactory.create(source, MAP),
                 DataQuery.builder(MAP, PLURAL)
+                        .comparisonAttribute(KEY)
                         .predicate(TextOp.of(
                                 "id",
                                 ExecutionDictionary.Op.EQUALS
@@ -149,10 +207,14 @@ public final class DataElementPhaseFourAndSixChecks {
                 "{id=one, status=ready}",
                 keys.first().returnProjection(DataAttribute.STRING)
         );
+        assertEquals(
+                List.of("code", "status"),
+                values.first().returnProjection(KEY)
+        );
     }
 
     @Test
-    void setsPreserveEncounterOrderAndRejectOrderedPredicates() {
+    void setsPreserveEncounterOrderWithExplicitValuesProjection() {
         Set<String> source = new LinkedHashSet<>(
                 List.of("alpha", "beta", "gamma")
         );
@@ -161,6 +223,7 @@ public final class DataElementPhaseFourAndSixChecks {
         DataSelection contains = collectionEngine.query(
                 context,
                 DataQuery.builder(SET, SINGULAR)
+                        .comparisonAttribute(VALUES)
                         .predicate(TextOp.of(
                                 "beta",
                                 ExecutionDictionary.Op.CONTAINS
@@ -172,18 +235,6 @@ public final class DataElementPhaseFourAndSixChecks {
         assertEquals(
                 List.of("alpha", "beta", "gamma"),
                 contains.first().associatedValues()
-        );
-        assertThrows(
-                DataQueryException.class,
-                () -> collectionEngine.query(
-                        context,
-                        DataQuery.builder(SET, SINGULAR)
-                                .predicate(TextOp.of(
-                                        "alpha",
-                                        ExecutionDictionary.Op.STARTS_WITH
-                                ))
-                                .build()
-                )
         );
     }
 
@@ -199,6 +250,7 @@ public final class DataElementPhaseFourAndSixChecks {
         DataSelection selection = collectionEngine.query(
                 DataContextFactory.create(source, MULTIMAP),
                 DataQuery.builder(MULTIMAP, SINGULAR)
+                        .comparisonAttribute(KEY)
                         .predicate(TextOp.of(
                                 "status",
                                 ExecutionDictionary.Op.EQUALS
@@ -227,7 +279,6 @@ public final class DataElementPhaseFourAndSixChecks {
                 DataContextFactory.create(source, MULTIMAP),
                 DataQuery.builder(MULTIMAP, SINGULAR).build()
         );
-
         Multimap<?, ?> converted = assertInstanceOf(
                 Multimap.class,
                 selection.materializeTerminal()
@@ -261,6 +312,7 @@ public final class DataElementPhaseFourAndSixChecks {
                         source,
                         DataQuery.builder(LIST, SINGULAR)
                                 .any()
+                                .comparisonAttribute(FIRST)
                                 .predicate(TextOp.of(
                                         "missing",
                                         ExecutionDictionary.Op.EQUALS
@@ -277,6 +329,7 @@ public final class DataElementPhaseFourAndSixChecks {
                         source,
                         DataQuery.builder(LIST, SINGULAR)
                                 .every()
+                                .comparisonAttribute(FIRST)
                                 .predicate(TextOp.of(
                                         "missing",
                                         ExecutionDictionary.Op.EQUALS
@@ -316,7 +369,6 @@ public final class DataElementPhaseFourAndSixChecks {
                 "name: Grace",
                 "yaml"
         );
-
         JsonNode json = assertInstanceOf(
                 JsonNode.class,
                 StructuredDataConverter.convert(
@@ -331,7 +383,6 @@ public final class DataElementPhaseFourAndSixChecks {
                         STRUCTURED_DATA
                 )
         );
-
         assertEquals("Ada", json.get("name").asText());
         assertEquals("Grace", yaml.get("name").asText());
     }
@@ -384,14 +435,12 @@ public final class DataElementPhaseFourAndSixChecks {
                 "\"plain text\"",
                 StructuredDataConverter.convert("plain text", JSON_STRING)
         );
-
         String yaml = (String) StructuredDataConverter.convert(
                 source,
                 YAML_STRING
         );
         assertTrue(yaml.contains("name: \"Ada\"")
                 || yaml.contains("name: Ada"));
-
         String xml = (String) StructuredDataConverter.convert(
                 source,
                 XML_STRING
@@ -462,10 +511,21 @@ public final class DataElementPhaseFourAndSixChecks {
     }
 
     private DataSelection queryLists(
+            List<List<String>> source
+    ) {
+        return collectionEngine.query(
+                DataContextFactory.create(source, LIST),
+                DataQuery.builder(LIST, PLURAL).build()
+        );
+    }
+
+    private DataSelection queryLists(
             List<List<String>> source,
+            DataAttribute comparisonAttribute,
             TextOp... predicates
     ) {
-        DataQuery.Builder query = DataQuery.builder(LIST, PLURAL);
+        DataQuery.Builder query = DataQuery.builder(LIST, PLURAL)
+                .comparisonAttribute(comparisonAttribute);
         for (TextOp predicate : predicates) {
             query.predicate(predicate);
         }

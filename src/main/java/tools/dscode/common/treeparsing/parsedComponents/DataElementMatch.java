@@ -1,6 +1,8 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 import tools.dscode.common.dataelements.DataAttribute;
+import tools.dscode.common.dataelements.DataElementGroup;
+import tools.dscode.common.dataelements.DataElementKind;
 import tools.dscode.common.dataelements.DataElementRegistration;
 import tools.dscode.common.dataelements.DataElementRegistry;
 import tools.dscode.common.dataelements.DataQuery;
@@ -12,19 +14,30 @@ import java.util.Optional;
 
 public final class DataElementMatch extends ElementMatch {
     private final DataElementRegistration registration;
+    private final boolean explicitSource;
 
     public DataElementMatch(PhraseData phraseData, MatchNode elementNode) {
         super(phraseData, elementNode);
         registration = DataElementRegistry.require(category);
+        explicitSource = supportsExplicitSource(registration.kind())
+                && elementNode.getFromLocalState("text") != null;
     }
 
     public DataElementMatch(PhraseData phraseData, ElementMatch elementMatch) {
         super(phraseData, elementMatch);
         registration = DataElementRegistry.require(category);
+        explicitSource = elementMatch instanceof DataElementMatch dataElementMatch
+                ? dataElementMatch.explicitSource
+                : supportsExplicitSource(registration.kind())
+                        && hasLeadingExplicitSource(elementMatch);
     }
 
     public DataElementRegistration registration() {
         return registration;
+    }
+
+    public boolean hasExplicitSource() {
+        return explicitSource;
     }
 
     public DataQuery dataQuery() {
@@ -53,7 +66,6 @@ public final class DataElementMatch extends ElementMatch {
 
         String modifier = normalize(selectionType);
         String position = normalize(elementPosition);
-
         switch (modifier) {
             case "" -> applyPosition(builder, position, false);
             case "every" -> {
@@ -72,13 +84,18 @@ public final class DataElementMatch extends ElementMatch {
             );
         }
 
-        if (registration.kind()
-                != tools.dscode.common.dataelements.DataElementKind.DATA_TABLE
-                && registration.kind()
-                != tools.dscode.common.dataelements.DataElementKind.DATA_DOC_STRING) {
-            textOps.forEach(textOp -> builder.predicate(
-                    new tools.dscode.common.dataoperations.TextOp(textOp.text(), textOp.op())
-            ));
+        int predicateStart = explicitSource ? 1 : 0;
+        if (registration.kind() != DataElementKind.DATA_TABLE
+                && registration.kind() != DataElementKind.DATA_DOC_STRING) {
+            for (int i = predicateStart; i < textOps.size(); i++) {
+                TextOp textOp = textOps.get(i);
+                builder.predicate(
+                        new tools.dscode.common.dataoperations.TextOp(
+                                textOp.text(),
+                                textOp.op()
+                        )
+                );
+            }
         }
 
         DataAttribute comparisonAttribute = null;
@@ -107,7 +124,6 @@ public final class DataElementMatch extends ElementMatch {
                 ));
             }
         }
-
         if (comparisonAttribute != null) {
             builder.comparisonAttribute(comparisonAttribute);
         }
@@ -141,6 +157,28 @@ public final class DataElementMatch extends ElementMatch {
                 : DataResultUse.CONTEXT;
     }
 
+    private static boolean supportsExplicitSource(DataElementKind kind) {
+        return kind == DataElementKind.DATA_TABLE
+                || kind.group() != DataElementGroup.CUCUMBER;
+    }
+
+    private static boolean hasLeadingExplicitSource(ElementMatch elementMatch) {
+        if (elementMatch.defaultText == null
+                || elementMatch.defaultText.isNullOrBlank()
+                || elementMatch.fullText == null
+                || elementMatch.category == null) {
+            return false;
+        }
+
+        int sourceIndex = elementMatch.fullText.indexOf(
+                elementMatch.defaultText.toString()
+        );
+        int categoryIndex = elementMatch.fullText.indexOf(elementMatch.category);
+        return sourceIndex >= 0
+                && categoryIndex >= 0
+                && sourceIndex < categoryIndex;
+    }
+
     private static void applyPosition(
             DataQuery.Builder builder,
             String position,
@@ -167,7 +205,6 @@ public final class DataElementMatch extends ElementMatch {
             builder.first();
             return;
         }
-
         int numericPosition;
         try {
             numericPosition = Integer.parseInt(
@@ -179,7 +216,6 @@ public final class DataElementMatch extends ElementMatch {
                     exception
             );
         }
-
         if (stride) {
             builder.stride(numericPosition);
         } else {
