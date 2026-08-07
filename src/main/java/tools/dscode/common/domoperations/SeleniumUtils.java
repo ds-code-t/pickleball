@@ -284,10 +284,12 @@ public class SeleniumUtils {
      *         false if no alert is present.
      */
     public static boolean hasAlert(WebDriver driver) {
+        if(driver == null)
+            return false;
         try {
             driver.switchTo().alert();
             return true;
-        } catch (NoAlertPresentException ignored) {
+        } catch (RuntimeException e) {
             return false;
         }
     }
