@@ -15,3 +15,12 @@ Feature: Internal Pickleball Java checks
   @all @regression @internal-java-checks @data-element-phase-3
   Scenario: Run Data Element phase three checks
     * RUN DATA ELEMENT PHASE 3 JAVA TESTS
+
+  @all @regression @internal-java-checks @data-element-phase-4 @data-element-phase-6
+  Scenario: Run combined read-only collection and structured-format checks
+    * RUN DATA ELEMENT PHASE 4 AND 6 JAVA TESTS
+
+  @all @regression @internal-java-checks @data-element-phase-5
+  Scenario: Run Data Element phase five copy-on-write checks
+    * RUN DATA ELEMENT PHASE 5 JAVA TESTS
+
