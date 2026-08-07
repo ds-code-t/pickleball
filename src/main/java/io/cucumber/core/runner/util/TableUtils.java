@@ -10,13 +10,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-
 import static io.cucumber.core.runner.util.CucumberQueryUtil.examplesOf;
 import static io.cucumber.core.runner.util.CucumberQueryUtil.messagePickle;
 
 
 public class TableUtils {
-
     public static final String DOCSTRING_KEY = "Doc String";
     public static final String TABLE_KEY = "Data Table";
     public static final String ROW_KEY = "Data Row";
@@ -32,9 +30,8 @@ public class TableUtils {
         rowList.forEach(r -> returnMap.put(ROW_KEY, r));
         return returnMap;
     }
-
     public static <K, V> List<LinkedListMultimap<K, V>> toListOfMultimap(DataTable dataTable) {
-        List<List<String>> lists = dataTable.asLists();
+        List<List<String>> lists = dataTable.cells();
         if (lists == null || lists.isEmpty()) {
             return List.of();
         }
@@ -46,7 +43,6 @@ public class TableUtils {
 
         @SuppressWarnings("unchecked")
         List<? extends K> header = (List<? extends K>) headerStrings;
-
         List<LinkedListMultimap<K, V>> out = new ArrayList<>();
         for (int r = 1; r < lists.size(); r++) {
             List<String> rowStrings = lists.get(r);
@@ -56,7 +52,6 @@ public class TableUtils {
         }
         return out;
     }
-
     public static <K, V> LinkedListMultimap<K, V> toFlatMultimap(List<? extends List<?>> table) {
         if (table == null || table.isEmpty() || table.size() < 2) {
             throw new IllegalArgumentException("Input table must not be null or empty");
@@ -65,7 +60,6 @@ public class TableUtils {
         // First row is the header
         List<?> header = table.get(0);
         LinkedListMultimap<K, V> multimap = LinkedListMultimap.create();
-
         // Remaining rows are values
         for (int r = 1; r < table.size(); r++) {
             List<?> row = table.get(r);
@@ -81,7 +75,6 @@ public class TableUtils {
                 multimap.put(key, value);
             }
         }
-
         return multimap;
     }
 
@@ -96,7 +89,6 @@ public class TableUtils {
         }
         return multimap;
     }
-
     public static LinkedListMultimap<String, String> exampleHeaderValueMap(io.cucumber.core.gherkin.Pickle pickle) {
         if (pickle == null)
             return null;
@@ -106,7 +98,6 @@ public class TableUtils {
         Optional<Examples> exOpt = examplesOf(gmPickle);
         if (exOpt.isEmpty())
             return null;
-
         Examples ex = exOpt.get();
         Optional<TableRow> headerOpt = ex.getTableHeader();
         if (headerOpt.isEmpty())
@@ -116,7 +107,6 @@ public class TableUtils {
         io.cucumber.messages.types.Pickle mp = messagePickle(gmPickle);
         String lastAstId = mp.getAstNodeIds().isEmpty() ? null
                 : mp.getAstNodeIds().get(mp.getAstNodeIds().size() - 1);
-
         TableRow row = null;
         if (lastAstId != null) {
             row = ex.getTableBody().stream()
@@ -126,7 +116,6 @@ public class TableUtils {
 
         if (row == null)
             return null;
-
         // Build header->value map
         List<String> headers = headerOpt.get().getCells().stream()
                 .map(TableCell::getValue).toList();
@@ -134,7 +123,6 @@ public class TableUtils {
                 .map(TableCell::getValue).toList();
         return toMultimap(headers, values);
     }
-
     /*
      * String convenience methods:
      *
@@ -142,7 +130,6 @@ public class TableUtils {
      * They normalize both keys and values so null, empty, and blank cells become "".
      * They intentionally do not change the existing generic methods.
      */
-
     public static LinkedListMultimap<String, LinkedListMultimap<String, String>> toRowsStringMultimap(DataTable dataTable) {
         List<LinkedListMultimap<String, String>> rowList = toListOfStringMultimap(dataTable);
         LinkedListMultimap<String, LinkedListMultimap<String, String>> returnMap = LinkedListMultimap.create();
@@ -150,9 +137,8 @@ public class TableUtils {
         rowList.forEach(r -> returnMap.put(ROW_KEY, r));
         return returnMap;
     }
-
     public static List<LinkedListMultimap<String, String>> toListOfStringMultimap(DataTable dataTable) {
-        List<List<String>> lists = dataTable.asLists();
+        List<List<String>> lists = dataTable.cells();
         if (lists == null || lists.isEmpty()) {
             return List.of();
         }
@@ -161,7 +147,6 @@ public class TableUtils {
         if (header == null) {
             return null; // mirrors original toListOfMultimap behavior
         }
-
         List<LinkedListMultimap<String, String>> out = new ArrayList<>();
         for (int r = 1; r < lists.size(); r++) {
             List<String> row = normalizeStringList(lists.get(r));
@@ -171,9 +156,8 @@ public class TableUtils {
     }
 
     public static LinkedListMultimap<String, String> toFlatStringMultimap(DataTable dataTable) {
-        return toFlatStringMultimap(dataTable.asLists());
+        return toFlatStringMultimap(dataTable.cells());
     }
-
     public static LinkedListMultimap<String, String> toFlatStringMultimap(List<? extends List<?>> table) {
         return toFlatMultimap(normalizeStringTable(table));
     }
@@ -181,7 +165,6 @@ public class TableUtils {
     public static LinkedListMultimap<String, String> toStringMultimap(List<?> keys, List<?> values) {
         return toMultimap(normalizeStringList(keys), normalizeStringList(values));
     }
-
     public static LinkedListMultimap<String, String> exampleHeaderValueStringMap(io.cucumber.core.gherkin.Pickle pickle) {
         if (pickle == null)
             return null;
@@ -191,7 +174,6 @@ public class TableUtils {
         Optional<Examples> exOpt = examplesOf(gmPickle);
         if (exOpt.isEmpty())
             return null;
-
         Examples ex = exOpt.get();
         Optional<TableRow> headerOpt = ex.getTableHeader();
         if (headerOpt.isEmpty())
@@ -201,7 +183,6 @@ public class TableUtils {
         io.cucumber.messages.types.Pickle mp = messagePickle(gmPickle);
         String lastAstId = mp.getAstNodeIds().isEmpty() ? null
                 : mp.getAstNodeIds().get(mp.getAstNodeIds().size() - 1);
-
         TableRow row = null;
         if (lastAstId != null) {
             row = ex.getTableBody().stream()
@@ -216,7 +197,6 @@ public class TableUtils {
                 .map(TableCell::getValue)
                 .map(TableUtils::blankToEmpty)
                 .toList();
-
         List<String> values = row.getCells().stream()
                 .map(TableCell::getValue)
                 .map(TableUtils::blankToEmpty)
@@ -229,7 +209,6 @@ public class TableUtils {
         if (table == null) {
             return null;
         }
-
         List<List<String>> normalized = new ArrayList<>();
         for (List<?> row : table) {
             normalized.add(normalizeStringList(row));
@@ -241,7 +220,6 @@ public class TableUtils {
         if (values == null) {
             return null;
         }
-
         List<String> normalized = new ArrayList<>();
         for (Object value : values) {
             normalized.add(blankToEmpty(value));

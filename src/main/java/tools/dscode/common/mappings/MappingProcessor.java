@@ -3,16 +3,15 @@
  *
  * Supports both <...> and ~[~...~]~ as built-in default bookend styles,
  * while retaining custom delimiters, comparison handling, file:, and ~unquote.
- * XML-like input automatically uses only the XML-safe ~[~...~]~ bookends when
- * no custom outer delimiters are supplied.
  */
 package tools.dscode.common.mappings;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.LinkedListMultimap;
+import io.cucumber.datatable.DataTable;
+import io.cucumber.docstring.DocString;
 import tools.dscode.common.mappings.queries.Tokenized;
 import tools.dscode.common.treeparsing.parsedComponents.ElementMatch;
 
@@ -53,15 +52,19 @@ import static tools.dscode.common.reporting.logging.LogForwarder.logTrace;
 import static tools.dscode.common.util.StringUtilities.decodeBackToText;
 import static tools.dscode.common.util.StringUtilities.encodeToPlaceHolders;
 import static tools.dscode.common.variables.RunVars.resolveFromVars;
+import static tools.dscode.coredefinitions.DataTableDefinitions.dataTableToJsonNode;
+import static tools.dscode.coredefinitions.DataTableDefinitions.jsonNodeToDataTable;
+import static tools.dscode.coredefinitions.DocStringDefinitions.docStringtoJsonNode;
 import static tools.dscode.coredefinitions.GeneralSteps.getReturnValue;
 import static tools.dscode.coredefinitions.ModularScenarios.getScenarioMarkerData;
 import static tools.dscode.testengine.PKB_props.PKB_PREFIX;
 
 public abstract class MappingProcessor implements Map<String, Object> {
-
     private static final String FILE_REFERENCE_PREFIX = "file:";
     private static final String DATA_REFERENCE_PREFIX = "data:";
-    protected final LinkedListMultimap<MapConfigurations.MapType, NodeMap> maps = LinkedListMultimap.create();
+
+    protected final LinkedListMultimap<MapConfigurations.MapType, NodeMap> maps =
+            LinkedListMultimap.create();
     protected final List<MapConfigurations.MapType> keyOrder = new ArrayList<>();
     protected final List<MapConfigurations.MapType> singletonOrder = new ArrayList<>();
 
@@ -69,16 +72,12 @@ public abstract class MappingProcessor implements Map<String, Object> {
     public static ThreadLocal<NodeMap> singletonMap = new ThreadLocal<>();
     public static ThreadLocal<NodeMap> overridesMap = new ThreadLocal<>();
     public static ThreadLocal<NodeMap> defaultsMap = new ThreadLocal<>();
-    public static ThreadLocal<NodeMap> dataTableMap = new ThreadLocal<>();
-    public static ThreadLocal<NodeMap> docStringMap = new ThreadLocal<>();
 
     public static void resetCommonMaps() {
         runMap.set(new NodeMap(MapConfigurations.MapType.RUN_MAP));
         singletonMap.set(new NodeMap(MapConfigurations.MapType.SINGLETON));
         overridesMap.set(new NodeMap(MapConfigurations.MapType.OVERRIDE_MAP));
         defaultsMap.set(new NodeMap(MapConfigurations.MapType.DEFAULT));
-        dataTableMap.set(new NodeMap(MapConfigurations.MapType.DATATABLE));
-        docStringMap.set(new NodeMap(MapConfigurations.MapType.DOCSTRING));
     }
 
     public NodeMap getOrAddAndGetMap(MapConfigurations.MapType mapType) {
@@ -107,38 +106,23 @@ public abstract class MappingProcessor implements Map<String, Object> {
         return defaultsMap.get();
     }
 
-    public static NodeMap getDataTableMap() {
-        return dataTableMap.get();
-    }
-
-    public static NodeMap getDocStringMap() {
-        return docStringMap.get();
-    }
-
     public MappingProcessor() {
-        // Defensive copy to make key order immutable
-        addMaps(GLOBALS, runMap.get(), singletonMap.get(), overridesMap.get(), defaultsMap.get(), dataTableMap.get(), docStringMap.get());
-
-        this.keyOrder.addAll(Arrays.asList(
+        addMaps(GLOBALS, runMap.get(), singletonMap.get(), overridesMap.get(), defaultsMap.get());
+        keyOrder.addAll(Arrays.asList(
                 MapConfigurations.MapType.OVERRIDE_MAP,
                 MapConfigurations.MapType.PHRASE_MAP,
                 MapConfigurations.MapType.STEP_MAP,
-                MapConfigurations.MapType.DATATABLE,
-                MapConfigurations.MapType.DOCSTRING,
                 MapConfigurations.MapType.PASSED_MAP,
                 MapConfigurations.MapType.EXAMPLE_MAP,
                 MapConfigurations.MapType.RUN_MAP,
                 MapConfigurations.MapType.SINGLETON,
                 MapConfigurations.MapType.GLOBAL_NODE,
                 MapConfigurations.MapType.DEFAULT));
-
-        this.singletonOrder.addAll(Arrays.asList(
+        singletonOrder.addAll(Arrays.asList(
                 MapConfigurations.MapType.OVERRIDE_MAP,
                 MapConfigurations.MapType.SINGLETON,
                 MapConfigurations.MapType.PHRASE_MAP,
                 MapConfigurations.MapType.STEP_MAP,
-                MapConfigurations.MapType.DATATABLE,
-                MapConfigurations.MapType.DOCSTRING,
                 MapConfigurations.MapType.PASSED_MAP,
                 MapConfigurations.MapType.EXAMPLE_MAP,
                 MapConfigurations.MapType.RUN_MAP,
@@ -148,8 +132,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     protected MappingProcessor(NodeMap nodeMap) {
         addMaps(nodeMap);
-        this.keyOrder.add(nodeMap.getMapType());
-        this.singletonOrder.add(nodeMap.getMapType());
+        keyOrder.add(nodeMap.getMapType());
+        singletonOrder.add(nodeMap.getMapType());
     }
 
     public NodeMap getPhraseMap() {
@@ -173,8 +157,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     public void clearDataSourceMaps(MapConfigurations.DataSource... dataSources) {
-        for (MapConfigurations.DataSource dataSource : dataSources) {
-            maps.values().forEach(m -> m.getDataSources());
+        for (MapConfigurations.DataSource ignored : dataSources) {
+            maps.values().forEach(NodeMap::getDataSources);
         }
     }
 
@@ -200,8 +184,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     public void removeMaps(List<NodeMap> nodes) {
         for (NodeMap node : nodes) {
-            List<NodeMap> nodeList = maps.get(node.getMapType());
-            nodeList.remove(node);
+            maps.get(node.getMapType()).remove(node);
         }
     }
 
@@ -210,14 +193,11 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     public void replaceMaps(List<NodeMap> nodes) {
-        if (nodes != null) {
-            for (NodeMap node : nodes) {
-                clearMapType(node.getMapType());
-            }
-            for (NodeMap node : nodes) {
-                maps.put(node.getMapType(), node);
-            }
+        if (nodes == null) {
+            return;
         }
+        nodes.forEach(node -> clearMapType(node.getMapType()));
+        nodes.forEach(node -> maps.put(node.getMapType(), node));
     }
 
     public void addMaps(NodeMap... nodes) {
@@ -225,13 +205,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     public void addMaps(List<NodeMap> nodes) {
-        boolean log = nodes.stream().anyMatch(m -> m.getMapType() == MapConfigurations.MapType.STEP_MAP);
-        if (log) {
-        }
         if (nodes != null) {
-            for (NodeMap node : nodes) {
-                maps.put(node.getMapType(), node);
-            }
+            nodes.stream().filter(java.util.Objects::nonNull)
+                    .forEach(node -> maps.put(node.getMapType(), node));
         }
     }
 
@@ -240,27 +216,21 @@ public abstract class MappingProcessor implements Map<String, Object> {
     }
 
     public void addMapsToStart(List<NodeMap> nodes) {
-        boolean log = nodes.stream().anyMatch(m -> m.getMapType() == MapConfigurations.MapType.STEP_MAP);
-        if (log) {
-        }
-        List<List<NodeMap>> grouped = groupByMapType(nodes);
-        for (List<NodeMap> list : grouped) {
-            if (list.isEmpty()) {
-                continue;
+        for (List<NodeMap> list : groupByMapType(nodes)) {
+            if (!list.isEmpty()) {
+                maps.get(list.getFirst().getMapType()).addAll(0, list);
             }
-            List<NodeMap> existingNodes = maps.get(list.getFirst().getMapType());
-            existingNodes.addAll(0, list);
         }
     }
 
     public static List<List<NodeMap>> groupByMapType(List<NodeMap> nodes) {
         List<List<NodeMap>> grouped = new ArrayList<>();
-        for (NodeMap c : nodes) {
+        for (NodeMap node : nodes) {
             if (grouped.isEmpty()
-                    || !grouped.getLast().getFirst().getMapType().equals(c.getMapType())) {
+                    || grouped.getLast().getFirst().getMapType() != node.getMapType()) {
                 grouped.add(new ArrayList<>());
             }
-            grouped.getLast().add(c);
+            grouped.getLast().add(node);
         }
         return grouped;
     }
@@ -269,14 +239,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
         maps.removeAll(key);
     }
 
-    /**
-     * Get a flat list of values, grouped and ordered by the original key order.
-     */
     public List<NodeMap> getMapsForResolution() {
         List<NodeMap> out = new ArrayList<>();
-        for (MapConfigurations.MapType key : keyOrder) {
-            out.addAll(maps.get(key));
-        }
+        keyOrder.forEach(key -> out.addAll(maps.get(key)));
         return out;
     }
 
@@ -287,17 +252,11 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 .map(String::trim)
                 .filter(segment -> !segment.isBlank())
                 .toList();
-
         if (segments.isEmpty()) {
             return getMapsForResolution();
         }
-
         List<NodeMap> nodeMaps = new ArrayList<>(segments.size());
-
-        for (String segment : segments) {
-            nodeMaps.add(getNodeMap(segment));
-        }
-
+        segments.forEach(segment -> nodeMaps.add(getNodeMap(segment)));
         return nodeMaps;
     }
 
@@ -305,14 +264,11 @@ public abstract class MappingProcessor implements Map<String, Object> {
         List<NodeMap> out = new ArrayList<>();
         for (MapConfigurations.MapType key : singletonOrder) {
             List<NodeMap> mapList = maps.get(key);
-            out.addAll(key.equals(MapConfigurations.MapType.STEP_MAP) ? mapList.reversed() : mapList);
+            out.addAll(key == MapConfigurations.MapType.STEP_MAP ? mapList.reversed() : mapList);
         }
         return out;
     }
 
-    /**
-     * Expose the configured key order for debugging and inspection.
-     */
     public List<MapConfigurations.MapType> keyOrder() {
         return keyOrder;
     }
@@ -323,40 +279,23 @@ public abstract class MappingProcessor implements Map<String, Object> {
     private static final String DEFAULT_CLOSE_EXPRESSION_COMPONENT = "}";
     private static final String SECONDARY_DEFAULT_OPEN_BOOKEND = "~[~";
     private static final String SECONDARY_DEFAULT_CLOSE_BOOKEND = "~]~";
-
-    /*
-     * Deliberately limited XML detection. This does not validate XML. It only
-     * recognizes text containing a closing element or a self-closing element,
-     * which is enough to avoid interpreting normal XML tags as <...> template
-     * references during default delimiter processing.
-     */
     private static final Pattern XML_CLOSING_ELEMENT = Pattern.compile(
             "</\\s*[A-Za-z_][A-Za-z0-9_.-]*\\s*>");
-
     private static final Pattern XML_SELF_CLOSING_ELEMENT = Pattern.compile(
-            "<\\s*[A-Za-z_][A-Za-z0-9_.-]*"
-                    + "(?:\\s+[^<>]*?)?/\\s*>");
+            "<\\s*[A-Za-z_][A-Za-z0-9_.-]*(?:\\s+[^<>]*?)?/\\s*>");
 
     private record Bookends(
-            String open,
-            String close,
-            String expressionOpen,
-            String expressionClose
+            String open, String close, String expressionOpen, String expressionClose
     ) {
         String wrap(String key) {
             return open + key + close;
         }
     }
 
-    /**
-     * Private-use sentinels used to collapse the configured bookends into one
-     * internal syntax. These sentinels are restored before text is returned.
-     */
     private static final String INTERNAL_OPEN_BOOKEND_SUB = "\uE000";
     private static final String INTERNAL_CLOSE_BOOKEND_SUB = "\uE001";
     private static final String INTERNAL_MAP_BOOKEND_FLAG = "\uE002";
     private static final String INTERNAL_EXPRESSION_BOOKEND_FLAG = "\uE003";
-
     private static final String INTERNAL_MAP_OPEN =
             INTERNAL_OPEN_BOOKEND_SUB + INTERNAL_MAP_BOOKEND_FLAG;
     private static final String INTERNAL_MAP_CLOSE =
@@ -365,99 +304,30 @@ public abstract class MappingProcessor implements Map<String, Object> {
             INTERNAL_OPEN_BOOKEND_SUB + INTERNAL_EXPRESSION_BOOKEND_FLAG;
     private static final String INTERNAL_EXPRESSION_CLOSE =
             INTERNAL_EXPRESSION_BOOKEND_FLAG + INTERNAL_CLOSE_BOOKEND_SUB;
-
     private static final String UNQUOTE_SUFFIX = "~unquote";
     private static final String INTERNAL_UNQUOTE_OPEN = "\uE004";
     private static final String INTERNAL_UNQUOTE_CLOSE = "\uE005";
-
-    /*
-     * Map references may not span lines or contain another normalized map or
-     * expression placeholder. Expression bodies may contain temporary map
-     * sentinels because comparison operators such as < and > can be normalized
-     * while the outer expression is being processed.
-     */
     private static final String MAP_BODY =
-            "[^\\r\\n"
-                    + INTERNAL_MAP_BOOKEND_FLAG
-                    + INTERNAL_EXPRESSION_BOOKEND_FLAG
-                    + "]+";
-
+            "[^\\r\\n" + INTERNAL_MAP_BOOKEND_FLAG + INTERNAL_EXPRESSION_BOOKEND_FLAG + "]+";
     private static final String EXPRESSION_BODY =
-            "[^\\r\\n"
-                    + INTERNAL_EXPRESSION_BOOKEND_FLAG
-                    + "]+";
-
+            "[^\\r\\n" + INTERNAL_EXPRESSION_BOOKEND_FLAG + "]+";
     private static final Pattern MAP_PLACEHOLDER = Pattern.compile(
             Pattern.quote(INTERNAL_MAP_OPEN)
                     + "(" + MAP_BODY + ")"
                     + Pattern.quote(INTERNAL_MAP_CLOSE));
-
     private static final Pattern EXPRESSION = Pattern.compile(
             Pattern.quote(INTERNAL_EXPRESSION_OPEN)
                     + "(" + EXPRESSION_BODY + ")"
                     + Pattern.quote(INTERNAL_EXPRESSION_CLOSE));
-
     private static final Pattern UNRESOLVED_OPTIONAL_PLACEHOLDER = Pattern.compile(
             Pattern.quote(INTERNAL_MAP_OPEN)
                     + "\\?" + MAP_BODY
                     + Pattern.quote(INTERNAL_MAP_CLOSE));
 
-
-    /**
-     * Resolves mapping and expression references in {@code input}.
-     *
-     * <p>When neither outer delimiter is explicitly supplied, both built-in
-     * outer-bookend styles are supported in ordinary text:</p>
-     * <ul>
-     *     <li>{@code <key>} and {@code <{expression}>}</li>
-     *     <li>{@code ~[~key~]~} and {@code ~[~{expression}~]~}</li>
-     * </ul>
-     *
-     * <p>If the input looks like XML and neither outer delimiter is explicitly
-     * supplied, only the XML-safe {@code ~[~...~]~} style is processed. This
-     * prevents normal XML elements from being interpreted as map references.</p>
-     *
-     * <p>The optional delimiter arguments replace, by position:</p>
-     * <ol>
-     *     <li>{@code <} — map/reference opening delimiter</li>
-     *     <li>{@code >} — map/reference closing delimiter</li>
-     *     <li>{@code {} opening component — appended to the map opening delimiter</li>
-     *     <li>{@code }} closing component — prepended to the map closing delimiter</li>
-     * </ol>
-     *
-     * <p>If either outer delimiter is explicitly supplied, only the resulting
-     * custom bookend style is used. Missing or {@code null} components retain
-     * their normal defaults. For example:</p>
-     * <pre>
-     * resolveWholeText(text)
-     * // Supports both &lt;key&gt; / &lt;{expression}&gt; and
-     * // ~[~key~]~ / ~[~{expression}~]~
-     *
-     * resolveWholeText(text, "[[", "]]", "(", ")")
-     * // Supports only [[key]] and [[(expression)]]
-     *
-     * resolveWholeText(text, null, null, "[", "]")
-     * // Supports both &lt;key&gt; / &lt;[expression]&gt; and
-     * // ~[~key~]~ / ~[~[expression]~]~
-     * </pre>
-     */
     public String resolveWholeText(String input, String... delimiterReplacements) {
         return resolveWholeText(input, true, delimiterReplacements);
     }
 
-    /**
-     * Same as {@link #resolveWholeText(String, String...)} but controls whether
-     * evaluations run during resolution:
-     * <ul>
-     *     <li>expression placeholders ({@code <{...}>} / bookend-equivalent)</li>
-     *     <li>embedded step references ({@code <$...>} / keys that start with
-     *     {@code $}), executed while preserving their original return objects</li>
-     * </ul>
-     *
-     * <p>When {@code resolveEvaluations} is {@code false}, map (and {@code &})
-     * placeholders still resolve; expressions and {@code $} step refs are left
-     * unresolved for a later pass.</p>
-     */
     public String resolveWholeText(
             String input,
             boolean resolveEvaluations,
@@ -467,19 +337,10 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 input, resolveEvaluations, false, delimiterReplacements);
     }
 
-    /**
-     * Resolves text exactly as {@link #resolveWholeText(String, String...)}, but
-     * preserves the resolved object when the complete input ultimately consists
-     * of one map/reference placeholder. Embedded replacements remain strings.
-     */
     public Object resolveWholeValue(String input, String... delimiterReplacements) {
         return resolveWholeValue(input, true, delimiterReplacements);
     }
 
-    /**
-     * Same as {@link #resolveWholeValue(String, String...)}, with explicit
-     * control over expression and step-reference evaluation.
-     */
     public Object resolveWholeValue(
             String input,
             boolean resolveEvaluations,
@@ -496,34 +357,29 @@ public abstract class MappingProcessor implements Map<String, Object> {
             String... delimiterReplacements
     ) {
         validateDelimiterReplacements(delimiterReplacements);
-
         Object resolvedValue;
-        if (usesDualDefaultOuterBookends(delimiterReplacements)
-                && looksLikeXml(input)) {
-            Bookends xmlSafeBookends = createBookendsForOuter(
-                    SECONDARY_DEFAULT_OPEN_BOOKEND,
-                    SECONDARY_DEFAULT_CLOSE_BOOKEND,
-                    delimiterReplacements);
-
+        if (usesDualDefaultOuterBookends(delimiterReplacements) && looksLikeXml(input)) {
             resolvedValue = resolveUsingBookends(
-                    input, xmlSafeBookends, resolveEvaluations, preserveWholeObject);
+                    input,
+                    createBookendsForOuter(
+                            SECONDARY_DEFAULT_OPEN_BOOKEND,
+                            SECONDARY_DEFAULT_CLOSE_BOOKEND,
+                            delimiterReplacements),
+                    resolveEvaluations,
+                    preserveWholeObject);
         } else if (usesDualDefaultOuterBookends(delimiterReplacements)) {
-            Bookends angleBookends = createBookendsForOuter(
-                    DEFAULT_OPEN_BOOKEND,
-                    DEFAULT_CLOSE_BOOKEND,
-                    delimiterReplacements);
-
-            Bookends tildeSquareBookends = createBookendsForOuter(
-                    SECONDARY_DEFAULT_OPEN_BOOKEND,
-                    SECONDARY_DEFAULT_CLOSE_BOOKEND,
-                    delimiterReplacements);
-
             resolvedValue = resolveUntilStable(
                     input,
                     resolveEvaluations,
                     preserveWholeObject,
-                    angleBookends,
-                    tildeSquareBookends);
+                    createBookendsForOuter(
+                            DEFAULT_OPEN_BOOKEND,
+                            DEFAULT_CLOSE_BOOKEND,
+                            delimiterReplacements),
+                    createBookendsForOuter(
+                            SECONDARY_DEFAULT_OPEN_BOOKEND,
+                            SECONDARY_DEFAULT_CLOSE_BOOKEND,
+                            delimiterReplacements));
         } else {
             resolvedValue = resolveUsingBookends(
                     input,
@@ -531,43 +387,27 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     resolveEvaluations,
                     preserveWholeObject);
         }
-
         logTrace("Resolved: '" + input + "' -> '" + resolvedValue + "'");
         return resolvedValue;
     }
 
-    /**
-     * Dual built-in mode is active only when neither outer delimiter was
-     * explicitly supplied. Expression components may still be customized.
-     */
-    private static boolean usesDualDefaultOuterBookends(
-            String[] delimiterReplacements
-    ) {
-        boolean defaultOpen = delimiterReplacements == null
-                || delimiterReplacements.length < 1
-                || delimiterReplacements[0] == null;
-
-        boolean defaultClose = delimiterReplacements == null
-                || delimiterReplacements.length < 2
-                || delimiterReplacements[1] == null;
-
+    private static boolean usesDualDefaultOuterBookends(String[] replacements) {
+        boolean defaultOpen = replacements == null
+                || replacements.length < 1
+                || replacements[0] == null;
+        boolean defaultClose = replacements == null
+                || replacements.length < 2
+                || replacements[1] == null;
         return defaultOpen && defaultClose;
     }
 
     private static boolean looksLikeXml(String input) {
-        if (input == null || input.isBlank()) {
-            return false;
-        }
-
-        return XML_CLOSING_ELEMENT.matcher(input).find()
-                || XML_SELF_CLOSING_ELEMENT.matcher(input).find();
+        return input != null
+                && !input.isBlank()
+                && (XML_CLOSING_ELEMENT.matcher(input).find()
+                || XML_SELF_CLOSING_ELEMENT.matcher(input).find());
     }
 
-    /**
-     * Runs each built-in dialect in its own complete normalization/restoration
-     * pass. This preserves the original unresolved syntax because each pass
-     * restores its own active bookends before the next dialect is attempted.
-     */
     private Object resolveUntilStable(
             String input,
             boolean resolveEvaluations,
@@ -576,36 +416,25 @@ public abstract class MappingProcessor implements Map<String, Object> {
     ) {
         Set<String> seenValues = new HashSet<>();
         String current = input;
-
         while (seenValues.add(current)) {
             String previous = current;
-
             for (Bookends bookends : bookendStyles) {
                 Object resolved = resolveUsingBookends(
-                        current,
-                        bookends,
-                        resolveEvaluations,
-                        preserveWholeObject);
+                        current, bookends, resolveEvaluations, preserveWholeObject);
                 if (!(resolved instanceof String resolvedText)) {
                     return resolved;
                 }
                 current = resolvedText;
             }
-
             if (current.equals(previous)) {
                 return current;
             }
         }
-
         throw new IllegalStateException(
                 "Cyclic template resolution detected between bookend styles while resolving: "
                         + input);
     }
 
-    /**
-     * Performs one complete quote, normalization, resolution, restoration, and
-     * unquote-cleanup pass using exactly one bookend style.
-     */
     private Object resolveUsingBookends(
             String input,
             Bookends bookends,
@@ -613,9 +442,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
             boolean preserveWholeObject
     ) {
         QuoteParser parsedObj = new QuoteParser(input);
-
-        // Quoted values are always embedded text, even when the surrounding
-        // input is eligible to preserve a whole-reference object.
         for (var entry : parsedObj.entrySetWithoutTripleSingle()) {
             parsedObj.put(
                     entry.getKey(),
@@ -626,7 +452,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
                             resolveEvaluations,
                             false));
         }
-
         Object resolvedMasked = resolveAll(
                 parsedObj.masked(),
                 parsedObj,
@@ -636,72 +461,61 @@ public abstract class MappingProcessor implements Map<String, Object> {
         if (!(resolvedMasked instanceof String resolvedText)) {
             return resolvedMasked;
         }
-
         parsedObj.setMasked(resolvedText);
         return cleanupUnquotedReplacements(parsedObj.restore());
     }
 
-    private static void validateDelimiterReplacements(
-            String[] delimiterReplacements
-    ) {
-        if (delimiterReplacements != null && delimiterReplacements.length > 4) {
+    private static void validateDelimiterReplacements(String[] replacements) {
+        if (replacements != null && replacements.length > 4) {
             throw new IllegalArgumentException(
                     "resolveWholeText accepts at most four delimiter replacements "
                             + "in this order: open, close, expression-open component, "
                             + "expression-close component. Received "
-                            + delimiterReplacements.length + ".");
+                            + replacements.length + ".");
         }
     }
 
-    private static Bookends createBookends(String... delimiterReplacements) {
-        String open = delimiterAt(
-                delimiterReplacements, 0, DEFAULT_OPEN_BOOKEND, "open");
-        String close = delimiterAt(
-                delimiterReplacements, 1, DEFAULT_CLOSE_BOOKEND, "close");
-
+    private static Bookends createBookends(String... replacements) {
         return createBookendsForOuter(
-                open,
-                close,
-                delimiterReplacements);
+                delimiterAt(replacements, 0, DEFAULT_OPEN_BOOKEND, "open"),
+                delimiterAt(replacements, 1, DEFAULT_CLOSE_BOOKEND, "close"),
+                replacements);
     }
 
     private static Bookends createBookendsForOuter(
             String open,
             String close,
-            String[] delimiterReplacements
+            String[] replacements
     ) {
-        String expressionOpenComponent = delimiterAt(
-                delimiterReplacements, 2, DEFAULT_OPEN_EXPRESSION_COMPONENT,
+        String expressionOpen = delimiterAt(
+                replacements, 2, DEFAULT_OPEN_EXPRESSION_COMPONENT,
                 "expression-open component");
-        String expressionCloseComponent = delimiterAt(
-                delimiterReplacements, 3, DEFAULT_CLOSE_EXPRESSION_COMPONENT,
+        String expressionClose = delimiterAt(
+                replacements, 3, DEFAULT_CLOSE_EXPRESSION_COMPONENT,
                 "expression-close component");
-
         return new Bookends(
                 open,
                 close,
-                open + expressionOpenComponent,
-                expressionCloseComponent + close);
+                open + expressionOpen,
+                expressionClose + close);
     }
 
     private static String delimiterAt(
-            String[] delimiterReplacements,
+            String[] replacements,
             int index,
             String defaultValue,
             String description
     ) {
-        if (delimiterReplacements == null
-                || index >= delimiterReplacements.length
-                || delimiterReplacements[index] == null) {
+        if (replacements == null
+                || index >= replacements.length
+                || replacements[index] == null) {
             return defaultValue;
         }
-
-        String replacement = delimiterReplacements[index];
-        if (replacement.isEmpty()) {
+        if (replacements[index].isEmpty()) {
             throw new IllegalArgumentException(
                     "The " + description + " delimiter replacement cannot be empty.");
         }
-        return replacement;
+        return replacements[index];
     }
 
     private Object resolveAll(
@@ -731,16 +545,13 @@ public abstract class MappingProcessor implements Map<String, Object> {
                         }
                         input = resolvedText;
                     }
-                    if (resolveEvaluations
-                            && input.contains(INTERNAL_EXPRESSION_OPEN)) {
+                    if (resolveEvaluations && input.contains(INTERNAL_EXPRESSION_OPEN)) {
                         input = resolveExpression(input, parsedObj, bookends);
                     }
                     input = normalizeBookends(input, bookends);
                 } while (!input.equals(previousInput));
-
                 input = UNRESOLVED_OPTIONAL_PLACEHOLDER.matcher(input).replaceAll("");
             } while (!input.equals(originalInput));
-
             return restoreBookends(
                     decodeBackToText(input.replaceAll(MATCH_BREAK, "")),
                     bookends);
@@ -766,10 +577,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
             Matcher matcher = MAP_PLACEHOLDER.matcher(input);
             boolean wholeReference = preserveWholeObject && matcher.matches();
             matcher.reset();
-
             StringBuffer output = new StringBuffer();
             Object replacement = null;
-
             while (matcher.find()) {
                 matchedKey = matcher.group(1);
                 key = matchedKey;
@@ -777,14 +586,11 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 if (unquote) {
                     key = key.substring(0, key.length() - UNQUOTE_SUFFIX.length());
                 }
-
                 if (key.startsWith("&")) {
                     key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
-                    String reference = key.substring(1);
-                    replacement = getReturnValue(reference);
+                    replacement = getReturnValue(key.substring(1));
                     break;
                 }
-
                 if (key.startsWith("$")) {
                     if (!resolveEvaluations) {
                         continue;
@@ -795,17 +601,14 @@ public abstract class MappingProcessor implements Map<String, Object> {
                             .runAndGetReturnValue();
                     break;
                 }
-
                 if (key.contains(MATCH_BREAK)) {
                     continue;
                 }
-
                 if (key.contains("&&") || key.contains("||")) {
                     replacement = bookends.wrap(key);
                     unquote = false;
                     break;
                 }
-
                 replacement = get(key);
                 if (replacement != null) {
                     logTrace("'" + bookends.wrap(matchedKey) + "' -> '" + replacement + "'");
@@ -816,12 +619,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
             if (replacement == null) {
                 return input;
             }
-
             if (wholeReference && !(replacement instanceof String)) {
                 return replacement;
             }
-
-//            String stringReplacement = getStringValue(replacement);
             String stringReplacement = unquote
                     && !(replacement instanceof JsonNode)
                     && (replacement instanceof Map<?, ?>
@@ -837,13 +637,11 @@ public abstract class MappingProcessor implements Map<String, Object> {
                         wrappedKey,
                         bookends.open() + MATCH_BREAK + matchedKey + bookends.close());
             }
-
             if (unquote) {
                 stringReplacement = INTERNAL_UNQUOTE_OPEN
                         + stringReplacement
                         + INTERNAL_UNQUOTE_CLOSE;
             }
-
             matcher.appendReplacement(output, Matcher.quoteReplacement(stringReplacement));
             matcher.appendTail(output);
             return output.toString();
@@ -857,59 +655,37 @@ public abstract class MappingProcessor implements Map<String, Object> {
     private String resolveExpression(String input, QuoteParser parsedObj, Bookends bookends) {
         Matcher matcher = EXPRESSION.matcher(input);
         StringBuffer output = new StringBuffer();
-
         while (matcher.find()) {
-            String key = matcher.group(1).trim();
-
-            // Restore map delimiters that were temporarily normalized inside
-            // the expression, such as the < and > comparison operators.
-            key = key
+            String key = matcher.group(1).trim()
                     .replace(INTERNAL_MAP_OPEN, bookends.open())
                     .replace(INTERNAL_MAP_CLOSE, bookends.close());
-
             key = parsedObj.restoreAndStripBookEnds(decodeBackToText(key));
-
             String replacement = key.endsWith("?")
                     ? String.valueOf(evalToBoolean(key.substring(0, key.length() - 1), this))
                     : String.valueOf(eval(key, this));
-
             logTrace("'" + bookends.expressionOpen() + key
                     + bookends.expressionClose() + "' -> '" + replacement + "'");
-
             matcher.appendReplacement(
                     output,
                     replacement == null
                             ? matcher.group(0)
                             : Matcher.quoteReplacement(replacement));
         }
-
         matcher.appendTail(output);
         return output.toString();
     }
 
-    /**
-     * Converts configured expression bookends first, then conditionally
-     * normalizes map bookends. An opening map delimiter is ignored when it is
-     * immediately followed by whitespace or '=', and a closing map delimiter
-     * is ignored when it is immediately preceded by whitespace. This avoids
-     * treating common comparison operators as map-reference delimiters.
-     */
     private static String normalizeBookends(String input, Bookends bookends) {
         if (input == null || input.isEmpty()) {
             return input;
         }
-
         input = input
                 .replace(bookends.expressionOpen(), INTERNAL_EXPRESSION_OPEN)
                 .replace(bookends.expressionClose(), INTERNAL_EXPRESSION_CLOSE);
-
-        input = Pattern.compile(
-                        Pattern.quote(bookends.open()) + "(?![\\s=])")
+        input = Pattern.compile(Pattern.quote(bookends.open()) + "(?![\\s=])")
                 .matcher(input)
                 .replaceAll(Matcher.quoteReplacement(INTERNAL_MAP_OPEN));
-
-        return Pattern.compile(
-                        "(?<!\\s)" + Pattern.quote(bookends.close()))
+        return Pattern.compile("(?<!\\s)" + Pattern.quote(bookends.close()))
                 .matcher(input)
                 .replaceAll(Matcher.quoteReplacement(INTERNAL_MAP_CLOSE));
     }
@@ -922,14 +698,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 .replace(INTERNAL_EXPRESSION_CLOSE, bookends.expressionClose());
     }
 
-    /**
-     * Removes a directly surrounding matching quote pair from a value marked by
-     * {@code ~unquote}. If the markers are not directly surrounded by matching
-     * double quotes, single quotes, or backticks, only the internal markers are
-     * removed and the surrounding text is left unchanged.
-     */
     private static String cleanupUnquotedReplacements(String input) {
-        String output = unwrapMarkedValue(input, '\"');
+        String output = unwrapMarkedValue(input, '"');
         output = unwrapMarkedValue(output, '\'');
         output = unwrapMarkedValue(output, '`');
         return output
@@ -946,7 +716,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
                         + Pattern.quote(INTERNAL_UNQUOTE_CLOSE + quoteText)
                         + "(?!" + Pattern.quote(quoteText) + ")",
                 Pattern.DOTALL);
-
         Matcher matcher = pattern.matcher(input);
         StringBuffer output = new StringBuffer();
         while (matcher.find()) {
@@ -954,7 +723,6 @@ public abstract class MappingProcessor implements Map<String, Object> {
                     output,
                     Matcher.quoteReplacement(
                             matcher.group(1).replace("\\" + quoteText, quoteText)));
-//            matcher.appendReplacement(output, Matcher.quoteReplacement(matcher.group(1)));
         }
         matcher.appendTail(output);
         return output.toString();
@@ -964,11 +732,8 @@ public abstract class MappingProcessor implements Map<String, Object> {
         if (key == null) {
             throw new RuntimeException("key cannot be null");
         }
-        Object returnObj = get(key);
-        if (returnObj instanceof String returnString) {
-            return resolveWholeText(returnString);
-        }
-        return returnObj;
+        Object value = get(key);
+        return value instanceof String text ? resolveWholeText(text) : value;
     }
 
     public Object getCaseInsensitive(String key) {
@@ -999,24 +764,18 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     public List<Object> getList(String key) {
         Object obj = get(key);
-
         if (obj instanceof List<?> list) {
             return new ArrayList<>(list);
         }
-
         if (obj instanceof Set<?> set) {
             return new ArrayList<>(set);
         }
-
         if (obj instanceof ArrayNode arrayNode) {
             List<Object> result = new ArrayList<>(arrayNode.size());
             arrayNode.forEach(result::add);
             return result;
         }
-
-        List<Object> result = new ArrayList<>(1);
-        result.add(obj);
-        return result;
+        return new ArrayList<>(Collections.singletonList(obj));
     }
 
     public static String addSuffix(String key, String suffix) {
@@ -1042,99 +801,96 @@ public abstract class MappingProcessor implements Map<String, Object> {
 
     public Object get(String key) {
         ParsedMapPrefix parsed = extractMapPrefix(key);
-        key = parsed.key;
-        boolean directGet = key.startsWith("`") && key.endsWith("`");
-        if (directGet) {
-            key = key.substring(1, key.length() - 1);
-        } else {
-            if (key.startsWith(FILE_REFERENCE_PREFIX)) {
-                return buildJsonFromPath(key.substring(FILE_REFERENCE_PREFIX.length()));
-            }
-            if (key.startsWith(DATA_REFERENCE_PREFIX)) {
-                return getScenarioMarkerData(key.substring(DATA_REFERENCE_PREFIX.length()));
-            }
-            if (key.contains("_") && key.toLowerCase().startsWith(PKB_PREFIX)) {
-                return resolveFromVars(key);
-            }
+        String query = parsed.key;
+        if (query.startsWith(FILE_REFERENCE_PREFIX)) {
+            return buildJsonFromPath(query.substring(FILE_REFERENCE_PREFIX.length()));
+        }
+        if (query.startsWith(DATA_REFERENCE_PREFIX)) {
+            return getScenarioMarkerData(query.substring(DATA_REFERENCE_PREFIX.length()));
+        }
+        if (query.contains("_") && query.toLowerCase().startsWith(PKB_PREFIX)) {
+            return resolveFromVars(query);
         }
 
-        Tokenized tokenized = new Tokenized(key);
-        Object returnReplacement = null;
-        while (true) {
-            for (NodeMap map : getMapsForResolution(parsed.prefix)) {
-                if (map == null) {
-                    continue;
-                }
-
-                Object replacement;
-                if (directGet) {
-                    replacement = map.directGet(key);
-                    if (replacement instanceof ArrayNode arrayNode) {
-                        replacement = arrayNode.isEmpty()
-                                ? null
-                                : arrayNode.get(arrayNode.size() - 1);
-                    }
-                } else {
-                    replacement = map.get(tokenized);
-                }
-
-                if (replacement != null) {
-                    if (replacement instanceof String replacementString
-                            && replacementString.isEmpty()
-                            && !key.startsWith("?")) {
-                        key = "?" + key;
-                        directGet = true;
-                        returnReplacement = replacement;
-                        continue;
-                    }
-                    returnReplacement = replacement;
-                    break;
-                }
-            }
-
-            if (returnReplacement != null || key.startsWith("?")) {
-                break;
-            }
-            key = "?" + key;
-            directGet = true;
+        Object primary = resolveQuery(query, parsed.prefix);
+        String literalQuery = Tokenized.unquoteLiteralProperty(query);
+        if (isQuestionPrefixedPropertyQuery(query) || !isMissingNullOrBlank(primary)) {
+            return primary;
         }
-        return returnReplacement;
+
+        Object fallback = resolveQuery(
+                Tokenized.quoteLiteralProperty("?" + literalQuery),
+                parsed.prefix);
+        return fallback != null ? fallback : primary;
+    }
+
+    private Object resolveQuery(String query, String mapTypes) {
+        Tokenized tokenized = new Tokenized(query);
+        for (NodeMap map : getMapsForResolution(mapTypes)) {
+            if (map == null) {
+                continue;
+            }
+            Object replacement = map.get(tokenized);
+            if (replacement != null) {
+                return replacement;
+            }
+        }
+        return null;
+    }
+
+    private static boolean isQuestionPrefixedPropertyQuery(String query) {
+        String source = query.strip();
+        return source.startsWith("?")
+                || source.startsWith("`?")
+                || source.contains(".?")
+                || source.contains(".`?");
+    }
+
+    private static boolean isMissingNullOrBlank(Object value) {
+        if (value == null) {
+            return true;
+        }
+        if (value instanceof String string) {
+            return string.isBlank();
+        }
+        if (value instanceof JsonNode node) {
+            return node.isNull()
+                    || node.isMissingNode()
+                    || node.isTextual() && node.textValue().isBlank();
+        }
+        return false;
     }
 
     public List<?> get(ElementMatch element) {
         String categoryName = element.category.replaceFirst("(?i:s)$", "");
         boolean noQuotedText = element.defaultText == null || element.defaultText.isNullOrBlank();
-
         if (categoryName.equals(TABLE_KEY)) {
             if (noQuotedText) {
-                return element.parentPhrase
+                Object raw = element.parentPhrase
                         .getPhraseParsingMap()
                         .getPhraseMap()
-                        .getAsList(TABLE_KEY);
+                        .get(TABLE_KEY);
+                return raw == null ? List.of() : List.of(raw);
             }
-
-            List<JsonNode> tableList = getDataTableMap().getAsList(TABLE_KEY);
-            List<String> tableNames = new ArrayList<>();
-            List<JsonNode> tableNodes = new ArrayList<>();
-            for (JsonNode jsonNode : tableList) {
-                if (jsonNode instanceof ObjectNode objectNode) {
-                    String tableName = objectNode.fieldNames().next();
-                    tableNames.add(tableName);
-                    tableNodes.add(MAPPER.valueToTree(objectNode.get(tableName)));
-                }
+            Object raw = getDataElementValue(element);
+            if (raw instanceof DataTable dataTable) {
+                return List.of(dataTable);
             }
-            return filterGroupedValues(tableNames, tableNodes, element, false);
+            if (raw instanceof JsonNode jsonNode) {
+                return List.of(jsonNodeToDataTable(jsonNode));
+            }
+            return raw == null ? List.of() : List.of(raw);
         }
-
         if (categoryName.equals(DOCSTRING_KEY)) {
             if (noQuotedText) {
-                return element.parentPhrase
+                Object raw = element.parentPhrase
                         .getPhraseParsingMap()
                         .getPhraseMap()
-                        .getAsList(DOCSTRING_KEY);
+                        .get(DOCSTRING_KEY);
+                return raw == null ? List.of() : List.of(raw);
             }
-            ObjectNode objectNode = (ObjectNode) getDocStringMap().get(DOCSTRING_KEY);
-            return new ArrayList<>(Collections.singleton(objectNode));
+            Object raw = getDataElementValue(element);
+            return raw == null ? List.of() : List.of(raw);
         }
 
         NodeMap phraseMap = getPhraseMap();
@@ -1144,17 +900,15 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 ArrayList<JsonNode> list = new ArrayList<>();
                 if (jsonNode instanceof ArrayNode arrayNode) {
                     arrayNode.forEach(list::add);
-                } else {
+                } else if (jsonNode != null) {
                     phraseMap.getRoot().elements().forEachRemaining(list::add);
                 }
                 return list;
-
             case ROW_KEY:
                 List<JsonNode> rowsArray = findRows(phraseMap.getRoot());
                 List<String> keyList = new ArrayList<>();
                 rowsArray.forEach(row -> keyList.add(row.values().next().get(0).asText()));
                 return filterGroupedValues(keyList, rowsArray, element, false);
-
             case CELL_KEY:
                 List<JsonNode> cellsArray = findCells(phraseMap.getRoot());
                 List<String> cellKeys = new ArrayList<>();
@@ -1167,33 +921,46 @@ public abstract class MappingProcessor implements Map<String, Object> {
                                 || value.isNull()
                                 || value.isMissingNode()
                                 ? ""
-                                : value.asText(""));
+                                : value.isContainerNode() ? value.toString() : value.asText(""));
                     } else {
                         cellKeys.add("");
                         cellValues.add(cell == null
                                 || cell.isNull()
                                 || cell.isMissingNode()
                                 ? ""
-                                : cell.asText(""));
+                                : cell.isContainerNode() ? cell.toString() : cell.asText(""));
                     }
                 }
-
                 List<Map<String, String>> keyedCellValues = new ArrayList<>(cellKeys.size());
                 for (int i = 0; i < cellKeys.size(); i++) {
                     keyedCellValues.add(Map.of(cellKeys.get(i), cellValues.get(i)));
                 }
                 return filterGroupedValues(cellKeys, keyedCellValues, element, false);
-
             case HEADER_KEY:
                 List<String> headers = findHeaders(phraseMap.root);
                 return filterGroupedValues(headers, headers, element, false);
-
             case DATA_OBJECT_KEY:
-                return Collections.singletonList(get(element.defaultText.toString()));
-
+                Object raw = getDataElementValue(element);
+                if (raw instanceof DataTable dataTable) {
+                    raw = dataTableToJsonNode(dataTable);
+                } else if (raw instanceof DocString docString) {
+                    try {
+                        raw = docStringtoJsonNode(docString);
+                    } catch (JsonProcessingException e) {
+                        throw new IllegalArgumentException(
+                                "Could not convert Doc String to Data", e);
+                    }
+                }
+                return Collections.singletonList(raw);
             default:
                 return null;
         }
+    }
+
+    private Object getDataElementValue(ElementMatch element) {
+        String value = element.defaultText.toString();
+        Object reference = ValueFormatting.fromReferenceText(value);
+        return reference != null ? reference : get(value);
     }
 
     @Override
@@ -1201,22 +968,12 @@ public abstract class MappingProcessor implements Map<String, Object> {
         if (key == null || key.isBlank()) {
             throw new RuntimeException("key cannot be null or blank");
         }
-
         if (key.contains("_") && key.toLowerCase().startsWith(PKB_PREFIX)) {
             Object oldValue = resolveFromVars(key);
             putVar(key.toLowerCase(), value);
             return oldValue;
         }
-
         Tokenized tokenized = new Tokenized(key);
-
-        if (key.startsWith("`") && key.endsWith("`")) {
-            key = key.substring(1, key.length() - 1);
-            Object oldValue = getPrimaryRunMap().directGet(key);
-            getPrimaryRunMap().directPut(key, value);
-            return oldValue;
-        }
-
         Object oldValue = getPrimaryRunMap().get(tokenized);
         getPrimaryRunMap().put(tokenized, value);
         return oldValue;
@@ -1287,6 +1044,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
         if (obj == null) {
             return "";
         }
+        if (obj instanceof DataTable || obj instanceof DocString) {
+            return ValueFormatting.toReferenceText(obj);
+        }
         if (obj instanceof JsonNode jsonNode) {
             if (jsonNode.isTextual()) {
                 return jsonNode.textValue();
@@ -1295,8 +1055,7 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 return jsonNode.asText("");
             }
             try {
-                String otherNode = MAPPER.writeValueAsString(jsonNode);
-                return encodeToPlaceHolders(otherNode);
+                return encodeToPlaceHolders(MAPPER.writeValueAsString(jsonNode));
             } catch (JsonProcessingException e) {
                 return jsonNode.toString();
             }
@@ -1325,11 +1084,9 @@ public abstract class MappingProcessor implements Map<String, Object> {
                 + "\n---\n";
     }
 
-
     private static final Pattern MAP_PREFIX_PATTERN = Pattern.compile(
             "^([A-Z](?:[A-Z., ]*[A-Z])?):(.*)$",
-            Pattern.DOTALL
-    );
+            Pattern.DOTALL);
 
     public record ParsedMapPrefix(String prefix, String key) {
     }
@@ -1338,16 +1095,12 @@ public abstract class MappingProcessor implements Map<String, Object> {
         if (input == null) {
             return new ParsedMapPrefix(null, null);
         }
-
         Matcher matcher = MAP_PREFIX_PATTERN.matcher(input);
-
         if (!matcher.matches()) {
             return new ParsedMapPrefix(null, input);
         }
-
         return new ParsedMapPrefix(
                 matcher.group(1).replaceAll("\\s+", " ").trim(),
-                matcher.group(2).trim()
-        );
+                matcher.group(2).trim());
     }
 }

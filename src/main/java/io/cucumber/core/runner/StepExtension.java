@@ -21,14 +21,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.argumentToGherkinText;
 import static io.cucumber.core.gherkin.messages.NGherkinFactory.getGherkinArgumentText;
-
 import static io.cucumber.core.runner.GlobalState.getCurrentScenarioState;
 import static io.cucumber.core.runner.GlobalState.getGlobalEventBus;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
@@ -44,8 +42,7 @@ import static tools.dscode.common.GlobalConstants.HARD_ERROR_STEP;
 import static tools.dscode.common.browseroperations.BrowserAlerts.isPresent;
 import static tools.dscode.common.domoperations.LeanWaits.safeWaitForPageReady;
 import static tools.dscode.common.gherkinoperations.DynamicExecution.getCustomStep;
-import static tools.dscode.common.mappings.MappingProcessor.getDataTableMap;
-import static tools.dscode.common.mappings.MappingProcessor.getDocStringMap;
+import static tools.dscode.common.mappings.MappingProcessor.getRunMap;
 import static tools.dscode.common.reporting.logging.LogForwarder.getGlobalLogLevel;
 import static tools.dscode.common.reporting.logging.LogForwarder.getParentEntryForStep;
 import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
@@ -60,76 +57,76 @@ public class StepExtension extends StepData {
 
     public boolean waitForPageReady = true;
 
-    public StepExtension(io.cucumber.core.runner.TestCase testCase, io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep) {
+    public StepExtension(
+            io.cucumber.core.runner.TestCase testCase,
+            io.cucumber.core.runner.PickleStepTestStep pickleStepTestStep
+    ) {
         super(testCase, pickleStepTestStep);
-
-//        pickle = (io.cucumber.messages.types.Pickle) getProperty(testCase, "pickle");
         method = pickleStepTestStep.getMethod();
         definitionFlags = pickleStepTestStep.getDefinitionFlags().stream().map(f -> {
-            if (f.toString().startsWith("_"))
+            if (f.toString().startsWith("_")) {
                 return DefinitionFlag.valueOf(f.toString().substring(1));
-            else
-                inheritableDefinitionFlags.add(f);
+            }
+            inheritableDefinitionFlags.add(f);
             return f;
         }).collect(Collectors.toCollection(ArrayList::new));
 
-
-        this.methodName = this.method == null ? "" : this.method.getName();
-        this.isDynamicStep = isCoreStep && methodName.startsWith("executeDynamicStep");
-        this.isStepMarker = isCoreStep && methodName.equals("stepMarker");
-        this.isCoreConditionalStep = isCoreStep && methodName.equals("runConditional");
-
+        methodName = method == null ? "" : method.getName();
+        isDynamicStep = isCoreStep && methodName.startsWith("executeDynamicStep");
+        isStepMarker = isCoreStep && methodName.equals("stepMarker");
+        isCoreConditionalStep = isCoreStep && methodName.equals("runConditional");
         if (isStepMarker) {
             stepMarkerText = (String) arguments.getFirst().getValue();
             stepMarkerText = stepMarkerText == null ? "" : stepMarkerText.trim();
         }
         if (isCoreStep) {
             if (methodName.startsWith("flagStep_")) {
-                this.isFlagStep = true;
+                isFlagStep = true;
                 stepFlags.add(pickleStepTestStep.getStep().getText());
             } else if (methodName.equals("NEXT_SIBLING_STEP")) {
-                nextSiblingDefinitionFlags = pickleStepTestStep.getDefinitionFlags().stream().filter(f -> !f.toString().startsWith("_")).collect(Collectors.toCollection(ArrayList::new));
-
+                nextSiblingDefinitionFlags = pickleStepTestStep.getDefinitionFlags().stream()
+                        .filter(f -> !f.toString().startsWith("_"))
+                        .collect(Collectors.toCollection(ArrayList::new));
             }
         }
 
         String metaText = pickleStepTestStep.getPickleStep().getMetaText();
         Matcher matcher = pattern.matcher(metaText);
-
         while (matcher.find()) {
             stepTags.add(matcher.group(1));
         }
-        stepTags.stream().filter(t -> t.startsWith("REF:")).forEach(t -> bookmarks.add(t.replaceFirst("REF:", "")));
+        stepTags.stream()
+                .filter(t -> t.startsWith("REF:"))
+                .forEach(t -> bookmarks.add(t.replaceFirst("REF:", "")));
         debugStartStep = parseDebugString(stepTags);
         setNestingLevel((int) matcher.replaceAll("").chars().filter(ch -> ch == ':').count());
-
 
         if (isCoreStep && methodName.equals("docString")) {
             dataArgumentStep = true;
             String docStringName = (String) arguments.getFirst().getValue();
             docString = (DocString) arguments.getLast().getValue();
             if (docStringName != null && !docStringName.isBlank()) {
-                getDocStringMap().put(DOCSTRING_KEY, Map.of(docStringName.trim(), docString));
+                getRunMap().put(docStringName.trim(), docString);
             }
             dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP);
             dataContextStepNodeMap.setDataSource(MapConfigurations.DataSource.DOC_STRING);
-            dataContextStepNodeMap.put("DOCSTRING", docString);
+            dataContextStepNodeMap.put(DOCSTRING_KEY, docString);
         } else if (isCoreStep && methodName.equals("dataTable")) {
             dataArgumentStep = true;
             String tableName = (String) arguments.getFirst().getValue();
             dataTable = (DataTable) arguments.getLast().getValue();
             if (tableName != null && !tableName.isBlank()) {
-                getDataTableMap().put(TABLE_KEY, Map.of(tableName.trim(), toRowsStringMultimap(dataTable)));
+                getRunMap().put(tableName.trim(), dataTable);
             }
             dataContextStepNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP);
             dataContextStepNodeMap.setDataSource(MapConfigurations.DataSource.DATA_TABLE);
-            dataContextStepNodeMap.put(TABLE_KEY, toRowsStringMultimap(dataTable));
+            dataContextStepNodeMap.put(TABLE_KEY, dataTable);
+            dataContextStepNodeMap.merge(toRowsStringMultimap(dataTable));
         }
     }
 
-
     public Object runAndGetReturnValue() {
-        Object instanceOrNull = null;
+        Object instanceOrNull;
         try {
             instanceOrNull = method.getDeclaringClass().getDeclaredConstructor().newInstance();
         } catch (Throwable t) {
@@ -140,9 +137,8 @@ public class StepExtension extends StepData {
         Object target = java.lang.reflect.Modifier.isStatic(method.getModifiers())
                 ? null
                 : instanceOrNull;
-
         try {
-            return method.invoke(target, arguments.stream().map(arg -> arg.getValue()).toArray());
+            return method.invoke(target, arguments.stream().map(Argument::getValue).toArray());
         } catch (Throwable t) {
             Throwable cause = t instanceof InvocationTargetException ? t.getCause() : t;
             cause.printStackTrace();
@@ -152,7 +148,8 @@ public class StepExtension extends StepData {
 
     public void addArg(Argument arg) {
         if (arg instanceof DocStringArgument || arg instanceof DataTableArgument) {
-            arguments.removeIf(a -> a instanceof DocStringArgument || a instanceof DataTableArgument);
+            arguments.removeIf(
+                    a -> a instanceof DocStringArgument || a instanceof DataTableArgument);
         }
         argument = arg;
         arguments.add(arg);
@@ -160,51 +157,51 @@ public class StepExtension extends StepData {
 
     public Result run() {
         result = null;
-
         ExecutionMode executionMode = ExecutionMode.RUN;
-
-//        if(pickleStepTestStep.getStepText().contains()
 
         if (logAndIgnore) {
             executingPickleStepTestStep = pickleStepTestStep;
             executionMode = ExecutionMode.SKIP;
         } else if (isDynamicStep) {
-            if (!lineData.runningText.startsWith("-"))
+            if (!lineData.runningText.startsWith("-")) {
                 overrideLoggingText = lineData.runningText;
+            }
             executingPickleStepTestStep = pickleStepTestStep;
         } else {
             executingPickleStepTestStep = resolveAndClone(getStepParsingMap());
         }
         executingPickleStepTestStep.getPickleStep().nestingLevel = getNestingLevel();
         executingPickleStepTestStep.getPickleStep().overrideLoggingText = overrideLoggingText;
-
-        if (definitionFlags.contains(DefinitionFlag.BLOCK_CONDITIONAL) || definitionFlags.contains(DefinitionFlag.DEBUG_LOGGING) || definitionFlags.contains(DefinitionFlag._DEBUG_LOGGING))
+        if (definitionFlags.contains(DefinitionFlag.BLOCK_CONDITIONAL)
+                || definitionFlags.contains(DefinitionFlag.DEBUG_LOGGING)
+                || definitionFlags.contains(DefinitionFlag._DEBUG_LOGGING)) {
             stepLogLevel = Level.DEBUG;
-        if (!shouldLog())
+        }
+        if (!shouldLog()) {
             executingPickleStepTestStep.setNoLogging(true);
+        }
 
-
-        String stepText = executingPickleStepTestStep.getStep().getKeyword() + " " + executingPickleStepTestStep.getStepText().replaceFirst("^([:\\s]*)", "");
-        stepEntry = getParentEntryForStep(this).logWithType("STEP", stepText, stepLogLevel).tags("Step").start();
+        String stepText = executingPickleStepTestStep.getStep().getKeyword()
+                + " "
+                + executingPickleStepTestStep.getStepText().replaceFirst("^([:\\s]*)", "");
+        stepEntry = getParentEntryForStep(this)
+                .logWithType("STEP", stepText, stepLogLevel)
+                .tags("Step")
+                .start();
         setDefaultEntry(getRunningStep().stepEntry);
         lifecycle.fire(Phase.BEFORE_SCENARIO_STEP);
         result = execute(executingPickleStepTestStep, executionMode);
-
         if (result.getError() != null) {
-            stepEntry.error(stackTraceToString(result.getError()))
-                    .timestamp();
+            stepEntry.error(stackTraceToString(result.getError())).timestamp();
         }
 
         if (waitForPageReady && webDriverUsed != null) {
             safeWaitForPageReady(webDriverUsed, Duration.ofSeconds(5), 200);
         }
         lifecycle.fire(Phase.AFTER_SCENARIO_STEP);
-
         finalizeStepEntryLogging();
-
         return result;
     }
-
 
     public void finalizeStepEntryLogging() {
         if (webDriverUsed != null && webDriverUsed.getSessionId() != null) {
@@ -217,18 +214,24 @@ public class StepExtension extends StepData {
         } else {
             stepEntry.stop();
         }
-
     }
 
-    public Result execute(io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep, ExecutionMode executionMode) {
-
+    public Result execute(
+            io.cucumber.core.runner.PickleStepTestStep executionPickleStepTestStep,
+            ExecutionMode executionMode
+    ) {
         Instant start = Instant.now();
         try {
-            Object r = invokeAnyMethodOrThrow(executionPickleStepTestStep, "run", getTestCase(), getGlobalEventBus(), getTestCaseState(), executionMode);
+            invokeAnyMethodOrThrow(
+                    executionPickleStepTestStep,
+                    "run",
+                    getTestCase(),
+                    getGlobalEventBus(),
+                    getTestCaseState(),
+                    executionMode);
         } catch (Throwable t) {
             Throwable cause = t instanceof InvocationTargetException ? t.getCause() : t;
             Duration duration = Duration.between(start, Instant.now());
-
             return new Result(Status.FAILED, duration, cause);
         }
         return executionPickleStepTestStep.getLastResult();
@@ -249,18 +252,19 @@ public class StepExtension extends StepData {
     @Override
     public void addDefinitionFlag(DefinitionFlag... flags) {
         for (DefinitionFlag flag : flags) {
-            if (!flag.toString().startsWith("_"))
-                this.definitionFlags.add(flag);
-
+            if (!flag.toString().startsWith("_")) {
+                definitionFlags.add(flag);
+            }
         }
     }
 
     public void setToLogAll() {
         pickleStepTestStep.setNoLogging(false);
-        new ArrayList<>(this.definitionFlags).forEach(f -> {
+        new ArrayList<>(definitionFlags).forEach(f -> {
             String flagString = f.toString().toLowerCase();
-            if (flagString.contains("ignore") || flagString.contains("logging"))
-                this.definitionFlags.remove(f);
+            if (flagString.contains("ignore") || flagString.contains("logging")) {
+                definitionFlags.remove(f);
+            }
         });
     }
 
@@ -279,7 +283,9 @@ public class StepExtension extends StepData {
     }
 
     public void insertChildSteps(List<StepExtension> newSteps) {
-        if (newSteps == null || newSteps.isEmpty()) return;
+        if (newSteps == null || newSteps.isEmpty()) {
+            return;
+        }
         StepExtension lastStep = newSteps.getLast();
         lastStep.childSteps.addAll(childSteps);
         lastStep.grandChildrenSteps.addAll(grandChildrenSteps);
@@ -297,10 +303,11 @@ public class StepExtension extends StepData {
         return newSteps;
     }
 
-
     public void insertSteps(List<StepExtension> newSteps) {
-        if (newSteps == null || newSteps.isEmpty()) return;
-        StepBase nextStep = this.nextSibling;
+        if (newSteps == null || newSteps.isEmpty()) {
+            return;
+        }
+        StepBase nextStep = nextSibling;
         StepExtension lastStep = this;
         for (StepExtension newStep : newSteps) {
             lastStep.nextSibling = newStep;
@@ -317,7 +324,13 @@ public class StepExtension extends StepData {
     }
 
     public StepExtension modifyStepExtension(String newText) {
-        StepExtension modifiedStep = new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep, pickleStepTestStep.getStep().getKeyword(), newText, getGherkinArgumentText(pickleStepTestStep.getStep())));
+        StepExtension modifiedStep = new StepExtension(
+                testCase,
+                getPickleStepTestStepFromStrings(
+                        pickleStepTestStep,
+                        pickleStepTestStep.getStep().getKeyword(),
+                        newText,
+                        getGherkinArgumentText(pickleStepTestStep.getStep())));
         modifiedStep.setStepParsingMap(getStepParsingMap());
         modifiedStep.parentStep = parentStep;
         modifiedStep.nestingLevel = nestingLevel;
@@ -326,7 +339,8 @@ public class StepExtension extends StepData {
     }
 
     public StepExtension createNewStepExtension(String stepText) {
-        PickleStepTestStep newPickleStepTestStep = getPickleStepTestStepFromStrings(pickleStepTestStep.getStep().getKeyword(), stepText, "");
+        PickleStepTestStep newPickleStepTestStep = getPickleStepTestStepFromStrings(
+                pickleStepTestStep.getStep().getKeyword(), stepText, "");
         StepExtension modifiedStep = new StepExtension(testCase, newPickleStepTestStep);
         modifiedStep.setStepParsingMap(getStepParsingMap());
         modifiedStep.parentStep = parentStep;
@@ -337,11 +351,9 @@ public class StepExtension extends StepData {
     public String resolveStepFromString(String stepText) {
         StepExtension newStepExtension = createNewStepExtension(stepText);
         Object obj = newStepExtension.runAndGetReturnValue();
-        logDebug("Return step '" + stepText + "' resolved to: " + obj + "");
-        if (obj == null) return null;
-        return obj.toString();
+        logDebug("Return step '" + stepText + "' resolved to: " + obj);
+        return obj == null ? null : obj.toString();
     }
-
 
     public PickleStepTestStep resolveAndClone(ParsingMap parsingMap) {
         String errorMessage;
@@ -349,9 +361,11 @@ public class StepExtension extends StepData {
             return resolvePickleStepTestStep(pickleStepTestStep, parsingMap);
         } catch (Exception e) {
             try {
-                errorMessage = GeneralSteps.registerStepThrowable(new RuntimeException("Step: '"+ pickleStepTestStep.getStepText() + "' failed",e));
-            }
-            catch (Exception e1) {
+                errorMessage = GeneralSteps.registerStepThrowable(
+                        new RuntimeException(
+                                "Step: '" + pickleStepTestStep.getStepText() + "' failed",
+                                e));
+            } catch (Exception ignored) {
                 errorMessage = GeneralSteps.registerStepThrowable(e);
             }
             return getCustomStep(HARD_ERROR_STEP + errorMessage).pickleStepTestStep;
@@ -362,21 +376,40 @@ public class StepExtension extends StepData {
         return resolvePickleStepTestStep(pickleStepTestStep, parsingMap, newText);
     }
 
-    public PickleStepTestStep resolveAndClone(ParsingMap parsingMap, String newText, PickleStepArgument newPickleStepArgument) {
-        return resolvePickleStepTestStep(pickleStepTestStep, parsingMap, newText, newPickleStepArgument);
+    public PickleStepTestStep resolveAndClone(
+            ParsingMap parsingMap,
+            String newText,
+            PickleStepArgument newPickleStepArgument
+    ) {
+        return resolvePickleStepTestStep(
+                pickleStepTestStep, parsingMap, newText, newPickleStepArgument);
     }
 
-    public StepExtension cloneWithOverrides(String newText, PickleStepArgument newPickleStepArgument) {
-        StepExtension modifiedStep = new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep.getStep().getKeyword(), newText, argumentToGherkinText(newPickleStepArgument)));
+    public StepExtension cloneWithOverrides(
+            String newText,
+            PickleStepArgument newPickleStepArgument
+    ) {
+        StepExtension modifiedStep = new StepExtension(
+                testCase,
+                getPickleStepTestStepFromStrings(
+                        pickleStepTestStep.getStep().getKeyword(),
+                        newText,
+                        argumentToGherkinText(newPickleStepArgument)));
         modifiedStep.setStepParsingMap(getStepParsingMap());
         return modifiedStep;
     }
 
     public StepExtension cloneWithOverrides(String newText) {
-        StepExtension modifiedStep = new StepExtension(testCase, getPickleStepTestStepFromStrings(pickleStepTestStep.getStep().getKeyword(), newText, argumentToGherkinText(pickleStepTestStep.getPickleStep().getArgument().orElse(null))));
+        StepExtension modifiedStep = new StepExtension(
+                testCase,
+                getPickleStepTestStepFromStrings(
+                        pickleStepTestStep.getStep().getKeyword(),
+                        newText,
+                        argumentToGherkinText(
+                                pickleStepTestStep.getPickleStep()
+                                        .getArgument()
+                                        .orElse(null))));
         modifiedStep.setStepParsingMap(getStepParsingMap());
         return modifiedStep;
     }
-
-
 }

@@ -6,8 +6,8 @@ import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -58,7 +58,43 @@ public class ScenarioStepChecks {
                 )
         );
     }
-
+    @Test
+    void trimsLeadingDashesAndWhitespaceFromMarkerText() {
+        assertEquals(
+                "payload",
+                ScenarioStep.normalizeStepMarkerText("payload")
+        );
+        assertEquals(
+                "payload",
+                ScenarioStep.normalizeStepMarkerText("-payload")
+        );
+        assertEquals(
+                "payload",
+                ScenarioStep.normalizeStepMarkerText("--- --payload")
+        );
+        assertEquals(
+                "pay-load 2",
+                ScenarioStep.normalizeStepMarkerText(
+                        "--- -- pay-load 2"
+                )
+        );
+        assertEquals(
+                "payload",
+                ScenarioStep.resolveMarkerText(
+                        "--- --payload",
+                        new ParsingMap()
+                )
+        );
+        assertTrue(
+                ScenarioStep.matchesStepMarker(
+                        ScenarioStep.resolveMarkerText(
+                                "--- --payload",
+                                new ParsingMap()
+                        ),
+                        "payload"
+                )
+        );
+    }
     @Test
     void emptyAndDashOnlyMarkersAreUnnamed() {
         assertTrue(ScenarioStep.isUnnamedStepMarker(null));
@@ -67,9 +103,50 @@ public class ScenarioStepChecks {
         assertTrue(ScenarioStep.isUnnamedStepMarker("-"));
         assertTrue(ScenarioStep.isUnnamedStepMarker("---"));
         assertTrue(ScenarioStep.isUnnamedStepMarker("- -"));
-
         assertFalse(ScenarioStep.isUnnamedStepMarker("payload"));
         assertFalse(ScenarioStep.isUnnamedStepMarker("--payload"));
+    }
+
+
+    @Test
+    void nearestMarkerSearchPrefersBelowThenFallsBackAbove() {
+        List<Integer> lines = List.of(2, 7, 12, 18);
+
+        assertEquals(
+                12,
+                ScenarioStep.findNearestByLine(
+                        lines,
+                        10,
+                        Integer::intValue,
+                        line -> true
+                )
+        );
+        assertEquals(
+                7,
+                ScenarioStep.findNearestByLine(
+                        lines,
+                        10,
+                        Integer::intValue,
+                        line -> line < 10
+                )
+        );
+        assertEquals(
+                18,
+                ScenarioStep.findNearestByLine(
+                        lines,
+                        10,
+                        Integer::intValue,
+                        line -> line == 18
+                )
+        );
+        assertNull(
+                ScenarioStep.findNearestByLine(
+                        lines,
+                        10,
+                        Integer::intValue,
+                        line -> false
+                )
+        );
     }
 
     @Test
@@ -80,11 +157,9 @@ public class ScenarioStepChecks {
         passedMap.put("firstMarker", "payload");
         passedMap.put("secondMarker", "payload");
         parsingMap.addMaps(passedMap);
-
         Map<String, String> markers = new LinkedHashMap<>();
         markers.put("<firstMarker>", "first");
         markers.put("<secondMarker>", "second");
-
         assertEquals(
                 "second",
                 ScenarioStep.findStepMarker(
