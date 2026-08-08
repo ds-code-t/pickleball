@@ -221,3 +221,108 @@ Feature: Pickleball 2.1.2 syntax demo
     # The same runtime also provides the related plural/string/projection forms,
     # including Data Object(s), Data String(s), JSON/YAML/XML String(s),
     # Data Cell/Header/Value/Entry, Map(s), List(s), Set(s), and Multimap(s).
+
+
+  Scenario: Query and iterate Data Table rows cells entries and values
+    Given CLEAR SAVED VALUES
+
+    * ------
+      | key1  | key2  | group | note        |
+      | valA1 | valA1 | alpha | alpha-start |
+      | valA2 | valA2 | alpha | has-needle  |
+      | valB1 | valB1 | beta  | beta-tail   |
+      | misc1 | misc1 | beta  | other       |
+
+  # Data Rows
+    Then , in the Data Table, for Data Row starting with "valA":
+  : And , verify "<key1>" equals "<key2>"
+  : And , verify "<key1>" equals "valA1"
+
+    Then , in the Data Table, for Data Row with value containing "needle":
+  : And , verify "<key1>" equals "valA2"
+  : And , verify "<note>" equals "has-needle"
+
+    When , in the Data Table, save last Data Row starting with "valA" as "lastValARow"
+    And , in the Data Table, save Data Row ending with "B1" as "rowEndingB1"
+
+    Then , verify "<lastValARow.key1>" equals "valA2"
+    And , verify "<rowEndingB1.group>" equals "beta"
+
+    When , in the Data Table, save Data Rows starting with "valA" as "valARows"
+
+    Then , verify "<valARows[0].key1>" equals "valA1"
+    And , verify "<valARows[1].key1>" equals "valA2"
+
+    When , in the Data Table, for every Data Row starting with "valA":
+  : * , verify "<key1>" starts with "valA"
+  : * , verify "<key1>" equals "<key2>"
+  : * , save "<key1>" as "lastValARowSeen"
+
+    Then , verify "<lastValARowSeen>" equals "valA2"
+
+    When , in the Data Table, save Data Rows with value equaling "alpha" as "alphaRows"
+
+    Then , verify "<alphaRows[0].key1>" equals "valA1"
+    And , verify "<alphaRows[0].group>" equals "alpha"
+    And , verify "<alphaRows[1].key1>" equals "valA2"
+    And , verify "<alphaRows[1].group>" equals "alpha"
+
+    Then , in the Data Table, for every Data Row with value equaling "alpha":
+  : And , verify "<group>" equals "alpha"
+  : And , verify "<key1>" starts with "valA"
+
+  # Data Cells
+    When , in the Data Table, save Data Cells starting with "valA" as "valACells"
+    And , in the Data Table, save Data Cell ending with "tail" as "tailCell"
+
+    Then , verify "<valACells[0]>" equals "valA1"
+    And , verify "<valACells[1]>" equals "valA1"
+    And , verify "<valACells[2]>" equals "valA2"
+    And , verify "<valACells[3]>" equals "valA2"
+    And , verify "<tailCell>" equals "beta-tail"
+
+    When , in the Data Table, for every Data Cell containing "val":
+  : * , verify "<value>" contains "val"
+  : * , save "<value>" as "lastMatchingCell"
+
+    Then , verify "<lastMatchingCell>" equals "valB1"
+
+  # Data Entries
+    When , in the Data Table, save value of Data Entries starting with "key" as "keyValues"
+    And , in the Data Table, save value of Data Entries ending with "2" as "key2Values"
+    And , in the Data Table, save value of Data Entries equaling "group" as "groupValues"
+    And , in the Data Table, save value of Data Entries containing "ote" as "noteValues"
+
+    Then , verify "<keyValues[0]>" equals "valA1"
+    And , verify "<keyValues[1]>" equals "valA1"
+    And , verify "<key2Values[0]>" equals "valA1"
+    And , verify "<key2Values[3]>" equals "misc1"
+    And , verify "<groupValues[0]>" equals "alpha"
+    And , verify "<groupValues[1]>" equals "alpha"
+    And , verify "<groupValues[2]>" equals "beta"
+    And , verify "<groupValues[3]>" equals "beta"
+    And , verify "<noteValues[1]>" equals "has-needle"
+
+    When , in the Data Table, for every Data Entry equaling "group":
+  : * , verify "<Data Header>" equals "group"
+  : * , save "<Data Value>" as "lastGroupValue"
+
+    Then , verify "<lastGroupValue>" equals "beta"
+
+  # Data Values
+    When , in the Data Table, save Data Values starting with "valA" as "valAValues"
+    And , in the Data Table, save Data Values containing "alpha" as "alphaValues"
+    And , in the Data Table, save Data Value ending with "tail" as "tailValue"
+
+    Then , verify "<valAValues[0]>" equals "valA1"
+    And , verify "<valAValues[3]>" equals "valA2"
+    And , verify "<alphaValues[0]>" equals "alpha"
+    And , verify "<alphaValues[1]>" equals "alpha-start"
+    And , verify "<alphaValues[2]>" equals "alpha"
+    And , verify "<tailValue>" equals "beta-tail"
+
+    When , in the Data Table, for every Data Value starting with "valA":
+  : * , verify "<value>" starts with "valA"
+  : * , save "<value>" as "lastValAValue"
+
+    Then , verify "<lastValAValue>" equals "valA2"
