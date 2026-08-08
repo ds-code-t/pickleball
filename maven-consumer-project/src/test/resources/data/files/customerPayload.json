@@ -1,0 +1,27 @@
+{
+  "source": "data-file",
+  "customer": {
+    "name": "Ava",
+    "active": true,
+    "orders": [
+      {
+        "id": "A-100",
+        "items": [
+          {
+            "sku": "SKU-1",
+            "quantity": 2
+          }
+        ]
+      },
+      {
+        "id": "A-200",
+        "items": [
+          {
+            "sku": "SKU-2",
+            "quantity": 1
+          }
+        ]
+      }
+    ]
+  }
+}

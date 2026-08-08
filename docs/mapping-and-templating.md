@@ -1,8 +1,10 @@
 # Mapping and Templating
 
-> **Working feature examples:** [`mapping-and-resources.feature`](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature) tests the supported mapping definitions, saved-value clearing, and comma-step `save` actions. [`service-call-definitions.feature`](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature) uses the same mapping definitions to assemble REST and SOAP request objects.
+> **Working feature examples:** [`mapping-and-resources.feature`](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature) covers supported mapping definitions. [`mapping-value-type-preservation.feature`](../maven-consumer-project/src/test/resources/features/mapping-value-type-preservation.feature) covers Jackson type preservation. [`scenario-data-references.feature`](../maven-consumer-project/src/test/resources/features/scenario-data-references.feature) covers marker-data and `data:/` file references.
 
-Pickleball maps values into `NodeMap` scopes and resolves them later through templates such as `<customer.name>`. This guide intentionally documents only these supported definitions from `MappingSteps.java`:
+Pickleball maps values into `NodeMap` scopes and resolves them later through templates such as `<customer.name>`.
+
+## Supported mapping steps
 
 ```gherkin
 CLEAR SAVED VALUES
@@ -13,113 +15,31 @@ MAP "prefix" NON-BLANK TABLE VALUES
 MAP "prefix" NON-NULL TABLE VALUES
 ```
 
-Other definitions currently present in `MappingSteps.java` are intentionally omitted from this guide and from the consumer mapping feature.
+Each mapping step may optionally end with `TO DEFAULT MAP`, `TO OVERRIDE MAP`, `TO SINGLETON MAP`, `TO STEP MAP`, `TO ROOT SCENARIO MAP`, `TO SCENARIO MAP`, or `TO RUN MAP`. Omitting the target uses the run map.
 
-## Supported mapping steps
+## Table values
 
-| Step | Purpose |
-|---|---|
-| `MAP "key" TEXT VALUE` | Resolve templates in an attached DocString and store the result as text without structured parsing. |
-| `MAP "key" OBJECT VALUE` | Resolve templates and parse an attached JSON, XML, or YAML DocString into a Jackson tree. |
-| `MAP "prefix" TABLE VALUES` | Map the first resolved nonblank candidate value in each row beneath an optional prefix. |
-| `MAP "prefix" NON-BLANK TABLE VALUES` | Explicit form of the default table-mapping behavior. |
-| `MAP "prefix" NON-NULL TABLE VALUES` | Map the first resolved candidate value that is not null or an unresolved template. Blank values are allowed. |
-| `CLEAR SAVED VALUES` | Clear the complete run map. |
-| `CLEAR SAVED VALUES:key1,key2` | Remove selected top-level keys from the run map. |
-
-The prefix is optional for table mappings. Each `MAP` step can optionally end with `TO DEFAULT MAP`, `TO OVERRIDE MAP`, `TO SINGLETON MAP`, `TO STEP MAP`, `TO ROOT SCENARIO MAP`, `TO SCENARIO MAP`, or `TO RUN MAP`. Omitting the target uses the run map.
-
-## Map table values
-
-The first cell in each row contains the property path. Every remaining cell is a candidate value. Candidate values are resolved from left to right, and only the first value that satisfies the selected requirement is mapped.
-
-If no candidate value qualifies, nothing is mapped for that row. A row with a blank key is also ignored. The table has no header row.
-
-### Default and `NON-BLANK` behavior
-
-When no requirement is written, table mapping defaults to `NON-BLANK`:
+The first cell in each row contains the property path. Remaining cells are candidate values. The default and `NON-BLANK` forms select the first resolved nonblank candidate. `NON-NULL` allows blank values but skips null and unresolved references.
 
 ```gherkin
 Given MAP "customer" TABLE VALUES TO RUN MAP
-| name         | Ava     |
-| address.city | Phoenix |
-| tier         | Premium |
+  | name         | Ava     |
+  | address.city | Phoenix |
+  | tier         | Premium |
 ```
 
-This is equivalent to:
-
-```gherkin
-Given MAP "customer" NON-BLANK TABLE VALUES TO RUN MAP
-| name         | Ava     |
-| address.city | Phoenix |
-| tier         | Premium |
-```
-
-`NON-BLANK` skips blank values, unresolved templates, and empty object or array values. It continues across the row until it finds the first qualifying value:
-
-```gherkin
-Given MAP "customer" TABLE VALUES TO RUN MAP
-| name  | <preferredName> |         | Ava     |
-| city  |                 | Phoenix |         |
-| phone | <missingPhone>  |         |         |
-|       | ignored         |         |         |
-```
-
-In this example:
-
-- `customer.name` is set to `Ava` if `<preferredName>` remains unresolved.
-- `customer.city` is set to `Phoenix`.
-- `customer.phone` is not set because none of its candidate values qualify.
-- The last row is ignored because its key is blank.
-
-The values can then be resolved as:
+Values resolve as:
 
 ```text
 <customer.name>
-<customer.city>
+<customer.address.city>
 ```
 
-### `NON-NULL` behavior
+Structured whole-value references are stored without converting Jackson objects and arrays to text.
 
-Use `NON-NULL` when a blank value should count as a supplied value. It still skips null values and unresolved templates, but it does not skip blank text or empty object or array values.
+## Raw text and structured DocStrings
 
-```gherkin
-Given MAP "customer" NON-NULL TABLE VALUES TO RUN MAP
-| nickname |             | Ava |
-| id       | <missingId> | 123 |
-```
-
-In this example:
-
-- `customer.nickname` is set to a blank value. Because that value qualifies for `NON-NULL`, the mapper does not continue to `Ava`.
-- `customer.id` is set to `123` if `<missingId>` remains unresolved.
-
-### Optional prefixes
-
-Without a prefix, the first column supplies the complete key:
-
-```gherkin
-Given MAP TABLE VALUES TO RUN MAP
-| status  | ready |
-| retries | 2     |
-```
-
-Nested request sections use nested prefixes:
-
-```gherkin
-Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
-| endpoint | http://127.0.0.1:8765/api/health |
-| method   | GET                               |
-And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
-| Accept        | application/json |
-| X-Test-Client | consumer-test    |
-```
-
-These general mapping steps are the supported way to prepare values used by reusable service-call scenarios.
-
-## Map raw text
-
-`TEXT` resolves templates in the DocString and stores the result as text without parsing it as JSON, XML, or YAML:
+`TEXT` resolves templates but keeps the final DocString as text:
 
 ```gherkin
 Given MAP "REQUEST.body" TEXT VALUE TO SCENARIO MAP
@@ -130,11 +50,7 @@ Given MAP "REQUEST.body" TEXT VALUE TO SCENARIO MAP
   """
 ```
 
-A DocString content type may still be supplied for editor formatting, but it does not change how `TEXT` is stored.
-
-## Map JSON, XML, or YAML objects
-
-`OBJECT` resolves templates in the complete DocString text and then parses the resolved result into a Jackson `JsonNode`:
+`OBJECT` resolves templates and parses JSON, XML, or YAML to a Jackson `JsonNode`:
 
 ```gherkin
 Given MAP "customer" OBJECT VALUE TO RUN MAP
@@ -150,101 +66,30 @@ Given MAP "customer" OBJECT VALUE TO RUN MAP
   """
 ```
 
-The resolved text must be valid for the selected format when parsing occurs. This matters for JSON templates containing runtime references; see [`~unquote` for raw values](#unquote-for-raw-values).
+## Save and clear values
 
-The DocString content type is required for `OBJECT`.
-
-| Format | Accepted content types |
-|---|---|
-| JSON | `json`, `application/json`, `text/json` |
-| XML | `xml`, `application/xml`, `text/xml` |
-| YAML | `yaml`, `yml`, `application/yaml`, `application/x-yaml`, `text/yaml`, `text/x-yaml` |
-
-Examples:
-
-```gherkin
-Given MAP "yamlCustomer" OBJECT VALUE
-  """yaml
-  name: Ben
-  address:
-    city: Tempe
-  """
-
-And MAP "xmlCustomer" OBJECT VALUE
-  """xml
-  <customer>
-    <name>Cara</name>
-    <city>Mesa</city>
-  </customer>
-  """
-```
-
-## Map targets
-
-| Target | Selected map |
-|---|---|
-| omitted or `RUN` | Run map |
-| `DEFAULT` | Default/fallback map |
-| `OVERRIDE` | Override map |
-| `SINGLETON` | Singleton map |
-| `STEP` | Current step map |
-| `SCENARIO` | Closest scenario-step map |
-| `ROOT SCENARIO` | Root scenario-step map |
-
-`SCENARIO` is useful for reusable component scenarios because the mapped request stays associated with that scenario while its child steps execute.
-
-> **Current implementation note:** the Cucumber expressions accept `ROOT SCENARIO`, but the map-selection switch currently checks `SCENARIO ROOT`. Do not rely on this target until those two forms are made consistent.
-
-## Save values from comma dynamic steps
-
-The comma dynamic-step parser has a `save` action. It stores a resolved value under a named key so later steps can retrieve it through the normal template syntax.
-
-Save text or a number:
+Dynamic comma steps can save values:
 
 ```gherkin
 * , save "Ava" as "customerName"
 * , save 3 as "retryCount"
 ```
 
-Save a value already supplied by a mapping:
+Clear the run map with:
 
 ```gherkin
-Given MAP "customer" TABLE VALUES
-  | city | Phoenix |
-
-When , save "<customer.city>" as "savedCity"
-Then , ensure "<savedCity>" equals "Phoenix"
+CLEAR SAVED VALUES
 ```
 
-Saving another value under the same key adds a newer value. A normal template lookup returns the latest value:
+or selected top-level keys with:
 
 ```gherkin
-* , save "draft" as "status"
-* , save "ready" as "status"
-* , ensure "<status>" equals "ready"
+CLEAR SAVED VALUES:temporaryToken,customerDraft
 ```
 
-The save action is part of the comma dynamic-step language rather than a separate `MappingSteps` Cucumber definition. See [Dynamic Steps](dynamic-steps.md) for the general comma-step syntax.
+## Template paths
 
-## Clear saved run values
-
-Clear the complete run map:
-
-```gherkin
-Given CLEAR SAVED VALUES
-```
-
-Clear selected top-level keys while leaving other run-map values intact:
-
-```gherkin
-Given CLEAR SAVED VALUES:temporaryToken,customerDraft
-```
-
-Only the run map is cleared. Default, override, singleton, step, and scenario maps are not cleared by this definition.
-
-## Templates and nested paths
-
-Use angle brackets to resolve saved or mapped values:
+Normal nested references include:
 
 ```text
 <customer.name>
@@ -253,76 +98,114 @@ Use angle brackets to resolve saved or mapped values:
 <orders #2.items #1.sku>
 ```
 
-XML-safe bookends are available where ordinary angle brackets would conflict with XML markup:
+XML-safe bookends are available where angle brackets conflict with XML markup:
 
 ```text
 ~[~customer.name~]~
 ```
 
-For example:
+## Source-qualified references
 
-```xml
-<customer>
-  <name>~[~customer.name~]~</name>
-</customer>
-```
+Recognized lowercase source prefixes are resolved before ordinary map lookup.
 
-When the input looks like XML and custom outer delimiters are not supplied, Pickleball resolves the XML-safe `~[~...~]~` form and does not interpret XML element tags as angle-bracket references.
+### `file:`
 
-### Source-qualified references
-
-Recognized lowercase source prefixes are resolved before ordinary map lookup:
+`file:` uses the existing resource lookup, parsing, suffix-agnostic discovery, and nested-query behavior:
 
 ```text
-<file:files/customers #1.name>
-<data:Customer record.payload>
+<file:files/customers>
+<file:files/customers.customer.name>
 ```
 
-`file:` loads and queries a classpath resource through the file parser. `data:`
-retrieves scenario marker data.
+### Scenario marker `data:`
 
-Source prefixes are separate from leading reference sigils. `<&reference>`
-always resolves a step return value. Only recognized source prefixes are
-reserved; an arbitrary lowercase key containing `:` is not automatically
-treated as a source reference.
+Without a slash, `data:` performs scenario-marker lookup. Addresses are right-aligned:
 
-### Scenario and run-map references in reusable components
+```text
+<data:marker>
+<data:scenario.marker>
+<data:feature.scenario.marker>
+```
 
-A reusable component scenario has its own scenario map. Use an explicit map prefix when a reference must come from the caller:
+Only unescaped periods separate components. Escape a literal period with `\.` and a literal backslash with `\\`:
+
+```text
+<data:Data\.reference\.records.Customer\.record.payload\.marker>
+```
+
+This addresses:
+
+```text
+Feature: Data.reference.records
+Scenario: Customer.record
+Marker: payload.marker
+```
+
+Marker references resolve directly to the marker's attached native `DataTable` or `DocString`.
+
+### Data-file `data:/`
+
+A slash immediately after `data:` switches to file lookup rooted below the resolved Pickleball data path:
+
+```text
+<data:/file>
+<data:/files/customerPayload>
+<data:/files/customerPayload.customer>
+<data:/files/customerPayload.customer.orders>
+<data:/files/customerPayload.customer.orders[0]>
+<data:/files/customerPayload.customer.orders[1].id>
+```
+
+The leading slash is only a syntax discriminator. It is **not** an operating-system absolute path.
+
+`data:/` uses the same already-resolved `pkb_datapath` and default fallback as marker-data lookup. It then reuses the existing `file:` machinery for:
+
+- filesystem/classpath resource resolution supported by the data root;
+- suffix-agnostic file discovery;
+- JSON/YAML/XML and other supported formats;
+- nested object and array queries.
+
+For example, with:
+
+```text
+pkb_datapath=src/test/resources/data
+```
+
+this reference:
+
+```text
+<data:/files/customerPayload>
+```
+
+can resolve:
+
+```text
+src/test/resources/data/files/customerPayload.json
+```
+
+without requiring the `.json` suffix.
+
+Whole documents and nested objects/arrays remain Jackson `JsonNode` values (`ObjectNode`/`ArrayNode`). Nested scalar queries return their natural scalar value.
+
+## Scenario and run-map references in reusable components
+
+A reusable component has its own scenario map. Use explicit map prefixes for caller-owned values:
 
 ```text
 <PARENT.SCENARIO:requestTemplate.client>
 <PARENT.SCENARIO:requestTemplate.body.quantity>
 ```
 
-The same pattern with XML-safe bookends is:
-
-```text
-~[~PARENT.SCENARIO:requestTemplate.body.quantity~]~
-```
-
-A completed named service call is saved in the shared run map under its call key. Reference that saved call directly, without `PARENT.SCENARIO`:
+A completed named service call is stored in the shared RunMap and is referenced directly:
 
 ```text
 <seedCall.RESPONSE.statusCode>
 <seedCall.RESPONSE.body.body.quantity>
 ```
 
-For XML:
+## `~unquote` for raw JSON values
 
-```text
-~[~seedCall.RESPONSE.body.body.quantity~]~
-```
-
-This distinction is important:
-
-- Caller-owned values mapped with `TO SCENARIO MAP` are reached through `PARENT.SCENARIO:` from inside the component.
-- Completed named service-call objects are reached through their run-map call key.
-- `<columnName>` tokens that match a `Scenario Outline` Examples header are Cucumber substitutions. Cucumber performs those substitutions before Pickleball runtime template resolution.
-
-### `~unquote` for raw values
-
-Append `~unquote` to a map reference when the reference is directly surrounded by quotes but its resolved value must be inserted without those quotes:
+Append `~unquote` when a quoted template must insert a number, boolean, object, or array as raw JSON:
 
 ```text
 "<order.quantity~unquote>"
@@ -331,79 +214,11 @@ Append `~unquote` to a map reference when the reference is directly surrounded b
 "<order.items~unquote>"
 ```
 
-`~unquote` is removed from the lookup key. After a value resolves, Pickleball removes one directly surrounding matching quote pair from that replacement. Double quotes, single quotes, and backticks are supported; JSON templates should use double quotes.
+`~unquote` removes one directly surrounding matching quote pair after resolution. Normal string references should remain ordinarily quoted.
 
-This pattern is especially useful with `MAP ... OBJECT VALUE` because the template remains valid JSON before resolution:
+## Index selectors
 
-```gherkin
-Given MAP "requestTemplate" OBJECT VALUE TO SCENARIO MAP
-  """json
-  {
-    "name": "Mapped Widget",
-    "quantity": 4,
-    "active": false,
-    "unitPrice": 19.95,
-    "metadata": {
-      "source": "scenario-map",
-      "priority": 3
-    },
-    "items": [
-      { "sku": "A-1", "count": 2 }
-    ]
-  }
-  """
-
-And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
-  """json
-  {
-    "name": "<requestTemplate.name>",
-    "quantity": "<requestTemplate.quantity~unquote>",
-    "active": "<requestTemplate.active~unquote>",
-    "unitPrice": "<requestTemplate.unitPrice~unquote>",
-    "metadata": "<requestTemplate.metadata~unquote>",
-    "items": "<requestTemplate.items~unquote>"
-  }
-  """
-```
-
-After resolution, Jackson parses values with their JSON types:
-
-```json
-{
-  "name": "Mapped Widget",
-  "quantity": 4,
-  "active": false,
-  "unitPrice": 19.95,
-  "metadata": {
-    "source": "scenario-map",
-    "priority": 3
-  },
-  "items": [
-    { "sku": "A-1", "count": 2 }
-  ]
-}
-```
-
-Use ordinary quoted references for string values. Use quoted `~unquote` references for a complete number, boolean, object, or array value.
-
-`~unquote` is raw insertion, not general type conversion:
-
-- The resolved text must be valid in the surrounding format.
-- A normal text value such as `Widget` is not valid raw JSON; keep string references quoted without `~unquote`.
-- Jackson `JsonNode` objects and arrays are serialized as JSON before insertion.
-- If the reference does not resolve, Pickleball does not add the internal unquote markers, so the original quoted placeholder remains a valid JSON string.
-
-The XML-safe spelling is also supported when that delimiter style is active:
-
-```text
-"~[~order.quantity~unquote~]~"
-```
-
-It is usually unnecessary for XML text content because XML element text does not need JSON scalar typing. Its main use is preserving raw structured syntax in formats where quoting changes the value.
-
-### Index selectors
-
-Square-bracket indexes use normal zero-based JSONata indexing. Pickleball `#` selectors provide one-based-friendly access:
+Square-bracket indexes use zero-based JSONata indexing. Pickleball `#` selectors provide one-based-friendly access:
 
 | Pickleball selector | Effective selector |
 |---|---|
@@ -414,12 +229,10 @@ Square-bracket indexes use normal zero-based JSONata indexing. Pickleball `#` se
 | `#1-3` | `[0..2]` |
 | `#1,3` | `[0,2]` |
 
-Ordinary top-level mapped properties retain Pickleball's history behavior, so an unqualified lookup returns the latest entry. Use `[]` or `[*]` where the complete array is required.
-
 ## Working examples
 
 - [Supported mapping and save-action tests](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature)
+- [Type-preservation and `data:/` tests](../maven-consumer-project/src/test/resources/features/scenario-data-references.feature)
 - [Generic mappings in reusable service calls](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature)
-- [Service-call caller feature](../maven-consumer-project/src/test/resources/features/service-call-execution.feature)
 
 [Previous: Dynamic Steps](dynamic-steps.md) · [Documentation home](README.md) · [Next: Configuration Files and Resource Mapping](config-files-and-resource-mapping.md)

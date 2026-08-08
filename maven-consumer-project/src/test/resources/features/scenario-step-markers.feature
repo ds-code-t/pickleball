@@ -10,17 +10,17 @@ Feature: Scenario step markers
 
   @all @regression @scenario-markers
   Scenario: Component scenario honors the default start and end markers
-    * RUN SCENARIO: FEATURE: Scenario step markers SCENARIO: Default marker component
+    * RUN SCENARIO: Scenario step markers.Default marker component
 
   @all @regression @scenario-markers
   Scenario: Component scenario accepts an inline custom start marker
-    * RUN SCENARIO: FEATURE: Scenario step markers SCENARIO: Custom marker component START: component start
+    * RUN SCENARIO: Scenario step markers.Custom marker component.component start
 
   @all @regression @scenario-markers
   Scenario: Component scenario accepts a table custom start marker
     * RUN SCENARIO
-      | pkb_featurename     | pkb_name                    | Step_Marker    |
-      | Scenario step markers | ^Custom marker component$ | component start |
+      | pkb_featurename       | pkb_name                    | Step_Marker     |
+      | Scenario step markers | ^Custom marker component$   | component start |
 
   @component-definition
   Scenario: Default marker component

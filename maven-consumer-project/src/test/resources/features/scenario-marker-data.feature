@@ -2,7 +2,7 @@ Feature: Scenario marker data extraction
 
   @all @regression @scenario-data
   Scenario: Read marker data without executing the component scenario
-    * VERIFY SCENARIO DATA: FEATURE: Scenario marker data extraction SCENARIO: Marker data component START: marker stored example-row
+    * VERIFY SCENARIO DATA: Scenario marker data extraction.Marker data component.marker stored example-row
       | passedValue |
       | stored      |
     * , verify "the component was not executed" equals "the component was not executed"

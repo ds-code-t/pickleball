@@ -362,6 +362,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 - `maven-consumer-project/src/test/resources/features/catalog-context.feature`
 - `maven-consumer-project/src/test/resources/features/component-scenarios.feature`
+- `maven-consumer-project/src/test/resources/features/data-element-all-phases.feature`
+- `maven-consumer-project/src/test/resources/features/data-element-native-collections.feature`
+- `maven-consumer-project/src/test/resources/features/data-element-native-formats.feature`
+- `maven-consumer-project/src/test/resources/features/data-element-native-tabular.feature`
 - `maven-consumer-project/src/test/resources/features/data-element-phase-3.feature`
 - `maven-consumer-project/src/test/resources/features/date-time-utilities.feature`
 - `maven-consumer-project/src/test/resources/features/dialogs.feature`
@@ -374,6 +378,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/navigation.feature`
 - `maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature`
 - `maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature`
+- `maven-consumer-project/src/test/resources/features/run-step-parameter-variations.feature`
 - `maven-consumer-project/src/test/resources/features/scenario-data-references.feature`
 - `maven-consumer-project/src/test/resources/features/scenario-marker-data.feature`
 - `maven-consumer-project/src/test/resources/features/scenario-step-markers.feature`
@@ -401,7 +406,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/configs/SAUCE_EDGE.yaml`
 - `maven-consumer-project/src/test/resources/configs/TEST_DATA.yaml`
 - `maven-consumer-project/src/test/resources/configs/URL.yaml`
+- `maven-consumer-project/src/test/resources/data/data-element-native-fixtures.feature`
 - `maven-consumer-project/src/test/resources/data/data-reference-records.feature`
+- `maven-consumer-project/src/test/resources/data/escaped-data-records.feature`
+- `maven-consumer-project/src/test/resources/data/files/customerPayload.json`
 - `maven-consumer-project/src/test/resources/files/customers.yaml`
 - `maven-consumer-project/src/test/resources/pickleball_local.properties`
 - `maven-consumer-project/src/test/resources/pickleball_local2.properties`

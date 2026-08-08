@@ -19,7 +19,7 @@ Feature: Service call orchestration with generic request mappings
 
   Scenario: Select with Run Tags and save under an exact RunKey header
     When RUN SERVICE CALLS
-      | Run Tags     | RunKey   | endpoint              | client     | traceId     | cookieValue | mode   | status | name   | quantity |
+      | Run Tags      | RunKey    | endpoint              | client     | traceId      | cookieValue | mode   | status | name   | quantity |
       | %inspect-post | tablePost | http://127.0.0.1:8765 | table-test | trace-post-1 | cookie-42   | create | 201    | Widget | 3        |
     Then , verify "<tablePost.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/inspect"
     And , verify "<tablePost.REQUEST.method>" equals "POST"
@@ -203,7 +203,7 @@ Feature: Service call orchestration with generic request mappings
 
   Scenario: RunKey takes precedence over the quoted inline object name
     When RUN "inlineMustLose" SERVICE CALL: %status-call
-      | RunKey   | endpoint              | status |
+      | RunKey    | endpoint              | status |
       | tableWins | http://127.0.0.1:8765 | 422    |
 
     Then , verify "<tableWins.REQUEST.queryParams.status>" equals "422"
@@ -219,7 +219,7 @@ Feature: Service call orchestration with generic request mappings
 
   Scenario: Treat an HTTP 500 response as a normal service response
     When RUN "serverFailure" SERVICE CALL
-      | Run Tags    | endpoint              | status |
+      | Run Tags     | endpoint              | status |
       | %status-call | http://127.0.0.1:8765 | 500    |
 
     Then , verify "<serverFailure.RESPONSE.method>" equals "GET"
@@ -228,10 +228,10 @@ Feature: Service call orchestration with generic request mappings
 
   Scenario: Reusing a RunKey follows ordinary NodeMap replacement behavior
     When RUN SERVICE CALL
-      | Run Tags    | RunKey      | endpoint              | status |
+      | Run Tags     | RunKey       | endpoint              | status |
       | %status-call | latestStatus | http://127.0.0.1:8765 | 404    |
     And RUN SERVICE CALL
-      | Run Tags    | RunKey      | endpoint              | status |
+      | Run Tags     | RunKey       | endpoint              | status |
       | %status-call | latestStatus | http://127.0.0.1:8765 | 503    |
     Then , verify "<latestStatus.RESPONSE.statusCode>" equals "503"
     And , verify "<latestStatus.RESPONSE.body.status>" equals "503"
@@ -299,7 +299,7 @@ Feature: Service call orchestration with generic request mappings
 
   Scenario: Use inline CALL without RETURN to receive the completed child root
     When CALL: %serviceCallA
-      | RunKey    | url                   | client        | scope        |
+      | RunKey     | url                   | client        | scope        |
       | inlineCall | http://127.0.0.1:8765 | inline-client | catalog.read |
     Then , verify "<inlineCall.TOKEN.REQUEST.endpoint>" equals "http://127.0.0.1:8765/api/service-calls/token"
     And , verify "<inlineCall.TOKEN.REQUEST.method>" equals "POST"
@@ -344,5 +344,5 @@ Feature: Service call orchestration with generic request mappings
 
   Scenario: Preserve an explicit null RETURN from CALL
     When MAP TABLE VALUES
-      | explicitNullResult | <$CALL:SCENARIO: ExplicitNullReturnCall> | fallback |
+      | explicitNullResult | <$CALL:ExplicitNullReturnCall> | fallback |
     Then , verify "<explicitNullResult>" equals "fallback"

@@ -9,6 +9,35 @@ Feature: Scenario data references
     * VERIFY EMBEDDED DOC STRING ADDRESS "Customer record.message" HAS CONTENT "marker doc string"
 
   @all @regression @scenario-data
+  Scenario: Read marker data with escaped feature scenario and marker periods
+    * VERIFY DATA ADDRESS "Data\.reference\.records.Customer\.record.payload\.marker" HAS MARKER "payload.marker"
+    Given CLEAR SAVED VALUES
+    When , save "<data:Data\.reference\.records.Customer\.record.payload\.marker>" Data as "escapedMarkerData"
+    Then RUN MAP QUERY "escapedMarkerData" RETURNS TYPE "ObjectNode"
+    And RUN MAP PATH "escapedMarkerData.source" HAS VALUE "escaped-marker"
+    And RUN MAP PATH "escapedMarkerData.nested.value" HAS VALUE "9"
+
+  @all @regression @scenario-data @data-file
+  Scenario: Load data file references with native Jackson types
+    Given CLEAR SAVED VALUES
+    When MAP "dataFiles" TABLE VALUES TO RUN MAP
+      | whole         | <data:/files/customerPayload>                                  |
+      | customer      | <data:/files/customerPayload.customer>                         |
+      | orders        | <data:/files/customerPayload.customer.orders>                  |
+      | firstOrder    | <data:/files/customerPayload.customer.orders[0]>               |
+      | customerName  | <data:/files/customerPayload.customer.name>                    |
+      | secondOrderId | <data:/files/customerPayload.customer.orders[1].id>            |
+      | secondSku     | <data:/files/customerPayload.customer.orders[1].items[0].sku>  |
+    Then RUN MAP PATH "dataFiles.whole" HAS PRESERVED TYPE "ObjectNode"
+    And RUN MAP PATH "dataFiles.customer" HAS PRESERVED TYPE "ObjectNode"
+    And RUN MAP PATH "dataFiles.orders" HAS PRESERVED TYPE "ArrayNode"
+    And RUN MAP PATH "dataFiles.firstOrder" HAS PRESERVED TYPE "ObjectNode"
+    And RUN MAP PATH "dataFiles.customerName" HAS PRESERVED TYPE "String"
+    And RUN MAP PATH "dataFiles.customerName" HAS VALUE "Ava"
+    And RUN MAP PATH "dataFiles.secondOrderId" HAS VALUE "A-200"
+    And RUN MAP PATH "dataFiles.secondSku" HAS VALUE "SKU-2"
+
+  @all @regression @scenario-data
   Scenario: Use RUN SCENARIO options for marker data lookup
     * VERIFY DATA ADDRESS "payload" HAS MARKER "payload"
       | pkb_features            | pkb_name          |
@@ -33,20 +62,19 @@ Feature: Scenario data references
       | local | current |
     * VERIFY EMBEDDED DATA TABLE ADDRESS "pay-load 2" HAS 1 DATA ROWS
 
-
   @all @regression @scenario-data @data-table @data-row
   Scenario: An unquoted Data Table prefers the first unnamed marker below
     Given CLEAR SAVED VALUES
     * ------
-      | captureKey | value         |
-      | aboveTable | not selected  |
+      | captureKey | value        |
+      | aboveTable | not selected |
     When , in the Data Table, for every Data Row:
     : * , save "<value>" as "<captureKey>"
     * ------
       | captureKey | value          |
       | belowTable | selected below |
     * ------
-      | captureKey     | value              |
+      | captureKey      | value              |
       | laterBelowTable | not selected later |
     Then RUN MAP PATH "belowTable" HAS VALUE "selected below"
 
