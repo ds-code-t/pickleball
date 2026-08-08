@@ -262,8 +262,15 @@ public class ModularScenarios extends CoreSteps {
             DataTable dataTable,
             String featuresPath
     ) {
-        List<Map<String, String>> maps =
-                buildRunScenarioMaps(inlineArgs, dataTable);
+        return getScenarioStepData(
+                buildRunScenarioMaps(inlineArgs, dataTable),
+                featuresPath
+        );
+    }
+    static ScenarioStepData getScenarioStepData(
+            List<Map<String, String>> maps,
+            String featuresPath
+    ) {
         if (maps.isEmpty() || maps.stream().allMatch(
                 map -> normalize(map.get(STEP_MARKER)).isBlank()
         )) {
@@ -364,12 +371,15 @@ public class ModularScenarios extends CoreSteps {
         if (featuresPath.isBlank() && !tableHasFeaturePath) {
             featuresPath = DEFAULT_DATA_PATH;
         }
-        String inlineArgs = buildDataInlineArguments(
+        DataAddress resolvedAddress = new DataAddress(
                 featureName,
                 scenarioName,
                 address.stepMarker()
         );
-        return getScenarioStepData(inlineArgs, options, featuresPath);
+        return getScenarioStepData(
+                buildDataScenarioMaps(resolvedAddress, options),
+                featuresPath
+        );
     }
     static DataAddress parseDataAddress(String dataAddress) {
         String normalized = normalize(dataAddress);
@@ -399,20 +409,26 @@ public class ModularScenarios extends CoreSteps {
                 padded[2]
         );
     }
-    private static String buildDataInlineArguments(
-            String featureName,
-            String scenarioName,
-            String stepMarker
+    static List<Map<String, String>> buildDataScenarioMaps(
+            DataAddress address,
+            DataTable options
     ) {
-        List<String> components = new ArrayList<>(3);
-        if (!normalize(featureName).isBlank()) {
-            components.add(escapePathComponent(featureName));
+        List<Map<String, String>> maps = dataTableRows(options).stream()
+                .map(HashMap::new)
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        if (maps.isEmpty()) {
+            maps.add(new HashMap<>());
         }
-        if (!normalize(scenarioName).isBlank()) {
-            components.add(escapePathComponent(scenarioName));
-        }
-        components.add(escapePathComponent(stepMarker));
-        return String.join(".", components);
+        maps.forEach(map -> {
+            if (!address.featureName().isBlank()) {
+                map.put(PKB_FEATURE_NAME, address.featureName());
+            }
+            if (!address.scenarioName().isBlank()) {
+                map.put(PKB_NAME, exactNameRegex(address.scenarioName()));
+            }
+            map.put(STEP_MARKER, address.stepMarker());
+        });
+        return maps;
     }
     private static String configuredDataPath() {
         Object configured = resolveFromVars(PKB_DATA_PATH);
@@ -884,11 +900,6 @@ public class ModularScenarios extends CoreSteps {
         }
         parts.add(part.toString());
         return parts;
-    }
-    private static String escapePathComponent(String value) {
-        return normalize(value)
-                .replace("\\", "\\\\")
-                .replace(".", "\\.");
     }
     private static String exactNameRegex(String scenarioName) {
         return "^" + Pattern.quote(scenarioName) + "$";
