@@ -406,6 +406,58 @@ public class ModularScenariosChecks {
     }
 
     @Test
+    void dataAddressMapsKeepRightAlignedFieldsAndPreserveTableFilters() {
+        DataTable options = DataTable.create(List.of(
+                List.of("pkb_features", "pkb_name", "Step_Marker"),
+                List.of("src/test/resources/data", "^Customer record$", "table marker")
+        ));
+
+        List<Map<String, String>> markerOnly =
+                ModularScenarios.buildDataScenarioMaps(
+                        ModularScenarios.parseDataAddress("payload"),
+                        options
+                );
+
+        assertEquals(
+                "src/test/resources/data",
+                markerOnly.getFirst().get("pkb_features")
+        );
+        assertEquals("^Customer record$", markerOnly.getFirst().get("pkb_name"));
+        assertEquals("payload", markerOnly.getFirst().get("Step_Marker"));
+
+        List<Map<String, String>> scenarioAndMarker =
+                ModularScenarios.buildDataScenarioMaps(
+                        ModularScenarios.parseDataAddress("Customer record.payload"),
+                        null
+                );
+
+        assertNull(scenarioAndMarker.getFirst().get("pkb_featurename"));
+        assertEquals(
+                "^\\QCustomer record\\E$",
+                scenarioAndMarker.getFirst().get("pkb_name")
+        );
+        assertEquals("payload", scenarioAndMarker.getFirst().get("Step_Marker"));
+
+        List<Map<String, String>> fullAddress =
+                ModularScenarios.buildDataScenarioMaps(
+                        ModularScenarios.parseDataAddress(
+                                "Data\\.reference\\.records.Customer\\.record.payload\\.marker"
+                        ),
+                        options
+                );
+
+        assertEquals(
+                "Data.reference.records",
+                fullAddress.getFirst().get("pkb_featurename")
+        );
+        assertEquals(
+                "^\\QCustomer.record\\E$",
+                fullAddress.getFirst().get("pkb_name")
+        );
+        assertEquals("payload.marker", fullAddress.getFirst().get("Step_Marker"));
+    }
+
+    @Test
     void dataAddressesPreserveEscapedPeriodsAndBackslashes() {
         ModularScenarios.DataAddress address = ModularScenarios.parseDataAddress(
                 "Data\\.records.Customer\\.record.payload\\.marker"
