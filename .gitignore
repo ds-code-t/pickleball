@@ -46,3 +46,4 @@ bin/
 .agent-bootstrap-backup-*/
 .datetime-update-backup/
 ajcore.*.txt
+maven-consumer-project/reports/
