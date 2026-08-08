@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -13,6 +14,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.zip.GZIPOutputStream;
+
+import tools.dscode.common.variables.PlatformLogFormatter;
+import tools.dscode.coredefinitions.ServiceCallSteps;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -39,6 +44,7 @@ public class DiagnosticReportingChecks {
             assertTrue(Files.isRegularFile(runRoot.resolve("run-events.jsonl")));
             assertTrue(Files.isRegularFile(runRoot.resolve("configuration.json")));
             assertTrue(Files.isRegularFile(runRoot.resolve("environment.json")));
+            assertTrue(Files.isRegularFile(runRoot.resolve("source-provenance.json")));
             assertTrue(Files.isRegularFile(runRoot.resolve("clusters.json")));
         } finally {
             deleteTree(root);
@@ -47,14 +53,19 @@ public class DiagnosticReportingChecks {
 
     @Test
     void reportRetentionDefaultsAndFailedPolicyAreDeterministic() {
-        ReportRetentionPolicy.configure(null);
-        assertEquals(ReportRetentionPolicy.Mode.ALL, ReportRetentionPolicy.mode());
-        assertTrue(ReportRetentionPolicy.keepScenarioDetails(false, false));
+        String original = ReportRetentionPolicy.configuredValue();
+        try {
+            ReportRetentionPolicy.configure(null);
+            assertEquals(ReportRetentionPolicy.Mode.ALL, ReportRetentionPolicy.mode());
+            assertTrue(ReportRetentionPolicy.keepScenarioDetails(false, false));
 
-        ReportRetentionPolicy.configure("failed");
-        assertFalse(ReportRetentionPolicy.keepScenarioDetails(false, false));
-        assertTrue(ReportRetentionPolicy.keepScenarioDetails(true, false));
-        assertTrue(ReportRetentionPolicy.keepScenarioDetails(false, true));
+            ReportRetentionPolicy.configure("failed");
+            assertFalse(ReportRetentionPolicy.keepScenarioDetails(false, false));
+            assertTrue(ReportRetentionPolicy.keepScenarioDetails(true, false));
+            assertTrue(ReportRetentionPolicy.keepScenarioDetails(false, true));
+        } finally {
+            ReportRetentionPolicy.configure(original);
+        }
     }
 
     @Test
@@ -73,6 +84,111 @@ public class DiagnosticReportingChecks {
         assertEquals("<redacted>", effective.get("pkb_api_token").value());
         assertTrue(effective.get("pkb_api_token").redacted());
         assertFalse(effective.get("pkb_api_token").valueHash().isBlank());
+    }
+
+
+    @Test
+    void platformLogFormattingPreservesDefaultAndSupportsSelection() {
+        String key = tools.dscode.testengine.PKB_props.PKB_PLATFORM_LOG;
+        String original = System.getProperty(key);
+        try {
+            System.clearProperty(key);
+            assertEquals("default-platform-text", PlatformLogFormatter.format("default-platform-text"));
+
+            System.setProperty(key, "keys:os.name");
+            String selected = PlatformLogFormatter.format("default-platform-text");
+            assertTrue(selected.startsWith("os.name="));
+            assertFalse(selected.contains("default-platform-text"));
+
+            System.setProperty(key, "template:OS=${os.name}");
+            assertTrue(PlatformLogFormatter.format("default-platform-text").startsWith("OS="));
+
+            System.setProperty(key, "none");
+            assertTrue(PlatformLogFormatter.isDisabled());
+            assertEquals(PlatformLogFormatter.DISABLED_MARKER, PlatformLogFormatter.format("default-platform-text"));
+        } finally {
+            if (original == null) System.clearProperty(key);
+            else System.setProperty(key, original);
+        }
+    }
+
+    @Test
+    void sourceProvenanceDistinguishesPickleballAndNonPickleballDefinitions() throws Exception {
+        SourceProvenance provenance = SourceProvenance.capture(Map.of("pkb_gitsnapshot", "none"));
+        Map<String, Object> pickleball = provenance.definitionSource(
+                ServiceCallSteps.class.getMethod("executeServiceCall"),
+                "tools.dscode.coredefinitions.ServiceCallSteps.executeServiceCall(ServiceCallSteps.java:1)"
+        );
+        Map<String, Object> nonPickleball = provenance.definitionSource(
+                DiagnosticReportingChecks.class.getDeclaredMethod("testImage", boolean.class),
+                "tools.dscode.common.reporting.diagnostic.DiagnosticReportingChecks.testImage(DiagnosticReportingChecks.java:1)"
+        );
+        assertEquals("PICKLEBALL", pickleball.get("origin"));
+        assertEquals("NON_PICKLEBALL", nonPickleball.get("origin"));
+    }
+
+    @Test
+    void indexRebuilderReadsCompressedTraceAndStructuredStepMetadata() throws Exception {
+        Path root = Files.createTempDirectory("pickleball-diagnostic-gzip-rebuild");
+        try {
+            ObjectMapper json = new ObjectMapper();
+            Path run = root.resolve("run-1");
+            Path scenario = run.resolve("scenarios/scenario-1");
+            Files.createDirectories(scenario);
+            json.writeValue(run.resolve("manifest.json").toFile(), Map.of(
+                    "runId", "run-1",
+                    "outcome", "PASSED",
+                    "completion", "COMPLETE",
+                    "startedAt", "2026-08-08T00:00:00Z",
+                    "reportRetention", "all"
+            ));
+            json.writeValue(run.resolve("configuration.json").toFile(), Map.of("effective", Map.of()));
+            json.writeValue(run.resolve("environment.json").toFile(), Map.of("javaVersion", "21"));
+            json.writeValue(run.resolve("source-provenance.json").toFile(), Map.of("repositories", List.of()));
+
+            List<Map<String, Object>> plain = List.of(
+                    event("scenario_start", 1, 1, Map.of("identity", Map.of(
+                            "featureUri", "file:example.feature",
+                            "scenarioName", "Example",
+                            "exactSourceKey", "exact",
+                            "semanticKey", "semantic",
+                            "nameKey", "name",
+                            "sourceOrderHint", 10
+                    ))),
+                    event("step", 3, 3, Map.of(
+                            "status", "PASSED",
+                            "definition", Map.of("origin", "PICKLEBALL"),
+                            "nativeCapabilitiesObserved", List.of("service.http")
+                    )),
+                    event("scenario_end", 4, 4, Map.of("outcome", "PASSED", "completion", "COMPLETE"))
+            );
+            StringBuilder plainText = new StringBuilder();
+            for (Map<String, Object> event : plain) plainText.append(json.writeValueAsString(event)).append('\n');
+            Files.writeString(scenario.resolve("events.jsonl"), plainText, StandardCharsets.UTF_8);
+
+            Map<String, Object> trace = event("log", 2, 2, Map.of("level", "TRACE", "text", "deep trace"));
+            try (OutputStream out = new GZIPOutputStream(Files.newOutputStream(scenario.resolve("trace.jsonl.gz")))) {
+                out.write((json.writeValueAsString(trace) + "\n").getBytes(StandardCharsets.UTF_8));
+            }
+
+            Map<String, Object> rebuilt = DiagnosticIndexRebuilder.rebuildRunIndex(run);
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> scenarios = (List<Map<String, Object>>) rebuilt.get("scenarios");
+            Map<String, Object> rebuiltScenario = scenarios.getFirst();
+            assertEquals(4L, ((Number) rebuiltScenario.get("eventCount")).longValue());
+            @SuppressWarnings("unchecked")
+            Map<String, Object> traceEvidence = (Map<String, Object>) rebuiltScenario.get("traceEvidence");
+            assertEquals("gzip", traceEvidence.get("contentEncoding"));
+            assertEquals(1, ((Number) traceEvidence.get("eventCount")).intValue());
+            @SuppressWarnings("unchecked")
+            Map<String, Object> steps = (Map<String, Object>) rebuiltScenario.get("steps");
+            assertEquals(1L, ((Number) steps.get("executed")).longValue());
+            assertTrue(((List<?>) rebuiltScenario.get("nativeCapabilitiesObserved")).contains("service.http"));
+            assertTrue(Files.isRegularFile(scenario.resolve("trace.jsonl.gz")));
+            assertFalse(Files.exists(scenario.resolve("trace.jsonl")));
+        } finally {
+            deleteTree(root);
+        }
     }
 
     @Test
@@ -188,6 +304,22 @@ public class DiagnosticReportingChecks {
         } finally {
             deleteTree(root);
         }
+    }
+
+
+    private static Map<String, Object> event(
+            String type,
+            long eventSeq,
+            long scenarioSeq,
+            Map<String, Object> values
+    ) {
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("type", type);
+        event.put("eventSeq", eventSeq);
+        event.put("scenarioSeq", scenarioSeq);
+        event.put("timestamp", "2026-08-08T00:00:0" + Math.min(9, scenarioSeq) + "Z");
+        event.putAll(values);
+        return event;
     }
 
     private static Map<String, Object> runIndex(String runId, String outcome, Map<String, Object> scenario) {

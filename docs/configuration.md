@@ -75,6 +75,8 @@ mvn test "-Dpkb_tags=@forms and @state-assertions" -Dpkb_loglevel=debug
 | `pkb_reportingmode` | `diagnostic` | use the diagnostic evidence pipeline; any other/absent value uses normal reporting |
 | `pkb_reportretention` | `all`, `failed`, or `none` | automatic local report/evidence retention; default `all` |
 | `pkb_diagnostic_output` | `reports/diagnostic-runs` | optional diagnostic-runs root; the default needs no configuration |
+| `pkb_platformlog` | `default`, `default+git`, `none`, `keys:...`, or `template:...` | controls automatic platform/caller identity stamps; absent/default preserves current logging |
+| `pkb_gitsnapshot` | `metadata`, `diff`, or `none` | diagnostic Git/source provenance; default `metadata`; `diff` also stores a gzipped consumer working-tree patch when dirty |
 | `pkb_compositeReport` | `true` or a path | combined HTML report |
 | `pkb_scenarioReport` | `true` or a path | individual scenario reports |
 
@@ -100,7 +102,25 @@ pkb_reportretention=failed
 
 `pkb_diagnostic_output` is optional; diagnostic mode needs only `pkb_reportingmode=diagnostic`.
 
-ReportPortal is not controlled by `pkb_reportretention` in normal mode because it is a remote reporting integration. See [Diagnostic reporting](diagnostic-reporting.md) for the artifact layout, scenario identity model, screenshots, fingerprints, provenance, and recovery behavior.
+`pkb_platformlog` controls the automatic caller/platform identity stamp used by normal logging and external reporting. It is independent of diagnostic mode. The default is deliberately backward-compatible:
+
+```properties
+pkb_platformlog=default
+```
+
+Supported forms are:
+
+- `default` or absent — preserve the current platform/caller text;
+- `default+git` — preserve the current text and append compact consumer/Pickleball source identity;
+- `none` — suppress automatic platform identity records;
+- `keys:hostname,user.name,ci.type` — log only the requested `PlatformSnapshot`/source-provenance keys;
+- `template:Caller=${user.name} Repo=${git.consumer.name} Commit=${git.consumer.commit}` — render a caller-defined template.
+
+The Git/source keys available to `keys:` and `template:` include `git.consumer.name`, `.remote`, `.webUrl`, `.branch`, `.commit`, `.commitMessage`, `.dirty`, the corresponding `git.pickleball.*` values, and `pickleball.version`. HTTP(S) Git credentials embedded in a remote URL are removed before provenance is persisted.
+
+`pkb_gitsnapshot` controls diagnostic source provenance. `metadata` is the default and records repository/branch/commit/dirty state without copying source diffs. `none` disables live consumer Git inspection. `diff` adds a gzipped working-tree status/diff artifact when the consumer repository is dirty; use it only when retaining local source changes in diagnostic evidence is acceptable.
+
+ReportPortal is not controlled by `pkb_reportretention` in normal mode because it is a remote reporting integration. See [Diagnostic reporting](diagnostic-reporting.md) for the artifact layout, scenario identity model, source provenance, step metadata, capability observations, screenshots, fingerprints, and recovery behavior.
 
 ## `pkb_datapath`
 

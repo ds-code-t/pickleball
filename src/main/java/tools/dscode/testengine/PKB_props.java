@@ -34,6 +34,8 @@ public final class PKB_props {
     public static final String PKB_REPORTING_MODE = PKB_PREFIX + "reportingmode";
     public static final String PKB_REPORT_RETENTION = PKB_PREFIX + "reportretention";
     public static final String PKB_DIAGNOSTIC_OUTPUT = PKB_PREFIX + "diagnostic_output";
+    public static final String PKB_PLATFORM_LOG = PKB_PREFIX + "platformlog";
+    public static final String PKB_GIT_SNAPSHOT = PKB_PREFIX + "gitsnapshot";
     public static final String PKB_INVESTIGATION_ID = PKB_PREFIX + "investigation_id";
     public static final String PKB_RUN_PURPOSE = PKB_PREFIX + "run_purpose";
     public static final String PKB_PARENT_RUN_ID = PKB_PREFIX + "parent_run_id";
@@ -194,6 +196,22 @@ public final class PKB_props {
 
     public static void diagnosticOutput(String diagnosticOutput) {
         put(PKB_DIAGNOSTIC_OUTPUT, diagnosticOutput);
+    }
+
+    public static String platformLog() {
+        return get(PKB_PLATFORM_LOG);
+    }
+
+    public static void platformLog(String platformLog) {
+        put(PKB_PLATFORM_LOG, platformLog);
+    }
+
+    public static String gitSnapshot() {
+        return get(PKB_GIT_SNAPSHOT);
+    }
+
+    public static void gitSnapshot(String gitSnapshot) {
+        put(PKB_GIT_SNAPSHOT, gitSnapshot);
     }
 
     public static String debugBrowser() {

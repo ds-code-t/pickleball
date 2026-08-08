@@ -1,6 +1,6 @@
 Feature: Internal Pickleball Java checks
 
-  @all @regression @internal-java-checks
+  @all @regression @internal-java-checks @diagnostic-single
   Scenario: Run framework checks through the published Pickleball dependency
     * RUN INTERNAL PICKLEBALL JAVA TESTS
 

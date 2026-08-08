@@ -67,6 +67,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/aspectj/tools/dscode/common/reporting/diagnostic/ConfigurationProvenanceAspect.aj`
 - `src/main/aspectj/tools/dscode/common/reporting/diagnostic/DiagnosticRuntimeAspect.aj`
 - `src/main/aspectj/tools/dscode/common/reporting/diagnostic/ReportRetentionAspect.aj`
+- `src/main/aspectj/tools/dscode/common/variables/PlatformLogAspect.aj`
 - `src/main/java/io/cucumber/core/feature/TestFeatureParser.java`
 - `src/main/java/io/cucumber/core/gherkin/messages/CucumberDeepCloneUtil.java`
 - `src/main/java/io/cucumber/core/gherkin/messages/CucumberStepTextCloneUtil.java`
@@ -77,6 +78,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/io/cucumber/core/runner/CoreConstants.java`
 - `src/main/java/io/cucumber/core/runner/CucumberStepInvoker.java`
 - `src/main/java/io/cucumber/core/runner/CurrentScenarioState.java`
+- `src/main/java/io/cucumber/core/runner/DiagnosticStepMetadata.java`
 - `src/main/java/io/cucumber/core/runner/GeneralGherkinUtils.java`
 - `src/main/java/io/cucumber/core/runner/GlobalState.java`
 - `src/main/java/io/cucumber/core/runner/HasOverrides.java`
@@ -220,6 +222,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/reporting/diagnostic/ExplicitReportRegistry.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/ReportRetentionPolicy.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/ScenarioIdentity.java`
+- `src/main/java/tools/dscode/common/reporting/diagnostic/SourceProvenance.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/VisualFingerprint.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/VisualFingerprintComparator.java`
 - `src/main/java/tools/dscode/common/reporting/logging/Attachment.java`
@@ -308,6 +311,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/util/GeneralUtils.java`
 - `src/main/java/tools/dscode/common/util/Reflect.java`
 - `src/main/java/tools/dscode/common/util/StringUtilities.java`
+- `src/main/java/tools/dscode/common/variables/PlatformLogFormatter.java`
 - `src/main/java/tools/dscode/common/variables/PlatformSnapshot.java`
 - `src/main/java/tools/dscode/common/variables/RunVars.java`
 - `src/main/java/tools/dscode/common/variables/SysEnv.java`
@@ -393,7 +397,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/mapping-value-type-preservation.feature`
 - `maven-consumer-project/src/test/resources/features/navigation.feature`
 - `maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature`
-- `maven-consumer-project/src/test/resources/features/pickleball-2.1.2-syntax-demo.feature`
 - `maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature`
 - `maven-consumer-project/src/test/resources/features/run-step-parameter-variations.feature`
 - `maven-consumer-project/src/test/resources/features/scenario-data-references.feature`
@@ -429,6 +432,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/data/files/customerPayload.json`
 - `maven-consumer-project/src/test/resources/files/customers.yaml`
 - `maven-consumer-project/src/test/resources/pickleball_local.properties`
+- `maven-consumer-project/src/test/resources/pickleball_local2.properties`
 
 ## Maven consumer test site
 

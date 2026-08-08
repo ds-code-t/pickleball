@@ -33,10 +33,10 @@ public final class DiagnosticRunComparator {
         result.put("rightRunId", right.get("runId"));
         result.put("leftOutcome", left.get("outcome"));
         result.put("rightOutcome", right.get("outcome"));
-        result.put("metadataDifferences", mapDifferences(
-                asMap(left.get("comparisonMetadata")),
-                asMap(right.get("comparisonMetadata"))
-        ));
+        Map<String, Object> leftMetadata = asMap(left.get("comparisonMetadata"));
+        Map<String, Object> rightMetadata = asMap(right.get("comparisonMetadata"));
+        result.put("metadataDifferences", mapDifferences(leftMetadata, rightMetadata));
+        result.put("sourceComparison", sourceComparison(leftMetadata, rightMetadata));
         List<Map<String, Object>> leftScenarios = asList(left.get("scenarios"));
         List<Map<String, Object>> rightScenarios = asList(right.get("scenarios"));
         List<Map<String, Object>> transitions = scenarioTransitions(leftScenarios, rightScenarios);
@@ -215,6 +215,8 @@ public final class DiagnosticRunComparator {
         result.put("outcome", scenario.get("outcome"));
         result.put("durationMillis", scenario.get("durationMillis"));
         result.put("failureSignature", scenario.get("failureSignature"));
+        result.put("steps", scenario.get("steps"));
+        result.put("nativeCapabilitiesObserved", scenario.get("nativeCapabilitiesObserved"));
         result.put("representativeScreenshots", scenario.get("representativeScreenshots"));
         result.put("summary", scenario.get("summary"));
         return result;
@@ -302,6 +304,24 @@ public final class DiagnosticRunComparator {
         Path resolved = normalizedRoot.resolve(relative).normalize();
         if (!resolved.startsWith(normalizedRoot)) throw new IllegalArgumentException("Evidence path escapes run root");
         return resolved;
+    }
+
+    private static Map<String, Object> sourceComparison(Map<String, Object> left, Map<String, Object> right) {
+        Map<String, Object> comparison = new LinkedHashMap<>();
+        comparison.put("sameConsumerCommit", sameValue(left, right, "consumerCommit"));
+        comparison.put("samePickleballCommit", sameValue(left, right, "pickleballCommit"));
+        comparison.put("samePickleballVersion", sameValue(left, right, "pickleballVersion"));
+        comparison.put("leftConsumerDirty", left.get("consumerDirty"));
+        comparison.put("rightConsumerDirty", right.get("consumerDirty"));
+        comparison.put("leftPickleballDirty", left.get("pickleballDirty"));
+        comparison.put("rightPickleballDirty", right.get("pickleballDirty"));
+        return comparison;
+    }
+
+    private static Boolean sameValue(Map<String, Object> left, Map<String, Object> right, String key) {
+        String a = text(left.get(key));
+        String b = text(right.get(key));
+        return a.isBlank() || b.isBlank() ? null : a.equals(b);
     }
 
     private static List<Map<String, Object>> mapDifferences(Map<String, Object> left, Map<String, Object> right) {

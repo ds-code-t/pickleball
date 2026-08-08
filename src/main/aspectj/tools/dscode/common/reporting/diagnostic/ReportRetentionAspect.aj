@@ -49,7 +49,29 @@ public privileged aspect ReportRetentionAspect {
             return;
         }
         ExplicitReportRegistry.writeExplicit(io.cucumber.core.runner.GlobalState.workBookMap.values());
-        DiagnosticRuntime.finishRun();
+    }
+
+    after(): execution(public static void tools.dscode.coredefinitions.GeneralSteps.afterAll()) {
+        if (DiagnosticRuntime.isDiagnostic()) DiagnosticRuntime.finishRun();
+    }
+
+    void around(String status):
+            call(void tools.dscode.common.reporting.logging.reportportal.ReportPortalBridge.finishLaunch(String))
+            && withincode(public static void tools.dscode.coredefinitions.GeneralSteps.afterAll())
+            && args(status) {
+        if (!DiagnosticRuntime.isDiagnostic()) proceed(status);
+    }
+
+    SimpleHtmlReportConverter around():
+            call(tools.dscode.common.reporting.logging.simplehtml.SimpleHtmlReportConverter.new(..))
+            && (within(io.cucumber.core.runner.GlobalState) || within(io.cucumber.core.runner.CurrentScenarioState)) {
+        return DiagnosticRuntime.isDiagnostic() ? null : proceed();
+    }
+
+    tools.dscode.common.reporting.logging.reportportal.ReportPortalBridgeConverter around():
+            call(tools.dscode.common.reporting.logging.reportportal.ReportPortalBridgeConverter.new(..))
+            && within(io.cucumber.core.runner.CurrentScenarioState) {
+        return DiagnosticRuntime.isDiagnostic() ? null : proceed();
     }
 
     void around(String reportPath, String sheetName, java.util.List lists):

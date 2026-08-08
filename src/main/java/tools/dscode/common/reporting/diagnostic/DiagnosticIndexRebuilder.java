@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,6 +16,10 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.LinkedHashSet;
+import java.util.zip.GZIPInputStream;
 
 /** Rebuilds derived diagnostic indexes from surviving run metadata and scenario summaries. */
 public final class DiagnosticIndexRebuilder {
@@ -27,6 +32,7 @@ public final class DiagnosticIndexRebuilder {
         Map<String, Object> manifest = readMap(runRoot.resolve("manifest.json"));
         Map<String, Object> configuration = readMap(runRoot.resolve("configuration.json"));
         Map<String, Object> environment = readMap(runRoot.resolve("environment.json"));
+        Map<String, Object> sourceProvenance = readMap(runRoot.resolve("source-provenance.json"));
         List<Map<String, Object>> scenarios = readScenarioSummaries(runRoot.resolve("scenarios"));
 
         Map<String, Integer> counts = counts(scenarios);
@@ -43,18 +49,24 @@ public final class DiagnosticIndexRebuilder {
         index.put("reportRetention", manifest.get("reportRetention"));
         index.put("configurationHash", first(manifest.get("configurationHash"), configuration.get("configurationHash")));
         index.put("environmentHash", first(manifest.get("environmentHash"), environment.get("environmentHash")));
+        index.put("sourceProvenanceHash", first(manifest.get("sourceProvenanceHash"), sourceProvenance.get("sourceProvenanceHash")));
         index.put("selectionFingerprint", manifest.get("selectionFingerprint"));
         index.put("sourceFingerprint", sourceFingerprint(scenarios));
         index.put("dependencyFingerprint", manifest.get("dependencyFingerprint"));
         index.put("evidenceIntegrity", first(manifest.get("evidenceIntegrity"), "PARTIAL"));
         if (manifest.get("lineage") != null) index.put("lineage", manifest.get("lineage"));
-        index.put("comparisonMetadata", comparisonMetadata(configuration, environment, index));
+        index.put("comparisonMetadata", comparisonMetadata(configuration, environment, sourceProvenance, index));
         index.put("counts", counts);
+        index.put("steps", aggregateSteps(scenarios));
+        index.put("nativeCapabilitiesObserved", aggregateCapabilities(scenarios));
+        index.put("nativeCapabilityCounts", aggregateCapabilityCounts(scenarios));
+        index.put("capabilitySemantics", "Presence means native Pickleball instrumentation observed the capability; absence does not prove the capability was unused by consumer-defined code.");
         index.put("scenarios", scenarios);
         index.put("paths", Map.of(
                 "manifest", "manifest.json",
                 "configuration", "configuration.json",
                 "environment", "environment.json",
+                "sourceProvenance", "source-provenance.json",
                 "runEvents", "run-events.jsonl",
                 "clusters", "clusters.json",
                 "runCatalog", "../run-catalog.json"
@@ -119,7 +131,14 @@ public final class DiagnosticIndexRebuilder {
                 ? readMap(summaryPath)
                 : new LinkedHashMap<>();
         Path eventsPath = scenarioRoot.resolve("events.jsonl");
+        Path traceRaw = scenarioRoot.resolve("trace.jsonl");
+        Path traceGzip = scenarioRoot.resolve("trace.jsonl.gz");
         List<Map<String, Object>> events = readJsonLines(eventsPath);
+        List<Map<String, Object>> traceEvents = Files.isRegularFile(traceGzip)
+                ? readJsonLinesGzip(traceGzip)
+                : readJsonLines(traceRaw);
+        List<Map<String, Object>> allEvents = new ArrayList<>(events);
+        allEvents.addAll(traceEvents);
         String executionId = text(summary.get("scenarioExecutionId"));
         if (executionId.isBlank()) executionId = scenarioRoot.getFileName().toString();
         summary.put("schemaVersion", 1);
@@ -146,7 +165,7 @@ public final class DiagnosticIndexRebuilder {
             }
         }
 
-        long eventCount = events.stream()
+        long eventCount = allEvents.stream()
                 .map(event -> event.get("scenarioSeq"))
                 .filter(Number.class::isInstance)
                 .map(Number.class::cast)
@@ -159,6 +178,8 @@ public final class DiagnosticIndexRebuilder {
                 "scenarioSeqEnd", eventCount
         ));
         boolean retained = Files.isRegularFile(eventsPath)
+                || Files.isRegularFile(traceRaw)
+                || Files.isRegularFile(traceGzip)
                 || Files.isDirectory(scenarioRoot.resolve("screenshots"))
                 || Files.isDirectory(scenarioRoot.resolve("fingerprints"));
         summary.put("detailedEvidenceRetained", retained);
@@ -166,6 +187,21 @@ public final class DiagnosticIndexRebuilder {
         summary.put("events", Files.isRegularFile(eventsPath)
                 ? "scenarios/" + executionId + "/events.jsonl"
                 : null);
+        if (!traceEvents.isEmpty()) {
+            long firstTrace = traceEvents.stream().map(event -> event.get("eventSeq")).filter(Number.class::isInstance)
+                    .map(Number.class::cast).mapToLong(Number::longValue).min().orElse(0);
+            long lastTrace = traceEvents.stream().map(event -> event.get("eventSeq")).filter(Number.class::isInstance)
+                    .map(Number.class::cast).mapToLong(Number::longValue).max().orElse(0);
+            summary.put("traceEvidence", Map.of(
+                    "path", "scenarios/" + executionId + "/" + (Files.isRegularFile(traceGzip) ? "trace.jsonl.gz" : "trace.jsonl"),
+                    "contentType", "application/x-ndjson",
+                    "contentEncoding", Files.isRegularFile(traceGzip) ? "gzip" : "identity",
+                    "eventCount", traceEvents.size(),
+                    "eventSeqFirst", firstTrace,
+                    "eventSeqLast", lastTrace
+            ));
+        }
+        recoverStepMetadata(summary, events);
         List<Map<String, Object>> screenshotEvents = events.stream()
                 .filter(event -> "screenshot".equals(text(event.get("type"))))
                 .toList();
@@ -238,6 +274,68 @@ public final class DiagnosticIndexRebuilder {
         return result;
     }
 
+    private static List<Map<String, Object>> readJsonLinesGzip(Path path) throws IOException {
+        List<Map<String, Object>> result = new ArrayList<>();
+        if (!Files.isRegularFile(path)) return result;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                new GZIPInputStream(Files.newInputStream(path)), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.isBlank()) continue;
+                try {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> event = JSON.readValue(line, LinkedHashMap.class);
+                    result.add(event);
+                } catch (Throwable ignored) {
+                }
+            }
+        } catch (java.util.zip.ZipException ignored) {
+            // A partially written compressed stream is treated as partial evidence.
+        }
+        return result;
+    }
+
+    private static void recoverStepMetadata(Map<String, Object> summary, List<Map<String, Object>> events) {
+        List<Map<String, Object>> steps = events.stream()
+                .filter(event -> "step".equals(text(event.get("type"))))
+                .toList();
+        if (steps.isEmpty()) return;
+        long passed = 0, failed = 0, skipped = 0, other = 0, pickleball = 0, nonPickleball = 0;
+        Map<String, Long> capabilityCounts = new TreeMap<>();
+        Set<String> capabilities = new LinkedHashSet<>();
+        for (Map<String, Object> step : steps) {
+            switch (text(step.get("status"))) {
+                case "PASSED" -> passed++;
+                case "FAILED", "AMBIGUOUS" -> failed++;
+                case "SKIPPED" -> skipped++;
+                default -> other++;
+            }
+            String origin = text(asMap(step.get("definition")).get("origin"));
+            if ("PICKLEBALL".equals(origin)) pickleball++;
+            else if ("NON_PICKLEBALL".equals(origin)) nonPickleball++;
+            Object rawCapabilities = step.get("nativeCapabilitiesObserved");
+            if (rawCapabilities instanceof List<?> list) {
+                for (Object raw : list) {
+                    String capability = text(raw);
+                    if (capability.isBlank()) continue;
+                    capabilities.add(capability);
+                    capabilityCounts.merge(capability, 1L, Long::sum);
+                }
+            }
+        }
+        summary.put("steps", Map.of(
+                "executed", steps.size(),
+                "passed", passed,
+                "failed", failed,
+                "skipped", skipped,
+                "other", other,
+                "pickleball", pickleball,
+                "nonPickleball", nonPickleball
+        ));
+        summary.put("nativeCapabilitiesObserved", capabilities.stream().sorted().toList());
+        summary.put("nativeCapabilityCounts", capabilityCounts);
+    }
+
     private static Map<String, Object> firstEvent(List<Map<String, Object>> events, String type) {
         return events.stream().filter(event -> type.equals(text(event.get("type")))).findFirst().orElse(Map.of());
     }
@@ -248,6 +346,51 @@ public final class DiagnosticIndexRebuilder {
             if (type.equals(text(event.get("type")))) return event;
         }
         return Map.of();
+    }
+
+    private static Map<String, Object> aggregateSteps(List<Map<String, Object>> scenarios) {
+        Map<String, Long> totals = new LinkedHashMap<>();
+        for (String key : List.of("executed", "passed", "failed", "skipped", "other", "pickleball", "nonPickleball")) totals.put(key, 0L);
+        for (Map<String, Object> scenario : scenarios) {
+            Map<String, Object> steps = asMap(scenario.get("steps"));
+            totals.replaceAll((key, value) -> value + number(steps.get(key)));
+        }
+        return new LinkedHashMap<>(totals);
+    }
+
+    private static List<String> aggregateCapabilities(List<Map<String, Object>> scenarios) {
+        Set<String> capabilities = new java.util.TreeSet<>();
+        for (Map<String, Object> scenario : scenarios) {
+            Object raw = scenario.get("nativeCapabilitiesObserved");
+            if (raw instanceof List<?> list) for (Object item : list) capabilities.add(text(item));
+        }
+        capabilities.remove("");
+        return List.copyOf(capabilities);
+    }
+
+    private static Map<String, Object> aggregateCapabilityCounts(List<Map<String, Object>> scenarios) {
+        Map<String, Long> scenarioCounts = new TreeMap<>();
+        Map<String, Long> stepCounts = new TreeMap<>();
+        for (Map<String, Object> scenario : scenarios) {
+            Object raw = scenario.get("nativeCapabilitiesObserved");
+            if (raw instanceof List<?> list) {
+                for (Object item : list) {
+                    String capability = text(item);
+                    if (!capability.isBlank()) scenarioCounts.merge(capability, 1L, Long::sum);
+                }
+            }
+            asMap(scenario.get("nativeCapabilityCounts")).forEach((capability, count) ->
+                    stepCounts.merge(capability, number(count), Long::sum));
+        }
+        Map<String, Object> result = new TreeMap<>();
+        Set<String> all = new java.util.TreeSet<>();
+        all.addAll(scenarioCounts.keySet());
+        all.addAll(stepCounts.keySet());
+        for (String capability : all) result.put(capability, Map.of(
+                "scenarioCount", scenarioCounts.getOrDefault(capability, 0L),
+                "stepCount", stepCounts.getOrDefault(capability, 0L)
+        ));
+        return result;
     }
 
     private static Map<String, Integer> counts(List<Map<String, Object>> scenarios) {
@@ -289,6 +432,7 @@ public final class DiagnosticIndexRebuilder {
     private static Map<String, Object> comparisonMetadata(
             Map<String, Object> configuration,
             Map<String, Object> environment,
+            Map<String, Object> sourceProvenance,
             Map<String, Object> index
     ) {
         Map<String, Object> meta = new LinkedHashMap<>();
@@ -308,6 +452,25 @@ public final class DiagnosticIndexRebuilder {
         meta.put("dependencyFingerprint", index.get("dependencyFingerprint"));
         for (String key : List.of("javaVersion", "osName", "osVersion", "timezone")) {
             if (environment.get(key) != null) meta.put(key, environment.get(key));
+        }
+        Object repositories = sourceProvenance.get("repositories");
+        if (repositories instanceof List<?> list) {
+            for (Object raw : list) {
+                Map<String, Object> repository = asMap(raw);
+                String role = text(repository.get("role"));
+                if ("consumer".equals(role)) {
+                    meta.put("consumerRepository", repository.get("name"));
+                    meta.put("consumerCommit", repository.get("commit"));
+                    meta.put("consumerBranch", repository.get("branch"));
+                    meta.put("consumerDirty", repository.get("dirty"));
+                    meta.put("consumerReproducibleFromGit", repository.get("reproducibleFromGit"));
+                } else if ("pickleball".equals(role)) {
+                    meta.put("pickleballVersion", repository.get("version"));
+                    meta.put("pickleballCommit", repository.get("commit"));
+                    meta.put("pickleballDirty", repository.get("dirty"));
+                    meta.put("pickleballArtifactSha256", repository.get("artifactSha256"));
+                }
+            }
         }
         return meta;
     }

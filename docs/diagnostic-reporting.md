@@ -71,11 +71,12 @@ run-index.json
 run-events.jsonl
 configuration.json
 environment.json
+source-provenance.json
 clusters.json
 scenarios/
 ```
 
-Each scenario has a lightweight `summary.json`. When dense evidence is retained it also has an append-only `events.jsonl`, plus `screenshots/` and `fingerprints/` directories.
+Each scenario has a lightweight `summary.json`. When dense evidence is retained it also has an append-only plain `events.jsonl`. TRACE/DEBUG log records are written live to `trace.jsonl` and, after controlled scenario completion, converted losslessly to `trace.jsonl.gz`. An interrupted process may therefore leave the raw `trace.jsonl`; recovery understands either form. `screenshots/` and `fingerprints/` are created lazily only when visual evidence is actually captured.
 
 `run-index.json` contains comparison-oriented metadata such as effective browser/environment/tag/options values, deterministic configuration/environment/dependency/selection/source fingerprints, runtime information, scenario identities, outcomes, durations, failure signatures, representative screenshot references, and links to deeper evidence. Pickleball does not assign a run-level comparability classification; an AI agent can decide which runs are relevant by reading `run-catalog.json` and these inexpensive indexes first. `DiagnosticRunComparator` first compares two run indexes without opening dense scenario JSONL or screenshots. After it matches scenarios, it may read at most four matching representative fingerprint pairs per matched scenario to produce compact cross-run visual transitions; it still never opens the full screenshots. `DiagnosticIndexRebuilder` can rebuild interrupted scenario summaries, missing fingerprint sidecars, the derived run index, failure clusters, and shared run catalog from surviving diagnostic evidence.
 
@@ -113,9 +114,23 @@ This deliberately supports duplicate scenario names in one feature and distingui
 
 Nested/component/service-call scenario invocations log caller and callee source information and receive their own invocation IDs.
 
-## Event ranges
+## Event ranges and deep trace evidence
 
-V1 diagnostic JSONL remains uncompressed. Every event records schema/run identity, wall-clock and monotonic timestamps, thread, and a monotonically increasing `eventSeq`; scenario evidence also receives a `scenarioSeq`. Indexes refer to logical sequence ranges/counts rather than byte offsets, so compression can be added later without changing the reference model.
+Every event records schema/run identity, wall-clock and monotonic timestamps, thread, and a monotonically increasing global `eventSeq`; scenario evidence also receives a `scenarioSeq`. Those logical sequence values remain authoritative even though events may live in two physical files.
+
+`events.jsonl` stays plain for inexpensive AI navigation and contains lifecycle, structured step, screenshot, failure, INFO-and-higher, and other non-deep events. TRACE/DEBUG log events retain their full event metadata and exact logical ordering in `trace.jsonl.gz` after normal scenario completion. `summary.json` describes the trace path, `contentEncoding`, event count, and first/last global sequence values so an agent can discover the deeper evidence without opening it. This is a storage/access-layer optimization, not filtering: `pkb_reportretention=all` retains the same TRACE-through-ERROR evidence.
+
+The raw `trace.jsonl` is used while a scenario is running so append/recovery behavior remains simple. It is gzip-compressed only after controlled completion. If execution is interrupted before that point, the raw file remains valid diagnostic evidence and `DiagnosticIndexRebuilder` can consume it directly.
+
+## Structured steps and native capability observations
+
+Diagnostic mode records a compact structured `step` event for each executed Pickleball/Cucumber step entry. Scenario and run indexes roll those records up into counts for executed/passed/failed/skipped/other steps and for definitions resolved from Pickleball versus outside the Pickleball artifact.
+
+Resolved step-definition metadata includes `origin` (`PICKLEBALL`, `NON_PICKLEBALL`, or `UNKNOWN`), declaring class, method, Cucumber code location, repository/source-path pointers when available, source or class-binary hashes, and the relevant source commit/reproducibility state. `NON_PICKLEBALL` deliberately does not mean “consumer” in every case because a third-party glue library may also supply a step definition.
+
+Pickleball also records positive-only, expandable `nativeCapabilitiesObserved` values at step/scenario/run scope. Initial capabilities include browser WebDriver initialization/use, browser navigation/DOM/screenshot activity, nested/component scenarios, service-call scenarios, and native HTTP execution. Capability counts are rolled up into lightweight indexes.
+
+The semantics are intentionally asymmetric: **presence means native Pickleball instrumentation positively observed the capability; absence does not prove the capability was unused.** A consumer-defined Cucumber step can use Selenium, HTTP clients, desktop automation, or future integrations without passing through Pickleball's native instrumentation. Dotted capability names make the set extensible for future functionality without changing the surrounding schema.
 
 ## Screenshots and fingerprints
 
@@ -133,11 +148,23 @@ V1 fingerprints:
 
 The comparison engine reads fingerprint sidecars without reopening screenshots. It returns small similarity/category results (`IDENTICAL`, `VERY_SIMILAR`, `SOMEWHAT_SIMILAR`, `VERY_DIFFERENT`). Scenario summaries keep at most eight representative screenshots such as the first visual state, significant visual changes, failures, and final visual state. An AI agent normally consumes only those summaries and opens a full screenshot when the comparison indicates it is useful.
 
+## Git and source provenance
+
+`source-provenance.json` records best-effort source identity for the consumer repository plus build-time provenance embedded in the Pickleball Maven artifact. For Git-backed sources it can include repository name/remote/web URL, branch, commit hash, commit message, dirty state, a one-way working-tree difference hash, and whether the committed revision alone is sufficient to reproduce the source. The Pickleball entry additionally records the framework version and artifact SHA-256 when available.
+
+Feature/scenario summaries carry the original feature URI, source line, repository-relative path and source hash when the file can be resolved. Structured step events carry the resolved Java definition class/method and source pointer. This lets an external AI retrieve the historical Gherkin and Java source at the recorded commit rather than accidentally analyzing today's branch. A dirty repository is explicitly marked `reproducibleFromGit=false`; the commit alone must not be treated as the exact executed source.
+
+`pkb_gitsnapshot=metadata` is the default and stores metadata/hashes only. `pkb_gitsnapshot=none` disables live consumer Git inspection. `pkb_gitsnapshot=diff` additionally stores `source/consumer-working-tree.patch.gz` for a dirty consumer checkout so uncommitted changes can be retained when that is acceptable. HTTP(S) credentials embedded in Git remote URLs are removed before persistence.
+
+The Pickleball build embeds `META-INF/pickleball-build.properties`, so a consumer using Pickleball only as a Maven dependency can still identify the framework source revision without having a Pickleball Git checkout on that machine.
+
 ## Configuration provenance and environment
 
 `configuration.json` stores execution-relevant effective settings with their winning source when that source can be observed during runner merging. Secret-like keys are redacted and retain only a one-way value hash so an agent can tell that two secret values differ without learning either value. Large diagnostic text/maps/collections are bounded and carry truncation markers rather than expanding without limit. The run index contains only the smaller subset useful for deciding whether runs are related.
 
-`environment.json` intentionally stores a focused runtime summary such as Java/OS/architecture/timezone/processor/container hints. It does not copy the full `PlatformSnapshot` workstation/user/network inventory. The manifest and run boundary events also contain lightweight heap/process CPU snapshots at run start and end; V1 does not start a background resource sampler.
+`environment.json` intentionally stores a focused runtime summary such as Java/OS/architecture/timezone/processor/container hints. It does not copy the full `PlatformSnapshot` workstation/user/network inventory. Existing platform/caller stamps used by normal logs and external reporting remain independent and are preserved by default because repeated caller identity can be operationally important when scenarios run in different environments or report to external systems. `pkb_platformlog` can explicitly select `default`, `default+git`, `none`, `keys:...`, or `template:...` behavior without changing the default contract.
+
+The manifest and run boundary events also contain lightweight heap/process CPU snapshots at run start and end; V1 does not start a background resource sampler.
 
 Optional external lineage values (`pkb_investigation_id`, `pkb_run_purpose`, `pkb_parent_run_id`, `pkb_baseline_run_id`, and `pkb_changed_variables`) are copied into the lightweight run metadata when supplied. None is required to enable diagnostic mode.
 
@@ -145,6 +172,6 @@ Optional external lineage values (`pkb_investigation_id`, `pkb_run_purpose`, `pk
 
 Diagnostic evidence failures do not change the test result. The run is marked with `evidenceIntegrity=PARTIAL` and a concise error is written to stderr.
 
-JSONL is appended as execution proceeds and index/summary files are replaced atomically. If a prior run still has a `RUNNING` manifest when a new diagnostic run starts, it is marked `UNKNOWN` / `INTERRUPTED`; already-written evidence remains available. Derived navigation artifacts are intentionally rebuildable with `DiagnosticIndexRebuilder`.
+Plain JSONL is appended as execution proceeds and index/summary files are replaced atomically. Deep TRACE/DEBUG evidence remains raw JSONL while active and is compressed only after controlled scenario completion. If a prior run still has a `RUNNING` manifest when a new diagnostic run starts, it is marked `UNKNOWN` / `INTERRUPTED`; already-written evidence remains available. `DiagnosticIndexRebuilder` understands raw or gzip trace evidence and can reconstruct derived navigation metadata without expanding the compressed artifact on disk.
 
 [Previous: Execution configuration](configuration.md) · [Documentation home](README.md)

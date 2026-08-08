@@ -39,13 +39,13 @@ The following decisions are authoritative for the 2.1.3 implementation and super
 - Pickleball does not assign a run-level comparability class. The run catalog/index exposes inexpensive browser, environment, configuration, selection, time, scenario-set, and runtime metadata so an AI can decide which runs are relevant and how strongly they can be compared before reading deeper evidence.
 - Scenario identity uses multiple signals: execution/invocation ID, full feature URI, scenario name, scenario-definition line, Scenario Outline example line, sorted tags/tag hash, normalized example-values hash, exact source key, semantic/name keys, and source ordering hints. Duplicate names and outline rows are therefore distinguishable without making line number the only cross-run key.
 - Top-level scenario source identity and nested caller/callee source identity are logged at normal INFO level and recorded structurally in diagnostic events.
-- V1 JSONL remains uncompressed. References use `scenarioExecutionId` plus logical `scenarioSeq` ranges/counts, never byte offsets.
+- Navigation JSONL remains plain. Full-fidelity TRACE/DEBUG log events are written live as raw `trace.jsonl` and losslessly gzip-compressed to `trace.jsonl.gz` after controlled scenario completion. Interrupted raw trace remains valid. References use logical global `eventSeq` and scenario `scenarioSeq`, never byte offsets.
 - Diagnostic screenshots use Selenium binary PNG bytes. Existing browser-visible after-step capture cadence is preserved, a best-effort failure screenshot is added before cleanup, explicit screenshot APIs remain supported, and service-only/mapping-only steps are not auto-captured.
 - V1 visual fingerprints use deterministic 64×36 Y/Cb/Cr sampling, a 32×18 edge grid, normalized 4×4×4 color histogram, dHash, dimensions, and canonical-pixel SHA-256. Expected storage is roughly 7–8 KB. PNG is required; JPEG is accepted through ImageIO; WebP is deferred.
 - Fingerprints are consumed by comparison code, not directly by an AI. AI-facing indexes contain compact similarity/category results and references to full screenshots.
 - Configuration provenance records execution-relevant effective values and their observed winning source in a deeper configuration artifact. Run indexes expose only a smaller comparison-oriented subset. Secret-like values are redacted and retain only a one-way comparison hash.
 - Environment capture is focused on debugging-relevant runtime data and does not directly persist the full workstation/user/network `PlatformSnapshot`.
-- Top-level comparison metadata includes deterministic configuration, environment, test-selection, scenario-source, and dependency fingerprints; V1 resource measurements are lightweight run-start/run-completion heap/process CPU snapshots rather than a background sampler.
+- Top-level comparison metadata includes deterministic configuration, environment, source-control, test-selection, scenario-source, and dependency fingerprints; consumer/Pickleball Git provenance and framework artifact identity are cheap comparison dimensions. V1 resource measurements are lightweight run-start/run-completion heap/process CPU snapshots rather than a background sampler.
 - Diagnostic values are bounded before JSON persistence; large text/collections are marked when truncated, and focused environment capture explicitly omits unrelated workstation/system data.
 - Derived indexes, clusters, catalogs, interrupted scenario summaries, and missing fingerprint sidecars can be rebuilt from surviving metadata/JSONL/screenshots with `DiagnosticIndexRebuilder`.
 - Pickleball 2.1.3 produces evidence for external AI/developer investigation. Autonomous agent command execution, permissions, source changes, and dependency installation are outside the framework implementation scope for this release.
@@ -248,7 +248,7 @@ reports/diagnostic-runs/
 
 `pkb_diagnostic_output` may optionally move the `diagnostic-runs` root. Comparison output may be written wherever the caller chooses. Investigation, hypothesis, action, and conclusion files are external/tooling concerns for 2.1.3 rather than framework-owned artifacts.
 
-V1 event files remain uncompressed even after their writers are closed. A later format version may add compression only if logical `scenarioExecutionId` / `scenarioSeq` references remain unchanged.
+`events.jsonl` remains plain for navigation. TRACE/DEBUG `log` events preserve their full structured metadata in a separate deep trace stream. The active writer uses `trace.jsonl`; controlled scenario completion replaces it with lossless `trace.jsonl.gz`. Logical `eventSeq` / `scenarioSeq` values span both files, so physical compression does not alter execution ordering or references.
 
 Active files must remain appendable and recoverable.
 
@@ -276,7 +276,7 @@ V1 records:
 
 ### 9.2 Source, dependency, and framework identity
 
-V1 records compact hashes rather than assuming that a Maven dependency can always inspect a consumer Git working tree:
+V1 records Git/source provenance in addition to compact hashes. The consumer working tree is inspected best-effort, while Pickleball embeds its own build-time Git revision into the Maven artifact so a consumer does not need a Pickleball checkout:
 
 - Pickleball implementation version when package metadata exposes it; otherwise `unknown` rather than a guessed value.
 - Deterministic dependency/classpath fingerprint based on dependency file names and sizes, without persisting absolute paths.
@@ -1125,7 +1125,7 @@ The diagnostic implementation should:
 - Avoid retaining completed event graphs.
 - Avoid quadratic screenshot comparisons.
 - Avoid duplicate binary artifacts.
-- Keep V1 JSONL uncompressed; add compression later only without changing logical event references.
+- Keep navigation JSONL plain; losslessly gzip only the completed deep TRACE/DEBUG stream while preserving logical event references and interrupted raw-trace recovery.
 - Keep V1 resource capture to bounded run-start/run-completion snapshots.
 - Avoid running full test suites unnecessarily.
 
@@ -1175,36 +1175,41 @@ The implementation is complete when it can:
 
 1. Run in an exclusive diagnostic reporting mode.
 2. Capture all events through `TRACE`.
-3. Record structured diagnostic evidence.
-4. Avoid retaining completed report trees in memory.
-5. Write scenario evidence incrementally.
-6. Preserve useful data after an interrupted run.
-7. Reconstruct derived indexes from surviving summaries, metadata, and valid JSONL evidence.
-8. Record run identity, outcome, completion, and evidence integrity without a `MIXED` or run-level comparability classification.
-9. Record sanitized source, configuration, environment, test-selection, and resource metadata.
-10. Compare runs and explain intentional and unexpected differences.
-11. Separate scenario failures from shared run-level incidents.
-12. Correlate failures across parallel scenarios.
-13. Identify persistent, resolved, new, and changed failures in pairwise comparisons and expose enough multi-run indexed history for external tooling to identify intermittent failures.
-14. Provide lightweight run catalogs, run indexes, scenario summaries, and failure clusters; external tooling may assemble investigation indexes.
-15. Reference exact detailed trace ranges.
-16. Preserve original screenshot bytes unchanged.
-17. Avoid Base64 screenshot duplication.
-18. Generate deterministic, versioned visual fingerprints.
-19. Compare fingerprints without reopening screenshots.
-20. Distinguish exact-pixel identity from visual identity.
-21. Classify visual changes as `IDENTICAL`, `VERY_SIMILAR`, `SOMEWHAT_SIMILAR`, or `VERY_DIFFERENT`.
-22. Compare relevant visual states across runs.
-23. Select representative screenshots.
-24. Retain similar screenshots while deprioritizing redundant AI analysis.
-25. Keep screenshot fingerprint generation synchronous within the already-bounded scenario execution concurrency, with no unbounded processing queue.
-26. Record redaction, bounded-value truncation, sensitive-value hashing, and focused-environment omission policy explicitly.
-27. Expose lightweight run catalogs/indexes so an external AI can select relevant runs before deeper consumption.
-28. Preserve optional investigation/run lineage metadata when supplied by external tooling.
-29. Keep autonomous AI command execution and permissions outside Pickleball 2.1.3.
-30. Support targeted and regression analysis through stable run/scenario evidence references.
-31. Produce evidence-linked failure clusters and comparison data that external tooling can use for conclusions.
-32. Produce deterministic fingerprints, configuration hashes, and comparison results for identical inputs/configuration.
+3. Preserve TRACE/DEBUG fidelity while storing the deep stream separately and losslessly compressing it after controlled scenario completion.
+4. Record structured diagnostic evidence.
+5. Avoid retaining completed report trees in memory.
+6. Write scenario evidence incrementally.
+7. Preserve useful data after an interrupted run.
+8. Reconstruct derived indexes from surviving summaries, metadata, and valid JSONL evidence.
+9. Record run identity, outcome, completion, and evidence integrity without a `MIXED` or run-level comparability classification.
+10. Record sanitized source, configuration, environment, test-selection, and resource metadata.
+11. Compare runs and explain intentional and unexpected differences.
+12. Separate scenario failures from shared run-level incidents.
+13. Correlate failures across parallel scenarios.
+14. Identify persistent, resolved, new, and changed failures in pairwise comparisons and expose enough multi-run indexed history for external tooling to identify intermittent failures.
+15. Provide lightweight run catalogs, run indexes, scenario summaries, and failure clusters; external tooling may assemble investigation indexes.
+16. Reference exact detailed trace ranges.
+17. Preserve original screenshot bytes unchanged.
+18. Avoid Base64 screenshot duplication.
+19. Generate deterministic, versioned visual fingerprints.
+20. Compare fingerprints without reopening screenshots.
+21. Distinguish exact-pixel identity from visual identity.
+22. Classify visual changes as `IDENTICAL`, `VERY_SIMILAR`, `SOMEWHAT_SIMILAR`, or `VERY_DIFFERENT`.
+23. Compare relevant visual states across runs.
+24. Select representative screenshots.
+25. Retain similar screenshots while deprioritizing redundant AI analysis.
+26. Keep screenshot fingerprint generation synchronous within the already-bounded scenario execution concurrency, with no unbounded processing queue.
+27. Record redaction, bounded-value truncation, sensitive-value hashing, and focused-environment omission policy explicitly.
+28. Expose lightweight run catalogs/indexes so an external AI can select relevant runs before deeper consumption.
+29. Preserve optional investigation/run lineage metadata when supplied by external tooling.
+30. Keep autonomous AI command execution and permissions outside Pickleball 2.1.3.
+31. Support targeted and regression analysis through stable run/scenario evidence references.
+32. Produce evidence-linked failure clusters and comparison data that external tooling can use for conclusions.
+33. Produce deterministic fingerprints, configuration hashes, and comparison results for identical inputs/configuration.
+34. Record structured step counts and resolved definition origin/source pointers.
+35. Record positive-only native capability observations at step/scenario/run scope without treating absence as proof of non-use.
+36. Record consumer Git/source provenance plus build-embedded Pickleball version/Git/artifact provenance, including dirty/reproducibility state.
+37. Preserve current automatic platform/caller logging by default while allowing explicit `pkb_platformlog` selection, templates, Git augmentation, or suppression.
 
 ## 41. Default Decisions
 
@@ -1217,7 +1222,7 @@ The implementation is complete when it can:
 | Event storage | Per-scenario append-only JSONL |
 | Run-scoped evidence | Separate run event stream |
 | Memory retention | Active scopes and compact summaries only |
-| Compression | V1 JSONL uncompressed |
+| Compression | Plain navigation JSONL; lossless gzip for completed deep TRACE/DEBUG evidence; interrupted raw trace remains valid |
 | Durability | Every JSONL event appended promptly; summaries/indexes atomically replaced |
 | Strict disk synchronization | Not forced per event in V1 |
 | Run manifests | Atomically updated and sanitized |

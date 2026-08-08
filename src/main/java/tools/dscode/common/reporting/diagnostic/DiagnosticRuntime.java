@@ -2,6 +2,9 @@ package tools.dscode.common.reporting.diagnostic;
 
 import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.ScenarioStep;
+import io.cucumber.core.runner.StepExtension;
+import io.cucumber.plugin.event.Result;
+import io.cucumber.datatable.DataTable;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Level;
@@ -47,6 +50,41 @@ public final class DiagnosticRuntime {
 
     public static void recordFilteredLog(Level level, String message) {
         if (DIAGNOSTIC_MODE && reporter != null) reporter.recordFilteredLog(level, message);
+    }
+
+    public static void beginStep(StepExtension step) {
+        if (DIAGNOSTIC_MODE && reporter != null) reporter.beginStep(step);
+    }
+
+    public static void bindStepDefinition(StepExtension step) {
+        if (DIAGNOSTIC_MODE && reporter != null) reporter.bindStepDefinition(step);
+    }
+
+    public static void endStep(StepExtension step, Result result, Throwable error) {
+        if (DIAGNOSTIC_MODE && reporter != null) reporter.endStep(step, result, error);
+    }
+
+    public static void observeCapability(String capability) {
+        if (DIAGNOSTIC_MODE && reporter != null) reporter.observeCapability(capability);
+    }
+
+    public static void observeRunType(String inlineRunType, DataTable dataTable) {
+        if (!DIAGNOSTIC_MODE || reporter == null) return;
+        observeRunTypeValue(inlineRunType);
+        if (dataTable == null) return;
+        for (Map<String, String> row : dataTable.asMaps(String.class, String.class)) {
+            row.entrySet().stream()
+                    .filter(entry -> entry.getKey().equalsIgnoreCase("RunType"))
+                    .map(Map.Entry::getValue)
+                    .forEach(DiagnosticRuntime::observeRunTypeValue);
+        }
+    }
+
+    private static void observeRunTypeValue(String value) {
+        if (value == null) return;
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if (normalized.contains("COMPONENT")) observeCapability("scenario.component");
+        if (normalized.contains("SERVICE CALL")) observeCapability("service.scenario");
     }
 
     public static void beginNested(ScenarioStep step) {

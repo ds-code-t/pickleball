@@ -3,6 +3,10 @@ package tools.dscode.common.reporting.diagnostic;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.cucumber.core.runner.CurrentScenarioState;
+import io.cucumber.core.runner.DiagnosticStepMetadata;
+import io.cucumber.core.runner.StepExtension;
+import io.cucumber.plugin.event.Result;
+import io.cucumber.plugin.event.Status;
 import org.openqa.selenium.OutputType;
 import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
@@ -17,6 +21,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -29,9 +35,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 import java.util.regex.Pattern;
 
 final class DiagnosticReporter {
@@ -56,16 +66,21 @@ final class DiagnosticReporter {
     private final Map<String, ScenarioSummary> scenarios = new ConcurrentHashMap<>();
     private final ThreadLocal<ScenarioContext> current = new ThreadLocal<>();
     private final ThreadLocal<Deque<NestedContext>> nested = ThreadLocal.withInitial(ArrayDeque::new);
+    private final ThreadLocal<Deque<StepContext>> steps = ThreadLocal.withInitial(ArrayDeque::new);
+    private final Set<String> runCapabilities = ConcurrentHashMap.newKeySet();
+    private final SourceProvenance sourceProvenance;
     private volatile boolean partial;
     private volatile boolean finished;
     private volatile Map<String, String> effectiveConfig = Map.of();
     private volatile String configurationHash = "";
     private volatile String environmentHash = "";
+    private volatile String sourceProvenanceHash = "";
     private final Map<String, Object> startResources = resourceSnapshot();
     private volatile Map<String, Object> endResources = Map.of();
 
     DiagnosticReporter(Map<String, String> values) {
         this.effectiveConfig = values == null ? Map.of() : Map.copyOf(values);
+        this.sourceProvenance = SourceProvenance.capture(values);
         this.runsRoot = resolveRunsRoot(values);
         this.runRoot = runsRoot.resolve(runId);
         this.runEvents = runRoot.resolve("run-events.jsonl");
@@ -74,6 +89,7 @@ final class DiagnosticReporter {
             recoverIncompleteRuns(runsRoot, runRoot);
             writeConfiguration();
             writeEnvironment();
+            writeSourceProvenance();
             writeManifest("RUNNING", "IN_PROGRESS", null);
             writeRunIndex("RUNNING", "IN_PROGRESS");
             writeRunCatalog();
@@ -82,6 +98,8 @@ final class DiagnosticReporter {
             runStart.put("reportingMode", "diagnostic");
             runStart.put("reportRetention", ReportRetentionPolicy.configuredValue());
             runStart.put("resources", startResources);
+            runStart.put("sourceProvenanceHash", sourceProvenanceHash);
+            runStart.put("source", sourceProvenance.comparisonMetadata());
             append(runEvents, event("run_start", runStart));
         } catch (Throwable t) {
             failEvidence("initialize diagnostic run", t);
@@ -93,8 +111,7 @@ final class DiagnosticReporter {
         ScenarioIdentity identity = ScenarioIdentity.from(state);
         Path root = runRoot.resolve("scenarios").resolve(executionId);
         try {
-            Files.createDirectories(root.resolve("screenshots"));
-            Files.createDirectories(root.resolve("fingerprints"));
+            Files.createDirectories(root);
         } catch (IOException e) {
             failEvidence("create scenario evidence directory", e);
         }
@@ -102,7 +119,14 @@ final class DiagnosticReporter {
         ScenarioContext context = new ScenarioContext(executionId, identity, root, Instant.now());
         current.set(context);
         nested.get().clear();
-        ScenarioSummary summary = new ScenarioSummary(executionId, identity, context.startedAt, configurationHash);
+        steps.get().clear();
+        ScenarioSummary summary = new ScenarioSummary(
+                executionId,
+                identity,
+                context.startedAt,
+                configurationHash,
+                sourceProvenance.featureSource(identity.featureUri(), identity.scenarioLine())
+        );
         scenarios.put(executionId, summary);
 
         append(runEvents, event("scenario_start", Map.of(
@@ -148,6 +172,9 @@ final class DiagnosticReporter {
         summary.completion = interrupted ? "INTERRUPTED" : "COMPLETE";
         summary.lastEventSeq = eventSeq.get();
         summary.eventCount = context.scenarioSeq.get();
+        summary.traceEventCount = context.traceEventCount.get();
+        summary.traceEventSeqFirst = context.traceEventSeqFirst;
+        summary.traceEventSeqLast = context.traceEventSeqLast;
         summary.detailedEvidenceRetained = ReportRetentionPolicy.keepScenarioDetails(failed, interrupted);
         if (!summary.detailedEvidenceRetained) {
             summary.representativeScreenshots.clear();
@@ -164,6 +191,9 @@ final class DiagnosticReporter {
             representative.put("fingerprint", relative(context.previousFingerprintPath));
             summary.representativeScreenshots.add(representative);
         }
+        if (summary.detailedEvidenceRetained) {
+            compressTrace(context, summary);
+        }
         writeScenarioSummary(summary);
 
         append(runEvents, event("scenario_end", Map.of(
@@ -178,6 +208,7 @@ final class DiagnosticReporter {
         writeRunIndex("RUNNING", "IN_PROGRESS");
         current.remove();
         nested.remove();
+        steps.remove();
     }
 
     void recordEntry(Entry entry, String phase) {
@@ -205,7 +236,99 @@ final class DiagnosticReporter {
         ));
     }
 
+    void beginStep(StepExtension step) {
+        ScenarioContext scenario = current.get();
+        if (scenario == null || step == null) return;
+        ScenarioSummary summary = scenarios.get(scenario.executionId);
+        if (summary == null) return;
+        long stepNumber = summary.stepExecuted.incrementAndGet();
+        StepContext context = new StepContext(step, stepNumber);
+        steps.get().push(context);
+    }
+
+    void bindStepDefinition(StepExtension step) {
+        Deque<StepContext> stack = steps.get();
+        if (stack.isEmpty()) return;
+        bindDefinition(stack.peek(), DiagnosticStepMetadata.from(step));
+    }
+
+    void endStep(StepExtension step, Result result, Throwable error) {
+        Deque<StepContext> stack = steps.get();
+        if (stack.isEmpty()) return;
+        StepContext context = stack.pop();
+        ScenarioContext scenario = current.get();
+        if (scenario == null) return;
+        ScenarioSummary summary = scenarios.get(scenario.executionId);
+        if (summary == null) return;
+
+        if (context.definition.isEmpty()) {
+            bindDefinition(context, DiagnosticStepMetadata.from(step));
+        }
+        String status = result == null || result.getStatus() == null
+                ? error == null ? "UNKNOWN" : "FAILED"
+                : result.getStatus().name();
+        switch (status) {
+            case "PASSED" -> summary.stepPassed.incrementAndGet();
+            case "FAILED", "AMBIGUOUS" -> summary.stepFailed.incrementAndGet();
+            case "SKIPPED" -> summary.stepSkipped.incrementAndGet();
+            default -> summary.stepOther.incrementAndGet();
+        }
+        String origin = String.valueOf(context.definition.getOrDefault("origin", "UNKNOWN"));
+        if ("PICKLEBALL".equals(origin)) summary.stepPickleball.incrementAndGet();
+        else if ("NON_PICKLEBALL".equals(origin)) summary.stepNonPickleball.incrementAndGet();
+
+        List<String> capabilities = context.capabilities.stream().sorted().toList();
+        for (String capability : capabilities) {
+            summary.capabilities.add(capability);
+            summary.capabilityStepCounts.merge(capability, 1L, Long::sum);
+        }
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("stepNumber", context.stepNumber);
+        data.put("nestingLevel", step == null ? 0 : step.getNestingLevel());
+        data.put("keyword", context.keyword);
+        data.put("text", context.text);
+        data.put("source", context.source);
+        data.put("definition", context.definition);
+        data.put("status", status);
+        if (result != null && result.getDuration() != null) data.put("durationMillis", result.getDuration().toMillis());
+        Throwable failure = error != null ? error : result == null ? null : result.getError();
+        if (failure != null) {
+            data.put("errorClass", failure.getClass().getName());
+            data.put("errorMessage", sanitizeText(failure.getMessage()));
+        }
+        data.put("nativeCapabilitiesObserved", capabilities);
+        recordScenarioEvent("step", data);
+    }
+
+    void observeCapability(String capability) {
+        if (capability == null || capability.isBlank()) return;
+        String normalized = capability.trim().toLowerCase(Locale.ROOT);
+        runCapabilities.add(normalized);
+        ScenarioContext scenario = current.get();
+        if (scenario == null) return;
+        ScenarioSummary summary = scenarios.get(scenario.executionId);
+        if (summary != null) summary.capabilities.add(normalized);
+        Deque<StepContext> stack = steps.get();
+        if (!stack.isEmpty()) stack.peek().capabilities.add(normalized);
+    }
+
+    private void bindDefinition(StepContext context, DiagnosticStepMetadata metadata) {
+        if (context == null || metadata == null) return;
+        context.definition = sourceProvenance.definitionSource(metadata.method(), metadata.codeLocation());
+        context.stepLine = metadata.stepLine();
+        context.keyword = metadata.keyword();
+        context.text = metadata.stepText();
+        ScenarioContext scenario = current.get();
+        if (scenario == null) return;
+        ScenarioIdentity identity = nested.get().isEmpty()
+                ? scenario.identity
+                : nested.get().peek().identity;
+        context.source = sourceProvenance.featureSource(identity.featureUri(), context.stepLine);
+    }
+
     void beginNested(ScenarioIdentity callee) {
+        observeCapability("scenario.nested");
         ScenarioContext context = current.get();
         if (context == null) return;
         ScenarioIdentity caller = nested.get().isEmpty() ? context.identity : nested.get().peek().identity;
@@ -256,6 +379,9 @@ final class DiagnosticReporter {
         Path image = context.root.resolve("screenshots").resolve(stem + ".png");
         Path fingerprint = context.root.resolve("fingerprints").resolve(stem + ".pkbf");
         try {
+            Files.createDirectories(image.getParent());
+            Files.createDirectories(fingerprint.getParent());
+            observeCapability("browser.screenshot");
             Files.write(image, png);
             VisualFingerprint visual = VisualFingerprint.fromImageBytes(png);
             Files.write(fingerprint, visual.toBytes());
@@ -349,7 +475,21 @@ final class DiagnosticReporter {
         event.put("scenarioSeq", scenarioSeq);
         Deque<NestedContext> stack = nested.get();
         if (!stack.isEmpty()) event.put("nestedInvocationId", stack.peek().invocationId);
-        append(context.root.resolve("events.jsonl"), event);
+        if (isDeepTrace(event)) {
+            long globalSeq = ((Number) event.get("eventSeq")).longValue();
+            context.traceEventCount.incrementAndGet();
+            if (context.traceEventSeqFirst == 0) context.traceEventSeqFirst = globalSeq;
+            context.traceEventSeqLast = globalSeq;
+            append(context.root.resolve("trace.jsonl"), event);
+        } else {
+            append(context.root.resolve("events.jsonl"), event);
+        }
+    }
+
+    private static boolean isDeepTrace(Map<String, Object> event) {
+        if (!"log".equals(String.valueOf(event.get("type")))) return false;
+        String level = String.valueOf(event.get("level"));
+        return "TRACE".equals(level) || "DEBUG".equals(level);
     }
 
     private Map<String, Object> event(String type, Map<String, ?> data) {
@@ -414,6 +554,21 @@ final class DiagnosticReporter {
         writeJsonAtomic(runRoot.resolve("environment.json"), environment);
     }
 
+    private void writeSourceProvenance() throws IOException {
+        Map<String, Object> provenance = new LinkedHashMap<>(sourceProvenance.asMap());
+        sourceProvenance.writeOptionalSnapshot(runRoot);
+        if (!sourceProvenance.optionalSnapshotPath().isBlank()) {
+            provenance.put("workingTreeSnapshot", Map.of(
+                    "path", sourceProvenance.optionalSnapshotPath(),
+                    "contentEncoding", "gzip",
+                    "format", "git-diff-and-status"
+            ));
+        }
+        sourceProvenanceHash = sha256Hex(JSON.writeValueAsBytes(provenance));
+        provenance.put("sourceProvenanceHash", sourceProvenanceHash);
+        writeJsonAtomic(runRoot.resolve("source-provenance.json"), provenance);
+    }
+
     private void writeManifest(String outcome, String completion, Instant endedAt) throws IOException {
         Map<String, Object> manifest = new LinkedHashMap<>();
         manifest.put("schemaVersion", 1);
@@ -433,6 +588,7 @@ final class DiagnosticReporter {
         manifest.put("evidenceIntegrity", partial ? "PARTIAL" : "COMPLETE");
         manifest.put("configurationHash", configurationHash);
         manifest.put("environmentHash", environmentHash);
+        manifest.put("sourceProvenanceHash", sourceProvenanceHash);
         manifest.put("selectionFingerprint", selectionFingerprint());
         manifest.put("sourceFingerprint", sourceFingerprint());
         manifest.put("dependencyFingerprint", dependencyFingerprint());
@@ -443,7 +599,8 @@ final class DiagnosticReporter {
                 "secretLikeConfiguration", "redacted",
                 "secretLikeLogAssignments", "redacted",
                 "largeValues", "bounded-and-marked-when-truncated",
-                "platformSnapshot", "focused-subset-only"
+                "platformSnapshot", "focused-subset-plus-configurable-caller-stamp",
+                "capabilityFlags", "positive-native-observations-only"
         ));
         writeJsonAtomic(runRoot.resolve("manifest.json"), manifest);
     }
@@ -463,6 +620,7 @@ final class DiagnosticReporter {
             index.put("reportRetention", ReportRetentionPolicy.configuredValue());
             index.put("configurationHash", configurationHash);
             index.put("environmentHash", environmentHash);
+            index.put("sourceProvenanceHash", sourceProvenanceHash);
             index.put("selectionFingerprint", selectionFingerprint());
             index.put("sourceFingerprint", sourceFingerprint());
             index.put("dependencyFingerprint", dependencyFingerprint());
@@ -470,11 +628,16 @@ final class DiagnosticReporter {
             if (!lineageMetadata().isEmpty()) index.put("lineage", lineageMetadata());
             index.put("comparisonMetadata", comparisonMetadata());
             index.put("counts", counts());
+            index.put("steps", runStepCounts());
+            index.put("nativeCapabilitiesObserved", runCapabilities.stream().sorted().toList());
+            index.put("nativeCapabilityCounts", runCapabilityCounts());
+            index.put("capabilitySemantics", "Presence means native Pickleball instrumentation observed the capability; absence does not prove the capability was unused by consumer-defined code.");
             index.put("scenarios", scenarioList);
             index.put("paths", Map.of(
                     "manifest", "manifest.json",
                     "configuration", "configuration.json",
                     "environment", "environment.json",
+                    "sourceProvenance", "source-provenance.json",
                     "runEvents", "run-events.jsonl",
                     "clusters", "clusters.json",
                     "runCatalog", "../run-catalog.json"
@@ -558,6 +721,7 @@ final class DiagnosticReporter {
         meta.put("timezone", java.time.ZoneId.systemDefault().getId());
         String commit = firstNonBlankEnv("GITHUB_SHA", "CI_COMMIT_SHA", "BUILD_VCS_NUMBER", "GIT_COMMIT");
         if (!commit.isBlank()) meta.put("sourceRevision", commit);
+        meta.putAll(sourceProvenance.comparisonMetadata());
         return meta;
     }
 
@@ -649,6 +813,47 @@ final class DiagnosticReporter {
         return counts;
     }
 
+    private Map<String, Object> runStepCounts() {
+        long executed = 0, passed = 0, failed = 0, skipped = 0, other = 0, pickleball = 0, nonPickleball = 0;
+        for (ScenarioSummary summary : scenarios.values()) {
+            executed += summary.stepExecuted.get();
+            passed += summary.stepPassed.get();
+            failed += summary.stepFailed.get();
+            skipped += summary.stepSkipped.get();
+            other += summary.stepOther.get();
+            pickleball += summary.stepPickleball.get();
+            nonPickleball += summary.stepNonPickleball.get();
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("executed", executed);
+        result.put("passed", passed);
+        result.put("failed", failed);
+        result.put("skipped", skipped);
+        result.put("other", other);
+        result.put("pickleball", pickleball);
+        result.put("nonPickleball", nonPickleball);
+        return result;
+    }
+
+    private Map<String, Object> runCapabilityCounts() {
+        Map<String, Long> scenarioCounts = new TreeMap<>();
+        Map<String, Long> stepCounts = new TreeMap<>();
+        for (ScenarioSummary summary : scenarios.values()) {
+            for (String capability : summary.capabilities) {
+                scenarioCounts.merge(capability, 1L, Long::sum);
+            }
+            summary.capabilityStepCounts.forEach((capability, count) -> stepCounts.merge(capability, count, Long::sum));
+        }
+        Map<String, Object> result = new TreeMap<>();
+        for (String capability : runCapabilities.stream().sorted().toList()) {
+            result.put(capability, Map.of(
+                    "scenarioCount", scenarioCounts.getOrDefault(capability, 0L),
+                    "stepCount", stepCounts.getOrDefault(capability, 0L)
+            ));
+        }
+        return result;
+    }
+
     private String runOutcome() {
         Map<String, Integer> counts = counts();
         if (counts.get("total") == 0) return "NO_TESTS";
@@ -687,8 +892,40 @@ final class DiagnosticReporter {
         return runRoot.resolve("scenarios").resolve(executionId).resolve("summary.json");
     }
 
+    private void compressTrace(ScenarioContext context, ScenarioSummary summary) {
+        if (context.traceEventCount.get() == 0) return;
+        Path raw = context.root.resolve("trace.jsonl");
+        if (!Files.isRegularFile(raw)) return;
+        Path compressed = context.root.resolve("trace.jsonl.gz");
+        Path temp = context.root.resolve("trace.jsonl.gz.tmp");
+        try (InputStream in = Files.newInputStream(raw);
+             OutputStream fileOut = Files.newOutputStream(temp);
+             GZIPOutputStream gzip = new GZIPOutputStream(fileOut)) {
+            in.transferTo(gzip);
+        } catch (Throwable error) {
+            deleteIfExists(temp);
+            summary.tracePath = "scenarios/" + context.executionId + "/trace.jsonl";
+            summary.traceEncoding = "identity";
+            failEvidence("compress scenario trace", error);
+            return;
+        }
+        try {
+            Files.move(temp, compressed, StandardCopyOption.REPLACE_EXISTING);
+            Files.deleteIfExists(raw);
+            summary.tracePath = "scenarios/" + context.executionId + "/trace.jsonl.gz";
+            summary.traceEncoding = "gzip";
+        } catch (Throwable error) {
+            deleteIfExists(temp);
+            summary.tracePath = "scenarios/" + context.executionId + "/trace.jsonl";
+            summary.traceEncoding = "identity";
+            failEvidence("finalize compressed scenario trace", error);
+        }
+    }
+
     private void pruneDenseEvidence(Path scenarioRoot) {
         deleteIfExists(scenarioRoot.resolve("events.jsonl"));
+        deleteIfExists(scenarioRoot.resolve("trace.jsonl"));
+        deleteIfExists(scenarioRoot.resolve("trace.jsonl.gz"));
         deleteTree(scenarioRoot.resolve("screenshots"));
         deleteTree(scenarioRoot.resolve("fingerprints"));
     }
@@ -892,6 +1129,9 @@ final class DiagnosticReporter {
         final Instant startedAt;
         final AtomicLong scenarioSeq = new AtomicLong();
         final AtomicLong screenshotSeq = new AtomicLong();
+        final AtomicLong traceEventCount = new AtomicLong();
+        volatile long traceEventSeqFirst;
+        volatile long traceEventSeqLast;
         VisualFingerprint previousFingerprint;
         String previousScreenshotId;
         Path previousImagePath;
@@ -907,29 +1147,67 @@ final class DiagnosticReporter {
 
     private record NestedContext(String invocationId, ScenarioIdentity identity) {}
 
+    private static final class StepContext {
+        final StepExtension step;
+        final long stepNumber;
+        final Set<String> capabilities = ConcurrentHashMap.newKeySet();
+        volatile int stepLine;
+        volatile String keyword = "";
+        volatile String text = "";
+        volatile Map<String, Object> source = Map.of();
+        volatile Map<String, Object> definition = Map.of();
+
+        StepContext(StepExtension step, long stepNumber) {
+            this.step = step;
+            this.stepNumber = stepNumber;
+        }
+    }
+
     private static final class ScenarioSummary {
         final String executionId;
         final ScenarioIdentity identity;
         final Instant startedAt;
         final String configurationHash;
+        final Map<String, Object> source;
         volatile Instant endedAt;
         volatile long durationMillis;
         volatile String outcome = "RUNNING";
         volatile String completion = "IN_PROGRESS";
         volatile long lastEventSeq;
         volatile long eventCount;
+        volatile long traceEventCount;
+        volatile long traceEventSeqFirst;
+        volatile long traceEventSeqLast;
+        volatile String tracePath;
+        volatile String traceEncoding;
         volatile boolean detailedEvidenceRetained = true;
         volatile long screenshotCount;
         final List<Map<String, Object>> representativeScreenshots = java.util.Collections.synchronizedList(new ArrayList<>());
         volatile String failureClass;
         volatile String failureMessage;
         volatile String failureSignature;
+        final Set<String> capabilities = ConcurrentHashMap.newKeySet();
+        final Map<String, Long> capabilityStepCounts = new ConcurrentHashMap<>();
+        final AtomicLong stepExecuted = new AtomicLong();
+        final AtomicLong stepPassed = new AtomicLong();
+        final AtomicLong stepFailed = new AtomicLong();
+        final AtomicLong stepSkipped = new AtomicLong();
+        final AtomicLong stepOther = new AtomicLong();
+        final AtomicLong stepPickleball = new AtomicLong();
+        final AtomicLong stepNonPickleball = new AtomicLong();
 
-        ScenarioSummary(String executionId, ScenarioIdentity identity, Instant startedAt, String configurationHash) {
+        ScenarioSummary(
+                String executionId,
+                ScenarioIdentity identity,
+                Instant startedAt,
+                String configurationHash,
+                Map<String, Object> source
+        ) {
             this.executionId = executionId;
             this.identity = identity;
             this.startedAt = startedAt;
             this.configurationHash = configurationHash;
+            this.source = source == null ? Map.of() : new LinkedHashMap<>(source);
         }
 
         Map<String, Object> indexMap() {
@@ -937,6 +1215,7 @@ final class DiagnosticReporter {
             map.put("schemaVersion", 1);
             map.put("scenarioExecutionId", executionId);
             map.put("identity", identity.asMap());
+            map.put("source", source);
             map.put("outcome", outcome);
             map.put("completion", completion);
             map.put("startedAt", startedAt.toString());
@@ -949,6 +1228,9 @@ final class DiagnosticReporter {
                     "scenarioSeqEnd", eventCount
             ));
             map.put("detailedEvidenceRetained", detailedEvidenceRetained);
+            map.put("steps", stepCountsMap());
+            map.put("nativeCapabilitiesObserved", capabilities.stream().sorted().toList());
+            map.put("nativeCapabilityCounts", new TreeMap<>(capabilityStepCounts));
             map.put("screenshotCount", screenshotCount);
             synchronized (representativeScreenshots) {
                 map.put("representativeScreenshots", List.copyOf(representativeScreenshots));
@@ -956,7 +1238,29 @@ final class DiagnosticReporter {
             map.put("failureSignature", failureSignature);
             map.put("summary", "scenarios/" + executionId + "/summary.json");
             map.put("events", detailedEvidenceRetained ? "scenarios/" + executionId + "/events.jsonl" : null);
+            if (detailedEvidenceRetained && traceEventCount > 0) {
+                Map<String, Object> trace = new LinkedHashMap<>();
+                trace.put("path", tracePath);
+                trace.put("contentType", "application/x-ndjson");
+                trace.put("contentEncoding", traceEncoding);
+                trace.put("eventCount", traceEventCount);
+                trace.put("eventSeqFirst", traceEventSeqFirst);
+                trace.put("eventSeqLast", traceEventSeqLast);
+                map.put("traceEvidence", trace);
+            }
             return map;
+        }
+
+        Map<String, Object> stepCountsMap() {
+            Map<String, Object> steps = new LinkedHashMap<>();
+            steps.put("executed", stepExecuted.get());
+            steps.put("passed", stepPassed.get());
+            steps.put("failed", stepFailed.get());
+            steps.put("skipped", stepSkipped.get());
+            steps.put("other", stepOther.get());
+            steps.put("pickleball", stepPickleball.get());
+            steps.put("nonPickleball", stepNonPickleball.get());
+            return steps;
         }
 
         Map<String, Object> fullMap() {

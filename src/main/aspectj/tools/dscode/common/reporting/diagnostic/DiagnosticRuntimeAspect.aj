@@ -3,14 +3,16 @@ package tools.dscode.common.reporting.diagnostic;
 import io.cucumber.core.runner.CurrentScenarioState;
 import io.cucumber.core.runner.ScenarioStep;
 import io.cucumber.core.runner.StepExtension;
+import io.cucumber.datatable.DataTable;
+import io.cucumber.plugin.event.Result;
 import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.remote.RemoteWebDriver;
 import tools.dscode.common.reporting.logging.BaseConverter;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.common.reporting.logging.Status;
 import tools.dscode.coredefinitions.BrowserSteps;
 
-import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
@@ -74,6 +76,69 @@ public privileged aspect DiagnosticRuntimeAspect {
         if (step instanceof ScenarioStep scenarioStep && scenarioStep.parentStep != null) {
             DiagnosticRuntime.endNested(state.isScenarioFailed());
         }
+    }
+
+    before(StepExtension step):
+            execution(io.cucumber.plugin.event.Result io.cucumber.core.runner.StepExtension+.run())
+            && this(step) {
+        DiagnosticRuntime.beginStep(step);
+    }
+
+    after(StepExtension step):
+            set(* io.cucumber.core.runner.StepBase.executingPickleStepTestStep)
+            && target(step) {
+        DiagnosticRuntime.bindStepDefinition(step);
+    }
+
+    after(StepExtension step) returning(Result result):
+            execution(io.cucumber.plugin.event.Result io.cucumber.core.runner.StepExtension+.run())
+            && this(step) {
+        DiagnosticRuntime.endStep(step, result, null);
+    }
+
+    after(StepExtension step) throwing(Throwable error):
+            execution(io.cucumber.plugin.event.Result io.cucumber.core.runner.StepExtension+.run())
+            && this(step) {
+        DiagnosticRuntime.endStep(step, null, error);
+    }
+
+    after() returning(RemoteWebDriver driver):
+            execution(public static org.openqa.selenium.remote.RemoteWebDriver tools.dscode.common.driver.DriverConstruction.create*(..)) {
+        if (driver != null) DiagnosticRuntime.observeCapability("browser.webdriver.initialized");
+    }
+
+    after() returning(RemoteWebDriver driver):
+            execution(public static org.openqa.selenium.remote.RemoteWebDriver tools.dscode.coredefinitions.BrowserSteps.getCurrentDriver()) {
+        if (driver != null) DiagnosticRuntime.observeCapability("browser.webdriver.used");
+    }
+
+    before(): (execution(public static void tools.dscode.coredefinitions.BrowserSteps.navigateWithBlocker(..))
+            || execution(public * tools.dscode.coredefinitions.BrowserSteps.navigate(..))) {
+        DiagnosticRuntime.observeCapability("browser.navigation");
+    }
+
+    before(): (execution(* tools.dscode.common.seleniumextensions.ElementWrapper.*(..))
+            || execution(* tools.dscode.common.domoperations.HumanInteractions.*(..))) {
+        DiagnosticRuntime.observeCapability("browser.dom");
+    }
+
+    before(): execution(public static void tools.dscode.coredefinitions.ServiceCallSteps.executeServiceCall()) {
+        DiagnosticRuntime.observeCapability("service.http");
+    }
+
+    before(): (execution(public static Object tools.dscode.coredefinitions.ServiceCallSteps.inlineCall(..))
+            || execution(public static void tools.dscode.coredefinitions.ServiceCallSteps.serviceCalls(..))) {
+        DiagnosticRuntime.observeCapability("service.scenario");
+    }
+
+    before(): execution(public static Object tools.dscode.coredefinitions.ModularScenarios.inlineComponent(..)) {
+        DiagnosticRuntime.observeCapability("scenario.component");
+    }
+
+    before(String inlineRunKey, String runTypeText, String pluralFlag, String inlineArgs, DataTable dataTable):
+            execution(public static void tools.dscode.coredefinitions.ModularScenarios.runScenarios(String, String, String, String, io.cucumber.datatable.DataTable))
+            && args(inlineRunKey, runTypeText, pluralFlag, inlineArgs, dataTable) {
+        DiagnosticRuntime.observeRunType(runTypeText, dataTable);
     }
 
     after(Entry entry) returning:
@@ -157,7 +222,6 @@ public privileged aspect DiagnosticRuntimeAspect {
             DiagnosticRuntime.recordFilteredLog(level, message);
         }
     }
-
 
     Entry around(Entry entry, java.util.List converters):
             execution(public tools.dscode.common.reporting.logging.Entry tools.dscode.common.reporting.logging.Entry.on(java.util.List))
