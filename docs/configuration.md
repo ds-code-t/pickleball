@@ -72,8 +72,35 @@ mvn test "-Dpkb_tags=@forms and @state-assertions" -Dpkb_loglevel=debug
 | `pkb_debugbrowser` | `true` | retain extra browser troubleshooting state |
 | `pkb_loglevel` | `debug` | `trace`, `debug`, `info`, `warn`, or `error` |
 | `pkb_parallel` | `4` | maximum parallel scenario count |
+| `pkb_reportingmode` | `diagnostic` | use the diagnostic evidence pipeline; any other/absent value uses normal reporting |
+| `pkb_reportretention` | `all`, `failed`, or `none` | automatic local report/evidence retention; default `all` |
+| `pkb_diagnostic_output` | `reports/diagnostic-runs` | optional diagnostic-runs root; the default needs no configuration |
 | `pkb_compositeReport` | `true` or a path | combined HTML report |
 | `pkb_scenarioReport` | `true` or a path | individual scenario reports |
+
+## Diagnostic reporting and retention
+
+Diagnostic mode requires only:
+
+```properties
+pkb_reportingmode=diagnostic
+```
+
+It is resolved once at runner startup. Diagnostic artifacts always capture TRACE-through-ERROR evidence while console output still follows `pkb_loglevel`. Automatic normal HTML/ReportPortal/XLSX lifecycle output is bypassed, while explicitly invoked reporting steps continue to work.
+
+`pkb_reportretention` applies independently:
+
+```properties
+pkb_reportretention=failed
+```
+
+- `all` — default; keep automatic output for all scenarios.
+- `failed` — keep dense output for failed/interrupted scenarios; passing diagnostic scenarios retain only lightweight indexes/summaries.
+- `none` — suppress/prune automatic dense local output while retaining minimal diagnostic navigation indexes when diagnostic mode is active.
+
+`pkb_diagnostic_output` is optional; diagnostic mode needs only `pkb_reportingmode=diagnostic`.
+
+ReportPortal is not controlled by `pkb_reportretention` in normal mode because it is a remote reporting integration. See [Diagnostic reporting](diagnostic-reporting.md) for the artifact layout, scenario identity model, screenshots, fingerprints, provenance, and recovery behavior.
 
 ## `pkb_datapath`
 

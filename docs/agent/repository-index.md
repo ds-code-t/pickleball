@@ -24,6 +24,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/agent/prompt-examples.md`
 - `docs/agent/README.md`
 - `docs/agent/repository-index.md`
+- `docs/ai-diagnostic-reporting-plan.md`
 - `docs/block-conditionals.md`
 - `docs/component-scenarios.md`
 - `docs/config-files-and-resource-mapping.md`
@@ -33,6 +34,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/data-element-query-runtime.md`
 - `docs/data-values-and-elements.md`
 - `docs/date-time-utilities.md`
+- `docs/diagnostic-reporting.md`
 - `docs/dynamic-steps.md`
 - `docs/feature-status-notes.md`
 - `docs/getting-started.md`
@@ -62,6 +64,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/aspectj/io/cucumber/java/JavaBackend_LoadGlue_Mutator.aj`
 - `src/main/aspectj/io/cucumber/messages/types/PickleStep_NestingLevel.aj`
 - `src/main/aspectj/io/cucumber/messages/types/PickleStepMetaTextAspect.aj`
+- `src/main/aspectj/tools/dscode/common/reporting/diagnostic/ConfigurationProvenanceAspect.aj`
+- `src/main/aspectj/tools/dscode/common/reporting/diagnostic/DiagnosticRuntimeAspect.aj`
+- `src/main/aspectj/tools/dscode/common/reporting/diagnostic/ReportRetentionAspect.aj`
 - `src/main/java/io/cucumber/core/feature/TestFeatureParser.java`
 - `src/main/java/io/cucumber/core/gherkin/messages/CucumberDeepCloneUtil.java`
 - `src/main/java/io/cucumber/core/gherkin/messages/CucumberStepTextCloneUtil.java`
@@ -207,6 +212,16 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/mappings/ScenarioMapping.java`
 - `src/main/java/tools/dscode/common/mappings/StepMapping.java`
 - `src/main/java/tools/dscode/common/mappings/ValueFormatting.java`
+- `src/main/java/tools/dscode/common/reporting/diagnostic/ConfigurationProvenance.java`
+- `src/main/java/tools/dscode/common/reporting/diagnostic/DiagnosticIndexRebuilder.java`
+- `src/main/java/tools/dscode/common/reporting/diagnostic/DiagnosticReporter.java`
+- `src/main/java/tools/dscode/common/reporting/diagnostic/DiagnosticRunComparator.java`
+- `src/main/java/tools/dscode/common/reporting/diagnostic/DiagnosticRuntime.java`
+- `src/main/java/tools/dscode/common/reporting/diagnostic/ExplicitReportRegistry.java`
+- `src/main/java/tools/dscode/common/reporting/diagnostic/ReportRetentionPolicy.java`
+- `src/main/java/tools/dscode/common/reporting/diagnostic/ScenarioIdentity.java`
+- `src/main/java/tools/dscode/common/reporting/diagnostic/VisualFingerprint.java`
+- `src/main/java/tools/dscode/common/reporting/diagnostic/VisualFingerprintComparator.java`
 - `src/main/java/tools/dscode/common/reporting/logging/Attachment.java`
 - `src/main/java/tools/dscode/common/reporting/logging/BaseConverter.java`
 - `src/main/java/tools/dscode/common/reporting/logging/CleanupTrace.java`
@@ -353,6 +368,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseThreeChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseTwoChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/mappings/MappingDataRefactorChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticReportingChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/util/datetime/BusinessTemporalDeltaChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/util/datetime/BusinessTimePostModifierChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/DataTableConversionChecks.java`
@@ -377,6 +393,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/mapping-value-type-preservation.feature`
 - `maven-consumer-project/src/test/resources/features/navigation.feature`
 - `maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature`
+- `maven-consumer-project/src/test/resources/features/pickleball-2.1.2-syntax-demo.feature`
 - `maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature`
 - `maven-consumer-project/src/test/resources/features/run-step-parameter-variations.feature`
 - `maven-consumer-project/src/test/resources/features/scenario-data-references.feature`
@@ -412,7 +429,6 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/data/files/customerPayload.json`
 - `maven-consumer-project/src/test/resources/files/customers.yaml`
 - `maven-consumer-project/src/test/resources/pickleball_local.properties`
-- `maven-consumer-project/src/test/resources/pickleball_local2.properties`
 
 ## Maven consumer test site
 

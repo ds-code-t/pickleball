@@ -27,6 +27,7 @@ Each functional guide begins with a prominent link to the specific consumer-proj
 ## Execution
 
 - [Execution configuration](configuration.md) — control tags, feature locations, browsers, parallelism, logging, reports, and local overrides.
+- [Diagnostic reporting](diagnostic-reporting.md) — capture layered AI-oriented evidence, browser screenshots/fingerprints, configuration provenance, and failed-only retention.
 ## Working consumer project
 
 The example project is not pseudocode. It contains a Maven dependency, a runner, a loopback server, browser pages, REST and SOAP endpoints, feature files, configuration data, and reusable call definitions.

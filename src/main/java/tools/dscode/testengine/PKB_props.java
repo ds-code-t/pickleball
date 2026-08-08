@@ -29,11 +29,20 @@ public final class PKB_props {
     public static final String PKB_BROWSER = PKB_PREFIX + "browser";
     public static final String PKB_OPTIONS = PKB_PREFIX + "options";
     public static final String PKB_CUCUMBER_CLI_ARGS = PKB_PREFIX + "cucumber_cli_args";
-    public static final String PKB_CUCUMBER_CLI_FEATURE_SELECTORS =  PKB_PREFIX + "cucumber_cli_feature_selectors";
+    public static final String PKB_CUCUMBER_CLI_FEATURE_SELECTORS = PKB_PREFIX + "cucumber_cli_feature_selectors";
     public static final String PKB_LOGLEVEL = PKB_PREFIX + "loglevel";
+    public static final String PKB_REPORTING_MODE = PKB_PREFIX + "reportingmode";
+    public static final String PKB_REPORT_RETENTION = PKB_PREFIX + "reportretention";
+    public static final String PKB_DIAGNOSTIC_OUTPUT = PKB_PREFIX + "diagnostic_output";
+    public static final String PKB_INVESTIGATION_ID = PKB_PREFIX + "investigation_id";
+    public static final String PKB_RUN_PURPOSE = PKB_PREFIX + "run_purpose";
+    public static final String PKB_PARENT_RUN_ID = PKB_PREFIX + "parent_run_id";
+    public static final String PKB_BASELINE_RUN_ID = PKB_PREFIX + "baseline_run_id";
+    public static final String PKB_CHANGED_VARIABLES = PKB_PREFIX + "changed_variables";
 
     public static final String PKB_DEBUG_BROWSER = PKB_PREFIX + "debugBrowser";
     public static final String PKB_DEBUG_ARGS = PKB_PREFIX + "debugargs";
+
     private PKB_props() {
     }
 
@@ -49,6 +58,7 @@ public final class PKB_props {
     public static void put(String key, String value) {
         values().put(PickleballRunner.normalizePkbKey(key), value);
     }
+
     public static String browser() {
         return get(PKB_BROWSER);
     }
@@ -69,6 +79,7 @@ public final class PKB_props {
     public static String glue() {
         return get(PKB_GLUE);
     }
+
     public static void glue(String gluePaths) {
         put(PKB_GLUE, gluePaths);
     }
@@ -128,6 +139,7 @@ public final class PKB_props {
     public static String name() {
         return get(PKB_NAME);
     }
+
     public static void name(String nameRegex) {
         put(PKB_NAME, nameRegex);
     }
@@ -149,6 +161,7 @@ public final class PKB_props {
     public static void profile(String profileName) {
         put(PKB_PROFILE, profileName);
     }
+
     // -- parallel --
     public static String parallel() {
         return get(PKB_PARALLEL);
@@ -156,6 +169,31 @@ public final class PKB_props {
 
     public static void parallel(String count) {
         put(PKB_PARALLEL, count);
+    }
+
+    // -- reporting --
+    public static String reportingMode() {
+        return get(PKB_REPORTING_MODE);
+    }
+
+    public static void reportingMode(String reportingMode) {
+        put(PKB_REPORTING_MODE, reportingMode);
+    }
+
+    public static String reportRetention() {
+        return get(PKB_REPORT_RETENTION);
+    }
+
+    public static void reportRetention(String reportRetention) {
+        put(PKB_REPORT_RETENTION, reportRetention);
+    }
+
+    public static String diagnosticOutput() {
+        return get(PKB_DIAGNOSTIC_OUTPUT);
+    }
+
+    public static void diagnosticOutput(String diagnosticOutput) {
+        put(PKB_DIAGNOSTIC_OUTPUT, diagnosticOutput);
     }
 
     public static String debugBrowser() {
@@ -169,5 +207,4 @@ public final class PKB_props {
     public static void debugBrowser(boolean enable) {
         put(PKB_DEBUG_BROWSER, Boolean.toString(enable));
     }
-
 }

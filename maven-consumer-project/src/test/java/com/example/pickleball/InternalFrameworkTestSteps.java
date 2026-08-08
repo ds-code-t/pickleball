@@ -8,6 +8,7 @@ import tools.dscode.common.dataelements.DataElementPhaseFourAndSixChecks;
 import tools.dscode.common.dataelements.DataElementPhaseOneChecks;
 import tools.dscode.common.dataelements.DataElementPhaseThreeChecks;
 import tools.dscode.common.dataelements.DataElementPhaseTwoChecks;
+import tools.dscode.common.reporting.diagnostic.DiagnosticReportingChecks;
 import tools.dscode.common.util.datetime.BusinessTemporalDeltaChecks;
 import tools.dscode.common.util.datetime.BusinessTimePostModifierChecks;
 import tools.dscode.coredefinitions.ModularScenariosChecks;
@@ -28,6 +29,12 @@ public final class InternalFrameworkTestSteps {
                 BusinessTimePostModifierChecks.class
         );
     }
+
+    @Given("^RUN DIAGNOSTIC REPORTING JAVA TESTS$")
+    public static void runDiagnosticReportingJavaTests() {
+        runAndAssert(DiagnosticReportingChecks.class);
+    }
+
     @Given("^RUN DATA ELEMENT PHASE 1 JAVA TESTS$")
     public static void runDataElementPhaseOneJavaTests() {
         runAndAssert(DataElementPhaseOneChecks.class);
