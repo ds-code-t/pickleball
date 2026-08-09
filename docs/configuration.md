@@ -1,6 +1,6 @@
 # Execution Configuration
 
-> **Runnable examples:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) exercises normal execution settings. [`scenario-data-references.feature`](../maven-consumer-project/src/test/resources/features/scenario-data-references.feature) exercises default data-path behavior and `data:/` file lookup.
+> **Runnable examples:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) exercises normal execution settings. [`scenario-data-references.feature`](../maven-consumer-project/src/test/resources/features/scenario-data-references.feature) exercises default data-path behavior and `data:/` file lookup. [`configuration-system-properties.feature`](../maven-consumer-project/src/test/resources/features/configuration-system-properties.feature) verifies JVM `pkb_*` value quote normalization.
 
 Pickleball execution properties select scenarios and control how they run. Property names are case-insensitive; this page uses lowercase `pkb_` names for consistency.
 
@@ -53,8 +53,29 @@ pkb_parallel=4
 Use `-D` only on the command line:
 
 ```bash
-mvn test "-Dpkb_tags=@forms and @state-assertions" -Dpkb_loglevel=debug
+mvn test -Dpkb_tags="@forms and @state-assertions" -Dpkb_loglevel="debug"
 ```
+
+### Quoted JVM `pkb_*` values
+
+Some shells and Maven launch paths preserve quotes around the value in an argument such as:
+
+```bash
+-Dpkb_loglevel="INFO"
+```
+
+For JVM system properties whose names begin with `pkb_`, Pickleball removes one matching outer pair of single or double quotes before applying configuration precedence. Embedded quotes remain part of the value.
+
+For example, these values resolve as shown:
+
+```text
+"INFO"                         -> INFO
+'all'                          -> all
+"@smoke and not @slow"        -> @smoke and not @slow
+'name="A B"'                  -> name="A B"
+```
+
+Only JVM `pkb_*` system-property values receive this command-line normalization. Non-Pickleball JVM properties and values authored in `.properties` files keep their normal Java semantics.
 
 ## Common properties
 

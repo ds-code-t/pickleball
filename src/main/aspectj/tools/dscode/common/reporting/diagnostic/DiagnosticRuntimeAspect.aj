@@ -46,7 +46,8 @@ public privileged aspect DiagnosticRuntimeAspect {
             execution(void io.cucumber.core.runner.CurrentScenarioState.scenarioRunCleanUp()) && this(state) {
         if (DiagnosticRuntime.isDiagnostic() && state.isScenarioFailed()) {
             try {
-                DiagnosticRuntime.captureScreenshot(BrowserSteps.getCurrentDriver(), "Scenario Failure");
+                RemoteWebDriver driver = BrowserSteps.getCurrentDriverIfPresent();
+                if (driver != null) DiagnosticRuntime.captureScreenshot(driver, "Scenario Failure");
             } catch (Throwable ignored) {
             }
         }
@@ -113,7 +114,8 @@ public privileged aspect DiagnosticRuntimeAspect {
     }
 
     before(): (execution(public static void tools.dscode.coredefinitions.BrowserSteps.navigateWithBlocker(..))
-            || execution(public * tools.dscode.coredefinitions.BrowserSteps.navigate(..))) {
+            || execution(public * tools.dscode.coredefinitions.BrowserSteps.navigate(..))
+            || execution(public void tools.dscode.coredefinitions.NavigationSteps.i_navigate_to(String))) {
         DiagnosticRuntime.observeCapability("browser.navigation");
     }
 

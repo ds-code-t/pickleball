@@ -65,9 +65,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/aspectj/io/cucumber/messages/types/PickleStep_NestingLevel.aj`
 - `src/main/aspectj/io/cucumber/messages/types/PickleStepMetaTextAspect.aj`
 - `src/main/aspectj/tools/dscode/common/reporting/diagnostic/ConfigurationProvenanceAspect.aj`
+- `src/main/aspectj/tools/dscode/common/reporting/diagnostic/Diagnostic213CompletionAspect.aj`
 - `src/main/aspectj/tools/dscode/common/reporting/diagnostic/DiagnosticRuntimeAspect.aj`
 - `src/main/aspectj/tools/dscode/common/reporting/diagnostic/ReportRetentionAspect.aj`
 - `src/main/aspectj/tools/dscode/common/variables/PlatformLogAspect.aj`
+- `src/main/aspectj/tools/dscode/testengine/PkbSystemPropertyValueAspect.aj`
 - `src/main/java/io/cucumber/core/feature/TestFeatureParser.java`
 - `src/main/java/io/cucumber/core/gherkin/messages/CucumberDeepCloneUtil.java`
 - `src/main/java/io/cucumber/core/gherkin/messages/CucumberStepTextCloneUtil.java`
@@ -347,6 +349,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/testengine/PickleballLauncherSessionListener.java`
 - `src/main/java/tools/dscode/testengine/PickleballRunner.java`
 - `src/main/java/tools/dscode/testengine/PKB_props.java`
+- `src/main/java/tools/dscode/testengine/PkbPropertyValueNormalizer.java`
 - `src/main/resources/META-INF/services/org.junit.platform.engine.TestEngine`
 - `src/main/resources/META-INF/services/org.junit.platform.launcher.LauncherSessionListener`
 
@@ -356,7 +359,9 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 ## Maven consumer Java support
 
+- `maven-consumer-project/src/test/java/com/example/pickleball/ConfigurationValidationSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/DataReferenceSteps.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/DiagnosticValidationSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/InternalFrameworkTestSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/MappingTypeSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java`
@@ -372,22 +377,26 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseThreeChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/dataelements/DataElementPhaseTwoChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/mappings/MappingDataRefactorChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/Diagnostic213CompletionChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticReportingChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/util/datetime/BusinessTemporalDeltaChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/common/util/datetime/BusinessTimePostModifierChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/DataTableConversionChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/ModularScenariosChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/testengine/PkbPropertyValueNormalizerChecks.java`
 
 ## Maven consumer feature scenarios
 
 - `maven-consumer-project/src/test/resources/features/catalog-context.feature`
 - `maven-consumer-project/src/test/resources/features/component-scenarios.feature`
+- `maven-consumer-project/src/test/resources/features/configuration-system-properties.feature`
 - `maven-consumer-project/src/test/resources/features/data-element-all-phases.feature`
 - `maven-consumer-project/src/test/resources/features/data-element-native-collections.feature`
 - `maven-consumer-project/src/test/resources/features/data-element-native-formats.feature`
 - `maven-consumer-project/src/test/resources/features/data-element-native-tabular.feature`
 - `maven-consumer-project/src/test/resources/features/data-element-phase-3.feature`
 - `maven-consumer-project/src/test/resources/features/date-time-utilities.feature`
+- `maven-consumer-project/src/test/resources/features/diagnostic-reporting-validation.feature`
 - `maven-consumer-project/src/test/resources/features/dialogs.feature`
 - `maven-consumer-project/src/test/resources/features/dynamic-steps.feature`
 - `maven-consumer-project/src/test/resources/features/forms-dynamic-steps.feature`
@@ -397,6 +406,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/features/mapping-value-type-preservation.feature`
 - `maven-consumer-project/src/test/resources/features/navigation.feature`
 - `maven-consumer-project/src/test/resources/features/nested-and-block-conditionals.feature`
+- `maven-consumer-project/src/test/resources/features/pickleball-2.1.2-syntax-demo.feature`
 - `maven-consumer-project/src/test/resources/features/reusable-scenario-selection.feature`
 - `maven-consumer-project/src/test/resources/features/run-step-parameter-variations.feature`
 - `maven-consumer-project/src/test/resources/features/scenario-data-references.feature`

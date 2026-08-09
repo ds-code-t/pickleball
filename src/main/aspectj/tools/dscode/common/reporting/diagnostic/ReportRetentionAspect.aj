@@ -51,10 +51,6 @@ public privileged aspect ReportRetentionAspect {
         ExplicitReportRegistry.writeExplicit(io.cucumber.core.runner.GlobalState.workBookMap.values());
     }
 
-    after(): execution(public static void tools.dscode.coredefinitions.GeneralSteps.afterAll()) {
-        if (DiagnosticRuntime.isDiagnostic()) DiagnosticRuntime.finishRun();
-    }
-
     void around(String status):
             call(void tools.dscode.common.reporting.logging.reportportal.ReportPortalBridge.finishLaunch(String))
             && withincode(public static void tools.dscode.coredefinitions.GeneralSteps.afterAll())

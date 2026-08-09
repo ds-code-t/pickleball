@@ -1,4 +1,5 @@
 package com.example.pickleball;
+
 import com.example.pickleball.support.InternalJavaTestRunner;
 import io.cucumber.core.runner.ScenarioStepChecks;
 import io.cucumber.core.runner.ScenarioStepDataChecks;
@@ -8,10 +9,13 @@ import tools.dscode.common.dataelements.DataElementPhaseFourAndSixChecks;
 import tools.dscode.common.dataelements.DataElementPhaseOneChecks;
 import tools.dscode.common.dataelements.DataElementPhaseThreeChecks;
 import tools.dscode.common.dataelements.DataElementPhaseTwoChecks;
+import tools.dscode.common.reporting.diagnostic.Diagnostic213CompletionChecks;
 import tools.dscode.common.reporting.diagnostic.DiagnosticReportingChecks;
 import tools.dscode.common.util.datetime.BusinessTemporalDeltaChecks;
 import tools.dscode.common.util.datetime.BusinessTimePostModifierChecks;
 import tools.dscode.coredefinitions.ModularScenariosChecks;
+import tools.dscode.testengine.PkbPropertyValueNormalizerChecks;
+
 import java.util.List;
 
 import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
@@ -19,6 +23,7 @@ import static tools.dscode.common.reporting.logging.LogForwarder.logInfo;
 public final class InternalFrameworkTestSteps {
     private InternalFrameworkTestSteps() {
     }
+
     @Given("^RUN INTERNAL PICKLEBALL JAVA TESTS$")
     public static void runInternalPickleballJavaTests() {
         runAndAssert(
@@ -26,13 +31,14 @@ public final class InternalFrameworkTestSteps {
                 ScenarioStepDataChecks.class,
                 ModularScenariosChecks.class,
                 BusinessTemporalDeltaChecks.class,
-                BusinessTimePostModifierChecks.class
+                BusinessTimePostModifierChecks.class,
+                PkbPropertyValueNormalizerChecks.class
         );
     }
 
     @Given("^RUN DIAGNOSTIC REPORTING JAVA TESTS$")
     public static void runDiagnosticReportingJavaTests() {
-        runAndAssert(DiagnosticReportingChecks.class);
+        runAndAssert(DiagnosticReportingChecks.class, Diagnostic213CompletionChecks.class);
     }
 
     @Given("^RUN DATA ELEMENT PHASE 1 JAVA TESTS$")
@@ -44,6 +50,7 @@ public final class InternalFrameworkTestSteps {
     public static void runDataElementPhaseTwoJavaTests() {
         runAndAssert(DataElementPhaseTwoChecks.class);
     }
+
     @Given("^RUN DATA ELEMENT PHASE 3 JAVA TESTS$")
     public static void runDataElementPhaseThreeJavaTests() {
         runAndAssert(DataElementPhaseThreeChecks.class);

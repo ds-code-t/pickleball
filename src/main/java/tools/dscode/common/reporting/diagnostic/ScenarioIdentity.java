@@ -6,7 +6,9 @@ import io.cucumber.core.runner.ScenarioStep;
 import io.cucumber.core.runner.util.CucumberQueryUtil;
 import io.cucumber.messages.types.TableCell;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -41,6 +43,7 @@ public record ScenarioIdentity(
         try {
             CucumberQueryUtil.GherkinView view = CucumberQueryUtil.describe(pickle);
             String uri = uri(pickle);
+            String identityUri = canonicalSourceUri(uri);
             String name = view.scenario == null ? "" : view.scenario.getName();
             long scenarioLine = view.scenarioLocation == null ? 0 : view.scenarioLocation.getLine();
             Long exampleLine = view.exampleRow == null ? null : view.exampleRow.getLocation().getLine();
@@ -53,8 +56,8 @@ public record ScenarioIdentity(
                     .orElse("");
             String valuesHash = values.isBlank() ? "" : shortHash(values);
             String normalizedName = normalize(name);
-            String exact = shortHash(uri + "|" + scenarioLine + "|" + (exampleLine == null ? "" : exampleLine));
-            String semantic = shortHash(uri + "|" + normalizedName + "|" + valuesHash);
+            String exact = shortHash(identityUri + "|" + scenarioLine + "|" + (exampleLine == null ? "" : exampleLine));
+            String semantic = shortHash(identityUri + "|" + normalizedName + "|" + valuesHash);
             String nameKey = shortHash(normalizedName);
             String tagKey = tags.isEmpty() ? "" : shortHash(String.join("\u001f", tags));
             return new ScenarioIdentity(
@@ -63,12 +66,13 @@ public record ScenarioIdentity(
             );
         } catch (Throwable ignored) {
             String uri = uri(pickle);
+            String identityUri = canonicalSourceUri(uri);
             String name = pickle.getName() == null ? "" : pickle.getName();
             long line = pickle.getLocation() == null ? 0 : pickle.getLocation().getLine();
             return new ScenarioIdentity(
                     uri, name, line, null, List.of(), "",
-                    shortHash(uri + "|" + line),
-                    shortHash(uri + "|" + normalize(name)),
+                    shortHash(identityUri + "|" + line),
+                    shortHash(identityUri + "|" + normalize(name)),
                     shortHash(normalize(name)),
                     "", line
             );
@@ -97,6 +101,29 @@ public record ScenarioIdentity(
                 + (exampleLine == null ? "" : ", exampleLine=" + exampleLine)
                 + ", exactSourceKey=" + exactSourceKey
                 + ", semanticKey=" + semanticKey;
+    }
+
+    static String canonicalSourceUri(String featureUri) {
+        if (featureUri == null || featureUri.isBlank()) return "";
+        String normalized = featureUri.trim().replace('\\', '/');
+
+        if (normalized.startsWith("classpath:")) {
+            normalized = normalized.substring("classpath:".length());
+        } else if (normalized.startsWith("file:")) {
+            try {
+                normalized = Path.of(URI.create(normalized)).toAbsolutePath().normalize().toString().replace('\\', '/');
+            } catch (Throwable ignored) {
+            }
+        }
+
+        for (String marker : List.of("/src/test/resources/", "/src/main/resources/")) {
+            int index = normalized.indexOf(marker);
+            if (index >= 0) return normalized.substring(index + marker.length());
+        }
+
+        while (normalized.startsWith("/")) normalized = normalized.substring(1);
+        while (normalized.startsWith("./")) normalized = normalized.substring(2);
+        return normalized;
     }
 
     private static ScenarioIdentity unknown() {

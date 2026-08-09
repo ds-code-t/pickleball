@@ -1,0 +1,16 @@
+Pickleball 2.1.3 diagnostic fixes
+
+REPLACE:
+src/main/java/tools/dscode/coredefinitions/BrowserSteps.java
+src/main/java/tools/dscode/common/reporting/diagnostic/ScenarioIdentity.java
+src/main/aspectj/tools/dscode/common/reporting/diagnostic/DiagnosticRuntimeAspect.aj
+src/main/aspectj/tools/dscode/common/reporting/diagnostic/Diagnostic213CompletionAspect.aj
+maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/Diagnostic213CompletionChecks.java
+maven-consumer-project/src/test/resources/features/diagnostic-reporting-validation.feature
+docs/agent/feature-map.md
+
+ADD:
+maven-consumer-project/run-diagnostic-fix-validation.ps1
+
+REFERENCE:
+README-APPLY.md

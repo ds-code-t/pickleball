@@ -1,14 +1,15 @@
 package tools.dscode.common.reporting.diagnostic;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class ConfigurationProvenance {
@@ -31,13 +32,21 @@ public final class ConfigurationProvenance {
 
     public static synchronized void capture(String source, Map<String, String> values) {
         if (values == null) return;
+        String winningSource = source == null ? "unknown" : source;
         values.forEach((key, value) -> {
             String normalized = normalize(key);
             String previous = lastValues.put(normalized, value);
-            if (previous == null || !java.util.Objects.equals(previous, value)) {
-                sources.put(normalized, source == null ? "unknown" : source);
+            if (!sources.containsKey(normalized) || !Objects.equals(previous, value)) {
+                sources.put(normalized, winningSource);
             }
         });
+    }
+
+    public static synchronized void captureSupplied(String source, String key, String value) {
+        if (key == null) return;
+        String normalized = normalize(key);
+        lastValues.put(normalized, value);
+        sources.put(normalized, source == null ? "unknown" : source);
     }
 
     public static synchronized Map<String, Value> effective(Map<String, String> values) {
