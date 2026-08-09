@@ -9,13 +9,18 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static tools.dscode.testengine.PKB_props.PKB_BASELINE_RUN_ID;
 import static tools.dscode.testengine.PKB_props.PKB_BROWSER;
+import static tools.dscode.testengine.PKB_props.PKB_CHANGED_VARIABLES;
 import static tools.dscode.testengine.PKB_props.PKB_ENVIRONMENT;
 import static tools.dscode.testengine.PKB_props.PKB_GLUE;
+import static tools.dscode.testengine.PKB_props.PKB_INVESTIGATION_ID;
 import static tools.dscode.testengine.PKB_props.PKB_NAME;
+import static tools.dscode.testengine.PKB_props.PKB_PARENT_RUN_ID;
 import static tools.dscode.testengine.PKB_props.PKB_PROFILE;
 import static tools.dscode.testengine.PKB_props.PKB_RP_API_KEY;
 import static tools.dscode.testengine.PKB_props.PKB_RUN_PROFILE;
+import static tools.dscode.testengine.PKB_props.PKB_RUN_PURPOSE;
 import static tools.dscode.testengine.PKB_props.PKB_TAGS;
 
 public final class ProfileConfigurationChecks {
@@ -33,6 +38,31 @@ public final class ProfileConfigurationChecks {
         assertEquals("firefox", values.get(PKB_BROWSER));
         assertFalse(values.containsKey(PKB_ENVIRONMENT));
         assertFalse(values.containsKey(PKB_PROFILE));
+    }
+
+    @Test
+    void directRunProfilePreservesSeparateDiagnosticLineage() {
+        LinkedHashMap<String, String> values = baseValues();
+        values.put(PKB_INVESTIGATION_ID, "diag-214");
+        values.put(PKB_RUN_PURPOSE, "controlled-rerun");
+        values.put(PKB_PARENT_RUN_ID, "run-parent");
+        values.put(PKB_BASELINE_RUN_ID, "run-baseline");
+        values.put(PKB_CHANGED_VARIABLES, "pkb_browser");
+        values.put(PKB_RUN_PROFILE, "pkb_tags=@direct, pkb_browser=firefox");
+
+        PickleballProfiles.apply(values);
+
+        assertEquals("diag-214", values.get(PKB_INVESTIGATION_ID));
+        assertEquals("controlled-rerun", values.get(PKB_RUN_PURPOSE));
+        assertEquals("run-parent", values.get(PKB_PARENT_RUN_ID));
+        assertEquals("run-baseline", values.get(PKB_BASELINE_RUN_ID));
+        assertEquals("pkb_browser", values.get(PKB_CHANGED_VARIABLES));
+        String serialized = PickleballProfiles.serializeRunProfile(values);
+        assertFalse(serialized.contains("pkb_investigation_id"));
+        assertFalse(serialized.contains("pkb_run_purpose"));
+        assertFalse(serialized.contains("pkb_parent_run_id"));
+        assertFalse(serialized.contains("pkb_baseline_run_id"));
+        assertFalse(serialized.contains("pkb_changed_variables"));
     }
 
     @Test
@@ -61,7 +91,6 @@ public final class ProfileConfigurationChecks {
         assertEquals("com.example.pickleball", values.get(PKB_GLUE));
     }
 
-
     @Test
     void selectedProfileCanSupplyDirectRunProfile() {
         LinkedHashMap<String, String> values = baseValues();
@@ -86,7 +115,6 @@ public final class ProfileConfigurationChecks {
         assertEquals("CHROME_HEADLESS", values.get(PKB_BROWSER));
         assertEquals("com.example.pickleball", values.get(PKB_GLUE));
     }
-
 
     @Test
     void literalAngleSyntaxThatIsNotAPkbReferenceIsPreserved() {
@@ -122,6 +150,32 @@ public final class ProfileConfigurationChecks {
     }
 
     @Test
+    void newSecretLikeRunVarsCannotBypassSerializedProfileProtection() {
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put("pkb_service_token", "do-not-print-me-either");
+        values.put(PKB_TAGS, "@smoke");
+
+        String serialized = PickleballProfiles.serializeRunProfile(values);
+
+        assertEquals("pkb_service_token=${protected:pkb_service_token}, pkb_tags=@smoke", serialized);
+        assertFalse(serialized.contains("do-not-print-me-either"));
+        assertTrue(SensitiveConfiguration.isSensitive("pkb_service_token"));
+    }
+
+    @Test
+    void runProfileSerializationIsDeterministic() {
+        Map<String, String> first = new LinkedHashMap<>();
+        first.put(PKB_TAGS, "@smoke");
+        first.put(PKB_BROWSER, "chrome");
+        Map<String, String> second = new LinkedHashMap<>();
+        second.put(PKB_BROWSER, "chrome");
+        second.put(PKB_TAGS, "@smoke");
+
+        assertEquals(PickleballProfiles.serializeRunProfile(first), PickleballProfiles.serializeRunProfile(second));
+        assertEquals("pkb_browser=chrome, pkb_tags=@smoke", PickleballProfiles.serializeRunProfile(first));
+    }
+
+    @Test
     void protectedDirectValueCanBeRestoredFromDefaultConfiguration() {
         LinkedHashMap<String, String> values = baseValues();
         values.put(PKB_RP_API_KEY, "runtime-secret");
@@ -134,14 +188,32 @@ public final class ProfileConfigurationChecks {
         assertEquals("runtime-secret", values.get(PKB_RP_API_KEY));
     }
 
-
     @Test
-    void profileControlPropertiesAreNotRunVars() {
+    void profileControlAndLineagePropertiesAreNotRunVars() {
         assertFalse(PKB_props.isRunVariableKey(PKB_PROFILE));
         assertFalse(PKB_props.isRunVariableKey(PKB_RUN_PROFILE));
         assertFalse(PKB_props.isRunVariableKey("pkb_options"));
         assertFalse(PKB_props.isRunVariableKey("pkb_profile_smoke"));
+        assertFalse(PKB_props.isRunVariableKey(PKB_INVESTIGATION_ID));
+        assertFalse(PKB_props.isRunVariableKey(PKB_RUN_PURPOSE));
+        assertFalse(PKB_props.isRunVariableKey(PKB_PARENT_RUN_ID));
+        assertFalse(PKB_props.isRunVariableKey(PKB_BASELINE_RUN_ID));
+        assertFalse(PKB_props.isRunVariableKey(PKB_CHANGED_VARIABLES));
+        assertTrue(PKB_props.isRunMetadataKey(PKB_INVESTIGATION_ID));
         assertTrue(PKB_props.isRunVariableKey(PKB_TAGS));
+    }
+
+    @Test
+    void directRunProfileRejectsDiagnosticLineageAssignments() {
+        LinkedHashMap<String, String> values = baseValues();
+        values.put(PKB_RUN_PROFILE, "pkb_tags=@direct, pkb_investigation_id=diag-214");
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> PickleballProfiles.apply(values));
+
+        assertTrue(exception.getMessage().contains("pkb_investigation_id"));
+        assertTrue(exception.getMessage().contains("separately"));
     }
 
     @Test

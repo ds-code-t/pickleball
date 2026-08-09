@@ -53,6 +53,10 @@ public final class DiagnosticIndexRebuilder {
         index.put("selectionFingerprint", manifest.get("selectionFingerprint"));
         index.put("sourceFingerprint", sourceFingerprint(scenarios));
         index.put("dependencyFingerprint", manifest.get("dependencyFingerprint"));
+        String runProfile = text(configuration.get("runProfile"));
+        if (!runProfile.isBlank()) index.put("runProfile", runProfile);
+        index.put("runProfileFingerprint", first(configuration.get("runProfileFingerprint"), manifest.get("runProfileFingerprint")));
+        index.put("directRunProfile", first(configuration.get("directRunProfile"), manifest.get("directRunProfile")));
         index.put("evidenceIntegrity", first(manifest.get("evidenceIntegrity"), "PARTIAL"));
         if (manifest.get("lineage") != null) index.put("lineage", manifest.get("lineage"));
         index.put("comparisonMetadata", comparisonMetadata(configuration, environment, sourceProvenance, index));
@@ -450,6 +454,8 @@ public final class DiagnosticIndexRebuilder {
         meta.put("selectionFingerprint", index.get("selectionFingerprint"));
         meta.put("sourceFingerprint", index.get("sourceFingerprint"));
         meta.put("dependencyFingerprint", index.get("dependencyFingerprint"));
+        meta.put("runProfileFingerprint", index.get("runProfileFingerprint"));
+        meta.put("directRunProfile", index.get("directRunProfile"));
         for (String key : List.of("javaVersion", "osName", "osVersion", "timezone")) {
             if (environment.get(key) != null) meta.put(key, environment.get(key));
         }

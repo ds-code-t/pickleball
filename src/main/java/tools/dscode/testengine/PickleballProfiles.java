@@ -141,6 +141,10 @@ final class PickleballProfiles {
             }
             String key = normalizeProfileProperty(assignment.substring(0, equals).trim());
             String value = unquote(assignment.substring(equals + 1).trim());
+            if (PKB_props.isRunMetadataKey(key)) {
+                throw new IllegalArgumentException(
+                        "Run metadata '" + key + "' must be supplied separately from Pickleball profiles.");
+            }
             boolean supported = PKB_props.isRunVariableKey(key)
                     || allowRunProfileControl && PKB_RUN_PROFILE.equals(key);
             if (!supported) {
@@ -154,20 +158,19 @@ final class PickleballProfiles {
 
     static String serializeRunProfile(Map<String, String> values) {
         StringBuilder out = new StringBuilder();
-        for (Map.Entry<String, String> entry : values.entrySet()) {
-            String key = entry.getKey();
-            String value = entry.getValue();
-            if (!PKB_props.isRunVariableKey(key) || value == null || value.isBlank()) {
-                continue;
-            }
-            if (!out.isEmpty()) {
-                out.append(", ");
-            }
-            String serializedValue = SensitiveConfiguration.isSensitive(key)
-                    ? SensitiveConfiguration.protectedReference(key)
-                    : value.trim();
-            out.append(key).append('=').append(quoteIfNeeded(serializedValue));
-        }
+        values.entrySet().stream()
+                .filter(entry -> PKB_props.isRunVariableKey(entry.getKey()))
+                .filter(entry -> entry.getValue() != null && !entry.getValue().isBlank())
+                .sorted(Map.Entry.comparingByKey())
+                .forEach(entry -> {
+                    if (!out.isEmpty()) {
+                        out.append(", ");
+                    }
+                    String serializedValue = SensitiveConfiguration.isSensitive(entry.getKey())
+                            ? SensitiveConfiguration.protectedReference(entry.getKey())
+                            : entry.getValue().trim();
+                    out.append(entry.getKey()).append('=').append(quoteIfNeeded(serializedValue));
+                });
         return out.toString();
     }
 
@@ -461,6 +464,10 @@ final class PickleballProfiles {
         ObjectNode normalized = JSON.createObjectNode();
         profile.fields().forEachRemaining(entry -> {
             String key = normalizeProfileProperty(entry.getKey());
+            if (PKB_props.isRunMetadataKey(key)) {
+                throw new IllegalArgumentException(
+                        "Run metadata '" + key + "' must be supplied separately from Pickleball profiles.");
+            }
             if (!PKB_props.isRunVariableKey(key) && !PKB_RUN_PROFILE.equals(key)) {
                 throw new IllegalArgumentException(
                         "Profile '" + profileName + "' contains unsupported property '" + entry.getKey() + "'.");
@@ -607,6 +614,9 @@ final class PickleballProfiles {
                 return false;
             }
             String normalized = PickleballRunner.normalizePkbKey(key);
+            if (PKB_props.isRunMetadataKey(normalized)) {
+                return false;
+            }
             return normalized.startsWith(PKB_PREFIX)
                     || MANAGED_CUCUMBER_KEYS.contains(key)
                     || MANAGED_JUNIT_KEYS.contains(key)

@@ -78,7 +78,7 @@ scenarios/
 
 Each scenario has a lightweight `summary.json`. When dense evidence is retained it also has an append-only plain `events.jsonl`. TRACE/DEBUG log records are written live to `trace.jsonl` and, after controlled scenario completion, converted losslessly to `trace.jsonl.gz`. An interrupted process may therefore leave the raw `trace.jsonl`; recovery understands either form. `screenshots/` and `fingerprints/` are created lazily only when visual evidence is actually captured.
 
-`run-index.json` contains comparison-oriented metadata such as effective browser/environment/tag/options values, deterministic configuration/environment/dependency/selection/source fingerprints, runtime information, scenario identities, outcomes, durations, failure signatures, representative screenshot references, and links to deeper evidence. Pickleball does not assign a run-level comparability classification; an AI agent can decide which runs are relevant by reading `run-catalog.json` and these inexpensive indexes first. `DiagnosticRunComparator` first compares two run indexes without opening dense scenario JSONL or screenshots. After it matches scenarios, it may read at most four matching representative fingerprint pairs per matched scenario to produce compact cross-run visual transitions; it still never opens the full screenshots. `DiagnosticIndexRebuilder` can rebuild interrupted scenario summaries, missing fingerprint sidecars, the derived run index, failure clusters, and shared run catalog from surviving diagnostic evidence.
+`run-index.json` contains comparison-oriented metadata such as effective browser/environment/tag/options values, deterministic configuration/environment/dependency/selection/source fingerprints, runtime information, scenario identities, outcomes, durations, failure signatures, representative screenshot references, and links to deeper evidence. It also exposes the sanitized final `runProfile`, a deterministic `runProfileFingerprint` for the actual final execution RunVars, and `directRunProfile` to show whether the run used direct full-override mode. The full profile stays in the selected run index; compact comparison metadata and `run-catalog.json` carry only the fingerprint/direct-mode indicators. Pickleball does not assign a run-level comparability classification; an AI agent can decide which runs are relevant by reading `run-catalog.json` and these inexpensive indexes first. `DiagnosticRunComparator` first compares two run indexes without opening dense scenario JSONL or screenshots. After it matches scenarios, it may read at most four matching representative fingerprint pairs per matched scenario to produce compact cross-run visual transitions; it still never opens the full screenshots. `DiagnosticIndexRebuilder` can rebuild interrupted scenario summaries, missing fingerprint sidecars, the derived run index, failure clusters, and shared run catalog from surviving diagnostic evidence, including the retained run-profile metadata.
 
 ## AI evidence access protocol
 
@@ -102,6 +102,14 @@ At every layer, stop when the evidence already answers the question with suffici
 - `VERY_SIMILAR`, `SOMEWHAT_SIMILAR`, or `VERY_DIFFERENT` already establishes a visual difference and its magnitude. Open the representative PNG only when the actual visible meaning of that difference matters.
 
 Do not recursively ingest an entire diagnostic run. Select evidence by run, scenario, event range, and representative visual reference.
+
+## Controlled diagnostic reruns
+
+When the evidence supports a bounded rerun, use the selected run index's `runProfile` as the authoritative starting RunVar set instead of reconstructing execution configuration from runner defaults, property files, named profiles, system properties, or Cucumber aliases. Supply the retained value through `pkb_run_profile` and change only the RunVars required by the current hypothesis.
+
+`runProfileFingerprint` is the SHA-256 fingerprint of the canonical final execution RunVars. Actual protected values participate in the one-way hash, while `runProfile` contains only safe/protected representations. `directRunProfile=true` identifies a run launched from an explicit full RunVar override. These fields let an agent verify the intended execution contract before comparing deeper evidence.
+
+Diagnostic lineage is deliberately separate from the RunVar profile. Supply `pkb_investigation_id`, `pkb_run_purpose`, `pkb_parent_run_id`, `pkb_baseline_run_id`, and `pkb_changed_variables` separately; they survive direct mode but are excluded from `runProfile`, `runProfileFingerprint`, and the execution `configurationHash`. Profiles reject those metadata keys. See `docs/ai-run-configuration.md` for the controlled-rerun contract and example Maven command.
 
 ## Diagnostic CLI
 
@@ -244,13 +252,13 @@ The Pickleball build embeds `META-INF/pickleball-build.properties`, so a consume
 
 ## Configuration provenance and environment
 
-`configuration.json` stores execution-relevant effective settings with their winning source when that source can be observed during runner merging. Secret-like keys are redacted and retain only a one-way value hash so an agent can tell that two secret values differ without learning either value. Large diagnostic text/maps/collections are bounded and carry truncation markers rather than expanding without limit. The run index contains only the smaller subset useful for deciding whether runs are related.
+`configuration.json` stores execution-relevant effective settings with their winning source when that source can be observed during runner merging. It also preserves the sanitized `runProfile`, `runProfileFingerprint`, and `directRunProfile` fields used to rebuild equivalent sparse indexes after interruption or deliberate index deletion. Secret-like keys are redacted and retain only a one-way value hash so an agent can tell that two secret values differ without learning either value. Sensitive-name detection is shared with serialized run-profile protection so a secret-like RunVar cannot bypass redaction by appearing inside `pkb_run_profile`. Large diagnostic text/maps/collections are bounded and carry truncation markers rather than expanding without limit. The run index contains only the smaller subset useful for deciding whether runs are related.
 
 `environment.json` intentionally stores a focused runtime summary such as Java/OS/architecture/timezone/processor/container hints. It does not copy the full `PlatformSnapshot` workstation/user/network inventory. Existing platform/caller stamps used by normal logs and external reporting remain independent and are preserved by default because repeated caller identity can be operationally important when scenarios run in different environments or report to external systems. `pkb_platformlog` can explicitly select `default`, `default+git`, `none`, `keys:...`, or `template:...` behavior without changing the default contract.
 
 The manifest and run boundary events also contain lightweight heap/process CPU snapshots at run start and end; V1 does not start a background resource sampler.
 
-Optional external lineage values (`pkb_investigation_id`, `pkb_run_purpose`, `pkb_parent_run_id`, `pkb_baseline_run_id`, and `pkb_changed_variables`) are copied into the lightweight run metadata when supplied. None is required to enable diagnostic mode.
+Optional external lineage values (`pkb_investigation_id`, `pkb_run_purpose`, `pkb_parent_run_id`, `pkb_baseline_run_id`, and `pkb_changed_variables`) are copied into the lightweight run metadata when supplied. They describe investigation lineage rather than execution and therefore are not RunVars: direct `pkb_run_profile` mode preserves separately supplied lineage, while profiles reject attempts to embed these keys. None is required to enable diagnostic mode.
 
 ## Failure safety and recovery
 

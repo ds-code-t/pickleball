@@ -12,6 +12,7 @@ import org.openqa.selenium.TakesScreenshot;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Level;
+import tools.dscode.testengine.PKB_props;
 
 import static tools.dscode.testengine.PKB_props.PKB_DIAGNOSTIC_OUTPUT;
 
@@ -69,17 +70,25 @@ final class DiagnosticReporter {
     private final ThreadLocal<Deque<StepContext>> steps = ThreadLocal.withInitial(ArrayDeque::new);
     private final Set<String> runCapabilities = ConcurrentHashMap.newKeySet();
     private final SourceProvenance sourceProvenance;
+    private final boolean directRunProfile;
     private volatile boolean partial;
     private volatile boolean finished;
     private volatile Map<String, String> effectiveConfig = Map.of();
     private volatile String configurationHash = "";
     private volatile String environmentHash = "";
     private volatile String sourceProvenanceHash = "";
+    private volatile String runProfile = "";
+    private volatile String runProfileFingerprint = "";
     private final Map<String, Object> startResources = resourceSnapshot();
     private volatile Map<String, Object> endResources = Map.of();
 
     DiagnosticReporter(Map<String, String> values) {
+        this(values, false);
+    }
+
+    DiagnosticReporter(Map<String, String> values, boolean directRunProfile) {
         this.effectiveConfig = values == null ? Map.of() : Map.copyOf(values);
+        this.directRunProfile = directRunProfile;
         this.sourceProvenance = SourceProvenance.capture(values);
         this.runsRoot = resolveRunsRoot(values);
         this.runRoot = runsRoot.resolve(runId);
@@ -525,10 +534,16 @@ final class DiagnosticReporter {
     private void writeConfiguration() throws IOException {
         Map<String, ConfigurationProvenance.Value> effective = ConfigurationProvenance.effective(effectiveConfig);
         configurationHash = sha256Hex(JSON.writeValueAsBytes(effective));
+        String configuredRunProfile = find(effectiveConfig, PKB_props.PKB_RUN_PROFILE);
+        runProfile = configuredRunProfile == null ? "" : configuredRunProfile;
+        runProfileFingerprint = runProfileFingerprint(effectiveConfig);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("schemaVersion", 1);
         body.put("capturedAt", Instant.now().toString());
         body.put("configurationHash", configurationHash);
+        if (!runProfile.isBlank()) body.put("runProfile", runProfile);
+        body.put("runProfileFingerprint", runProfileFingerprint);
+        body.put("directRunProfile", directRunProfile);
         body.put("effective", effective);
         writeJsonAtomic(runRoot.resolve("configuration.json"), body);
     }
@@ -592,6 +607,8 @@ final class DiagnosticReporter {
         manifest.put("selectionFingerprint", selectionFingerprint());
         manifest.put("sourceFingerprint", sourceFingerprint());
         manifest.put("dependencyFingerprint", dependencyFingerprint());
+        manifest.put("runProfileFingerprint", runProfileFingerprint);
+        manifest.put("directRunProfile", directRunProfile);
         manifest.put("resourceStart", startResources);
         if (!endResources.isEmpty()) manifest.put("resourceEnd", endResources);
         if (!lineageMetadata().isEmpty()) manifest.put("lineage", lineageMetadata());
@@ -624,6 +641,9 @@ final class DiagnosticReporter {
             index.put("selectionFingerprint", selectionFingerprint());
             index.put("sourceFingerprint", sourceFingerprint());
             index.put("dependencyFingerprint", dependencyFingerprint());
+            if (!runProfile.isBlank()) index.put("runProfile", runProfile);
+            index.put("runProfileFingerprint", runProfileFingerprint);
+            index.put("directRunProfile", directRunProfile);
             index.put("evidenceIntegrity", partial ? "PARTIAL" : "COMPLETE");
             if (!lineageMetadata().isEmpty()) index.put("lineage", lineageMetadata());
             index.put("comparisonMetadata", comparisonMetadata());
@@ -716,6 +736,8 @@ final class DiagnosticReporter {
         meta.put("selectionFingerprint", selectionFingerprint());
         meta.put("sourceFingerprint", sourceFingerprint());
         meta.put("dependencyFingerprint", dependencyFingerprint());
+        meta.put("runProfileFingerprint", runProfileFingerprint);
+        meta.put("directRunProfile", directRunProfile);
         meta.put("javaVersion", System.getProperty("java.version"));
         meta.put("os", System.getProperty("os.name") + " " + System.getProperty("os.version"));
         meta.put("timezone", java.time.ZoneId.systemDefault().getId());
@@ -736,6 +758,22 @@ final class DiagnosticReporter {
         }
         try {
             return sha256Hex(JSON.writeValueAsBytes(selection));
+        } catch (IOException e) {
+            return "";
+        }
+    }
+
+    private static String runProfileFingerprint(Map<String, String> values) {
+        Map<String, String> runVars = new TreeMap<>();
+        if (values != null) {
+            values.forEach((key, value) -> {
+                if (PKB_props.isRunVariableKey(key) && value != null) {
+                    runVars.put(key.toLowerCase(Locale.ROOT), value);
+                }
+            });
+        }
+        try {
+            return sha256Hex(JSON.writeValueAsBytes(runVars));
         } catch (IOException e) {
             return "";
         }

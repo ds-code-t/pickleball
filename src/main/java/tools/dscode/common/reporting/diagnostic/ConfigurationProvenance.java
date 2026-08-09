@@ -1,5 +1,6 @@
 package tools.dscode.common.reporting.diagnostic;
 
+import tools.dscode.testengine.PKB_props;
 import tools.dscode.testengine.SensitiveConfiguration;
 
 import java.nio.charset.StandardCharsets;
@@ -11,7 +12,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public final class ConfigurationProvenance {
@@ -19,10 +19,6 @@ public final class ConfigurationProvenance {
 
     private static final Map<String, String> lastValues = new ConcurrentHashMap<>();
     private static final Map<String, String> sources = new ConcurrentHashMap<>();
-    private static final Set<String> sensitiveFragments = Set.of(
-            "password", "passwd", "secret", "token", "apikey", "api_key",
-            "accesskey", "privatekey", "credential", "authorization", "cookie"
-    );
 
     private ConfigurationProvenance() {
     }
@@ -74,13 +70,12 @@ public final class ConfigurationProvenance {
     }
 
     public static boolean sensitive(String key) {
-        String normalized = normalize(key);
-        return SensitiveConfiguration.isSensitive(normalized)
-                || sensitiveFragments.stream().anyMatch(normalized::contains);
+        return SensitiveConfiguration.isSensitive(key);
     }
 
     private static boolean executionRelevant(String key) {
         String k = normalize(key);
+        if (PKB_props.isRunMetadataKey(k)) return false;
         return k.startsWith("pkb_")
                 || k.startsWith("cucumber.")
                 || k.startsWith("rp.")

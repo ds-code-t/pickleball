@@ -114,6 +114,12 @@ public abstract class PickleballRunner {
         return getInstance().values.get(PKB_OPTIONS);
     }
 
+    /** True when the current runner was resolved from a direct {@code pkb_run_profile}. */
+    public static boolean isDirectRunProfileActive() {
+        PickleballRunner current = INSTANCE;
+        return current != null && current.directRunProfile;
+    }
+
     public static Properties getReportPortalProperties() {
         Properties properties = new Properties();
         getInstance().values.forEach((key, value) -> {
@@ -572,6 +578,7 @@ public abstract class PickleballRunner {
                     || key.equals(PKB_OPTIONS)
                     || key.equals(PKB_RUN_PROFILE)
                     || key.startsWith(PickleballProfiles.INLINE_PROFILE_PREFIX)
+                    || PKB_props.isRunMetadataKey(key)
                     || !key.startsWith(PKB_PREFIX)
                     || value.isBlank()) {
                 continue;

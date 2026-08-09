@@ -51,6 +51,12 @@ For visual evidence:
 - Raw PNG byte equality proves the files are identical, but raw PNG byte inequality does not prove their rendered pixels differ because encoding or metadata may differ. Prefer decoded-pixel equality from the fingerprint comparator.
 
 For routine diagnostic utility operations, prefer `tools.dscode.common.reporting.diagnostic.DiagnosticCli` over constructing a Maven classpath and JShell script. See `docs/diagnostic-reporting.md` for commands.
+
+### Controlled diagnostic reruns
+
+When an investigation requires a rerun and the intended Pickleball execution settings are known, prefer the selected run's retained `runProfile` from `run-index.json` as the starting execution contract. Supply that value through `pkb_run_profile` and change only the RunVars required by the current hypothesis. Do not reconstruct the effective RunVars by manually combining runner defaults, property files, named profiles, system properties, and Cucumber aliases when a retained final run profile is available.
+
+Diagnostic lineage is metadata, not part of the execution RunVars. Supply `pkb_investigation_id`, `pkb_run_purpose`, `pkb_parent_run_id`, `pkb_baseline_run_id`, and `pkb_changed_variables` separately from `pkb_run_profile`; profiles must not contain those keys. After the rerun, verify `runProfileFingerprint` / `directRunProfile` and the declared changed variables before attributing observed differences to the intended configuration change. See `docs/ai-run-configuration.md`.
 ## Sources of truth
 
 Use all relevant evidence rather than trusting one file in isolation:

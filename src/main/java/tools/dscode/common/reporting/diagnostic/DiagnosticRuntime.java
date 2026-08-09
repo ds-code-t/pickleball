@@ -8,6 +8,7 @@ import io.cucumber.datatable.DataTable;
 import org.openqa.selenium.WebDriver;
 import tools.dscode.common.reporting.logging.Entry;
 import tools.dscode.common.reporting.logging.Level;
+import tools.dscode.testengine.PickleballRunner;
 
 import java.nio.file.Path;
 import java.util.Locale;
@@ -27,7 +28,9 @@ public final class DiagnosticRuntime {
     public static synchronized void configure(Map<String, String> values) {
         DIAGNOSTIC_MODE = "diagnostic".equalsIgnoreCase(find(values, PKB_REPORTING_MODE));
         ReportRetentionPolicy.configure(find(values, PKB_REPORT_RETENTION));
-        if (DIAGNOSTIC_MODE && (reporter == null || reporter.isFinished())) reporter = new DiagnosticReporter(values);
+        if (DIAGNOSTIC_MODE && (reporter == null || reporter.isFinished())) {
+            reporter = new DiagnosticReporter(values, PickleballRunner.isDirectRunProfileActive());
+        }
     }
 
     public static boolean isDiagnostic() {

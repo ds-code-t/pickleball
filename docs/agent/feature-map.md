@@ -12,7 +12,7 @@ Agents must use it for navigation, verify all paths and symbols against current 
 | Keyboard and key-expression DSL | `KeyParser.java`; mapping query classes; search `Keyboard`, `Tokenized`, `Query` | Search key/query tests | `keyboard.feature`; `site/keyboard.html` | `docs/key-parser-dsl.md` |
 | Mapping, parsing maps, Data Elements, templates, `file:`, marker `data:`, and rooted `data:/` | `MappingSteps.java`; `FileAndDataParsing.java`; `MappingProcessor.java`; `NodeMap.java`; `ParsingMap.java`; `ValueFormatting.java`; `common/dataelements`; query classes | Consumer-hosted mapping/Data Element checks | `mapping-and-resources.feature`; `mapping-value-type-preservation.feature`; `scenario-data-references.feature`; `data-element-*`; `internal-framework-java-checks.feature`; `data/escaped-data-records.feature`; `data/files/customerPayload.json`; service-call definitions | `docs/mapping-and-templating.md`; `docs/data-values-and-elements.md`; `docs/data-element-query-runtime.md`; `docs/config-files-and-resource-mapping.md`; `docs/configuration.md` |
 | Configuration and resource lookup | `src/main/java/tools/dscode/common`; `src/main/java/tools/dscode/registry`; `PKB_props.java`; `PkbPropertyValueNormalizer.java`; `PkbSystemPropertyValueAspect.aj`; search `Configuration`, `Resource`, `Properties`, `Yaml`, `PKB_DATA_PATH` | `PkbPropertyValueNormalizerChecks.java`; `ProfileConfigurationChecks.java`; search configuration/resource tests | `configuration-system-properties.feature`; `profiles.yaml`; `pickleball.properties`; `configs`; `mapping-and-resources.feature`; `scenario-data-references.feature`; consumer `pom.xml` | `docs/configuration.md`; `docs/getting-started.md`; `docs/ai-run-configuration.md`; `docs/config-files-and-resource-mapping.md` |
-| Diagnostic reporting, sparse-first agent navigation, CLI comparison/rebuild, compressed deep trace evidence, source/Git provenance, step-origin/capability metadata, evidence retention, screenshots, fingerprints, and run comparison | `src/main/java/tools/dscode/common/reporting/diagnostic`; `src/main/aspectj/tools/dscode/common/reporting/diagnostic`; `DiagnosticCli.java`; `DiagnosticRunComparator.java`; `VisualFingerprintComparator.java`; `DiagnosticIndexRebuilder.java`; `SourceProvenance.java`; `ScenarioIdentity.java`; `DiagnosticStepMetadata.java`; `PlatformLogFormatter.java`; `PlatformLogAspect.aj`; `gradle/pickleball-build-provenance.gradle`; `Entry.java`; `Log.java`; `SimpleHtmlReportConverter.java`; `CurrentScenarioState.java`; search `pkb_reportingmode`, `pkb_reportretention`, `pkb_platformlog`, `pkb_gitsnapshot`, `DIAGNOSTIC_MODE`, `nativeCapabilitiesObserved`, `comparisonToPrevious`, `decodedPixelsExactlyEqual`, `failureSignatureVersion`, `failureSiteKey` | Consumer-hosted `DiagnosticReportingChecks.java`; `Diagnostic213CompletionChecks.java` including CLI delegate checks | `internal-framework-java-checks.feature`; `diagnostic-reporting-validation.feature`; `InternalFrameworkTestSteps.java`; `run-diagnostic-fix-validation.ps1`; `maven-consumer-project/README.md` CLI examples | `docs/diagnostic-reporting.md`; `docs/ai-diagnostic-reporting-plan.md`; `docs/ai-run-configuration.md`; `docs/configuration.md`; root `AGENTS.md` diagnostic investigation protocol |
+| Diagnostic reporting, sparse-first agent navigation, controlled reruns, CLI comparison/rebuild, compressed deep trace evidence, source/Git provenance, step-origin/capability metadata, evidence retention, screenshots, fingerprints, and run comparison | `src/main/java/tools/dscode/common/reporting/diagnostic`; `src/main/aspectj/tools/dscode/common/reporting/diagnostic`; `DiagnosticCli.java`; `DiagnosticRunComparator.java`; `VisualFingerprintComparator.java`; `DiagnosticIndexRebuilder.java`; `SourceProvenance.java`; `ScenarioIdentity.java`; `DiagnosticStepMetadata.java`; `PlatformLogFormatter.java`; `PlatformLogAspect.aj`; `gradle/pickleball-build-provenance.gradle`; `Entry.java`; `Log.java`; `SimpleHtmlReportConverter.java`; `CurrentScenarioState.java`; `PKB_props.java`; `PickleballProfiles.java`; search `pkb_reportingmode`, `pkb_reportretention`, `pkb_platformlog`, `pkb_gitsnapshot`, `pkb_run_profile`, `runProfileFingerprint`, `directRunProfile`, `DIAGNOSTIC_MODE`, `nativeCapabilitiesObserved`, `comparisonToPrevious`, `decodedPixelsExactlyEqual`, `failureSignatureVersion`, `failureSiteKey` | Consumer-hosted `DiagnosticReportingChecks.java`; `Diagnostic213CompletionChecks.java` including CLI delegate and run-profile metadata/rebuild checks; `ProfileConfigurationChecks.java` | `internal-framework-java-checks.feature`; `diagnostic-reporting-validation.feature`; `configuration-system-properties.feature` (`@profile-direct-validation`); `InternalFrameworkTestSteps.java`; `run-diagnostic-fix-validation.ps1`; `maven-consumer-project/README.md` CLI examples | `docs/diagnostic-reporting.md`; `docs/ai-diagnostic-reporting-plan.md`; `docs/ai-run-configuration.md`; `docs/configuration.md`; root `AGENTS.md` diagnostic investigation and controlled-rerun protocols |
 | Nested steps and block conditionals | Search `src/main/java` for `Nested`, `Conditional`, `Block`, `Condition` | Search nested/conditional tests | `nested-and-block-conditionals.feature`; `site/workflow.html` | `docs/nested-steps.md`; `docs/block-conditionals.md` |
 | Component scenarios, reusable selector paths, step markers, and marker-data lookup | `src/main/java/tools/dscode/coredefinitions/ModularScenarios.java`; `ScenarioStep.java`; `ScenarioStepData.java`; `StepExtension.java`; `CucumberScanUtil.java`; search unified `RUN`, `splitEscapedPath`, `RunKey`, `pkb_componentpath`, `Step_Marker`, `getScenarioStepData`, `getScenarioMarkerData` | `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/ModularScenariosChecks.java`; `ScenarioStepChecks.java`; `ScenarioStepDataChecks.java` | `component-scenarios.feature`; `reusable-scenario-selection.feature`; `run-step-parameter-variations.feature`; `scenario-step-markers.feature`; `scenario-marker-data.feature`; `scenario-data-references.feature`; `data/escaped-data-records.feature` | `docs/component-scenarios.md`; `docs/data-values-and-elements.md`; `docs/configuration.md` |
 | Service-call definitions and execution | `ServiceCallSteps.java`; `ModularScenarios.java`; `ScenarioStep.java`; `RestAssuredUtil.java`; mapping classes; search `RUN SERVICE CALL`, `CALL:`, `$CALL:`, `RunKey`, `pkb_callpath`, `Step_Marker` | `ModularScenariosChecks.java`; `ScenarioStepChecks.java`; service/request/response checks | `service-call-execution.feature`; `reusable-scenario-selection.feature`; `run-step-parameter-variations.feature`; `scenario-step-markers.feature`; `calls/service-call-definitions.feature`; local server support | `docs/service-call-scenarios.md`; `docs/component-scenarios.md`; `docs/configuration.md`; `docs/mapping-and-templating.md` |
@@ -20,7 +20,7 @@ Agents must use it for navigation, verify all paths and symbols against current 
 | Dialog handling | `BrowserAlerts.java`; browser steps; search `Alert`, `Dialog` | Search dialog/alert tests | `dialogs.feature`; `site/dialogs.html` | Dynamic-step/custom-element docs |
 | Cucumber compatibility and weaving | `src/main/aspectj/io/cucumber`; `src/main/java/io/cucumber`; `build.gradle` | Search compatibility tests | Consumer runner and all consumer features | `docs/cucumber-compatibility.md`; `docs/feature-status-notes.md` |
 | Test-site server and fixtures | `maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java`; `maven-consumer-project/src/test/resources/site` | Consumer-side support checks | Browser and service-call features | `maven-consumer-project/README.md`; relevant guides |
-| Execution configuration, named/composite profiles, direct run profiles, ReportPortal aliases, and tagging | `src/main/java/tools/dscode/testengine/PickleballRunner.java`; `PickleballProfiles.java`; `PKB_props.java`; `SensitiveConfiguration.java`; `DynamicSuiteConfigUtils.java`; `ReportPortalBridge.java`; `ConfigurationProvenance.java`; search `pkb_profile`, `pkb_run_profile`, `pkb_profile_`, `pkb_rp_`, `default_profile`, `profiles.yaml` | Consumer-hosted `ProfileConfigurationChecks.java` | `maven-consumer-project/src/test/resources/profiles.yaml`; `pickleball.properties`; `pickleball_local.properties`; `internal-framework-java-checks.feature`; consumer `pom.xml` | `docs/configuration.md`; `docs/getting-started.md`; `docs/ai-run-configuration.md`; `docs/ai-diagnostic-reporting-plan.md` |
+| Execution configuration, named/composite profiles, direct run profiles, diagnostic lineage metadata, ReportPortal aliases, and tagging | `src/main/java/tools/dscode/testengine/PickleballRunner.java`; `PickleballProfiles.java`; `PKB_props.java`; `SensitiveConfiguration.java`; `DynamicSuiteConfigUtils.java`; `ReportPortalBridge.java`; `ConfigurationProvenance.java`; search `pkb_profile`, `pkb_run_profile`, `pkb_profile_`, `pkb_investigation_id`, `pkb_parent_run_id`, `pkb_changed_variables`, `pkb_rp_`, `default_profile`, `profiles.yaml` | Consumer-hosted `ProfileConfigurationChecks.java` | `maven-consumer-project/src/test/resources/profiles.yaml`; `configuration-system-properties.feature` (`@profile-direct-validation`); `pickleball.properties`; `pickleball_local.properties`; `internal-framework-java-checks.feature`; consumer `pom.xml` | `docs/configuration.md`; `docs/getting-started.md`; `docs/ai-run-configuration.md`; `docs/ai-diagnostic-reporting-plan.md`; `docs/diagnostic-reporting.md` |
 
 ## Pickleball profile and direct-run contract
 
@@ -28,11 +28,13 @@ The legacy resolved Pickleball RunVars form an in-memory `default_profile`. `pro
 
 Profile values may use normal `<...>` mapping references to any retained profile, including `default_profile`, and are resolved after composition. `pkb_profile_<name>` defines the same kind of named profile inline from any normal Pickleball configuration source; the final inline definition overlays a same-named YAML profile.
 
-`pkb_run_profile` is a control/derived property rather than a RunVar. After normal/profile resolution it contains the serialized active RunVars. A top-level value, or a value contained in a selected YAML/inline profile when no top-level value wins, enters direct mode and becomes the complete RunVar source: normal RunVar defaults, the rest of `pkb_profile` composition, and projected Cucumber CLI RunVar overrides are not applied. Profile/default objects are still loaded as reference data so templates and protected-value references can resolve.
+`pkb_run_profile` is a control/derived property rather than a RunVar. After normal/profile resolution it contains the deterministic, key-sorted serialized active RunVars. A top-level value, or a value contained in a selected YAML/inline profile when no top-level value wins, enters direct mode and becomes the complete RunVar source: normal RunVar defaults, the rest of `pkb_profile` composition, and projected Cucumber CLI RunVar overrides are not applied. Profile/default objects are still loaded as reference data so templates and protected-value references can resolve.
 
-ReportPortal native `rp.*` names are generically mapped to/from `pkb_rp_*` aliases. The active run profile is authoritative for the bridge, and active `pkb_rp_enable=true` is required for ReportPortal logging. Protected variable names are centralized in `SensitiveConfiguration`; serialized `pkb_run_profile` uses `${protected:<pkb-key>}` instead of plaintext secret values.
+Diagnostic lineage keys `pkb_investigation_id`, `pkb_run_purpose`, `pkb_parent_run_id`, `pkb_baseline_run_id`, and `pkb_changed_variables` are run metadata rather than RunVars. They must be supplied outside profiles, survive direct mode, and do not participate in the retained `pkb_run_profile` or `runProfileFingerprint`.
 
-AI agents should use `docs/ai-run-configuration.md` and prefer an explicit `pkb_run_profile` for deterministic reruns where inheritance from local/default RunVars would weaken the comparison.
+ReportPortal native `rp.*` names are generically mapped to/from `pkb_rp_*` aliases. The active run profile is authoritative for the bridge, and active `pkb_rp_enable=true` is required for ReportPortal logging. Protected variable names are centralized in `SensitiveConfiguration`; explicit audited names remain available while conservative secret-like name detection prevents future credential/token/password-style RunVars from bypassing serialized-profile or diagnostic redaction. Serialized `pkb_run_profile` uses `${protected:<pkb-key>}` instead of plaintext sensitive values.
+
+Diagnostic `run-index.json` exposes the sanitized final `runProfile`, its `runProfileFingerprint`, and `directRunProfile`. Agents should use `docs/ai-run-configuration.md` and prefer an explicit retained `pkb_run_profile` for deterministic reruns, changing only the intended RunVars and passing diagnostic lineage separately.
 
 ## Unified reusable-scenario selector contract
 
@@ -118,46 +120,3 @@ For an affected row:
 2. Confirm focused framework/internal checks.
 3. Confirm the canonical consumer scenario and supporting resources.
 4. Confirm the canonical guide.
-5. Update all affected surfaces.
-6. Refine broad anchors when stable exact paths are available.
-
-## Maintenance rules
-
-Update this map when:
-
-- a capability is added, removed, renamed, or split;
-- responsibility moves between classes/modules;
-- a new canonical consumer fixture is introduced;
-- public syntax, defaults, constraints, value types, or compatibility changes.
-
-Do not update it for a purely internal refactor when all listed ownership and public contracts remain accurate.
-
-## Internal or provisional features
-
-### `?`-prefixed fallback keys
-
-Status: internal/provisional; do not add to public documentation.
-
-A root property named `?key` may provide a fallback for `key` when the normal value is missing, null, empty, or blank. This behavior may be revised or deprecated.
-
-### Consumer-hosted internal Java checks
-
-Internal Java checks are compiled against the locally published dependency and run through:
-
-- `maven-consumer-project/src/test/resources/features/internal-framework-java-checks.feature`
-- `maven-consumer-project/src/test/java/com/example/pickleball/InternalFrameworkTestSteps.java`
-- `maven-consumer-project/src/test/java/com/example/pickleball/support/InternalJavaTestRunner.java`
-
-The reusable selector/parser checks are in:
-
-- `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/ModularScenariosChecks.java`
-
-The configuration JVM-value normalization and profile checks are in:
-
-- `maven-consumer-project/src/test/java/tools/dscode/testengine/PkbPropertyValueNormalizerChecks.java`
-- `maven-consumer-project/src/test/java/tools/dscode/testengine/ProfileConfigurationChecks.java`
-
-The diagnostic reporting checks are in:
-
-- `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/DiagnosticReportingChecks.java`
-- `maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/Diagnostic213CompletionChecks.java`

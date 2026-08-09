@@ -1,6 +1,6 @@
 # Execution Configuration
 
-> **Runnable examples:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) exercises normal execution settings. [`scenario-data-references.feature`](../maven-consumer-project/src/test/resources/features/scenario-data-references.feature) exercises default data-path behavior and `data:/` file lookup. [`configuration-system-properties.feature`](../maven-consumer-project/src/test/resources/features/configuration-system-properties.feature) verifies JVM `pkb_*` value quote normalization. The consumer [`profiles.yaml`](../maven-consumer-project/src/test/resources/profiles.yaml) is a syntax example for run profiles.
+> **Runnable examples:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) exercises normal execution settings. [`scenario-data-references.feature`](../maven-consumer-project/src/test/resources/features/scenario-data-references.feature) exercises default data-path behavior and `data:/` file lookup. [`configuration-system-properties.feature`](../maven-consumer-project/src/test/resources/features/configuration-system-properties.feature) verifies JVM `pkb_*` value quote normalization and the direct-run/lineage contract. The consumer [`profiles.yaml`](../maven-consumer-project/src/test/resources/profiles.yaml) is a syntax example for run profiles.
 
 Pickleball execution properties select scenarios and control how they run. Property names are case-insensitive; this page uses lowercase `pkb_` names for consistency.
 
@@ -165,13 +165,13 @@ pkb_profile=agent_direct
 
 `pkb_run_profile` is both the retained serialized form of the final active RunVars and an optional direct input.
 
-After normal/profile resolution, Pickleball stores a comma-separated, quote-aware representation such as:
+After normal/profile resolution, Pickleball stores a deterministic key-sorted, comma-separated, quote-aware representation such as:
 
 ```text
-pkb_glue=com.example.pickleball, pkb_features=classpath:features, pkb_tags=@smoke, pkb_browser=CHROME_HEADLESS
+pkb_browser=CHROME_HEADLESS, pkb_features=classpath:features, pkb_glue=com.example.pickleball, pkb_tags=@smoke
 ```
 
-`pkb_run_profile` itself, `pkb_profile`, inline profile definitions, and `pkb_options` are control/derived properties and are not copied into `RunVars`.
+`pkb_run_profile` itself, `pkb_profile`, inline profile definitions, `pkb_options`, and diagnostic lineage metadata are control/metadata properties and are not copied into `RunVars`.
 
 When `pkb_run_profile` is supplied explicitly, it is a **full RunVar override**:
 
@@ -186,9 +186,34 @@ In direct mode:
 - only assignments contained in `pkb_run_profile` become RunVars;
 - template references inside it are resolved after profile definitions and `default_profile` have been loaded as reference data;
 - projected Cucumber CLI RunVar overrides are ignored, so the direct run profile remains deterministic;
-- normal downstream Cucumber/ReportPortal alias conversion still occurs.
+- normal downstream Cucumber/ReportPortal alias conversion still occurs;
+- diagnostic lineage metadata supplied separately remains available without becoming part of the execution profile.
 
 This mode is intended for reproducible automation and AI-agent test runs where the caller wants one explicit configuration without auditing every possible default or override source.
+
+### Diagnostic run metadata
+
+These properties describe investigation lineage rather than execution behavior and are therefore **not RunVars**:
+
+```text
+pkb_investigation_id
+pkb_run_purpose
+pkb_parent_run_id
+pkb_baseline_run_id
+pkb_changed_variables
+```
+
+Supply them separately from `pkb_run_profile`. They survive direct mode, are excluded from the retained run profile, its fingerprint, and the execution-configuration hash, and are rejected if placed inside a YAML/inline profile or direct run-profile assignment. This keeps the execution contract stable while allowing each diagnostic rerun to carry different lineage.
+
+For example:
+
+```bash
+mvn test \
+  -Dpkb_investigation_id="diag-214" \
+  -Dpkb_parent_run_id="20260809-previous" \
+  -Dpkb_changed_variables="pkb_browser" \
+  "-Dpkb_run_profile=pkb_tags=@smoke, pkb_browser=CHROME_HEADLESS, pkb_reportingmode=diagnostic"
+```
 
 A derived `pkb_run_profile` protects configured sensitive fields using placeholders such as:
 
@@ -197,6 +222,8 @@ pkb_rp_api_key=${protected:pkb_rp_api_key}
 ```
 
 When such a protected run profile is reused in another process, provide the sensitive value separately through normal secure configuration (for example `-Drp.api.key=...` or `-Dpkb_rp_api_key=...`). Pickleball resolves the protected placeholder from `default_profile` for the direct run without printing the secret in the serialized profile.
+
+The explicit protected-property registry remains in `SensitiveConfiguration`. In addition, secret-like names containing fragments such as `password`, `secret`, `token`, `api_key`, or `credential` are treated as sensitive for display/serialization so a newly introduced credential-shaped RunVar cannot bypass redaction accidentally.
 
 ## Common properties
 
@@ -213,6 +240,11 @@ When such a protected run profile is reused in another process, provide the sens
 | `pkb_browser` | `chrome` | browser configuration name |
 | `pkb_profile` | `default_profile,qa` | selected profile(s), composed left-to-right |
 | `pkb_run_profile` | `pkb_tags=@smoke, pkb_browser=chrome` | retained final RunVars or explicit full RunVar override |
+| `pkb_investigation_id` | `diag-214` | diagnostic investigation lineage metadata; not a RunVar |
+| `pkb_run_purpose` | `browser-counterfactual` | diagnostic run purpose metadata; not a RunVar |
+| `pkb_parent_run_id` | `20260809-...` | immediate parent-run lineage metadata; not a RunVar |
+| `pkb_baseline_run_id` | `20260809-...` | baseline-run lineage metadata; not a RunVar |
+| `pkb_changed_variables` | `pkb_browser` | declares intended changed RunVars; not itself a RunVar |
 | `pkb_debugbrowser` | `true` | retain extra browser troubleshooting state |
 | `pkb_loglevel` | `debug` | `trace`, `debug`, `info`, `warn`, or `error` |
 | `pkb_parallel` | `4` | maximum parallel scenario count |

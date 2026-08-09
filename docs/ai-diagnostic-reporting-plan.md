@@ -51,6 +51,19 @@ The following decisions are authoritative for the 2.1.3 implementation and super
 - `tools.dscode.common.reporting.diagnostic.DiagnosticCli` is the maintained command-line front end for routine run comparison, explicit fingerprint comparison, and rebuild/recovery operations. It delegates to the existing diagnostic APIs rather than duplicating comparison or rebuild logic.
 - Pickleball 2.1.3 produces evidence for external AI/developer investigation. Autonomous agent command execution, permissions, source changes, and dependency installation remain outside the framework implementation scope.
 
+## 1.2 Pickleball 2.1.4 profile-assisted rerun decisions
+
+Pickleball 2.1.4 adds a deterministic bridge from diagnostic investigation to controlled rerun:
+
+- `pkb_run_profile` represents only execution RunVars and can be supplied as the complete authoritative RunVar set for a rerun.
+- `pkb_investigation_id`, `pkb_run_purpose`, `pkb_parent_run_id`, `pkb_baseline_run_id`, and `pkb_changed_variables` are investigation metadata rather than RunVars. They are supplied separately, survive direct mode, are rejected inside profiles, and do not participate in the execution-configuration hash.
+- `run-index.json` retains a sanitized copyable `runProfile`, a deterministic `runProfileFingerprint`, and `directRunProfile`.
+- The fingerprint is calculated from the canonical final execution RunVars. Actual protected values participate only as one-way hash input; the retained profile remains sanitized/protected.
+- `comparisonMetadata` and therefore the sparse catalog carry the fingerprint/direct flag but not the full profile string.
+- `configuration.json` preserves the profile metadata so `DiagnosticIndexRebuilder` can reproduce equivalent sparse indexes.
+- Agents should reuse the selected baseline/relevant run's `runProfile`, change only the variable(s) required by the current hypothesis, pass lineage separately, and verify the resulting fingerprint/declared changes before attributing differences to the rerun.
+- Secret detection for configuration provenance and serialized run profiles uses one central policy so new secret-like RunVars cannot become a redaction bypass.
+
 ## 2. Diagnostic architecture and evidence hierarchy
 
 The framework uses progressive disclosure:
@@ -378,9 +391,9 @@ A failure signature is an investigation aid, not a permanent public identifier o
 
 ## 17. Configuration provenance
 
-`configuration.json` records execution-relevant effective settings and their observed winning source when available.
+`configuration.json` records execution-relevant effective settings and their observed winning source when available. It also stores the sanitized final `runProfile`, `runProfileFingerprint`, and `directRunProfile` so reconstructed sparse indexes retain the same execution-contract metadata.
 
-Secret-like configuration keys are redacted before persistence. A one-way value hash may be retained so an agent can compare whether protected values differ without learning either value.
+Secret-like configuration keys are redacted before persistence. The same central sensitivity policy protects serialized run-profile assignments. A one-way value hash may be retained so an agent can compare whether protected values differ without learning either value; protected values may likewise influence `runProfileFingerprint` without being exposed.
 
 Large values are bounded and marked when truncated.
 
@@ -590,7 +603,7 @@ run catalog
 -> TRACE/DEBUG only as the final evidence layer
 ```
 
-Every diagnostic rerun should have a purpose and should change as few variables as practical.
+Every diagnostic rerun should have a purpose and should change as few variables as practical. When the selected run index contains `runProfile`, use it as the starting execution contract instead of auditing and recombining the individual configuration sources. Pass the investigation lineage fields separately from `pkb_run_profile`, change only the declared RunVars, and verify `runProfileFingerprint` / `directRunProfile` on the resulting run before deeper comparison.
 
 Preferred test expansion:
 

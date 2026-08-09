@@ -510,6 +510,67 @@ public class Diagnostic213CompletionChecks {
     }
 
     @Test
+    void runProfileMetadataIsSparseAndRebuildable() throws Exception {
+        Path root = Files.createTempDirectory("pickleball-run-profile-diagnostic");
+        try {
+            Map<String, String> values = new LinkedHashMap<>();
+            values.put("pkb_diagnostic_output", root.toString());
+            values.put("pkb_browser", "CHROME_HEADLESS");
+            values.put("pkb_tags", "@profile-direct-validation");
+            values.put("pkb_reportingmode", "diagnostic");
+            values.put("pkb_service_token", "runtime-secret");
+            values.put("pkb_run_profile",
+                    "pkb_browser=CHROME_HEADLESS, pkb_reportingmode=diagnostic, "
+                            + "pkb_service_token=${protected:pkb_service_token}, "
+                            + "pkb_tags=@profile-direct-validation");
+            values.put("pkb_investigation_id", "diag-214-run-profile");
+
+            DiagnosticReporter reporter = new DiagnosticReporter(values, true);
+            reporter.finishRun();
+            Path runRoot = reporter.runRoot();
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> index = JSON.readValue(runRoot.resolve("run-index.json").toFile(), LinkedHashMap.class);
+            String runProfile = String.valueOf(index.get("runProfile"));
+            String fingerprint = String.valueOf(index.get("runProfileFingerprint"));
+            assertTrue(runProfile.contains("pkb_tags=@profile-direct-validation"));
+            assertTrue(runProfile.contains("pkb_service_token=${protected:pkb_service_token}"));
+            assertFalse(runProfile.contains("runtime-secret"));
+            assertFalse(runProfile.contains("pkb_investigation_id"));
+            assertEquals(Boolean.TRUE, index.get("directRunProfile"));
+            assertEquals(64, fingerprint.length());
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> comparison = (Map<String, Object>) index.get("comparisonMetadata");
+            assertEquals(fingerprint, comparison.get("runProfileFingerprint"));
+            assertEquals(Boolean.TRUE, comparison.get("directRunProfile"));
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> configuration = JSON.readValue(
+                    runRoot.resolve("configuration.json").toFile(), LinkedHashMap.class);
+            assertEquals(runProfile, configuration.get("runProfile"));
+            assertEquals(fingerprint, configuration.get("runProfileFingerprint"));
+            assertEquals(Boolean.TRUE, configuration.get("directRunProfile"));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> effective = (Map<String, Object>) configuration.get("effective");
+            assertFalse(effective.containsKey("pkb_investigation_id"));
+            assertFalse(Files.readString(runRoot.resolve("configuration.json")).contains("runtime-secret"));
+
+            Files.delete(runRoot.resolve("run-index.json"));
+            Map<String, Object> rebuilt = DiagnosticIndexRebuilder.rebuildRunIndex(runRoot);
+            assertEquals(runProfile, rebuilt.get("runProfile"));
+            assertEquals(fingerprint, rebuilt.get("runProfileFingerprint"));
+            assertEquals(Boolean.TRUE, rebuilt.get("directRunProfile"));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> rebuiltComparison = (Map<String, Object>) rebuilt.get("comparisonMetadata");
+            assertEquals(fingerprint, rebuiltComparison.get("runProfileFingerprint"));
+            assertEquals(Boolean.TRUE, rebuiltComparison.get("directRunProfile"));
+        } finally {
+            deleteTree(root);
+        }
+    }
+
+    @Test
     void failureSignatureNormalizesVolatileNumbersAndPreservesNoSiteFallback() {
         String site = "stable-site";
         String first = Diagnostic213CompletionAspect.failureSignatureForTesting(

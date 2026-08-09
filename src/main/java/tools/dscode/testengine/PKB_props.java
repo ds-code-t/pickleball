@@ -2,6 +2,7 @@ package tools.dscode.testengine;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.Set;
 
 /** Canonical definitions for Pickleball {@code pkb_*} configuration property names. */
 public final class PKB_props {
@@ -48,6 +49,14 @@ public final class PKB_props {
     public static final String PKB_DEBUG_BROWSER = PKB_PREFIX + "debugBrowser";
     public static final String PKB_DEBUG_ARGS = PKB_PREFIX + "debugargs";
 
+    private static final Set<String> RUN_METADATA_KEYS = Set.of(
+            PKB_INVESTIGATION_ID,
+            PKB_RUN_PURPOSE,
+            PKB_PARENT_RUN_ID,
+            PKB_BASELINE_RUN_ID,
+            PKB_CHANGED_VARIABLES
+    );
+
     private PKB_props() {
     }
 
@@ -64,13 +73,20 @@ public final class PKB_props {
         values().put(PickleballRunner.normalizePkbKey(key), value);
     }
 
-    /** True only for effective execution RunVars, not profile selectors/definitions or derived summaries. */
+    /** Diagnostic/investigation lineage that describes a run but does not control execution. */
+    public static boolean isRunMetadataKey(String key) {
+        String normalized = PickleballRunner.normalizePkbKey(key);
+        return normalized != null && RUN_METADATA_KEYS.contains(normalized);
+    }
+
+    /** True only for effective execution RunVars, not profile controls, derived summaries, or run metadata. */
     public static boolean isRunVariableKey(String key) {
         String normalized = PickleballRunner.normalizePkbKey(key);
         if (normalized == null || !normalized.startsWith(PKB_PREFIX)) {
             return false;
         }
-        return !normalized.equals(PKB_PROFILE)
+        return !isRunMetadataKey(normalized)
+                && !normalized.equals(PKB_PROFILE)
                 && !normalized.equals(PKB_RUN_PROFILE)
                 && !normalized.equals(PKB_OPTIONS)
                 && !normalized.startsWith(PKB_PROFILE + "_");

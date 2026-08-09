@@ -23,6 +23,12 @@ public final class SensitiveConfiguration {
             "pkb_rp_http_proxy_password"
     );
 
+    /* Conservative fallback so new secret-like RunVars cannot bypass redaction before being audited above. */
+    private static final Set<String> SENSITIVE_FRAGMENTS = Set.of(
+            "password", "passwd", "secret", "token", "apikey", "api_key",
+            "accesskey", "privatekey", "credential", "authorization", "cookie"
+    );
+
     private SensitiveConfiguration() {
     }
 
@@ -32,7 +38,8 @@ public final class SensitiveConfiguration {
 
     public static boolean isSensitive(String key) {
         String normalized = normalize(key);
-        return PROTECTED_PROPERTIES.contains(normalized);
+        return PROTECTED_PROPERTIES.contains(normalized)
+                || SENSITIVE_FRAGMENTS.stream().anyMatch(normalized::contains);
     }
 
     public static String displayValue(String key, String value) {
