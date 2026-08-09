@@ -1,5 +1,7 @@
 package tools.dscode.common.reporting.diagnostic;
 
+import tools.dscode.testengine.SensitiveConfiguration;
+
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -61,7 +63,7 @@ public final class ConfigurationProvenance {
             boolean redacted = sensitive(normalized);
             String source = sources.getOrDefault(normalized, "resolved");
             result.put(entry.getKey(), new Value(
-                    redacted ? "<redacted>" : entry.getValue(),
+                    redacted ? SensitiveConfiguration.REDACTED : entry.getValue(),
                     source,
                     source.toLowerCase(Locale.ROOT).contains("default"),
                     redacted,
@@ -73,7 +75,8 @@ public final class ConfigurationProvenance {
 
     public static boolean sensitive(String key) {
         String normalized = normalize(key);
-        return sensitiveFragments.stream().anyMatch(normalized::contains);
+        return SensitiveConfiguration.isSensitive(normalized)
+                || sensitiveFragments.stream().anyMatch(normalized::contains);
     }
 
     private static boolean executionRelevant(String key) {

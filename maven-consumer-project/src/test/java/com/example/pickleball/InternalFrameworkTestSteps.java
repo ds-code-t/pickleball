@@ -15,6 +15,7 @@ import tools.dscode.common.util.datetime.BusinessTemporalDeltaChecks;
 import tools.dscode.common.util.datetime.BusinessTimePostModifierChecks;
 import tools.dscode.coredefinitions.ModularScenariosChecks;
 import tools.dscode.testengine.PkbPropertyValueNormalizerChecks;
+import tools.dscode.testengine.ProfileConfigurationChecks;
 
 import java.util.List;
 
@@ -32,7 +33,8 @@ public final class InternalFrameworkTestSteps {
                 ModularScenariosChecks.class,
                 BusinessTemporalDeltaChecks.class,
                 BusinessTimePostModifierChecks.class,
-                PkbPropertyValueNormalizerChecks.class
+                PkbPropertyValueNormalizerChecks.class,
+                ProfileConfigurationChecks.class
         );
     }
 

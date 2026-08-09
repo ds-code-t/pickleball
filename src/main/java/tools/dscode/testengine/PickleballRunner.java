@@ -1,5 +1,6 @@
 package tools.dscode.testengine;
 
+import com.epam.reportportal.utils.properties.PropertiesLoader;
 import io.cucumber.core.runner.CurrentScenarioState;
 import tools.dscode.common.reporting.logging.Level;
 
@@ -36,8 +37,9 @@ import static tools.dscode.testengine.PKB_props.PKB_NAME;
 import static tools.dscode.testengine.PKB_props.PKB_OPTIONS;
 import static tools.dscode.testengine.PKB_props.PKB_PARALLEL;
 import static tools.dscode.testengine.PKB_props.PKB_PREFIX;
+import static tools.dscode.testengine.PKB_props.PKB_PROFILE;
+import static tools.dscode.testengine.PKB_props.PKB_RUN_PROFILE;
 import static tools.dscode.testengine.PKB_props.PKB_TAGS;
-
 
 public abstract class PickleballRunner {
 
@@ -48,76 +50,85 @@ public abstract class PickleballRunner {
         java.util.logging.Logger.getLogger("org.junit.platform.launcher.core").setLevel(java.util.logging.Level.SEVERE);
     }
 
-
-
     private static volatile PickleballRunner INSTANCE;
 
     protected final LinkedHashMap<String, String> values = new LinkedHashMap<>();
     private final Map<String, String> readOnlyValues = Collections.unmodifiableMap(values);
+    private boolean directRunProfile;
 
     protected PickleballRunner() {
         debug("Constructing suite subclass: " + getClass().getName());
-
         EngineFilterBootstrap.ensureEngineFilterApplied("PickleballRunner.<init>");
-
         INSTANCE = this;
 
         globalTestDefaults();
-
         debug("Values after globalTestDefaults(): " + values);
 
         mergeResourcePropertiesIfMissing("pickleball.properties");
         mergeResourcePropertiesOverwriting("pickleball_local.properties");
         mergeResourcePropertiesOverwriting("pickleball_local2.properties");
-
         debug("Values after resource property merge: " + values);
 
         mergeAllSystemProperties();
-
         debug("Values after system property merge: " + values);
 
         globalTestProperties();
-
         debug("Values after globalTestProperties(): " + values);
 
         mergeAllSystemProperties();
-
+        mergeReportPortalSourceProperties();
         debug("Values after system property overrides: " + values);
 
+        /* Build the backward-compatible default_profile from the fully resolved legacy state. */
         applyPkbAliases();
-
-        debug("Values after pkb alias expansion: " + values);
-
-        String detectedGlue = DynamicSuiteBootstrap.detectDefaultGluePackage();
-        if (detectedGlue != null && !detectedGlue.isBlank()) {
-            values.putIfAbsent(GLUE_PROPERTY_NAME, detectedGlue);
-        }
-
-        values.putIfAbsent(FEATURES_PROPERTY_NAME, "classpath:features");
-
+        syncReportPortalAliases(false);
+        applyLegacyFrameworkDefaults();
         syncCanonicalAndAliasKeys();
+        syncReportPortalAliases(false);
 
+        PickleballProfiles.Resolution profileResolution = PickleballProfiles.apply(values);
+        directRunProfile = profileResolution.direct();
+
+        /* The selected/direct profile is now authoritative. Only aliases are derived after this point. */
+        applyPkbAliases();
+        syncCanonicalAndAliasKeys();
+        syncReportPortalAliases(true);
+        refreshRunProfile();
         refreshPkbOptions();
 
-        debug("Final values after defaults + alias sync: " + values);
-
+        debug("Final values after profile resolution + alias sync: " + values);
         publishToSystemProperties();
-
         applyDebugFlags();
 
         INSTANCE = this;
         debug("Registered singleton instance: " + getClass().getName());
 
-        values.putIfAbsent(PKB_LOGLEVEL,"INFO");
-        LOG_LEVEL = Level.valueOf(get(PKB_LOGLEVEL).toUpperCase().trim());
-
+        String configuredLogLevel = get(PKB_LOGLEVEL);
+        String effectiveLogLevel = configuredLogLevel == null || configuredLogLevel.isBlank()
+                ? "INFO"
+                : configuredLogLevel.trim();
+        LOG_LEVEL = Level.valueOf(effectiveLogLevel.toUpperCase(Locale.ROOT));
     }
 
     public static String getOptionsString() {
         return getInstance().values.get(PKB_OPTIONS);
     }
 
+    public static Properties getReportPortalProperties() {
+        Properties properties = new Properties();
+        getInstance().values.forEach((key, value) -> {
+            if (key != null && value != null && key.toLowerCase(Locale.ROOT).startsWith("rp.")) {
+                properties.setProperty(key, value);
+            }
+        });
+        return properties;
+    }
+
     public synchronized void captureCucumberCliArgs(String[] argv) {
+        if (directRunProfile) {
+            return;
+        }
+
         String[] args = argv == null ? new String[0] : Arrays.copyOf(argv, argv.length);
         values.put(PKB_CUCUMBER_CLI_ARGS, formatCliArgs(args));
 
@@ -127,9 +138,17 @@ public abstract class PickleballRunner {
         putCliOverride(PKB_GLUE, GLUE_PROPERTY_NAME, joinCommaSeparated(projection.glue));
         putCliReference(PKB_CUCUMBER_CLI_FEATURE_SELECTORS, formatCliArgs(projection.features));
 
+        refreshRunProfile();
         refreshPkbOptions();
     }
 
+    private void applyLegacyFrameworkDefaults() {
+        String detectedGlue = DynamicSuiteBootstrap.detectDefaultGluePackage();
+        if (detectedGlue != null && !detectedGlue.isBlank()) {
+            values.putIfAbsent(GLUE_PROPERTY_NAME, detectedGlue);
+        }
+        values.putIfAbsent(FEATURES_PROPERTY_NAME, "classpath:features");
+    }
 
     private void applyDebugFlags() {
         String debugArgs = get(PKB_DEBUG_ARGS);
@@ -137,7 +156,7 @@ public abstract class PickleballRunner {
             debugFlags.addAll(
                     Arrays.stream(debugArgs.split(","))
                             .filter(s -> !s.isBlank())
-                            .map(s -> s.trim().toLowerCase())
+                            .map(s -> s.trim().toLowerCase(Locale.ROOT))
                             .toList());
         }
         if (debugFlags.contains("logallsteps")) {
@@ -148,7 +167,7 @@ public abstract class PickleballRunner {
         if (raw == null || !"true".equalsIgnoreCase(raw.trim())) {
             return;
         }
-        io.cucumber.core.runner.CurrentScenarioState.globalDebugBrowser = true;
+        CurrentScenarioState.globalDebugBrowser = true;
         debug("Applied " + PKB_DEBUG_BROWSER + "=true -> CurrentScenarioState.globalDebugBrowser=true");
     }
 
@@ -170,7 +189,6 @@ public abstract class PickleballRunner {
             count++;
         }
 
-
         debug("Published " + count + " value(s) to system properties (skipped "
                 + skipped + "key(s) that could trigger foreign TestEngine discovery)");
     }
@@ -186,7 +204,6 @@ public abstract class PickleballRunner {
 
     public void globalTestProperties() {
     }
-
 
     public final Map<String, String> values() {
         return readOnlyValues;
@@ -295,6 +312,33 @@ public abstract class PickleballRunner {
                 + skipped + " derived internal key(s)");
     }
 
+    private void mergeReportPortalSourceProperties() {
+        try {
+            Properties reportPortal = PropertiesLoader.load().getProperties();
+            for (String key : reportPortal.stringPropertyNames()) {
+                if (key.toLowerCase(Locale.ROOT).startsWith("rp.")) {
+                    values.putIfAbsent(key.toLowerCase(Locale.ROOT), reportPortal.getProperty(key));
+                }
+            }
+
+            /* Native/aliased JVM values remain the strongest normal source. */
+            Properties system = System.getProperties();
+            for (String key : system.stringPropertyNames()) {
+                String normalized = key.toLowerCase(Locale.ROOT);
+                if (!normalized.startsWith("rp.")) {
+                    continue;
+                }
+                String alias = PickleballProfiles.reportPortalAliasKey(normalized);
+                String explicitAlias = system.getProperty(alias);
+                values.put(normalized, system.getProperty(key));
+                values.put(alias, explicitAlias != null ? explicitAlias : system.getProperty(key));
+            }
+        } catch (RuntimeException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new RuntimeException("Failed loading ReportPortal configuration", exception);
+        }
+    }
 
     private void applyPkbAliases() {
         syncPair(PKB_GLUE, GLUE_PROPERTY_NAME);
@@ -322,18 +366,45 @@ public abstract class PickleballRunner {
         syncPair(PKB_TAGS, FILTER_TAGS_PROPERTY_NAME);
     }
 
+    private void syncReportPortalAliases(boolean aliasWins) {
+        List<Map.Entry<String, String>> snapshot = new ArrayList<>(values.entrySet());
+        for (Map.Entry<String, String> entry : snapshot) {
+            String key = entry.getKey();
+            String value = entry.getValue();
+            if (key == null || value == null || value.isBlank()) {
+                continue;
+            }
+            String alias = PickleballProfiles.reportPortalAliasKey(key);
+            if (alias != null) {
+                values.putIfAbsent(alias, value);
+            }
+        }
+
+        snapshot = new ArrayList<>(values.entrySet());
+        for (Map.Entry<String, String> entry : snapshot) {
+            String canonical = PickleballProfiles.reportPortalCanonicalKey(entry.getKey());
+            String value = entry.getValue();
+            if (canonical == null || value == null || value.isBlank()) {
+                continue;
+            }
+            if (aliasWins) {
+                values.put(canonical, value);
+            } else {
+                values.putIfAbsent(canonical, value);
+            }
+        }
+    }
+
     private void syncPair(String aliasKey, String canonicalKey) {
         String aliasValue = values.get(aliasKey);
         String canonicalValue = values.get(canonicalKey);
 
         if (canonicalValue == null && aliasValue != null && !aliasValue.isBlank()) {
-            canonicalValue = aliasValue;
-            values.put(canonicalKey, canonicalValue);
+            values.put(canonicalKey, aliasValue);
         }
 
         if (aliasValue == null && canonicalValue != null && !canonicalValue.isBlank()) {
-            aliasValue = canonicalValue;
-            values.put(aliasKey, aliasValue);
+            values.put(aliasKey, canonicalValue);
         }
     }
 
@@ -379,7 +450,6 @@ public abstract class PickleballRunner {
                 case "--help", "-h", "--version", "-v", "--publish", "--dry-run", "-d",
                      "--no-dry-run", "--no-summary", "--monochrome", "-m", "--no-monochrome",
                      "--wip", "-w" -> {
-                    // Recognized Cucumber CLI flags without a direct pkb_* counterpart.
                 }
                 default -> {
                     if (!arg.startsWith("-")) {
@@ -482,6 +552,14 @@ public abstract class PickleballRunner {
         private final List<String> features = new ArrayList<>();
     }
 
+    private void refreshRunProfile() {
+        values.remove(PKB_RUN_PROFILE);
+        String serialized = PickleballProfiles.serializeRunProfile(values);
+        if (!serialized.isBlank()) {
+            values.put(PKB_RUN_PROFILE, serialized);
+        }
+    }
+
     private String formatPkbOptions() {
         StringBuilder out = new StringBuilder();
 
@@ -492,6 +570,8 @@ public abstract class PickleballRunner {
             if (key == null
                     || value == null
                     || key.equals(PKB_OPTIONS)
+                    || key.equals(PKB_RUN_PROFILE)
+                    || key.startsWith(PickleballProfiles.INLINE_PROFILE_PREFIX)
                     || !key.startsWith(PKB_PREFIX)
                     || value.isBlank()) {
                 continue;
@@ -503,7 +583,7 @@ public abstract class PickleballRunner {
 
             out.append(formatPkbOptionName(key))
                     .append("=")
-                    .append(value.trim());
+                    .append(SensitiveConfiguration.displayValue(key, value.trim()));
         }
 
         return out.toString();
@@ -511,24 +591,17 @@ public abstract class PickleballRunner {
 
     private static String formatPkbOptionName(String key) {
         String name = key.substring(PKB_PREFIX.length());
-
-        if (name.isBlank()) {
-            return key;
-        }
-
-        return name;
+        return name.isBlank() ? key : name;
     }
 
     private static void debug(String message) {
 //        logTrace("[DynamicSuiteBase] " + message);
     }
 
-
     private void refreshPkbOptions() {
         values.remove(PKB_OPTIONS);
 
         String formatted = formatPkbOptions();
-
         if (formatted != null && !formatted.isBlank()) {
             values.put(PKB_OPTIONS, formatted);
         }
@@ -537,7 +610,6 @@ public abstract class PickleballRunner {
     private static boolean isDerivedInternalKey(String key) {
         return PKB_OPTIONS.equals(normalizePkbKey(key));
     }
-
 
     static String normalizePkbKey(String key) {
         if (key == null) {

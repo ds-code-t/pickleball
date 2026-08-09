@@ -25,6 +25,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/agent/README.md`
 - `docs/agent/repository-index.md`
 - `docs/ai-diagnostic-reporting-plan.md`
+- `docs/ai-run-configuration.md`
 - `docs/block-conditionals.md`
 - `docs/component-scenarios.md`
 - `docs/config-files-and-resource-mapping.md`
@@ -348,9 +349,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/testengine/EngineFilterBootstrap.java`
 - `src/main/java/tools/dscode/testengine/MergedConfigurationParameters.java`
 - `src/main/java/tools/dscode/testengine/PickleballLauncherSessionListener.java`
+- `src/main/java/tools/dscode/testengine/PickleballProfiles.java`
 - `src/main/java/tools/dscode/testengine/PickleballRunner.java`
 - `src/main/java/tools/dscode/testengine/PKB_props.java`
 - `src/main/java/tools/dscode/testengine/PkbPropertyValueNormalizer.java`
+- `src/main/java/tools/dscode/testengine/SensitiveConfiguration.java`
 - `src/main/resources/META-INF/services/org.junit.platform.engine.TestEngine`
 - `src/main/resources/META-INF/services/org.junit.platform.launcher.LauncherSessionListener`
 
@@ -385,6 +388,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/DataTableConversionChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/coredefinitions/ModularScenariosChecks.java`
 - `maven-consumer-project/src/test/java/tools/dscode/testengine/PkbPropertyValueNormalizerChecks.java`
+- `maven-consumer-project/src/test/java/tools/dscode/testengine/ProfileConfigurationChecks.java`
 
 ## Maven consumer feature scenarios
 
@@ -442,8 +446,10 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/data/escaped-data-records.feature`
 - `maven-consumer-project/src/test/resources/data/files/customerPayload.json`
 - `maven-consumer-project/src/test/resources/files/customers.yaml`
+- `maven-consumer-project/src/test/resources/pickleball.properties`
 - `maven-consumer-project/src/test/resources/pickleball_local.properties`
 - `maven-consumer-project/src/test/resources/pickleball_local2.properties`
+- `maven-consumer-project/src/test/resources/profiles.yaml`
 
 ## Maven consumer test site
 

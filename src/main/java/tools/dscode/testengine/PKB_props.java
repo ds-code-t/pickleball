@@ -1,14 +1,9 @@
 package tools.dscode.testengine;
 
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 
-/**
- * Canonical definitions for pickleball {@code pkb_*} configuration property names.
- * <p>
- * Cucumber {@code cucumber.*} property names are defined in
- * {@link io.cucumber.core.options.Constants} and
- * {@link io.cucumber.junit.platform.engine.Constants}.
- */
+/** Canonical definitions for Pickleball {@code pkb_*} configuration property names. */
 public final class PKB_props {
 
     public static final String PKB_PREFIX = "pkb_";
@@ -23,6 +18,14 @@ public final class PKB_props {
     public static final String PKB_ORDER = PKB_PREFIX + "order";
     public static final String PKB_LIMIT = PKB_PREFIX + "limit";
     public static final String PKB_PROFILE = PKB_PREFIX + "profile";
+    public static final String PKB_RUN_PROFILE = PKB_PREFIX + "run_profile";
+    public static final String PKB_RP_PREFIX = PKB_PREFIX + "rp_";
+    public static final String PKB_RP_ENABLE = PKB_RP_PREFIX + "enable";
+    public static final String PKB_RP_ENDPOINT = PKB_RP_PREFIX + "endpoint";
+    public static final String PKB_RP_PROJECT = PKB_RP_PREFIX + "project";
+    public static final String PKB_RP_LAUNCH = PKB_RP_PREFIX + "launch";
+    public static final String PKB_RP_DESCRIPTION = PKB_RP_PREFIX + "description";
+    public static final String PKB_RP_API_KEY = PKB_RP_PREFIX + "api_key";
     public static final String PKB_PLUGINS = PKB_PREFIX + "plugins";
     public static final String PKB_PARALLEL = PKB_PREFIX + "parallel";
     public static final String PKB_ENVIRONMENT = PKB_PREFIX + "environment";
@@ -61,6 +64,18 @@ public final class PKB_props {
         values().put(PickleballRunner.normalizePkbKey(key), value);
     }
 
+    /** True only for effective execution RunVars, not profile selectors/definitions or derived summaries. */
+    public static boolean isRunVariableKey(String key) {
+        String normalized = PickleballRunner.normalizePkbKey(key);
+        if (normalized == null || !normalized.startsWith(PKB_PREFIX)) {
+            return false;
+        }
+        return !normalized.equals(PKB_PROFILE)
+                && !normalized.equals(PKB_RUN_PROFILE)
+                && !normalized.equals(PKB_OPTIONS)
+                && !normalized.startsWith(PKB_PROFILE + "_");
+    }
+
     public static String browser() {
         return get(PKB_BROWSER);
     }
@@ -77,7 +92,6 @@ public final class PKB_props {
         put(PKB_ENVIRONMENT, environment);
     }
 
-    // -- glue --
     public static String glue() {
         return get(PKB_GLUE);
     }
@@ -86,7 +100,6 @@ public final class PKB_props {
         put(PKB_GLUE, gluePaths);
     }
 
-    // -- features --
     public static String features() {
         return get(PKB_FEATURES);
     }
@@ -119,7 +132,6 @@ public final class PKB_props {
         put(PKB_COMPONENT_PATH, componentPath);
     }
 
-    // -- feature name filter --
     public static String featureName() {
         return get(PKB_FEATURE_NAME);
     }
@@ -128,7 +140,6 @@ public final class PKB_props {
         put(PKB_FEATURE_NAME, featureName);
     }
 
-    // -- tags --
     public static String tags() {
         return get(PKB_TAGS);
     }
@@ -137,7 +148,6 @@ public final class PKB_props {
         put(PKB_TAGS, tagExpression);
     }
 
-    // -- name filter --
     public static String name() {
         return get(PKB_NAME);
     }
@@ -146,7 +156,6 @@ public final class PKB_props {
         put(PKB_NAME, nameRegex);
     }
 
-    // -- plugins --
     public static String plugins() {
         return get(PKB_PLUGINS);
     }
@@ -155,7 +164,6 @@ public final class PKB_props {
         put(PKB_PLUGINS, pluginConfig);
     }
 
-    // -- profile --
     public static String profile() {
         return get(PKB_PROFILE);
     }
@@ -164,7 +172,45 @@ public final class PKB_props {
         put(PKB_PROFILE, profileName);
     }
 
-    // -- parallel --
+    public static void profile(String... profileNames) {
+        put(PKB_PROFILE, Arrays.stream(profileNames)
+                .filter(name -> name != null && !name.isBlank())
+                .map(String::trim)
+                .collect(java.util.stream.Collectors.joining(",")));
+    }
+
+    public static void profileDefinition(String profileName, String assignments) {
+        if (profileName == null || profileName.isBlank()) {
+            throw new IllegalArgumentException("profileName cannot be blank");
+        }
+        put(PKB_PROFILE + "_" + profileName.trim(), assignments);
+    }
+
+    public static String runProfile() {
+        return get(PKB_RUN_PROFILE);
+    }
+
+    /** Direct full RunVar override. When supplied, pkb_profile/default RunVar composition is bypassed. */
+    public static void runProfile(String assignments) {
+        put(PKB_RUN_PROFILE, assignments);
+    }
+
+    public static String reportPortal(String nativePropertyName) {
+        String alias = PickleballProfiles.reportPortalAliasKey(nativePropertyName);
+        if (alias == null) {
+            throw new IllegalArgumentException("ReportPortal property must start with 'rp.': " + nativePropertyName);
+        }
+        return get(alias);
+    }
+
+    public static void reportPortal(String nativePropertyName, String value) {
+        String alias = PickleballProfiles.reportPortalAliasKey(nativePropertyName);
+        if (alias == null) {
+            throw new IllegalArgumentException("ReportPortal property must start with 'rp.': " + nativePropertyName);
+        }
+        put(alias, value);
+    }
+
     public static String parallel() {
         return get(PKB_PARALLEL);
     }
@@ -173,7 +219,6 @@ public final class PKB_props {
         put(PKB_PARALLEL, count);
     }
 
-    // -- reporting --
     public static String reportingMode() {
         return get(PKB_REPORTING_MODE);
     }

@@ -80,6 +80,8 @@ your-project/
         │   └── example.feature
         ├── calls/                       # optional reusable service calls
         ├── configs/                     # optional shared data
+        ├── profiles.yaml                # optional named Pickleball profiles
+        ├── pickleball.properties        # optional shared configuration
         └── pickleball_local.properties  # optional local overrides
 ```
 
@@ -89,20 +91,48 @@ your-project/
 mvn test
 ```
 
-The consumer also provides Maven profiles such as:
-
-```bash
-mvn test -Psmoke
-mvn test -Pbrowser
-mvn test -Pdata
-mvn test -Pworkflow
-```
-
 Any Cucumber tag expression can be passed directly:
 
 ```bash
 mvn test "-Dpkb_tags=@forms and not @dialogs"
 ```
+
+### Run with a Pickleball profile
+
+Named profiles let a project keep reusable RunVar groups in `profiles.yaml`:
+
+```yaml
+qa:
+  pkb_glue: "<default_profile.pkb_glue>"
+  pkb_features: "<default_profile.pkb_features>"
+  pkb_tags: "<default_profile.pkb_tags> and @qa"
+  pkb_environment: QA
+  pkb_browser: CHROME_HEADLESS
+```
+
+Run it with:
+
+```bash
+mvn test -Dpkb_profile=qa
+```
+
+Compose several profiles left-to-right:
+
+```bash
+mvn test -Dpkb_profile=default_profile,qa,browser_firefox
+```
+
+The working consumer includes a commented [`profiles.yaml`](../maven-consumer-project/src/test/resources/profiles.yaml) example.
+
+### Deterministic direct run configuration
+
+For automation or an AI agent that must ignore every other Pickleball RunVar source, use `pkb_run_profile`:
+
+```bash
+mvn test "-Dpkb_run_profile=pkb_glue=com.example.tests, pkb_features=classpath:features, pkb_tags=@smoke, pkb_browser=CHROME_HEADLESS"
+```
+
+When explicitly supplied, `pkb_run_profile` is the complete RunVar set. Normal defaults, `pkb_profile`, property-file RunVars, and runner RunVars are not merged into it. See [Execution Configuration](configuration.md#pkb_run_profile-complete-direct-runvar-override) for template references, protected values, ReportPortal aliases, and exact precedence semantics.
 
 ## First feature
 

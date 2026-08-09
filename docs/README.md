@@ -26,8 +26,10 @@ Each functional guide begins with a prominent link to the specific consumer-proj
 
 ## Execution
 
-- [Execution configuration](configuration.md) — control tags, feature locations, browsers, parallelism, logging, reports, and local overrides.
+- [Execution configuration](configuration.md) — control tags, feature locations, browsers, named/composite profiles, direct `pkb_run_profile` overrides, ReportPortal aliases, parallelism, logging, reports, and local overrides.
+- [AI and automation run configuration](ai-run-configuration.md) — use `pkb_run_profile` as a deterministic full RunVar override for controlled AI/automation reruns.
 - [Diagnostic reporting](diagnostic-reporting.md) — capture layered AI-oriented evidence, Git/source provenance, step/capability metadata, compressed deep traces, browser screenshots/fingerprints, configuration provenance, and configurable retention.
+- [AI diagnostic reporting plan](ai-diagnostic-reporting-plan.md) — follow the sparse-first investigation and controlled-rerun model.
 ## Working consumer project
 
 The example project is not pseudocode. It contains a Maven dependency, a runner, a loopback server, browser pages, REST and SOAP endpoints, feature files, configuration data, and reusable call definitions.
@@ -35,6 +37,7 @@ The example project is not pseudocode. It contains a Maven dependency, a runner,
 - [Pickleball test runner](../maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java)
 - [Local browser and service test server](../maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java)
 - [Executable feature files](../maven-consumer-project/src/test/resources/features)
+- [Example run profiles](../maven-consumer-project/src/test/resources/profiles.yaml)
 - [Shared configuration data](../maven-consumer-project/src/test/resources/configs)
 - [Reusable service calls](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature)
 [Return to the project README](../README.md)

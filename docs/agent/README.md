@@ -8,6 +8,7 @@ This directory supports repository-native AI coding agents. It is not a runtime 
 - `/docs/agent/feature-map.md` — living map from capabilities to implementation, tests, consumer examples, and documentation
 - `/docs/agent/change-checklist.md` — explicit change-completion checklist
 - `/docs/agent/repository-index.md` — generated inventory of relevant files
+- `/docs/ai-run-configuration.md` — deterministic test-run configuration for agents, including full-override `pkb_run_profile` usage and protected values
 - `/REVIEW.md` — review-time checks for compatibility, tests, consumer examples, and documentation omissions
 - `/.agents/skills/pickleball-functionality-change/SKILL.md` — reusable functionality-change workflow for agents supporting Agent Skills
 
@@ -41,6 +42,8 @@ should cause the agent to:
 6. Run validation.
 7. Remove disposable working files.
 8. Report results.
+
+For controlled test reruns, agents should follow `/docs/ai-run-configuration.md`. When the intended RunVars are already known, prefer an explicit `pkb_run_profile` so local/default/profile RunVar sources cannot silently alter the rerun.
 
 This is task-time automation, not a passive background documentation watcher. Manual code edits do not automatically update documentation.
 

@@ -1,0 +1,27 @@
+# Pickleball profile examples. Profiles are inert until selected by pkb_profile.
+# Multiple names are composed left-to-right, so later profiles override earlier ones.
+
+qa:
+  pkb_glue: "<default_profile.pkb_glue>"
+  pkb_features: "<default_profile.pkb_features>"
+  pkb_tags: "<default_profile.pkb_tags> and @qa"
+  pkb_environment: QA
+  pkb_browser: CHROME_HEADLESS
+
+browser_chrome:
+  pkb_browser: chrome
+
+browser_firefox:
+  pkb_browser: firefox
+
+reportportal_qa:
+  pkb_rp_enable: false
+  pkb_rp_project: example-qa-project
+  pkb_rp_launch: "Pickleball QA"
+  # Keep real credentials out of source control. A profile can instead use:
+  # pkb_rp_api_key: "<default_profile.pkb_rp_api_key>"
+
+# A profile may itself choose deterministic direct-run mode. When selected, only
+# the assignments inside pkb_run_profile become RunVars.
+agent_direct:
+  pkb_run_profile: "pkb_tags=<default_profile.pkb_tags> and @agent; pkb_browser=firefox"

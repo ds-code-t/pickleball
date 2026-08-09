@@ -1,6 +1,6 @@
 # Execution Configuration
 
-> **Runnable examples:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) exercises normal execution settings. [`scenario-data-references.feature`](../maven-consumer-project/src/test/resources/features/scenario-data-references.feature) exercises default data-path behavior and `data:/` file lookup. [`configuration-system-properties.feature`](../maven-consumer-project/src/test/resources/features/configuration-system-properties.feature) verifies JVM `pkb_*` value quote normalization.
+> **Runnable examples:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) exercises normal execution settings. [`scenario-data-references.feature`](../maven-consumer-project/src/test/resources/features/scenario-data-references.feature) exercises default data-path behavior and `data:/` file lookup. [`configuration-system-properties.feature`](../maven-consumer-project/src/test/resources/features/configuration-system-properties.feature) verifies JVM `pkb_*` value quote normalization. The consumer [`profiles.yaml`](../maven-consumer-project/src/test/resources/profiles.yaml) is a syntax example for run profiles.
 
 Pickleball execution properties select scenarios and control how they run. Property names are case-insensitive; this page uses lowercase `pkb_` names for consistency.
 
@@ -12,13 +12,16 @@ pkb_loglevel=debug
 
 ## Configuration sources and precedence
 
-When the same setting appears in several places, the stronger source wins:
+The legacy/default configuration is still resolved from the existing sources. When the same setting appears in several places, the stronger source wins:
 
 1. JVM system property;
 2. `globalTestProperties()`;
-3. `pickleball_local.properties`;
-4. `globalTestDefaults()`;
-5. `pickleball.properties`, when no stronger value has been supplied.
+3. `pickleball_local2.properties`;
+4. `pickleball_local.properties`;
+5. `globalTestDefaults()`;
+6. `pickleball.properties`, when no stronger value has been supplied.
+
+That fully resolved legacy state becomes the in-memory `default_profile`. If no profile is selected, Pickleball deep-copies `default_profile` into the active run profile, preserving existing behavior.
 
 Use `globalTestDefaults()` for normal team defaults. Reserve `globalTestProperties()` for values that must not be replaced locally.
 
@@ -66,16 +69,134 @@ Some shells and Maven launch paths preserve quotes around the value in an argume
 
 For JVM system properties whose names begin with `pkb_`, Pickleball removes one matching outer pair of single or double quotes before applying configuration precedence. Embedded quotes remain part of the value.
 
-For example, these values resolve as shown:
+Only JVM `pkb_*` system-property values receive this command-line normalization. Non-Pickleball JVM properties and values authored in `.properties` files keep their normal Java semantics.
+
+## Pickleball run profiles
+
+Profiles are optional named groups of Pickleball RunVars. They are loaded from classpath-root resources in this order:
 
 ```text
-"INFO"                         -> INFO
-'all'                          -> all
-"@smoke and not @slow"        -> @smoke and not @slow
-'name="A B"'                  -> name="A B"
+profiles.yaml
+profiles_local.yaml
+profiles_local2.yaml
 ```
 
-Only JVM `pkb_*` system-property values receive this command-line normalization. Non-Pickleball JVM properties and values authored in `.properties` files keep their normal Java semantics.
+Matching profile names are deep-merged at property level, with later/local files overriding earlier fields. Profile names are case-insensitive. `default_profile` and `run_profile` are reserved names.
+
+Example:
+
+```yaml
+qa:
+  pkb_glue: "<default_profile.pkb_glue>"
+  pkb_features: "<default_profile.pkb_features>"
+  pkb_tags: "<default_profile.pkb_tags> and @qa"
+  pkb_environment: QA
+  pkb_browser: CHROME_HEADLESS
+
+browser_firefox:
+  pkb_browser: firefox
+```
+
+Select one profile:
+
+```properties
+pkb_profile=qa
+```
+
+Or compose several profiles into one active run profile:
+
+```properties
+pkb_profile=qa,browser_firefox
+```
+
+Profiles merge left-to-right, so the later profile wins when both define the same RunVar. Selecting a custom profile does **not** implicitly merge `default_profile`. Include it explicitly when desired:
+
+```properties
+pkb_profile=default_profile,qa
+```
+
+All source profiles remain available for template references even when they are not selected:
+
+```yaml
+qa:
+  pkb_tags: "<default_profile.pkb_tags> and @qa"
+  pkb_browser: "<browser_defaults.pkb_browser>"
+
+browser_defaults:
+  pkb_browser: chrome
+```
+
+Profile templates use the existing Pickleball `<...>` mapping/template resolver and are resolved after the final composite profile is built. Cyclic or unresolved profile references fail configuration with a descriptive exception.
+
+### Inline named profiles
+
+A profile can also be defined anywhere a normal `pkb_*` property can be supplied:
+
+```properties
+pkb_profile_smoke=pkb_tags=@smoke, pkb_browser=CHROME_HEADLESS
+pkb_profile=smoke
+```
+
+The text after `pkb_profile_` is the profile name. Inline profile definitions are definitions only; they are not RunVars and are not used unless selected. The inline property value follows the normal Pickleball property-source precedence; the resulting inline definition is then merged over any same-named YAML definition, making it the final profile-definition override layer. Commas or semicolons separate `key=value` assignments. Quote a value that itself contains a comma or semicolon:
+
+```properties
+pkb_profile_custom=pkb_tags="@a, @b"; pkb_browser=chrome
+```
+
+Runner code can use the convenience helper:
+
+```java
+PKB_props.profileDefinition("smoke", "pkb_tags=@smoke, pkb_browser=CHROME_HEADLESS");
+PKB_props.profile("smoke");
+```
+
+A named YAML or inline profile may itself set `pkb_run_profile`. If that profile is selected, the `pkb_run_profile` value becomes the direct full RunVar override and the other RunVars in the composed profile are discarded. With multiple selected profiles, normal left-to-right merging determines the winning `pkb_run_profile` value:
+
+```yaml
+agent_direct:
+  pkb_run_profile: "pkb_tags=<default_profile.pkb_tags> and @agent; pkb_browser=firefox"
+```
+
+```properties
+pkb_profile=agent_direct
+```
+
+### `pkb_run_profile`: complete direct RunVar override
+
+`pkb_run_profile` is both the retained serialized form of the final active RunVars and an optional direct input.
+
+After normal/profile resolution, Pickleball stores a comma-separated, quote-aware representation such as:
+
+```text
+pkb_glue=com.example.pickleball, pkb_features=classpath:features, pkb_tags=@smoke, pkb_browser=CHROME_HEADLESS
+```
+
+`pkb_run_profile` itself, `pkb_profile`, inline profile definitions, and `pkb_options` are control/derived properties and are not copied into `RunVars`.
+
+When `pkb_run_profile` is supplied explicitly, it is a **full RunVar override**:
+
+```bash
+mvn test "-Dpkb_run_profile=pkb_glue=com.example.pickleball, pkb_features=classpath:features, pkb_tags=@smoke, pkb_browser=CHROME_HEADLESS"
+```
+
+In direct mode:
+
+- Pickleball first determines the winning top-level `pkb_run_profile` using normal source precedence; if none is supplied, a selected profile may provide it;
+- `pkb_profile`, `default_profile`, runner defaults, property-file RunVars, and other resolved RunVars are not applied to execution;
+- only assignments contained in `pkb_run_profile` become RunVars;
+- template references inside it are resolved after profile definitions and `default_profile` have been loaded as reference data;
+- projected Cucumber CLI RunVar overrides are ignored, so the direct run profile remains deterministic;
+- normal downstream Cucumber/ReportPortal alias conversion still occurs.
+
+This mode is intended for reproducible automation and AI-agent test runs where the caller wants one explicit configuration without auditing every possible default or override source.
+
+A derived `pkb_run_profile` protects configured sensitive fields using placeholders such as:
+
+```text
+pkb_rp_api_key=${protected:pkb_rp_api_key}
+```
+
+When such a protected run profile is reused in another process, provide the sensitive value separately through normal secure configuration (for example `-Drp.api.key=...` or `-Dpkb_rp_api_key=...`). Pickleball resolves the protected placeholder from `default_profile` for the direct run without printing the secret in the serialized profile.
 
 ## Common properties
 
@@ -90,14 +211,16 @@ Only JVM `pkb_*` system-property values receive this command-line normalization.
 | `pkb_name` | `Checkout.*` | scenario-name expression |
 | `pkb_environment` | `QA` | project environment name |
 | `pkb_browser` | `chrome` | browser configuration name |
+| `pkb_profile` | `default_profile,qa` | selected profile(s), composed left-to-right |
+| `pkb_run_profile` | `pkb_tags=@smoke, pkb_browser=chrome` | retained final RunVars or explicit full RunVar override |
 | `pkb_debugbrowser` | `true` | retain extra browser troubleshooting state |
 | `pkb_loglevel` | `debug` | `trace`, `debug`, `info`, `warn`, or `error` |
 | `pkb_parallel` | `4` | maximum parallel scenario count |
 | `pkb_reportingmode` | `diagnostic` | use the diagnostic evidence pipeline; any other/absent value uses normal reporting |
 | `pkb_reportretention` | `all`, `failed`, or `none` | automatic local report/evidence retention; default `all` |
 | `pkb_diagnostic_output` | `reports/diagnostic-runs` | optional diagnostic-runs root; the default needs no configuration |
-| `pkb_platformlog` | `default`, `default+git`, `none`, `keys:...`, or `template:...` | controls automatic platform/caller identity stamps; absent/default preserves current logging |
-| `pkb_gitsnapshot` | `metadata`, `diff`, or `none` | diagnostic Git/source provenance; default `metadata`; `diff` also stores a gzipped consumer working-tree patch when dirty |
+| `pkb_platformlog` | `default`, `default+git`, `none`, `keys:...`, or `template:...` | controls automatic platform/caller identity stamps |
+| `pkb_gitsnapshot` | `metadata`, `diff`, or `none` | diagnostic Git/source provenance |
 | `pkb_compositeReport` | `true` or a path | combined HTML report |
 | `pkb_scenarioReport` | `true` or a path | individual scenario reports |
 
@@ -121,33 +244,11 @@ pkb_reportretention=failed
 - `failed` — keep dense output for failed/interrupted scenarios; passing diagnostic scenarios retain only lightweight indexes/summaries.
 - `none` — suppress/prune automatic dense local output while retaining minimal diagnostic navigation indexes when diagnostic mode is active.
 
-`pkb_diagnostic_output` is optional; diagnostic mode needs only `pkb_reportingmode=diagnostic`.
-
-`pkb_platformlog` controls the automatic caller/platform identity stamp used by normal logging and external reporting. It is independent of diagnostic mode. The default is deliberately backward-compatible:
-
-```properties
-pkb_platformlog=default
-```
-
-Supported forms are:
-
-- `default` or absent — preserve the current platform/caller text;
-- `default+git` — preserve the current text and append compact consumer/Pickleball source identity;
-- `none` — suppress automatic platform identity records;
-- `keys:hostname,user.name,ci.type` — log only the requested `PlatformSnapshot`/source-provenance keys;
-- `template:Caller=${user.name} Repo=${git.consumer.name} Commit=${git.consumer.commit}` — render a caller-defined template.
-
-The Git/source keys available to `keys:` and `template:` include `git.consumer.name`, `.remote`, `.webUrl`, `.branch`, `.commit`, `.commitMessage`, `.dirty`, the corresponding `git.pickleball.*` values, and `pickleball.version`. HTTP(S) Git credentials embedded in a remote URL are removed before provenance is persisted.
-
-`pkb_gitsnapshot` controls diagnostic source provenance. `metadata` is the default and records repository/branch/commit/dirty state without copying source diffs. `none` disables live consumer Git inspection. `diff` adds a gzipped working-tree status/diff artifact when the consumer repository is dirty; use it only when retaining local source changes in diagnostic evidence is acceptable.
-
-ReportPortal is not controlled by `pkb_reportretention` in normal mode because it is a remote reporting integration. See [Diagnostic reporting](diagnostic-reporting.md) for the artifact layout, scenario identity model, source provenance, step metadata, capability observations, screenshots, fingerprints, and recovery behavior.
+`pkb_platformlog` controls the automatic caller/platform identity stamp used by normal logging and external reporting. `pkb_gitsnapshot` controls diagnostic source provenance. See [Diagnostic reporting](diagnostic-reporting.md) for the complete evidence contract.
 
 ## `pkb_datapath`
 
-`pkb_datapath` keeps its existing resolution and precedence behavior. This feature does not introduce a second data-root setting or a new precedence model.
-
-When no configured value is resolved, framework data lookup falls back to:
+`pkb_datapath` keeps its existing data-root behavior. When no configured value is resolved, framework data lookup falls back to:
 
 ```text
 src/test/resources/data
@@ -160,26 +261,7 @@ The same resolved root is used by both kinds of `data:` references:
 <data:/directory/file>
 ```
 
-The meanings differ only after the `data:` prefix:
-
-- no leading slash: scenario-marker data lookup;
-- leading slash: file lookup beneath the resolved data root.
-
-For example:
-
-```text
-<data:/files/customerPayload>
-```
-
-means "find `files/customerPayload` below the resolved data root." The slash is not an operating-system absolute-path marker.
-
-`data:/` then reuses the normal `file:` parsing, suffix discovery, and nested query behavior:
-
-```text
-<data:/files/customerPayload.customer.orders[0].id>
-```
-
-A configured filesystem/source path remains a filesystem/source path; a supported classpath form remains classpath-based according to the existing resolver. `data:/` does not force the data root to classpath-only lookup.
+The meanings differ only after the `data:` prefix: no leading slash selects scenario-marker data; a leading slash selects file lookup beneath the resolved data root.
 
 ## Cucumber aliases
 
@@ -190,26 +272,46 @@ A configured filesystem/source path remains a filesystem/source path; a supporte
 | `pkb_tags` | `cucumber.filter.tags` |
 | `pkb_name` | `cucumber.filter.name` |
 
-## ReportPortal
+The default profile captures the normal synchronized Pickleball/Cucumber values. After a custom/direct profile is selected, its `pkb_*` values are used to derive the corresponding native Cucumber options.
 
-ReportPortal integration is disabled unless a supported enable property is explicitly set to `true`, case-insensitively:
+## ReportPortal aliases and profiles
 
-```properties
-rp.enable=true
+All native ReportPortal properties beginning with `rp.` have a generic Pickleball alias. Dots after `rp.` become underscores after `pkb_rp_`:
+
+```text
+rp.enable             <-> pkb_rp_enable
+rp.endpoint           <-> pkb_rp_endpoint
+rp.project            <-> pkb_rp_project
+rp.launch             <-> pkb_rp_launch
+rp.description        <-> pkb_rp_description
+rp.api.key            <-> pkb_rp_api_key
+rp.reporting.async    <-> pkb_rp_reporting_async
+rp.http.proxy.password <-> pkb_rp_http_proxy_password
 ```
 
-Equivalent environment/property forms such as `rp_enable` and `RP_ENABLE` are recognized where supplied.
+The mapping is generic, so supported ReportPortal `rp.*` settings do not need individual Pickleball code additions.
+
+Normal native ReportPortal configuration (`-Drp.*`, environment/reportportal properties loaded by the ReportPortal client) is synchronized into `default_profile`. `pkb_rp_*` properties can also be supplied through JVM arguments, the runner subclass, Pickleball property files, inline profiles, or profile YAML.
+
+The final active run profile is authoritative for the ReportPortal bridge. The bridge receives only the final synchronized `rp.*` values, so an old native property that is not present in the selected/direct run profile cannot silently re-enter ReportPortal configuration.
+
+ReportPortal logging additionally requires active `pkb_rp_enable=true`. This preserves an explicit Pickleball-side enable gate even if an unrelated/native `rp.enable=true` remains in the JVM.
+
+Sensitive ReportPortal settings remain usable in profiles and RunVars, but human-readable Pickleball output redacts them. The central protected-property registry currently includes API keys, OAuth passwords/client secrets, keystore/truststore passwords, and ReportPortal proxy passwords. Add future protected names to `SensitiveConfiguration` rather than adding one-off logging checks.
+
+Example:
+
+```yaml
+reportportal_qa:
+  pkb_rp_enable: true
+  pkb_rp_endpoint: https://reportportal.example
+  pkb_rp_project: qa-project
+  pkb_rp_launch: QA Regression
+  pkb_rp_api_key: "<default_profile.pkb_rp_api_key>"
+```
 
 ## Consumer Maven profiles
 
-The working [pom.xml](../maven-consumer-project/pom.xml) supplies profiles including `all`, `smoke`, `browser`, `data`, `forms`, `mapping`, `workflow`, `conditionals`, `nested`, `keyboard`, `dialogs`, and `components`.
-
-Examples:
-
-```bash
-mvn test -Pall
-mvn test -Psmoke
-mvn test -Pworkflow
-```
+Maven POM profiles such as `-Psmoke` are separate from Pickleball `pkb_profile`. They can coexist: a Maven profile controls Maven configuration, while `pkb_profile` composes Pickleball RunVars.
 
 [Previous: Keyboard Expressions](key-parser-dsl.md) · [Documentation home](README.md) · [Next: Custom Element Definitions](custom-element-definitions.md)

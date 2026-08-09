@@ -12,9 +12,10 @@ Pickleball also adds:
 - inline and block `if` / `else-if` / `else` flow;
 - mapping and templating for scenario values, saved values, JSON-like data, and resource files;
 - reusable component scenarios and REST or SOAP service-call scenarios;
+- composable execution profiles through `pkb_profile`, YAML or inline profile definitions, and deterministic full RunVar overrides through `pkb_run_profile`;
 - optional `pkb_reportingmode=diagnostic` evidence capture with lightweight run/scenario indexes, losslessly compressed deep trace evidence, Git/source provenance, structured step/capability metadata, binary screenshots, compact visual fingerprints, failure clustering, cross-run comparison, and configurable evidence retention; and
 - a small consumer setup consisting primarily of the Pickleball dependency and one test runner.
 Pickleball remains compatible with standard Cucumber features such as tags, Scenario Outlines, Examples tables, DataTables, DocStrings, hooks, plugins, and custom Java step definitions. Dynamic Pickleball steps and ordinary project-specific Cucumber steps can be used together in the same suite.
 The working [`maven-consumer-project`](maven-consumer-project/README.md) starts a loopback test server during the run. Its scenarios exercise both Selenium against a local HTML test site and service calls against local REST and SOAP endpoints.
 
-[Read the Pickleball documentation](docs/README.md) · [Diagnostic reporting](docs/diagnostic-reporting.md)
+[Read the Pickleball documentation](docs/README.md) · [Execution profiles](docs/configuration.md) · [AI run configuration](docs/ai-run-configuration.md) · [Diagnostic reporting](docs/diagnostic-reporting.md)

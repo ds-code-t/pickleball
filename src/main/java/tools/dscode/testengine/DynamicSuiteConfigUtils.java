@@ -11,16 +11,10 @@ import static io.cucumber.core.options.Constants.FILTER_TAGS_PROPERTY_NAME;
 import static io.cucumber.core.options.Constants.GLUE_PROPERTY_NAME;
 import static tools.dscode.testengine.PKB_props.PKB_FEATURES;
 import static tools.dscode.testengine.PKB_props.PKB_GLUE;
-import static tools.dscode.testengine.PKB_props.PKB_PREFIX;
 import static tools.dscode.testengine.PKB_props.PKB_TAGS;
 
-/**
- * Resolves suite configuration by preferring {@link PKB_props} aliases and falling back to
- * Cucumber {@link io.cucumber.core.options.Constants} property names.
- */
+/** Resolves suite configuration from the final active Pickleball run profile. */
 public final class DynamicSuiteConfigUtils {
-
-
 
     private DynamicSuiteConfigUtils() {
     }
@@ -40,9 +34,8 @@ public final class DynamicSuiteConfigUtils {
     public static HashMap<String, Object> getPkbValues() {
         HashMap<String, Object> out = new HashMap<>();
         for (Map.Entry<String, String> entry : PickleballRunner.getInstance().values().entrySet()) {
-            String key = entry.getKey();
-            if (key != null && key.startsWith(PKB_PREFIX)) {
-                out.put(key, entry.getValue());
+            if (PKB_props.isRunVariableKey(entry.getKey())) {
+                out.put(entry.getKey(), entry.getValue());
             }
         }
         return out;
