@@ -2,6 +2,7 @@ package tools.dscode.testengine;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 /** Canonical definitions for Pickleball {@code pkb_*} configuration property names. */
@@ -20,6 +21,7 @@ public final class PKB_props {
     public static final String PKB_LIMIT = PKB_PREFIX + "limit";
     public static final String PKB_PROFILE = PKB_PREFIX + "profile";
     public static final String PKB_RUN_PROFILE = PKB_PREFIX + "run_profile";
+    public static final String PKB_RUN_PROFILE_PREFIX = PKB_RUN_PROFILE + ".";
     public static final String PKB_RP_PREFIX = PKB_PREFIX + "rp_";
     public static final String PKB_RP_ENABLE = PKB_RP_PREFIX + "enable";
     public static final String PKB_RP_ENDPOINT = PKB_RP_PREFIX + "endpoint";
@@ -88,8 +90,15 @@ public final class PKB_props {
         return !isRunMetadataKey(normalized)
                 && !normalized.equals(PKB_PROFILE)
                 && !normalized.equals(PKB_RUN_PROFILE)
+                && !normalized.startsWith(PKB_RUN_PROFILE_PREFIX)
                 && !normalized.equals(PKB_OPTIONS)
                 && !normalized.startsWith(PKB_PROFILE + "_");
+    }
+
+    /** True for expanded direct-profile members such as {@code pkb_run_profile.pkb_browser}. */
+    public static boolean isRunProfileMemberKey(String key) {
+        String normalized = PickleballRunner.normalizePkbKey(key);
+        return normalized != null && normalized.startsWith(PKB_RUN_PROFILE_PREFIX);
     }
 
     public static String browser() {
@@ -208,7 +217,34 @@ public final class PKB_props {
 
     /** Direct full RunVar override. When supplied, pkb_profile/default RunVar composition is bypassed. */
     public static void runProfile(String assignments) {
+        clearRunProfileMembers();
         put(PKB_RUN_PROFILE, assignments);
+    }
+
+    /** Expanded direct full RunVar override without compact assignment-string parsing. */
+    public static void runProfile(Map<String, String> runVars) {
+        if (runVars == null) {
+            throw new IllegalArgumentException("runVars cannot be null");
+        }
+        values().remove(PKB_RUN_PROFILE);
+        clearRunProfileMembers();
+        runVars.forEach((key, value) -> {
+            String profileKey = key == null ? null : key.trim();
+            String normalized = profileKey != null && profileKey.toLowerCase(java.util.Locale.ROOT).startsWith("rp.")
+                    ? PickleballProfiles.reportPortalAliasKey(profileKey)
+                    : PickleballRunner.normalizePkbKey(profileKey);
+            if (!isRunVariableKey(normalized)) {
+                throw new IllegalArgumentException("Run profile property '" + key + "' is not a Pickleball run variable.");
+            }
+            if (value == null) {
+                throw new IllegalArgumentException("Run profile value for '" + key + "' cannot be null.");
+            }
+            values().put(PKB_RUN_PROFILE_PREFIX + normalized, value);
+        });
+    }
+
+    private static void clearRunProfileMembers() {
+        values().keySet().removeIf(PKB_props::isRunProfileMemberKey);
     }
 
     public static String reportPortal(String nativePropertyName) {

@@ -137,11 +137,24 @@ pkb_profile_smoke=pkb_tags=@smoke, pkb_browser=CHROME_HEADLESS
 pkb_profile=smoke
 ```
 
-The text after `pkb_profile_` is the profile name. Inline profile definitions are definitions only; they are not RunVars and are not used unless selected. The inline property value follows the normal Pickleball property-source precedence; the resulting inline definition is then merged over any same-named YAML definition, making it the final profile-definition override layer. Commas or semicolons separate `key=value` assignments. Quote a value that itself contains a comma or semicolon:
+The text after `pkb_profile_` is the profile name. Inline profile definitions are definitions only; they are not RunVars and are not used unless selected. The inline property value follows the normal Pickleball property-source precedence; the resulting inline definition is then merged over any same-named YAML definition, making it the final profile-definition override layer.
+
+Compact profile assignment strings use a small deterministic grammar:
+
+- comma or semicolon separates assignments;
+- the first `=` in an assignment separates its key from its value, so later `=` characters are ordinary value text;
+- a single or double quote becomes a quoting delimiter only when it is the first non-whitespace character after `=`; quotes appearing later in an unquoted value are literal text;
+- a quoted value may contain commas and semicolons; inside it, `\\` represents a literal backslash and a backslash before the matching quote represents that literal quote;
+- after a closing quote, only whitespace and the next assignment delimiter/end are allowed; malformed quoted values fail clearly;
+- `<...>` template spans remain one token while assignments are identified, including template selectors containing commas; the parsed values are resolved afterward, so delimiters produced by template resolution cannot create additional assignments.
+
+For example:
 
 ```properties
-pkb_profile_custom=pkb_tags="@a, @b"; pkb_browser=chrome
+pkb_profile_custom=pkb_tags="@a, @b"; pkb_browser=chrome; pkb_rp_description=Bob's "QA" run
 ```
+
+Here the quotes around `@a, @b` protect the comma, while the apostrophe and double quotes in `Bob's "QA" run` are literal because they do not begin the value.
 
 Runner code can use the convenience helper:
 
@@ -150,12 +163,24 @@ PKB_props.profileDefinition("smoke", "pkb_tags=@smoke, pkb_browser=CHROME_HEADLE
 PKB_props.profile("smoke");
 ```
 
-A named YAML or inline profile may itself set `pkb_run_profile`. If that profile is selected, the `pkb_run_profile` value becomes the direct full RunVar override and the other RunVars in the composed profile are discarded. With multiple selected profiles, normal left-to-right merging determines the winning `pkb_run_profile` value:
+A named YAML or inline profile may itself set `pkb_run_profile`. If that profile is selected, the `pkb_run_profile` value becomes the direct full RunVar override and the other RunVars in the composed profile are discarded. With multiple selected profiles, normal left-to-right merging determines the winning `pkb_run_profile` value. The compact string form remains valid:
 
 ```yaml
 agent_direct:
   pkb_run_profile: "pkb_tags=<default_profile.pkb_tags> and @agent; pkb_browser=firefox"
 ```
+
+YAML profiles may alternatively use a map, which avoids compact assignment parsing entirely and is preferred for punctuation-heavy values:
+
+```yaml
+agent_direct_map:
+  pkb_run_profile:
+    pkb_tags: "<default_profile.pkb_tags> and @agent"
+    pkb_browser: firefox
+    pkb_rp_description: "Bob's QA, phase 2; retry"
+```
+
+`pkb_run_profile` is treated atomically while profiles are merged, so a later selected/profile-resource definition replaces an earlier direct-run control rather than deep-merging two complete direct profiles.
 
 ```properties
 pkb_profile=agent_direct
@@ -171,7 +196,9 @@ After normal/profile resolution, Pickleball stores a deterministic key-sorted, c
 pkb_browser=CHROME_HEADLESS, pkb_features=classpath:features, pkb_glue=com.example.pickleball, pkb_tags=@smoke
 ```
 
-`pkb_run_profile` itself, `pkb_profile`, inline profile definitions, `pkb_options`, and diagnostic lineage metadata are control/metadata properties and are not copied into `RunVars`.
+The serializer uses double quotes only when needed and escapes literal double quotes/backslashes inside quoted values. For every retained nonblank scalar RunVar, serializing and reparsing the compact form preserves the exact value, including surrounding whitespace and punctuation.
+
+`pkb_run_profile` itself, `pkb_run_profile.<pkb_var>` expanded members, `pkb_profile`, inline profile definitions, `pkb_options`, and diagnostic lineage metadata are control/metadata properties and are not copied into `RunVars`.
 
 When `pkb_run_profile` is supplied explicitly, it is a **full RunVar override**:
 
@@ -179,12 +206,47 @@ When `pkb_run_profile` is supplied explicitly, it is a **full RunVar override**:
 mvn test "-Dpkb_run_profile=pkb_glue=com.example.pickleball, pkb_features=classpath:features, pkb_tags=@smoke, pkb_browser=CHROME_HEADLESS"
 ```
 
+### Expanded direct-profile form
+
+As a secondary syntax, the same direct profile can be supplied as separate `pkb_run_profile.<pkb_var>` properties:
+
+```text
+pkb_run_profile.pkb_glue=com.example.pickleball
+pkb_run_profile.pkb_features=classpath:features
+pkb_run_profile.pkb_tags=@smoke
+pkb_run_profile.pkb_browser=CHROME_HEADLESS
+```
+
+The expanded members may be supplied through the normal property sources, including JVM system properties, Pickleball property files, and runner code. Each member value is already associated with one RunVar and is therefore **not parsed as a compact `key=value, key=value` assignment string**. Commas, semicolons, `=`, apostrophes, quotes, backslashes, and brackets in that member value are ordinary value characters once the surrounding configuration source has delivered the string to Pickleball. Normal `<...>` template resolution still applies afterward.
+
+For example, a properties file can use:
+
+```properties
+pkb_run_profile.pkb_tags=@smoke
+pkb_run_profile.pkb_browser=CHROME_HEADLESS
+pkb_run_profile.pkb_rp_description=Bob's "QA, phase 2; retry" = green
+```
+
+Runner code may avoid string serialization completely:
+
+```java
+PKB_props.runProfile(Map.of(
+    "pkb_tags", "@smoke",
+    "pkb_browser", "CHROME_HEADLESS",
+    "pkb_rp_description", "Bob's \"QA, phase 2; retry\" = green"
+));
+```
+
+Do not combine a compact `pkb_run_profile` value with `pkb_run_profile.*` members in the same resolved configuration. Pickleball rejects that mixture instead of guessing which representation should win. Expanded members still follow normal source precedence individually, so use the expanded form consistently across sources when member-by-member overrides are desired.
+
+Command shells, Maven launchers, and CI products can still impose their own quoting rules before Pickleball receives a JVM property. The expanded form cannot remove those external rules, but it removes the additional nested Pickleball assignment grammar from each member value.
+
 In direct mode:
 
-- Pickleball first determines the winning top-level `pkb_run_profile` using normal source precedence; if none is supplied, a selected profile may provide it;
+- Pickleball first checks for an explicit compact `pkb_run_profile` or expanded `pkb_run_profile.*` direct profile; if neither is supplied, a selected profile may provide `pkb_run_profile`;
 - `pkb_profile`, `default_profile`, runner defaults, property-file RunVars, and other resolved RunVars are not applied to execution;
-- only assignments contained in `pkb_run_profile` become RunVars;
-- template references inside it are resolved after profile definitions and `default_profile` have been loaded as reference data;
+- only the values contained in the selected direct-profile representation become RunVars;
+- compact assignment boundaries are identified before template resolution; template references are then resolved against the loaded profile/default reference data, so delimiters introduced by a resolved template remain part of that RunVar value;
 - projected Cucumber CLI RunVar overrides are ignored, so the direct run profile remains deterministic;
 - normal downstream Cucumber/ReportPortal alias conversion still occurs;
 - diagnostic lineage metadata supplied separately remains available without becoming part of the execution profile.
@@ -239,7 +301,8 @@ The explicit protected-property registry remains in `SensitiveConfiguration`. In
 | `pkb_environment` | `QA` | project environment name |
 | `pkb_browser` | `chrome` | browser configuration name |
 | `pkb_profile` | `default_profile,qa` | selected profile(s), composed left-to-right |
-| `pkb_run_profile` | `pkb_tags=@smoke, pkb_browser=chrome` | retained final RunVars or explicit full RunVar override |
+| `pkb_run_profile` | `pkb_tags=@smoke, pkb_browser=chrome` | retained final RunVars or compact explicit full RunVar override |
+| `pkb_run_profile.<pkb_var>` | `pkb_run_profile.pkb_browser=chrome` | expanded direct-profile member; avoids compact assignment parsing |
 | `pkb_investigation_id` | `diag-214` | diagnostic investigation lineage metadata; not a RunVar |
 | `pkb_run_purpose` | `browser-counterfactual` | diagnostic run purpose metadata; not a RunVar |
 | `pkb_parent_run_id` | `20260809-...` | immediate parent-run lineage metadata; not a RunVar |

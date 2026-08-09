@@ -55,7 +55,8 @@ The following decisions are authoritative for the 2.1.3 implementation and super
 
 Pickleball 2.1.4 adds a deterministic bridge from diagnostic investigation to controlled rerun:
 
-- `pkb_run_profile` represents only execution RunVars and can be supplied as the complete authoritative RunVar set for a rerun.
+- `pkb_run_profile` represents only execution RunVars and can be supplied as the complete authoritative RunVar set for a rerun. A secondary expanded `pkb_run_profile.<pkb_var>` form supplies the same direct profile member-by-member without compact assignment parsing; compact and expanded forms cannot be mixed.
+- Compact assignment parsing treats a quote as syntactic only at the start of a value, keeps template spans intact while identifying assignments, and resolves templates only after boundaries are established so resolved delimiters cannot create new assignments. Selected YAML profiles may provide `pkb_run_profile` as a RunVar map.
 - `pkb_investigation_id`, `pkb_run_purpose`, `pkb_parent_run_id`, `pkb_baseline_run_id`, and `pkb_changed_variables` are investigation metadata rather than RunVars. They are supplied separately, survive direct mode, are rejected inside profiles, and do not participate in the execution-configuration hash.
 - `run-index.json` retains a sanitized copyable `runProfile`, a deterministic `runProfileFingerprint`, and `directRunProfile`.
 - The fingerprint is calculated from the canonical final execution RunVars. Actual protected values participate only as one-way hash input; the retained profile remains sanitized/protected.
@@ -603,7 +604,7 @@ run catalog
 -> TRACE/DEBUG only as the final evidence layer
 ```
 
-Every diagnostic rerun should have a purpose and should change as few variables as practical. When the selected run index contains `runProfile`, use it as the starting execution contract instead of auditing and recombining the individual configuration sources. Pass the investigation lineage fields separately from `pkb_run_profile`, change only the declared RunVars, and verify `runProfileFingerprint` / `directRunProfile` on the resulting run before deeper comparison.
+Every diagnostic rerun should have a purpose and should change as few variables as practical. When the selected run index contains `runProfile`, use it as the starting execution contract instead of auditing and recombining the individual configuration sources. Use compact `pkb_run_profile` for simple values or expanded `pkb_run_profile.<pkb_var>` members when avoiding nested assignment parsing is safer, pass the investigation lineage fields separately, change only the declared RunVars, and verify `runProfileFingerprint` / `directRunProfile` on the resulting run before deeper comparison. `configurationHash` is broader than the final RunVar identity and must not replace `runProfileFingerprint` for that equality check.
 
 Preferred test expansion:
 

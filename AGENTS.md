@@ -54,9 +54,10 @@ For routine diagnostic utility operations, prefer `tools.dscode.common.reporting
 
 ### Controlled diagnostic reruns
 
-When an investigation requires a rerun and the intended Pickleball execution settings are known, prefer the selected run's retained `runProfile` from `run-index.json` as the starting execution contract. Supply that value through `pkb_run_profile` and change only the RunVars required by the current hypothesis. Do not reconstruct the effective RunVars by manually combining runner defaults, property files, named profiles, system properties, and Cucumber aliases when a retained final run profile is available.
+When an investigation requires a rerun and the intended Pickleball execution settings are known, prefer the selected run's retained `runProfile` from `run-index.json` as the starting execution contract. Use the compact `pkb_run_profile` form for simple values, or expanded `pkb_run_profile.<pkb_var>` members when avoiding nested assignment parsing is safer for punctuation-heavy/CI values. Never mix compact and expanded direct-profile forms in one resolved configuration. Change only the RunVars required by the current hypothesis; do not reconstruct the effective RunVars by manually combining runner defaults, property files, named profiles, system properties, and Cucumber aliases when a retained final run profile is available.
 
-Diagnostic lineage is metadata, not part of the execution RunVars. Supply `pkb_investigation_id`, `pkb_run_purpose`, `pkb_parent_run_id`, `pkb_baseline_run_id`, and `pkb_changed_variables` separately from `pkb_run_profile`; profiles must not contain those keys. After the rerun, verify `runProfileFingerprint` / `directRunProfile` and the declared changed variables before attributing observed differences to the intended configuration change. See `docs/ai-run-configuration.md`.
+Diagnostic lineage is metadata, not part of the execution RunVars. Supply `pkb_investigation_id`, `pkb_run_purpose`, `pkb_parent_run_id`, `pkb_baseline_run_id`, and `pkb_changed_variables` separately from either direct-profile form; profiles must not contain those keys. After the rerun, verify `runProfileFingerprint` / `directRunProfile` and the declared changed variables before attributing observed differences to the intended configuration change. Use `runProfileFingerprint`, not `configurationHash`, as the equality check for the final RunVar set. See `docs/ai-run-configuration.md`.
+
 ## Sources of truth
 
 Use all relevant evidence rather than trusting one file in isolation:

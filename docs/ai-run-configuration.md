@@ -24,6 +24,8 @@ A selected YAML or inline named profile may also contain `pkb_run_profile`. In t
 
 This is the preferred mode for an AI-controlled diagnostic rerun when the goal is to change a known, bounded set of execution conditions without accidentally inheriting another local/default RunVar.
 
+For simple values, the compact `pkb_run_profile=key=value, key=value` form is the shortest representation. For punctuation-heavy values or CI/property setups where nested assignment quoting would be awkward, use the expanded `pkb_run_profile.<pkb_var>=value` form instead. Both produce the same final RunVar model and `runProfileFingerprint`; do not mix the two direct-profile forms in one resolved configuration.
+
 ## Diagnostic lineage is separate from RunVars
 
 These diagnostic/investigation properties describe a run but do not control scenario execution:
@@ -34,7 +36,7 @@ These diagnostic/investigation properties describe a run but do not control scen
 - `pkb_baseline_run_id`;
 - `pkb_changed_variables`.
 
-They are **run metadata, not RunVars**. They survive direct `pkb_run_profile` resolution when supplied separately and are intentionally excluded from the retained run profile, its fingerprint, and the execution-configuration hash. YAML profiles, inline profiles, and direct `pkb_run_profile` text reject these keys so investigation lineage cannot accidentally become part of the execution contract.
+They are **run metadata, not RunVars**. They survive direct `pkb_run_profile` resolution when supplied separately and are intentionally excluded from the retained run profile, its fingerprint, and the execution-configuration hash. YAML profiles, inline profiles, compact `pkb_run_profile` text, expanded `pkb_run_profile.*` members, and YAML direct-profile maps reject these keys so investigation lineage cannot accidentally become part of the execution contract.
 
 For a controlled diagnostic rerun, pass the exact execution profile and lineage separately:
 
@@ -50,6 +52,58 @@ mvn test \
 
 This separation means an agent can reuse the same execution contract while changing only the lineage that explains why a new run exists.
 
+## Compact and expanded direct-profile syntax
+
+The compact form keeps the normal human-readable syntax:
+
+```text
+pkb_run_profile=pkb_tags=@checkout, pkb_browser=CHROME_HEADLESS
+```
+
+Its assignment parser is intentionally small and deterministic:
+
+- comma or semicolon separates assignments;
+- the first `=` separates key and value;
+- `'` or `"` starts a quoted value only when it is the first non-whitespace character after `=`; quotes later in an unquoted value are literal characters;
+- quoted values can contain assignment delimiters, with backslash used only for a literal matching quote or literal backslash;
+- Pickleball identifies assignment boundaries before resolving `<...>` templates, so a comma or semicolon produced by template resolution stays inside the already-selected RunVar value. Template selector commas inside `<...>` are also kept inside the template token.
+
+Example:
+
+```text
+pkb_tags="@checkout, @smoke"; pkb_rp_description=Bob's "QA" run; pkb_browser=CHROME_HEADLESS
+```
+
+When nested assignment syntax itself is undesirable, use expanded members:
+
+```text
+pkb_run_profile.pkb_tags=@checkout
+pkb_run_profile.pkb_browser=CHROME_HEADLESS
+pkb_run_profile.pkb_rp_description=Bob's "QA, phase 2; retry" = green
+```
+
+Each expanded property is one RunVar value and is not reparsed as an assignment list. The surrounding shell, Maven launcher, CI product, `.properties` parser, or YAML parser can still have its own transport rules; Pickleball cannot remove those external rules, but the expanded form removes the extra nested profile grammar.
+
+Runner subclasses can construct the same form without serialization:
+
+```java
+PKB_props.runProfile(Map.of(
+    "pkb_tags", "@checkout",
+    "pkb_browser", "CHROME_HEADLESS",
+    "pkb_rp_description", "Bob's \"QA, phase 2; retry\" = green"
+));
+```
+
+A selected YAML profile can use a map directly:
+
+```yaml
+agent_direct:
+  pkb_run_profile:
+    pkb_tags: "<default_profile.pkb_tags> and @checkout"
+    pkb_browser: CHROME_HEADLESS
+    pkb_rp_description: "Bob's QA, phase 2; retry"
+```
+
 ## Reuse the retained final run profile
 
 After normal or named-profile resolution, Pickleball retains the resolved RunVars in `pkb_run_profile`. Diagnostic mode additionally exposes the sanitized value directly in sparse `run-index.json` as `runProfile`, together with:
@@ -63,9 +117,7 @@ After normal or named-profile resolution, Pickleball retains the resolved RunVar
 
 Use `runProfileFingerprint` as the authoritative equality check for the final execution RunVars. If two runs have the same `runProfileFingerprint`, their canonical final RunVar sets are the same, including protected values through one-way hash input.
 
-`configurationHash` is intentionally broader. It represents execution-relevant configuration provenance and representation in addition to the final RunVars, so it may differ between two runs even when `runProfileFingerprint` is identical. For example, the same final RunVars may have been reached through different configuration sources or equivalent option representations.
-
-For a controlled rerun, use `runProfileFingerprint` to verify that the final execution RunVars were preserved or changed as intended. Treat a `configurationHash` difference as additional configuration/provenance evidence to investigate, not by itself as proof that the final RunVars changed.
+`configurationHash` is intentionally broader. It can reflect execution-relevant configuration provenance or representation in addition to the final RunVars, so it may differ between two runs even when `runProfileFingerprint` is identical. Treat a `configurationHash` difference as additional configuration/provenance evidence to investigate, not by itself as proof that the final RunVars changed.
 
 Example retained value:
 
@@ -117,7 +169,7 @@ For AI-assisted troubleshooting:
 2. Identify the smallest useful rerun and exact configuration change.
 3. Read `runProfile`, `runProfileFingerprint`, and `directRunProfile` from the selected `run-index.json`.
 4. Start from the retained `runProfile` when available.
-5. Supply it explicitly as `-Dpkb_run_profile=...` so the rerun has one authoritative RunVar set.
+5. Supply it as one compact `pkb_run_profile` value when the retained values are simple, or as expanded `pkb_run_profile.<pkb_var>` members when avoiding nested assignment parsing is safer for the target environment. Do not mix the forms.
 6. Change only the intended execution variables.
 7. Supply `pkb_investigation_id`, `pkb_parent_run_id`, `pkb_baseline_run_id`, `pkb_run_purpose`, and `pkb_changed_variables` separately as lineage metadata.
 8. Supply protected values separately rather than expanding them into the run-profile text.
@@ -127,6 +179,21 @@ The Maven consumer scenario tagged `@profile-direct-validation` is the end-to-en
 
 ```bash
 mvn test -Dpkb_tags="@should-not-win" -Dpkb_investigation_id="diag-214-run-profile" -Dpkb_run_purpose="direct-profile-validation" -Dpkb_changed_variables="pkb_browser" -Dpkb_run_profile="pkb_glue=com.example.pickleball, pkb_features=classpath:features, pkb_tags=@profile-direct-validation, pkb_browser=CHROME_HEADLESS, pkb_reportingmode=diagnostic, pkb_reportretention=all"
+```
+
+The consumer also includes `@profile-expanded-validation` for the expanded form. The Pickleball portion of the command has no nested assignment list:
+
+```bash
+mvn test \
+  -Dpkb_run_profile.pkb_glue=com.example.pickleball \
+  -Dpkb_run_profile.pkb_features=classpath:features \
+  -Dpkb_run_profile.pkb_tags=@profile-expanded-validation \
+  -Dpkb_run_profile.pkb_browser=CHROME_HEADLESS \
+  -Dpkb_run_profile.pkb_reportingmode=diagnostic \
+  -Dpkb_run_profile.pkb_reportretention=all \
+  -Dpkb_run_profile.pkb_rp_description=expanded-direct-profile \
+  -Dpkb_investigation_id=diag-214-expanded-profile \
+  -Dpkb_run_purpose=expanded-profile-validation
 ```
 
 See [AI Diagnostic Reporting](ai-diagnostic-reporting-plan.md) for the evidence-reading hierarchy and [Execution Configuration](configuration.md) for the complete profile syntax and precedence contract.

@@ -25,3 +25,11 @@ reportportal_qa:
 # the assignments inside pkb_run_profile become RunVars.
 agent_direct:
   pkb_run_profile: "pkb_tags=<default_profile.pkb_tags> and @agent; pkb_browser=firefox"
+
+# The same direct-run control may be written as a YAML map. This avoids the
+# compact assignment grammar entirely and is preferred for punctuation-heavy values.
+agent_direct_map:
+  pkb_run_profile:
+    pkb_tags: "<default_profile.pkb_tags> and @agent-map"
+    pkb_browser: chrome
+    pkb_rp_description: "Map direct profile, phase 2; ready"

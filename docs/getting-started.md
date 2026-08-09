@@ -132,7 +132,31 @@ For automation or an AI agent that must ignore every other Pickleball RunVar sou
 mvn test "-Dpkb_run_profile=pkb_glue=com.example.tests, pkb_features=classpath:features, pkb_tags=@smoke, pkb_browser=CHROME_HEADLESS"
 ```
 
-When explicitly supplied, `pkb_run_profile` is the complete RunVar set. Normal defaults, `pkb_profile`, property-file RunVars, and runner RunVars are not merged into it. See [Execution Configuration](configuration.md#pkb_run_profile-complete-direct-runvar-override) for template references, protected values, ReportPortal aliases, and exact precedence semantics.
+When explicitly supplied, `pkb_run_profile` is the complete RunVar set. Normal defaults, `pkb_profile`, property-file RunVars, and runner RunVars are not merged into it.
+
+For values where a nested assignment string would be awkward, the same direct profile can be supplied as expanded members:
+
+```text
+pkb_run_profile.pkb_glue=com.example.tests
+pkb_run_profile.pkb_features=classpath:features
+pkb_run_profile.pkb_tags=@smoke
+pkb_run_profile.pkb_browser=CHROME_HEADLESS
+```
+
+Each expanded member is already one RunVar value, so Pickleball does not parse commas, semicolons, equals signs, or quotes inside that member as another profile assignment. Do not combine compact `pkb_run_profile` with expanded `pkb_run_profile.*` members in the same resolved configuration.
+
+Runner subclasses can avoid compact-string serialization entirely:
+
+```java
+PKB_props.runProfile(Map.of(
+    "pkb_glue", "com.example.tests",
+    "pkb_features", "classpath:features",
+    "pkb_tags", "@smoke",
+    "pkb_browser", "CHROME_HEADLESS"
+));
+```
+
+See [Execution Configuration](configuration.md#pkb_run_profile-complete-direct-runvar-override) for compact quoting rules, YAML-map direct profiles, template references, protected values, ReportPortal aliases, and exact precedence semantics.
 
 ## First feature
 

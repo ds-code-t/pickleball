@@ -19,7 +19,9 @@ import static tools.dscode.testengine.PKB_props.PKB_NAME;
 import static tools.dscode.testengine.PKB_props.PKB_PARENT_RUN_ID;
 import static tools.dscode.testengine.PKB_props.PKB_PROFILE;
 import static tools.dscode.testengine.PKB_props.PKB_RP_API_KEY;
+import static tools.dscode.testengine.PKB_props.PKB_RP_DESCRIPTION;
 import static tools.dscode.testengine.PKB_props.PKB_RUN_PROFILE;
+import static tools.dscode.testengine.PKB_props.PKB_RUN_PROFILE_PREFIX;
 import static tools.dscode.testengine.PKB_props.PKB_RUN_PURPOSE;
 import static tools.dscode.testengine.PKB_props.PKB_TAGS;
 
@@ -103,6 +105,66 @@ public final class ProfileConfigurationChecks {
         assertEquals("firefox", values.get(PKB_BROWSER));
         assertFalse(values.containsKey(PKB_GLUE));
         assertFalse(values.containsKey(PKB_PROFILE));
+    }
+
+
+    @Test
+    void expandedDirectRunProfileUsesLiteralMemberValues() {
+        LinkedHashMap<String, String> values = baseValues();
+        String description = "Bob's \"QA, phase 2; retry\" = green < baseline > C:\\results";
+        values.put(PKB_RUN_PROFILE_PREFIX + PKB_TAGS, "@expanded");
+        values.put(PKB_RUN_PROFILE_PREFIX + PKB_BROWSER, "firefox");
+        values.put(PKB_RUN_PROFILE_PREFIX + PKB_RP_DESCRIPTION, description);
+
+        PickleballProfiles.Resolution resolution = PickleballProfiles.apply(values);
+
+        assertTrue(resolution.direct());
+        assertEquals("@expanded", values.get(PKB_TAGS));
+        assertEquals("firefox", values.get(PKB_BROWSER));
+        assertEquals(description, values.get(PKB_RP_DESCRIPTION));
+        assertFalse(values.containsKey(PKB_GLUE));
+        assertFalse(values.keySet().stream().anyMatch(PKB_props::isRunProfileMemberKey));
+    }
+
+    @Test
+    void compactAndExpandedDirectRunProfileCannotBeMixed() {
+        LinkedHashMap<String, String> values = baseValues();
+        values.put(PKB_RUN_PROFILE, "pkb_tags=@compact");
+        values.put(PKB_RUN_PROFILE_PREFIX + PKB_BROWSER, "firefox");
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> PickleballProfiles.apply(values));
+
+        assertTrue(exception.getMessage().contains("Cannot combine compact"));
+    }
+
+    @Test
+    void selectedYamlProfileCanSupplyRunProfileMap() {
+        LinkedHashMap<String, String> values = baseValues();
+        values.put(PKB_PROFILE, "agent_direct_map");
+
+        PickleballProfiles.Resolution resolution = PickleballProfiles.apply(values);
+
+        assertTrue(resolution.direct());
+        assertEquals("@all and @agent-map", values.get(PKB_TAGS));
+        assertEquals("chrome", values.get(PKB_BROWSER));
+        assertEquals("Map direct profile, phase 2; ready", values.get(PKB_RP_DESCRIPTION));
+        assertFalse(values.containsKey(PKB_GLUE));
+    }
+
+    @Test
+    void selectedDirectProfileResolvesTemplatesAfterAssignmentParsing() {
+        LinkedHashMap<String, String> values = baseValues();
+        values.put("pkb_profile_template_direct",
+                "pkb_name=\"Alpha, Beta; Gamma\"; "
+                        + "pkb_run_profile=\"pkb_name=<run_profile.pkb_name>; pkb_browser=firefox\"");
+        values.put(PKB_PROFILE, "template_direct");
+
+        PickleballProfiles.apply(values);
+
+        assertEquals("Alpha, Beta; Gamma", values.get(PKB_NAME));
+        assertEquals("firefox", values.get(PKB_BROWSER));
     }
 
     @Test
@@ -192,6 +254,8 @@ public final class ProfileConfigurationChecks {
     void profileControlAndLineagePropertiesAreNotRunVars() {
         assertFalse(PKB_props.isRunVariableKey(PKB_PROFILE));
         assertFalse(PKB_props.isRunVariableKey(PKB_RUN_PROFILE));
+        assertFalse(PKB_props.isRunVariableKey(PKB_RUN_PROFILE_PREFIX + PKB_BROWSER));
+        assertTrue(PKB_props.isRunProfileMemberKey(PKB_RUN_PROFILE_PREFIX + PKB_BROWSER));
         assertFalse(PKB_props.isRunVariableKey("pkb_options"));
         assertFalse(PKB_props.isRunVariableKey("pkb_profile_smoke"));
         assertFalse(PKB_props.isRunVariableKey(PKB_INVESTIGATION_ID));
@@ -251,6 +315,55 @@ public final class ProfileConfigurationChecks {
         assertEquals("@a, @b", values.get(PKB_TAGS));
         assertEquals("chrome", values.get(PKB_BROWSER));
         assertEquals("QA", values.get(PKB_ENVIRONMENT));
+    }
+
+
+    @Test
+    void assignmentParserTreatsMidValueQuotesAsLiteralText() {
+        Map<String, String> values = PickleballProfiles.parseAssignments(
+                "pkb_name=Bob's \"QA\" run, pkb_browser=chrome");
+
+        assertEquals("Bob's \"QA\" run", values.get(PKB_NAME));
+        assertEquals("chrome", values.get(PKB_BROWSER));
+    }
+
+    @Test
+    void assignmentParserSupportsEscapedQuotesAndBackslashesInsideQuotedValues() {
+        Map<String, String> values = PickleballProfiles.parseAssignments(
+                "pkb_name=\"Bob's \\\"QA, phase 2; retry\\\" C:\\\\results\", pkb_browser=chrome");
+
+        assertEquals("Bob's \"QA, phase 2; retry\" C:\\results", values.get(PKB_NAME));
+        assertEquals("chrome", values.get(PKB_BROWSER));
+    }
+
+    @Test
+    void assignmentParserRejectsTextAfterQuotedValue() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> PickleballProfiles.parseAssignments("pkb_name=\"QA\"extra, pkb_browser=chrome"));
+
+        assertTrue(exception.getMessage().contains("Unexpected text after quoted profile value"));
+    }
+
+    @Test
+    void assignmentParserKeepsTemplateSelectorCommasInsideOneValue() {
+        Map<String, String> values = PickleballProfiles.parseAssignments(
+                "pkb_name=<orders #1,3>, pkb_browser=chrome");
+
+        assertEquals("<orders #1,3>", values.get(PKB_NAME));
+        assertEquals("chrome", values.get(PKB_BROWSER));
+    }
+
+    @Test
+    void serializedRunProfileRoundTripsComplexScalarValues() {
+        Map<String, String> original = new LinkedHashMap<>();
+        original.put(PKB_BROWSER, "chrome");
+        original.put(PKB_NAME, "  Bob's \"QA, phase 2; retry\" = green <orders #1,3> C:\\results  ");
+
+        String serialized = PickleballProfiles.serializeRunProfile(original);
+        Map<String, String> reparsed = PickleballProfiles.parseAssignments(serialized);
+
+        assertEquals(original, reparsed);
     }
 
     private static LinkedHashMap<String, String> baseValues() {

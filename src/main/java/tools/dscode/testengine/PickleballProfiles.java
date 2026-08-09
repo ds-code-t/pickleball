@@ -69,7 +69,14 @@ final class PickleballProfiles {
 
     static Resolution apply(LinkedHashMap<String, String> values) {
         String selectedProfiles = trimToNull(values.get(PKB_PROFILE));
-        String directRunProfile = trimToNull(values.get(PKB_RUN_PROFILE));
+        String compactDirectRunProfile = trimToNull(values.get(PKB_RUN_PROFILE));
+        ObjectNode expandedDirectRunProfile = expandedRunProfileFromValues(values);
+
+        if (compactDirectRunProfile != null && !expandedDirectRunProfile.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Cannot combine compact '" + PKB_RUN_PROFILE + "' with expanded '"
+                            + PKB_props.PKB_RUN_PROFILE_PREFIX + "*' assignments. Use one direct-profile form.");
+        }
 
         ObjectNode registry = JSON.createObjectNode();
         loadProfileResources(registry);
@@ -79,30 +86,38 @@ final class PickleballProfiles {
         registry.set(DEFAULT_PROFILE, defaultProfile.deepCopy());
 
         ObjectNode composed;
-        boolean direct = directRunProfile != null;
-        if (direct) {
-            composed = objectFromAssignments(directRunProfile, PKB_RUN_PROFILE, false);
+        ObjectNode directReferenceContext = JSON.createObjectNode();
+        boolean direct = compactDirectRunProfile != null || !expandedDirectRunProfile.isEmpty();
+        if (compactDirectRunProfile != null) {
+            composed = objectFromAssignments(compactDirectRunProfile, PKB_RUN_PROFILE, false);
+        } else if (!expandedDirectRunProfile.isEmpty()) {
+            composed = expandedDirectRunProfile;
         } else if (selectedProfiles == null) {
             composed = defaultProfile.deepCopy();
         } else {
             composed = composeSelectedProfiles(registry, selectedProfiles);
             JsonNode profileDirect = composed.remove(PKB_RUN_PROFILE);
             if (profileDirect != null && !profileDirect.isNull()) {
-                if (!profileDirect.isTextual()) {
-                    throw new IllegalArgumentException(
-                            "Profile control '" + PKB_RUN_PROFILE + "' must be a scalar assignment string.");
-                }
-                String rawAssignments = trimToNull(profileDirect.textValue());
-                if (rawAssignments != null) {
-                    String assignments = resolveRunProfileControl(rawAssignments, registry, composed);
-                    composed = objectFromAssignments(assignments, PKB_RUN_PROFILE, false);
+                directReferenceContext = composed.deepCopy();
+                if (profileDirect.isTextual()) {
+                    String rawAssignments = trimToNull(profileDirect.textValue());
+                    if (rawAssignments != null) {
+                        composed = objectFromAssignments(rawAssignments, PKB_RUN_PROFILE, false);
+                        direct = true;
+                    }
+                } else if (profileDirect instanceof ObjectNode directObject) {
+                    composed = directObject.deepCopy();
                     direct = true;
+                } else {
+                    throw new IllegalArgumentException(
+                            "Profile control '" + PKB_RUN_PROFILE
+                                    + "' must be an assignment string or a map of RunVars.");
                 }
             }
         }
 
         restoreProtectedReferences(composed, defaultProfile);
-        ObjectNode resolved = resolveProfile(composed, registry);
+        ObjectNode resolved = resolveProfile(composed, registry, directReferenceContext);
         Map<String, String> finalRunVars = toRunVarMap(resolved);
 
         clearManagedValues(values);
@@ -168,7 +183,7 @@ final class PickleballProfiles {
                     }
                     String serializedValue = SensitiveConfiguration.isSensitive(entry.getKey())
                             ? SensitiveConfiguration.protectedReference(entry.getKey())
-                            : entry.getValue().trim();
+                            : entry.getValue();
                     out.append(entry.getKey()).append('=').append(quoteIfNeeded(serializedValue));
                 });
         return out.toString();
@@ -283,6 +298,34 @@ final class PickleballProfiles {
         return profile;
     }
 
+    private static ObjectNode expandedRunProfileFromValues(Map<String, String> values) {
+        ObjectNode profile = JSON.createObjectNode();
+        values.forEach((key, value) -> {
+            String normalizedKey = PickleballRunner.normalizePkbKey(key);
+            if (!PKB_props.isRunProfileMemberKey(normalizedKey)) {
+                return;
+            }
+            String member = normalizedKey.substring(PKB_props.PKB_RUN_PROFILE_PREFIX.length());
+            String runVar = normalizeProfileProperty(member);
+            if (PKB_props.isRunMetadataKey(runVar)) {
+                throw new IllegalArgumentException(
+                        "Run metadata '" + runVar + "' must be supplied separately from Pickleball profiles.");
+            }
+            if (!PKB_props.isRunVariableKey(runVar)) {
+                throw new IllegalArgumentException(
+                        "Expanded run-profile property '" + key + "' is not a Pickleball run variable.");
+            }
+            if (profile.has(runVar)) {
+                throw new IllegalArgumentException(
+                        "Expanded run profile defines '" + runVar + "' more than once.");
+            }
+            if (value != null) {
+                profile.put(runVar, value);
+            }
+        });
+        return profile;
+    }
+
     private static ObjectNode composeSelectedProfiles(ObjectNode registry, String selectedProfiles) {
         ObjectNode composed = JSON.createObjectNode();
         List<String> names = splitProfileNames(selectedProfiles);
@@ -303,28 +346,9 @@ final class PickleballProfiles {
         return composed;
     }
 
-    private static String resolveRunProfileControl(
-            String value, ObjectNode registry, ObjectNode composedProfile
+    private static ObjectNode resolveProfile(
+            ObjectNode profile, ObjectNode registry, ObjectNode directReferenceContext
     ) {
-        ObjectNode resolutionRoot = registry.deepCopy();
-        resolutionRoot.set(RUN_PROFILE, composedProfile.deepCopy());
-        composedProfile.fields().forEachRemaining(
-                entry -> resolutionRoot.set(entry.getKey(), entry.getValue().deepCopy()));
-        Object resolved = new ProfileTemplateResolver(resolutionRoot).resolveWholeValue(value);
-        if (!(resolved instanceof String text)) {
-            throw new IllegalArgumentException(
-                    "Profile control '" + PKB_RUN_PROFILE + "' must resolve to an assignment string.");
-        }
-        String unresolved = unresolvedPkbReference(text);
-        if (unresolved != null) {
-            throw new IllegalArgumentException(
-                    "Unresolved Pickleball profile reference '" + unresolved
-                            + "' in '" + PKB_RUN_PROFILE + "': " + text);
-        }
-        return text;
-    }
-
-    private static ObjectNode resolveProfile(ObjectNode profile, ObjectNode registry) {
         ObjectNode current = profile.deepCopy();
         Set<String> seen = new java.util.HashSet<>();
         for (int pass = 0; pass < 64; pass++) {
@@ -335,8 +359,15 @@ final class PickleballProfiles {
             }
 
             ObjectNode resolutionRoot = registry.deepCopy();
-            resolutionRoot.set(RUN_PROFILE, current.deepCopy());
-            current.fields().forEachRemaining(entry -> resolutionRoot.set(entry.getKey(), entry.getValue().deepCopy()));
+            if (directReferenceContext.isEmpty()) {
+                resolutionRoot.set(RUN_PROFILE, current.deepCopy());
+                current.fields().forEachRemaining(
+                        entry -> resolutionRoot.set(entry.getKey(), entry.getValue().deepCopy()));
+            } else {
+                resolutionRoot.set(RUN_PROFILE, directReferenceContext.deepCopy());
+                directReferenceContext.fields().forEachRemaining(
+                        entry -> resolutionRoot.set(entry.getKey(), entry.getValue().deepCopy()));
+            }
 
             ProfileTemplateResolver resolver = new ProfileTemplateResolver(resolutionRoot);
             ObjectNode next = resolveObject(current, resolver);
@@ -468,9 +499,44 @@ final class PickleballProfiles {
                 throw new IllegalArgumentException(
                         "Run metadata '" + key + "' must be supplied separately from Pickleball profiles.");
             }
-            if (!PKB_props.isRunVariableKey(key) && !PKB_RUN_PROFILE.equals(key)) {
+            if (PKB_RUN_PROFILE.equals(key)) {
+                JsonNode control = entry.getValue();
+                if (control instanceof ObjectNode objectControl) {
+                    normalized.set(key, normalizeDirectRunProfileObject(objectControl, profileName));
+                } else if (control != null && control.isTextual()) {
+                    normalized.set(key, control.deepCopy());
+                } else {
+                    throw new IllegalArgumentException(
+                            "Profile '" + profileName + "' control '" + PKB_RUN_PROFILE
+                                    + "' must be an assignment string or a map of RunVars.");
+                }
+                return;
+            }
+            if (!PKB_props.isRunVariableKey(key)) {
                 throw new IllegalArgumentException(
                         "Profile '" + profileName + "' contains unsupported property '" + entry.getKey() + "'.");
+            }
+            normalized.set(key, entry.getValue().deepCopy());
+        });
+        return normalized;
+    }
+
+    private static ObjectNode normalizeDirectRunProfileObject(ObjectNode profile, String profileName) {
+        ObjectNode normalized = JSON.createObjectNode();
+        profile.fields().forEachRemaining(entry -> {
+            String key = normalizeProfileProperty(entry.getKey());
+            if (PKB_props.isRunMetadataKey(key)) {
+                throw new IllegalArgumentException(
+                        "Run metadata '" + key + "' must be supplied separately from Pickleball profiles.");
+            }
+            if (!PKB_props.isRunVariableKey(key)) {
+                throw new IllegalArgumentException(
+                        "Direct run profile in '" + profileName + "' contains unsupported property '"
+                                + entry.getKey() + "'.");
+            }
+            if (entry.getValue() != null && entry.getValue().isContainerNode()) {
+                throw new IllegalArgumentException(
+                        "Direct run-profile property '" + key + "' must be a scalar value.");
             }
             normalized.set(key, entry.getValue().deepCopy());
         });
@@ -512,35 +578,76 @@ final class PickleballProfiles {
     private static List<String> splitAssignments(String input) {
         List<String> out = new ArrayList<>();
         StringBuilder current = new StringBuilder();
+        boolean seenEquals = false;
+        boolean valueStarted = false;
+        boolean quotedValueClosed = false;
         char quote = 0;
         boolean escaped = false;
         int templateDepth = 0;
 
         for (int index = 0; index < input.length(); index++) {
             char ch = input.charAt(index);
-            if (escaped) {
-                current.append(ch);
-                escaped = false;
-                continue;
-            }
-            if (ch == '\\') {
-                current.append(ch);
-                escaped = true;
-                continue;
-            }
+
             if (quote != 0) {
                 current.append(ch);
-                if (ch == quote) {
+                if (escaped) {
+                    escaped = false;
+                } else if (ch == '\\') {
+                    escaped = true;
+                } else if (ch == quote) {
                     quote = 0;
+                    quotedValueClosed = true;
                 }
                 continue;
             }
-            if (ch == '\'' || ch == '"') {
-                quote = ch;
+
+            if (quotedValueClosed) {
+                if (ch == ',' || ch == ';') {
+                    addAssignment(out, current);
+                    seenEquals = false;
+                    valueStarted = false;
+                    quotedValueClosed = false;
+                    templateDepth = 0;
+                    continue;
+                }
+                if (!Character.isWhitespace(ch)) {
+                    throw new IllegalArgumentException(
+                            "Unexpected text after quoted profile value near '" + current + ch + "'.");
+                }
                 current.append(ch);
                 continue;
             }
-            if (ch == '<') {
+
+            if (!seenEquals) {
+                if (ch == ',' || ch == ';') {
+                    addAssignment(out, current);
+                    seenEquals = false;
+                    valueStarted = false;
+                    templateDepth = 0;
+                    continue;
+                }
+                current.append(ch);
+                if (ch == '=') {
+                    seenEquals = true;
+                }
+                continue;
+            }
+
+            if (!valueStarted) {
+                current.append(ch);
+                if (Character.isWhitespace(ch)) {
+                    continue;
+                }
+                valueStarted = true;
+                if (ch == '\'' || ch == '"') {
+                    quote = ch;
+                } else if (ch == '<' && hasClosingAngle(input, index + 1)) {
+                    templateDepth = 1;
+                }
+                continue;
+            }
+
+            if (ch == '<' && hasClosingAngle(input, index + 1)) {
                 templateDepth++;
                 current.append(ch);
                 continue;
@@ -552,12 +659,23 @@ final class PickleballProfiles {
             }
             if ((ch == ',' || ch == ';') && templateDepth == 0) {
                 addAssignment(out, current);
+                seenEquals = false;
+                valueStarted = false;
+                templateDepth = 0;
                 continue;
             }
             current.append(ch);
         }
+
+        if (quote != 0) {
+            throw new IllegalArgumentException("Unterminated quoted profile value in '" + current + "'.");
+        }
         addAssignment(out, current);
         return out;
+    }
+
+    private static boolean hasClosingAngle(String input, int fromIndex) {
+        return input.indexOf('>', fromIndex) >= 0;
     }
 
     private static void addAssignment(List<String> out, StringBuilder current) {
@@ -572,22 +690,37 @@ final class PickleballProfiles {
         if (value.length() < 2) {
             return value;
         }
-        char first = value.charAt(0);
-        char last = value.charAt(value.length() - 1);
-        if ((first != '"' && first != '\'') || first != last) {
+        char quote = value.charAt(0);
+        if ((quote != '"' && quote != '\'') || value.charAt(value.length() - 1) != quote) {
             return value;
         }
+
         String inner = value.substring(1, value.length() - 1);
-        return inner.replace("\\" + first, String.valueOf(first)).replace("\\\\", "\\");
+        StringBuilder out = new StringBuilder(inner.length());
+        for (int index = 0; index < inner.length(); index++) {
+            char ch = inner.charAt(index);
+            if (ch == '\\' && index + 1 < inner.length()) {
+                char next = inner.charAt(index + 1);
+                if (next == quote || next == '\\') {
+                    out.append(next);
+                    index++;
+                    continue;
+                }
+            }
+            out.append(ch);
+        }
+        return out.toString();
     }
 
     private static String quoteIfNeeded(String value) {
         if (value == null) {
             return "";
         }
+        boolean startsWithQuote = !value.isEmpty() && (value.charAt(0) == '"' || value.charAt(0) == '\'');
         boolean quote = value.indexOf(',') >= 0
                 || value.indexOf(';') >= 0
                 || value.indexOf('"') >= 0
+                || startsWithQuote
                 || !value.equals(value.trim());
         if (!quote) {
             return value;
@@ -599,7 +732,9 @@ final class PickleballProfiles {
         source.fields().forEachRemaining(entry -> {
             JsonNode existing = target.get(entry.getKey());
             JsonNode incoming = entry.getValue();
-            if (existing instanceof ObjectNode existingObject && incoming instanceof ObjectNode incomingObject) {
+            if (PKB_RUN_PROFILE.equals(entry.getKey())) {
+                target.set(entry.getKey(), incoming.deepCopy());
+            } else if (existing instanceof ObjectNode existingObject && incoming instanceof ObjectNode incomingObject) {
                 mergeDeep(existingObject, incomingObject);
             } else {
                 target.set(entry.getKey(), incoming.deepCopy());
