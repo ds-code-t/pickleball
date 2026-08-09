@@ -59,6 +59,14 @@ After normal or named-profile resolution, Pickleball retains the resolved RunVar
 
 `comparisonMetadata` carries the fingerprint and direct-mode flag so `run-catalog.json` and `DiagnosticRunComparator` can compare execution contracts without duplicating the full profile string into the catalog.
 
+### `runProfileFingerprint` versus `configurationHash`
+
+Use `runProfileFingerprint` as the authoritative equality check for the final execution RunVars. If two runs have the same `runProfileFingerprint`, their canonical final RunVar sets are the same, including protected values through one-way hash input.
+
+`configurationHash` is intentionally broader. It represents execution-relevant configuration provenance and representation in addition to the final RunVars, so it may differ between two runs even when `runProfileFingerprint` is identical. For example, the same final RunVars may have been reached through different configuration sources or equivalent option representations.
+
+For a controlled rerun, use `runProfileFingerprint` to verify that the final execution RunVars were preserved or changed as intended. Treat a `configurationHash` difference as additional configuration/provenance evidence to investigate, not by itself as proof that the final RunVars changed.
+
 Example retained value:
 
 ```text
