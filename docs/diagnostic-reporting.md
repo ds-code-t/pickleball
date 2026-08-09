@@ -80,6 +80,61 @@ Each scenario has a lightweight `summary.json`. When dense evidence is retained 
 
 `run-index.json` contains comparison-oriented metadata such as effective browser/environment/tag/options values, deterministic configuration/environment/dependency/selection/source fingerprints, runtime information, scenario identities, outcomes, durations, failure signatures, representative screenshot references, and links to deeper evidence. Pickleball does not assign a run-level comparability classification; an AI agent can decide which runs are relevant by reading `run-catalog.json` and these inexpensive indexes first. `DiagnosticRunComparator` first compares two run indexes without opening dense scenario JSONL or screenshots. After it matches scenarios, it may read at most four matching representative fingerprint pairs per matched scenario to produce compact cross-run visual transitions; it still never opens the full screenshots. `DiagnosticIndexRebuilder` can rebuild interrupted scenario summaries, missing fingerprint sidecars, the derived run index, failure clusters, and shared run catalog from surviving diagnostic evidence.
 
+## AI evidence access protocol
+
+Diagnostic evidence is intentionally hierarchical. Agents should use the shallowest layer that completely answers the current question and stop there. Do not open deeper evidence just because a path is available.
+
+Use this escalation order:
+
+1. **Run catalog** — `run-catalog.json` to select candidate runs by purpose, outcome, time, lineage, and compact comparison metadata.
+2. **Run indexes and clusters** — selected `run-index.json` files and `clusters.json` for scenario outcomes, identities, failure signatures/sites, capabilities, retention state, step rollups, and representative visual references.
+3. **Scenario summary** — selected `summary.json` only when the run index does not contain enough sparse scenario detail.
+4. **Normal events** — the selected scenario's `events.jsonl` only when exact step, nested lifecycle, ordering, or INFO+ detail remains unanswered.
+5. **Visual comparison metadata/fingerprints** — use existing `comparisonToPrevious`, `DiagnosticRunComparator`, or `VisualFingerprintComparator` before opening a screenshot.
+6. **Representative screenshot** — open a PNG only when the question requires interpreting the semantic content of a visual difference.
+7. **Deep trace** — read `trace.jsonl.gz` or interrupted raw `trace.jsonl` only when structured and INFO+ evidence is insufficient.
+
+At every layer, stop when the evidence already answers the question with sufficient confidence. Examples:
+
+- Distinct `failureSignature` / `failureSiteKey` values already establish separate failure clusters; events are not required merely to prove clustering.
+- If a targeted `events.jsonl` record identifies the failed assertion and lifecycle, TRACE/DEBUG evidence is unnecessary.
+- `decodedPixelsExactlyEqual=true` already establishes decoded-pixel equality; opening a PNG adds no evidence for the question "did these screenshots differ?"
+- `VERY_SIMILAR`, `SOMEWHAT_SIMILAR`, or `VERY_DIFFERENT` already establishes a visual difference and its magnitude. Open the representative PNG only when the actual visible meaning of that difference matters.
+
+Do not recursively ingest an entire diagnostic run. Select evidence by run, scenario, event range, and representative visual reference.
+
+## Diagnostic CLI
+
+`tools.dscode.common.reporting.diagnostic.DiagnosticCli` is the supported command-line front end for routine comparison and recovery operations. It delegates to the existing diagnostic APIs so agents do not need to construct Maven classpaths and JShell scripts or reimplement comparison logic.
+
+From a Maven consumer where Pickleball is available on the test classpath. In PowerShell, quote each complete `-Dexec.*` argument as shown so Maven receives it as one argument:
+
+```powershell
+mvn org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.common.reporting.diagnostic.DiagnosticCli" "-Dexec.classpathScope=test" "-Dexec.args=compare-runs reports/diagnostic-runs/<left-run>/run-index.json reports/diagnostic-runs/<right-run>/run-index.json target/diagnostic-comparison.json"
+```
+
+Compare two compact fingerprint sidecars without opening the screenshots:
+
+```powershell
+mvn org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.common.reporting.diagnostic.DiagnosticCli" "-Dexec.classpathScope=test" "-Dexec.args=compare-fingerprints reports/diagnostic-runs/<left-run>/scenarios/<scenario>/fingerprints/<left>.pkbf reports/diagnostic-runs/<right-run>/scenarios/<scenario>/fingerprints/<right>.pkbf target/fingerprint-comparison.json"
+```
+
+Rebuild derived sparse evidence and missing fingerprint sidecars from surviving evidence:
+
+```powershell
+mvn org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.common.reporting.diagnostic.DiagnosticCli" "-Dexec.classpathScope=test" "-Dexec.args=rebuild reports/diagnostic-runs"
+```
+
+The CLI commands are:
+
+```text
+compare-runs <left-run-index> <right-run-index> [output-json]
+compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
+rebuild <diagnostic-runs-root-or-run-root>
+```
+
+If an output path is omitted for a comparison, JSON is written to stdout. `rebuild` prints a compact JSON summary after regenerating each run index and then the shared catalog. Agents should prefer this CLI for routine diagnostic operations; direct Java API use remains supported.
+
 ## Outcomes
 
 Run outcomes are:
@@ -164,7 +219,18 @@ V1 fingerprints:
 - include a `32 × 18` edge grid, normalized 4×4×4 color histogram, dHash, dimensions, and SHA-256;
 - serialize to a versioned compact binary sidecar of roughly 7–8 KB for typical screenshots.
 
-The comparison engine reads fingerprint sidecars without reopening screenshots. It returns small similarity/category results (`IDENTICAL`, `VERY_SIMILAR`, `SOMEWHAT_SIMILAR`, `VERY_DIFFERENT`). Scenario summaries keep at most eight representative screenshots such as the first visual state, significant visual changes, failures, and final visual state. An AI agent normally consumes only those summaries and opens a full screenshot when the comparison indicates it is useful.
+Each screenshot event can include `comparisonToPrevious`, produced eagerly from the previous and current fingerprints. It exposes compact fields such as `similarity`, component similarities, `changedCellRatio`, `dHashDistance`, `decodedPixelsExactlyEqual`, `dimensionsEqual`, and category. Use this existing metadata before loading either fingerprint or screenshot when the question concerns adjacent visual stability.
+
+For cross-run or explicit comparisons, feed `.pkbf` files to Pickleball's comparator through `DiagnosticCli`, `DiagnosticRunComparator`, or `VisualFingerprintComparator`. Do not manually decode `.pkbf`; the binary format is an implementation detail consumed by Pickleball comparison code.
+
+Visual equality rules for agents:
+
+- `decodedPixelsExactlyEqual=true` means dimensions match and the fingerprint's canonical decoded-pixel SHA-256 matches. The rendered pixels are equal, so opening the PNG is unnecessary to establish equality.
+- `IDENTICAL` is the corresponding comparison category for exact decoded-pixel equality.
+- `VERY_SIMILAR`, `SOMEWHAT_SIMILAR`, and `VERY_DIFFERENT` mean decoded pixels are not exactly equal and provide increasingly strong evidence of visual change.
+- Raw PNG byte equality also proves identical files, but raw byte inequality does **not** prove rendered pixels differ. PNG metadata, compression, or encoding can change while decoded pixels remain the same. Prefer `decodedPixelsExactlyEqual` for visual equality decisions.
+
+The comparison engine reads fingerprint sidecars without reopening screenshots. It returns small similarity/category results (`IDENTICAL`, `VERY_SIMILAR`, `SOMEWHAT_SIMILAR`, `VERY_DIFFERENT`). Scenario summaries keep at most eight representative screenshots such as the first visual state, significant visual changes, failures, and final visual state. Open a full screenshot only when those compact results establish that a visual difference exists and the investigation requires understanding what the changed pixels mean.
 
 ## Git and source provenance
 
@@ -190,6 +256,6 @@ Optional external lineage values (`pkb_investigation_id`, `pkb_run_purpose`, `pk
 
 Diagnostic evidence failures do not change the test result. The run is marked with `evidenceIntegrity=PARTIAL` and a concise error is written to stderr.
 
-Plain JSONL is appended as execution proceeds and index/summary files are replaced atomically. Deep TRACE/DEBUG evidence remains raw JSONL while active and is compressed only after controlled scenario completion. If a prior run still has a `RUNNING` manifest when a new diagnostic run starts, it is marked `UNKNOWN` / `INTERRUPTED`; already-written evidence remains available. `DiagnosticIndexRebuilder` understands raw or gzip trace evidence and can reconstruct derived navigation metadata without expanding the compressed artifact on disk.
+Plain JSONL is appended as execution proceeds and index/summary files are replaced atomically. Deep TRACE/DEBUG evidence remains raw JSONL while active and is compressed only after controlled scenario completion. If a prior run still has a `RUNNING` manifest when a new diagnostic run starts, it is marked `UNKNOWN` / `INTERRUPTED`; already-written evidence remains available. `DiagnosticIndexRebuilder` understands raw or gzip trace evidence and can reconstruct derived navigation metadata without expanding the compressed artifact on disk. `DiagnosticCli rebuild` provides the command-line entry point for rebuilding run indexes, clusters, the shared catalog, and missing fingerprint sidecars without rerunning the tests.
 
 [Previous: Execution configuration](configuration.md) · [Documentation home](README.md)

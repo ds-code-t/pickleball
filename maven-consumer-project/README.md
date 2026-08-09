@@ -68,6 +68,30 @@ Run only the date/time examples with:
 mvn test "-Dpkb_tags=@datetime"
 ```
 
+## Diagnostic CLI examples
+
+Pickleball's diagnostic utilities can be invoked from this consumer without building a dependency classpath or using JShell. The Maven exec plugin can run `DiagnosticCli` directly from the test-scoped Pickleball dependency. In PowerShell, quote each complete `-Dexec.*` argument as shown so Maven receives it as one argument.
+
+Compare two run indexes:
+
+```powershell
+mvn org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.common.reporting.diagnostic.DiagnosticCli" "-Dexec.classpathScope=test" "-Dexec.args=compare-runs reports/diagnostic-runs/<left-run>/run-index.json reports/diagnostic-runs/<right-run>/run-index.json target/diagnostic-comparison.json"
+```
+
+Compare two visual fingerprint sidecars without opening PNG screenshots:
+
+```powershell
+mvn org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.common.reporting.diagnostic.DiagnosticCli" "-Dexec.classpathScope=test" "-Dexec.args=compare-fingerprints reports/diagnostic-runs/<left-run>/scenarios/<scenario>/fingerprints/<left>.pkbf reports/diagnostic-runs/<right-run>/scenarios/<scenario>/fingerprints/<right>.pkbf target/fingerprint-comparison.json"
+```
+
+Rebuild derived diagnostic indexes, clusters, the shared catalog, and missing fingerprint sidecars from surviving evidence:
+
+```powershell
+mvn org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.common.reporting.diagnostic.DiagnosticCli" "-Dexec.classpathScope=test" "-Dexec.args=rebuild reports/diagnostic-runs"
+```
+
+See [Diagnostic Reporting](../docs/diagnostic-reporting.md) for the sparse-first evidence hierarchy and visual-evidence escalation rules.
+
 ## Configuration overrides
 
 The runner defaults to Chrome. To keep machine-specific settings out of Git, copy:

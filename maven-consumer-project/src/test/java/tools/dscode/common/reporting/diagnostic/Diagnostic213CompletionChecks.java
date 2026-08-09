@@ -3,6 +3,7 @@ package tools.dscode.common.reporting.diagnostic;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.lang.reflect.Method;
@@ -50,7 +51,6 @@ public class Diagnostic213CompletionChecks {
                 .endsWith("maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/Diagnostic213CompletionChecks.java"));
         assertTrue(String.valueOf(definition.get("sourceSha256")).length() == 64);
     }
-
 
     @Test
     void classpathFeatureSourceResolvesFromNestedConsumerModule() {
@@ -230,6 +230,128 @@ public class Diagnostic213CompletionChecks {
             assertEquals(7L, ((Number) traceEvidence.get("eventSeqFirst")).longValue());
         } finally {
             deleteTree(root);
+        }
+    }
+
+    @Test
+    void diagnosticCliComparesRunsWithoutJshell() throws Exception {
+        Path root = Files.createTempDirectory("pickleball-cli-runs");
+        try {
+            Path left = root.resolve("left/run-index.json");
+            Path right = root.resolve("right/run-index.json");
+            Path output = root.resolve("comparison.json");
+            Files.createDirectories(left.getParent());
+            Files.createDirectories(right.getParent());
+
+            Map<String, Object> identity = Map.of(
+                    "featureUri", "classpath:features/example.feature",
+                    "scenarioName", "CLI comparison",
+                    "exactSourceKey", "same-source",
+                    "semanticKey", "same-semantic",
+                    "nameKey", "same-name",
+                    "tagKey", "same-tags",
+                    "sourceOrderHint", 10
+            );
+            Map<String, Object> scenario = Map.of(
+                    "scenarioExecutionId", "scenario-1",
+                    "identity", identity,
+                    "outcome", "PASSED",
+                    "representativeScreenshots", List.of()
+            );
+            Map<String, Object> index = Map.of(
+                    "runId", "run-1",
+                    "outcome", "PASSED",
+                    "comparisonMetadata", Map.of(),
+                    "scenarios", List.of(scenario)
+            );
+            JSON.writeValue(left.toFile(), index);
+            JSON.writeValue(right.toFile(), index);
+
+            assertEquals(0, DiagnosticCli.run(new String[]{
+                    "compare-runs", left.toString(), right.toString(), output.toString()
+            }, System.out, System.err));
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> comparison = JSON.readValue(output.toFile(), LinkedHashMap.class);
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> transitions = (List<Map<String, Object>>) comparison.get("scenarioTransitions");
+            assertEquals("EXACT_SOURCE", transitions.getFirst().get("matchBasis"));
+            assertEquals("PERSISTENT_PASS", transitions.getFirst().get("transition"));
+        } finally {
+            deleteTree(root);
+        }
+    }
+
+    @Test
+    void diagnosticCliComparesFingerprintSidecarsWithoutOpeningImages() throws Exception {
+        Path root = Files.createTempDirectory("pickleball-cli-fingerprints");
+        try {
+            BufferedImage image = new BufferedImage(8, 8, BufferedImage.TYPE_INT_RGB);
+            Path left = root.resolve("left.pkbf");
+            Path right = root.resolve("right.pkbf");
+            Path output = root.resolve("comparison.json");
+            byte[] fingerprint = VisualFingerprint.fromImage(image).toBytes();
+            Files.write(left, fingerprint);
+            Files.write(right, fingerprint);
+
+            assertEquals(0, DiagnosticCli.run(new String[]{
+                    "compare-fingerprints", left.toString(), right.toString(), output.toString()
+            }, System.out, System.err));
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> result = JSON.readValue(output.toFile(), LinkedHashMap.class);
+            @SuppressWarnings("unchecked")
+            Map<String, Object> comparison = (Map<String, Object>) result.get("comparison");
+            assertEquals("IDENTICAL", comparison.get("category"));
+            assertEquals(Boolean.TRUE, comparison.get("decodedPixelsExactlyEqual"));
+        } finally {
+            deleteTree(root);
+        }
+    }
+
+    @Test
+    void diagnosticCliRebuildRestoresSparseNavigation() throws Exception {
+        Path runsRoot = Files.createTempDirectory("pickleball-cli-rebuild");
+        try {
+            Path runRoot = runsRoot.resolve("run-1");
+            Path scenarioRoot = runRoot.resolve("scenarios/scenario-1");
+            Files.createDirectories(scenarioRoot);
+            JSON.writeValue(runRoot.resolve("manifest.json").toFile(), Map.of(
+                    "runId", "run-1",
+                    "outcome", "FAILED",
+                    "completion", "COMPLETE",
+                    "startedAt", "2026-08-08T00:00:00Z",
+                    "reportRetention", "all"
+            ));
+            JSON.writeValue(runRoot.resolve("configuration.json").toFile(), Map.of("effective", Map.of()));
+            JSON.writeValue(runRoot.resolve("environment.json").toFile(), Map.of("javaVersion", "21"));
+            JSON.writeValue(runRoot.resolve("source-provenance.json").toFile(), Map.of("repositories", List.of()));
+
+            Map<String, Object> summary = new LinkedHashMap<>();
+            summary.put("scenarioExecutionId", "scenario-1");
+            summary.put("outcome", "FAILED");
+            summary.put("completion", "COMPLETE");
+            summary.put("startedAt", "2026-08-08T00:00:00Z");
+            summary.put("identity", Map.of(
+                    "featureUri", "classpath:features/example.feature",
+                    "scenarioName", "CLI rebuild",
+                    "exactSourceKey", "exact",
+                    "semanticKey", "semantic",
+                    "nameKey", "name",
+                    "sourceOrderHint", 1
+            ));
+            summary.put("failureSignature", "failure-1");
+            JSON.writeValue(scenarioRoot.resolve("summary.json").toFile(), summary);
+
+            assertEquals(0, DiagnosticCli.run(new String[]{
+                    "rebuild", runsRoot.toString()
+            }, System.out, System.err));
+
+            assertTrue(Files.isRegularFile(runsRoot.resolve("run-catalog.json")));
+            assertTrue(Files.isRegularFile(runRoot.resolve("run-index.json")));
+            assertTrue(Files.isRegularFile(runRoot.resolve("clusters.json")));
+        } finally {
+            deleteTree(runsRoot);
         }
     }
 

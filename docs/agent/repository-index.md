@@ -217,6 +217,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/mappings/StepMapping.java`
 - `src/main/java/tools/dscode/common/mappings/ValueFormatting.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/ConfigurationProvenance.java`
+- `src/main/java/tools/dscode/common/reporting/diagnostic/DiagnosticCli.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/DiagnosticIndexRebuilder.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/DiagnosticReporter.java`
 - `src/main/java/tools/dscode/common/reporting/diagnostic/DiagnosticRunComparator.java`

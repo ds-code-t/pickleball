@@ -23,6 +23,34 @@ For any request to add, change, fix, refactor, or remove project functionality:
 Do not require the user to repeat the project background, repository layout, test-server setup, dependency model, documentation policy, or definition of done.
 
 Ask for clarification only when the requested product behavior remains materially ambiguous after reviewing the repository. Prefer existing conventions and backward-compatible behavior when a reasonable interpretation is available.
+
+### Diagnostic investigation protocol
+
+When investigating Pickleball diagnostic evidence, use the shallowest evidence layer that completely answers the question. Do not advance to a denser layer merely because it exists.
+
+Use this escalation order:
+
+1. `run-catalog.json` to choose relevant runs.
+2. Selected `run-index.json` files and `clusters.json` for outcomes, scenario identity, failure grouping, capabilities, retention state, and representative visual references.
+3. Selected scenario `summary.json` files for additional sparse scenario detail.
+4. Only the relevant scenario `events.jsonl` when exact step/lifecycle/order detail is still unanswered.
+5. Existing `comparisonToPrevious` visual metadata or Pickleball fingerprint/run comparison before opening any screenshot.
+6. A representative PNG only when the semantic content of a visual difference must be understood.
+7. `trace.jsonl.gz` or interrupted raw `trace.jsonl` only when structured/INFO+ evidence is insufficient.
+
+Stop reading as soon as the current layer answers the investigation with sufficient confidence.
+
+For visual evidence:
+
+- Never open a PNG merely to determine whether two screenshots differ.
+- Prefer already-recorded `comparisonToPrevious` metadata for adjacent screenshots.
+- For cross-run or explicit fingerprint comparison, use Pickleball's `DiagnosticCli`, `DiagnosticRunComparator`, or `VisualFingerprintComparator`; do not manually decode `.pkbf` files or invent an image-comparison algorithm.
+- `decodedPixelsExactlyEqual=true` means the decoded rendered pixels are equal; no PNG inspection is needed to establish visual equality.
+- `IDENTICAL` ends a visual-difference investigation unless the user explicitly needs the image itself.
+- `VERY_SIMILAR`, `SOMEWHAT_SIMILAR`, or `VERY_DIFFERENT` establish that pixels differ and provide magnitude. Open a representative PNG only if the question requires interpreting what changed.
+- Raw PNG byte equality proves the files are identical, but raw PNG byte inequality does not prove their rendered pixels differ because encoding or metadata may differ. Prefer decoded-pixel equality from the fingerprint comparator.
+
+For routine diagnostic utility operations, prefer `tools.dscode.common.reporting.diagnostic.DiagnosticCli` over constructing a Maven classpath and JShell script. See `docs/diagnostic-reporting.md` for commands.
 ## Sources of truth
 
 Use all relevant evidence rather than trusting one file in isolation:
