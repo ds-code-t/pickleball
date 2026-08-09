@@ -93,6 +93,24 @@ Scenario/run completion is tracked separately from outcome. A scenario that exit
 
 The old `MIXED` classification is not used. Exact scenario counts remain in the run index.
 
+## Failure clustering
+
+Failed scenarios expose a compact `failureSignature` used by `clusters.json` and cross-run comparison. For failures associated with a structured Cucumber/Pickleball step, the signature combines the normalized failure class/message with a stable failure-site key derived from the canonical feature source, Gherkin step line, and resolved step-definition method. This keeps repeated failures at the same assertion site grouped while preventing unrelated hard assertions with the same generic exception message from collapsing into one cluster.
+
+Sparse scenario summaries and run-index entries also expose the clustering inputs needed to interpret the signature without opening `events.jsonl`:
+
+- `failureSignatureVersion` — `2` for site-aware signatures and `1` for the legacy no-site fallback;
+- `failureSiteKey` — the compact deterministic hash of the structured failure site when available;
+- `failureSite.feature` — canonical resource-relative feature source;
+- `failureSite.stepLine` — Gherkin line used as the site anchor;
+- `failureSite.definition` — resolved `declaringClass#method` for the step definition.
+
+`clusters.json` carries the same metadata for each cluster, and `DiagnosticRunComparator` retains it in compact scenario transitions. `DiagnosticIndexRebuilder` preserves this metadata when rebuilding run indexes and clusters from surviving scenario summaries.
+
+The first observed failing step is used as the site anchor. Scenario Outline rows executing the same Gherkin assertion line therefore remain clusterable. If a failure occurs outside a structured step and no site can be identified, Pickleball deliberately falls back to the previous class/message-only signature and records `failureSignatureVersion=1`; no synthetic failure site is invented.
+
+Failure messages normalize volatile decimal numbers and hexadecimal addresses before hashing. The signature is an investigation aid rather than a permanent public identifier: agents should still use scenario identity, failure details, step metadata, and source provenance when deciding whether two failures have the same root cause.
+
 ## Scenario identity
 
 Every top-level scenario logs its source identity at normal INFO level and records the same data structurally in diagnostic mode. Identity uses multiple signals rather than one fragile key:

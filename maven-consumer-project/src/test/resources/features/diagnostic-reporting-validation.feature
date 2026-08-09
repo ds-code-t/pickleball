@@ -51,7 +51,7 @@ Feature: AI diagnostic reporting validation
     * , ensure "Name: Mia Variant" Text is displayed
     * , ensure "Account Type: Standard" Text is displayed
 
-  @diagnostic-validation @diagnostic-browser-fail @browser @local-site
+  @diagnostic-validation @diagnostic-cluster-validation @diagnostic-browser-fail @browser @local-site
   Scenario: Diagnostic browser failure evidence
     * navigate to: URL.forms
     * , ensure "Forms Playground" Text is displayed
@@ -64,7 +64,7 @@ Feature: AI diagnostic reporting validation
     * emit diagnostic log markers "diagnostic-soft-failure"
     * , verify "actual-soft" equals "expected-soft"
 
-  @diagnostic-validation @diagnostic-hard-fail
+  @diagnostic-validation @diagnostic-cluster-validation @diagnostic-hard-fail
   Scenario: Diagnostic hard assertion failure evidence
     * emit diagnostic log markers "diagnostic-hard-failure"
     * , ensure "actual-hard" equals "expected-hard"

@@ -1,5 +1,9 @@
 package tools.dscode.common.reporting.diagnostic;
 
+import io.cucumber.core.runner.CurrentScenarioState;
+import io.cucumber.core.runner.DiagnosticStepMetadata;
+import io.cucumber.core.runner.StepExtension;
+import io.cucumber.plugin.event.Result;
 import org.junit.platform.engine.ExecutionRequest;
 import tools.dscode.testengine.DynamicSuiteEngine;
 import tools.dscode.testengine.PickleballRunner;
@@ -11,10 +15,13 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.GZIPOutputStream;
@@ -26,6 +33,12 @@ import static tools.dscode.testengine.PKB_props.PKB_CUCUMBER_CLI_FEATURE_SELECTO
 public privileged aspect Diagnostic213CompletionAspect {
     private final ThreadLocal<String> configurationSource = new ThreadLocal<>();
     private final Map<DiagnosticReporter, RunTraceState> runTraceStates = new ConcurrentHashMap<>();
+    private final ThreadLocal<ScenarioIdentity> failureScenario = new ThreadLocal<>();
+    private final ThreadLocal<Deque<ScenarioIdentity>> failureNestedScenarios =
+            ThreadLocal.withInitial(ArrayDeque::new);
+    private final ThreadLocal<FailureSite> failureSite = new ThreadLocal<>();
+    private final Map<String, FailureMetadata> failureMetadataBySignature = new ConcurrentHashMap<>();
+    private final ThreadLocal<Map<String, FailureMetadata>> rebuildingFailureMetadata = new ThreadLocal<>();
 
     before(String resource):
             execution(private void PickleballRunner.mergeResourcePropertiesIfMissing(String))
@@ -91,6 +104,239 @@ public privileged aspect Diagnostic213CompletionAspect {
         String source = configurationSource.get();
         if (source == null || key == null) return;
         ConfigurationProvenance.captureSupplied(source, String.valueOf(key), value == null ? null : String.valueOf(value));
+    }
+
+    before(CurrentScenarioState state):
+            execution(void DiagnosticReporter.startScenario(io.cucumber.core.runner.CurrentScenarioState))
+            && args(state) {
+        failureScenario.set(ScenarioIdentity.from(state));
+        failureNestedScenarios.get().clear();
+        failureSite.remove();
+    }
+
+    before(ScenarioIdentity callee):
+            execution(void DiagnosticReporter.beginNested(ScenarioIdentity))
+            && args(callee) {
+        if (callee != null) failureNestedScenarios.get().push(callee);
+    }
+
+    after(): execution(void DiagnosticReporter.endNested(boolean)) {
+        Deque<ScenarioIdentity> stack = failureNestedScenarios.get();
+        if (!stack.isEmpty()) stack.pop();
+    }
+
+    before(StepExtension step, Result result, Throwable error):
+            execution(void DiagnosticReporter.endStep(
+                    io.cucumber.core.runner.StepExtension,
+                    io.cucumber.plugin.event.Result,
+                    Throwable))
+            && args(step, result, error) {
+        if (failureSite.get() != null) return;
+
+        Throwable failure = error != null ? error : result == null ? null : result.getError();
+        if (failure == null) return;
+
+        DiagnosticStepMetadata metadata = DiagnosticStepMetadata.from(step);
+        if (metadata == null) return;
+
+        Deque<ScenarioIdentity> stack = failureNestedScenarios.get();
+        ScenarioIdentity identity = stack.isEmpty() ? failureScenario.get() : stack.peek();
+        FailureSite site = failureSite(identity, metadata);
+        if (site != null && !site.key.isBlank()) failureSite.set(site);
+    }
+
+    String around(Throwable failure):
+            execution(private static String DiagnosticReporter.failureSignature(Throwable))
+            && args(failure) {
+        FailureSite site = failureSite.get();
+        String signature = failureSignature(failure, site == null ? "" : site.key);
+        failureMetadataBySignature.put(signature, FailureMetadata.from(site));
+        return signature;
+    }
+
+    void around(Path target, Object value):
+            execution(private void DiagnosticReporter.writeJsonAtomic(java.nio.file.Path, Object))
+            && args(target, value) {
+        proceed(target, enrichFailureMetadata(value, failureMetadataBySignature));
+    }
+
+    void around(Path runRoot, List scenarios):
+            execution(private static void DiagnosticIndexRebuilder.rebuildClusters(java.nio.file.Path, java.util.List))
+            && args(runRoot, scenarios) {
+        Map<String, FailureMetadata> previous = rebuildingFailureMetadata.get();
+        rebuildingFailureMetadata.set(failureMetadataFromScenarios(scenarios));
+        try {
+            proceed(runRoot, scenarios);
+        } finally {
+            if (previous == null) rebuildingFailureMetadata.remove();
+            else rebuildingFailureMetadata.set(previous);
+        }
+    }
+
+    void around(Path target, Object value):
+            execution(private static void DiagnosticIndexRebuilder.writeAtomic(java.nio.file.Path, Object))
+            && args(target, value) {
+        Map<String, FailureMetadata> metadata = rebuildingFailureMetadata.get();
+        if (metadata != null && target != null && target.getFileName() != null
+                && "clusters.json".equals(target.getFileName().toString())) {
+            proceed(target, enrichFailureMetadata(value, metadata));
+            return;
+        }
+        proceed(target, value);
+    }
+
+    after(Map scenario) returning(Map compact):
+            execution(private static java.util.Map DiagnosticRunComparator.compactScenario(java.util.Map))
+            && args(scenario) {
+        copyFailureMetadata(scenario, compact);
+    }
+
+    after(): execution(void DiagnosticReporter.endScenario(
+            io.cucumber.core.runner.CurrentScenarioState,
+            boolean,
+            Throwable)) {
+        failureScenario.remove();
+        failureNestedScenarios.remove();
+        failureSite.remove();
+    }
+
+    public static String failureSignatureForTesting(Throwable failure, String siteKey) {
+        return failureSignature(failure, siteKey);
+    }
+
+    public static String failureSiteKeyForTesting(
+            String featureUri,
+            int stepLine,
+            String stepText,
+            Method method
+    ) {
+        FailureSite site = failureSite(featureUri, stepLine, stepText, method);
+        return site == null ? "" : site.key;
+    }
+
+    public static Map<String, Object> failureMetadataForTesting(
+            Throwable failure,
+            String featureUri,
+            int stepLine,
+            String stepText,
+            Method method
+    ) {
+        FailureSite site = failureSite(featureUri, stepLine, stepText, method);
+        String signature = failureSignature(failure, site == null ? "" : site.key);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("failureSignature", signature);
+        FailureMetadata.from(site).addTo(result);
+        return result;
+    }
+
+    private static String failureSignature(Throwable failure, String siteKey) {
+        String type = failure == null ? "" : failure.getClass().getName();
+        String message = normalizedFailureMessage(failure == null ? null : failure.getMessage());
+        String site = siteKey == null ? "" : siteKey.trim();
+
+        // Preserve the previous signature for failures that have no structured step site.
+        if (site.isBlank()) return ScenarioIdentity.shortHash(type + "|" + message);
+        return ScenarioIdentity.shortHash("v2|" + type + "|" + message + "|" + site);
+    }
+
+    private static FailureSite failureSite(ScenarioIdentity identity, DiagnosticStepMetadata metadata) {
+        if (metadata == null) return null;
+        return failureSite(
+                identity == null ? "" : identity.featureUri(),
+                metadata.stepLine(),
+                metadata.stepText(),
+                metadata.method()
+        );
+    }
+
+    private static FailureSite failureSite(
+            String featureUri,
+            int stepLine,
+            String stepText,
+            Method method
+    ) {
+        String source = ScenarioIdentity.canonicalSourceUri(featureUri);
+        String normalizedStep = normalizedSiteText(stepText);
+        String definition = method == null
+                ? ""
+                : method.getDeclaringClass().getName() + "#" + method.getName();
+        if (source.isBlank() && stepLine <= 0 && normalizedStep.isBlank() && definition.isBlank()) return null;
+
+        String location = stepLine > 0
+                ? source + ":" + stepLine
+                : source + "|step=" + normalizedStep;
+        String raw = location + "|" + definition;
+        return new FailureSite(ScenarioIdentity.shortHash(raw), source, stepLine, definition);
+    }
+
+    private static Object enrichFailureMetadata(Object value, Map<String, FailureMetadata> metadata) {
+        if (value instanceof Map<?, ?>) {
+            Map<?, ?> map = (Map<?, ?>) value;
+            Map<Object, Object> copy = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                copy.put(entry.getKey(), enrichFailureMetadata(entry.getValue(), metadata));
+            }
+            Object rawSignature = map.get("failureSignature");
+            if (rawSignature != null) {
+                FailureMetadata failure = metadata.get(String.valueOf(rawSignature));
+                if (failure != null) failure.addTo(copy);
+            }
+            return copy;
+        }
+        if (value instanceof List<?>) {
+            List<?> list = (List<?>) value;
+            List<Object> copy = new ArrayList<>(list.size());
+            for (Object item : list) copy.add(enrichFailureMetadata(item, metadata));
+            return copy;
+        }
+        return value;
+    }
+
+    private static Map<String, FailureMetadata> failureMetadataFromScenarios(List scenarios) {
+        Map<String, FailureMetadata> metadata = new LinkedHashMap<>();
+        if (scenarios == null) return metadata;
+        for (Object raw : scenarios) {
+            if (!(raw instanceof Map<?, ?>)) continue;
+            Map<?, ?> scenario = (Map<?, ?>) raw;
+            Object rawSignature = scenario.get("failureSignature");
+            Object rawVersion = scenario.get("failureSignatureVersion");
+            if (rawSignature == null || !(rawVersion instanceof Number)) continue;
+            Number version = (Number) rawVersion;
+
+            String siteKey = scenario.get("failureSiteKey") == null
+                    ? ""
+                    : String.valueOf(scenario.get("failureSiteKey"));
+            Map<String, Object> site = new LinkedHashMap<>();
+            Object rawSite = scenario.get("failureSite");
+            if (rawSite instanceof Map<?, ?>) {
+                Map<?, ?> siteMap = (Map<?, ?>) rawSite;
+                for (Map.Entry<?, ?> entry : siteMap.entrySet()) {
+                    site.put(String.valueOf(entry.getKey()), entry.getValue());
+                }
+            }
+            metadata.put(String.valueOf(rawSignature),
+                    new FailureMetadata(version.intValue(), siteKey, site));
+        }
+        return metadata;
+    }
+
+    private static void copyFailureMetadata(Map source, Map target) {
+        if (source == null || target == null) return;
+        for (String key : List.of("failureSignatureVersion", "failureSiteKey", "failureSite")) {
+            if (source.containsKey(key)) target.put(key, source.get(key));
+        }
+    }
+
+    private static String normalizedFailureMessage(String value) {
+        return DiagnosticReporter.sanitizeText(value)
+                .replaceAll("\\b\\d+\\b", "#")
+                .replaceAll("0x[0-9a-fA-F]+", "0x#")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private static String normalizedSiteText(String value) {
+        return normalizedFailureMessage(value).toLowerCase(Locale.ROOT);
     }
 
     after(SourceProvenance provenance, Method method, String codeLocation) returning(Map definition):
@@ -312,6 +558,53 @@ public privileged aspect Diagnostic213CompletionAspect {
 
     private void finishDiagnosticRun() {
         if (DiagnosticRuntime.isDiagnostic()) DiagnosticRuntime.finishRun();
+    }
+
+    private static final class FailureSite {
+        final String key;
+        final String feature;
+        final int stepLine;
+        final String definition;
+
+        FailureSite(String key, String feature, int stepLine, String definition) {
+            this.key = key == null ? "" : key;
+            this.feature = feature == null ? "" : feature;
+            this.stepLine = stepLine;
+            this.definition = definition == null ? "" : definition;
+        }
+
+        Map<String, Object> asMap() {
+            Map<String, Object> result = new LinkedHashMap<>();
+            if (!feature.isBlank()) result.put("feature", feature);
+            if (stepLine > 0) result.put("stepLine", stepLine);
+            if (!definition.isBlank()) result.put("definition", definition);
+            return result;
+        }
+    }
+
+    private static final class FailureMetadata {
+        final int version;
+        final String siteKey;
+        final Map<String, Object> site;
+
+        FailureMetadata(int version, String siteKey, Map<String, Object> site) {
+            this.version = version;
+            this.siteKey = siteKey == null ? "" : siteKey;
+            this.site = site == null ? Map.of() : new LinkedHashMap<>(site);
+        }
+
+        static FailureMetadata from(FailureSite site) {
+            return site == null
+                    ? new FailureMetadata(1, "", Map.of())
+                    : new FailureMetadata(2, site.key, site.asMap());
+        }
+
+        void addTo(Map target) {
+            if (target == null) return;
+            target.put("failureSignatureVersion", version);
+            if (!siteKey.isBlank()) target.put("failureSiteKey", siteKey);
+            if (!site.isEmpty()) target.put("failureSite", new LinkedHashMap<>(site));
+        }
     }
 
     private void refreshCliConfiguration(PickleballRunner runner) {

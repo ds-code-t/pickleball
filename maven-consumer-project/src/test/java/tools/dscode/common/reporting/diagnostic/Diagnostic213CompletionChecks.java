@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,6 +18,7 @@ import java.util.zip.GZIPInputStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class Diagnostic213CompletionChecks {
@@ -229,6 +231,181 @@ public class Diagnostic213CompletionChecks {
         } finally {
             deleteTree(root);
         }
+    }
+
+    @Test
+    void failureSignaturesSeparateDifferentStepSites() throws Exception {
+        Method method = Diagnostic213CompletionChecks.class.getDeclaredMethod(
+                "failureSignaturesSeparateDifferentStepSites"
+        );
+        RuntimeException failure = new RuntimeException("FAILED Assertion evaluates to: false");
+
+        String firstSite = Diagnostic213CompletionAspect.failureSiteKeyForTesting(
+                "classpath:features/diagnostic-reporting-validation.feature",
+                54,
+                "ensure first assertion",
+                method
+        );
+        String secondSite = Diagnostic213CompletionAspect.failureSiteKeyForTesting(
+                "classpath:features/diagnostic-reporting-validation.feature",
+                61,
+                "ensure second assertion",
+                method
+        );
+        String intellijEquivalentSite = Diagnostic213CompletionAspect.failureSiteKeyForTesting(
+                "file:/C:/work/pickleball/maven-consumer-project/src/test/resources/features/diagnostic-reporting-validation.feature",
+                54,
+                "ensure first assertion",
+                method
+        );
+
+        assertEquals(firstSite, intellijEquivalentSite);
+
+        String first = Diagnostic213CompletionAspect.failureSignatureForTesting(failure, firstSite);
+        String repeated = Diagnostic213CompletionAspect.failureSignatureForTesting(
+                new RuntimeException("FAILED Assertion evaluates to: false"),
+                firstSite
+        );
+        String second = Diagnostic213CompletionAspect.failureSignatureForTesting(failure, secondSite);
+
+        assertEquals(first, repeated);
+        assertNotEquals(firstSite, secondSite);
+        assertNotEquals(first, second);
+    }
+
+    @Test
+    void failureMetadataExposesSparseSiteDetails() throws Exception {
+        Method method = Diagnostic213CompletionChecks.class.getDeclaredMethod(
+                "failureMetadataExposesSparseSiteDetails"
+        );
+        Map<String, Object> metadata = Diagnostic213CompletionAspect.failureMetadataForTesting(
+                new RuntimeException("FAILED Assertion evaluates to: false"),
+                "classpath:features/diagnostic-reporting-validation.feature",
+                60,
+                "ensure browser assertion",
+                method
+        );
+
+        assertEquals(2, ((Number) metadata.get("failureSignatureVersion")).intValue());
+        assertEquals(24, String.valueOf(metadata.get("failureSiteKey")).length());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> site = (Map<String, Object>) metadata.get("failureSite");
+        assertEquals("features/diagnostic-reporting-validation.feature", site.get("feature"));
+        assertEquals(60, ((Number) site.get("stepLine")).intValue());
+        assertEquals(
+                Diagnostic213CompletionChecks.class.getName() + "#failureMetadataExposesSparseSiteDetails",
+                site.get("definition")
+        );
+
+        Map<String, Object> legacy = Diagnostic213CompletionAspect.failureMetadataForTesting(
+                new RuntimeException("runner failure"), "", 0, "", null
+        );
+        assertEquals(1, ((Number) legacy.get("failureSignatureVersion")).intValue());
+        assertFalse(legacy.containsKey("failureSiteKey"));
+        assertFalse(legacy.containsKey("failureSite"));
+    }
+
+    @Test
+    void rebuiltClustersAndRunComparisonPreserveFailureMetadata() throws Exception {
+        Path root = Files.createTempDirectory("pickleball-failure-metadata-rebuild");
+        try {
+            Path scenarioRoot = root.resolve("scenarios/scenario-1");
+            Files.createDirectories(scenarioRoot);
+            Map<String, Object> failureSite = Map.of(
+                    "feature", "features/diagnostic-reporting-validation.feature",
+                    "stepLine", 60,
+                    "definition", "tools.dscode.coredefinitions.DynamicSteps#executeDynamicStep"
+            );
+            Map<String, Object> identity = Map.of(
+                    "featureUri", "classpath:features/diagnostic-reporting-validation.feature",
+                    "scenarioName", "Diagnostic browser failure evidence",
+                    "exactSourceKey", "exact",
+                    "semanticKey", "semantic",
+                    "nameKey", "name",
+                    "sourceOrderHint", 60
+            );
+            Map<String, Object> summary = new LinkedHashMap<>();
+            summary.put("scenarioExecutionId", "scenario-1");
+            summary.put("identity", identity);
+            summary.put("outcome", "FAILED");
+            summary.put("completion", "COMPLETE");
+            summary.put("startedAt", "2026-08-08T00:00:00Z");
+            summary.put("failureSignature", "signature-v2");
+            summary.put("failureSignatureVersion", 2);
+            summary.put("failureSiteKey", "site-key");
+            summary.put("failureSite", failureSite);
+            JSON.writeValue(scenarioRoot.resolve("summary.json").toFile(), summary);
+
+            JSON.writeValue(root.resolve("manifest.json").toFile(), Map.of(
+                    "runId", "run-1",
+                    "outcome", "FAILED",
+                    "completion", "COMPLETE",
+                    "startedAt", "2026-08-08T00:00:00Z",
+                    "reportRetention", "all"
+            ));
+            JSON.writeValue(root.resolve("configuration.json").toFile(), Map.of("effective", Map.of()));
+            JSON.writeValue(root.resolve("environment.json").toFile(), Map.of("javaVersion", "21"));
+            JSON.writeValue(root.resolve("source-provenance.json").toFile(), Map.of("repositories", List.of()));
+
+            Map<String, Object> rebuilt = DiagnosticIndexRebuilder.rebuildRunIndex(root);
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> scenarios = (List<Map<String, Object>>) rebuilt.get("scenarios");
+            assertEquals(2, ((Number) scenarios.getFirst().get("failureSignatureVersion")).intValue());
+            assertEquals("site-key", scenarios.getFirst().get("failureSiteKey"));
+            assertEquals(failureSite, scenarios.getFirst().get("failureSite"));
+
+            @SuppressWarnings("unchecked")
+            Map<String, Object> clusters = JSON.readValue(root.resolve("clusters.json").toFile(), LinkedHashMap.class);
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> clusterList = (List<Map<String, Object>>) clusters.get("clusters");
+            Map<String, Object> cluster = clusterList.getFirst();
+            assertEquals(2, ((Number) cluster.get("failureSignatureVersion")).intValue());
+            assertEquals("site-key", cluster.get("failureSiteKey"));
+            assertEquals(failureSite, cluster.get("failureSite"));
+
+            Path other = root.resolveSibling(root.getFileName() + "-other");
+            Files.createDirectories(other);
+            try {
+                JSON.writeValue(other.resolve("run-index.json").toFile(), rebuilt);
+                Map<String, Object> comparison = DiagnosticRunComparator.compare(
+                        root.resolve("run-index.json"),
+                        other.resolve("run-index.json")
+                );
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> transitions =
+                        (List<Map<String, Object>>) comparison.get("scenarioTransitions");
+                @SuppressWarnings("unchecked")
+                Map<String, Object> left = (Map<String, Object>) transitions.getFirst().get("left");
+                assertEquals(2, ((Number) left.get("failureSignatureVersion")).intValue());
+                assertEquals("site-key", left.get("failureSiteKey"));
+                assertEquals(failureSite, left.get("failureSite"));
+            } finally {
+                deleteTree(other);
+            }
+        } finally {
+            deleteTree(root);
+        }
+    }
+
+    @Test
+    void failureSignatureNormalizesVolatileNumbersAndPreservesNoSiteFallback() {
+        String site = "stable-site";
+        String first = Diagnostic213CompletionAspect.failureSignatureForTesting(
+                new RuntimeException("Timed out after 1000 ms at 0xA12F"),
+                site
+        );
+        String second = Diagnostic213CompletionAspect.failureSignatureForTesting(
+                new RuntimeException("Timed out after 2500 ms at 0xB99C"),
+                site
+        );
+        assertEquals(first, second);
+
+        RuntimeException failure = new RuntimeException("FAILED Assertion evaluates to: false");
+        String expectedLegacy = ScenarioIdentity.shortHash(
+                RuntimeException.class.getName() + "|FAILED Assertion evaluates to: false"
+        );
+        assertEquals(expectedLegacy,
+                Diagnostic213CompletionAspect.failureSignatureForTesting(failure, ""));
     }
 
     private static boolean isTraceOrDebug(Map<String, Object> event) {
