@@ -1,0 +1,3 @@
+# Pickleball Consumer Agent Bridge
+
+Before any Pickleball scenario, configuration, diagnostic, or troubleshooting work, run `mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.common.reporting.diagnostic.DiagnosticCli" "-Dexec.classpathScope=test" "-Dexec.args=export-guidance .pickleball"`. If export succeeds, read and follow `.pickleball/AGENT-GUIDE.md` and treat `.pickleball/GUIDANCE-MANIFEST.json` as the record of that completed version-matched export. If export fails, treat any existing `.pickleball` contents as potentially stale and do not rely on them as current Pickleball guidance.

@@ -31,18 +31,28 @@ REQUIRED_FILES = (
     ".continue/rules/01-pickleball.md",
     ".clinerules/01-pickleball.md",
     ".windsurf/rules/pickleball.md",
+    "docs/consumer-agent-guide.md",
+    "docs/consumer-project.md",
+    "docs/diagnostic-lineage-metadata.md",
     "docs/agent/README.md",
     "docs/agent/feature-map.md",
     "docs/agent/change-checklist.md",
     "docs/agent/prompt-examples.md",
     "docs/agent/repository-index.md",
     "scripts/refresh_agent_index.py",
+    "scripts/sync_consumer_guidance.py",
     "scripts/verify_agent_contract.py",
     "scripts/agent_validate.sh",
     "scripts/agent_validate.ps1",
+    "maven-consumer-project/AGENTS.md",
+    "maven-consumer-project/.gitignore",
     "maven-consumer-project/mvnw",
     "maven-consumer-project/mvnw.cmd",
     "maven-consumer-project/.mvn/wrapper/maven-wrapper.properties",
+)
+FORBIDDEN_CONSUMER_DOCS = (
+    "maven-consumer-project/TAGGING.md",
+    "maven-consumer-project/CHANGESET.md",
 )
 ADAPTER_FILES = (
     "CLAUDE.md",
@@ -87,6 +97,7 @@ DOC_PREFIXES = (
 DOC_FILES = {
     "README.md",
     "maven-consumer-project/README.md",
+    "maven-consumer-project/AGENTS.md",
 }
 
 
@@ -136,6 +147,65 @@ def starts_with_any(path: str, prefixes: tuple[str, ...]) -> bool:
     return any(path.startswith(prefix) for prefix in prefixes)
 
 
+def validate_consumer_bridge(errors: list[str]) -> None:
+    bridge = ROOT / "maven-consumer-project" / "AGENTS.md"
+    if not bridge.is_file():
+        return
+
+    text = bridge.read_text(encoding="utf-8")
+    for required in (
+        "DiagnosticCli",
+        "export-guidance",
+        ".pickleball/AGENT-GUIDE.md",
+        "GUIDANCE-MANIFEST.json",
+        "potentially stale",
+    ):
+        if required not in text:
+            errors.append(
+                f"Consumer AGENTS bridge must reference {required}: "
+                "maven-consumer-project/AGENTS.md"
+            )
+
+
+def validate_consumer_ignore(errors: list[str]) -> None:
+    path = ROOT / "maven-consumer-project" / ".gitignore"
+    if not path.is_file():
+        return
+
+    normalized = {
+        line.strip().replace("\\", "/").strip("/")
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    if ".pickleball" not in normalized:
+        errors.append(
+            "Consumer .gitignore must ignore /.pickleball/: "
+            "maven-consumer-project/.gitignore"
+        )
+
+
+def validate_packaged_guidance(errors: list[str]) -> None:
+    script = ROOT / "scripts" / "sync_consumer_guidance.py"
+    if not script.is_file():
+        return
+
+    result = subprocess.run(
+        [sys.executable, str(script), "--check"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if result.returncode != 0:
+        details = (result.stderr or result.stdout).strip()
+        errors.append(
+            "Packaged consumer guidance is stale. "
+            "Run: python scripts/sync_consumer_guidance.py"
+            + (f" ({details})" if details else "")
+        )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -160,6 +230,12 @@ def main() -> int:
     for relative in REQUIRED_FILES:
         if not (ROOT / relative).is_file():
             errors.append(f"Missing required agent file: {relative}")
+
+    for relative in FORBIDDEN_CONSUMER_DOCS:
+        if (ROOT / relative).exists():
+            errors.append(
+                f"Consumer documentation must be centralized in core; remove: {relative}"
+            )
 
     gitignore = ROOT / ".gitignore"
     if gitignore.is_file():
@@ -197,6 +273,10 @@ def main() -> int:
                 "Agent Skill copies differ. Keep all "
                 "pickleball-functionality-change/SKILL.md files identical."
             )
+
+    validate_consumer_bridge(errors)
+    validate_consumer_ignore(errors)
+    validate_packaged_guidance(errors)
 
     if args.base_ref:
         changed = git_changed_files(args.base_ref)

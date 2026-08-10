@@ -9,6 +9,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "docs" / "agent" / "repository-index.md"
+GENERATED_GUIDANCE_PREFIX = "src/main/resources/META-INF/pickleball/guidance/"
 
 EXCLUDED_PARTS = {
     ".agent-work",
@@ -29,6 +30,7 @@ GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "gradle.properties",
         "gradlew",
         "gradlew.bat",
+        "maven-consumer-project/AGENTS.md",
         "maven-consumer-project/pom.xml",
         "maven-consumer-project/README.md",
         "maven-consumer-project/mvnw",
@@ -90,6 +92,7 @@ GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "scripts/agent_validate.*",
         "scripts/verify_agent_contract.py",
         "scripts/refresh_agent_index.py",
+        "scripts/sync_consumer_guidance.py",
     )),
 )
 
@@ -98,6 +101,9 @@ def is_included(path: Path) -> bool:
     if not path.is_file():
         return False
     relative = path.relative_to(ROOT)
+    relative_text = relative.as_posix()
+    if relative_text.startswith(GENERATED_GUIDANCE_PREFIX):
+        return False
     return not any(part in EXCLUDED_PARTS for part in relative.parts)
 
 
