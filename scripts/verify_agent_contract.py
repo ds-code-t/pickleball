@@ -45,6 +45,7 @@ REQUIRED_FILES = (
     "scripts/agent_validate.sh",
     "scripts/agent_validate.ps1",
     "maven-consumer-project/AGENTS.md",
+    "maven-consumer-project/README.md",
     "maven-consumer-project/.gitignore",
     "maven-consumer-project/mvnw",
     "maven-consumer-project/mvnw.cmd",
@@ -54,6 +55,30 @@ FORBIDDEN_CONSUMER_DOCS = (
     "maven-consumer-project/TAGGING.md",
     "maven-consumer-project/CHANGESET.md",
 )
+FORBIDDEN_TRACKED_CONSUMER_PREFIXES = (
+    "maven-consumer-project/.idea/",
+    "maven-consumer-project/.run/",
+    "maven-consumer-project/.pickleball/",
+    "maven-consumer-project/.agents/",
+    "maven-consumer-project/.aiassistant/",
+    "maven-consumer-project/.amazonq/",
+    "maven-consumer-project/.claude/",
+    "maven-consumer-project/.continue/",
+    "maven-consumer-project/.cursor/",
+    "maven-consumer-project/.github/agents/",
+    "maven-consumer-project/.github/instructions/",
+    "maven-consumer-project/.github/skills/",
+    "maven-consumer-project/.clinerules/",
+    "maven-consumer-project/.junie/",
+    "maven-consumer-project/.windsurf/",
+)
+FORBIDDEN_TRACKED_CONSUMER_FILES = {
+    "maven-consumer-project/CLAUDE.md",
+    "maven-consumer-project/GEMINI.md",
+    "maven-consumer-project/REVIEW.md",
+    "maven-consumer-project/.clinerules",
+    "maven-consumer-project/.github/copilot-instructions.md",
+}
 ADAPTER_FILES = (
     "CLAUDE.md",
     "GEMINI.md",
@@ -129,9 +154,9 @@ def git_changed_files(base_ref: str) -> list[str] | None:
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
-def git_tracked_temp_files() -> list[str]:
+def git_tracked_files(path: str) -> list[str]:
     result = subprocess.run(
-        ["git", "ls-files", "--", TEMP_WORKSPACE],
+        ["git", "ls-files", "--", path],
         cwd=ROOT,
         text=True,
         stdout=subprocess.PIPE,
@@ -140,7 +165,11 @@ def git_tracked_temp_files() -> list[str]:
     )
     if result.returncode != 0:
         return []
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    return [line.strip().replace("\\", "/") for line in result.stdout.splitlines() if line.strip()]
+
+
+def git_tracked_temp_files() -> list[str]:
+    return git_tracked_files(TEMP_WORKSPACE)
 
 
 def starts_with_any(path: str, prefixes: tuple[str, ...]) -> bool:
@@ -152,18 +181,90 @@ def validate_consumer_bridge(errors: list[str]) -> None:
     if not bridge.is_file():
         return
 
-    text = bridge.read_text(encoding="utf-8")
+    text = bridge.read_text(encoding="utf-8").strip()
+    nonblank_lines = [line for line in text.splitlines() if line.strip()]
+    if len(nonblank_lines) != 1:
+        errors.append(
+            "Consumer AGENTS bridge must stay a single nonblank bootstrap line: "
+            "maven-consumer-project/AGENTS.md"
+        )
+
     for required in (
         "DiagnosticCli",
         "export-guidance",
         ".pickleball/AGENT-GUIDE.md",
-        "GUIDANCE-MANIFEST.json",
-        "potentially stale",
     ):
         if required not in text:
             errors.append(
                 f"Consumer AGENTS bridge must reference {required}: "
                 "maven-consumer-project/AGENTS.md"
+            )
+
+    for forbidden in (
+        "GUIDANCE-MANIFEST.json",
+        ".git/info/exclude",
+        "pkb_changed_variables",
+        "runProfileFingerprint",
+        "Diagnostic investigation protocol",
+    ):
+        if forbidden in text:
+            errors.append(
+                f"Consumer AGENTS bridge contains dependency-owned guidance ({forbidden}); "
+                "keep only the bootstrap command and generated-guide pointer."
+            )
+
+
+def validate_consumer_readme(errors: list[str]) -> None:
+    readme = ROOT / "maven-consumer-project" / "README.md"
+    if not readme.is_file():
+        return
+
+    text = readme.read_text(encoding="utf-8")
+    for forbidden in (
+        "export-guidance",
+        ".pickleball/",
+        "GUIDANCE-MANIFEST.json",
+        "AGENT-GUIDE.md",
+        ".git/info/exclude",
+    ):
+        if forbidden in text:
+            errors.append(
+                f"Consumer README must not duplicate dependency guidance lifecycle ({forbidden}): "
+                "maven-consumer-project/README.md"
+            )
+
+
+def validate_dependency_owned_guidance(errors: list[str]) -> None:
+    guide = ROOT / "docs" / "consumer-agent-guide.md"
+    if not guide.is_file():
+        return
+
+    text = guide.read_text(encoding="utf-8")
+    for required in (
+        "Generated guidance lifecycle",
+        "GUIDANCE-MANIFEST.json",
+        ".git/info/exclude",
+        "potentially stale",
+        "managed guidance files",
+        "version-matched",
+    ):
+        if required not in text:
+            errors.append(
+                f"Dependency-owned consumer guide must retain lifecycle guidance ({required}): "
+                "docs/consumer-agent-guide.md"
+            )
+
+
+def validate_consumer_tracked_artifacts(errors: list[str]) -> None:
+    for relative in git_tracked_files("maven-consumer-project"):
+        if not (ROOT / relative).exists():
+            continue
+        if relative in FORBIDDEN_TRACKED_CONSUMER_FILES or starts_with_any(
+            relative, FORBIDDEN_TRACKED_CONSUMER_PREFIXES
+        ):
+            errors.append(
+                "Consumer project must not track local AI/IDE/generated guidance artifacts: "
+                + relative
             )
 
 
@@ -275,6 +376,9 @@ def main() -> int:
             )
 
     validate_consumer_bridge(errors)
+    validate_consumer_readme(errors)
+    validate_dependency_owned_guidance(errors)
+    validate_consumer_tracked_artifacts(errors)
     validate_consumer_ignore(errors)
     validate_packaged_guidance(errors)
 

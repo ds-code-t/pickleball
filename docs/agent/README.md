@@ -17,7 +17,9 @@ This directory supports repository-native AI coding agents. It is not a runtime 
 
 Agent-specific files are intentionally small adapters that point back to the canonical contract. Avoid copying the full project description into every adapter.
 
-The nested `/maven-consumer-project/AGENTS.md` follows the same rule: it is only a short consumer adapter. It invokes the dependency's `DiagnosticCli export-guidance` command and directs agents to `.pickleball/AGENT-GUIDE.md`, so the same bridge continues working after the consumer is copied outside the Pickleball repository. The nested README is likewise only a human-facing bridge.
+The nested `/maven-consumer-project/AGENTS.md` is intentionally the only consumer-side AI bootstrap. It contains only the dependency command that materializes version-matched guidance and then directs the agent to `.pickleball/AGENT-GUIDE.md`. All details after that bootstrap — refresh behavior, version matching, manifest semantics, stale-guidance handling, managed-file cleanup, Git-ignore handling, Pickleball authoring guidance, diagnostics, configuration, and troubleshooting — belong to the dependency-owned exported guidance.
+
+The nested `/maven-consumer-project/README.md` is ordinary sample-project documentation, not an AI-guidance bridge. It must not duplicate `export-guidance`, `.pickleball` lifecycle, manifest, staleness, Git-ignore, or other Pickleball guidance instructions.
 
 `export-guidance .pickleball` is deliberately unconditional: agents should rerun it before Pickleball work rather than trying to infer whether the dependency changed. A successful export writes `.pickleball/GUIDANCE-MANIFEST.json` last with the exporting Pickleball version and managed-file list, removes obsolete previously managed files, and refreshes the current dependency guidance. Git-ignore handling is best effort only: prefer an existing synchronized `.gitignore`, fall back to `.git/info/exclude`, and never let ignore-file problems block the guidance refresh. If export fails, existing `.pickleball` content is potentially stale.
 
