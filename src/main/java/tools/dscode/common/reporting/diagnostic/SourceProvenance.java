@@ -34,12 +34,20 @@ public final class SourceProvenance {
     private final Repository consumer;
     private final Repository pickleball;
     private final Path consumerRoot;
+    private final Path consumerProjectRoot;
     private final String snapshotMode;
 
-    private SourceProvenance(Repository consumer, Repository pickleball, Path consumerRoot, String snapshotMode) {
+    private SourceProvenance(
+            Repository consumer,
+            Repository pickleball,
+            Path consumerRoot,
+            Path consumerProjectRoot,
+            String snapshotMode
+    ) {
         this.consumer = consumer;
         this.pickleball = pickleball;
         this.consumerRoot = consumerRoot;
+        this.consumerProjectRoot = consumerProjectRoot;
         this.snapshotMode = snapshotMode;
     }
 
@@ -73,7 +81,13 @@ public final class SourceProvenance {
         }
         framework = framework.withArtifact(frameworkVersion(buildInfo), frameworkArtifactSha256());
 
-        return new SourceProvenance(consumer, framework, live == null ? null : live.root, mode);
+        return new SourceProvenance(
+                consumer,
+                framework,
+                live == null ? null : live.root,
+                projectRoot(workingDirectory),
+                mode
+        );
     }
 
     public static Map<String, String> platformValues() {
@@ -162,7 +176,7 @@ public final class SourceProvenance {
             definition.put("commit", emptyToNull(pickleball.commit()));
             definition.put("reproducibleFromGit", pickleball.reproducibleFromGit());
         } else {
-            sourceFile = findConsumerSource(classPath);
+            sourceFile = findConsumerSource(declaringClass, classPath);
             sourcePath = sourceFile == null ? "" : relativeToConsumer(sourceFile);
             boolean consumerSource = sourceFile != null;
             definition.put("repository", consumerSource ? "consumer" : "external");
@@ -217,22 +231,116 @@ public final class SourceProvenance {
             URI uri = URI.create(featureUri);
             if ("file".equalsIgnoreCase(uri.getScheme())) return Path.of(uri).toAbsolutePath().normalize();
         } catch (Throwable ignored) { }
-        if (consumerRoot == null) return null;
         String raw = featureUri.replace('\\', '/');
         if (raw.startsWith("classpath:")) raw = raw.substring("classpath:".length());
         while (raw.startsWith("/")) raw = raw.substring(1);
-        for (String prefix : List.of("src/test/resources/", "src/main/resources/", "")) {
-            Path candidate = consumerRoot.resolve(prefix + raw).normalize();
+
+        Path source = findClasspathSource(raw);
+        if (source != null) return source;
+
+        source = findSource(
+                consumerProjectRoot,
+                raw,
+                "src/test/resources/",
+                "src/main/resources/",
+                ""
+        );
+        if (source != null) return source;
+
+        source = findSource(consumerRoot, raw, "src/test/resources/", "src/main/resources/", "");
+        return source != null
+                ? source
+                : findNestedSource(consumerRoot, raw, "src/test/resources/", "src/main/resources/");
+    }
+
+    private Path findConsumerSource(Class<?> type, String classPath) {
+        Path moduleRoot = moduleRootFromOutputRoot(codeSourceRoot(type));
+        Path source = findSource(moduleRoot, classPath, "src/test/java/", "src/main/java/");
+        if (source != null) return source;
+
+        source = findSource(consumerProjectRoot, classPath, "src/test/java/", "src/main/java/");
+        if (source != null) return source;
+
+        source = findSource(consumerRoot, classPath, "src/test/java/", "src/main/java/");
+        return source != null
+                ? source
+                : findNestedSource(consumerRoot, classPath, "src/test/java/", "src/main/java/");
+    }
+
+    private Path findClasspathSource(String raw) {
+        if (raw.isBlank()) return null;
+        try {
+            ClassLoader loader = Thread.currentThread().getContextClassLoader();
+            URL resource = loader == null ? null : loader.getResource(raw);
+            if (resource == null) resource = SourceProvenance.class.getClassLoader().getResource(raw);
+            if (resource == null || !"file".equalsIgnoreCase(resource.getProtocol())) return null;
+
+            Path resourcePath = Path.of(resource.toURI()).toAbsolutePath().normalize();
+            Path outputRoot = resourcePath;
+            for (String ignored : raw.split("/")) {
+                outputRoot = outputRoot.getParent();
+                if (outputRoot == null) return null;
+            }
+            Path moduleRoot = moduleRootFromOutputRoot(outputRoot);
+            return findSource(moduleRoot, raw, "src/test/resources/", "src/main/resources/");
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static Path projectRoot(Path workingDirectory) {
+        String basedir = System.getProperty("basedir", "");
+        if (!basedir.isBlank()) {
+            try {
+                Path candidate = Path.of(basedir).toAbsolutePath().normalize();
+                if (Files.isDirectory(candidate.resolve("src")) || Files.isRegularFile(candidate.resolve("pom.xml"))) {
+                    return candidate;
+                }
+            } catch (Throwable ignored) { }
+        }
+        return workingDirectory;
+    }
+
+    private static Path codeSourceRoot(Class<?> type) {
+        try {
+            URL url = type.getProtectionDomain().getCodeSource().getLocation();
+            if (url == null || !"file".equalsIgnoreCase(url.getProtocol())) return null;
+            return Path.of(url.toURI()).toAbsolutePath().normalize();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static Path moduleRootFromOutputRoot(Path outputRoot) {
+        if (outputRoot == null || outputRoot.getFileName() == null) return null;
+        String outputName = outputRoot.getFileName().toString();
+        Path target = outputRoot.getParent();
+        if (target == null || target.getFileName() == null || !"target".equals(target.getFileName().toString())) return null;
+        if (!"test-classes".equals(outputName) && !"classes".equals(outputName)) return null;
+        return target.getParent();
+    }
+
+    private static Path findSource(Path root, String relative, String... prefixes) {
+        if (root == null) return null;
+        for (String prefix : prefixes) {
+            Path candidate = root.resolve(prefix + relative).normalize();
             if (Files.isRegularFile(candidate)) return candidate;
         }
         return null;
     }
 
-    private Path findConsumerSource(String classPath) {
-        if (consumerRoot == null) return null;
-        for (String prefix : List.of("src/test/java/", "src/main/java/")) {
-            Path candidate = consumerRoot.resolve(prefix + classPath).normalize();
-            if (Files.isRegularFile(candidate)) return candidate;
+    private static Path findNestedSource(Path repositoryRoot, String relative, String... prefixes) {
+        if (repositoryRoot == null) return null;
+        for (String prefix : prefixes) {
+            Path suffix = Path.of(prefix + relative).normalize();
+            try (var paths = Files.find(
+                    repositoryRoot,
+                    10,
+                    (path, attributes) -> attributes.isRegularFile() && path.normalize().endsWith(suffix)
+            )) {
+                Path match = paths.findFirst().orElse(null);
+                if (match != null) return match.toAbsolutePath().normalize();
+            } catch (IOException ignored) { }
         }
         return null;
     }
@@ -391,7 +499,6 @@ public final class SourceProvenance {
             return "";
         }
     }
-
 
     private static String sanitizeRemote(String remote) {
         if (remote == null || remote.isBlank()) return "";

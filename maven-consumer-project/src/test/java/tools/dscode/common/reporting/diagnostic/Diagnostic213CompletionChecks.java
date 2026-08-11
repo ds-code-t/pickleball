@@ -47,9 +47,18 @@ public class Diagnostic213CompletionChecks {
 
         assertEquals("NON_PICKLEBALL", definition.get("origin"));
         assertEquals("consumer", definition.get("repository"));
-        assertTrue(String.valueOf(definition.get("sourcePath"))
-                .endsWith("maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/Diagnostic213CompletionChecks.java"));
-        assertTrue(String.valueOf(definition.get("sourceSha256")).length() == 64);
+        String sourcePath = String.valueOf(definition.get("sourcePath"));
+        assertTrue(
+                sourcePath.endsWith(
+                        "src/test/java/tools/dscode/common/reporting/diagnostic/Diagnostic213CompletionChecks.java"
+                ),
+                () -> "Unexpected consumer source provenance: " + definition
+        );
+        assertEquals(
+                64,
+                String.valueOf(definition.get("sourceSha256")).length(),
+                () -> "Missing consumer source hash: " + definition
+        );
     }
 
     @Test
@@ -60,9 +69,18 @@ public class Diagnostic213CompletionChecks {
                 1
         );
 
-        assertTrue(String.valueOf(source.get("path"))
-                .endsWith("maven-consumer-project/src/test/resources/features/diagnostic-reporting-validation.feature"));
-        assertEquals(64, String.valueOf(source.get("sha256")).length());
+        String sourcePath = String.valueOf(source.get("path"));
+        assertTrue(
+                sourcePath.endsWith(
+                        "src/test/resources/features/diagnostic-reporting-validation.feature"
+                ),
+                () -> "Unexpected feature source provenance: " + source
+        );
+        assertEquals(
+                64,
+                String.valueOf(source.get("sha256")).length(),
+                () -> "Missing feature source hash: " + source
+        );
     }
 
     @Test
