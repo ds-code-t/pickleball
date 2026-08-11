@@ -19,6 +19,8 @@ The exporter does not create or commit a new `.gitignore`, alter the Git index, 
 
 The generated `AGENT-GUIDE.md` also carries the exporting Pickleball version. If export fails, treat any existing `.pickleball` directory as potentially stale and do not rely on it as current guidance. Inspect `GUIDANCE-MANIFEST.json` only as evidence of the last **completed** export; it is not a substitute for rerunning the exporter.
 
+Compatibility note: the manifest-based managed-file cleanup above is provided by Pickleball releases that include that lifecycle. If a consumer downgrades to an older Pickleball release whose exporter predates the manifest lifecycle, that older exporter may overwrite the files it ships while leaving newer files or a newer manifest from a later release in `.pickleball`. Those leftovers are not authoritative for the downgraded dependency. Prefer the dependency actually resolved on the test classpath and the files freshly exported by that dependency; a subsequent export by a modern Pickleball release restores the managed tree.
+
 ## First actions
 
 For Pickleball scenario authoring, configuration, execution, diagnostics, or troubleshooting:
@@ -55,6 +57,8 @@ Use these supporting guides as appropriate:
 ## Diagnostic investigation protocol
 
 When Pickleball diagnostic evidence exists, use the shallowest evidence layer that completely answers the question. Do not advance to a denser layer merely because it exists.
+
+For AI-controlled diagnostic runs, keep terminal logging minimal. Diagnostic mode captures TRACE-through-ERROR evidence independently of console `pkb_loglevel`, so prefer `pkb_loglevel=warn` or, when appropriate, `pkb_loglevel=error`. Use terminal output primarily to detect Maven, compilation, JVM, dependency, command-line, or other startup failures that may occur before Pickleball diagnostic capture begins; use the structured diagnostic artifacts as the primary investigation evidence after the run starts successfully.
 
 Use this escalation order:
 

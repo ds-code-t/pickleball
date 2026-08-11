@@ -23,6 +23,8 @@ Then read:
 
 The `.pickleball` directory is generated local guidance. The exporter should be rerun before Pickleball work even when the directory already exists; this avoids requiring a human or AI agent to detect dependency-version changes itself. A successful export records the exporting Pickleball version and managed-file list in `GUIDANCE-MANIFEST.json`, removes obsolete files that were managed by the previous manifest, and overwrites current files from the dependency. If export fails, treat any existing `.pickleball` contents as potentially stale.
 
+That managed-file cleanup guarantee depends on the exporter version currently resolved by Maven. If a consumer downgrades to an older Pickleball release whose exporter predates the manifest lifecycle, the older exporter may replace the files it knows about while leaving files or a manifest introduced by a newer release. Those leftovers are not authoritative for the downgraded dependency. Prefer the dependency actually resolved on the test classpath and its freshly exported content; a later export by a modern Pickleball release restores the managed tree.
+
 When the output directory is exactly `.pickleball`, the exporter also tries to keep it out of Git without making export brittle. It first appends an ignore rule to an existing consumer/repository `.gitignore` when available, otherwise it falls back to the repository-local `.git/info/exclude`. It never creates or commits a new `.gitignore`, changes the Git index, or fails the guidance export merely because an ignore rule could not be added. The checked-in consumer example already ignores `/.pickleball/`, so copied consumers normally need no mutation.
 
 AI agents should read `.pickleball/AGENT-GUIDE.md` first after a successful export.
@@ -181,6 +183,8 @@ pkb_reportingmode=diagnostic
 ```
 
 Diagnostic runs are written beneath `reports/diagnostic-runs` by default.
+
+For AI-driven diagnostic execution, keep console verbosity low because diagnostic capture is independent of console `pkb_loglevel`. Prefer `pkb_loglevel=warn`, or `error` when appropriate, so the terminal remains a compact launch/build health channel while the structured diagnostic artifacts retain the detailed evidence. Terminal output is still important for Maven, compilation, JVM, dependency, command-line, or other startup failures that can occur before diagnostic capture begins.
 
 For troubleshooting, humans and AI agents should follow `docs/diagnostic-reporting.md`. Its key rule is to use the shallowest evidence layer that answers the question and stop there.
 

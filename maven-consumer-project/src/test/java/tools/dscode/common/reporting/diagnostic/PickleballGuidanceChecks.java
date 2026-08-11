@@ -38,6 +38,8 @@ public class PickleballGuidanceChecks {
         assertTrue(guide.contains("Controlled diagnostic reruns"));
         assertTrue(guide.contains("Do not put source paths"));
         assertTrue(guide.contains("GUIDANCE-MANIFEST.json"));
+        assertTrue(guide.contains("keep terminal logging minimal"));
+        assertTrue(guide.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
     }
 
     @Test
@@ -70,6 +72,12 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("use the shallowest evidence layer"));
             assertTrue(guide.contains("Exported from Pickleball `" + version + "`"));
             assertTrue(guide.contains("If export fails, treat any existing `.pickleball` contents as potentially stale"));
+            assertTrue(guide.contains("keep terminal logging minimal"));
+            assertTrue(guide.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
+
+            String consumerProject = Files.readString(root.resolve("docs/consumer-project.md"));
+            assertTrue(consumerProject.contains("keep console verbosity low"));
+            assertTrue(consumerProject.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
         } finally {
             deleteTree(root);
         }
