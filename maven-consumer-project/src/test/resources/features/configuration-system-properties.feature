@@ -10,7 +10,7 @@ Feature: Pickleball JVM system-property normalization
     * pkb property "pkb_run_purpose" equals "quoted-value-validation"
 
   @configuration @profile-direct-validation
-  Scenario: Direct run profile controls execution while diagnostic lineage stays separate
+  Scenario: Controlled RunVars determine execution while diagnostic lineage stays separate
     * pkb property "pkb_tags" equals "@profile-direct-validation"
     * pkb property "pkb_browser" equals "CHROME_HEADLESS"
     * pkb property "pkb_reportingmode" equals "diagnostic"
@@ -20,7 +20,7 @@ Feature: Pickleball JVM system-property normalization
     * pkb property "pkb_changed_variables" equals "pkb_browser"
 
   @configuration @profile-expanded-validation
-  Scenario: Expanded direct run profile controls execution without compact assignment parsing
+  Scenario: Expanded controlled RunVars preserve literal member values
     * pkb property "pkb_tags" equals "@profile-expanded-validation"
     * pkb property "pkb_browser" equals "CHROME_HEADLESS"
     * pkb property "pkb_reportingmode" equals "diagnostic"

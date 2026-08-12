@@ -1,13 +1,8 @@
 # Getting Started
 
-> **Working feature example:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) — a small browser feature you can run after completing the setup on this page.
+> **Working feature example:** [`dynamic-steps.feature`](../maven-consumer-project/src/test/resources/features/dynamic-steps.feature) is a small browser feature you can run after setup.
 
-A consumer project normally needs only two Pickleball-specific additions:
-
-1. the Pickleball test dependency; and
-2. one test runner that extends `PickleballRunner`.
-
-Most test behavior can then be written in `.feature` files.
+A consumer normally needs the Pickleball test dependency and one runner extending `PickleballRunner`. Most test behavior can then live in `.feature` files.
 
 ## Requirements
 
@@ -17,12 +12,10 @@ Most test behavior can then be written in `.feature` files.
 
 ## Maven dependency
 
-The working consumer centralizes the version in a Maven property:
-
 ```xml
 <properties>
     <maven.compiler.release>21</maven.compiler.release>
-    <pickleball.version>2.1.1</pickleball.version>
+    <pickleball.version>2.1.5</pickleball.version>
 </properties>
 
 <dependency>
@@ -48,6 +41,7 @@ public final class PickleballTests extends PickleballRunner {
     public void globalTestDefaults() {
         PKB_props.glue("com.example.tests");
         PKB_props.features("classpath:features");
+        PKB_props.configPath("configs");
         PKB_props.plugins("pretty");
         PKB_props.browser("chrome");
     }
@@ -56,14 +50,7 @@ public final class PickleballTests extends PickleballRunner {
 
 Use a class name ending in `Tests` so normal Maven Surefire discovery can find it.
 
-The working [PickleballTests.java](../maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java) also:
-
-- selects `@all` as its default tag expression;
-- registers project-specific element categories;
-- starts the local test server before Cucumber runs; and
-- stops the server after the run.
-
-The server setup is an example-project lifecycle hook, not a requirement for every Pickleball consumer. A real application suite can test an already-running application instead.
+The working [PickleballTests.java](../maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java) additionally selects `@all`, registers project element categories, and starts/stops the local example test server through lifecycle hooks.
 
 ## Suggested layout
 
@@ -71,18 +58,18 @@ The server setup is an example-project lifecycle hook, not a requirement for eve
 your-project/
 ├── pom.xml
 └── src/test/
-    ├── java/
-    │   └── com/example/tests/
-    │       ├── PickleballTests.java
-    │       └── ProjectSteps.java        # optional custom Cucumber steps
+    ├── java/com/example/tests/
+    │   ├── PickleballTests.java
+    │   └── ProjectSteps.java        # optional custom Cucumber glue
     └── resources/
         ├── features/
-        │   └── example.feature
-        ├── calls/                       # optional reusable service calls
-        ├── configs/                     # optional shared data
-        ├── profiles.yaml                # optional named Pickleball profiles
-        ├── pickleball.properties        # optional shared configuration
-        └── pickleball_local.properties  # optional local overrides
+        ├── calls/                   # optional reusable service calls
+        ├── component/               # optional component scenarios
+        ├── data/                    # optional structured/scenario data
+        ├── configs/                 # optional shared config mapping
+        ├── profiles.yaml            # optional named Pickleball profiles
+        ├── pickleball.properties
+        └── pickleball_local.properties
 ```
 
 ## Run
@@ -91,72 +78,84 @@ your-project/
 mvn test
 ```
 
-Any Cucumber tag expression can be passed directly:
+Filter normally with RunVars such as:
 
 ```bash
 mvn test "-Dpkb_tags=@forms and not @dialogs"
 ```
 
-### Run with a Pickleball profile
-
-Named profiles let a project keep reusable RunVar groups in `profiles.yaml`:
+## Named profiles
 
 ```yaml
 qa:
-  pkb_glue: "<default_profile.pkb_glue>"
-  pkb_features: "<default_profile.pkb_features>"
   pkb_tags: "<default_profile.pkb_tags> and @qa"
   pkb_environment: QA
   pkb_browser: CHROME_HEADLESS
 ```
 
-Run it with:
-
 ```bash
 mvn test -Dpkb_profile=qa
 ```
 
-Compose several profiles left-to-right:
+Multiple profile names compose left-to-right:
 
 ```bash
-mvn test -Dpkb_profile=default_profile,qa,browser_firefox
+mvn test -Dpkb_profile=qa,browser_firefox
 ```
 
-The working consumer includes a commented [`profiles.yaml`](../maven-consumer-project/src/test/resources/profiles.yaml) example.
+A named profile automatically receives missing project execution-context RunVars (`pkb_glue`, `pkb_features`, `pkb_datapath`, `pkb_callpath`, `pkb_componentpath`, and `pkb_configpath`) when those values exist in normal project configuration. Optional RunVars do not implicitly inherit.
 
-### Deterministic direct run configuration
+## Deterministic controlled runs
 
-For automation or an AI agent that must ignore every other Pickleball RunVar source, use `pkb_run_profile`:
+For automation or an AI agent, use `pkb_runvars` as the direct input:
 
 ```bash
-mvn test "-Dpkb_run_profile=pkb_glue=com.example.tests, pkb_features=classpath:features, pkb_tags=@smoke, pkb_browser=CHROME_HEADLESS"
+mvn test "-Dpkb_runvars=pkb_tags=@smoke, pkb_browser=CHROME_HEADLESS"
 ```
 
-When explicitly supplied, `pkb_run_profile` is the complete RunVar set. Normal defaults, `pkb_profile`, property-file RunVars, and runner RunVars are not merged into it.
+Project wiring omitted from a controlled input inherits only the six execution-context RunVars listed above. This lets a controlled rerun specify what changes without copying repetitive glue/resource wiring.
 
-For values where a nested assignment string would be awkward, the same direct profile can be supplied as expanded members:
+Expanded input avoids nested compact assignment parsing:
 
 ```text
-pkb_run_profile.pkb_glue=com.example.tests
-pkb_run_profile.pkb_features=classpath:features
-pkb_run_profile.pkb_tags=@smoke
-pkb_run_profile.pkb_browser=CHROME_HEADLESS
+pkb_runvars.pkb_tags=@smoke
+pkb_runvars.pkb_browser=CHROME_HEADLESS
 ```
 
-Each expanded member is already one RunVar value, so Pickleball does not parse commas, semicolons, equals signs, or quotes inside that member as another profile assignment. Do not combine compact `pkb_run_profile` with expanded `pkb_run_profile.*` members in the same resolved configuration.
+Do not mix compact and expanded `pkb_runvars` forms.
 
-Runner subclasses can avoid compact-string serialization entirely:
+A blank execution-context member intentionally suppresses inheritance:
+
+```text
+pkb_runvars.pkb_features=
+```
+
+The blank suppresses the inherited value and remains blank in the final canonical `pkb_run_profile`; replaying that blank tells Pickleball to use the same historical subsystem fallback behavior.
+
+Runner code can use:
 
 ```java
-PKB_props.runProfile(Map.of(
-    "pkb_glue", "com.example.tests",
-    "pkb_features", "classpath:features",
-    "pkb_tags", "@smoke",
-    "pkb_browser", "CHROME_HEADLESS"
+PKB_props.runVars(Map.of(
+        "pkb_tags", "@smoke",
+        "pkb_browser", "CHROME_HEADLESS"
 ));
 ```
 
-See [Execution Configuration](configuration.md#pkb_run_profile-complete-direct-runvar-override) for compact quoting rules, YAML-map direct profiles, template references, protected values, ReportPortal aliases, and exact precedence semantics.
+`PKB_props.runProfile()` is the read-only getter for the final canonical serialized RunVars. There are no direct `runProfile(String/Map)` input setters; external `pkb_run_profile` input is rejected. Use `pkb_runvars`.
+
+See [Execution Configuration](configuration.md) and [AI Run Configuration](ai-run-configuration.md).
+
+## Configuration mapping path
+
+Prefer `<config:...>` for configuration mappings, while legacy `<configs...>` remains valid. Use `pkb_configpath` only to select where that mapping is loaded from:
+
+```text
+pkb_configpath=configs
+pkb_configpath=classpath:environment/qa/configs
+pkb_configpath=src/test/resources/environment/qa/configs
+```
+
+If missing or blank, the historical `configs` resource root remains the Java fallback.
 
 ## First feature
 
@@ -171,6 +170,4 @@ Feature: Customer form
     * , ensure "Submitted: Ava" Text is displayed
 ```
 
-See the working [browser feature files](../maven-consumer-project/src/test/resources/features) and continue with [Dynamic Steps](dynamic-steps.md).
-
-[Documentation home](README.md)
+Continue with [Dynamic Steps](dynamic-steps.md), and use [Documentation home](README.md) for the complete Pickleball syntax map.

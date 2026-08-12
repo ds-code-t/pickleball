@@ -1,60 +1,66 @@
 # Repository Agent Context
 
-This directory supports repository-native AI coding agents. It is not a runtime dependency of Pickleball and does not change framework behavior.
+This directory supports repository-native AI coding agents. It is not a runtime dependency of Pickleball and does not itself change framework behavior.
 
 ## Canonical files
 
-- `/AGENTS.md` — project contract, workflow, compatibility rules, validation, temporary-work rules, and definition of done
+- `/AGENTS.md` — project contract, workflow, compatibility rules, validation, core technical-debt notes, temporary-work rules, and definition of done
 - `/docs/consumer-project.md` — canonical human-readable guide for Maven consumers
-- `/docs/consumer-agent-guide.md` — canonical AI-agent contract for Maven consumers; packaged as `AGENT-GUIDE.md` in the dependency guidance bundle
+- `/docs/consumer-agent-guide.md` — canonical AI-agent contract for Maven consumers; packaged as `AGENT-GUIDE.md`
 - `/docs/agent/feature-map.md` — living map from capabilities to implementation, tests, consumer examples, and documentation
 - `/docs/agent/change-checklist.md` — explicit change-completion checklist
 - `/docs/agent/repository-index.md` — generated inventory of relevant files
-- `/docs/ai-run-configuration.md` — deterministic test-run configuration for agents, including full-override `pkb_run_profile` usage and protected values
-- `/docs/diagnostic-lineage-metadata.md` — canonical semantics for investigation lineage, `pkb_changed_variables`, parent/baseline relationships, evidence-control RunVars, and derived diagnostic metadata
+- `/docs/ai-run-configuration.md` — controlled execution through `pkb_runvars`, canonical `pkb_run_profile`, inherited execution context, `pkb_configpath`, replay, and protected values
+- `/docs/diagnostic-lineage-metadata.md` — investigation lineage and derived diagnostic metadata
 - `/REVIEW.md` — review-time checks for compatibility, tests, consumer examples, and documentation omissions
-- `/.agents/skills/pickleball-functionality-change/SKILL.md` — reusable functionality-change workflow for agents supporting Agent Skills
+- `/.agents/skills/pickleball-functionality-change/SKILL.md` — reusable functionality-change workflow for Agent Skills
 
-Agent-specific files are intentionally small adapters that point back to the canonical contract. Avoid copying the full project description into every adapter.
+Agent adapters should remain small and point back to the canonical contract rather than copying the full project description.
 
-The nested `/maven-consumer-project/AGENTS.md` is intentionally the only consumer-side AI bootstrap. It contains only the dependency command that materializes version-matched guidance and then directs the agent to `.pickleball/AGENT-GUIDE.md`. All details after that bootstrap — refresh behavior, version matching, manifest semantics, stale-guidance handling, managed-file cleanup, Git-ignore handling, Pickleball authoring guidance, diagnostics, configuration, and troubleshooting — belong to the dependency-owned exported guidance.
+The nested `/maven-consumer-project/AGENTS.md` is intentionally only a dependency-owned guidance bootstrap. It materializes version-matched guidance and directs the consumer agent to `.pickleball/AGENT-GUIDE.md`. Refresh/version/manifest semantics, authoring rules, configuration, diagnostics, and troubleshooting belong in the exported dependency guidance.
 
-The nested `/maven-consumer-project/README.md` is ordinary sample-project documentation, not an AI-guidance bridge. It must not duplicate `export-guidance`, `.pickleball` lifecycle, manifest, staleness, Git-ignore, or other Pickleball guidance instructions.
+The nested `/maven-consumer-project/README.md` is ordinary sample-project documentation and should not duplicate the AI guidance lifecycle.
 
-`export-guidance .pickleball` is deliberately unconditional: agents should rerun it before Pickleball work rather than trying to infer whether the dependency changed. A successful export writes `.pickleball/GUIDANCE-MANIFEST.json` last with the exporting Pickleball version and managed-file list, removes obsolete previously managed files, and refreshes the current dependency guidance. Git-ignore handling is best effort only: prefer an existing synchronized `.gitignore`, fall back to `.git/info/exclude`, and never let ignore-file problems block the guidance refresh. If export fails, existing `.pickleball` content is potentially stale.
+`export-guidance .pickleball` is deliberately unconditional before Pickleball work. A successful export writes `.pickleball/GUIDANCE-MANIFEST.json` last, removes obsolete previously managed files, and refreshes current dependency guidance. Git-ignore handling is best effort. If export fails, existing `.pickleball` content is potentially stale.
+
+## Configuration-development context
+
+Core agents working on execution configuration must distinguish:
+
+```text
+default_profile  = normal resolved project RunVar reference snapshot
+pkb_runvars      = authoritative AI controlled-run input
+pkb_run_profile  = canonical resolved RunVar output; never external input
+```
+
+Controlled/named-profile execution inherits only missing `pkb_glue`, `pkb_features`, `pkb_datapath`, `pkb_callpath`, `pkb_componentpath`, and `pkb_configpath`. Explicit blanks suppress inheritance and remain replayable blank tombstones in the final canonical run profile so established subsystem fallback behavior is preserved.
+
+Runtime configuration mappings are loaded only after final run configuration; they must not participate in resolving profiles/RunVars or `pkb_configpath`. New syntax should prefer `<config:...>` while legacy `<configs...>` remains compatible.
+
+Resource-path grammar normalization across feature/data/call/component/config paths is intentionally deferred technical debt documented in root `AGENTS.md`. Do not normalize those paths opportunistically during unrelated configuration work.
 
 ## Temporary agent work
 
-Disposable scripts, patches, generated bundles, migration utilities, investigation output, and intermediate files belong under:
+Disposable scripts, patches, generated bundles, migration utilities, investigation output, and intermediate files belong under `.agent-work/`. The directory is ignored by Git and excluded from the generated repository index. Delete temporary files after use and never force-add them.
 
-```text
-.agent-work/
-```
-
-The directory is ignored by Git and excluded from the generated repository index. Delete temporary files after use. Do not force-add files from `.agent-work/`.
-
-The committed `scripts/` directory is reserved for reusable project-maintenance tooling that is reviewed and intended to remain in the repository.
+The committed `scripts/` directory is reserved for reusable maintained project tooling.
 
 ## Expected behavior
 
-With a compatible write-capable coding agent, a prompt such as:
-
-> Add support for template references in XML attributes.
-
-should cause the agent to:
+A functionality-change agent should:
 
 1. Load the repository contract.
 2. Locate the capability in the feature map.
-3. Inspect related source, tests, Maven consumer scenarios, and guides.
+3. Inspect source, tests, Maven consumer scenarios, and guides.
 4. Implement the change.
-5. Update executable examples and documentation when applicable.
+5. Update executable examples/documentation when applicable.
 6. Run validation.
 7. Remove disposable working files.
 8. Report results.
 
-For controlled test reruns, agents should follow `/docs/ai-run-configuration.md` and `/docs/diagnostic-lineage-metadata.md`. When the intended RunVars are already known, prefer an explicit `pkb_run_profile` so local/default/profile RunVar sources cannot silently alter the rerun. `pkb_changed_variables` names intentionally changed RunVars only; source-only fixes should omit it and use `pkb_run_purpose` plus source provenance instead.
+For AI-launched tests with known settings, default to `pkb_runvars`. Use ordinary JVM RunVars or named profiles instead only when intentionally exercising those resolution paths. For controlled reruns, follow `/docs/ai-run-configuration.md` and `/docs/diagnostic-lineage-metadata.md`: replay retained `runProfile` through `pkb_runvars`, change only intentional RunVars, keep lineage separate, and verify `runProfileFingerprint`. `pkb_changed_variables` names RunVars only, not source changes or profile controls.
 
-This is task-time automation, not a passive background documentation watcher. Manual code edits do not automatically update documentation.
+This is task-time automation, not a passive background documentation watcher.
 
 ## Maintenance
 
@@ -65,9 +71,9 @@ python scripts/refresh_agent_index.py
 python scripts/sync_consumer_guidance.py
 ```
 
-`docs` is the canonical guidance source. `sync_consumer_guidance.py` refreshes the generated Markdown mirror under `src/main/resources/META-INF/pickleball/guidance` that is packaged into the Maven artifact.
+`docs` is the canonical guidance source. `sync_consumer_guidance.py` refreshes the Markdown mirror under `src/main/resources/META-INF/pickleball/guidance` packaged in the Maven artifact.
 
-Check the contract and index:
+Checks:
 
 ```shell
 python scripts/verify_agent_contract.py
@@ -75,7 +81,7 @@ python scripts/refresh_agent_index.py --check
 python scripts/sync_consumer_guidance.py --check
 ```
 
-Run the full project validation:
+Full validation:
 
 ```shell
 scripts/agent_validate.sh
@@ -89,35 +95,10 @@ Windows:
 
 ## Enforcement levels
 
-By default, `verify_agent_contract.py` treats missing agent files and an invalid temporary-workspace configuration as errors. Change-coverage findings remain warnings.
+By default, `verify_agent_contract.py` treats missing agent files and invalid temporary-workspace configuration as errors; change-coverage findings remain warnings. Strict mode may be used in CI when appropriate.
 
-Use strict mode in CI when the team is comfortable with the heuristics:
-
-```shell
-python scripts/verify_agent_contract.py --base-ref origin/master --strict
-```
-
-Temporary narrowly scoped overrides are available for false positives:
-
-- `AGENT_CONTRACT_ALLOW_NO_DOCS=true`
-- `AGENT_CONTRACT_ALLOW_NO_TESTS=true`
-
-Do not use overrides to bypass genuinely missing documentation or tests.
+Temporary narrowly scoped overrides exist for documented false positives; never use them to bypass genuinely missing tests or documentation.
 
 ## Supported adapters included
 
-The repository includes adapters for:
-
-- JetBrains AI Assistant project rules
-- JetBrains Junie (`AGENTS.md` plus `.junie/guidelines.md` compatibility adapter)
-- GitHub Copilot repository instructions, path rules, Agent Skill, and selectable `pickleball-maintainer` custom agent
-- OpenAI Codex
-- Claude Code
-- Gemini CLI
-- Amazon Q Developer
-- Cursor
-- Continue
-- Cline
-- Windsurf
-
-Actual support depends on the installed product/version and whether the selected mode can edit files and execute commands.
+The repository includes adapters for JetBrains AI Assistant/Junie, GitHub Copilot, OpenAI Codex, Claude Code, Gemini CLI, Amazon Q Developer, Cursor, Continue, Cline, and Windsurf. Actual support depends on installed product/version and permissions.

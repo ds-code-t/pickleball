@@ -1,125 +1,100 @@
 # Configuration Files and Resource Mapping
 
-> **Working feature example:** [`mapping-and-resources.feature`](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature) resolves values from the consumer project's YAML, JSON, CSV, text, and on-demand resource files.
+Pickleball loads structured configuration into one runtime configuration mapping.
 
-Pickleball can expose files under `src/test/resources` as nested scenario data.
+## Configuration references
 
-Use two approaches:
-
-1. place commonly used data under `configs`, where it is loaded for every scenario; or
-2. load a file or directory on demand with a template beginning with `/`.
-
-## Shared `configs` directory
+Prefer the source-qualified `config:` syntax regardless of the physical source path:
 
 ```text
-src/test/resources/configs/
+<config:application.baseUrl>
+<config:users.admin.username>
 ```
 
-Directory names become nested groups. File names become property names without their extensions.
-
-Supported resource types include:
-
-| Type | Result |
-|---|---|
-| YAML / YML | nested objects, arrays, and scalar values |
-| JSON | nested objects, arrays, and scalar values |
-| XML | nested data based on XML content |
-| CSV | an array of row objects using the header names |
-| TXT | one text value |
-
-Unsupported file types are ignored.
-
-The consumer project contains real examples:
+Legacy references remain supported:
 
 ```text
-configs/
-├── CALENDARS.yaml
-├── CHROME.yaml
-├── CHROME_HEADLESS.yaml
-├── EDGE.yaml
-├── GRID_CHROME.yaml
-├── GRID_EDGE.yaml
-├── REGEX.yaml
-├── REMOTE_CHROME.yaml
-├── REMOTE_EDGE.yaml
-├── SAUCE_CHROME.yaml
-├── SAUCE_EDGE.yaml
-├── TEST_DATA.yaml
-├── URL.yaml
-├── jsonfiles/
-└── otherfiles/
+<configs.application.baseUrl>
+<configs.users.admin.username>
 ```
 
-## Reading shared values
+Both forms resolve against the same loaded configuration data. Do not substitute a configured directory name into either reference. `pkb_configpath` changes the source, not the logical configuration mapping.
 
-Given [`TEST_DATA.yaml`](../maven-consumer-project/src/test/resources/configs/TEST_DATA.yaml):
+## Config source path
 
-```yaml
-siteName: Pickleball Test Lab
-users:
-  - name: Ava
-    city: Phoenix
-    accountType: Premium
-```
-
-Feature files can use:
-
-```gherkin
-* , ensure "<configs.TEST_DATA.siteName>" equals "Pickleball Test Lab"
-* , ensure "<configs.TEST_DATA.users #1.name>" equals "Ava"
-```
-
-URLs can be placed in [`URL.yaml`](../maven-consumer-project/src/test/resources/configs/URL.yaml):
-
-```gherkin
-* navigate to: URL.forms
-```
-
-The URL shorthand and normal `<configs...>` templates are both available where their corresponding steps support them.
-
-## Loading one file on demand
-
-A template beginning with `/` loads a resource relative to `src/test/resources`:
+The RunVar is:
 
 ```text
-</files/customers #1.name>
-</files/customers #2.city>
+pkb_configpath
 ```
 
-File extensions may be omitted.
-
-Given [`files/customers.yaml`](../maven-consumer-project/src/test/resources/files/customers.yaml), the first expression returns `Ava` and the second returns `Tempe`.
-
-## Loading a directory
-
-A `/` template can load a directory and continue with a nested query. Prefer loading a known file when possible because it avoids reading unrelated resources.
+Examples:
 
 ```text
-</configs/jsonfiles.accounts #1.id>
+pkb_configpath=configs
+pkb_configpath=classpath:configs
+pkb_configpath=classpath:environment/qa/configs
+pkb_configpath=src/test/resources/environment/qa/configs
+pkb_configpath=file:/opt/pickleball/configs
 ```
 
-Forward slashes identify physical resource paths. Dots, indexes, `#` positions, and wildcards query the loaded data.
+When the value is absent or blank, Pickleball keeps the historical Java fallback: the classpath resource root `configs`.
 
-## Recommended use
+A project-level `pkb_configpath` is part of required execution context. Named profiles and controlled `pkb_runvars` inherit it when they omit the key. An explicit blank suppresses that inheritance and returns to the Java fallback.
 
-Use `configs` for data shared broadly across the suite:
+Example:
 
-- application and service URLs;
-- browser definitions;
-- environments and feature flags;
-- calendars and time zones;
-- regular expressions;
-- reusable non-secret test identities; and
-- common expected values.
+```text
+project: pkb_configpath=classpath:environment/qa/configs
+run:     pkb_runvars=pkb_configpath=,pkb_browser=firefox
+```
 
-Use on-demand files for larger or specialized data needed by only a few scenarios.
+The controlled run uses the default `configs` resource root because the blank value intentionally suppresses the project path.
 
-Do not commit passwords, access tokens, private keys, or other secrets. Supply sensitive values through local or CI configuration.
+## Initialization order
 
-## Working examples
+Run configuration is resolved before the final config source is bound:
 
-- [Resource-mapping feature](../maven-consumer-project/src/test/resources/features/mapping-and-resources.feature)
-- [All shared configuration files](../maven-consumer-project/src/test/resources/configs)
-- [On-demand files](../maven-consumer-project/src/test/resources/files)
+```text
+normal properties / profiles / pkb_runvars
+                    ↓
+             final RunVars
+                    ↓
+          final pkb_configpath
+                    ↓
+        load/replace configs map
+                    ↓
+             scenario runtime
+```
 
-[Previous: Mapping and Templating](mapping-and-templating.md) · [Documentation home](README.md) · [Next: Nested Steps](nested-steps.md)
+Configuration data is not loaded during profile/RunVar resolution. `ParsingMap.initializeConfigs` binds the final source only after the effective RunVars and `pkb_configpath` are known.
+
+`<config:...>` and legacy `<configs...>` are runtime mapping data. Neither form can choose `pkb_configpath` or otherwise resolve `default_profile`, named profiles, `pkb_runvars`, or the final `pkb_run_profile`.
+
+Supported profile references remain valid because they do not depend on runtime configs:
+
+```text
+pkb_runvars=pkb_configpath=<qa.pkb_configpath>,pkb_browser=firefox
+```
+
+## Other resource paths
+
+This feature intentionally preserves the existing path behavior of other RunVars.
+
+- `pkb_features` uses Cucumber feature-location semantics. Explicit `classpath:` and `file:` locations are supported; a bare path follows the existing Cucumber/Pickleball feature-path behavior.
+- `pkb_datapath` keeps its existing filesystem/classpath-root behavior and Java fallback.
+- `pkb_callpath` keeps its existing component/service-call path behavior and Java fallback.
+- `pkb_componentpath` keeps its existing component-scenario path behavior and Java fallback.
+- `pkb_glue` is Java/Cucumber glue package syntax, not a resource path.
+
+Do not assume those keys share one public path grammar merely because they are all inherited execution-context values.
+
+## Structured resource formats
+
+`FileAndDataParsing` continues to provide suffix-agnostic resource lookup and the structured formats already supported by Pickleball, including JSON, YAML/YML, XML, properties, INI/conf/text, and CSV where applicable.
+
+Template resolution behavior for ordinary runtime resource files is unchanged by `pkb_configpath`.
+
+## Consumer-agent rule
+
+When a consumer agent needs project configuration data, read the version-matched Pickleball documentation and the consumer's active `pkb_configpath`. Prefer `<config:...>` for new references; preserve existing `<configs...>` references unless there is a reason to modernize them. Never rewrite config references to match a physical directory name.

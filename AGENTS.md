@@ -9,9 +9,11 @@ The repository also contains `maven-consumer-project`, which is both:
 2. An executable compatibility and integration test for the framework.
 
 Consumer scenarios start a local test-site server and exercise browser behavior through Selenium as well as REST/SOAP-style service calls, mappings, templates, dynamic Cucumber steps, nested flows, and component scenarios.
+
 ## Default agent behavior
 
 For any request to add, change, fix, refactor, or remove project functionality:
+
 1. Read this file.
 2. Read `docs/agent/feature-map.md`.
 3. Locate the current implementation, tests, consumer scenarios, and documentation for the affected capability.
@@ -54,13 +56,18 @@ For routine diagnostic utility operations, prefer `tools.dscode.common.reporting
 
 ### Controlled diagnostic reruns
 
-When an investigation requires a rerun and the intended Pickleball execution settings are known, prefer the selected run's retained `runProfile` from `run-index.json` as the starting execution contract. Use the compact `pkb_run_profile` form for simple values, or expanded `pkb_run_profile.<pkb_var>` members when avoiding nested assignment parsing is safer for punctuation-heavy/CI values. Never mix compact and expanded direct-profile forms in one resolved configuration. Change only the RunVars required by the current hypothesis; do not reconstruct the effective RunVars by manually combining runner defaults, property files, named profiles, system properties, and Cucumber aliases when a retained final run profile is available.
+When an AI agent launches Pickleball tests and the intended execution settings are known, use `pkb_runvars` as the authoritative test-run input. Put intentional selection and execution RunVars such as `pkb_tags`, `pkb_name`, browser, reporting/logging controls, and other non-secret overrides in `pkb_runvars` rather than relying on ambient optional defaults. Use ordinary JVM `-Dpkb_*` RunVars or `pkb_profile` instead only when the task specifically needs to exercise normal configuration/profile precedence or the user explicitly requests those semantics. Protected secret values and diagnostic lineage remain separate.
 
-Diagnostic lineage is metadata, not part of the execution RunVars. Supply `pkb_investigation_id`, `pkb_run_purpose`, `pkb_parent_run_id`, `pkb_baseline_run_id`, and `pkb_changed_variables` separately from either direct-profile form; profiles must not contain those keys. After the rerun, verify `runProfileFingerprint` / `directRunProfile` and the declared changed variables before attributing observed differences to the intended configuration change. Use `runProfileFingerprint`, not `configurationHash`, as the equality check for the final RunVar set. See `docs/ai-run-configuration.md`.
+When an investigation requires a rerun, start from the selected run's retained `runProfile` in `run-index.json`. Replay that retained final RunVar set through `pkb_runvars`, using compact `pkb_runvars` for ordinary values or expanded `pkb_runvars.<pkb_var>` members when avoiding nested assignment parsing is safer. Never mix compact and expanded `pkb_runvars` forms. `pkb_run_profile` is internal derived output and must never be supplied as input; compact or expanded external `pkb_run_profile` values are configuration errors.
+
+A partial controlled input inherits only missing project execution-context RunVars: `pkb_glue`, `pkb_features`, `pkb_datapath`, `pkb_callpath`, `pkb_componentpath`, and `pkb_configpath`. An explicit blank value suppresses inheritance and remains a blank tombstone in the canonical `pkb_run_profile`, preserving the existing subsystem fallback semantics when replayed. Do not reconstruct optional RunVars by manually combining runner defaults, property files, named profiles, system properties, and Cucumber aliases when a retained final run profile is available.
+
+Diagnostic lineage is metadata, not part of the execution RunVars. Supply `pkb_investigation_id`, `pkb_run_purpose`, `pkb_parent_run_id`, `pkb_baseline_run_id`, and `pkb_changed_variables` separately from `pkb_runvars`; profiles must not contain those keys. After the rerun, verify `runProfileFingerprint` / compatibility field `directRunProfile` and the declared changed variables before attributing observed differences to the intended configuration change. Use `runProfileFingerprint`, not `configurationHash`, as the equality check for the final RunVar set. See `docs/ai-run-configuration.md`.
 
 ## Sources of truth
 
 Use all relevant evidence rather than trusting one file in isolation:
+
 - Current implementation under `src/main/java` and `src/main/aspectj`
 - Consumer-hosted internal Java checks under `maven-consumer-project/src/test/java`
 - Executable consumer examples under `maven-consumer-project/src/test`
@@ -75,7 +82,9 @@ When implementation, tests, examples, and documentation disagree:
 3. Preserve established consumer behavior unless the user explicitly requests a breaking change.
 4. Update the inconsistent surfaces together.
 5. State the resolution in the final report.
+
 ## Repository structure
+
 - `src/main/java` — framework implementation and Cucumber integrations
 - `src/main/aspectj` — AspectJ integrations and weaving behavior
 - `src/main/resources` — framework resources
@@ -87,9 +96,11 @@ When implementation, tests, examples, and documentation disagree:
 - `maven-consumer-project/src/test/resources/configs` — example configuration
 - `maven-consumer-project/src/test/resources/site` — local browser/service test site
 - `maven-consumer-project/src/test/java` — runner, local server, support code, and internal framework checks compiled against the locally published dependency
+
 ## Public contracts
 
 Treat these as consumer-visible contracts unless source evidence clearly shows otherwise:
+
 - Public Java APIs
 - Maven artifact behavior and runtime dependencies
 - Cucumber step phrases and dynamic-step behavior
@@ -102,6 +113,7 @@ Treat these as consumer-visible contracts unless source evidence clearly shows o
 - The behavior demonstrated by the Maven consumer scenarios
 
 Do not silently rename or remove public syntax, steps, configuration, APIs, or documented behavior.
+
 ## Required impact analysis
 
 Before editing, search for:
@@ -115,6 +127,7 @@ Before editing, search for:
 - Compatibility assumptions in `maven-consumer-project`
 
 Do not make a behavior change based only on a method or class name.
+
 ## Functionality-change requirements
 
 For externally observable functionality, update all applicable areas:
@@ -130,26 +143,16 @@ For externally observable functionality, update all applicable areas:
 - `docs/agent/repository-index.md` when indexed repository files change
 
 A task is not complete merely because the Java source compiles.
+
 ### Documentation policy
 
-Update documentation when a change affects:
+Update documentation when a change affects supported behavior/syntax, inputs/outputs/value types, defaults/constraints/errors/edge cases, public APIs/configuration/compatibility, or user-visible examples and recommended workflows.
 
-- Supported behavior or syntax
-- Inputs, outputs, or value types
-- Defaults, constraints, errors, or edge cases
-- Public APIs, steps, configuration, or compatibility
-- A user-visible example or recommended workflow
-
-Do not create documentation churn for a purely internal refactor with no externally observable effect.
-
-Prefer updating the existing canonical guide over creating a competing guide.
+Do not create documentation churn for a purely internal refactor. Prefer updating the existing canonical guide over creating a competing guide.
 
 ### Experimental value-conversion syntax
 
-Do not document `ValConverter` special-value syntax in `README.md` or the
-`docs` directory unless the task explicitly approves it. The markers are
-experimental and may change or be removed. They may still receive focused
-implementation and executable test coverage.
+Do not document `ValConverter` special-value syntax in `README.md` or the `docs` directory unless the task explicitly approves it. The markers are experimental and may change or be removed. They may still receive focused implementation and executable test coverage.
 
 ### Test policy
 
@@ -160,6 +163,7 @@ For consumer-visible behavior, add or update an executable scenario in `maven-co
 Internal Java checks should normally live in `maven-consumer-project` and be exercised by the dedicated Cucumber feature so they compile and run against the locally published Pickleball dependency. Keep a test under root `src/test` only when it must execute inside the framework build itself.
 
 Tests must cover the requested behavior and meaningful compatibility or edge cases. Do not weaken or delete assertions merely to make a change pass.
+
 ## Build and validation
 
 Use Java 21.
@@ -180,14 +184,14 @@ For consumer-visible changes, publish the current framework artifact locally and
 
 ```shell
 ./gradlew test publishToMavenLocal
-./maven-consumer-project/mvnw -f maven-consumer-project/pom.xml -U test -Dpkb_browser=CHROME_HEADLESS
+./maven-consumer-project/mvnw -f maven-consumer-project/pom.xml -U test -Dpkb_runvars.pkb_browser=CHROME_HEADLESS -Dpkb_runvars.pkb_tags=@all
 ```
 
 Windows:
 
 ```powershell
 .\gradlew.bat test publishToMavenLocal
-.\maven-consumer-project\mvnw.cmd -f maven-consumer-project\pom.xml -U test -Dpkb_browser=CHROME_HEADLESS
+.\maven-consumer-project\mvnw.cmd -f maven-consumer-project\pom.xml -U test -Dpkb_runvars.pkb_browser=CHROME_HEADLESS -Dpkb_runvars.pkb_tags=@all
 ```
 
 Repository contract and generated-index checks:
@@ -195,6 +199,7 @@ Repository contract and generated-index checks:
 ```shell
 python scripts/verify_agent_contract.py
 python scripts/refresh_agent_index.py --check
+python scripts/sync_consumer_guidance.py --check
 ```
 
 Or run the turnkey validator:
@@ -210,7 +215,9 @@ Windows:
 ```
 
 If a required validation cannot run, state exactly what was not run and why. Never claim that a test passed without executing it.
+
 ## Change boundaries
+
 - Keep changes focused on the requested behavior.
 - Do not perform unrelated refactors.
 - Do not change versions, publish remote artifacts, create releases, or push branches unless explicitly requested.
@@ -220,28 +227,37 @@ If a required validation cannot run, state exactly what was not run and why. Nev
 - Do not replace executable examples with prose.
 - Never store secrets, credentials, machine-specific paths, or private data in agent instruction files.
 
+### Core technical debt: resource-path RunVar consistency
+
+**Status: intentionally deferred.**
+
+The following resource-path RunVars do not currently share one public path-resolution grammar:
+
+- `pkb_features`
+- `pkb_datapath`
+- `pkb_callpath`
+- `pkb_componentpath`
+- `pkb_configpath`
+
+`pkb_glue` is part of inherited execution context but is Java/Cucumber glue syntax, not a resource path, and is outside this debt item.
+
+Current compatibility behavior is intentionally retained. In particular, feature paths use Cucumber URI/path semantics; data roots use Pickleball's hybrid filesystem/classpath lookup; call/component paths retain their historical project-relative defaults; and `pkb_configpath` preserves the historical `configs` classpath-resource fallback while allowing an explicit configured source.
+
+A future dedicated change may investigate one common public grammar supporting `classpath:`, `file:`, absolute filesystem paths, relative filesystem paths, portable retained run profiles, Maven/Gradle resource output, IDE execution, JAR resources, Windows paths, multiple feature locations, and classpath/filesystem collisions. Do not assume all keys must share one internal loader: Cucumber feature locations and Pickleball structured-resource loading have different runtime requirements.
+
+**Maintainer rule:** do not normalize these path semantics opportunistically while changing profiles, `pkb_runvars`, `pkb_run_profile`, or execution-context inheritance. Bare values can already mean different things for different RunVars, and changing precedence can silently redirect existing consumer projects. Address this debt only in a task explicitly scoped to resource-path normalization with compatibility tests and migration documentation.
+
 ### Temporary agent workspace
 
-Use `.agent-work/` for disposable scripts, patches, generated bundles,
-intermediate files, migration utilities, investigation output, and other
-agent-created artifacts that are not maintained project code.
+Use `.agent-work/` for disposable scripts, patches, generated bundles, intermediate files, migration utilities, investigation output, and other agent-created artifacts that are not maintained project code.
 
-Do not place temporary automation in the repository root, `scripts/`, source
-directories, test directories, or documentation directories. The committed
-`scripts/` directory is only for reusable project-maintenance tooling intended
-to remain part of the repository.
+Do not place temporary automation in the repository root, `scripts/`, source directories, test directories, or documentation directories. The committed `scripts/` directory is only for reusable project-maintenance tooling intended to remain part of the repository.
 
-Delete temporary files after they have served their purpose. Before completing
-a task, confirm that `.agent-work/` contains no files that need to be retained.
-Never force-add `.agent-work/` content to Git.
+Delete temporary files after they have served their purpose. Before completing a task, confirm that `.agent-work/` contains no files that need to be retained. Never force-add `.agent-work/` content to Git.
+
 ## Agent-maintained context
 
-`docs/agent/feature-map.md` is a living navigation map. Update it when:
-
-- A capability is added or removed.
-- Responsibility moves to different files or modules.
-- A canonical test, scenario, endpoint, or guide changes.
-- Public syntax or compatibility expectations change.
+`docs/agent/feature-map.md` is a living navigation map. Update it when a capability is added/removed, responsibility moves, a canonical test/scenario/endpoint/guide changes, or public syntax/compatibility expectations change.
 
 Run:
 
@@ -252,9 +268,11 @@ python scripts/refresh_agent_index.py
 after adding, moving, or removing indexed source, test, documentation, or consumer files.
 
 Do not use these files as substitutes for inspecting current source.
+
 ## Definition of done
 
 A functionality change is complete only when:
+
 - The requested behavior is implemented.
 - Applicable compatibility has been preserved or a breaking change is clearly identified.
 - Relevant consumer-hosted internal Java checks exist and pass.

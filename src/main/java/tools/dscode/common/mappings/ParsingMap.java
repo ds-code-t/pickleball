@@ -33,17 +33,46 @@ import static tools.dscode.coredefinitions.DataTableDefinitions.dataTableToJsonN
 import static tools.dscode.coredefinitions.DocStringDefinitions.docStringtoJsonNode;
 public class ParsingMap extends MappingProcessor {
     private static final String DATA_REFERENCE_PREFIX = "data:";
+    private static final String CONFIG_REFERENCE_PREFIX = "config:";
     private static final DataElementRuntime DATA_ELEMENT_RUNTIME =
             new DataElementRuntime();
     private static final ParsingMap GLOBALS_PARSINGMAP =
             new ParsingMap(GLOBALS);
-    public static final String configsRoot = "configs";
-    static {
-        JsonNode configsNode = FileAndDataParsing.buildJsonFromPath(
-                configsRoot,
-                false
-        );
-        GLOBALS.root.set(configsRoot, configsNode);
+    public static final String CONFIGS_MAP_ROOT = "configs";
+    public static final String DEFAULT_CONFIG_PATH = "configs";
+    /** @deprecated use {@link #CONFIGS_MAP_ROOT}; retained for source compatibility. */
+    @Deprecated
+    public static final String configsRoot = CONFIGS_MAP_ROOT;
+    public static synchronized void initializeConfigs(String configuredPath) {
+        String path = configuredPath == null || configuredPath.isBlank()
+                ? DEFAULT_CONFIG_PATH
+                : configuredPath.trim();
+        JsonNode configsNode = loadConfigs(path);
+        GLOBALS.root.set(CONFIGS_MAP_ROOT, configsNode);
+    }
+
+    private static JsonNode loadConfigs(String path) {
+        String normalized = path.replace('\\', '/');
+        if (normalized.startsWith("classpath:")) {
+            return FileAndDataParsing.buildJsonFromPath(
+                    normalized.substring("classpath:".length()),
+                    false
+            );
+        }
+
+        int slash = normalized.lastIndexOf('/');
+        if (slash < 0) {
+            return FileAndDataParsing.buildJsonFromPath(normalized, false);
+        }
+
+        String root = normalized.substring(0, slash);
+        String name = normalized.substring(slash + 1);
+        if (name.isBlank()) {
+            int previousSlash = root.lastIndexOf('/');
+            name = previousSlash < 0 ? root : root.substring(previousSlash + 1);
+            root = previousSlash < 0 ? "" : root.substring(0, previousSlash);
+        }
+        return FileAndDataParsing.buildJsonFromPathUnderRoot(root, name, false);
     }
 
     public static ParsingMap getGlobalsParsingmap() {
@@ -62,8 +91,15 @@ public class ParsingMap extends MappingProcessor {
     }
     @Override
     public Object get(String key) {
-        Object value = super.get(key);
         String query = extractMapPrefix(key).key();
+        if (query != null && query.startsWith(CONFIG_REFERENCE_PREFIX)) {
+            String configQuery = query.substring(CONFIG_REFERENCE_PREFIX.length());
+            return super.get(configQuery.isBlank()
+                    ? CONFIGS_MAP_ROOT
+                    : CONFIGS_MAP_ROOT + "." + configQuery);
+        }
+
+        Object value = super.get(key);
         if (!(value instanceof ScenarioStepData data)
                 || query == null
                 || !query.startsWith(DATA_REFERENCE_PREFIX)) {
@@ -74,6 +110,18 @@ public class ParsingMap extends MappingProcessor {
                 ? dataTable
                 : data.getDocStringValue(null);
     }
+    @Override
+    public Object getCaseInsensitive(String key) {
+        String query = extractMapPrefix(key).key();
+        if (query != null && query.startsWith(CONFIG_REFERENCE_PREFIX)) {
+            String configQuery = query.substring(CONFIG_REFERENCE_PREFIX.length());
+            return super.getCaseInsensitive(configQuery.isBlank()
+                    ? CONFIGS_MAP_ROOT
+                    : CONFIGS_MAP_ROOT + "." + configQuery);
+        }
+        return super.getCaseInsensitive(key);
+    }
+
     @Override
     public List<?> get(ElementMatch element) {
         Optional<DataElementMatch> dataElement =
@@ -207,7 +255,6 @@ public class ParsingMap extends MappingProcessor {
                 ? wrapper.getValue()
                 : value;
     }
-
     private Object phraseContextSource() {
         NodeMap phraseMap = getPhraseMap();
         if (phraseMap instanceof DataContextNodeMap dataContext) {
@@ -362,7 +409,7 @@ public class ParsingMap extends MappingProcessor {
             );
         }
         return getFromRunningParsingMapCaseInsensitive(
-                configsRoot + "." + key
+                CONFIGS_MAP_ROOT + "." + key
         );
     }
     public static NodeMap getRootScenarioStepNodeMap() {

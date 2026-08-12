@@ -108,6 +108,26 @@ XML-safe bookends are available where angle brackets conflict with XML markup:
 
 Recognized lowercase source prefixes are resolved before ordinary map lookup.
 
+### `config:`
+
+`config:` reads from the configuration data loaded after final RunVar resolution from `pkb_configpath`:
+
+```text
+<config:application.baseUrl>
+<config:users.admin.name>
+```
+
+This is the recommended syntax for new configuration references. Legacy references remain valid and address the same data:
+
+```text
+<configs.application.baseUrl>
+<configs.users.admin.name>
+```
+
+Runtime configuration mappings cannot participate in resolving `default_profile`, named profiles, `pkb_runvars`, `pkb_configpath`, or the final `pkb_run_profile`; the RunVar configuration must be complete before the config data can be loaded.
+
+See [Configuration Files and Resource Mapping](config-files-and-resource-mapping.md).
+
 ### `file:`
 
 `file:` uses the existing resource lookup, parsing, suffix-agnostic discovery, and nested-query behavior:
@@ -158,12 +178,7 @@ A slash immediately after `data:` switches to file lookup rooted below the resol
 
 The leading slash is only a syntax discriminator. It is **not** an operating-system absolute path.
 
-`data:/` uses the same already-resolved `pkb_datapath` and default fallback as marker-data lookup. It then reuses the existing `file:` machinery for:
-
-- filesystem/classpath resource resolution supported by the data root;
-- suffix-agnostic file discovery;
-- JSON/YAML/XML and other supported formats;
-- nested object and array queries.
+`data:/` uses the same already-resolved `pkb_datapath` and default fallback as marker-data lookup. It then reuses the existing `file:` machinery for filesystem/classpath resource resolution supported by the data root, suffix-agnostic discovery, supported structured formats, and nested object/array queries.
 
 For example, with:
 
@@ -177,13 +192,7 @@ this reference:
 <data:/files/customerPayload>
 ```
 
-can resolve:
-
-```text
-src/test/resources/data/files/customerPayload.json
-```
-
-without requiring the `.json` suffix.
+can resolve `src/test/resources/data/files/customerPayload.json` without requiring the `.json` suffix.
 
 Whole documents and nested objects/arrays remain Jackson `JsonNode` values (`ObjectNode`/`ArrayNode`). Nested scalar queries return their natural scalar value.
 

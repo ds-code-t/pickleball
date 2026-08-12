@@ -143,6 +143,7 @@ Push-Location $RepositoryRoot
 try {
     Invoke-Python scripts/verify_agent_contract.py
     Invoke-Python scripts/refresh_agent_index.py --check
+    Invoke-Python scripts/sync_consumer_guidance.py --check
 
     & .\gradlew.bat test
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -153,7 +154,9 @@ try {
 
         $MavenExe = Get-MavenExecutable -RequestedCommand $MavenCommand
         Write-Host "Using Maven command: $MavenExe"
-        & $MavenExe -f maven-consumer-project/pom.xml -U test -Dpkb_browser=CHROME_HEADLESS
+        & $MavenExe -f maven-consumer-project/pom.xml -U test `
+            -Dpkb_runvars.pkb_browser=CHROME_HEADLESS `
+            -Dpkb_runvars.pkb_tags=@all
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
 

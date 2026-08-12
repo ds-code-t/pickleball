@@ -1,18 +1,12 @@
 # Diagnostic Lineage and Metadata
 
-This guide defines how Pickleball diagnostic lineage fields should be authored and how they differ from execution RunVars and derived diagnostic evidence.
+This guide defines how Pickleball diagnostic lineage fields differ from execution RunVars, profile controls, and derived evidence.
 
-The key rule is:
+> Lineage metadata explains why runs are related. It does not control execution and it is not proof that a configuration or source change occurred.
 
-> Lineage metadata explains why runs are related. It does not control execution and it is not proof that a configuration or source change actually occurred.
+## Four categories
 
-## Four different kinds of diagnostic/configuration data
-
-Keep these categories separate when authoring or investigating a run.
-
-### 1. Lineage metadata: descriptive inputs
-
-These five properties describe the investigation relationship between runs:
+### 1. Lineage metadata
 
 ```text
 pkb_investigation_id
@@ -22,11 +16,11 @@ pkb_baseline_run_id
 pkb_changed_variables
 ```
 
-They are metadata, not RunVars. Pickleball keeps them out of `pkb_run_profile`, `runProfileFingerprint`, and the execution `configurationHash`.
+These are metadata, not RunVars. Pickleball excludes them from `pkb_run_profile`, `runProfileFingerprint`, and the execution configuration hash.
 
-### 2. RunVars: settings that affect execution or evidence behavior
+### 2. Execution/evidence RunVars
 
-Normal Pickleball settings remain RunVars even when they mainly control diagnostics or logging. Examples include:
+Examples:
 
 ```text
 pkb_reportingmode
@@ -38,27 +32,31 @@ pkb_loglevel
 pkb_browser
 pkb_tags
 pkb_parallel
+pkb_configpath
 ```
 
-These values belong in the effective run profile. If an agent intentionally changes one during a controlled rerun, its canonical `pkb_*` name may be listed in `pkb_changed_variables`.
+These belong in the effective RunVar set. If intentionally changed during a controlled rerun, their canonical `pkb_*` names may be listed in `pkb_changed_variables`.
 
-### 3. Profile/control properties: configuration inputs that are not RunVars
+### 3. Profile/control properties
 
-Some `pkb_*` properties control how the final execution model is selected or represented but are deliberately excluded from the RunVar set. Important examples are:
+These select or represent the final RunVar set but are not themselves RunVars:
 
 ```text
 pkb_profile
-pkb_run_profile
-pkb_run_profile.<pkb_var>
 pkb_profile_<name>
+pkb_runvars
+pkb_runvars.<pkb_var>
+pkb_run_profile
 pkb_options
 ```
 
-Do not list these control names in `pkb_changed_variables`. For example, if a direct rerun changes the browser inside `pkb_run_profile`, declare `pkb_browser`, not `pkb_run_profile`. If a profile/control change causes effective RunVars or selection metadata to differ, verify those resolved outputs directly.
+`pkb_runvars` is the controlled-run input. `pkb_run_profile` is canonical final serialized output; external direct `pkb_run_profile` input is rejected.
 
-### 4. Derived evidence: read-only outputs
+Do not list control names in `pkb_changed_variables`. If `pkb_runvars` changes the browser, declare `pkb_browser`, not `pkb_runvars`.
 
-Fields such as these are produced by Pickleball and should be read, not supplied as lineage properties:
+### 4. Derived evidence
+
+Read-only examples include:
 
 ```text
 runId
@@ -78,23 +76,21 @@ nativeCapabilitiesObserved
 
 Use derived evidence to verify what actually happened. Do not turn these fields into ad hoc `pkb_*` inputs.
 
-## Lineage field meanings
+## Lineage fields
 
-| Property | Meaning | Recommended use | Do not use it for |
+| Property | Meaning | Recommended use | Do not use for |
 |---|---|---|---|
-| `pkb_investigation_id` | Stable label grouping related runs into one investigation | Reuse the same value across related reruns; include it on the original/control run when the investigation is known at launch | Encoding configuration differences or source paths |
-| `pkb_run_purpose` | Human/agent-readable reason this specific run exists | State the hypothesis or validation goal, such as `verify-source-fix` or `browser-counterfactual` | Machine-verifying that a change occurred |
-| `pkb_parent_run_id` | Immediate predecessor from which this run was derived | Point to the run whose evidence/profile directly motivated this rerun | A permanent baseline when several generations of reruns exist |
-| `pkb_baseline_run_id` | Stable comparison anchor for an investigation | Keep the original failed/control run as the baseline while later reruns chain through different parents | Automatically selecting the previous run |
-| `pkb_changed_variables` | Declaration of the Pickleball RunVar names intentionally changed for this rerun | Use canonical names such as `pkb_browser` or `pkb_tags`; for several, use a comma-separated list | Source files, feature files, commits, test data, application changes, reasons, or derived evidence fields |
+| `pkb_investigation_id` | Stable grouping label | Reuse across related reruns | configuration/source encoding |
+| `pkb_run_purpose` | Reason the specific run exists | State hypothesis/validation goal | proof that a change occurred |
+| `pkb_parent_run_id` | Immediate predecessor | Point to the run that motivated this rerun | permanent baseline |
+| `pkb_baseline_run_id` | Stable comparison anchor | Keep the original control/failure as anchor | automatic previous-run selection |
+| `pkb_changed_variables` | RunVar names intentionally changed | Canonical names such as `pkb_browser` | source files, commits, data, reasons, controls, derived fields |
 
-All five fields are optional. Omit a field when it would add no accurate information.
+All fields are optional. Omit a field when it adds no accurate information.
 
-## `pkb_changed_variables` means changed RunVars only
+## `pkb_changed_variables` means RunVars only
 
-`pkb_changed_variables` is intentionally narrow. It names the Pickleball execution/evidence RunVars that the rerun intentionally changes relative to the retained execution contract used as the rerun starting point, normally the selected parent run.
-
-Good examples:
+Good:
 
 ```text
 pkb_changed_variables=pkb_browser
@@ -103,53 +99,64 @@ pkb_changed_variables=pkb_browser,pkb_tags
 pkb_changed_variables=pkb_reportretention
 ```
 
-Do not use source-oriented or control-property values such as:
+Wrong:
 
 ```text
 pkb_changed_variables=source:navigation.feature
 pkb_changed_variables=src/test/resources/features/navigation.feature
 pkb_changed_variables=git-commit
 pkb_changed_variables=test-data
+pkb_changed_variables=pkb_runvars
 pkb_changed_variables=pkb_run_profile
 pkb_changed_variables=pkb_profile
 ```
 
-Those are not execution RunVar names. `pkb_run_profile` and `pkb_profile` may control how RunVars are resolved, but the changed-variable declaration should name the effective RunVars themselves.
-
-If a rerun changes only project source, Gherkin, mappings, test data, or application code while preserving the same execution RunVars, **omit `pkb_changed_variables`**. Describe the reason in `pkb_run_purpose`; use diagnostic source provenance to determine what source actually changed.
+If a rerun changes only source, Gherkin, mappings, test data, or application code while preserving the same execution RunVars, omit `pkb_changed_variables`. Put the reason in `pkb_run_purpose` and use source provenance to determine what source actually changed.
 
 Example source-fix validation:
 
 ```bash
 mvn test \
-  -Dpkb_run_profile="<retained runProfile>" \
+  -Dpkb_runvars="<retained runProfile>" \
   -Dpkb_investigation_id="diag-navigation" \
   -Dpkb_parent_run_id="<failed-run-id>" \
   -Dpkb_baseline_run_id="<original-failed-run-id>" \
   -Dpkb_run_purpose="verify-source-fix"
 ```
 
-There is deliberately no `pkb_changed_variables` assignment in that example.
+There is intentionally no `pkb_changed_variables` assignment.
 
-## Lineage metadata is annotation, not proof
+## Controlled rerun starting contract
 
-Pickleball records supplied lineage values in lightweight diagnostic metadata. The fields are descriptive strings; they do not replace comparison of the actual run evidence. Nonblank lineage values are copied into the run manifest/index/catalog as investigation context; Pickleball does not automatically prove that referenced runs exist or validate `pkb_changed_variables` against a computed RunVar diff.
+Start from the selected run's retained `runProfile`. That string is the canonical final RunVar set from the earlier run. Replay it through `pkb_runvars`, not by manually reconstructing defaults/profiles/property files.
 
-In particular:
+```text
+retained runProfile
+        ↓
+pkb_runvars input
+        ↓
+intentional edits only
+        ↓
+new canonical runProfile
+```
 
-- `pkb_changed_variables=pkb_browser` does not by itself prove the browser changed; an inaccurate or misspelled declaration can still be recorded as metadata.
-- A matching `runProfileFingerprint` means the final canonical RunVar set is the same, regardless of what lineage text claims.
-- A different `runProfileFingerprint` means at least one final RunVar differs, but `pkb_changed_variables` should still accurately name only the intentionally changed RunVars.
+Expanded `pkb_runvars.<pkb_var>` members may be used instead of compact input. Do not mix compact and expanded forms.
+
+Preserve blank assignments. For example, `pkb_features=` records intentional suppression of inherited project wiring and must survive replay.
+
+A partial `pkb_runvars` input inherits only missing project execution-context RunVars: `pkb_glue`, `pkb_features`, `pkb_datapath`, `pkb_callpath`, `pkb_componentpath`, and `pkb_configpath`. Optional RunVars do not implicitly inherit into a controlled run.
+
+## Lineage is annotation, not proof
+
+- `pkb_changed_variables=pkb_browser` does not prove the browser changed.
+- Matching `runProfileFingerprint` means the canonical final RunVar set is the same.
+- Different `runProfileFingerprint` means at least one final RunVar differs.
 - `configurationHash` is broader than the final RunVar set and is not a substitute for `runProfileFingerprint`.
-- `DiagnosticRunComparator` compares derived comparison metadata and scenario evidence; lineage remains investigation context rather than an execution-equivalence assertion.
+- `DiagnosticRunComparator` compares derived evidence; lineage remains context.
 
-For a controlled rerun, verify the actual profile/fingerprint after the run before attributing behavior to the declared change.
+Verify the resulting profile/fingerprint before attributing behavior to the declared change.
 
 ## Parent versus baseline
-
-`pkb_parent_run_id` and `pkb_baseline_run_id` often match on the first rerun, but they serve different purposes.
-
-Example investigation:
 
 ```text
 Run A  original failure
@@ -167,94 +174,53 @@ Run D  source-fix validation derived from C
        baseline = A
 ```
 
-The parent describes the immediate derivation chain. The baseline remains the stable comparison anchor.
-
-Pickleball records these IDs as metadata; agents should not assume the referenced run exists without checking the run catalog when that relationship matters.
+The parent is the immediate derivation chain. The baseline is the stable comparison anchor.
 
 ## Source changes belong in source provenance
 
-Diagnostic mode captures source identity separately from lineage. Depending on repository state and `pkb_gitsnapshot`, evidence can include consumer commit/branch/dirty state, source hashes, and optionally a working-tree diff snapshot.
-
-Use that evidence for questions such as:
+Use source provenance for questions such as:
 
 - Did the feature file change?
 - Did the consumer commit change?
 - Was the working tree dirty?
-- Did the resolved step-definition source change?
+- Did resolved step-definition source change?
 
 Use `pkb_run_purpose` to explain why a source change was made. Do not overload `pkb_changed_variables` with file names.
 
-## Logging and evidence controls are still RunVars
+## Evidence controls are still RunVars
 
-Several names may look like "metadata settings" because they control evidence rather than application behavior. They are nevertheless RunVars:
+| RunVar | What it controls |
+|---|---|
+| `pkb_reportingmode` | normal versus diagnostic pipeline |
+| `pkb_reportretention` | automatic local evidence retention |
+| `pkb_diagnostic_output` | diagnostic output root |
+| `pkb_platformlog` | platform/caller stamp behavior |
+| `pkb_gitsnapshot` | source-provenance capture |
+| `pkb_loglevel` | console verbosity |
 
-| RunVar | What it controls | If intentionally changed during a controlled rerun |
-|---|---|---|
-| `pkb_reportingmode` | Normal versus diagnostic reporting pipeline | Include `pkb_reportingmode` in `pkb_changed_variables` |
-| `pkb_reportretention` | Automatic local evidence/report retention | Include `pkb_reportretention` |
-| `pkb_diagnostic_output` | Diagnostic output root | Include `pkb_diagnostic_output` |
-| `pkb_platformlog` | Automatic platform/caller log stamp behavior | Include `pkb_platformlog` |
-| `pkb_gitsnapshot` | Source-provenance capture mode (`metadata`, `diff`, `none`) | Include `pkb_gitsnapshot` |
-| `pkb_loglevel` | Console logging verbosity | Include `pkb_loglevel` |
+If one is intentionally changed during a controlled rerun, include its name in `pkb_changed_variables`.
 
-This distinction matters because these values participate in the resolved RunVar model and can affect `runProfileFingerprint`.
+## Protected RunVars
 
-## Recommended controlled-rerun patterns
-
-### Same RunVars, source-only fix
-
-```text
-runProfile: reuse retained profile unchanged
-pkb_investigation_id: keep investigation ID
-pkb_parent_run_id: failed/control run being followed
-pkb_baseline_run_id: stable original baseline
-pkb_run_purpose: verify-source-fix
-pkb_changed_variables: omit
-```
-
-### One RunVar counterfactual
-
-```text
-runProfile: retained profile with only pkb_browser changed
-pkb_investigation_id: keep investigation ID
-pkb_parent_run_id: run being counterfactually rerun
-pkb_baseline_run_id: stable original baseline
-pkb_run_purpose: browser-counterfactual
-pkb_changed_variables: pkb_browser
-```
-
-### Several intentional RunVar changes
-
-Use canonical names and keep the declaration bounded:
-
-```text
-pkb_changed_variables=pkb_browser,pkb_tags
-```
-
-Do not add values that merely happened to differ because of source/runtime provenance. Investigate those through the corresponding derived evidence.
-
-### Protected RunVar change
-
-If a protected RunVar itself is intentionally changed, its name may still be declared without exposing its value:
+A protected RunVar name may be declared without exposing its value:
 
 ```text
 pkb_changed_variables=pkb_rp_api_key
 ```
 
-The retained `runProfile` continues to use `${protected:pkb_rp_api_key}` while the actual protected value participates only in one-way fingerprint/hash inputs.
+The retained `runProfile` uses `${protected:pkb_rp_api_key}` for a nonblank secret. The actual protected value participates only in secure runtime configuration/one-way comparison inputs. An explicitly blank protected RunVar remains blank in the canonical profile.
 
 ## Agent checklist
 
-Before launching a controlled diagnostic rerun:
-
 1. Read the selected run's `runProfile`, `runProfileFingerprint`, and `directRunProfile`.
-2. Decide whether the hypothesis changes any actual RunVars.
-3. If yes, change only those RunVars and list their canonical names in `pkb_changed_variables`.
-4. If no RunVar changes, omit `pkb_changed_variables`.
-5. Use `pkb_run_purpose` for the reason or hypothesis, including source-fix validation.
-6. Use `pkb_parent_run_id` for the immediate predecessor and `pkb_baseline_run_id` for the stable comparison anchor.
-7. Keep `pkb_investigation_id` stable across related runs when grouping is useful.
-8. Keep protected values out of lineage text, prompts, logs, and committed files.
-9. After the run, verify the actual `runProfileFingerprint` and relevant source/comparison evidence. Treat lineage as context, not proof.
+2. Replay `runProfile` through `pkb_runvars`.
+3. Decide whether the hypothesis changes any actual RunVars.
+4. If yes, change only those RunVars and list their canonical names in `pkb_changed_variables`.
+5. If no RunVar changes, omit `pkb_changed_variables`.
+6. Use `pkb_run_purpose` for the reason/hypothesis.
+7. Use parent/baseline IDs for their distinct relationships.
+8. Keep `pkb_investigation_id` stable when grouping related runs.
+9. Keep protected values out of lineage text, prompts, logs, and committed files.
+10. After the run, verify `runProfileFingerprint` and relevant source/comparison evidence.
 
-See [AI and Automation Run Configuration](ai-run-configuration.md) for direct-profile behavior and [Diagnostic Reporting](diagnostic-reporting.md) for the evidence hierarchy and source-provenance model.
+See [AI Run Configuration](ai-run-configuration.md) for `pkb_runvars` behavior and [Diagnostic Reporting](diagnostic-reporting.md) for evidence navigation.
