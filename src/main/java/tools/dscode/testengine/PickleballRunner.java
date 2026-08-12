@@ -64,6 +64,7 @@ public abstract class PickleballRunner {
         INSTANCE = this;
 
         globalTestDefaults();
+        normalizeReportPortalValues();
         debug("Values after globalTestDefaults(): " + values);
 
         mergeResourcePropertiesIfMissing("pickleball.properties");
@@ -75,6 +76,7 @@ public abstract class PickleballRunner {
         debug("Values after system property merge: " + values);
 
         globalTestProperties();
+        normalizeReportPortalValues();
         debug("Values after globalTestProperties(): " + values);
 
         mergeAllSystemProperties();
@@ -216,7 +218,7 @@ public abstract class PickleballRunner {
     public void globalTestDefaults() {}
     public void globalTestProperties() {}
     public final Map<String, String> values() { return readOnlyValues; }
-    public final String get(String key) { return values.get(normalizePkbKey(key)); }
+    public final String get(String key) { return values.get(normalizeConfigurationKey(key)); }
     public static String getTestConfigurationValue(String key) { return getInstance().get(key); }
 
     public static PickleballRunner getInstance() {
@@ -239,7 +241,7 @@ public abstract class PickleballRunner {
                 Properties props = new Properties();
                 try (InputStream in = url.openStream()) { props.load(in); }
                 for (String key : props.stringPropertyNames()) {
-                    values.putIfAbsent(normalizePkbKey(key), props.getProperty(key));
+                    values.putIfAbsent(normalizeConfigurationKey(key), props.getProperty(key));
                 }
             }
             debug("Loaded " + count + " resource(s) named " + resourceName);
@@ -262,7 +264,7 @@ public abstract class PickleballRunner {
                 Properties props = new Properties();
                 try (InputStream in = url.openStream()) { props.load(in); }
                 for (String key : props.stringPropertyNames()) {
-                    values.put(normalizePkbKey(key), props.getProperty(key));
+                    values.put(normalizeConfigurationKey(key), props.getProperty(key));
                 }
             }
             debug("Loaded " + count + " resource(s) named " + resourceName);
@@ -281,7 +283,7 @@ public abstract class PickleballRunner {
                 skipped++;
                 continue;
             }
-            String normalized = normalizePkbKey(key);
+            String normalized = normalizeConfigurationKey(key);
             String value = sys.getProperty(key);
             values.put(normalized, value);
             if (PKB_props.isRunVariableKey(normalized)) {
@@ -303,13 +305,15 @@ public abstract class PickleballRunner {
             }
             Properties system = System.getProperties();
             for (String key : system.stringPropertyNames()) {
-                String normalized = key.toLowerCase(Locale.ROOT);
-                if (!normalized.startsWith("rp.")) continue;
-                String alias = PickleballProfiles.reportPortalAliasKey(normalized);
+                String canonical = normalizeConfigurationKey(key);
+                if (canonical == null || !canonical.startsWith("rp.")) continue;
+
+                String alias = PickleballProfiles.reportPortalAliasKey(canonical);
                 String explicitAlias = system.getProperty(alias);
                 String canonicalValue = system.getProperty(key);
                 String effectiveAliasValue = explicitAlias != null ? explicitAlias : canonicalValue;
-                values.put(normalized, canonicalValue);
+
+                values.put(canonical, canonicalValue);
                 values.put(alias, effectiveAliasValue);
                 systemRunVarOverrides.put(alias, effectiveAliasValue);
             }
@@ -513,6 +517,45 @@ public abstract class PickleballRunner {
 
     private static boolean isDerivedInternalKey(String key) {
         return PKB_OPTIONS.equals(normalizePkbKey(key));
+    }
+
+    private static String normalizeConfigurationKey(String key) {
+        String normalized = normalizePkbKey(key);
+        if (normalized == null) {
+            return null;
+        }
+
+        String lower = normalized.toLowerCase(Locale.ROOT);
+        if (lower.startsWith("rp_")) {
+            return lower.replace('_', '.');
+        }
+        if (lower.startsWith("rp.")) {
+            return lower;
+        }
+        return normalized;
+    }
+
+    private void normalizeReportPortalValues() {
+        LinkedHashMap<String, String> normalized = new LinkedHashMap<>();
+
+        values.forEach((key, value) -> {
+            if (key == null) {
+                normalized.put(null, value);
+                return;
+            }
+
+            String lower = key.toLowerCase(Locale.ROOT);
+            if (lower.startsWith("rp_")) {
+                normalized.put(lower.replace('_', '.'), value);
+            } else if (lower.startsWith("rp.")) {
+                normalized.put(lower, value);
+            } else {
+                normalized.put(key, value);
+            }
+        });
+
+        values.clear();
+        values.putAll(normalized);
     }
 
     static String normalizePkbKey(String key) {
