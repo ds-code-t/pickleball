@@ -110,7 +110,7 @@ def is_included(path: Path) -> bool:
 def collect(patterns: tuple[str, ...]) -> list[str]:
     found: set[str] = set()
     for pattern in patterns:
-        for path in ROOT.glob(pattern, case_sensitive=False):
+        for path in ROOT.glob(pattern):
             if is_included(path):
                 found.add(path.relative_to(ROOT).as_posix())
     return sorted(found, key=lambda value: (value.lower(), value))
