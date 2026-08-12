@@ -1,50 +1,50 @@
 package tools.dscode.common.treeparsing.parsedComponents;
-
-
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.Multimap;
 import io.cucumber.core.runner.StepExtension;
+import io.cucumber.datatable.DataTable;
+import tools.dscode.common.assertions.ValueWrapper;
+import tools.dscode.common.dataelements.DataContextNodeMap;
 import tools.dscode.common.domoperations.ExecutionDictionary;
+import tools.dscode.common.mappings.MapConfigurations;
+import tools.dscode.common.mappings.NodeMap;
+import tools.dscode.common.mappings.ParsingMap;
 import tools.dscode.common.reporting.logging.Level;
 import tools.dscode.common.seleniumextensions.ContextWrapper;
 import tools.dscode.common.seleniumextensions.ElementWrapper;
 import tools.dscode.common.treeparsing.preparsing.LineData;
-
 import java.util.ArrayList;
 import java.util.List;
-
+import java.util.Map;
+import java.util.Set;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
+import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
+import static io.cucumber.core.runner.util.TableUtils.toRowsStringMultimap;
 import static tools.dscode.common.assertions.AssertionChain.copyAssertionChainToNewPhrase;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
+import static tools.dscode.common.mappings.MapConfigurations.MapType.PHRASE_MAP;
+import static tools.dscode.common.mappings.StepMapping.copytoNewParsingMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
 import static tools.dscode.common.reporting.logging.LogForwarder.logSkip;
 import static tools.dscode.common.reporting.logging.LogForwarder.logToDefaultLevel;
 import static tools.dscode.common.reporting.logging.LogForwarder.setDefaultEntry;
-
-
-
 public final class Phrase extends PhraseData {
-
 
     public Phrase(LineData parsedLine) {
         super(STARTING_CONTEXT, ',', parsedLine);
         isTopContext = true;
     }
-
     public Phrase(String inputText, Character delimiter, LineData parsedLine) {
         super(inputText, delimiter, parsedLine, null);
     }
-
     public Phrase(String inputText, Character delimiter, LineData parsedLine, PhraseData previousPhrase) {
         super(inputText, delimiter, parsedLine, previousPhrase);
         if (!isOperationPhrase) {
             elementMatches = new ArrayList<>(elementMatches.stream().filter(e -> !e.isPlaceHolder()).toList());
         }
     }
-
-
     boolean shouldRun() {
-
         if (assertionChainMembership != null)
             return true;
         if (getConditional().startsWith("else")) {
@@ -63,16 +63,12 @@ public final class Phrase extends PhraseData {
             } else {
                 phraseConditionalMode = 1;
             }
-
-
             if (getConditional().trim().equals("else")) {
-
-                if(parsedLine.isBlockConditionalStep && phraseConditionalMode > 0)
-                {
+                if (parsedLine.isBlockConditionalStep && phraseConditionalMode > 0) {
                     PhraseData nextPhrase = this;
-                    String emitText =  " , " + nextPhrase.getText().replaceFirst("else","") + nextPhrase.termination + " ";
+                    String emitText = " , " + nextPhrase.getText().replaceFirst("else", "") + nextPhrase.termination + " ";
                     PhraseData lastPhrase = nextPhrase;
-                    while ((nextPhrase= nextPhrase.getNextPhrase()) != null) {
+                    while ((nextPhrase = nextPhrase.getNextPhrase()) != null) {
                         if (nextPhrase.metaTextPrefix.contains("BLOCK_CONDITIONAL")) {
                             lastPhrase.setNextPhrase(null);
                             break;
@@ -85,10 +81,7 @@ public final class Phrase extends PhraseData {
                     setNextPhrase(null);
                     return false;
                 }
-
-
             }
-
 
         } else {
             phraseConditionalMode = getPreviousPhrase() == null ? 1 : getPreviousPhrase().phraseConditionalMode;
@@ -97,26 +90,20 @@ public final class Phrase extends PhraseData {
         return phraseConditionalMode > 0;
     }
 
-
     @Override
     public PhraseData runPhrase() {
         executePhrase();
         resolveResults();
         setDefaultEntry(getRunningStep().stepEntry);
         PhraseData nextResolvedPhrase = getNextResolvedPhrase();
-
-
         if (isContextTermination()) {
             if (termination.equals(':') || termination.equals('?')) {
                 parsedLine.lineConditionalMode = phraseConditionalMode;
                 parsedLine.inheritancePhrases.add(this);
             }
         }
-
         return nextResolvedPhrase;
     }
-
-
     public void executePhrase() {
         if ((phraseType == null || phraseType == PhraseType.ELEMENT_ONLY) && (templatePhrase != null && templatePhrase.phraseType != null)) {
             if (!templatePhrase.getAction().isBlank()) {
@@ -125,31 +112,24 @@ public final class Phrase extends PhraseData {
                 if (!templatePhrase.getConditional().isBlank() && getConditional().isBlank()) {
                     setConditional(templatePhrase.getConditional());
                 }
-
                 if (!templatePhrase.getAssertionType().isBlank() && getAssertionType().isBlank()) {
                     setAssertionType(templatePhrase.getAssertionType());
                 }
-
                 if (!templatePhrase.getAssertion().isBlank() && getAssertion().isBlank()) {
                     setAssertion(templatePhrase.getAssertion());
                 }
             }
         }
-
         if (phraseType == null && !getConditional().isBlank()) {
             phraseType = PhraseType.CONDITIONAL;
         }
 
-
         if (assertionChain == null)
             parsedLine.executedPhrases.add(this);
-
         if (!text.equals(resolvedText)) {
             logDebug("Resolving `" + text + "` to `" + resolvedText + "`");
         }
-
         StepExtension currentStep = getRunningStep();
-
         if (shouldRun()) {
             if (assertionChain == null) {
                 phraseEntry = currentStep.stepEntry.logWithType("PHRASE", toString(), currentStep.stepLogLevel).tags("phrase").start();
@@ -167,32 +147,63 @@ public final class Phrase extends PhraseData {
             assertionChain = null;
             return;
         }
-
-
-
         if (noExecution) {
             logDebug("Context branch set");
             return;
         }
-
-
         getElementMatches().forEach(e -> {
             if (e.elementTypes.contains(ElementType.HTML_TYPE)) e.contextWrapper = new ContextWrapper(e);
         });
-
         if (isOperationPhrase) {
+            prepareDataElementValues();
             runOperation();
         } else if (phraseType == PhraseType.CONTEXT) {
             processContextPhrase();
         }
     }
-
-
+    private void prepareDataElementValues() {
+        for (ElementMatch element : getElementMatches()) {
+            if (!element.elementTypes.contains(ElementType.DATA_TYPE)) {
+                continue;
+            }
+            element.nonHTMLValues.clear();
+            for (Object value : getPhraseParsingMap().get(element)) {
+                element.nonHTMLValues.add(wrapDataElementValue(value));
+            }
+            element.elementTypes.add(ElementType.RETURNS_VALUE);
+        }
+    }
+    private static ValueWrapper wrapDataElementValue(Object value) {
+        if (value instanceof List<?>) {
+            return ValueWrapper.createValueWrapper(
+                    value,
+                    ValueWrapper.ValueTypes.LIST
+            );
+        }
+        if (value instanceof Set<?>) {
+            return ValueWrapper.createValueWrapper(
+                    value,
+                    ValueWrapper.ValueTypes.SET
+            );
+        }
+        if (value instanceof Map<?, ?>) {
+            return ValueWrapper.createValueWrapper(
+                    value,
+                    ValueWrapper.ValueTypes.MAP
+            );
+        }
+        if (value instanceof Multimap<?, ?>) {
+            return ValueWrapper.createValueWrapper(
+                    value,
+                    ValueWrapper.ValueTypes.MULTIMAP
+            );
+        }
+        return ValueWrapper.createValueWrapper(value);
+    }
     void processContextPhrase() {
         ElementMatch firstElement = getFirstElement();
         if (firstElement.elementTypes.contains(ElementType.DATA_TYPE)) {
             categoryFlags.add(ExecutionDictionary.CategoryFlags.DATA_CONTEXT);
-//            String categoryName = firstElement.category.replaceFirst("(?i:s)$", "");
             String key = null;
             List obj;
             try {
@@ -202,7 +213,6 @@ public final class Phrase extends PhraseData {
             }
             if (obj == null)
                 throw new RuntimeException("Failed to find Data element for: " + firstElement);
-
             if (firstElement.selectionType.isEmpty()) {
                 if (obj == null || obj.isEmpty())
                     phraseConditionalMode = 0;
@@ -234,8 +244,6 @@ public final class Phrase extends PhraseData {
             }
         }
     }
-
-
     public PhraseData cloneWithElementContext(ElementWrapper elementWrapper) {
         PhraseData clone = clonePhrase(getPreviousPhrase());
         clone.contextElement = elementWrapper;
@@ -243,7 +251,6 @@ public final class Phrase extends PhraseData {
         clone.noExecution = true;
         return clone;
     }
-
     public PhraseData cloneWithDataElement(String key, Object object) {
         PhraseData clone = clonePhrase(getPreviousPhrase());
         clone.categoryFlags.add(ExecutionDictionary.CategoryFlags.DATA_CONTEXT);
@@ -252,12 +259,20 @@ public final class Phrase extends PhraseData {
         return clone;
     }
 
-
     public void saveToPhraseParsingMap(String key, Object object) {
         saveToPhraseParsingMap(this, key, object);
     }
-
     public void saveToPhraseParsingMap(PhraseData phraseData, String key, Object object) {
+        if (key == null && object instanceof DataContextNodeMap dataContext) {
+            phraseData.setPhraseParsingMap(
+                    dataElementContext(phraseData, dataContext)
+            );
+            return;
+        }
+        if (key == null && object instanceof DataTable dataTable) {
+            phraseData.setPhraseParsingMap(dataTableContext(phraseData, dataTable));
+            return;
+        }
         if (key == null) {
             if (object instanceof ObjectNode objectNode) {
                 phraseData.setPhraseParsingMap(objectNode);
@@ -268,8 +283,25 @@ public final class Phrase extends PhraseData {
             phraseData.setPhraseParsingMap(MAPPER.createObjectNode().set(key, MAPPER.valueToTree(object)));
         }
     }
-
-
+    private ParsingMap dataTableContext(PhraseData phraseData, DataTable dataTable) {
+        ParsingMap parsingMap = copytoNewParsingMap(phraseData.getPhraseParsingMap());
+        parsingMap.removeMaps(MapConfigurations.MapType.PHRASE_MAP);
+        NodeMap phraseNodeMap = new NodeMap(PHRASE_MAP);
+        phraseNodeMap.put(TABLE_KEY, dataTable);
+        phraseNodeMap.merge(toRowsStringMultimap(dataTable));
+        phraseNodeMap.setDataSource(TABLE_KEY);
+        parsingMap.addMapsToStart(phraseNodeMap);
+        return parsingMap;
+    }
+    private ParsingMap dataElementContext(
+            PhraseData phraseData,
+            DataContextNodeMap dataContext
+    ) {
+        ParsingMap parsingMap = copytoNewParsingMap(phraseData.getPhraseParsingMap());
+        parsingMap.removeMaps(PHRASE_MAP);
+        parsingMap.addMapsToStart(dataContext);
+        return parsingMap;
+    }
     @Override
     public PhraseData cloneInheritedPhrase() {
         PhraseData clonedPhrase = clonePhrase(getPreviousPhrase());
@@ -277,20 +309,16 @@ public final class Phrase extends PhraseData {
         clonedPhrase.setResolvedPhrase(clonedPhrase);
         return clonedPhrase;
     }
-
     @Override
     public PhraseData clonePhrase(PhraseData previous) {
         return clonePhrase(previous, null);
     }
-
-
     @Override
     public PhraseData clonePhrase(PhraseData previous, Character newTermination) {
         Phrase clone = copyPhraseWithModifications(this, newTermination, parsedLine, previous);
         clone.phraseParsingMap = null;
         return clone;
     }
-
     public PhraseData resolvePhrase() {
         PhraseData resolvedPhrase = new Phrase(originalText, termination, parsedLine, getPreviousPhrase());
         setResolvedPhrase(resolvedPhrase);
@@ -301,22 +329,17 @@ public final class Phrase extends PhraseData {
         getResolvedPhrase().setNextPhrase(getNextPhrase());
         return getResolvedPhrase();
     }
-
-
     public PhraseData getNextResolvedPhrase() {
         if (getNextPhrase() == null) return null;
         PhraseData nextResolvedPhrase = getNextPhrase().resolvePhrase();
         nextResolvedPhrase.setPreviousPhrase(this);
         this.setNextPhrase(nextResolvedPhrase);
-
         return nextResolvedPhrase;
     }
-
 
     public static Phrase copyPhraseWithModifications(Phrase phrase) {
         return copyPhraseWithModifications(phrase, null, null, null);
     }
-
     public static Phrase copyPhraseWithModifications(Phrase phrase, Character newTermination, LineData parsedLine, PhraseData previous) {
         Phrase clonePhrase = newTermination == null ? new Phrase(phrase.originalText, phrase.termination, phrase.parsedLine) : new Phrase(phrase.originalText, newTermination, parsedLine, previous);
         clonePhrase.operationInheritancePhrase = phrase.operationInheritancePhrase;
@@ -345,10 +368,7 @@ public final class Phrase extends PhraseData {
             clonePhrase.setNextPhrase(phrase.getNextPhrase().clonePhrase(clonePhrase));
             clonePhrase.getNextPhrase().setPreviousPhrase(clonePhrase);
         }
-
         return clonePhrase;
-
     }
-
 
 }

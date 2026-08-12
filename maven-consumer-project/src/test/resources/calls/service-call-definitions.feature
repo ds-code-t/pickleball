@@ -3,7 +3,6 @@ Feature: Reusable service call definitions
   # These component scenarios use only the generic mapping steps.
   # REQUEST contains the complete endpoint, including scheme, host, port, and path.
   # EXECUTE SERVICE CALL initializes RESPONSE before the HTTP request is attempted.
-
   Scenario Outline: InspectGetCall
     Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
       | endpoint | <endpoint>/api/service-calls/inspect |
@@ -20,11 +19,9 @@ Feature: Reusable service call definitions
       | urlEncodingEnabled     | true |
       | relaxedHTTPSValidation |      |
     When EXECUTE SERVICE CALL
-
     Examples:
-      | Scenario Tags | endpoint                  | client         | traceId    | include | mode    |
-      | %inspect-get | http://127.0.0.1:8765     | default-client | get-default | none    | summary |
-
+      | Scenario Tags | endpoint              | client         | traceId     | include | mode    |
+      | %inspect-get  | http://127.0.0.1:8765 | default-client | get-default | none    | summary |
 
   Scenario Outline: InspectPostCall
     Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
@@ -51,10 +48,9 @@ Feature: Reusable service call definitions
     And MAP "CONFIGURATION" TABLE VALUES TO SCENARIO MAP
       | urlEncodingEnabled | true |
     When EXECUTE SERVICE CALL
-
     Examples:
-      | Scenario Tags | endpoint                  | client         | traceId     | cookieValue | mode   | status | name    | quantity |
-      | %inspect-post | http://127.0.0.1:8765     | default-client | post-default | default     | create | 201    | default | 1        |
+      | Scenario Tags | endpoint              | client         | traceId      | cookieValue | mode   | status | name    | quantity |
+      | %inspect-post | http://127.0.0.1:8765 | default-client | post-default | default     | create | 201    | default | 1        |
 
   # These components validate runtime template resolution rather than only
   # Cucumber Scenario Outline substitution. JSON can use the ordinary <...>
@@ -89,12 +85,9 @@ Feature: Reusable service call definitions
     And MAP "CONFIGURATION" TABLE VALUES TO SCENARIO MAP
       | urlEncodingEnabled | true |
     When EXECUTE SERVICE CALL
-
     Examples:
-      | Scenario Tags     | endpoint                  |
-      | %mapped-json-body | http://127.0.0.1:8765     |
-
-
+      | Scenario Tags     | endpoint              |
+      | %mapped-json-body | http://127.0.0.1:8765 |
 
   # ~unquote allows the template itself to remain valid JSON while inserting
   # resolved numbers, booleans, objects, or arrays as raw JSON values. String
@@ -127,7 +120,6 @@ Feature: Reusable service call definitions
     And MAP "CONFIGURATION" TABLE VALUES TO SCENARIO MAP
       | urlEncodingEnabled | true |
     When EXECUTE SERVICE CALL
-
     Examples:
       | Scenario Tags       | endpoint              |
       | %unquoted-json-body | http://127.0.0.1:8765 |
@@ -169,11 +161,9 @@ Feature: Reusable service call definitions
     And MAP "CONFIGURATION" TABLE VALUES TO SCENARIO MAP
       | urlEncodingEnabled | true |
     When EXECUTE SERVICE CALL
-
     Examples:
-      | Scenario Tags                | endpoint                  |
-      | %previous-response-json-body | http://127.0.0.1:8765     |
-
+      | Scenario Tags                | endpoint              |
+      | %previous-response-json-body | http://127.0.0.1:8765 |
 
   Scenario Outline: StatusCall
     Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
@@ -184,36 +174,30 @@ Feature: Reusable service call definitions
       | status | <status>    |
       | mode   | status-test |
     When EXECUTE SERVICE CALL
-
     Examples:
-      | Scenario Tags | endpoint                  | status |
-      | %status-call | http://127.0.0.1:8765     | 418    |
-
+      | Scenario Tags | endpoint              | status |
+      | %status-call  | http://127.0.0.1:8765 | 418    |
 
   # This component intentionally omits CONFIGURATION and uses EXECUTE SERVICE CALL.
-  # Its scenario name is used as the caller's fallback object key.
+  # Its scenario name is used by the deprecated compatibility wrapper only.
   Scenario Outline: HealthCall
     Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
       | endpoint | <endpoint>/api/health |
       | method   | GET                   |
       | accept   | application/json      |
     When EXECUTE SERVICE CALL
-
     Examples:
-      | Scenario Tags | endpoint                  |
-      | %health-full-url | http://127.0.0.1:8765     |
-
+      | Scenario Tags    | endpoint              |
+      | %health-full-url | http://127.0.0.1:8765 |
 
   Scenario Outline: DeleteCall
     Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
       | endpoint | <endpoint>/api/service-calls/no-content/<itemId> |
-      | method   | DELETE                                               |
+      | method   | DELETE                                           |
     When EXECUTE SERVICE CALL
-
     Examples:
-      | Scenario Tags | endpoint                  | itemId |
-      | %delete-call | http://127.0.0.1:8765     | 1      |
-
+      | Scenario Tags | endpoint              | itemId |
+      | %delete-call  | http://127.0.0.1:8765 | 1      |
 
   Scenario Outline: SoapAddCall
     Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
@@ -222,7 +206,7 @@ Feature: Reusable service call definitions
       | accept      | text/xml                   |
       | contentType | text/xml                   |
     And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
-      | SOAPAction  | urn:pickleball:calculator#Add |
+      | SOAPAction   | urn:pickleball:calculator#Add |
       | X-Test-Trace | <traceId>                     |
     And MAP "REQUEST.body" TEXT VALUE TO SCENARIO MAP
       """xml
@@ -240,10 +224,9 @@ Feature: Reusable service call definitions
     And MAP "CONFIGURATION" TABLE VALUES TO SCENARIO MAP
       | urlEncodingEnabled | true |
     When EXECUTE SERVICE CALL
-
     Examples:
-      | Scenario Tags | endpoint                  | traceId       | left | right |
-      | %soap-add | http://127.0.0.1:8765     | soap-default  | 5    | 7     |
+      | Scenario Tags | endpoint              | traceId      | left | right |
+      | %soap-add     | http://127.0.0.1:8765 | soap-default | 5    | 7     |
 
   # XML-looking input deliberately uses only the XML-safe ~[~...~]~ reference
   # bookends. The left operand comes from the parent scenario map. The completed
@@ -256,8 +239,8 @@ Feature: Reusable service call definitions
       | accept      | text/xml                   |
       | contentType | text/xml                   |
     And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
-      | SOAPAction   | urn:pickleball:calculator#Add             |
-      | X-Test-Trace | <PARENT.SCENARIO:soapTemplate.traceId>    |
+      | SOAPAction   | urn:pickleball:calculator#Add          |
+      | X-Test-Trace | <PARENT.SCENARIO:soapTemplate.traceId> |
     And MAP "REQUEST.body" TEXT VALUE TO SCENARIO MAP
       """xml
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
@@ -274,11 +257,9 @@ Feature: Reusable service call definitions
     And MAP "CONFIGURATION" TABLE VALUES TO SCENARIO MAP
       | urlEncodingEnabled | true |
     When EXECUTE SERVICE CALL
-
     Examples:
-      | Scenario Tags     | endpoint                  |
-      | %mapped-soap-body | http://127.0.0.1:8765     |
-
+      | Scenario Tags     | endpoint              |
+      | %mapped-soap-body | http://127.0.0.1:8765 |
 
   # END SCENARIO stops the remaining component steps. The caller already
   # holds the component root by reference, so its partial REQUEST remains visible.
@@ -292,11 +273,9 @@ Feature: Reusable service call definitions
       | urlEncodingEnabled | true |
     And END SCENARIO
     When EXECUTE SERVICE CALL
-
     Examples:
-      | Scenario Tags | endpoint                  |
-      | %early-exit | http://127.0.0.1:8765     |
-
+      | Scenario Tags | endpoint              |
+      | %early-exit   | http://127.0.0.1:8765 |
 
   # CALL executes this component synchronously and, because RETURN is not set,
   # returns the completed default scenario-map root. Parent values are resolved
@@ -304,9 +283,9 @@ Feature: Reusable service call definitions
   Scenario Outline: TokenCall
     Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
       | endpoint    | <PARENT.SCENARIO:url>/api/service-calls/token |
-      | method      | POST                                             |
-      | accept      | application/json                                 |
-      | contentType | application/json                                 |
+      | method      | POST                                         |
+      | accept      | application/json                             |
+      | contentType | application/json                             |
     And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
       | X-Test-Client | <PARENT.SCENARIO:client> |
     And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
@@ -318,11 +297,9 @@ Feature: Reusable service call definitions
       }
       """
     When EXECUTE SERVICE CALL
-
     Examples:
       | Scenario Tags |
       | %TokenCall    |
-
 
   # This owner uses the inline CALL fallback result: TOKEN receives the complete
   # child scenario-map root, including REQUEST and RESPONSE.
@@ -343,11 +320,9 @@ Feature: Reusable service call definitions
     And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
       | scope | <scope> |
     When EXECUTE SERVICE CALL
-
     Examples:
-      | Scenario Tags | url                      | client         | scope        |
-      | %serviceCallA | http://127.0.0.1:8765    | default-client | catalog.read |
-
+      | Scenario Tags | url                   | client         | scope        |
+      | %serviceCallA | http://127.0.0.1:8765 | default-client | catalog.read |
 
   # This inline component uses the special RETURN key. CALL returns only the
   # access-token string instead of the complete child scenario-map root.
@@ -362,19 +337,21 @@ Feature: Reusable service call definitions
     And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
       | scope | <PARENT.SCENARIO:scope> |
     And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
-    """json
-    {
-      "grantType": "client_credentials"
-    }
-    """
+      """json
+      {
+        "grantType": "client_credentials"
+      }
+      """
     When EXECUTE SERVICE CALL
     And MAP TABLE VALUES TO SCENARIO MAP
       | RETURN | <SCENARIO:RESPONSE.body.accessToken> |
-
     Examples:
       | Scenario Tags   |
       | %TokenValueCall |
 
+  Scenario: ExplicitNullReturnCall
+    Given MAP TABLE VALUES TO SCENARIO MAP
+      | RETURN | <^~NULL~^> |
 
   # This owner receives only TokenValueCall's explicit RETURN value under TOKEN.
   Scenario Outline: ServiceCallB
@@ -394,20 +371,18 @@ Feature: Reusable service call definitions
     And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
       | scope | <scope> |
     When EXECUTE SERVICE CALL
-
     Examples:
-      | Scenario Tags | url                      | client         | scope        |
-      | %serviceCallB | http://127.0.0.1:8765    | default-client | catalog.read |
-
+      | Scenario Tags | url                   | client         | scope        |
+      | %serviceCallB | http://127.0.0.1:8765 | default-client | catalog.read |
 
   # This ordinary nested component also resolves its inputs from its parent
   # scenario map instead of receiving duplicate values through an invocation table.
   Scenario Outline: NestedTokenComponent
     Given MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
       | endpoint    | <PARENT.SCENARIO:url>/api/service-calls/token |
-      | method      | POST                                             |
-      | accept      | application/json                                 |
-      | contentType | application/json                                 |
+      | method      | POST                                         |
+      | accept      | application/json                             |
+      | contentType | application/json                             |
     And MAP "REQUEST.headers" TABLE VALUES TO SCENARIO MAP
       | X-Test-Client | <PARENT.SCENARIO:client> |
     And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
@@ -419,13 +394,11 @@ Feature: Reusable service call definitions
       }
       """
     When EXECUTE SERVICE CALL
-
     Examples:
       | Scenario Tags         |
       | %nestedTokenComponent |
 
-
-  # This component performs an ordinary nested SERVICE CALL. Its child resolves
+  # This component performs an ordinary nested RUN SERVICE CALL. Its child resolves
   # url, client, and scope from this component's scenario map through ancestry.
   # The child root is still registered by reference under TOKEN in the shared RunMap.
   Scenario Outline: NestedComponent
@@ -433,7 +406,7 @@ Feature: Reusable service call definitions
       | url    | <url>    |
       | client | <client> |
       | scope  | <scope>  |
-    And "TOKEN" SERVICE CALL: %nestedTokenComponent
+    And RUN "TOKEN" SERVICE CALL: %nestedTokenComponent
     And MAP "REQUEST" TABLE VALUES TO SCENARIO MAP
       | endpoint | <url>/api/service-calls/protected |
       | method   | GET                                |
@@ -444,7 +417,6 @@ Feature: Reusable service call definitions
     And MAP "REQUEST.queryParams" TABLE VALUES TO SCENARIO MAP
       | scope | <scope> |
     When EXECUTE SERVICE CALL
-
     Examples:
-      | Scenario Tags    | url                      | client         | scope          |
-      | %nestedComponent | http://127.0.0.1:8765    | default-client | inventory.read |
+      | Scenario Tags    | url                   | client         | scope          |
+      | %nestedComponent | http://127.0.0.1:8765 | default-client | inventory.read |

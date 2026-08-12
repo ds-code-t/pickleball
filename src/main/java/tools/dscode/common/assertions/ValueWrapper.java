@@ -2,6 +2,8 @@ package tools.dscode.common.assertions;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.LinkedListMultimap;
+import io.cucumber.datatable.DataTable;
+import io.cucumber.docstring.DocString;
 import com.google.common.collect.ListMultimap;
 
 import java.math.BigDecimal;
@@ -15,7 +17,6 @@ import tools.dscode.common.util.datetime.DurationFormattingUtils;
 import tools.dscode.common.util.datetime.TemporalValue;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
-
 import static tools.dscode.common.evaluations.AviatorUtil.isStringTruthy;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyUtils.normalizeText;
 
@@ -36,14 +37,13 @@ public class ValueWrapper {
         if (value.equals(o))
             return true;
         ValueWrapper other = o instanceof ValueWrapper vw ? vw : createValueWrapper(o);
-
         if (isNumeric() || other.isNumeric()) {
             return isNumeric()
                     && other.isNumeric()
                     && asBigDecimal().compareTo(other.asBigDecimal()) == 0;
         }
         String normalizedInput = normalizeText(o.toString());
-        return (value.equals(o) || normalizedText.equals(normalizedInput));
+        return value.equals(o) || Objects.equals(normalizedText, normalizedInput);
     }
 
     public Object getValue() {
@@ -58,10 +58,9 @@ public class ValueWrapper {
 
     public static ValueWrapper createValueWrapper(Object obj, ValueTypes type) {
         return new ValueWrapper(obj, type);
-
     }
+
     public static ValueWrapper createValueWrapper(Object obj) {
-        // Keep existing scalar behavior first
         if (obj == null || obj instanceof String)
             return new ValueWrapper((String) obj);
         if (obj instanceof Number)
@@ -79,68 +78,65 @@ public class ValueWrapper {
                         ValueTypes.DATE_TIME,
                         temporalValue.toString()
                 );
-                case DELTA -> new ValueWrapper(temporalValue.requireDuration(), ValueTypes.DURATION, temporalValue.toString());
+                case DELTA -> new ValueWrapper(
+                        temporalValue.requireDuration(),
+                        ValueTypes.DURATION,
+                        temporalValue.toString()
+                );
                 case TIME_RANGE -> new ValueWrapper(
                         temporalValue.requireTimeRange(),
                         ValueTypes.TIME_RANGE,
                         temporalValue.requireTimeRange().toCanonicalString()
                 );
                 case TEXT -> new ValueWrapper(temporalValue.requireText());
-                case BOOLEAN -> new ValueWrapper(temporalValue.requireBoolean(), ValueTypes.BOOLEAN);
+                case BOOLEAN -> new ValueWrapper(
+                        temporalValue.requireBoolean(),
+                        ValueTypes.BOOLEAN
+                );
                 case NULL -> new ValueWrapper(null);
             };
-
-        // NEW: containers (wrap inner values)
         if (obj instanceof List<?> list) {
             List<ValueWrapper> wrapped = new ArrayList<>(list.size());
-            for (Object el : list) wrapped.add(createValueWrapper(el));
+            for (Object element : list) wrapped.add(createValueWrapper(element));
             return new ValueWrapper(wrapped, ValueTypes.LIST);
         }
-
         if (obj instanceof Set<?> set) {
-            // preserve order when possible (LinkedHashSet for most sets, TreeSet if SortedSet)
             Set<ValueWrapper> wrapped;
             if (set instanceof SortedSet<?>)
                 wrapped = new TreeSet<>(Comparator.comparing(ValueWrapper::toNonNullString));
-            else wrapped = new LinkedHashSet<>(Math.max(16, set.size() * 2));
-
-            for (Object el : set) wrapped.add(createValueWrapper(el));
+            else
+                wrapped = new LinkedHashSet<>(Math.max(16, set.size() * 2));
+            for (Object element : set) wrapped.add(createValueWrapper(element));
             return new ValueWrapper(wrapped, ValueTypes.SET);
         }
-
         if (obj instanceof Map<?, ?> map) {
             Map<Object, ValueWrapper> wrapped =
-                    (map instanceof LinkedHashMap<?, ?>) ? new LinkedHashMap<>(Math.max(16, map.size() * 2))
-                            : (map instanceof SortedMap<?, ?>) ? new TreeMap<>()
-                              : new LinkedHashMap<>(Math.max(16, map.size() * 2));
-
-            for (Map.Entry<?, ?> e : map.entrySet()) {
-                // keys NOT wrapped, per your requirement
-                wrapped.put(e.getKey(), createValueWrapper(e.getValue()));
+                    map instanceof SortedMap<?, ?>
+                            ? new TreeMap<>()
+                            : new LinkedHashMap<>(Math.max(16, map.size() * 2));
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                wrapped.put(entry.getKey(), createValueWrapper(entry.getValue()));
             }
             return new ValueWrapper(wrapped, ValueTypes.MAP);
         }
-
-        if (obj instanceof ListMultimap<?, ?> mm) {
+        if (obj instanceof ListMultimap<?, ?> multimap) {
             LinkedListMultimap<Object, ValueWrapper> wrapped = LinkedListMultimap.create();
-            for (Map.Entry<?, ?> e : mm.entries()) {
-                wrapped.put(e.getKey(), createValueWrapper(e.getValue()));
+            for (Map.Entry<?, ?> entry : multimap.entries()) {
+                wrapped.put(entry.getKey(), createValueWrapper(entry.getValue()));
             }
             return new ValueWrapper(wrapped, ValueTypes.MULTIMAP);
         }
-
-        // Existing JsonNode behavior unchanged
         if (obj instanceof JsonNode node) {
-            if (node == null || node.isNull() || node.isMissingNode()) return new ValueWrapper(null);
-
+            if (node.isNull() || node.isMissingNode()) return new ValueWrapper(null);
             if (node.isTextual()) return new ValueWrapper(node.textValue());
-            if (node.isBoolean()) return new ValueWrapper(node.booleanValue(), ValueTypes.BOOLEAN);
-            if (node.isNumber()) {
+            if (node.isBoolean())
+                return new ValueWrapper(node.booleanValue(), ValueTypes.BOOLEAN);
+            if (node.isNumber())
                 return new ValueWrapper(node.decimalValue(), ValueTypes.NUMERIC);
-            }
-            return new ValueWrapper(node.textValue());
+            return new ValueWrapper(node, ValueTypes.DEFAULT, node.toString());
         }
-
+        if (obj instanceof DataTable || obj instanceof DocString)
+            return new ValueWrapper(obj, ValueTypes.DEFAULT, obj.toString());
         return new ValueWrapper(obj.toString());
     }
 
@@ -161,41 +157,43 @@ public class ValueWrapper {
             this.normalizedText = null;
             return;
         }
-
         if (raw.length() >= 2) {
-            char f = raw.charAt(0);
-            char l = raw.charAt(raw.length() - 1);
-            if (f == l) {
-                switch (f) {
+            char first = raw.charAt(0);
+            char last = raw.charAt(raw.length() - 1);
+            if (first == last) {
+                switch (first) {
                     case '"' -> {
                         type = ValueTypes.DOUBLE_QUOTED;
-                        value = raw.substring(1, raw.length() - 1);
-                        this.normalizedText = normalizeText((String) value);
+                        value = unescapeMatchingQuote(
+                                raw.substring(1, raw.length() - 1), first);
+                        normalizedText = normalizeText((String) value);
                         return;
                     }
                     case '\'' -> {
                         type = ValueTypes.SINGLE_QUOTED;
-                        value = raw.substring(1, raw.length() - 1);
-                        this.normalizedText = normalizeText((String) value);
+                        value = unescapeMatchingQuote(
+                                raw.substring(1, raw.length() - 1), first);
+                        normalizedText = normalizeText((String) value);
                         return;
                     }
                     case '`' -> {
                         type = ValueTypes.BACK_TICKED;
-                        value = raw.substring(1, raw.length() - 1);
-                        this.normalizedText = normalizeText((String) value);
+                        value = unescapeMatchingQuote(
+                                raw.substring(1, raw.length() - 1), first);
+                        normalizedText = normalizeText((String) value);
                         return;
                     }
                     case '~' -> {
                         type = ValueTypes.TILDE_QUOTED;
-                        value = raw.substring(1, raw.length() - 1);
-                        this.normalizedText = normalizeText((String) value);
+                        value = unescapeMatchingQuote(
+                                raw.substring(1, raw.length() - 1), first);
+                        normalizedText = normalizeText((String) value);
                         return;
                     }
                 }
             }
         }
-
-        this.normalizedText = normalizeText(raw);
+        normalizedText = normalizeText(raw);
         if (isNumeric(normalizedText)) {
             type = ValueTypes.NUMERIC;
             value = normalizedText;
@@ -207,9 +205,12 @@ public class ValueWrapper {
 
     private static String canonicalNormalizedText(Object raw, ValueTypes type) {
         if (raw == null) return null;
-        if (type == ValueTypes.DURATION && raw instanceof Duration duration) return durationSyntax(duration);
-        if (type == ValueTypes.DATE_TIME && raw instanceof Instant instant) return instant.toString();
-        if (type == ValueTypes.TIME_RANGE && raw instanceof BusinessTimeRange timeRange) return timeRange.toCanonicalString();
+        if (type == ValueTypes.DURATION && raw instanceof Duration duration)
+            return durationSyntax(duration);
+        if (type == ValueTypes.DATE_TIME && raw instanceof Instant instant)
+            return instant.toString();
+        if (type == ValueTypes.TIME_RANGE && raw instanceof BusinessTimeRange timeRange)
+            return timeRange.toCanonicalString();
         return raw.toString();
     }
 
@@ -217,78 +218,68 @@ public class ValueWrapper {
         return DurationFormattingUtils.format(duration, null);
     }
 
+    private static String unescapeMatchingQuote(String value, char quote) {
+        return value.replace("\\" + quote, String.valueOf(quote));
+    }
+
     public BigInteger asForcedSimpleNumber() {
-        String s = asNormalizedText();
-        if (s == null) return BigInteger.ZERO;
-
-        s = s.replaceAll("\\D", "");
-        if (s.isEmpty()) return BigInteger.ZERO;
-
-        return new BigInteger(s);
+        String text = asNormalizedText();
+        if (text == null) return BigInteger.ZERO;
+        text = text.replaceAll("\\D", "");
+        if (text.isEmpty()) return BigInteger.ZERO;
+        return new BigInteger(text);
     }
 
     public BigDecimal asBigDecimal() {
-        String s = asNormalizedText();
-        if (s == null || s.isBlank()) return BigDecimal.ZERO;
+        String text = asNormalizedText();
+        if (text == null || text.isBlank()) return BigDecimal.ZERO;
+        if (isNumeric()) return new BigDecimal(text);
 
-        // Fast path: already clean numeric text.
-        if (isNumeric()) {
-            return new BigDecimal(s);
-        }
-
-        StringBuilder cleaned = new StringBuilder(s.length());
-
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-
-            if (Character.isDigit(c) || c == '.') {
-                cleaned.append(c);
-            } else if ((c == '+' || c == '-') && cleaned.isEmpty()) {
-                cleaned.append(c);
+        StringBuilder cleaned = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            char character = text.charAt(i);
+            if (Character.isDigit(character) || character == '.') {
+                cleaned.append(character);
+            } else if ((character == '+' || character == '-') && cleaned.isEmpty()) {
+                cleaned.append(character);
             }
         }
 
-        s = cleaned.toString();
-
-        int lastDot = s.lastIndexOf('.');
+        text = cleaned.toString();
+        int lastDot = text.lastIndexOf('.');
         if (lastDot >= 0) {
-            String before = s.substring(0, lastDot).replace(".", "");
-            String after = s.substring(lastDot + 1).replace(".", "");
-            s = before + "." + after;
+            String before = text.substring(0, lastDot).replace(".", "");
+            String after = text.substring(lastDot + 1).replace(".", "");
+            text = before + "." + after;
         }
-
-        boolean hasDigit = s.chars().anyMatch(Character::isDigit);
-        if (!hasDigit || s.equals("+") || s.equals("-") || s.equals(".") || s.equals("+.") || s.equals("-.")) {
+        boolean hasDigit = text.chars().anyMatch(Character::isDigit);
+        if (!hasDigit
+                || text.equals("+")
+                || text.equals("-")
+                || text.equals(".")
+                || text.equals("+.")
+                || text.equals("-.")) {
             return BigDecimal.ZERO;
         }
-
-        return new BigDecimal(s);
+        return new BigDecimal(text);
     }
-
 
     public static BigInteger convertToInteger(String inputString) {
         if (inputString == null || inputString.isBlank()) return BigInteger.ZERO;
 
-        String s = inputString.trim();
+        String text = inputString.trim();
+        boolean negative = text.startsWith("-");
+        text = text.replaceAll("[^0-9.]", "");
 
-        boolean negative = s.startsWith("-");
-
-        // Keep only digits and decimal points.
-        s = s.replaceAll("[^0-9.]", "");
-
-        // If there is more than one decimal point, remove all but the last one.
-        int lastDot = s.lastIndexOf('.');
+        int lastDot = text.lastIndexOf('.');
         if (lastDot >= 0) {
-            String before = s.substring(0, lastDot).replace(".", "");
-            String after = s.substring(lastDot + 1).replace(".", "");
-            s = before + after; // BigInteger cannot contain decimals, so strip the remaining dot too.
+            String before = text.substring(0, lastDot).replace(".", "");
+            String after = text.substring(lastDot + 1).replace(".", "");
+            text = before + after;
         }
-
-        if (s.isEmpty()) return BigInteger.ZERO;
-
-        if (negative) s = "-" + s;
-
-        return new BigInteger(s);
+        if (text.isEmpty()) return BigInteger.ZERO;
+        if (negative) text = "-" + text;
+        return new BigInteger(text);
     }
 
     public Integer asInteger() {
@@ -298,10 +289,10 @@ public class ValueWrapper {
     public BigInteger asBigInteger() {
         return asBigDecimal().toBigInteger();
     }
+
     public long asLong() {
         return asBigDecimal().longValue();
     }
-
 
     public String asNormalizedText() {
         return normalizedText;
@@ -309,39 +300,39 @@ public class ValueWrapper {
 
     private Boolean isNumeric;
 
-
     @Override
     public String toString() {
-        if (value == null) return null;
-        return value.toString();
+        return value == null ? null : value.toString();
     }
 
     public String toNonNullString() {
-        if (value == null) return "";
-        return value.toString();
+        return value == null ? "" : value.toString();
     }
 
-    private boolean isNumeric(String s) {
+    private boolean isNumeric(String text) {
         if (isNumeric != null) return isNumeric;
         if (type == ValueTypes.NUMERIC) {
             isNumeric = true;
             return true;
         }
-        if (s == null || s.isBlank()) {
+        if (text == null || text.isBlank()) {
             isNumeric = false;
             return false;
         }
 
-        String t = s.strip();
-        if (t.equals(".") || t.equals("-") || t.equals("+") || t.equals("-.") || t.equals("+.")) {
+        String candidate = text.strip();
+        if (candidate.equals(".")
+                || candidate.equals("-")
+                || candidate.equals("+")
+                || candidate.equals("-.")
+                || candidate.equals("+.")) {
             isNumeric = false;
             return false;
         }
-
-        if (t.startsWith("-") || t.startsWith("+")) t = t.substring(1);
-        t = t.replaceFirst("\\.", "").replaceAll("[0-9]", "");
-
-        isNumeric = t.isEmpty();
+        if (candidate.startsWith("-") || candidate.startsWith("+"))
+            candidate = candidate.substring(1);
+        candidate = candidate.replaceFirst("\\.", "").replaceAll("[0-9]", "");
+        isNumeric = candidate.isEmpty();
         return isNumeric;
     }
 
@@ -356,9 +347,8 @@ public class ValueWrapper {
     public boolean isTruthy() {
         if (type.toString().endsWith("QUOTED"))
             return isStringTruthy(asNormalizedText());
-        if (isNumeric()) {
+        if (isNumeric())
             return asForcedSimpleNumber().signum() != 0;
-        }
         return isStringTruthy(asNormalizedText());
     }
 
@@ -383,19 +373,8 @@ public class ValueWrapper {
         return normalizedText == null || normalizedText.isBlank();
     }
 
-
-    /**
-     * Best-guess value type for writing to XLSX:
-     * - quoted => String
-     * - true/false => Boolean
-     * - integer-like => Long (or BigInteger if too large)
-     * - decimal/scientific => Double
-     * - else => String
-     */
     public Object asBestGuessXlsxValue() {
         if (value == null) return null;
-
-        // Always strings if explicitly quoted
         if (type == ValueTypes.DOUBLE_QUOTED
                 || type == ValueTypes.SINGLE_QUOTED
                 || type == ValueTypes.BACK_TICKED
@@ -403,85 +382,68 @@ public class ValueWrapper {
             return value.toString();
         }
 
-        // Prefer booleans for textual "true"/"false"
         String raw = value.toString().trim();
         if (raw.equalsIgnoreCase("true")) return Boolean.TRUE;
         if (raw.equalsIgnoreCase("false")) return Boolean.FALSE;
+        if (type == ValueTypes.BOOLEAN && value instanceof Boolean booleanValue)
+            return booleanValue;
 
-        // If we already know it's a Boolean
-        if (type == ValueTypes.BOOLEAN && value instanceof Boolean b) {
-            return b;
-        }
-
-        // Numbers: choose integer vs double
         if (type == ValueTypes.NUMERIC || looksNumeric(raw)) {
-            String s = raw.replace("_", ""); // allow 1_000 style if it slips in
-
-            // Integer form: optional leading -, digits only
-            if (looksInteger(s)) {
-                // Use BigInteger to parse safely, then downcast when possible
-                BigInteger bi = new BigInteger(s);
-                if (fitsInLong(bi)) return bi.longValue();
-                return bi; // caller can decide how to write huge ints
+            String numericText = raw.replace("_", "");
+            if (looksInteger(numericText)) {
+                BigInteger integer = new BigInteger(numericText);
+                return fitsInLong(integer) ? integer.longValue() : integer;
             }
-
-            // Decimal/scientific form: use Double
-            // (XLSX stores numbers as double internally)
             try {
-                return Double.parseDouble(s);
+                return Double.parseDouble(numericText);
             } catch (NumberFormatException ignored) {
-                // fall through to String
+                // Return the original value as text below.
             }
         }
-
-        // Default: string
         return value.toString();
     }
 
-    private static boolean looksInteger(String s) {
-        if (s == null || s.isBlank()) return false;
-        int i = 0;
-        if (s.charAt(0) == '-') {
-            if (s.length() == 1) return false;
-            i = 1;
+    private static boolean looksInteger(String text) {
+        if (text == null || text.isBlank()) return false;
+        int index = 0;
+        if (text.charAt(0) == '-') {
+            if (text.length() == 1) return false;
+            index = 1;
         }
-        for (; i < s.length(); i++) {
-            if (!Character.isDigit(s.charAt(i))) return false;
+        for (; index < text.length(); index++) {
+            if (!Character.isDigit(text.charAt(index))) return false;
         }
         return true;
     }
 
-    private static boolean looksNumeric(String s) {
-        if (s == null) return false;
-        String t = s.trim();
-        if (t.isEmpty()) return false;
-
-        // Quick accept: digits/-, ., e/E, + (for exponent), underscores
-        // We’ll rely on parseDouble later for final validation.
-        for (int i = 0; i < t.length(); i++) {
-            char c = t.charAt(i);
-            if (!(Character.isDigit(c) || c == '-' || c == '.' || c == 'e' || c == 'E' || c == '+' || c == '_')) {
+    private static boolean looksNumeric(String text) {
+        if (text == null) return false;
+        String candidate = text.trim();
+        if (candidate.isEmpty()) return false;
+        for (int i = 0; i < candidate.length(); i++) {
+            char character = candidate.charAt(i);
+            if (!(Character.isDigit(character)
+                    || character == '-'
+                    || character == '.'
+                    || character == 'e'
+                    || character == 'E'
+                    || character == '+'
+                    || character == '_')) {
                 return false;
             }
         }
         return true;
     }
 
-    private static boolean fitsInLong(BigInteger bi) {
-        return bi.compareTo(BigInteger.valueOf(Long.MIN_VALUE)) >= 0
-                && bi.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) <= 0;
+    private static boolean fitsInLong(BigInteger integer) {
+        return integer.compareTo(BigInteger.valueOf(Long.MIN_VALUE)) >= 0
+                && integer.compareTo(BigInteger.valueOf(Long.MAX_VALUE)) <= 0;
     }
-
-
-//    public ValueWrapper normalizeAndReplaceAll(String regex, String replacement)
-//    {
-//        if(normalizedText == null) return null;
-//        return createValueWrapper("'" + normalizedText.replaceAll(regex, replacement) + "'");
-//    }
 
     public ValueWrapper normalizeLowerCaseAndStripAllWhiteSpace() {
         if (normalizedText == null) return null;
-        return createValueWrapper("'" + normalizedText.toLowerCase().replaceAll("\\s+", "") + "'");
+        return createValueWrapper(
+                "'" + normalizedText.toLowerCase().replaceAll("\\s+", "") + "'");
     }
 
     public ValueWrapper stripAllNonLetters() {
@@ -497,29 +459,46 @@ public class ValueWrapper {
     }
 
     public boolean hasLetters() {
-        if (normalizedText == null) return false;
-        return normalizedText.chars().anyMatch(Character::isLetter);
+        return normalizedText != null
+                && normalizedText.chars().anyMatch(Character::isLetter);
     }
 
     public ValueWrapper getDateTimeStringValue() {
         if (isNullOrBlank()) return null;
-        if (value instanceof Instant) return new ValueWrapper(normalizedText, ValueTypes.DATE_TIME);
-        String dateTimeString = normalizedText.trim().startsWith("DateTime:") ? normalizedText.trim() : "DateTime:" + normalizedText.trim();
-        return new ValueWrapper(getRunningStep().resolveStepFromString(dateTimeString), ValueTypes.DATE_TIME);
+        if (value instanceof Instant)
+            return new ValueWrapper(normalizedText, ValueTypes.DATE_TIME);
+        String dateTimeString = normalizedText.trim().startsWith("DateTime:")
+                ? normalizedText.trim()
+                : "DateTime:" + normalizedText.trim();
+        return new ValueWrapper(
+                getRunningStep().resolveStepFromString(dateTimeString),
+                ValueTypes.DATE_TIME
+        );
     }
 
     public ValueWrapper getDurationStringValue() {
         if (isNullOrBlank()) return null;
-        if (value instanceof Duration) return new ValueWrapper(normalizedText, ValueTypes.DURATION);
-        String durationString = normalizedText.trim().startsWith("Duration:") ? normalizedText.trim() : "Duration:" + normalizedText.trim();
-        return  new ValueWrapper(getRunningStep().resolveStepFromString(durationString), ValueTypes.DURATION);
+        if (value instanceof Duration)
+            return new ValueWrapper(normalizedText, ValueTypes.DURATION);
+        String durationString = normalizedText.trim().startsWith("Duration:")
+                ? normalizedText.trim()
+                : "Duration:" + normalizedText.trim();
+        return new ValueWrapper(
+                getRunningStep().resolveStepFromString(durationString),
+                ValueTypes.DURATION
+        );
     }
 
     public ValueWrapper getTimeRangeStringValue() {
         if (isNullOrBlank()) return null;
-        if (value instanceof BusinessTimeRange) return new ValueWrapper(normalizedText, ValueTypes.TIME_RANGE);
-        String durationString = normalizedText.trim().startsWith("TimeRange:") ? normalizedText.trim() : "TimeRange:" + normalizedText.trim();
-        return  new ValueWrapper(getRunningStep().resolveStepFromString(durationString), ValueTypes.TIME_RANGE);
+        if (value instanceof BusinessTimeRange)
+            return new ValueWrapper(normalizedText, ValueTypes.TIME_RANGE);
+        String timeRangeString = normalizedText.trim().startsWith("TimeRange:")
+                ? normalizedText.trim()
+                : "TimeRange:" + normalizedText.trim();
+        return new ValueWrapper(
+                getRunningStep().resolveStepFromString(timeRangeString),
+                ValueTypes.TIME_RANGE
+        );
     }
-
 }

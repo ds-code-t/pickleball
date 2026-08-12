@@ -1,7 +1,10 @@
 package com.example.pickleball;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.cucumber.datatable.DataTable;
+import io.cucumber.docstring.DocString;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import tools.dscode.common.mappings.queries.Tokenized;
@@ -22,12 +25,11 @@ import static tools.dscode.common.mappings.ValueFormatting.fromSafeJsonNode;
  * normal Java values before their types are asserted.</p>
  *
  * <p>"RUN MAP QUERY ... RETURNS TYPE" exercises the public NodeMap/Tokenized
- * read behavior. This is used separately to verify that a terminal [] returns
- * the whole collection while the same query without [] returns its normal
- * last-item result.</p>
+ * read behavior. Structured results remain Jackson ObjectNode/ArrayNode values,
+ * including JSONata array subtypes returned by explicit terminal
+ * {@code []} collection queries.</p>
  */
 public final class MappingTypeSteps {
-
     public MappingTypeSteps() {
     }
 
@@ -47,7 +49,6 @@ public final class MappingTypeSteps {
             String expectedType
     ) {
         Object value = storedRunMapValue(path);
-
         if (!matchesType(value, expectedType)) {
             JsonNode rawValue = rawRunMapValue(path);
             throw new AssertionError(
@@ -68,7 +69,6 @@ public final class MappingTypeSteps {
             String expectedType
     ) {
         Object value = queriedRunMapValue(query);
-
         if (!matchesType(value, expectedType)) {
             throw new AssertionError(
                     "Expected RUN map query '" + query + "' to return type '"
@@ -87,11 +87,28 @@ public final class MappingTypeSteps {
     ) {
         Object value = queriedRunMapValue(path);
         String actualValue = String.valueOf(value);
-
         if (!expectedValue.equals(actualValue)) {
             throw new AssertionError(
                     "Expected RUN map path '" + path + "' to have value '"
                             + expectedValue + "', but was '" + actualValue + "'."
+            );
+        }
+    }
+
+    @Then("^RUN MAP PATH \"([^\"]+)\" HAS TEXT VALUE$")
+    public static void assertRunMapPathTextValue(
+            String path,
+            DocString expectedText
+    ) {
+        Object value = queriedRunMapValue(path);
+        String expectedValue = expectedText.getContent().strip();
+        if (!(value instanceof String actualValue)
+                || !expectedValue.equals(actualValue)) {
+            throw new AssertionError(
+                    "Expected RUN map path '" + path
+                            + "' to contain exact text '" + expectedValue
+                            + "', but was '" + value + "' of type '"
+                            + typeName(value) + "'."
             );
         }
     }
@@ -111,7 +128,6 @@ public final class MappingTypeSteps {
         if (rawValue.isContainerNode()) {
             return rawValue;
         }
-
         return fromSafeJsonNode(rawValue);
     }
 
@@ -133,6 +149,11 @@ public final class MappingTypeSteps {
 
     private static boolean matchesType(Object value, String expectedType) {
         return switch (expectedType) {
+            case "JsonNode" -> value instanceof JsonNode;
+            case "ObjectNode" -> value instanceof ObjectNode;
+            case "ArrayNode" -> value instanceof ArrayNode;
+            case "DataTable" -> value instanceof DataTable;
+            case "DocString" -> value instanceof DocString;
             case "Map" -> value instanceof Map<?, ?>;
             case "List" -> value instanceof List<?>;
             default -> value != null

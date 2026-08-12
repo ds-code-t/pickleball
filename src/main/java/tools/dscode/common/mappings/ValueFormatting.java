@@ -1,6 +1,4 @@
 package tools.dscode.common.mappings;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -14,7 +12,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-
 import static tools.dscode.common.mappings.custommappings.ValConverter.valConverter;
 
 
@@ -27,15 +24,8 @@ public abstract class ValueFormatting {
         MAPPER.registerModule(new GuavaModule());
     }
 
-    public Object directGet(String key) {
-        return root.get(key);
-    }
-
-    public void directPut(String key, Object value) {
-        root.put(key , MAPPER.valueToTree(value));
-    }
-
     public static final String NON_SERIALIZABLE_FIELD = "_NonSerializableReferenceID";
+    public static final String NON_SERIALIZABLE_TEXT_PREFIX = "__PKB_OBJECT_REF__:";
     protected final ObjectNode root;
 
 
@@ -48,7 +38,6 @@ public abstract class ValueFormatting {
      */
     public record NonSerializableRef(String _NonSerializableReferenceID) {
     }
-
     protected ValueFormatting(ObjectNode root) {
         this.root = root;
     }
@@ -62,7 +51,6 @@ public abstract class ValueFormatting {
         if (obj == null) {
             return JsonNodeFactory.instance.nullNode();
         }
-
         // Already JsonNode → leave as-is
         if (obj instanceof JsonNode node) {
             return node;
@@ -76,23 +64,46 @@ public abstract class ValueFormatting {
         // Unsafe / non-serializable: put in registry, return placeholder ref as JSON
         String id = UUID.randomUUID().toString();
         nonSerializable.put(id, obj);
-
         NonSerializableRef ref = new NonSerializableRef(id);
         return MAPPER.valueToTree(ref);
     }
 
-    public static Object fromSafeJsonNode(Object node) {
-        if (node instanceof ObjectNode objectNode) {
-            // Only treat as a NonSerializableRef placeholder if our special field is present
-            if (objectNode.has(NON_SERIALIZABLE_FIELD)) {
-                NonSerializableRef ref = MAPPER.convertValue(objectNode, NonSerializableRef.class);
-                return nonSerializable.get(ref._NonSerializableReferenceID());
-            }
-            return valConverter.convert(objectNode);
+    public static String toReferenceText(Object value) {
+        JsonNode node = toSafeJsonNode(value);
+        if (node instanceof ObjectNode objectNode && objectNode.has(NON_SERIALIZABLE_FIELD)) {
+            return NON_SERIALIZABLE_TEXT_PREFIX + objectNode.get(NON_SERIALIZABLE_FIELD).asText();
         }
-        return valConverter.convert(node);
+        throw new IllegalArgumentException("Value is not stored as an object reference");
     }
 
+    public static Object fromReferenceText(String value) {
+        if (value == null || !value.startsWith(NON_SERIALIZABLE_TEXT_PREFIX)) {
+            return null;
+        }
+        return nonSerializable.get(value.substring(NON_SERIALIZABLE_TEXT_PREFIX.length()));
+    }
+
+    public static Object fromSafeJsonNode(Object node) {
+        if (!(node instanceof JsonNode jsonNode)) {
+            return valConverter.convert(node);
+        }
+
+        if (jsonNode instanceof ObjectNode objectNode
+                && objectNode.has(NON_SERIALIZABLE_FIELD)) {
+            NonSerializableRef ref = MAPPER.convertValue(objectNode, NonSerializableRef.class);
+            return nonSerializable.get(ref._NonSerializableReferenceID());
+        }
+
+        if (jsonNode.isNull() || jsonNode.isMissingNode()) {
+            return null;
+        }
+
+        if (jsonNode.isContainerNode()) {
+            return jsonNode;
+        }
+
+        return valConverter.convert(jsonNode);
+    }
 
     // ───────── safe package detection ─────────
 
@@ -104,7 +115,6 @@ public abstract class ValueFormatting {
             "org.json.",
             "org.yaml."
     };
-
     private static boolean isFromSafePackage(Object obj) {
         if (obj instanceof Enum<?>) {
             return true;
@@ -120,7 +130,6 @@ public abstract class ValueFormatting {
         return false;
     }
 
-
     public String getStringValue(String periodSeparatedPath) {
         Object obj = getByNormalizedPath(periodSeparatedPath);
         if (obj == null) return null;
@@ -132,7 +141,6 @@ public abstract class ValueFormatting {
 
         String path = periodSeparatedPath.trim();
         if (path.isEmpty()) return null;
-
         IdentityHashMap<JsonNode, Map<String, String>> fieldLookupCache = new IdentityHashMap<>();
 
 
@@ -140,7 +148,6 @@ public abstract class ValueFormatting {
         for (String segment : splitByDot(path)) {
 
             if (segment.isBlank()) continue;
-
             ParsedSegment ps = parseSegment(segment);
             if (ps == null) return null;
             if (!ps.name.isEmpty()) {
@@ -156,9 +163,6 @@ public abstract class ValueFormatting {
         }
         return fromSafeJsonNode(current); // handles null/missing/null-node conversions
     }
-
-
-
     /**
      * Split on '.' with basic trimming (indexes are in [n], so '.' is safe to split on).
      */
@@ -174,7 +178,6 @@ public abstract class ValueFormatting {
         parts.add(path.substring(start).trim());
         return parts;
     }
-
     public static JsonNode getFieldIgnoreCaseSpaceNormalized(ObjectNode objectNode, String rawName) {
         if (objectNode == null || rawName == null) {
             return JsonNodeFactory.instance.missingNode();
@@ -183,7 +186,6 @@ public abstract class ValueFormatting {
         IdentityHashMap<JsonNode, Map<String, String>> cache = new IdentityHashMap<>();
         return getFieldIgnoreCaseSpaceNormalized(objectNode, rawName, cache);
     }
-
     private static JsonNode getFieldIgnoreCaseSpaceNormalized(
             JsonNode objectNode,
             String rawName,
@@ -193,7 +195,6 @@ public abstract class ValueFormatting {
         if (direct != null) {
             return direct;
         }
-
         String normalizedTarget = normalizeKey(rawName);
         Map<String, String> lookup = cache.get(objectNode);
         if (lookup == null) {
@@ -205,7 +206,6 @@ public abstract class ValueFormatting {
             }
             cache.put(objectNode, lookup);
         }
-
         String actualField = lookup.get(normalizedTarget);
         return actualField == null ? JsonNodeFactory.instance.missingNode() : objectNode.get(actualField);
     }
@@ -218,7 +218,6 @@ public abstract class ValueFormatting {
         List<Integer> indexes = new ArrayList<>();
 
         int i = 0;
-
         while (i < s.length() && s.charAt(i) != '[') {
             name.append(s.charAt(i));
             i++;
@@ -232,7 +231,6 @@ public abstract class ValueFormatting {
 
             String inside = s.substring(i + 1, close).trim();
             if (inside.isEmpty()) return null;
-
             try {
                 indexes.add(Integer.parseInt(inside));
             } catch (NumberFormatException e) {
@@ -247,7 +245,6 @@ public abstract class ValueFormatting {
 
     private record ParsedSegment(String name, List<Integer> indexes) {
     }
-
     private static String normalizeKey(String key) {
         if (key == null) return "";
         StringBuilder sb = new StringBuilder(key.length());
@@ -259,7 +256,6 @@ public abstract class ValueFormatting {
         }
         return sb.toString().trim();
     }
-
     public void putReference(String key, JsonNode value) {
         Objects.requireNonNull(key, "Key cannot be null");
 

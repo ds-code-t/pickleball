@@ -62,6 +62,12 @@ Feature: Use supported mapping steps and comma save actions
     And , ensure "<rawPayload>" equals "raw mapping text"
     And CLEAR SAVED VALUES
 
+  @all @regression @data @mapping @config-reference
+  Scenario: Resolve recommended and legacy configuration references from the same mapping
+    Then , ensure "<config:TEST_DATA.siteName>" equals "Pickleball Test Lab"
+    And , ensure "<configs.TEST_DATA.siteName>" equals "Pickleball Test Lab"
+    And , ensure "<config:TEST_DATA.expected.catalogCount>" equals "3"
+
   @all @regression @data @mapping @dynamic-steps @save-values
   Scenario: Save literal numeric mapped and replacement values
     Given CLEAR SAVED VALUES

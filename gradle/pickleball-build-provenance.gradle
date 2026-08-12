@@ -1,0 +1,96 @@
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+import java.net.URI
+
+// Embeds the exact Pickleball source revision used to build the Maven artifact.
+def buildInfoDir = layout.buildDirectory.dir('generated/pickleball-build-provenance')
+
+def gitText = { Object... args ->
+    try {
+        def stdout = new ByteArrayOutputStream()
+        def stderr = new ByteArrayOutputStream()
+        def result = exec {
+            commandLine(['git'] + args.collect { String.valueOf(it) })
+            standardOutput = stdout
+            errorOutput = stderr
+            ignoreExitValue = true
+        }
+        result.exitValue == 0 ? stdout.toString(StandardCharsets.UTF_8).trim() : ''
+    } catch (Throwable ignored) {
+        ''
+    }
+}
+
+def sha256 = { String value ->
+    byte[] digest = MessageDigest.getInstance('SHA-256')
+            .digest((value ?: '').getBytes(StandardCharsets.UTF_8))
+    digest.collect { String.format('%02x', it & 0xff) }.join()
+}
+
+
+def sanitizeRemote = { String remote ->
+    if (!remote) return ''
+    try {
+        URI uri = URI.create(remote.trim())
+        if (uri.scheme && uri.host && uri.userInfo) {
+            String clean = "${uri.scheme}://${uri.host}"
+            if (uri.port >= 0) clean += ":${uri.port}"
+            clean += uri.rawPath ?: ''
+            if (uri.rawQuery) clean += "?${uri.rawQuery}"
+            if (uri.rawFragment) clean += "#${uri.rawFragment}"
+            return clean
+        }
+    } catch (Throwable ignored) {
+    }
+    remote.trim()
+}
+
+def fileSha256 = { File file ->
+    if (file == null || !file.isFile()) return ''
+    MessageDigest digest = MessageDigest.getInstance('SHA-256')
+    file.withInputStream { input ->
+        byte[] buffer = new byte[8192]
+        int read
+        while ((read = input.read(buffer)) >= 0) digest.update(buffer, 0, read)
+    }
+    digest.digest().collect { String.format('%02x', it & 0xff) }.join()
+}
+
+def generateBuildProvenance = tasks.register('generatePickleballBuildProvenance') {
+    outputs.dir(buildInfoDir)
+    outputs.upToDateWhen { false }
+    doLast {
+        String status = gitText('status', '--porcelain', '--untracked-files=normal')
+        String unstaged = status ? gitText('diff', '--binary') : ''
+        String staged = status ? gitText('diff', '--cached', '--binary', 'HEAD') : ''
+        String untracked = ''
+        if (status) {
+            untracked = gitText('ls-files', '--others', '--exclude-standard')
+                    .readLines()
+                    .findAll { !it.isBlank() }
+                    .collect { path -> "${path}=${fileSha256(rootProject.file(path))}" }
+                    .join('\n')
+        }
+
+        Properties properties = new Properties()
+        properties.setProperty('repositoryName', rootProject.name)
+        properties.setProperty('version', project.version.toString())
+        properties.setProperty('remote', sanitizeRemote(gitText('config', '--get', 'remote.origin.url')))
+        properties.setProperty('branch', gitText('symbolic-ref', '--short', '-q', 'HEAD') ?: gitText('rev-parse', '--abbrev-ref', 'HEAD'))
+        properties.setProperty('commit', gitText('rev-parse', 'HEAD'))
+        properties.setProperty('commitMessage', gitText('log', '-1', '--pretty=%B'))
+        properties.setProperty('dirty', Boolean.toString(!status.isBlank()))
+        properties.setProperty('workingTreeDiffHash', status.isBlank() ? '' : sha256(status + '\n' + unstaged + '\n' + staged + '\n' + untracked))
+
+        File target = buildInfoDir.get().file('META-INF/pickleball-build.properties').asFile
+        target.parentFile.mkdirs()
+        target.withOutputStream { properties.store(it, 'Generated Pickleball build provenance') }
+    }
+}
+
+pluginManager.withPlugin('java') {
+    tasks.named('processResources').configure {
+        dependsOn(generateBuildProvenance)
+        from(buildInfoDir)
+    }
+}

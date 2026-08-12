@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.java.DataTableType;
-
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -29,7 +28,6 @@ public class DataTableDefinitions {
         if (cells.size() == 1) {
             return singleRowAsArrayNode(cells.getFirst());
         }
-
         List<Map<String, String>> rows = rowsAsStringMaps(table);
         if (rows.isEmpty()) {
             return JSON_MAPPER.createObjectNode();
@@ -78,7 +76,6 @@ public class DataTableDefinitions {
         if (cells.size() == 1) {
             return List.copyOf(cells.getFirst());
         }
-
         List<Map<String, String>> rows = rowsAsStringMaps(table);
         if (rows.isEmpty()) {
             if (table.width() == 1) {
@@ -97,6 +94,108 @@ public class DataTableDefinitions {
             throw new IllegalArgumentException("DataTable cannot be null");
         }
         return new DataTableDefinitions().jsonNode(table);
+    }
+
+    public static DataTable jsonNodeToDataTable(JsonNode node) {
+        if (node == null || node.isNull() || node.isMissingNode()) {
+            throw new IllegalArgumentException("A null or missing JSON value cannot be converted to DataTable");
+        }
+
+        if (node instanceof ObjectNode objectNode) {
+            return DataTable.create(objectRows(objectNode));
+        }
+
+        if (!(node instanceof ArrayNode arrayNode)) {
+            return DataTable.create(List.of(List.of(toCellText(node))));
+        }
+
+        if (arrayNode.isEmpty()) {
+            return DataTable.create(List.of(List.of("")));
+        }
+
+        if (allRowsAre(arrayNode, JsonNode::isArray)) {
+            return DataTable.create(arrayRows(arrayNode));
+        }
+
+        if (allRowsAre(arrayNode, JsonNode::isObject)) {
+            return DataTable.create(objectArrayRows(arrayNode));
+        }
+
+        List<String> row = new ArrayList<>(arrayNode.size());
+        arrayNode.forEach(value -> row.add(toCellText(value)));
+        return DataTable.create(List.of(row));
+    }
+
+    public static String toCellText(JsonNode node) {
+        if (node == null || node.isNull() || node.isMissingNode()) {
+            return "";
+        }
+        if (node.isContainerNode()) {
+            return node.toString();
+        }
+        return node.asText();
+    }
+
+    private static boolean allRowsAre(ArrayNode arrayNode, java.util.function.Predicate<JsonNode> predicate) {
+        for (JsonNode node : arrayNode) {
+            if (!predicate.test(node)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static List<List<String>> arrayRows(ArrayNode arrayNode) {
+        int width = 0;
+        for (JsonNode row : arrayNode) {
+            width = Math.max(width, row.size());
+        }
+        width = Math.max(width, 1);
+
+        List<List<String>> rows = new ArrayList<>(arrayNode.size());
+        for (JsonNode rowNode : arrayNode) {
+            List<String> row = new ArrayList<>(width);
+            rowNode.forEach(cell -> row.add(toCellText(cell)));
+            while (row.size() < width) {
+                row.add("");
+            }
+            rows.add(row);
+        }
+        return rows;
+    }
+
+    private static List<List<String>> objectArrayRows(ArrayNode arrayNode) {
+        LinkedHashSet<String> headers = new LinkedHashSet<>();
+        for (JsonNode row : arrayNode) {
+            row.fieldNames().forEachRemaining(headers::add);
+        }
+
+        List<String> headerRow = headers.isEmpty() ? List.of("") : List.copyOf(headers);
+        List<List<String>> rows = new ArrayList<>(arrayNode.size() + 1);
+        rows.add(headerRow);
+
+        for (JsonNode row : arrayNode) {
+            List<String> values = new ArrayList<>(headerRow.size());
+            for (String header : headerRow) {
+                values.add(headers.isEmpty() ? "" : toCellText(row.get(header)));
+            }
+            rows.add(values);
+        }
+        return rows;
+    }
+
+    private static List<List<String>> objectRows(ObjectNode objectNode) {
+        List<String> headers = new ArrayList<>();
+        List<String> values = new ArrayList<>();
+        objectNode.fields().forEachRemaining(entry -> {
+            headers.add(entry.getKey());
+            values.add(toCellText(entry.getValue()));
+        });
+        if (headers.isEmpty()) {
+            headers.add("");
+            values.add("");
+        }
+        return List.of(headers, values);
     }
 
     /**
@@ -125,7 +224,6 @@ public class DataTableDefinitions {
         if (cells.size() < 2) {
             return List.of();
         }
-
         List<String> headers = cells.getFirst();
         List<Map<String, String>> rows = new ArrayList<>(cells.size() - 1);
         for (int rowIndex = 1; rowIndex < cells.size(); rowIndex++) {
@@ -153,7 +251,6 @@ public class DataTableDefinitions {
         if (cells.getFirst().isEmpty()) {
             return List.of();
         }
-
         List<String> values = new ArrayList<>(cells.size() - 1);
         for (int rowIndex = 1; rowIndex < cells.size(); rowIndex++) {
             List<String> row = cells.get(rowIndex);

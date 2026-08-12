@@ -93,13 +93,13 @@ public final class BrowserAlerts {
      * Checks whether an alert is currently present.
      */
     public static boolean isPresent(WebDriver driver) {
+        if (driver == null)
+            return false;
 
         try {
             driver.switchTo().alert();
-
             return true;
-        } catch (NoAlertPresentException e) {
-
+        } catch (RuntimeException e) {
             return false;
         }
     }

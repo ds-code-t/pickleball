@@ -1,0 +1,33 @@
+# Pickleball profile examples. Profiles are inert until selected by pkb_profile.
+# Multiple names are composed left-to-right, so later profiles override earlier ones.
+# Missing execution-context RunVars inherit from the project configuration automatically.
+
+qa:
+  pkb_tags: "<default_profile.pkb_tags> and @qa"
+  pkb_environment: QA
+  pkb_browser: CHROME_HEADLESS
+
+browser_chrome:
+  pkb_browser: chrome
+
+browser_firefox:
+  pkb_browser: firefox
+
+reportportal_qa:
+  pkb_rp_enable: false
+  pkb_rp_project: example-qa-project
+  pkb_rp_launch: "Pickleball QA"
+  # Keep real credentials out of source control. A profile can instead use:
+  # pkb_rp_api_key: "<default_profile.pkb_rp_api_key>"
+
+# A profile may provide controlled RunVars. Only these optional RunVars plus inherited
+# execution context become active; pkb_run_profile is generated afterward as output.
+agent_direct:
+  pkb_runvars: "pkb_tags=<default_profile.pkb_tags> and @agent; pkb_browser=firefox"
+
+# YAML-map form avoids compact assignment parsing and is preferred for punctuation-heavy values.
+agent_direct_map:
+  pkb_runvars:
+    pkb_tags: "<default_profile.pkb_tags> and @agent-map"
+    pkb_browser: chrome
+    pkb_rp_description: "Map direct RunVars, phase 2; ready"

@@ -1,5 +1,4 @@
 package tools.dscode.common.treeparsing.parsedComponents;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -10,7 +9,6 @@ import tools.dscode.common.annotations.Phase;
 import tools.dscode.common.assertions.AssertionChain;
 import tools.dscode.common.assertions.ValueWrapper;
 import tools.dscode.common.domoperations.ExecutionDictionary;
-
 import tools.dscode.common.mappings.MapConfigurations;
 import tools.dscode.common.mappings.NodeMap;
 import tools.dscode.common.mappings.ParsingMap;
@@ -23,12 +21,10 @@ import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.Asserti
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.OperationsInterface;
 import tools.dscode.common.treeparsing.parsedComponents.phraseoperations.PlaceHolderMatch;
 import tools.dscode.common.treeparsing.preparsing.LineData;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.GlobalState.lifecycle;
 import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
@@ -51,7 +47,6 @@ import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.bef
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.inBetweenOf;
 import static tools.dscode.common.treeparsing.xpathcomponents.XPathyAssembly.insideOf;
 
-
 public abstract class PhraseData extends PassedData {
     //    protected Optional<ElementMatch> repetitionElementOptional;
     public boolean isChainedAssertion = false;
@@ -68,7 +63,6 @@ public abstract class PhraseData extends PassedData {
 //    public boolean shouldRepeatPhrase = false;
 //    public boolean repeatRootPhrase = false;
 //    public List<PhraseData> repeatedChain = new ArrayList<>();
-
     public boolean untilPhrase = false;
 
 //    public boolean runAssertionChain = false;
@@ -84,7 +78,6 @@ public abstract class PhraseData extends PassedData {
     public String getPreviousTerminator() {
         return getPreviousPhrase() == null ? "" : getPreviousPhrase().termination.toString();
     }
-
     protected boolean skipSync = false;
 
     public boolean skipPageSync() {
@@ -96,7 +89,6 @@ public abstract class PhraseData extends PassedData {
     }
 
     public SearchContext getSearchContext() {
-
         if (contextElement != null) {
             if (contextElement.element == null)
                 throw new RuntimeException("Element not found: " + contextElement.elementMatch + " at " + contextElement.elementMatch.xPathy);
@@ -113,7 +105,6 @@ public abstract class PhraseData extends PassedData {
     public List<ElementWrapper> getWrappedElements() {
         return wrappedElements;
     }
-
     List<ElementWrapper> wrappedElements = new ArrayList<>();
 
     public enum PhraseType {
@@ -130,7 +121,6 @@ public abstract class PhraseData extends PassedData {
     public String getResolvedText() {
         return (resolvedText == null ? text : resolvedText).replaceAll(BOOK_END, "") + termination;
     }
-
     public String getText() {
         return text.replaceAll(BOOK_END, "") + termination;
     }
@@ -138,7 +128,6 @@ public abstract class PhraseData extends PassedData {
 
     public boolean hasResolvedText = false;
     public boolean hasTextToResolve = false;
-
 
     public ParsingMap getPhraseParsingMap() {
         if (phraseParsingMap == null) {
@@ -151,7 +140,6 @@ public abstract class PhraseData extends PassedData {
         }
         return phraseParsingMap;
     }
-
     public String resolveText(String inputText) {
         return getPhraseParsingMap().resolveWholeText(inputText);
     }
@@ -160,7 +148,6 @@ public abstract class PhraseData extends PassedData {
     public void setPhraseParsingMap(ParsingMap newParsingMap) {
         this.phraseParsingMap = newParsingMap;
     }
-
     public void setPhraseParsingMap(JsonNode data) {
         ObjectNode objectNode;
         if (data instanceof ObjectNode) {
@@ -171,7 +158,6 @@ public abstract class PhraseData extends PassedData {
         } else {
             throw new RuntimeException("Unexpected data type: " + data.getClass().getName());
         }
-
         phraseParsingMap = copytoNewParsingMap(getPhraseParsingMap());
         phraseParsingMap.removeMaps(MapConfigurations.MapType.PHRASE_MAP);
         NodeMap phraseNodeMap = new NodeMap(MapConfigurations.MapType.PHRASE_MAP, objectNode);
@@ -180,7 +166,6 @@ public abstract class PhraseData extends PassedData {
         String categoryName = dataElement == null ? null : dataElement.category.replaceFirst("(?i:s)$", "");
         phraseNodeMap.setDataSource(categoryName);
     }
-
 
     public PhraseData(String inputText, Character delimiter, LineData lineData) {
         this(inputText, delimiter, lineData, null);
@@ -192,14 +177,12 @@ public abstract class PhraseData extends PassedData {
         return (termination.equals('.') || termination.equals('?') || termination.equals(':'));
     }
 
-
     public PhraseData(String inputText, Character delimiter, LineData lineData, PhraseData previousPhrase) {
         originalText = inputText;
         var m = Pattern.compile(META_TEXT_SEPARATOR + "\\s*(.*?)\\s*" + META_TEXT_SEPARATOR).matcher(inputText);
         boolean found = m.find();
         metaTextPrefix = found ? m.group(1) : "";
         inputText = found ? m.replaceFirst("") : inputText;
-
         inputText = wrapLooseConditionalExpression(inputText);
         defaultContextPhrase = inputText.equals(STARTING_CONTEXT);
         if (defaultContextPhrase)
@@ -211,7 +194,6 @@ public abstract class PhraseData extends PassedData {
         hasResolvedText = !text.trim().equalsIgnoreCase(resolvedText.trim());
         hasTextToResolve = hasResolvedText || text.matches(".*<.*>.*");
         termination = delimiter;
-
         MatchNode returnMatchNode = getNodeDictionary().parse(resolvedText);
         phraseNode = returnMatchNode.getChild("phrase");
         assert phraseNode != null;
@@ -222,7 +204,6 @@ public abstract class PhraseData extends PassedData {
             untilPhrase = true;
         }
         setConditional(conditional);
-
         Integer opIndex = (Integer) phraseNode.getFromLocalState("operationIndex");
         operationIndex = opIndex == null ? 0 : opIndex;
 
@@ -230,13 +211,11 @@ public abstract class PhraseData extends PassedData {
         body = phraseNode.getStringFromLocalState("body");
         separator = phraseNode.localStateBoolean("separator");
         setElementMatches(phraseNode.getOrderedChildren("elementMatch").stream().map(this::getElementMatch).collect(Collectors.toList()));
-
         isTopContext = categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_TOP_CONTEXT);
         isPageContext = isTopContext || categoryFlags.contains(ExecutionDictionary.CategoryFlags.PAGE_CONTEXT);
 
 
         conjunction = phraseNode.getStringFromLocalState("conjunction");
-
         position = lineData.phrases.size();
         context = phraseNode.getStringFromLocalState("context");
         if (getConditional().contains("if")) {
@@ -259,7 +238,6 @@ public abstract class PhraseData extends PassedData {
             }
         }
 
-
         setNewContext(phraseNode.localStateBoolean("newStartContext"));
 
         if (phraseType == null) {
@@ -274,15 +252,11 @@ public abstract class PhraseData extends PassedData {
     }
 
     public ElementMatch getElementMatch(MatchNode elementNode) {
-
-
         if (elementNode.getStringFromLocalState("type").equals(PLACE_HOLDER_MATCH)) {
             return new PlaceHolderMatch(this);
-        } else {
-            return new ElementMatch(this, elementNode);
         }
+        return ElementMatchFactory.create(this, elementNode);
     }
-
 
     public List<PhraseData> getPhraseContextList() {
         List<PhraseData> contextList = getContextListFromInheritedPhrases();
@@ -290,7 +264,6 @@ public abstract class PhraseData extends PassedData {
             contextList.addFirst(new Phrase(parsedLine));
         return contextList;
     }
-
     private List<PhraseData> getContextListFromInheritedPhrases() {
         List<PhraseData> contextList = new ArrayList<>();
         PhraseData currentPhrase = this;
@@ -301,7 +274,6 @@ public abstract class PhraseData extends PassedData {
                 if (currentPhrase.termination != ',' && currentPhrase.termination != ':') {
                     return contextList;
                 }
-
                 if (currentPhrase.phraseType == PhraseType.CONTEXT) {
                     contextList.addFirst(currentPhrase);
                     if (currentPhrase.isTopContext || currentPhrase.contextElement != null) {
@@ -313,7 +285,6 @@ public abstract class PhraseData extends PassedData {
                     return contextList;
                 }
             }
-
             if (currentPhrase.isNewContext()) {
                 return contextList;
             }
@@ -328,7 +299,6 @@ public abstract class PhraseData extends PassedData {
         if (elements.isEmpty()) phraseData.contextXPathy = null;
         XPathy secondXPathy = elements.size() == 1 ? null : elements.get(1).xPathy;
         String context = phraseData.context.toLowerCase();
-
         XPathy xPathy = elements.getFirst().xPathy;
         if (xPathy == null) {
             phraseData.contextXPathy = null;
@@ -342,7 +312,6 @@ public abstract class PhraseData extends PassedData {
         );
 
     }
-
     private static XPathy resolveContextXPathy(String context, XPathy first, XPathy second) {
         if (context.startsWith("for") || context.startsWith("from") || context.startsWith("in")) {
             return insideOf(first);
@@ -360,7 +329,6 @@ public abstract class PhraseData extends PassedData {
         return null;
     }
 
-
     public abstract PhraseData runPhrase();
 
     public abstract PhraseData cloneInheritedPhrase();
@@ -376,7 +344,6 @@ public abstract class PhraseData extends PassedData {
     public abstract PhraseData getNextResolvedPhrase();
 
 //    private final LifecycleManager lifecycle = new LifecycleManager();
-
 
     public void syncWithDOM() {
         waitMilliseconds(400);
@@ -394,7 +361,6 @@ public abstract class PhraseData extends PassedData {
         }
         return returnList;
     }
-
 
     public void runOperation() {
         OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
@@ -415,7 +381,6 @@ public abstract class PhraseData extends PassedData {
         } else {
             operation.execute(this);
         }
-
         if (result.failed()) {
             throw new RuntimeException("operation '" + operation + "' failed", result.error());
         }
@@ -425,7 +390,6 @@ public abstract class PhraseData extends PassedData {
         }
 
     }
-
     public void runUntilOperation() {
         OperationsInterface operation = actionOperation != null ? actionOperation : assertionOperation;
         if (operation instanceof ActionOperations) {
@@ -438,13 +402,11 @@ public abstract class PhraseData extends PassedData {
     }
 
     Boolean previouslyResolvedBoolean = null;
-
     public boolean resolveResults() {
         if (wasPhraseSkipped || !isOperationPhrase || getAssertion().isBlank())
             return true;
 
         previouslyResolvedBoolean = (result == null || result.value() == null) ? null : (boolean) result.value();
-
         String assertionMessage = "Assertion evaluates to: " + previouslyResolvedBoolean;
         if (assertionChain == null) {
             phraseConditionalMode = previouslyResolvedBoolean ? 1 : -1;
@@ -455,7 +417,6 @@ public abstract class PhraseData extends PassedData {
             assertionMessage += " , elements:" + resultElements.stream()
                     .map(Object::toString)
                     .collect(Collectors.joining("\n", "\n", ""));
-
         switch (getAssertionType()) {
             case "ensure" -> {
                 if (!previouslyResolvedBoolean) {
@@ -475,7 +436,6 @@ public abstract class PhraseData extends PassedData {
         }
         return previouslyResolvedBoolean;
     }
-
     public int getRepetition() {
         ElementMatch repetitionElement = getSpecialElementByFlag(ElementMatch.SpecialUse.TIMES);
         if (repetitionElement == null) return 1;
@@ -487,7 +447,6 @@ public abstract class PhraseData extends PassedData {
         if (marginElement == null) return null;
         return marginElement.getValue();
     }
-
     public void resetElementWrapper() {
         wrappedElements.clear();
         elementMatches.forEach(e -> e.wrappedElements = null);

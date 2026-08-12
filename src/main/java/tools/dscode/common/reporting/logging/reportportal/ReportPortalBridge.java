@@ -6,7 +6,6 @@ import com.epam.reportportal.message.TypeAwareByteSource;
 import com.epam.reportportal.service.Launch;
 import com.epam.reportportal.service.ReportPortal;
 import com.epam.reportportal.utils.files.ByteSource;
-import com.epam.reportportal.utils.properties.ListenerProperty;
 import com.epam.reportportal.utils.properties.PropertiesLoader;
 import com.epam.ta.reportportal.ws.model.FinishExecutionRQ;
 import com.epam.ta.reportportal.ws.model.log.SaveLogRQ;
@@ -14,6 +13,8 @@ import io.reactivex.Maybe;
 import io.reactivex.exceptions.UndeliverableException;
 import io.reactivex.plugins.RxJavaPlugins;
 import tools.dscode.common.reporting.logging.CleanupTrace;
+import tools.dscode.testengine.PKB_props;
+import tools.dscode.testengine.PickleballRunner;
 
 import java.io.File;
 import java.lang.reflect.Method;
@@ -25,11 +26,13 @@ import java.time.Instant;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static tools.dscode.testengine.PKB_props.PKB_RP_ENABLE;
 
 public final class ReportPortalBridge {
 
@@ -80,9 +83,7 @@ public final class ReportPortalBridge {
         throw new RuntimeException("ReportPortal client failure", t);
     }
 
-    /**
-     * Retained for source and binary compatibility. ReportPortal bridge work now runs synchronously.
-     */
+    /** Retained for source and binary compatibility. ReportPortal bridge work now runs synchronously. */
     @Deprecated(forRemoval = false)
     public static void throwIfAsyncFailure() {
         throwIfFailure();
@@ -100,21 +101,23 @@ public final class ReportPortalBridge {
                 return;
             }
 
-            PropertiesLoader properties = PropertiesLoader.load();
-
             /*
-             * ReportPortal is enabled only when rp.enable is
-             * explicitly set to true.
-             *
-             * null, blank, false, and every other value disable it.
+             * PickleballRunner has already converted the active run profile's pkb_rp_*
+             * values to native rp.* names. PropertiesLoader is retained because
+             * ListenerParameters requires it, but its preloaded state is cleared before
+             * the active profile values are supplied so omitted values cannot leak back in.
              */
-            boolean explicitlyEnabled = Boolean.parseBoolean(
-                    properties.getProperty(ListenerProperty.ENABLE)
-            );
+            Properties activeProperties = PickleballRunner.getReportPortalProperties();
+            PropertiesLoader properties = PropertiesLoader.load();
+            Properties loadedProperties = properties.getProperties();
+            loadedProperties.clear();
+            loadedProperties.putAll(activeProperties);
 
-            ListenerParameters params =
-                    new ListenerParameters(properties);
+            boolean pkbEnabled = Boolean.parseBoolean(PKB_props.get(PKB_RP_ENABLE));
+            boolean nativeEnabled = Boolean.parseBoolean(properties.getProperty("rp.enable"));
+            boolean explicitlyEnabled = pkbEnabled && nativeEnabled;
 
+            ListenerParameters params = new ListenerParameters(properties);
             params.setEnable(explicitlyEnabled);
             enabled = explicitlyEnabled;
 
@@ -228,7 +231,6 @@ public final class ReportPortalBridge {
 
     public static void finishCurrentTest(String status) {
         CleanupTrace.print("[ReportPortalBridge.finishCurrentTest] START status=" + status);
-
         CleanupTrace.print("[ReportPortalBridge.finishCurrentTest] START: initIfNeeded()");
         initIfNeeded();
         CleanupTrace.print("[ReportPortalBridge.finishCurrentTest] END: initIfNeeded()");
@@ -340,10 +342,7 @@ public final class ReportPortalBridge {
         runReportPortalWork(() -> logAttachmentNow(test, lvl, msg, data, null, safeName, when));
     }
 
-    /**
-     * Preferred attachment path. Uses a file-backed byte source when the installed
-     * ReportPortal client supports one.
-     */
+    /** Preferred attachment path using a file-backed source when the client supports one. */
     public static void logAttachmentFile(String level,
                                          String message,
                                          Path file,
@@ -396,11 +395,6 @@ public final class ReportPortalBridge {
         }
     }
 
-    /**
-     * Prefer a file/path-backed ByteSource if the installed client exposes one.  client-java
-     * versions differ, so reflection keeps this drop-in compatible with 5.4.x. If unavailable,
-     * fall back to byte[] materialization.
-     */
     private static ByteSource byteSourceFromFileOrFallback(Path file) throws Exception {
         if (file == null) {
             return ByteSource.wrap(new byte[0]);
@@ -420,7 +414,6 @@ public final class ReportPortalBridge {
                     return (ByteSource) m.invoke(null, file.toFile());
                 }
             } catch (ReflectiveOperationException ignored) {
-                // Try the next compatible factory method.
             }
         }
 
@@ -477,45 +470,22 @@ public final class ReportPortalBridge {
             throw unchecked(t);
         } finally {
             CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: cleanup");
-
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: CURRENT_TEST.remove()");
             CURRENT_TEST.remove();
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: CURRENT_TEST.remove()");
-
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: launchUuid = Maybe.empty()");
             launchUuid = Maybe.empty();
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: launchUuid = Maybe.empty()");
-
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: launchStarted = false");
             launchStarted = false;
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: launchStarted = false");
-
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: KNOWN_SUITES.clear()");
             KNOWN_SUITES.clear();
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: KNOWN_SUITES.clear()");
-
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: CLIENT_FAILURE.set(null)");
             CLIENT_FAILURE.set(null);
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: CLIENT_FAILURE.set(null)");
-
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] START: ReportPortalHierarchy.resetLaunch()");
             ReportPortalHierarchy.resetLaunch();
-            CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: ReportPortalHierarchy.resetLaunch()");
-
             CleanupTrace.print("[ReportPortalBridge.finishLaunch] END: cleanup");
         }
     }
 
-    /**
-     * Retained for source and binary compatibility. There is no bridge executor to shut down.
-     */
+    /** Retained for source and binary compatibility. There is no bridge executor to shut down. */
     @Deprecated(forRemoval = false)
     public static void shutdown() {
     }
 
-    /**
-     * Retained for source and binary compatibility. Work is complete before logging methods return.
-     */
+    /** Retained for source and binary compatibility. Work is complete before logging methods return. */
     @Deprecated(forRemoval = false)
     public static CompletableFuture<Void> drainSubmittedWorkAsync() {
         initIfNeeded();
@@ -558,5 +528,4 @@ public final class ReportPortalBridge {
         String t = s.trim();
         return t.isEmpty() ? null : t;
     }
-
 }

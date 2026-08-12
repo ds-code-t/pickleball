@@ -12,6 +12,7 @@ import tools.dscode.parallelutilities.Stagger;
 
 import java.time.Duration;
 
+import static io.cucumber.core.runner.CurrentScenarioState.getScenarioObject;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static tools.dscode.common.evaluations.AviatorUtil.isTruthy;
 import static tools.dscode.common.reporting.logging.LogForwarder.logDebug;
@@ -36,7 +37,6 @@ public class BrowserSteps {
         }
     }
 
-
     public static RemoteWebDriver getCurrentDriver() {
         String browserName = String.valueOf(resolveFromVarsOrDefault("BROWSER", "CHROME"));
         RemoteWebDriver webDriver = getDriver(browserName);
@@ -52,12 +52,19 @@ public class BrowserSteps {
         return getDriver(browserName);
     }
 
+    public static RemoteWebDriver getCurrentDriverIfPresent() {
+        String browserName = String.valueOf(resolveFromVarsOrDefault("BROWSER", "CHROME"));
+        Object existing = getScenarioObject(browserName);
+        return existing instanceof RemoteWebDriver driver && driver.getSessionId() != null
+                ? driver
+                : null;
+    }
+
     public static RemoteWebDriver getDriver(String browserName) {
         Object created = constructObjectFromParsingMap(browserName);
         RemoteWebDriver webDriver = (RemoteWebDriver) created;
         return webDriver;
     }
-
 
     @Given(ObjectRegistrationSteps.objCreation + "CREATE_DRIVER$")
     public RemoteWebDriver createDriver(ObjectNode configuration) throws Exception {

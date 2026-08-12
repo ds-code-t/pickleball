@@ -1,6 +1,7 @@
 package tools.dscode.common.treeparsing.parsedComponents;
 
 import tools.dscode.common.browseroperations.WindowSwitch;
+import tools.dscode.common.dataelements.DataElementRegistry;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -10,34 +11,45 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static io.cucumber.core.runner.util.TableUtils.CELL_KEY;
-import static io.cucumber.core.runner.util.TableUtils.DATA_OBJECT_KEY;
-import static io.cucumber.core.runner.util.TableUtils.DOCSTRING_KEY;
-import static io.cucumber.core.runner.util.TableUtils.HEADER_KEY;
-import static io.cucumber.core.runner.util.TableUtils.ENTRY_KEY;
-import static io.cucumber.core.runner.util.TableUtils.ROW_KEY;
-import static io.cucumber.core.runner.util.TableUtils.TABLE_KEY;
-import static io.cucumber.core.runner.util.TableUtils.VALUE_KEY;
 import static tools.dscode.common.domoperations.ExecutionDictionary.STARTING_CONTEXT;
 
 public enum ElementType {
     DEFAULT_STARTING_CONTEXT,
-    SINGLE_ELEMENT_IN_PHRASE, MULTIPLE_ELEMENTS_IN_PHRASE,
-    //    FIRST_ELEMENT, SECOND_ELEMENT, LAST_ELEMENT,
-//    PRECEDING_OPERATION, FOLLOWING_OPERATION,
-    HTML_TYPE, HTML_ELEMENT, HTML_IFRAME, HTML_SHADOW_ROOT,
-    HTML_OPTION, HTML_DROPDOWN, HTML_LOADING,
-    BROWSER_TYPE, ALERT, BROWSER, BROWSER_WINDOW, BROWSER_TAB, URL,
+    SINGLE_ELEMENT_IN_PHRASE,
+    MULTIPLE_ELEMENTS_IN_PHRASE,
+    HTML_TYPE,
+    HTML_ELEMENT,
+    HTML_IFRAME,
+    HTML_SHADOW_ROOT,
+    HTML_OPTION,
+    HTML_DROPDOWN,
+    HTML_LOADING,
+    BROWSER_TYPE,
+    ALERT,
+    BROWSER,
+    BROWSER_WINDOW,
+    BROWSER_TAB,
+    URL,
     DATA_TYPE,
-    VALUE_TYPE, TIME_VALUE, NUMERIC_VALUE, INTEGER_VALUE, DECIMAL_VALUE, TEXT_VALUE, KEY_VALUE,
-    TIME_DURATION, TIME_INSTANCE, TIME_RANGE, TIME_UNIT,
+    VALUE_TYPE,
+    TIME_VALUE,
+    NUMERIC_VALUE,
+    INTEGER_VALUE,
+    DECIMAL_VALUE,
+    TEXT_VALUE,
+    KEY_VALUE,
+    TIME_DURATION,
+    TIME_INSTANCE,
+    TIME_RANGE,
+    TIME_UNIT,
     RETURNS_VALUE,
-    STEP_TYPE, STEP_DURATION, STEP_REPETITION,
+    STEP_TYPE,
+    STEP_DURATION,
+    STEP_REPETITION,
     REGEX_MATCH;
 
     public static final String VALUE_TYPE_MATCH = "InternalValueUnit";
     public static final String PLACE_HOLDER_MATCH = "InternalPLACEHOLDER";
-
 
     private static final Map<String, ElementType> LOOKUP =
             Arrays.stream(values())
@@ -46,11 +58,9 @@ public enum ElementType {
                             Function.identity()
                     ));
 
-    // canonical key for matching (covers spaces, underscores, plurals, case)
     private String key() {
-        return name(); // enum constant name is the canonical key
+        return name();
     }
-
 
     public static final Set<String> TIME_UNITS = Set.of(
             "MILLISECOND",
@@ -71,9 +81,8 @@ public enum ElementType {
 
     public static final String KEY_NAME = "KEYNAME";
 
-
     public static final Set<String> DATA_ELEMENTS =
-            Set.of(DOCSTRING_KEY, TABLE_KEY, ROW_KEY, CELL_KEY, HEADER_KEY, VALUE_KEY, DATA_OBJECT_KEY, ENTRY_KEY);
+            DataElementRegistry.DATA_ELEMENTS;
 
     public static final Set<String> BROWSER_ELEMENTS =
             Set.of("Alert", "Window", "BROWSER", "Browser Tab", "Address Bar");
@@ -86,7 +95,14 @@ public enum ElementType {
             return returnSet;
         }
 
+        if (DataElementRegistry.contains(raw)) {
+            returnSet.add(DATA_TYPE);
+            returnSet.add(RETURNS_VALUE);
+            return returnSet;
+        }
+
         String singular = raw.replaceAll("s$", "");
+
         if (singular.matches("^Step\\b.*")) {
             returnSet.add(STEP_TYPE);
             if (singular.contains("Repetition")) {
@@ -98,7 +114,6 @@ public enum ElementType {
                 returnSet.add(TIME_VALUE);
                 returnSet.add(RETURNS_VALUE);
             }
-
             return returnSet;
         }
 
@@ -128,33 +143,32 @@ public enum ElementType {
             return returnSet;
         }
 
-
         if (singular.equals("Loading")) {
             returnSet.add(HTML_LOADING);
             returnSet.add(HTML_TYPE);
             return returnSet;
         }
 
-        if (DATA_ELEMENTS.contains(singular)) {
-            returnSet.add(DATA_TYPE);
-            returnSet.add(RETURNS_VALUE);
-            return returnSet;
-        }
         if (BROWSER_ELEMENTS.contains(singular)) {
             returnSet.add(BROWSER_TYPE);
         }
+
         if (singular.equals("Browser")) {
             returnSet.add(BROWSER_TYPE);
             returnSet.add(BROWSER_WINDOW);
             return returnSet;
         }
+
         if (raw.contains("Window")) {
-            String windowNormalized = raw.replaceAll("Windows?", "").trim().toUpperCase(Locale.ROOT);
+            String windowNormalized = raw.replaceAll("Windows?", "")
+                    .trim()
+                    .toUpperCase(Locale.ROOT);
             if (windowNormalized.isBlank()) {
                 windowNormalized = "TITLE";
             }
 
-            WindowSwitch.WindowSelectionType windowSelectionType = WindowSwitch.WindowSelectionType.LOOKUP.get(windowNormalized);
+            WindowSwitch.WindowSelectionType windowSelectionType =
+                    WindowSwitch.WindowSelectionType.LOOKUP.get(windowNormalized);
 
             if (windowSelectionType != null) {
                 returnSet.add(BROWSER_TYPE);
@@ -169,6 +183,7 @@ public enum ElementType {
             returnSet.add(RETURNS_VALUE);
             return returnSet;
         }
+
         if (returnSet.contains(BROWSER_TYPE)) {
             return returnSet;
         }
@@ -180,14 +195,15 @@ public enum ElementType {
 
         if (normalized.startsWith(VALUE_TYPE_MATCH.toUpperCase(Locale.ROOT))) {
             switch (normalized.substring(VALUE_TYPE_MATCH.length())) {
-                case String x when x.equals(KEY_NAME) -> returnSet.add(KEY_VALUE);
-                case String x when TIME_UNITS.contains(x) -> {
+                case String value when value.equals(KEY_NAME) ->
+                        returnSet.add(KEY_VALUE);
+                case String value when TIME_UNITS.contains(value) -> {
                     returnSet.add(TIME_DURATION);
                     returnSet.add(TIME_UNIT);
                     returnSet.add(TIME_VALUE);
                     returnSet.add(RETURNS_VALUE);
                 }
-                case String x when NUMERIC_TYPES.contains(x) -> {
+                case String value when NUMERIC_TYPES.contains(value) -> {
                     returnSet.add(NUMERIC_VALUE);
                     returnSet.add(RETURNS_VALUE);
                 }
@@ -201,8 +217,6 @@ public enum ElementType {
         }
 
         returnSet.add(LOOKUP.getOrDefault(normalized, HTML_TYPE));
-
         return returnSet;
     }
-
 }

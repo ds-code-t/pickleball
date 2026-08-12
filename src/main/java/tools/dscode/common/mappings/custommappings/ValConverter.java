@@ -3,6 +3,9 @@ package tools.dscode.common.mappings.custommappings;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.NullNode;
+import io.cucumber.datatable.DataTable;
+import io.cucumber.docstring.DocString;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -11,13 +14,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMap;
 import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
 import static tools.dscode.common.mappings.ParsingMap.resolveToStringWithRunningParsingMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
 import static tools.dscode.common.variables.RunVars.resolveFromVars;
-
 
 public class ValConverter extends CustomReader {
     public ValConverter(ObjectMapper mapper) {
@@ -26,8 +27,22 @@ public class ValConverter extends CustomReader {
 
     public static final CustomReader valConverter = new ValConverter(MAPPER);
 
+    public static Object convertSpecialValues(Object value) {
+        if (value instanceof JsonNode || value instanceof DataTable || value instanceof DocString) {
+            return value;
+        }
+        return valConverter.convertValue(value);
+    }
+
+    public static JsonNode convertSpecialValuesToTree(Object value) {
+        return valConverter.valueToTree(value);
+    }
+
     @Override
     protected Object modify(Object value, Object parent) {
+        if (isExplicitNull(value)) {
+            return NullNode.getInstance();
+        }
         if (value instanceof String s && s.trim().startsWith("~") && s.contains(":")) {
             int colonIndex = s.indexOf(':');
             if (colonIndex > 0) {
@@ -40,11 +55,9 @@ public class ValConverter extends CustomReader {
             }
             return value;
         }
-
         if (!(value instanceof Map<?, ?> map) || map.size() != 1) {
             return value;
         }
-
         Map.Entry<?, ?> entry = map.entrySet().iterator().next();
         if (!(entry.getKey() instanceof String key)
                 || key.length() < 3
@@ -52,13 +65,11 @@ public class ValConverter extends CustomReader {
                 || key.charAt(key.length() - 1) != '~') {
             return value;
         }
-
         return convertMarkedValue(key, entry.getValue(), value, parent);
     }
 
     private Object convertMarkedValue(String key, Object innerValue, Object originalValue, Object parent) {
         if (innerValue == null) return null;
-
 
         if (key == null
                 || key.length() < 3
@@ -66,16 +77,13 @@ public class ValConverter extends CustomReader {
                 || key.charAt(key.length() - 1) != '~') {
             return originalValue;
         }
-
         if ("~PARSE~".equals(key)) {
             return resolveToStringWithRunningParsingMap("{" + modify(innerValue, parent) + "}");
         }
-
         if ("~VAR~".equals(key)) {
             String val = String.valueOf(modify(innerValue, parent));
             return resolveFromVars(val);
         }
-
         if (key.startsWith("~RESOLVE")) {
             if ("~RESOLVE~".equals(key)) {
                 return getFromRunningParsingMap(String.valueOf(modify(innerValue, parent)));
@@ -84,21 +92,17 @@ public class ValConverter extends CustomReader {
                 return getFromRunningParsingMapCaseInsensitive(String.valueOf(modify(innerValue, parent)));
             }
         }
-
         Object structured = convertStructuredType(key, modify(innerValue, parent), originalValue);
         if (structured != originalValue) {
             return structured;
         }
-
         Class<?> targetType = resolveScalarType(key);
         if (targetType == null) {
             return originalValue;
         }
-
         if (targetType == String.class) {
             return String.valueOf(modify(innerValue, parent));
         }
-
         return mapper.convertValue(modify(innerValue, parent), targetType);
     }
 
@@ -169,5 +173,14 @@ public class ValConverter extends CustomReader {
             case "~BIGINT~" -> BigInteger.class;
             default -> null;
         };
+    }
+
+    private static boolean isExplicitNull(Object value) {
+        if (!(value instanceof String text)) {
+            return false;
+        }
+        String normalized = text.trim();
+        return "^~NULL~^".equals(normalized)
+                || "<^~NULL~^>".equals(normalized);
     }
 }
