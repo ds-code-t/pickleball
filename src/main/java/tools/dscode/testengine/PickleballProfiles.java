@@ -326,18 +326,22 @@ final class PickleballProfiles {
                 if (classLoader == null) {
                     classLoader = PickleballProfiles.class.getClassLoader();
                 }
+
                 Enumeration<URL> resources = classLoader.getResources(resourceName);
                 while (resources.hasMoreElements()) {
                     URL url = resources.nextElement();
                     try (InputStream input = url.openStream()) {
                         JsonNode parsed = YAML.readTree(input);
-                        if (parsed == null || parsed.isNull()) {
+
+                        if (parsed == null || parsed.isNull() || parsed.isMissingNode()) {
                             continue;
                         }
+
                         if (!(parsed instanceof ObjectNode profiles)) {
                             throw new IllegalArgumentException(
                                     resourceName + " must contain a top-level map of profile names.");
                         }
+
                         mergeProfileDocument(registry, profiles, resourceName);
                     }
                 }
