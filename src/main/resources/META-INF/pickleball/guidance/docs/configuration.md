@@ -1,6 +1,6 @@
 # Execution Configuration
 
-> **Runnable examples:** [`configuration-system-properties.feature`](../maven-consumer-project/src/test/resources/features/configuration-system-properties.feature) covers JVM configuration and controlled-run behavior. The consumer [`profiles.yaml`](../maven-consumer-project/src/test/resources/profiles.yaml) demonstrates named profiles and `pkb_runvars`.
+> **Runnable examples:** [`configuration-system-properties.feature`](../maven-consumer-project/src/test/resources/features/configuration-system-properties.feature) covers normal source precedence, JVM configuration, and controlled-run behavior. The consumer [`profiles.yaml`](../maven-consumer-project/src/test/resources/profiles.yaml) and [`profiles_local.yaml`](../maven-consumer-project/src/test/resources/profiles_local.yaml) demonstrate shared and local named-profile configuration.
 
 Pickleball execution properties use canonical lowercase `pkb_*` names. JVM property names beginning with `pkb_` are normalized case-insensitively.
 
@@ -12,18 +12,23 @@ pkb_loglevel=debug
 
 ## Normal configuration sources
 
-The established source precedence is retained. From stronger to weaker normal sources:
+From stronger to weaker, the public normal configuration precedence is:
 
 1. JVM system properties;
 2. `globalTestProperties()`;
-3. `pickleball_local2.properties`;
-4. `pickleball_local.properties`;
-5. `globalTestDefaults()`;
-6. `pickleball.properties` when no stronger value has been supplied.
+3. `pickleball_local.properties`;
+4. `pickleball.properties`;
+5. `globalTestDefaults()`.
+
+Each stronger source overwrites the same key from weaker sources. The naming is intentional:
+
+- `globalTestDefaults()` supplies the runner's lowest-level fallback values;
+- `pickleball.properties` supplies shared project configuration and overrides runner defaults;
+- `pickleball_local.properties` supplies local project overrides;
+- `globalTestProperties()` supplies runner-enforced project values that outrank property files;
+- JVM `-D` properties are invocation-specific overrides and have the highest normal precedence.
 
 The fully resolved normal RunVars become the in-memory `default_profile`. If neither `pkb_profile` nor `pkb_runvars` is supplied, that normal configuration becomes the effective RunVar set and is serialized into `pkb_run_profile`.
-
-Use `globalTestDefaults()` for normal project defaults. Use `globalTestProperties()` only for project values that intentionally outrank local property files.
 
 ```java
 @Override
@@ -37,9 +42,18 @@ public void globalTestDefaults() {
 }
 ```
 
+Use `globalTestProperties()` only for project values that should intentionally outrank the shared and local property files:
+
+```java
+@Override
+public void globalTestProperties() {
+    PKB_props.environment("QA");
+}
+```
+
 ## Local overrides and JVM values
 
-Local resource properties contain ordinary property names:
+Shared `pickleball.properties` and local `pickleball_local.properties` contain ordinary property names. A local file can override only the values that need to differ from the shared project configuration:
 
 ```properties
 pkb_environment=QA
@@ -86,15 +100,14 @@ Lineage survives controlled execution but is excluded from `pkb_run_profile` and
 
 ## Named profiles
 
-Profiles are loaded from classpath-root resources in this order:
+Profiles are publicly configured from classpath-root resources in this order:
 
 ```text
 profiles.yaml
 profiles_local.yaml
-profiles_local2.yaml
 ```
 
-Matching profile definitions are deep-merged at property level. `pkb_profile` selects one or more names and composes them left-to-right; later profiles win.
+Matching profile definitions are deep-merged at property level, so the local file can override selected properties from the shared profile definition. `pkb_profile` selects one or more names and composes them left-to-right; later selected profiles win.
 
 ```yaml
 qa:

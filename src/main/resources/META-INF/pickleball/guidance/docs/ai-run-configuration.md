@@ -36,18 +36,27 @@ test execution / diagnostics
 
 Without `pkb_profile` or `pkb_runvars`, normal Pickleball configuration is resolved into `default_profile` and becomes the active RunVars. The runner then serializes those effective RunVars into `pkb_run_profile`.
 
-Normal configuration sources retain their existing ordering and semantics, including runner defaults/properties, resource property files, JVM properties, Pickleball aliases, Cucumber aliases, and ReportPortal aliases.
+For consumer-facing normal configuration, stronger sources override weaker sources in this order:
+
+1. JVM `-D` system properties;
+2. `globalTestProperties()`;
+3. `pickleball_local.properties`;
+4. `pickleball.properties`;
+5. `globalTestDefaults()`.
+
+This means `globalTestDefaults()` is the true fallback layer, shared `pickleball.properties` can override those defaults, the regular local property file can override shared configuration, runner properties can enforce project values, and JVM properties remain invocation-specific final overrides.
+
+The resolved normal RunVars are then captured as `default_profile`. Profile and controlled-run resolution is a later stage; do not flatten named profiles or `pkb_runvars` into the normal source-precedence list.
 
 ## Named profiles
 
-Profiles may be defined in:
+Profiles may be publicly defined in:
 
 - `profiles.yaml`
 - `profiles_local.yaml`
-- `profiles_local2.yaml`
 - inline `pkb_profile_<name>` properties
 
-`pkb_profile` accepts one or more comma-separated names. Multiple profiles compose left-to-right; later values overwrite earlier values.
+Matching names from `profiles_local.yaml` deep-merge over the shared `profiles.yaml` definition at property level. `pkb_profile` accepts one or more comma-separated names. Multiple selected profiles compose left-to-right; later values overwrite earlier values.
 
 Named profiles remain reference namespaces. A profile does not receive every optional value from `default_profile` automatically. It does automatically receive any missing **execution-context RunVars** listed below so the profile remains runnable without repeating project wiring.
 

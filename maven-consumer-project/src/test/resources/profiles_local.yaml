@@ -1,0 +1,13 @@
+# Optional local overrides for named Pickleball profiles.
+# This Maven consumer commits the file as an example for consumer projects.
+# Matching profile names deep-merge over profiles.yaml at property level.
+# Profiles are inert until selected with pkb_profile.
+#
+# To override an existing profile locally, add the same profile name here, for example:
+# qa:
+#   pkb_browser: firefox
+#
+# This committed example keeps the YAML document valid without changing normal defaults.
+local_example:
+  pkb_environment: LOCAL
+  pkb_browser: chrome

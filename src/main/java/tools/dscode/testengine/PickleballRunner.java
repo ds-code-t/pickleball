@@ -67,7 +67,7 @@ public abstract class PickleballRunner {
         normalizeReportPortalValues();
         debug("Values after globalTestDefaults(): " + values);
 
-        mergeResourcePropertiesIfMissing("pickleball.properties");
+        mergeResourcePropertiesOverwriting("pickleball.properties");
         mergeResourcePropertiesOverwriting("pickleball_local.properties");
         mergeResourcePropertiesOverwriting("pickleball_local2.properties");
         debug("Values after resource property merge: " + values);

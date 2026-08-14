@@ -67,7 +67,7 @@ Runner defaults include:
 - tags `@all`;
 - browser `chrome`.
 
-Normal Pickleball source precedence applies unless controlled `pkb_runvars` are active.
+Normal Pickleball source precedence applies unless controlled `pkb_runvars` are active. Public normal precedence from strongest to weakest is JVM `-D`, `globalTestProperties()`, `pickleball_local.properties`, `pickleball.properties`, then `globalTestDefaults()`.
 
 ## Project layout
 
@@ -82,7 +82,9 @@ maven-consumer-project/
 ├── src/test/resources/data/
 ├── src/test/resources/site/
 ├── src/test/resources/profiles.yaml
-└── src/test/resources/pickleball*.properties
+├── src/test/resources/profiles_local.yaml
+├── src/test/resources/pickleball.properties
+└── src/test/resources/pickleball_local.properties
 ```
 
 Important locations:
@@ -94,7 +96,10 @@ Important locations:
 - shared `<configs...>` data — `src/test/resources/configs`;
 - structured/scenario data — `src/test/resources/data`;
 - local static test site — `src/test/resources/site`;
-- named profiles — `src/test/resources/profiles.yaml`.
+- shared named profiles — `src/test/resources/profiles.yaml`;
+- local named-profile overrides — `src/test/resources/profiles_local.yaml`;
+- shared Pickleball properties — `src/test/resources/pickleball.properties`;
+- local Pickleball property overrides — `src/test/resources/pickleball_local.properties`.
 
 ## What the consumer exercises
 
@@ -123,7 +128,7 @@ Feature files remain authoritative for exact scenario tags.
 
 ## Named profiles and controlled RunVars
 
-Reusable profiles live in `profiles.yaml` and are selected with `pkb_profile`.
+Reusable profiles live in `profiles.yaml`; local property-level overrides for matching profile names can live in `profiles_local.yaml`. Select one or more profiles with `pkb_profile`; selected names compose left-to-right and later profiles win.
 
 For deterministic automation or AI reruns, use `pkb_runvars` as direct input:
 

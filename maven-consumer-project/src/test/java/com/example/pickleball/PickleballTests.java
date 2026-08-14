@@ -24,6 +24,16 @@ public final class PickleballTests extends PickleballRunner {
         PKB_props.plugins("pretty");
         PKB_props.tags("@all");
         PKB_props.browser("chrome");
+
+        // Non-RunVar fixtures used by configuration-system-properties.feature.
+        values.put("example.precedence.shared", "globalTestDefaults");
+        values.put("example.precedence.local", "globalTestDefaults");
+        values.put("example.precedence.runner-property", "globalTestDefaults");
+    }
+
+    @Override
+    public void globalTestProperties() {
+        values.put("example.precedence.runner-property", "globalTestProperties");
     }
 
     @LifecycleHook(Phase.BEFORE_CUCUMBER_RUN)

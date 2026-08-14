@@ -67,10 +67,15 @@ your-project/
         ├── component/               # optional component scenarios
         ├── data/                    # optional structured/scenario data
         ├── configs/                 # optional shared config mapping
-        ├── profiles.yaml            # optional named Pickleball profiles
-        ├── pickleball.properties
-        └── pickleball_local.properties
+        ├── profiles.yaml            # optional shared named profiles
+        ├── profiles_local.yaml      # optional local profile overrides
+        ├── pickleball.properties    # optional shared configuration
+        └── pickleball_local.properties # optional local overrides
 ```
+
+For normal project configuration, stronger sources override weaker sources in this order: JVM `-D`, `globalTestProperties()`, `pickleball_local.properties`, `pickleball.properties`, then `globalTestDefaults()`. This makes runner defaults true fallbacks while keeping shared and local property files as ordinary override layers.
+
+Named profile definitions use the same shared/local idea: define shared profiles in `profiles.yaml`, then override individual fields for the local project in `profiles_local.yaml` when needed.
 
 ## Run
 
