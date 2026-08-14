@@ -40,6 +40,8 @@ public class PickleballGuidanceChecks {
         assertTrue(guide.contains("GUIDANCE-MANIFEST.json"));
         assertTrue(guide.contains("keep terminal logging minimal"));
         assertTrue(guide.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
+        assertTrue(guide.contains("Generated Maven consumer reference"));
+        assertTrue(guide.contains("maven-consumer-project/"));
     }
 
     @Test
@@ -61,12 +63,59 @@ public class PickleballGuidanceChecks {
             assertTrue(Files.isRegularFile(root.resolve("docs/ai-run-configuration.md")));
             assertTrue(Files.isRegularFile(root.resolve("docs/diagnostic-lineage-metadata.md")));
 
+            assertTrue(Files.isRegularFile(root.resolve("maven-consumer-project/pom.xml")));
+            assertTrue(Files.isRegularFile(root.resolve(
+                    "maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java"
+            )));
+            assertTrue(Files.isRegularFile(root.resolve(
+                    "maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java"
+            )));
+            assertTrue(Files.isRegularFile(root.resolve(
+                    "maven-consumer-project/src/test/resources/features/dynamic-steps.feature"
+            )));
+            assertTrue(Files.isRegularFile(root.resolve(
+                    "maven-consumer-project/src/test/resources/calls/service-call-definitions.feature"
+            )));
+            assertTrue(Files.isRegularFile(root.resolve(
+                    "maven-consumer-project/src/test/resources/configs/URL.yaml"
+            )));
+            assertTrue(Files.isRegularFile(root.resolve(
+                    "maven-consumer-project/src/test/resources/data/files/customerPayload.json"
+            )));
+            assertTrue(Files.isRegularFile(root.resolve(
+                    "maven-consumer-project/src/test/resources/site/forms.html"
+            )));
+            assertTrue(Files.isRegularFile(root.resolve(
+                    "maven-consumer-project/src/test/resources/profiles.yaml"
+            )));
+            assertTrue(Files.isRegularFile(root.resolve(
+                    "maven-consumer-project/src/test/resources/profiles_local.yaml"
+            )));
+            assertTrue(Files.isRegularFile(root.resolve(
+                    "maven-consumer-project/src/test/resources/pickleball.properties"
+            )));
+            assertTrue(Files.isRegularFile(root.resolve(
+                    "maven-consumer-project/src/test/resources/pickleball_local.properties"
+            )));
+
             Map<String, Object> manifest = readManifest(root);
             assertEquals(true, manifest.get("generated"));
             String version = String.valueOf(manifest.get("pickleballVersion"));
             assertFalse(version.isBlank());
-            assertTrue(asStringList(manifest.get("files")).contains("AGENT-GUIDE.md"));
-            assertTrue(asStringList(manifest.get("files")).contains("docs/configuration.md"));
+
+            List<String> managedFiles = asStringList(manifest.get("files"));
+            assertTrue(managedFiles.contains("AGENT-GUIDE.md"));
+            assertTrue(managedFiles.contains("docs/configuration.md"));
+            assertTrue(managedFiles.contains("maven-consumer-project/pom.xml"));
+            assertTrue(managedFiles.contains(
+                    "maven-consumer-project/src/test/resources/features/dynamic-steps.feature"
+            ));
+            assertTrue(managedFiles.stream().noneMatch(path -> path.contains("_local2")));
+            assertFalse(managedFiles.contains("maven-consumer-project/AGENTS.md"));
+            assertFalse(managedFiles.contains("maven-consumer-project/mvnw"));
+            assertFalse(managedFiles.contains(
+                    "maven-consumer-project/src/test/java/tools/dscode/common/reporting/diagnostic/PickleballGuidanceChecks.java"
+            ));
 
             String guide = Files.readString(root.resolve("AGENT-GUIDE.md"));
             assertTrue(guide.contains("use the shallowest evidence layer"));
@@ -74,10 +123,12 @@ public class PickleballGuidanceChecks {
             assertTrue(guide.contains("If export fails, treat any existing `.pickleball` contents as potentially stale"));
             assertTrue(guide.contains("keep terminal logging minimal"));
             assertTrue(guide.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
+            assertTrue(guide.contains("read-only reference snapshot"));
 
             String consumerProject = Files.readString(root.resolve("docs/consumer-project.md"));
             assertTrue(consumerProject.contains("keep console verbosity low"));
             assertTrue(consumerProject.contains("older Pickleball release whose exporter predates the manifest lifecycle"));
+            assertTrue(consumerProject.contains("Version-matched reference snapshot"));
         } finally {
             deleteTree(root);
         }
