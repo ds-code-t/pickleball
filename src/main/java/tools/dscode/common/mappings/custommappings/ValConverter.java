@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
 import tools.dscode.common.mappings.ParsingMap.MappingDirectiveResolver;
+import tools.dscode.common.mappings.ValueFormatting;
 
 import java.lang.reflect.Array;
 import java.util.Collection;
@@ -49,6 +50,7 @@ public class ValConverter extends CustomReader {
 
     @Override
     public Object convert(Object input) {
+        input = restoreObjectReference(input);
         rejectRemovedMarkers(input);
         return super.convert(input);
     }
@@ -56,6 +58,7 @@ public class ValConverter extends CustomReader {
     public static final CustomReader valConverter = new ValConverter(MAPPER);
 
     public static Object convertSpecialValues(Object value) {
+        value = restoreObjectReference(value);
         if (value instanceof JsonNode || value instanceof DataTable || value instanceof DocString) {
             return value;
         }
@@ -63,12 +66,14 @@ public class ValConverter extends CustomReader {
     }
 
     public static JsonNode convertSpecialValuesToTree(Object value) {
-        return valConverter.valueToTree(value);
+        return valConverter.valueToTree(restoreObjectReference(value));
     }
 
     @Override
     @SuppressWarnings({"rawtypes", "unchecked"})
     protected Object modify(Object value, Object parent) {
+        value = restoreObjectReference(value);
+
         Object special = MappingDirectiveResolver.convertSpecialLiteral(value);
         if (special != value) {
             return special;
@@ -136,6 +141,22 @@ public class ValConverter extends CustomReader {
         map.clear();
         map.putAll(rewritten);
         return map;
+    }
+
+    private static Object restoreObjectReference(Object value) {
+        String referenceText = null;
+        if (value instanceof String text) {
+            referenceText = text;
+        } else if (value instanceof JsonNode node && node.isTextual()) {
+            referenceText = node.textValue();
+        }
+
+        if (referenceText == null) {
+            return value;
+        }
+
+        Object referenced = ValueFormatting.fromReferenceText(referenceText);
+        return referenced == null ? value : referenced;
     }
 
     private static void rejectRemovedMarkers(Object value) {
