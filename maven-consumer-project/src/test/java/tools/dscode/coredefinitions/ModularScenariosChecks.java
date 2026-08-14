@@ -363,12 +363,12 @@ public class ModularScenariosChecks {
         assertTrue(MappingSteps.hasNonBlankValue(direct));
 
         JsonNode structured = ValConverter.convertSpecialValuesToTree(Map.of(
-                "A", "^~NULL~^",
-                "B", "prefix ^~NULL~^ suffix"
+                "A", "<^~NULL~^>",
+                "B", "prefix <^~NULL~^> suffix"
         ));
         assertTrue(structured.path("A").isNull());
         assertEquals(
-                "prefix ^~NULL~^ suffix",
+                "prefix <^~NULL~^> suffix",
                 structured.path("B").asText()
         );
     }

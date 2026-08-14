@@ -11,13 +11,13 @@ import tools.dscode.common.CoreSteps;
 import tools.dscode.common.annotations.DefinitionFlags;
 import tools.dscode.common.mappings.MappingProcessor;
 import tools.dscode.common.mappings.NodeMap;
+import tools.dscode.common.mappings.ParsingMap.MappingDirectiveResolver;
 
 import java.util.Locale;
 
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
 import static io.cucumber.core.runner.util.TableUtils.toFlatStringMultimap;
 import static tools.dscode.common.annotations.DefinitionFlag.NO_ARG_RESOLUTION;
-import static tools.dscode.common.annotations.DefinitionFlag._DEBUG_LOGGING;
 import static tools.dscode.common.mappings.FileAndDataParsing.JSON_MAPPER;
 import static tools.dscode.common.mappings.FileAndDataParsing.XML_MAPPER;
 import static tools.dscode.common.mappings.FileAndDataParsing.YAML_MAPPER;
@@ -137,21 +137,35 @@ public class MappingSteps extends CoreSteps {
                         ? ""
                         : prefix.trim() + ".";
 
-        for (var row : dataTable.asLists()) {
+        for (var row : dataTable.cells()) {
             if (row.isEmpty()) {
                 continue;
             }
 
-            String rowKey = row.getFirst() == null
+            String rawRowKey = row.getFirst() == null
                     ? ""
                     : row.getFirst().trim();
-            if (rowKey.isBlank()) {
+            if (rawRowKey.isBlank()) {
                 continue;
             }
-            for (int cellIndex = 1; cellIndex < row.size(); cellIndex++) {
-                Object value = convertSpecialValues(
-                        resolveFromParsingMap(row.get(cellIndex))
+            MappingDirectiveResolver.DirectiveSpec keySpec =
+                    MappingDirectiveResolver.parseDirectiveSuffix(rawRowKey);
+            MappingDirectiveResolver.validateTableKeyDirectives(keySpec);
+            String rowKey = keySpec.base() == null ? "" : keySpec.base().trim();
+            if (rowKey.isBlank()) {
+                throw new IllegalArgumentException(
+                        "MAP TABLE VALUES row keys cannot contain only mapping directives: "
+                                + rawRowKey
                 );
+            }
+
+            for (int cellIndex = 1; cellIndex < row.size(); cellIndex++) {
+                Object source = keySpec.has("UNRESOLVED")
+                        ? MappingDirectiveResolver.resolveUnresolvedCarrier(
+                                row.get(cellIndex)
+                        )
+                        : resolveFromParsingMap(row.get(cellIndex));
+                Object value = convertSpecialValues(source);
                 boolean hasRequiredValue = switch (valueRequirement) {
                     case "NON-BLANK" -> hasNonBlankValue(value);
                     case "NON-NULL" -> hasNonNullValue(value);
@@ -160,7 +174,13 @@ public class MappingSteps extends CoreSteps {
                     );
                 };
                 if (hasRequiredValue) {
-                    nodeMap.put(keyPrefix + rowKey, value);
+                    value = MappingDirectiveResolver.applyDirectives(
+                            value,
+                            keySpec.directives()
+                    );
+                    String destinationKey = keyPrefix + rowKey
+                            + (keySpec.has("MERGE") ? NodeMap.MERGE_SUFFIX : "");
+                    nodeMap.put(destinationKey, value);
                     break;
                 }
             }

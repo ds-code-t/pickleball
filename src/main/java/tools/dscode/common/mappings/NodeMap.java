@@ -7,6 +7,7 @@ import com.google.common.collect.LinkedListMultimap;
 import io.cucumber.core.runner.StepBase;
 import io.cucumber.core.runner.StepExtension;
 import tools.dscode.common.mappings.queries.Tokenized;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -18,6 +19,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.IntStream;
+
 import static io.cucumber.core.runner.GlobalState.getClosestScenarioStepAncestor;
 import static io.cucumber.core.runner.GlobalState.getRootScenarioStep;
 import static io.cucumber.core.runner.GlobalState.getRunningStep;
@@ -26,6 +28,7 @@ import static tools.dscode.common.GlobalConstants.META_FLAG;
 /** A mutable JSON-backed map with JSONata reads and writable path queries. */
 public class NodeMap extends ValueFormatting {
     public static final String MAP_TYPE_KEY = META_FLAG + "_MapType";
+    public static final String MERGE_SUFFIX = "~merge;";
     private final Set<MapConfigurations.DataSource> dataSources = new HashSet<>();
     private MapConfigurations.MapType mapType = MapConfigurations.MapType.DEFAULT;
 
@@ -42,6 +45,7 @@ public class NodeMap extends ValueFormatting {
         super(root);
         setMapType(MapConfigurations.MapType.DEFAULT);
     }
+
     public NodeMap(MapConfigurations.MapType mapType, ObjectNode root) {
         super(root);
         setMapType(mapType);
@@ -59,6 +63,7 @@ public class NodeMap extends ValueFormatting {
     public NodeMap(Map<?, ?> map) {
         this(toObjectNode(map));
     }
+
     public NodeMap(LinkedListMultimap<?, ?> multimap) {
         this(toObjectNode(multimap));
     }
@@ -146,7 +151,12 @@ public class NodeMap extends ValueFormatting {
     }
 
     public void put(String query, Object value) {
-        writeValue(resolveQuery(query), value);
+        String mergeQuery = mergeQuery(query);
+        if (mergeQuery == null) {
+            writeValue(resolveQuery(query), value);
+            return;
+        }
+        mergeValue(mergeQuery, value);
     }
 
     public void put(Tokenized query, Object value) {
@@ -155,6 +165,85 @@ public class NodeMap extends ValueFormatting {
 
     protected void writeValue(Tokenized query, Object value) {
         query.put(root, value);
+    }
+
+    private void mergeValue(String query, Object value) {
+        if (value == null || value instanceof JsonNode node && node.isNull()) {
+            return;
+        }
+
+        Object existing = get(query);
+        if (existing == null) {
+            writeValue(resolveQuery(query), value);
+            return;
+        }
+
+        if (existing instanceof ObjectNode existingObject
+                && value instanceof ObjectNode incomingObject) {
+            mergeObject(existingObject, incomingObject);
+            return;
+        }
+        if (existing instanceof ArrayNode existingArray
+                && value instanceof ArrayNode incomingArray) {
+            existingArray.addAll(incomingArray);
+            return;
+        }
+
+        throw new IllegalArgumentException(
+                "Cannot apply " + MERGE_SUFFIX + " to '" + query + "'. "
+                        + "Existing value is " + mergeType(existing)
+                        + " and incoming value is " + mergeType(value) + ". "
+                        + MERGE_SUFFIX + " requires ObjectNode + ObjectNode or "
+                        + "ArrayNode + ArrayNode; a missing/null existing value is "
+                        + "stored normally and a null incoming value is ignored."
+        );
+    }
+
+    private static void mergeObject(ObjectNode target, ObjectNode incoming) {
+        incoming.fields().forEachRemaining(entry -> {
+            String key = entry.getKey();
+            JsonNode incomingValue = entry.getValue();
+            JsonNode existingValue = target.get(key);
+
+            if (existingValue instanceof ObjectNode existingObject
+                    && incomingValue instanceof ObjectNode incomingObject) {
+                mergeObject(existingObject, incomingObject);
+            } else if (existingValue instanceof ArrayNode existingArray
+                    && incomingValue instanceof ArrayNode incomingArray) {
+                existingArray.addAll(incomingArray);
+            } else {
+                target.set(key, incomingValue);
+            }
+        });
+    }
+
+    private static String mergeQuery(String query) {
+        if (query == null) {
+            return null;
+        }
+        String trimmed = query.stripTrailing();
+        int suffixStart = trimmed.length() - MERGE_SUFFIX.length();
+        if (suffixStart < 0
+                || !trimmed.regionMatches(
+                        true,
+                        suffixStart,
+                        MERGE_SUFFIX,
+                        0,
+                        MERGE_SUFFIX.length()
+                )) {
+            return null;
+        }
+        String base = trimmed.substring(0, suffixStart).stripTrailing();
+        if (base.isBlank()) {
+            throw new IllegalArgumentException(
+                    "A NodeMap " + MERGE_SUFFIX + " key must include a query before the suffix."
+            );
+        }
+        return base;
+    }
+
+    private static String mergeType(Object value) {
+        return value == null ? "null" : value.getClass().getSimpleName();
     }
 
     public void putAsSingleton(String query, Object value) {
@@ -182,6 +271,7 @@ public class NodeMap extends ValueFormatting {
     public MapConfigurations.MapType getMapType() {
         return mapType;
     }
+
     public void setMapType(MapConfigurations.MapType mapType) {
         this.mapType = Objects.requireNonNullElse(mapType, MapConfigurations.MapType.DEFAULT);
         root.set(MAP_TYPE_KEY, toSafeJsonNode(this.mapType));
@@ -190,6 +280,7 @@ public class NodeMap extends ValueFormatting {
     public Set<MapConfigurations.DataSource> getDataSources() {
         return Set.copyOf(dataSources);
     }
+
     public void setDataSource(MapConfigurations.DataSource... sources) {
         if (sources == null) {
             return;
@@ -198,6 +289,7 @@ public class NodeMap extends ValueFormatting {
                 .filter(Objects::nonNull)
                 .forEach(dataSources::add);
     }
+
     public void setDataSource(String... sources) {
         if (sources == null) {
             return;
@@ -213,6 +305,7 @@ public class NodeMap extends ValueFormatting {
             root.setAll(other);
         }
     }
+
     public void merge(Map<?, ?> other) {
         if (other != null) {
             root.setAll(toObjectNode(other));
@@ -224,6 +317,7 @@ public class NodeMap extends ValueFormatting {
             root.setAll(toObjectNode(other));
         }
     }
+
     public void merge(List<?> keys, List<?> values) {
         if (keys == null || values == null) {
             return;
@@ -236,6 +330,7 @@ public class NodeMap extends ValueFormatting {
                 .forEach(index -> multimap.put(keys.get(index), values.get(index)));
         merge(multimap);
     }
+
     @Override
     public String toString() {
         return "Type: " + mapType + " Source: " + dataSources + "\nroot:" + root;
@@ -244,6 +339,7 @@ public class NodeMap extends ValueFormatting {
     private static ObjectNode toObjectNode(Map<?, ?> map) {
         return requireObjectNode(map == null ? Map.of() : map, "Map");
     }
+
     private static ObjectNode toObjectNode(LinkedListMultimap<?, ?> multimap) {
         if (multimap == null) {
             return MAPPER.createObjectNode();
@@ -253,6 +349,7 @@ public class NodeMap extends ValueFormatting {
                 (key, collection) -> values.put(key, new ArrayList<>(collection)));
         return requireObjectNode(values, "Multimap");
     }
+
     private static ObjectNode requireObjectNode(Object value, String description) {
         JsonNode node = toSafeJsonNode(value);
         if (node instanceof ObjectNode object) {
@@ -260,6 +357,7 @@ public class NodeMap extends ValueFormatting {
         }
         throw new IllegalArgumentException(description + " did not serialize to an ObjectNode");
     }
+
     public static NodeMap getNodeMap(String input) {
         List<String> segments = input == null
                 ? List.of()
@@ -288,6 +386,7 @@ public class NodeMap extends ValueFormatting {
                             + "SCENARIO ROOT, ROOT SCENARIO, RUN, STEP, or SCENARIO.");
         };
     }
+
     private static NodeMap getStepNodeMap(String input, List<String> segments) {
         validateParentPrefixes(input, segments);
         StepBase step = getRunningStep();
@@ -299,6 +398,7 @@ public class NodeMap extends ValueFormatting {
         }
         return step.getDefaultStepNodeMap();
     }
+
     private static NodeMap getScenarioNodeMap(String input, List<String> segments) {
         validateParentPrefixes(input, segments);
         int parentCount = segments.size() - 1;
@@ -314,6 +414,7 @@ public class NodeMap extends ValueFormatting {
         }
         return scenarioStep.getDefaultStepNodeMap();
     }
+
     private static void validateParentPrefixes(String input, List<String> segments) {
         List<String> invalidPrefixes = segments
                 .subList(0, segments.size() - 1)

@@ -1,28 +1,56 @@
 package tools.dscode.common.mappings.custommappings;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.NullNode;
 import io.cucumber.datatable.DataTable;
 import io.cucumber.docstring.DocString;
+import tools.dscode.common.mappings.ParsingMap.MappingDirectiveResolver;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.util.LinkedHashSet;
-import java.util.List;
+import java.lang.reflect.Array;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
-import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMap;
-import static tools.dscode.common.mappings.ParsingMap.getFromRunningParsingMapCaseInsensitive;
-import static tools.dscode.common.mappings.ParsingMap.resolveToStringWithRunningParsingMap;
 import static tools.dscode.common.mappings.ValueFormatting.MAPPER;
-import static tools.dscode.common.variables.RunVars.resolveFromVars;
 
 public class ValConverter extends CustomReader {
+    private static final Set<String> REMOVED_BARE_VALUE_MARKERS = Set.of(
+            "^~NULL~^",
+            "^~NAN~^",
+            "^~INF~^",
+            "^~-INF~^",
+            "^~TAB~^",
+            "^~EMPTY~^"
+    );
+
+    private static final Set<String> REMOVED_MARKERS = Set.of(
+            "~PARSE~",
+            "~VAR~",
+            "~RESOLVE~",
+            "~RESOLVE-CASE-INSENSITIVE~",
+            "~MAP~",
+            "~LIST~",
+            "~SET~",
+            "~OBJECT~",
+            "~JSON~",
+            "~STRING~",
+            "~INT~",
+            "~LONG~",
+            "~DOUBLE~",
+            "~BOOLEAN~",
+            "~DECIMAL~",
+            "~BIGINT~"
+    );
+
     public ValConverter(ObjectMapper mapper) {
         super(mapper);
+    }
+
+    @Override
+    public Object convert(Object input) {
+        rejectRemovedMarkers(input);
+        return super.convert(input);
     }
 
     public static final CustomReader valConverter = new ValConverter(MAPPER);
@@ -39,148 +67,137 @@ public class ValConverter extends CustomReader {
     }
 
     @Override
+    @SuppressWarnings({"rawtypes", "unchecked"})
     protected Object modify(Object value, Object parent) {
-        if (isExplicitNull(value)) {
-            return NullNode.getInstance();
+        Object special = MappingDirectiveResolver.convertSpecialLiteral(value);
+        if (special != value) {
+            return special;
         }
-        if (value instanceof String s && s.trim().startsWith("~") && s.contains(":")) {
-            int colonIndex = s.indexOf(':');
-            if (colonIndex > 0) {
-                String key = s.substring(0, colonIndex);
-                String innerValue = s.substring(colonIndex + 1);
-                Object converted = convertMarkedValue(key, innerValue, s, parent);
-                if (converted != s) {
-                    return converted;
+
+        if (value instanceof String text && isRemovedStringMarker(text)) {
+            throw removedMarker(text);
+        }
+
+        if (!(value instanceof Map<?, ?> rawMap)) {
+            return value;
+        }
+
+        Map map = (Map) rawMap;
+        Map<Object, Object> rewritten = new LinkedHashMap<>();
+        for (Object rawEntry : map.entrySet()) {
+            Map.Entry entry = (Map.Entry) rawEntry;
+            Object rawKey = entry.getKey();
+            Object entryValue = entry.getValue();
+
+            if (!(rawKey instanceof String key)) {
+                rewritten.put(rawKey, entryValue);
+                continue;
+            }
+            if (isRemovedObjectMarker(key)) {
+                throw removedMarker(key);
+            }
+
+            MappingDirectiveResolver.DirectiveSpec spec =
+                    MappingDirectiveResolver.parseDirectiveSuffix(key);
+            if (spec.directives().isEmpty()) {
+                if (rewritten.containsKey(key)) {
+                    throw new IllegalArgumentException(
+                            "Mapping directive key collision for '" + key + "'."
+                    );
                 }
+                rewritten.put(key, entryValue);
+                continue;
             }
-            return value;
-        }
-        if (!(value instanceof Map<?, ?> map) || map.size() != 1) {
-            return value;
-        }
-        Map.Entry<?, ?> entry = map.entrySet().iterator().next();
-        if (!(entry.getKey() instanceof String key)
-                || key.length() < 3
-                || key.charAt(0) != '~'
-                || key.charAt(key.length() - 1) != '~') {
-            return value;
-        }
-        return convertMarkedValue(key, entry.getValue(), value, parent);
-    }
+            MappingDirectiveResolver.validateStructuredKeyDirectives(spec);
 
-    private Object convertMarkedValue(String key, Object innerValue, Object originalValue, Object parent) {
-        if (innerValue == null) return null;
-
-        if (key == null
-                || key.length() < 3
-                || key.charAt(0) != '~'
-                || key.charAt(key.length() - 1) != '~') {
-            return originalValue;
-        }
-        if ("~PARSE~".equals(key)) {
-            return resolveToStringWithRunningParsingMap("{" + modify(innerValue, parent) + "}");
-        }
-        if ("~VAR~".equals(key)) {
-            String val = String.valueOf(modify(innerValue, parent));
-            return resolveFromVars(val);
-        }
-        if (key.startsWith("~RESOLVE")) {
-            if ("~RESOLVE~".equals(key)) {
-                return getFromRunningParsingMap(String.valueOf(modify(innerValue, parent)));
+            Object converted = MappingDirectiveResolver.applyDirectives(
+                    entryValue,
+                    spec.directives()
+            );
+            String rewrittenKey = spec.base() == null ? "" : spec.base().trim();
+            if (rewrittenKey.isEmpty()) {
+                if (map.size() != 1) {
+                    throw new IllegalArgumentException(
+                            "A key made only of mapping directives can only be used "
+                                    + "as the single key of its object: '" + key + "'."
+                    );
+                }
+                return converted;
             }
-            if ("~RESOLVE-CASE-INSENSITIVE~".equals(key)) {
-                return getFromRunningParsingMapCaseInsensitive(String.valueOf(modify(innerValue, parent)));
+            if (rewritten.containsKey(rewrittenKey)) {
+                throw new IllegalArgumentException(
+                        "Mapping directive key '" + key
+                                + "' collides with existing key '" + rewrittenKey + "'."
+                );
+            }
+            rewritten.put(rewrittenKey, converted);
+        }
+
+        map.clear();
+        map.putAll(rewritten);
+        return map;
+    }
+
+    private static void rejectRemovedMarkers(Object value) {
+        if (value instanceof String text) {
+            if (isRemovedStringMarker(text) || isRemovedObjectMarker(text)) {
+                throw removedMarker(text);
+            }
+            return;
+        }
+        if (value instanceof JsonNode node) {
+            if (node.isTextual()) {
+                rejectRemovedMarkers(node.textValue());
+            } else if (node.isObject()) {
+                node.fields().forEachRemaining(entry -> {
+                    if (isRemovedObjectMarker(entry.getKey())) {
+                        throw removedMarker(entry.getKey());
+                    }
+                    rejectRemovedMarkers(entry.getValue());
+                });
+            } else if (node.isArray()) {
+                node.forEach(ValConverter::rejectRemovedMarkers);
+            }
+            return;
+        }
+        if (value instanceof Map<?, ?> map) {
+            map.forEach((key, item) -> {
+                if (key instanceof String text && isRemovedObjectMarker(text)) {
+                    throw removedMarker(text);
+                }
+                rejectRemovedMarkers(item);
+            });
+            return;
+        }
+        if (value instanceof Collection<?> collection) {
+            collection.forEach(ValConverter::rejectRemovedMarkers);
+            return;
+        }
+        if (value != null && value.getClass().isArray()) {
+            for (int index = 0; index < Array.getLength(value); index++) {
+                rejectRemovedMarkers(Array.get(value, index));
             }
         }
-        Object structured = convertStructuredType(key, modify(innerValue, parent), originalValue);
-        if (structured != originalValue) {
-            return structured;
-        }
-        Class<?> targetType = resolveScalarType(key);
-        if (targetType == null) {
-            return originalValue;
-        }
-        if (targetType == String.class) {
-            return String.valueOf(modify(innerValue, parent));
-        }
-        return mapper.convertValue(modify(innerValue, parent), targetType);
     }
 
-    private Object convertStructuredType(String key, Object innerValue, Object originalValue) {
-        try {
-            return switch (key) {
-                case "~MAP~" -> convertToMap(innerValue);
-                case "~LIST~" -> convertToList(innerValue);
-                case "~SET~" -> convertToSet(innerValue);
-                case "~OBJECT~" -> convertToObject(innerValue);
-                case "~JSON~" -> convertToJsonNode(innerValue);
-                default -> originalValue;
-            };
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to convert value: " + originalValue, e);
-        }
+    private static boolean isRemovedStringMarker(String text) {
+        String trimmed = text.trim();
+        int colon = trimmed.indexOf(':');
+        return REMOVED_BARE_VALUE_MARKERS.contains(trimmed)
+                || colon > 0 && REMOVED_MARKERS.contains(trimmed.substring(0, colon));
     }
 
-    private Object convertToMap(Object innerValue) throws Exception {
-        if (innerValue instanceof String s) {
-            return mapper.readValue(s, new TypeReference<Map<String, Object>>() {
-            });
-        }
-        return mapper.convertValue(innerValue, new TypeReference<Map<String, Object>>() {
-        });
+    private static boolean isRemovedObjectMarker(String text) {
+        return REMOVED_MARKERS.contains(text.trim());
     }
 
-    private Object convertToList(Object innerValue) throws Exception {
-        if (innerValue instanceof String s) {
-            return mapper.readValue(s, new TypeReference<List<Object>>() {
-            });
-        }
-        return mapper.convertValue(innerValue, new TypeReference<List<Object>>() {
-        });
-    }
-
-    private Object convertToSet(Object innerValue) throws Exception {
-        if (innerValue instanceof String s) {
-            return mapper.readValue(s, new TypeReference<LinkedHashSet<Object>>() {
-            });
-        }
-        return mapper.convertValue(innerValue, new TypeReference<LinkedHashSet<Object>>() {
-        });
-    }
-
-    private Object convertToObject(Object innerValue) throws Exception {
-        if (innerValue instanceof String s) {
-            return mapper.readValue(s, Object.class);
-        }
-        return mapper.convertValue(innerValue, Object.class);
-    }
-
-    private JsonNode convertToJsonNode(Object innerValue) throws Exception {
-        if (innerValue instanceof String s) {
-            return mapper.readTree(s);
-        }
-        return mapper.valueToTree(innerValue);
-    }
-
-    private Class<?> resolveScalarType(String marker) {
-        return switch (marker) {
-            case "~STRING~" -> String.class;
-            case "~INT~" -> Integer.class;
-            case "~LONG~" -> Long.class;
-            case "~DOUBLE~" -> Double.class;
-            case "~BOOLEAN~" -> Boolean.class;
-            case "~DECIMAL~" -> BigDecimal.class;
-            case "~BIGINT~" -> BigInteger.class;
-            default -> null;
-        };
-    }
-
-    private static boolean isExplicitNull(Object value) {
-        if (!(value instanceof String text)) {
-            return false;
-        }
-        String normalized = text.trim();
-        return "^~NULL~^".equals(normalized)
-                || "<^~NULL~^>".equals(normalized);
+    private static IllegalArgumentException removedMarker(String marker) {
+        return new IllegalArgumentException(
+                "ValConverter marker syntax '" + marker + "' was removed. "
+                        + "Use mapping directives such as '~JSON;', '~STRING;', "
+                        + "or the explicit special markers '<^~NULL~^>', "
+                        + "'<^~NAN~^>', '<^~INF~^>', '<^~-INF~^>', "
+                        + "'<^~TAB~^>', and '<^~EMPTY~^>'."
+        );
     }
 }

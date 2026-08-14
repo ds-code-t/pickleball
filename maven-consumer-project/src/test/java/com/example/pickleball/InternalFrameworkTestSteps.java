@@ -9,6 +9,7 @@ import tools.dscode.common.dataelements.DataElementPhaseFourAndSixChecks;
 import tools.dscode.common.dataelements.DataElementPhaseOneChecks;
 import tools.dscode.common.dataelements.DataElementPhaseThreeChecks;
 import tools.dscode.common.dataelements.DataElementPhaseTwoChecks;
+import tools.dscode.common.mappings.MappingDataRefactorChecks;
 import tools.dscode.common.reporting.diagnostic.Diagnostic213CompletionChecks;
 import tools.dscode.common.reporting.diagnostic.DiagnosticReportingChecks;
 import tools.dscode.common.reporting.diagnostic.PickleballGuidanceChecks;
@@ -31,6 +32,7 @@ public final class InternalFrameworkTestSteps {
         runAndAssert(
                 ScenarioStepChecks.class,
                 ScenarioStepDataChecks.class,
+                MappingDataRefactorChecks.class,
                 ModularScenariosChecks.class,
                 BusinessTemporalDeltaChecks.class,
                 BusinessTimePostModifierChecks.class,

@@ -89,7 +89,7 @@ Feature: Reusable service call definitions
       | Scenario Tags     | endpoint              |
       | %mapped-json-body | http://127.0.0.1:8765 |
 
-  # ~unquote allows the template itself to remain valid JSON while inserting
+  # ~unquoted; allows the template itself to remain valid JSON while inserting
   # resolved numbers, booleans, objects, or arrays as raw JSON values. String
   # references remain normally quoted. The suffix is part of the Pickleball
   # runtime reference and is removed before the lookup is performed.
@@ -109,11 +109,11 @@ Feature: Reusable service call definitions
       """json
       {
         "name": "<PARENT.SCENARIO:unquoteTemplate.name>",
-        "quantity": "<PARENT.SCENARIO:unquoteTemplate.quantity~unquote>",
-        "active": "<PARENT.SCENARIO:unquoteTemplate.active~unquote>",
-        "unitPrice": "<PARENT.SCENARIO:unquoteTemplate.unitPrice~unquote>",
-        "metadata": "<PARENT.SCENARIO:unquoteTemplate.metadata~unquote>",
-        "items": "<PARENT.SCENARIO:unquoteTemplate.items[]~unquote>",
+        "quantity": "<PARENT.SCENARIO:unquoteTemplate.quantity~unquoted;>",
+        "active": "<PARENT.SCENARIO:unquoteTemplate.active~unquoted;>",
+        "unitPrice": "<PARENT.SCENARIO:unquoteTemplate.unitPrice~unquoted;>",
+        "metadata": "<PARENT.SCENARIO:unquoteTemplate.metadata~unquoted;>",
+        "items": "<PARENT.SCENARIO:unquoteTemplate.items[]~unquoted;>",
         "description": "<PARENT.SCENARIO:unquoteTemplate.name> has <PARENT.SCENARIO:unquoteTemplate.items[0].count> first-item units"
       }
       """

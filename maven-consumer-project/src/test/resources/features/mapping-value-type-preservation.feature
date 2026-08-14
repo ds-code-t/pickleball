@@ -241,13 +241,13 @@ Feature: MappingSteps value type preservation
       """json
       {
         "customer": {
-          "profile": "<SAVED_PROFILE~unquote>",
-          "address": "<SAVED_ADDRESS~unquote>"
+          "profile": "<SAVED_PROFILE~unquoted;>",
+          "address": "<SAVED_ADDRESS~unquoted;>"
         },
         "collections": {
-          "tags": "<SAVED_TAGS~unquote>",
-          "orders": "<SAVED_ORDERS~unquote>",
-          "matrix": "<SAVED_MATRIX~unquote>"
+          "tags": "<SAVED_TAGS~unquoted;>",
+          "orders": "<SAVED_ORDERS~unquoted;>",
+          "matrix": "<SAVED_MATRIX~unquoted;>"
         },
         "serialized": {
           "profile": "<SAVED_PROFILE>",

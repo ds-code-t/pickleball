@@ -168,19 +168,21 @@ For XML content, use XML-safe reference bookends:
 
 ## JSON body types
 
-A quoted `~unquote` reference preserves resolved numbers, booleans, objects, and arrays as JSON values:
+A quoted `~unquoted;` reference preserves resolved numbers, booleans, objects, and arrays as raw JSON values:
 
 ```gherkin
 And MAP "REQUEST.body" OBJECT VALUE TO SCENARIO MAP
   """json
   {
     "name": "<PARENT.SCENARIO:template.name>",
-    "quantity": "<PARENT.SCENARIO:template.quantity~unquote>",
-    "active": "<PARENT.SCENARIO:template.active~unquote>",
-    "metadata": "<PARENT.SCENARIO:template.metadata~unquote>"
+    "quantity": "<PARENT.SCENARIO:template.quantity~unquoted;>",
+    "active": "<PARENT.SCENARIO:template.active~unquoted;>",
+    "metadata": "<PARENT.SCENARIO:template.metadata~unquoted;>"
   }
   """
 ```
+
+`~unquoted;` is valid only when the reference is directly surrounded by one matching quote pair. See [Mapping and Templating](mapping-and-templating.md) for conversion directives, pipelines, masks, and directive placement rules.
 
 ## Request and response structure
 
