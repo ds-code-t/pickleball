@@ -2,7 +2,7 @@
 
 This is the canonical human-readable guide for the executable `maven-consumer-project` example and the basic shape of an external Maven consumer.
 
-The nested consumer intentionally keeps its own Markdown minimal. Detailed usage and AI guidance live in Pickleball core and are packaged into the Maven artifact so an external consumer can materialize version-matched instructions.
+The nested consumer intentionally keeps its own Markdown minimal. Detailed usage and AI guidance live in Pickleball core and are packaged into the Maven artifact so an external consumer can materialize version-matched instructions and working reference examples.
 
 ## Materialize dependency guidance
 
@@ -12,20 +12,37 @@ From a Maven consumer with Pickleball on the test classpath:
 mvn -q org.codehaus.mojo:exec-maven-plugin:3.5.0:java "-Dexec.mainClass=tools.dscode.common.reporting.diagnostic.DiagnosticCli" "-Dexec.classpathScope=test" "-Dexec.args=export-guidance .pickleball"
 ```
 
-Then read:
+Then read or browse:
 
 ```text
 .pickleball/GUIDANCE-MANIFEST.json
 .pickleball/AGENT-GUIDE.md
 .pickleball/docs/README.md
 .pickleball/docs/consumer-project.md
+.pickleball/maven-consumer-project/
 ```
 
 Rerun export before Pickleball work even when `.pickleball` already exists. A successful export overwrites current managed files, removes obsolete previously managed files, writes the manifest last, and best-effort keeps `.pickleball` ignored by Git. If export fails, treat existing generated guidance as potentially stale.
 
 Compatibility note: an older Pickleball release whose exporter predates the manifest lifecycle may leave newer files or a newer manifest behind after a downgrade. Those leftovers are not authoritative for the downgraded dependency; prefer the dependency actually resolved on the test classpath and the files freshly exported by that dependency.
 
-AI agents should read `.pickleball/AGENT-GUIDE.md` first after a successful export.
+AI agents should read `.pickleball/AGENT-GUIDE.md` first after a successful export. Human readers can start with `.pickleball/docs/README.md`; links from those guides to `maven-consumer-project` resolve to the exported version-matched reference files.
+
+## Version-matched reference snapshot
+
+`export-guidance` also materializes a curated, read-only snapshot of the canonical Pickleball Maven consumer under `.pickleball/maven-consumer-project/`. It is intended for both human readers and AI agents that need concrete working examples in addition to prose documentation.
+
+The snapshot includes:
+
+- `pom.xml`;
+- the `PickleballTests` runner and `LocalTestSite` browser/service test server;
+- executable feature files;
+- reusable service-call definitions;
+- configuration, data, and file fixtures;
+- static local test-site resources; and
+- the committed shared/local `profiles*.yaml` and `pickleball*.properties` examples.
+
+It intentionally excludes Maven wrappers, Git/IDE/generated artifacts, the consumer `AGENTS.md` bridge, internal Java verification classes, and maintainer-only `_local2` files. It is reference material, not another consumer project to edit or run. Make changes in the real consumer project; a future guidance export may replace every managed file in this snapshot.
 
 ## Purpose
 
@@ -100,6 +117,8 @@ Important locations:
 - local named-profile overrides — `src/test/resources/profiles_local.yaml`;
 - shared Pickleball properties — `src/test/resources/pickleball.properties`;
 - local Pickleball property overrides — `src/test/resources/pickleball_local.properties`.
+
+When this guide is read from `.pickleball/docs/consumer-project.md`, the same paths are available beneath `.pickleball/maven-consumer-project/` as version-matched reference material.
 
 ## What the consumer exercises
 
@@ -220,6 +239,6 @@ When evidence supports a bounded rerun:
 - The runner class name ends in `Tests` for Maven Surefire discovery.
 - Standard Cucumber and consumer Java glue can coexist with Pickleball dynamic steps.
 - Port `8765` must be available for the example test server.
-- Nested README/AGENTS files are minimal adapters; detailed guidance is owned by Pickleball core and exported from the dependency.
+- Nested README/AGENTS files are minimal adapters; detailed guidance and version-matched reference examples are owned by Pickleball core and exported from the dependency.
 
-Use `docs/README.md` for the complete version-matched Pickleball syntax/documentation map.
+Use `docs/README.md` for the complete version-matched Pickleball syntax/documentation map and `maven-consumer-project/` for the corresponding working reference files.

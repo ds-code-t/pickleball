@@ -39,6 +39,7 @@ REQUIRED_FILES = (
     "docs/agent/change-checklist.md",
     "docs/agent/prompt-examples.md",
     "docs/agent/repository-index.md",
+    "gradle/consumer-guidance.gradle",
     "scripts/refresh_agent_index.py",
     "scripts/sync_consumer_guidance.py",
     "scripts/verify_agent_contract.py",
@@ -106,6 +107,7 @@ BEHAVIOR_PREFIXES = (
 BEHAVIOR_FILES = {
     "build.gradle",
     "settings.gradle",
+    "gradle/consumer-guidance.gradle",
     "gradle.properties",
 }
 TEST_PREFIXES = (
@@ -247,12 +249,25 @@ def validate_dependency_owned_guidance(errors: list[str]) -> None:
         "potentially stale",
         "managed guidance files",
         "version-matched",
+        "Generated Maven consumer reference",
+        "maven-consumer-project/",
     ):
         if required not in text:
             errors.append(
                 f"Dependency-owned consumer guide must retain lifecycle guidance ({required}): "
                 "docs/consumer-agent-guide.md"
             )
+
+
+def validate_consumer_reference_build_hook(errors: list[str]) -> None:
+    settings = ROOT / "settings.gradle"
+    if not settings.is_file():
+        return
+    if "gradle/consumer-guidance.gradle" not in settings.read_text(encoding="utf-8"):
+        errors.append(
+            "settings.gradle must apply gradle/consumer-guidance.gradle so indexed Maven "
+            "consumer reference files are packaged into the Pickleball dependency."
+        )
 
 
 def validate_consumer_tracked_artifacts(errors: list[str]) -> None:
@@ -378,6 +393,7 @@ def main() -> int:
     validate_consumer_bridge(errors)
     validate_consumer_readme(errors)
     validate_dependency_owned_guidance(errors)
+    validate_consumer_reference_build_hook(errors)
     validate_consumer_tracked_artifacts(errors)
     validate_consumer_ignore(errors)
     validate_packaged_guidance(errors)

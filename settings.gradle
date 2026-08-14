@@ -3,5 +3,6 @@ rootProject.name = 'pickleball'
 gradle.beforeProject { project ->
     if (project.path == ':') {
         project.apply from: new File(settingsDir, 'gradle/pickleball-build-provenance.gradle')
+        project.apply from: new File(settingsDir, 'gradle/consumer-guidance.gradle')
     }
 }

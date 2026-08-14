@@ -2,7 +2,7 @@
 
 This is the canonical AI-agent contract for projects that consume Pickleball as a Maven dependency.
 
-A consumer project may contain only a short `AGENTS.md` bridge. That bridge can use Pickleball's `DiagnosticCli export-guidance` command to materialize the version-matched guidance embedded in the installed Pickleball dependency. When this file is materialized as `.pickleball/AGENT-GUIDE.md`, supporting documentation is under `.pickleball/docs/`.
+A consumer project may contain only a short `AGENTS.md` bridge. That bridge can use Pickleball's `DiagnosticCli export-guidance` command to materialize the version-matched guidance embedded in the installed Pickleball dependency. When this file is materialized as `.pickleball/AGENT-GUIDE.md`, supporting documentation is under `.pickleball/docs/` and a curated reference snapshot of Pickleball's executable Maven consumer is under `.pickleball/maven-consumer-project/`.
 
 ## Generated guidance lifecycle
 
@@ -10,7 +10,7 @@ Treat `.pickleball` as generated dependency guidance, not as a durable source of
 
 A successful `export-guidance .pickleball` run:
 
-- overwrites the current version's managed guidance files;
+- overwrites the current version's managed guidance files, documentation, and Maven consumer reference snapshot;
 - writes `.pickleball/GUIDANCE-MANIFEST.json` last, recording the exporting Pickleball version and managed files;
 - removes files managed by the previous manifest that are no longer shipped, while leaving unrelated files alone; and
 - best-effort ensures `.pickleball` is ignored by Git, preferring an existing `.gitignore` and then repository-local `.git/info/exclude`.
@@ -27,15 +27,25 @@ For Pickleball scenario authoring, configuration, execution, diagnostics, or tro
 2. Read this guide before changing Pickleball scenarios or diagnosing a Pickleball run.
 3. Use `docs/README.md` as the documentation map.
 4. Inspect the consumer project's `pom.xml`, Pickleball runner subclass, features, configuration, data, mappings, and test support before changing them.
-5. Do not assume the Pickleball core source repository is present. A normal consumer may only have the Maven dependency.
+5. Use `maven-consumer-project/` as a version-matched read-only reference when a documented syntax/configuration example or working Pickleball consumer structure is useful.
+6. Do not assume the Pickleball core source repository is present. A normal consumer may only have the Maven dependency.
 
-The exported documentation is version-matched to the Pickleball artifact on the consumer's test classpath. Prefer it over instructions copied from another release.
+The exported documentation and Maven consumer reference are version-matched to the Pickleball artifact on the consumer's test classpath. Prefer them over instructions or examples copied from another release.
+
+## Generated Maven consumer reference
+
+`.pickleball/maven-consumer-project/` is a generated, read-only reference snapshot of the canonical Maven consumer used by Pickleball itself. It preserves repository-relative paths so links from the exported Markdown documentation continue to resolve locally.
+
+The snapshot intentionally includes the consumer `pom.xml`, Pickleball runner, local browser/service test server, executable feature files, service-call definitions, configuration/data fixtures, local test-site resources, and the committed shared/local profile and property examples. It intentionally excludes Maven wrappers, Git/IDE/generated artifacts, the consumer `AGENTS.md` bridge, internal Java verification classes, and maintainer-only `_local2` files.
+
+Use the snapshot to answer questions such as how a working feature, profile, property file, service call, configuration resource, browser fixture, or runner is structured. Do not modify or execute files under `.pickleball/maven-consumer-project/` as the consumer project's implementation. Make requested changes in the consumer project's own source tree. A later `export-guidance` run may overwrite or remove every managed reference file.
 
 ## Scenario authoring and fixes
 
 When changing a consumer scenario:
 
 - Prefer existing documented Pickleball syntax and executable examples.
+- Use the version-matched `maven-consumer-project/` reference when it provides a working example of the same syntax or configuration.
 - Do not invent a new Gherkin phrase when a Pickleball step or supported dynamic-step form already expresses the behavior.
 - Preserve standard Cucumber behavior and project-specific custom glue.
 - Inspect related mappings, component scenarios, service-call definitions, configuration, and test-site support before assuming a failing line is self-contained.
@@ -120,7 +130,7 @@ DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
 DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
 ```
 
-Use `guidance` to print this guide and `export-guidance` to materialize the complete version-matched documentation. Prefer `DiagnosticCli` over constructing Maven classpaths and JShell scripts for routine diagnostic operations.
+Use `guidance` to print this guide and `export-guidance` to materialize the complete version-matched documentation plus curated Maven consumer reference. Prefer `DiagnosticCli` over constructing Maven classpaths and JShell scripts for routine diagnostic operations.
 
 ## Controlled diagnostic reruns
 
@@ -156,7 +166,7 @@ See `docs/ai-run-configuration.md` for the full profile/RunVar contract and `doc
 
 ## Pickleball syntax documentation
 
-The exported `docs/` tree is the version-matched reference for all supported Pickleball behavior and syntax. Use `docs/README.md` to select the relevant guide. In particular:
+The exported `docs/` tree is the version-matched reference for all supported Pickleball behavior and syntax. Use `docs/README.md` to select the relevant guide. Its links to the working consumer resolve into the exported `maven-consumer-project/` reference snapshot. In particular:
 
 - dynamic Gherkin/action/assertion syntax — `docs/dynamic-steps.md`;
 - element vocabulary/selectors — `docs/custom-element-definitions.md`;
@@ -171,11 +181,11 @@ The exported `docs/` tree is the version-matched reference for all supported Pic
 - Cucumber compatibility — `docs/cucumber-compatibility.md`;
 - diagnostics and lineage — `docs/diagnostic-reporting.md`, `docs/diagnostic-lineage-metadata.md`.
 
-Do not guess Pickleball syntax when the version-matched guide or executable consumer example can answer it.
+Do not guess Pickleball syntax when the version-matched guide or executable consumer reference can answer it.
 
 ## Human-readable consumer guidance
 
-Use `docs/consumer-project.md` for the Maven consumer layout, local test site, common tag entry points, diagnostic usage, and example commands. Use `docs/README.md` to navigate the complete bundled documentation.
+Use `docs/consumer-project.md` for the Maven consumer layout, local test site, common tag entry points, diagnostic usage, and example commands. Use `docs/README.md` to navigate the complete bundled documentation. Human readers can open files under `maven-consumer-project/` directly in the IDE to inspect the version-matched working features, configuration, calls, data, runner, and test-site examples linked from those guides.
 
 ## When the core Pickleball repository is also present
 

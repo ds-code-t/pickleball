@@ -2,10 +2,12 @@
 
 Pickleball extends Cucumber with a dynamic feature-file language while preserving normal Cucumber behavior. The pages below describe the supported authoring model and link to real executable examples in [`maven-consumer-project`](consumer-project.md).
 
+When these docs are materialized from the Maven dependency with `DiagnosticCli export-guidance`, links to `../maven-consumer-project/...` resolve to the version-matched, read-only reference snapshot exported beside the docs. Human readers and AI agents can therefore inspect the same working features, configuration, calls, data, runner, and local test-site examples without checking out the Pickleball source repository.
+
 ## Start here
 
 - [Getting started](getting-started.md) — add the Maven dependency, create one runner, and run feature files.
-- [Consumer project guide](consumer-project.md) — run the executable Maven consumer, local test site, tag suites, configuration, and diagnostic workflow.
+- [Consumer project guide](consumer-project.md) — run the executable Maven consumer, local test site, tag suites, configuration, diagnostic workflow, and exported reference snapshot.
 - [Consumer AI agent guide](consumer-agent-guide.md) — canonical instructions for AI agents authoring, running, diagnosing, and rerunning Pickleball scenarios from a Maven consumer.
 - [Cucumber compatibility](cucumber-compatibility.md) — mix Pickleball dynamic steps with standard Cucumber steps, hooks, tags, tables, and plugins.
 
@@ -39,14 +41,17 @@ Pickleball extends Cucumber with a dynamic feature-file language while preservin
 
 ## Working consumer project
 
-The example project contains a Maven dependency, runner, loopback server, browser pages, REST/SOAP endpoints, feature files, configuration data, and reusable call definitions.
+The example project contains a Maven dependency, runner, loopback server, browser pages, REST/SOAP endpoints, feature files, configuration data, and reusable call definitions. In the Pickleball source repository these links open the canonical consumer; after dependency guidance export they open the version-matched reference snapshot.
 
 - [Consumer `pom.xml`](../maven-consumer-project/pom.xml)
 - [Pickleball test runner](../maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java)
 - [Local browser/service test server](../maven-consumer-project/src/test/java/com/example/pickleball/support/LocalTestSite.java)
 - [Executable feature files](../maven-consumer-project/src/test/resources/features)
 - [Example profiles](../maven-consumer-project/src/test/resources/profiles.yaml)
+- [Local profile overrides](../maven-consumer-project/src/test/resources/profiles_local.yaml)
+- [Shared Pickleball properties](../maven-consumer-project/src/test/resources/pickleball.properties)
+- [Local Pickleball property overrides](../maven-consumer-project/src/test/resources/pickleball_local.properties)
 - [Shared configuration data](../maven-consumer-project/src/test/resources/configs)
+- [Structured and scenario data](../maven-consumer-project/src/test/resources/data)
 - [Reusable service calls](../maven-consumer-project/src/test/resources/calls/service-call-definitions.feature)
-
-[Return to the project README](../README.md)
+- [Local browser/service test-site fixtures](../maven-consumer-project/src/test/resources/site)

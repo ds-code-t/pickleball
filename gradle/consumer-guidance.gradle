@@ -1,0 +1,38 @@
+def guidanceIndex = file('src/main/resources/META-INF/pickleball/guidance/index.txt')
+def consumerRoot = file('maven-consumer-project')
+def consumerPrefix = 'maven-consumer-project/'
+
+def consumerReferencePaths = {
+    if (!guidanceIndex.isFile()) {
+        throw new GradleException("Missing Pickleball guidance index: ${guidanceIndex}")
+    }
+
+    guidanceIndex.readLines('UTF-8')
+            .collect { it.trim() }
+            .findAll { it.startsWith(consumerPrefix) }
+            .collect { it.substring(consumerPrefix.length()) }
+}
+
+pluginManager.withPlugin('java') {
+    tasks.named('processResources').configure {
+        def referencePaths = consumerReferencePaths()
+        if (referencePaths.isEmpty()) {
+            throw new GradleException('Pickleball guidance index contains no Maven consumer reference files.')
+        }
+
+        def missing = referencePaths.findAll { !new File(consumerRoot, it).isFile() }
+        if (!missing.isEmpty()) {
+            throw new GradleException(
+                    'Missing Maven consumer guidance reference files: ' + missing.join(', ')
+            )
+        }
+
+        inputs.file(guidanceIndex)
+        inputs.files(referencePaths.collect { new File(consumerRoot, it) })
+
+        from(consumerRoot) {
+            include(referencePaths)
+            into 'META-INF/pickleball/guidance/maven-consumer-project'
+        }
+    }
+}
