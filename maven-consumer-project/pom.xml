@@ -13,7 +13,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>21</maven.compiler.release>
-        <pickleball.version>2.1.6</pickleball.version>
+        <pickleball.version>2.1.7</pickleball.version>
         <!-- Empty by default. A Maven suite profile supplies a -Dpkb_tags argument. -->
         <tagArgLine></tagArgLine>
     </properties>
@@ -22,12 +22,6 @@
         <dependency>
             <groupId>tools.dscode</groupId>
             <artifactId>pickleball</artifactId>
-            <version>${pickleball.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>tools.dscode</groupId>
-            <artifactId>pickleball-control-api</artifactId>
             <version>${pickleball.version}</version>
             <scope>test</scope>
         </dependency>

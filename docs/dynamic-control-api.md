@@ -1,10 +1,10 @@
 # Dynamic Control API
 
-Pickleball exposes a small core interception contract plus an optional `tools.dscode:pickleball-control-api` artifact for dynamic tooling. The API is intentionally independent of MCP, Spring AI, GUIs, and process orchestration so those layers can be added without coupling them to Pickleball core.
+Pickleball exposes a small core interception contract plus a separately organized `pickleball-control-api` source module for dynamic tooling. The control API classes are bundled into the main `tools.dscode:pickleball` artifact; consumers do not add a second Maven dependency. The source module is intentionally independent of MCP, Spring AI, GUIs, and process orchestration so those layers can be added without coupling them to Pickleball core.
 
-## Artifacts
+## Artifact
 
-Normal Pickleball consumers continue to depend only on:
+All consumers, including tooling that uses dynamic control, depend only on Pickleball:
 
 ```xml
 <dependency>
@@ -15,24 +15,13 @@ Normal Pickleball consumers continue to depend only on:
 </dependency>
 ```
 
-Tooling that wants dynamic control adds the optional companion artifact:
-
-```xml
-<dependency>
-  <groupId>tools.dscode</groupId>
-  <artifactId>pickleball-control-api</artifactId>
-  <version>2.1.6</version>
-  <scope>test</scope>
-</dependency>
-```
-
-The companion artifact depends on Pickleball; Pickleball does not depend on the companion artifact.
+`pickleball-control-api` remains a separate Gradle source module inside the Pickleball repository for organization and architectural separation. It is not published as a separate Maven artifact. Its `tools.dscode.control.api` classes are bundled into the main shaded Pickleball JAR and its Java sources are included in the main Pickleball sources JAR.
 
 ## Compatibility rule
 
-Installing Pickleball with no control handler and never calling the optional control API preserves normal execution behavior. Normal scenario traversal continues to create, inherit, resolve, and mutate its `ParsingMap`/`NodeMap` state exactly as before. Mapping interception advice immediately proceeds with the original key/value/result when no handler is installed.
+Installing Pickleball with no control handler and never calling the bundled control API preserves normal execution behavior. Normal scenario traversal continues to create, inherit, resolve, and mutate its `ParsingMap`/`NodeMap` state exactly as before. Mapping interception advice immediately proceeds with the original key/value/result when no handler is installed.
 
-Dynamic mapping contexts, scoped map replacement, mapping snapshots, and value interception are opt-in control operations. They are never activated merely because `pickleball-control-api` is present on the classpath.
+Dynamic mapping contexts, scoped map replacement, mapping snapshots, and value interception are opt-in control operations. They are never activated merely because the bundled control API classes are present on the classpath.
 
 ## Dynamic execution
 

@@ -69,7 +69,7 @@ Diagnostic lineage is metadata, not part of the execution RunVars. Supply `pkb_i
 Use all relevant evidence rather than trusting one file in isolation:
 
 - Current implementation under `src/main/java` and `src/main/aspectj`
-- Optional dynamic-control companion implementation under `pickleball-control-api`
+- Dynamic-control companion source module under `pickleball-control-api`; its classes are bundled into the main `tools.dscode:pickleball` artifact and are not a separate consumer dependency
 - Consumer-hosted internal Java checks under `maven-consumer-project/src/test/java`
 - Executable consumer examples under `maven-consumer-project/src/test`
 - `README.md` and the guides under `docs`
@@ -89,7 +89,7 @@ When implementation, tests, examples, and documentation disagree:
 - `src/main/java` — framework implementation and Cucumber integrations
 - `src/main/aspectj` — AspectJ integrations and weaving behavior
 - `src/main/resources` — framework resources
-- `pickleball-control-api` — optional companion Java API for retry-friendly detached execution, Gherkin utilities, ParsingMap/NodeMap inspection and emulation, and dynamic controller tooling
+- `pickleball-control-api` — internal companion source module for retry-friendly detached execution, Gherkin utilities, ParsingMap/NodeMap inspection and emulation, and dynamic controller tooling; bundled into the main Pickleball artifact rather than published separately
 - `src/test` — reserved for tests that must run inside the framework build
 - `docs` — detailed user-facing documentation
 - `maven-consumer-project` — executable Maven consumer example
