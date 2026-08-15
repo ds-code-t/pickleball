@@ -20,6 +20,7 @@ docs/data-values-and-elements.md
 docs/date-time-utilities.md
 docs/diagnostic-lineage-metadata.md
 docs/diagnostic-reporting.md
+docs/dynamic-control-api.md
 docs/dynamic-steps.md
 docs/feature-status-notes.md
 docs/getting-started.md

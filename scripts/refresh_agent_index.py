@@ -48,6 +48,11 @@ GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "src/test/**/*.feature",
         "src/test/resources/**/*",
     )),
+    ("Control API module", (
+        "pickleball-control-api/build.gradle",
+        "pickleball-control-api/src/main/**/*",
+        "pickleball-control-api/src/test/**/*",
+    )),
     ("Maven consumer Java support", (
         "maven-consumer-project/src/test/java/**/*.java",
     )),

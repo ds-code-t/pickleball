@@ -37,7 +37,8 @@ public final class InternalFrameworkTestSteps {
                 BusinessTemporalDeltaChecks.class,
                 BusinessTimePostModifierChecks.class,
                 PkbPropertyValueNormalizerChecks.class,
-                ProfileConfigurationChecks.class
+                ProfileConfigurationChecks.class,
+                DynamicControlApiChecks.class
         );
     }
 

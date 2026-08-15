@@ -1,0 +1,97 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'signing'
+}
+
+group = rootProject.group
+version = rootProject.version
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(21) }
+    withSourcesJar()
+    withJavadocJar()
+}
+
+dependencies {
+    api project(':')
+}
+
+tasks.withType(JavaCompile).configureEach {
+    dependsOn rootProject.tasks.named('ajcMain')
+    options.encoding = 'UTF-8'
+}
+
+publishing {
+    repositories {
+        maven {
+            name = 'staging'
+            url = rootProject.layout.buildDirectory.dir('maven-central-staging')
+        }
+    }
+
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = 'pickleball-control-api'
+            from components.java
+
+            pom {
+                name.set('pickleball-control-api')
+                description.set('Optional dynamic execution, mapping control, and Gherkin utility API for Pickleball tooling')
+                url.set('https://github.com/ds-code-t/pickleball')
+                licenses {
+                    license {
+                        name.set('Apache License, Version 2.0')
+                        url.set('https://www.apache.org/licenses/LICENSE-2.0')
+                    }
+                }
+                scm {
+                    url.set('https://github.com/ds-code-t/pickleball')
+                    connection.set('scm:git:git://github.com/ds-code-t/pickleball.git')
+                    developerConnection.set('scm:git:ssh://git@github.com/ds-code-t/pickleball.git')
+                }
+                developers {
+                    developer {
+                        id.set('ds-code-t')
+                        name.set('DSCode Tools')
+                        url.set('https://github.com/ds-code-t')
+                    }
+                }
+            }
+        }
+    }
+}
+
+def requested = gradle.startParameter.taskNames*.toLowerCase()
+def isMavenLocalPublish = requested.any { it.contains('publishtomavenlocal') }
+def isStagingPublish = requested.any { it.contains('publicationtostagingrepository') }
+        || requested.any { it.contains('publishallpublicationstostagingrepository') }
+        || requested.any { it.contains('closeandrelease') }
+        || requested.any { it.contains('releasesonatype') }
+        || requested.any { it.contains('publishsonatype') }
+def signingIsRequired = isStagingPublish && !isMavenLocalPublish
+
+signing {
+    required { signingIsRequired }
+
+    def key = (rootProject.findProperty('signingKey') ?: System.getenv('SIGNING_KEY'))?.toString()
+    def pass = (rootProject.findProperty('signingPassword') ?: System.getenv('SIGNING_PASSWORD'))?.toString()
+
+    if (signingIsRequired) {
+        if (!key) {
+            throw new GradleException(
+                    'Signing is required for staging publish, but no signingKey/SIGNING_KEY was provided.'
+            )
+        }
+        useInMemoryPgpKeys(key, pass)
+        sign(publishing.publications.named('mavenJava').get())
+    }
+}
+
+rootProject.tasks.named('generateCentralChecksums').configure {
+    dependsOn tasks.named('publishMavenJavaPublicationToStagingRepository')
+}

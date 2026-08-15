@@ -112,6 +112,11 @@ public abstract class StepBase implements Cloneable {
         return stepParsingMap;
     }
 
+    /** Returns the original Cucumber step text without exposing package-private runner types. */
+    public String getStepText() {
+        return pickleStepTestStep.getStepText();
+    }
+
     /**
      * Adds one or more runtime execution flags to this step.
      *

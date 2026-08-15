@@ -69,10 +69,11 @@ Diagnostic lineage is metadata, not part of the execution RunVars. Supply `pkb_i
 Use all relevant evidence rather than trusting one file in isolation:
 
 - Current implementation under `src/main/java` and `src/main/aspectj`
+- Optional dynamic-control companion implementation under `pickleball-control-api`
 - Consumer-hosted internal Java checks under `maven-consumer-project/src/test/java`
 - Executable consumer examples under `maven-consumer-project/src/test`
 - `README.md` and the guides under `docs`
-- Build and dependency configuration in `build.gradle` and `maven-consumer-project/pom.xml`
+- Build and dependency configuration in `build.gradle`, `settings.gradle`, `pickleball-control-api/build.gradle`, and `maven-consumer-project/pom.xml`
 - `docs/agent/feature-map.md` for navigation, not as a replacement for source inspection
 
 When implementation, tests, examples, and documentation disagree:
@@ -88,6 +89,7 @@ When implementation, tests, examples, and documentation disagree:
 - `src/main/java` — framework implementation and Cucumber integrations
 - `src/main/aspectj` — AspectJ integrations and weaving behavior
 - `src/main/resources` — framework resources
+- `pickleball-control-api` — optional companion Java API for retry-friendly detached execution, Gherkin utilities, ParsingMap/NodeMap inspection and emulation, and dynamic controller tooling
 - `src/test` — reserved for tests that must run inside the framework build
 - `docs` — detailed user-facing documentation
 - `maven-consumer-project` — executable Maven consumer example
@@ -101,7 +103,8 @@ When implementation, tests, examples, and documentation disagree:
 
 Treat these as consumer-visible contracts unless source evidence clearly shows otherwise:
 
-- Public Java APIs
+- Public Java APIs, including the optional dynamic-control API and semantic hook contract
+- Dynamic-control mapping behavior: isolated caller-defined NodeMap contexts, scoped live-map replacement, snapshot materialization, and mapping resolve/lookup/write interception are opt-in and must not alter normal execution when unused
 - Maven artifact behavior and runtime dependencies
 - Cucumber step phrases and dynamic-step behavior
 - Mapping, template, key-expression, and reference syntax
@@ -223,6 +226,7 @@ If a required validation cannot run, state exactly what was not run and why. Nev
 - Do not change versions, publish remote artifacts, create releases, or push branches unless explicitly requested.
 - Do not edit generated build output.
 - Preserve backward compatibility unless the user explicitly approves a breaking change.
+- Dynamic-control additions must remain opt-in: no handler/API call means normal scenario traversal, ParsingMap construction/order, NodeMap references, resolution, and writes retain their pre-control behavior.
 - Follow existing code style and patterns before introducing new abstractions.
 - Do not replace executable examples with prose.
 - Never store secrets, credentials, machine-specific paths, or private data in agent instruction files.

@@ -25,6 +25,12 @@
             <version>${pickleball.version}</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>tools.dscode</groupId>
+            <artifactId>pickleball-control-api</artifactId>
+            <version>${pickleball.version}</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

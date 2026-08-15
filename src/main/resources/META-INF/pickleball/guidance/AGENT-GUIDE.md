@@ -1,194 +1,287 @@
-# Pickleball Consumer Agent Guide
+# Pickleball Agent Contract
+## Purpose
 
-This is the canonical AI-agent contract for projects that consume Pickleball as a Maven dependency.
+Pickleball is a Java 21 testing framework distributed for use by consumer projects as a Maven dependency.
 
-A consumer project may contain only a short `AGENTS.md` bridge. That bridge can use Pickleball's `DiagnosticCli export-guidance` command to materialize the version-matched guidance embedded in the installed Pickleball dependency. When this file is materialized as `.pickleball/AGENT-GUIDE.md`, supporting documentation is under `.pickleball/docs/` and a curated reference snapshot of Pickleball's executable Maven consumer is under `.pickleball/maven-consumer-project/`.
+The repository also contains `maven-consumer-project`, which is both:
 
-## Generated guidance lifecycle
+1. An example of how a consumer configures and uses Pickleball.
+2. An executable compatibility and integration test for the framework.
 
-Treat `.pickleball` as generated dependency guidance, not as a durable source of truth by itself. Do not skip `export-guidance` merely because the directory already exists. The consumer bridge intentionally reruns the exporter before Pickleball work so the Maven dependency currently resolved on the test classpath remains authoritative.
+Consumer scenarios start a local test-site server and exercise browser behavior through Selenium as well as REST/SOAP-style service calls, mappings, templates, dynamic Cucumber steps, nested flows, and component scenarios.
 
-A successful `export-guidance .pickleball` run:
+## Default agent behavior
 
-- overwrites the current version's managed guidance files, documentation, and Maven consumer reference snapshot;
-- writes `.pickleball/GUIDANCE-MANIFEST.json` last, recording the exporting Pickleball version and managed files;
-- removes files managed by the previous manifest that are no longer shipped, while leaving unrelated files alone; and
-- best-effort ensures `.pickleball` is ignored by Git, preferring an existing `.gitignore` and then repository-local `.git/info/exclude`.
+For any request to add, change, fix, refactor, or remove project functionality:
 
-The exporter does not create/commit a new `.gitignore`, alter the Git index, or untrack files that were already committed. If export fails, treat any existing `.pickleball` contents as potentially stale. The manifest records the last completed export; it is not a substitute for rerunning the exporter.
+1. Read this file.
+2. Read `docs/agent/feature-map.md`.
+3. Locate the current implementation, tests, consumer scenarios, and documentation for the affected capability.
+4. Infer repository setup, build configuration, project goals, and established conventions from the repository.
+5. Make the requested change across every affected surface.
+6. Run the applicable validation.
+7. Report changed behavior, compatibility implications, documentation updates, and validation results.
 
-Compatibility note: an older Pickleball release whose exporter predates the manifest lifecycle may leave newer files behind after a downgrade. Those leftovers are not authoritative for the downgraded dependency. Prefer the dependency actually resolved on the test classpath and files freshly exported by that dependency.
+Do not require the user to repeat the project background, repository layout, test-server setup, dependency model, documentation policy, or definition of done.
 
-## First actions
+Ask for clarification only when the requested product behavior remains materially ambiguous after reviewing the repository. Prefer existing conventions and backward-compatible behavior when a reasonable interpretation is available.
 
-For Pickleball scenario authoring, configuration, execution, diagnostics, or troubleshooting:
+### Diagnostic investigation protocol
 
-1. Follow the consumer project's own instructions first; they remain authoritative for project-specific behavior.
-2. Read this guide before changing Pickleball scenarios or diagnosing a Pickleball run.
-3. Use `docs/README.md` as the documentation map.
-4. Inspect the consumer project's `pom.xml`, Pickleball runner subclass, features, configuration, data, mappings, and test support before changing them.
-5. Use `maven-consumer-project/` as a version-matched read-only reference when a documented syntax/configuration example or working Pickleball consumer structure is useful.
-6. Do not assume the Pickleball core source repository is present. A normal consumer may only have the Maven dependency.
-
-The exported documentation and Maven consumer reference are version-matched to the Pickleball artifact on the consumer's test classpath. Prefer them over instructions or examples copied from another release.
-
-## Generated Maven consumer reference
-
-`.pickleball/maven-consumer-project/` is a generated, read-only reference snapshot of the canonical Maven consumer used by Pickleball itself. It preserves repository-relative paths so links from the exported Markdown documentation continue to resolve locally.
-
-The snapshot intentionally includes the consumer `pom.xml`, Pickleball runner, local browser/service test server, executable feature files, service-call definitions, configuration/data fixtures, local test-site resources, and the committed shared/local profile and property examples. It intentionally excludes Maven wrappers, Git/IDE/generated artifacts, the consumer `AGENTS.md` bridge, internal Java verification classes, and maintainer-only `_local2` files.
-
-Use the snapshot to answer questions such as how a working feature, profile, property file, service call, configuration resource, browser fixture, or runner is structured. Do not modify or execute files under `.pickleball/maven-consumer-project/` as the consumer project's implementation. Make requested changes in the consumer project's own source tree. A later `export-guidance` run may overwrite or remove every managed reference file.
-
-## Scenario authoring and fixes
-
-When changing a consumer scenario:
-
-- Prefer existing documented Pickleball syntax and executable examples.
-- Use the version-matched `maven-consumer-project/` reference when it provides a working example of the same syntax or configuration.
-- Do not invent a new Gherkin phrase when a Pickleball step or supported dynamic-step form already expresses the behavior.
-- Preserve standard Cucumber behavior and project-specific custom glue.
-- Inspect related mappings, component scenarios, service-call definitions, configuration, and test-site support before assuming a failing line is self-contained.
-- Make the smallest change supported by evidence.
-- Rerun the narrowest useful scenario/tag selection first, then broaden validation when needed.
-
-Use supporting guides as appropriate, especially `docs/dynamic-steps.md`, `docs/component-scenarios.md`, `docs/service-call-scenarios.md`, `docs/mapping-and-templating.md`, `docs/data-values-and-elements.md`, `docs/configuration.md`, and `docs/cucumber-compatibility.md`.
-
-## Configuration and controlled RunVars
-
-Treat these as distinct concepts:
-
-- `default_profile` — internal reference snapshot of normal resolved project RunVars;
-- `pkb_runvars` — preferred controlled-run **input**;
-- `pkb_run_profile` — canonical resolved RunVar **output** retained for diagnostics/replay.
-
-Never supply `pkb_run_profile` or `pkb_run_profile.<pkb_var>` as input. They are reserved internal derived-output names; Pickleball rejects external use. Use `pkb_runvars` or `pkb_runvars.<pkb_var>` for controlled execution.
-
-### Default AI test-launch rule
-
-When you launch Pickleball tests and the intended execution settings are known, use `pkb_runvars` as the authoritative input. Put intentional tag/name selection, browser, evidence/logging controls, and other non-secret RunVar changes inside `pkb_runvars`; do not default to ambient optional project settings or separate JVM `-Dpkb_*` RunVars. Use `pkb_profile` or ordinary JVM RunVar overrides only when the task specifically tests those configuration semantics or the user asks for them. Keep protected secrets and diagnostic lineage outside `pkb_runvars`.
-
-A selected profile or partial `pkb_runvars` input inherits only missing project execution-context RunVars:
-
-```text
-pkb_glue
-pkb_features
-pkb_datapath
-pkb_callpath
-pkb_componentpath
-pkb_configpath
-```
-
-Optional RunVars such as browser, tags, reporting, logging, and ReportPortal values do not leak into a controlled run merely because normal configuration contains them.
-
-Explicit JVM `-Dpkb_*` RunVars are different from ambient project defaults: they are intentional runtime overrides and remain active with a selected profile or controlled run. With a selected profile they override the same profile key; with `pkb_runvars`, the controlled value wins any conflict.
-
-For those six inherited keys, missing means inherit, nonblank means override, and blank/null means suppress inheritance. A blank remains a blank tombstone in the retained final `runProfile`, because replaying that blank is what tells the underlying Pickleball subsystem to use its historical fallback behavior instead of re-inheriting a project value.
-
-`pkb_configpath` selects the source loaded beneath the configuration mapping. Prefer `<config:...>` references such as `<config:URL.forms>`; legacy `<configs...>` references remain supported. Missing/blank `pkb_configpath` uses the historical `configs` Java fallback. Runtime config data cannot resolve profiles, `pkb_runvars`, or the path that loads the configs themselves.
-
-Do not normalize other resource-path RunVar conventions. Follow the version-matched `docs/configuration.md` and `docs/config-files-and-resource-mapping.md` for each path.
-
-## Diagnostic investigation protocol
-
-When Pickleball diagnostic evidence exists, use the shallowest evidence layer that completely answers the question. Do not advance to denser evidence merely because it exists.
-
-For AI-controlled diagnostic runs, keep terminal logging minimal. Diagnostic mode captures TRACE-through-ERROR evidence independently of console `pkb_loglevel`, so prefer `pkb_loglevel=warn` or `error` when appropriate. Use terminal output primarily for Maven, compilation, JVM, dependency, command-line, or other startup failures; use structured diagnostic artifacts after the run begins successfully.
+When investigating Pickleball diagnostic evidence, use the shallowest evidence layer that completely answers the question. Do not advance to a denser layer merely because it exists.
 
 Use this escalation order:
 
 1. `run-catalog.json` to choose relevant runs.
-2. Selected `run-index.json` and `clusters.json` for outcomes, scenario identity, failure grouping, capabilities, retention, step rollups, profile fingerprints, and representative visual references.
-3. Selected scenario `summary.json` when additional sparse detail is needed.
-4. Relevant `events.jsonl` only when exact step/lifecycle/order/INFO+ detail remains unanswered.
-5. Existing `comparisonToPrevious` or Pickleball run/fingerprint comparison before opening screenshots.
-6. A representative PNG only when semantic visual meaning must be understood.
-7. `trace.jsonl.gz` or interrupted `trace.jsonl` only when structured/INFO+ evidence is insufficient.
+2. Selected `run-index.json` files and `clusters.json` for outcomes, scenario identity, failure grouping, capabilities, retention state, and representative visual references.
+3. Selected scenario `summary.json` files for additional sparse scenario detail.
+4. Only the relevant scenario `events.jsonl` when exact step/lifecycle/order detail is still unanswered.
+5. Existing `comparisonToPrevious` visual metadata or Pickleball fingerprint/run comparison before opening any screenshot.
+6. A representative PNG only when the semantic content of a visual difference must be understood.
+7. `trace.jsonl.gz` or interrupted raw `trace.jsonl` only when structured/INFO+ evidence is insufficient.
 
-Stop reading as soon as the current layer answers the investigation. Do not recursively ingest an entire diagnostic run.
+Stop reading as soon as the current layer answers the investigation with sufficient confidence.
 
-## Visual evidence rules
+For visual evidence:
 
 - Never open a PNG merely to determine whether two screenshots differ.
-- Prefer already-recorded `comparisonToPrevious` for adjacent screenshots.
-- For cross-run or explicit comparison, use `DiagnosticCli`, `DiagnosticRunComparator`, or `VisualFingerprintComparator`.
-- Do not manually decode `.pkbf` files or invent another image-comparison algorithm.
-- `decodedPixelsExactlyEqual=true` establishes rendered-pixel equality.
-- `IDENTICAL` ends a visual-difference investigation unless the image itself is required.
-- Other similarity categories establish that pixels differ and their magnitude; open a representative PNG only when interpreting what visibly changed matters.
-- Raw PNG byte inequality does not prove rendered pixels differ.
+- Prefer already-recorded `comparisonToPrevious` metadata for adjacent screenshots.
+- For cross-run or explicit fingerprint comparison, use Pickleball's `DiagnosticCli`, `DiagnosticRunComparator`, or `VisualFingerprintComparator`; do not manually decode `.pkbf` files or invent an image-comparison algorithm.
+- `decodedPixelsExactlyEqual=true` means the decoded rendered pixels are equal; no PNG inspection is needed to establish visual equality.
+- `IDENTICAL` ends a visual-difference investigation unless the user explicitly needs the image itself.
+- `VERY_SIMILAR`, `SOMEWHAT_SIMILAR`, or `VERY_DIFFERENT` establish that pixels differ and provide magnitude. Open a representative PNG only if the question requires interpreting what changed.
+- Raw PNG byte equality proves the files are identical, but raw PNG byte inequality does not prove their rendered pixels differ because encoding or metadata may differ. Prefer decoded-pixel equality from the fingerprint comparator.
 
-## Diagnostic utility commands
+For routine diagnostic utility operations, prefer `tools.dscode.common.reporting.diagnostic.DiagnosticCli` over constructing a Maven classpath and JShell script. See `docs/diagnostic-reporting.md` for commands.
 
-From a Maven consumer where Pickleball is on the test classpath:
+### Controlled diagnostic reruns
 
-```text
-DiagnosticCli guidance
-DiagnosticCli export-guidance [output-directory]
-DiagnosticCli compare-runs <left-run-index> <right-run-index> [output-json]
-DiagnosticCli compare-fingerprints <left.pkbf> <right.pkbf> [output-json]
-DiagnosticCli rebuild <diagnostic-runs-root-or-run-root>
+When an AI agent launches Pickleball tests and the intended execution settings are known, use `pkb_runvars` as the authoritative test-run input. Put intentional selection and execution RunVars such as `pkb_tags`, `pkb_name`, browser, reporting/logging controls, and other non-secret overrides in `pkb_runvars` rather than relying on ambient optional defaults. Use ordinary JVM `-Dpkb_*` RunVars or `pkb_profile` instead only when the task specifically needs to exercise normal configuration/profile precedence or the user explicitly requests those semantics. Protected secret values and diagnostic lineage remain separate.
+
+When an investigation requires a rerun, start from the selected run's retained `runProfile` in `run-index.json`. Replay that retained final RunVar set through `pkb_runvars`, using compact `pkb_runvars` for ordinary values or expanded `pkb_runvars.<pkb_var>` members when avoiding nested assignment parsing is safer. Never mix compact and expanded `pkb_runvars` forms. `pkb_run_profile` is internal derived output and must never be supplied as input; compact or expanded external `pkb_run_profile` values are configuration errors.
+
+A partial controlled input inherits only missing project execution-context RunVars: `pkb_glue`, `pkb_features`, `pkb_datapath`, `pkb_callpath`, `pkb_componentpath`, and `pkb_configpath`. An explicit blank value suppresses inheritance and remains a blank tombstone in the canonical `pkb_run_profile`, preserving the existing subsystem fallback semantics when replayed. Do not reconstruct optional RunVars by manually combining runner defaults, property files, named profiles, system properties, and Cucumber aliases when a retained final run profile is available.
+
+Diagnostic lineage is metadata, not part of the execution RunVars. Supply `pkb_investigation_id`, `pkb_run_purpose`, `pkb_parent_run_id`, `pkb_baseline_run_id`, and `pkb_changed_variables` separately from `pkb_runvars`; profiles must not contain those keys. After the rerun, verify `runProfileFingerprint` / compatibility field `directRunProfile` and the declared changed variables before attributing observed differences to the intended configuration change. Use `runProfileFingerprint`, not `configurationHash`, as the equality check for the final RunVar set. See `docs/ai-run-configuration.md`.
+
+## Sources of truth
+
+Use all relevant evidence rather than trusting one file in isolation:
+
+- Current implementation under `src/main/java` and `src/main/aspectj`
+- Optional dynamic-control companion implementation under `pickleball-control-api`
+- Consumer-hosted internal Java checks under `maven-consumer-project/src/test/java`
+- Executable consumer examples under `maven-consumer-project/src/test`
+- `README.md` and the guides under `docs`
+- Build and dependency configuration in `build.gradle`, `settings.gradle`, `pickleball-control-api/build.gradle`, and `maven-consumer-project/pom.xml`
+- `docs/agent/feature-map.md` for navigation, not as a replacement for source inspection
+
+When implementation, tests, examples, and documentation disagree:
+
+1. Identify the inconsistency.
+2. Determine the intended contract from the strongest available evidence.
+3. Preserve established consumer behavior unless the user explicitly requests a breaking change.
+4. Update the inconsistent surfaces together.
+5. State the resolution in the final report.
+
+## Repository structure
+
+- `src/main/java` — framework implementation and Cucumber integrations
+- `src/main/aspectj` — AspectJ integrations and weaving behavior
+- `src/main/resources` — framework resources
+- `pickleball-control-api` — optional companion Java API for retry-friendly detached execution, Gherkin utilities, ParsingMap/NodeMap inspection and emulation, and dynamic controller tooling
+- `src/test` — reserved for tests that must run inside the framework build
+- `docs` — detailed user-facing documentation
+- `maven-consumer-project` — executable Maven consumer example
+- `maven-consumer-project/src/test/resources/features` — consumer acceptance scenarios
+- `maven-consumer-project/src/test/resources/calls` — service-call definitions
+- `maven-consumer-project/src/test/resources/configs` — example configuration
+- `maven-consumer-project/src/test/resources/site` — local browser/service test site
+- `maven-consumer-project/src/test/java` — runner, local server, support code, and internal framework checks compiled against the locally published dependency
+
+## Public contracts
+
+Treat these as consumer-visible contracts unless source evidence clearly shows otherwise:
+
+- Public Java APIs, including the optional dynamic-control API and semantic hook contract
+- Dynamic-control mapping behavior: isolated caller-defined NodeMap contexts, scoped live-map replacement, snapshot materialization, and mapping resolve/lookup/write interception are opt-in and must not alter normal execution when unused
+- Maven artifact behavior and runtime dependencies
+- Cucumber step phrases and dynamic-step behavior
+- Mapping, template, key-expression, and reference syntax
+- Configuration keys, defaults, and resource lookup rules
+- Selenium element lookup, interaction, retry, and stale-element behavior
+- Service-call definitions, request/response mapping, and REST/SOAP behavior
+- Component-scenario, nested-step, and conditional-flow semantics
+- Cucumber compatibility and AspectJ weaving behavior
+- The behavior demonstrated by the Maven consumer scenarios
+
+Do not silently rename or remove public syntax, steps, configuration, APIs, or documented behavior.
+
+## Required impact analysis
+
+Before editing, search for:
+
+- The implementation symbol or behavior
+- Unit and component tests
+- Gherkin phrases and examples
+- Related documentation terms and headings
+- Consumer configuration and test-site support
+- Callers, adapters, interfaces, and serialization formats
+- Compatibility assumptions in `maven-consumer-project`
+
+Do not make a behavior change based only on a method or class name.
+
+## Functionality-change requirements
+
+For externally observable functionality, update all applicable areas:
+
+- Framework implementation
+- Consumer-hosted internal Java checks
+- Maven consumer feature scenarios
+- Service-call definitions
+- Local test-site endpoints or pages
+- Example configuration and test data
+- README or detailed guides
+- `docs/agent/feature-map.md` when ownership, locations, syntax, or contracts change
+- `docs/agent/repository-index.md` when indexed repository files change
+
+A task is not complete merely because the Java source compiles.
+
+### Documentation policy
+
+Update documentation when a change affects supported behavior/syntax, inputs/outputs/value types, defaults/constraints/errors/edge cases, public APIs/configuration/compatibility, or user-visible examples and recommended workflows.
+
+Do not create documentation churn for a purely internal refactor. Prefer updating the existing canonical guide over creating a competing guide.
+
+### Experimental value-conversion syntax
+
+Do not document `ValConverter` special-value syntax in `README.md` or the `docs` directory unless the task explicitly approves it. The markers are experimental and may change or be removed. They may still receive focused implementation and executable test coverage.
+
+### Test policy
+
+Use the narrowest useful test first, then run broader validation.
+
+For consumer-visible behavior, add or update an executable scenario in `maven-consumer-project` whenever practical. A consumer scenario is preferred over a prose-only example.
+
+Internal Java checks should normally live in `maven-consumer-project` and be exercised by the dedicated Cucumber feature so they compile and run against the locally published Pickleball dependency. Keep a test under root `src/test` only when it must execute inside the framework build itself.
+
+Tests must cover the requested behavior and meaningful compatibility or edge cases. Do not weaken or delete assertions merely to make a change pass.
+
+## Build and validation
+
+Use Java 21.
+
+Framework validation:
+
+```shell
+./gradlew test
 ```
 
-Use `guidance` to print this guide and `export-guidance` to materialize the complete version-matched documentation plus curated Maven consumer reference. Prefer `DiagnosticCli` over constructing Maven classpaths and JShell scripts for routine diagnostic operations.
+Windows:
 
-## Controlled diagnostic reruns
-
-When an investigation requires a rerun and the intended execution settings are known:
-
-1. Start from the selected run's retained `runProfile` in `run-index.json`.
-2. Replay that retained final RunVar set through compact `pkb_runvars` or expanded `pkb_runvars.<pkb_var>` members.
-3. Never mix compact and expanded `pkb_runvars` forms. Never supply `pkb_run_profile` as input.
-4. Preserve explicit blank assignments from the retained profile.
-5. Change only RunVars required by the current hypothesis.
-6. Do not reconstruct optional effective RunVars by manually combining defaults, property files, profiles, system properties, and Cucumber aliases when a retained profile is available.
-7. Supply diagnostic lineage separately through `pkb_investigation_id`, `pkb_run_purpose`, `pkb_parent_run_id`, `pkb_baseline_run_id`, and `pkb_changed_variables`.
-8. Treat lineage as descriptive investigation context, not proof of an execution/source difference.
-9. Use `pkb_changed_variables` only for canonical execution RunVar names intentionally changed, such as `pkb_browser` or `pkb_tags`. Do not put source paths, feature files, commits, test-data changes, reasons, profile controls, or derived fields in `pkb_changed_variables`.
-10. If source changes but final execution RunVars should remain identical, omit `pkb_changed_variables` and describe the goal in `pkb_run_purpose`.
-11. Evidence/logging controls such as `pkb_reportingmode`, `pkb_reportretention`, `pkb_diagnostic_output`, `pkb_platformlog`, `pkb_gitsnapshot`, and `pkb_loglevel` are RunVars; declare them when intentionally changed.
-12. After the rerun, verify `runProfileFingerprint`, compatibility field `directRunProfile`, and actual source/comparison evidence before attributing differences.
-13. Use `runProfileFingerprint`, not `configurationHash`, as the equality signal for the final RunVar set.
-14. Never expand protected values into logs, prompts, committed files, or diagnostic evidence.
-
-Example controlled replay:
-
-```text
--Dpkb_runvars="<retained runProfile with only intended edits>"
--Dpkb_investigation_id=<investigation>
--Dpkb_parent_run_id=<parent>
--Dpkb_baseline_run_id=<baseline>
--Dpkb_run_purpose=<hypothesis>
--Dpkb_changed_variables=pkb_browser
+```powershell
+.\gradlew.bat test
 ```
 
-See `docs/ai-run-configuration.md` for the full profile/RunVar contract and `docs/diagnostic-lineage-metadata.md` for lineage semantics.
+For consumer-visible changes, publish the current framework artifact locally and run the Maven consumer:
 
-## Pickleball syntax documentation
+```shell
+./gradlew test publishToMavenLocal
+./maven-consumer-project/mvnw -f maven-consumer-project/pom.xml -U test -Dpkb_runvars.pkb_browser=CHROME_HEADLESS -Dpkb_runvars.pkb_tags=@all
+```
 
-The exported `docs/` tree is the version-matched reference for all supported Pickleball behavior and syntax. Use `docs/README.md` to select the relevant guide. Its links to the working consumer resolve into the exported `maven-consumer-project/` reference snapshot. In particular:
+Windows:
 
-- dynamic Gherkin/action/assertion syntax — `docs/dynamic-steps.md`;
-- element vocabulary/selectors — `docs/custom-element-definitions.md`;
-- mappings/templates — `docs/mapping-and-templating.md`;
-- Data Elements and values — `docs/data-values-and-elements.md` and `docs/data-element-query-runtime.md`;
-- reusable component scenarios — `docs/component-scenarios.md`;
-- service calls — `docs/service-call-scenarios.md`;
-- nested flow and conditionals — `docs/nested-steps.md`, `docs/block-conditionals.md`;
-- keyboard expressions — `docs/key-parser-dsl.md`;
-- execution/configuration/profiles — `docs/configuration.md`, `docs/ai-run-configuration.md`;
-- resource/config mapping — `docs/config-files-and-resource-mapping.md`;
-- Cucumber compatibility — `docs/cucumber-compatibility.md`;
-- diagnostics and lineage — `docs/diagnostic-reporting.md`, `docs/diagnostic-lineage-metadata.md`.
+```powershell
+.\gradlew.bat test publishToMavenLocal
+.\maven-consumer-project\mvnw.cmd -f maven-consumer-project\pom.xml -U test -Dpkb_runvars.pkb_browser=CHROME_HEADLESS -Dpkb_runvars.pkb_tags=@all
+```
 
-Do not guess Pickleball syntax when the version-matched guide or executable consumer reference can answer it.
+Repository contract and generated-index checks:
 
-## Human-readable consumer guidance
+```shell
+python scripts/verify_agent_contract.py
+python scripts/refresh_agent_index.py --check
+python scripts/sync_consumer_guidance.py --check
+```
 
-Use `docs/consumer-project.md` for the Maven consumer layout, local test site, common tag entry points, diagnostic usage, and example commands. Use `docs/README.md` to navigate the complete bundled documentation. Human readers can open files under `maven-consumer-project/` directly in the IDE to inspect the version-matched working features, configuration, calls, data, runner, and test-site examples linked from those guides.
+Or run the turnkey validator:
 
-## When the core Pickleball repository is also present
+```shell
+scripts/agent_validate.sh
+```
 
-If the consumer is nested inside the Pickleball source repository, repository-level `AGENTS.md` may impose additional maintainer rules for framework changes. Those core-maintainer rules are additive and do not replace this consumer-facing contract.
+Windows:
 
-For a normal external consumer, do not assume those core files exist.
+```powershell
+.\scripts\agent_validate.ps1
+```
+
+If a required validation cannot run, state exactly what was not run and why. Never claim that a test passed without executing it.
+
+## Change boundaries
+
+- Keep changes focused on the requested behavior.
+- Do not perform unrelated refactors.
+- Do not change versions, publish remote artifacts, create releases, or push branches unless explicitly requested.
+- Do not edit generated build output.
+- Preserve backward compatibility unless the user explicitly approves a breaking change.
+- Dynamic-control additions must remain opt-in: no handler/API call means normal scenario traversal, ParsingMap construction/order, NodeMap references, resolution, and writes retain their pre-control behavior.
+- Follow existing code style and patterns before introducing new abstractions.
+- Do not replace executable examples with prose.
+- Never store secrets, credentials, machine-specific paths, or private data in agent instruction files.
+
+### Core technical debt: resource-path RunVar consistency
+
+**Status: intentionally deferred.**
+
+The following resource-path RunVars do not currently share one public path-resolution grammar:
+
+- `pkb_features`
+- `pkb_datapath`
+- `pkb_callpath`
+- `pkb_componentpath`
+- `pkb_configpath`
+
+`pkb_glue` is part of inherited execution context but is Java/Cucumber glue syntax, not a resource path, and is outside this debt item.
+
+Current compatibility behavior is intentionally retained. In particular, feature paths use Cucumber URI/path semantics; data roots use Pickleball's hybrid filesystem/classpath lookup; call/component paths retain their historical project-relative defaults; and `pkb_configpath` preserves the historical `configs` classpath-resource fallback while allowing an explicit configured source.
+
+A future dedicated change may investigate one common public grammar supporting `classpath:`, `file:`, absolute filesystem paths, relative filesystem paths, portable retained run profiles, Maven/Gradle resource output, IDE execution, JAR resources, Windows paths, multiple feature locations, and classpath/filesystem collisions. Do not assume all keys must share one internal loader: Cucumber feature locations and Pickleball structured-resource loading have different runtime requirements.
+
+**Maintainer rule:** do not normalize these path semantics opportunistically while changing profiles, `pkb_runvars`, `pkb_run_profile`, or execution-context inheritance. Bare values can already mean different things for different RunVars, and changing precedence can silently redirect existing consumer projects. Address this debt only in a task explicitly scoped to resource-path normalization with compatibility tests and migration documentation.
+
+### Temporary agent workspace
+
+Use `.agent-work/` for disposable scripts, patches, generated bundles, intermediate files, migration utilities, investigation output, and other agent-created artifacts that are not maintained project code.
+
+Do not place temporary automation in the repository root, `scripts/`, source directories, test directories, or documentation directories. The committed `scripts/` directory is only for reusable project-maintenance tooling intended to remain part of the repository.
+
+Delete temporary files after they have served their purpose. Before completing a task, confirm that `.agent-work/` contains no files that need to be retained. Never force-add `.agent-work/` content to Git.
+
+## Agent-maintained context
+
+`docs/agent/feature-map.md` is a living navigation map. Update it when a capability is added/removed, responsibility moves, a canonical test/scenario/endpoint/guide changes, or public syntax/compatibility expectations change.
+
+Run:
+
+```shell
+python scripts/refresh_agent_index.py
+```
+
+after adding, moving, or removing indexed source, test, documentation, or consumer files.
+
+Do not use these files as substitutes for inspecting current source.
+
+## Definition of done
+
+A functionality change is complete only when:
+
+- The requested behavior is implemented.
+- Applicable compatibility has been preserved or a breaking change is clearly identified.
+- Relevant consumer-hosted internal Java checks exist and pass.
+- Relevant consumer scenarios exist and pass when applicable.
+- Documentation matches the resulting behavior.
+- The feature map remains accurate.
+- The generated repository index is current.
+- The final response summarizes the implementation, affected contracts, documentation, tests, and any validation not performed.

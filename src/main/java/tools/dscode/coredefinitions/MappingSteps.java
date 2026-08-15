@@ -247,7 +247,7 @@ public class MappingSteps extends CoreSteps {
      * Returns false when:
      * - input is null
      * - input is a String or textual JsonNode whose trimmed value is enclosed
-     *   by either <...> or ~[~...~]~
+     *   by either {@code <...>} or {@code ~[~...~]~}
      *
      * Blank strings, empty arrays, and empty objects still return true here.
      */

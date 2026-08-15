@@ -40,6 +40,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/date-time-utilities.md`
 - `docs/diagnostic-lineage-metadata.md`
 - `docs/diagnostic-reporting.md`
+- `docs/dynamic-control-api.md`
 - `docs/dynamic-steps.md`
 - `docs/feature-status-notes.md`
 - `docs/getting-started.md`
@@ -69,6 +70,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/aspectj/io/cucumber/java/JavaBackend_LoadGlue_Mutator.aj`
 - `src/main/aspectj/io/cucumber/messages/types/PickleStep_NestingLevel.aj`
 - `src/main/aspectj/io/cucumber/messages/types/PickleStepMetaTextAspect.aj`
+- `src/main/aspectj/tools/dscode/common/control/ControlRuntimeAspect.aj`
 - `src/main/aspectj/tools/dscode/common/reporting/diagnostic/ConfigurationProvenanceAspect.aj`
 - `src/main/aspectj/tools/dscode/common/reporting/diagnostic/Diagnostic213CompletionAspect.aj`
 - `src/main/aspectj/tools/dscode/common/reporting/diagnostic/DiagnosticRuntimeAspect.aj`
@@ -132,6 +134,14 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/common/browseroperations/WindowElement.java`
 - `src/main/java/tools/dscode/common/browseroperations/WindowSafeAccess.java`
 - `src/main/java/tools/dscode/common/browseroperations/WindowSwitch.java`
+- `src/main/java/tools/dscode/common/control/ControlDecision.java`
+- `src/main/java/tools/dscode/common/control/ControlEvent.java`
+- `src/main/java/tools/dscode/common/control/ControlExecutionScope.java`
+- `src/main/java/tools/dscode/common/control/ControlHook.java`
+- `src/main/java/tools/dscode/common/control/ControlHookHandler.java`
+- `src/main/java/tools/dscode/common/control/ControlRuntime.java`
+- `src/main/java/tools/dscode/common/control/ControlRuntimeAspect.java`
+- `src/main/java/tools/dscode/common/control/ControlValueEvent.java`
 - `src/main/java/tools/dscode/common/CoreSteps.java`
 - `src/main/java/tools/dscode/common/dataelements/CollectionDataAdapter.java`
 - `src/main/java/tools/dscode/common/dataelements/CollectionQueryEngine.java`
@@ -365,11 +375,31 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 - _No matching files found._
 
+## Control API module
+
+- `pickleball-control-api/build.gradle`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/ControlCallResult.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/ControlCallStatus.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/ControlError.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/DynamicControl.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/DynamicStepSpec.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/GherkinControl.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/MappingContext.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/MappingControl.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/MappingScope.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/MappingSnapshot.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/NodeMapSnapshot.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/OverrideScope.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/ResolutionCandidate.java`
+- `pickleball-control-api/src/main/java/tools/dscode/control/api/ResolutionExplanation.java`
+
 ## Maven consumer Java support
 
 - `maven-consumer-project/src/test/java/com/example/pickleball/ConfigurationValidationSteps.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/ControlApiTestSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/DataReferenceSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/DiagnosticValidationSteps.java`
+- `maven-consumer-project/src/test/java/com/example/pickleball/DynamicControlApiChecks.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/InternalFrameworkTestSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/MappingTypeSteps.java`
 - `maven-consumer-project/src/test/java/com/example/pickleball/PickleballTests.java`
