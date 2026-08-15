@@ -33,7 +33,7 @@ ControlCallResult<Object> result = DynamicControl.executeStep(
 );
 ```
 
-A call failure is returned as `ControlCallResult` with status `FAILED` rather than being propagated through `CurrentScenarioState.runningStep`. This lets a controller try another action without automatically failing or terminating the paused scenario. Effects that occurred before failure are not rolled back.
+A call failure is returned as `ControlCallResult` with status `FAILED` rather than being propagated through `CurrentScenarioState.runningStep`. This lets a controller try another action without automatically failing or terminating the paused scenario. Effects that occurred before failure are not rolled back. Detached failures also suppress the runner's raw `Throwable.printStackTrace()` output; the structured `ControlError` still retains the failure type, message, and stack trace, and normal scenario execution keeps its existing console behavior. This suppression is limited to the raw stack-trace dump; ordinary Pickleball log entries emitted by the attempted step before it fails remain available.
 
 `createSteps` and `executeSteps` deliberately continue after individual failures and return one result per request. `executePickle` runs the compiled steps from a parsed Cucumber `Pickle`, while `executeTree` walks a temporary `StepExtension` tree in pre-order without entering normal scenario traversal.
 

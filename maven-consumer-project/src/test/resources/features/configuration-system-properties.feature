@@ -1,9 +1,9 @@
 Feature: Pickleball configuration resolution
 
   @all @configuration @normal-source-precedence
-  Scenario: Resolve normal project configuration from defaults through local and runner properties
+  Scenario: Resolve normal project configuration from defaults through shared and runner properties
     * pkb property "example.precedence.shared" equals "pickleball.properties"
-    * pkb property "example.precedence.local" equals "pickleball_local.properties"
+    * pkb property "example.precedence.local" equals "pickleball.properties"
     * pkb property "example.precedence.runner-property" equals "globalTestProperties"
 
   @configuration @quoted-pkb-values

@@ -483,6 +483,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `maven-consumer-project/src/test/resources/files/customers.yaml`
 - `maven-consumer-project/src/test/resources/pickleball.properties`
 - `maven-consumer-project/src/test/resources/pickleball_local.properties`
+- `maven-consumer-project/src/test/resources/pickleball_local2.properties`
 - `maven-consumer-project/src/test/resources/profiles.yaml`
 - `maven-consumer-project/src/test/resources/profiles_local.yaml`
 

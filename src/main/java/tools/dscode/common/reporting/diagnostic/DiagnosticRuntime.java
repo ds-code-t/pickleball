@@ -27,7 +27,7 @@ public final class DiagnosticRuntime {
 
     public static synchronized void configure(Map<String, String> values) {
         DIAGNOSTIC_MODE = "diagnostic".equalsIgnoreCase(find(values, PKB_REPORTING_MODE));
-        ReportRetentionPolicy.configure(find(values, PKB_REPORT_RETENTION));
+        ReportRetentionPolicy.configureRun(find(values, PKB_REPORT_RETENTION));
         if (DIAGNOSTIC_MODE && (reporter == null || reporter.isFinished())) {
             reporter = new DiagnosticReporter(values, PickleballRunner.isDirectRunProfileActive());
         }

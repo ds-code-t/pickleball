@@ -63,12 +63,39 @@ public class DynamicControlApiChecks {
     }
 
     @Test
+    void detachedFailureDoesNotInvokeRawStackTracePrinting() {
+        ControlApiTestSteps.reset();
+
+        ControlCallResult<Object> result = DynamicControl.executeStep(
+                "CONTROL API FAILING TEST STEP"
+        );
+
+        assertEquals(ControlCallStatus.FAILED, result.status());
+        assertNotNull(result.error());
+        assertEquals(0, ControlApiTestSteps.rawStackTracePrintCount());
+    }
+
+    @Test
     void dynamicPhraseCanRunDetachedFromTheScenarioTree() {
         ControlCallResult<Object> result = DynamicControl.executeStep(
                 ", verify \"same\" equals \"same\""
         );
 
         assertTrue(result.successful(), () -> String.valueOf(result.error()));
+    }
+
+    @Test
+    void detachedExecutionRestoresItsTemporaryStepLogEntry() {
+        StepExtension step = DynamicControl.createStep(
+                ", verify \"same\" equals \"same\""
+        ).value();
+        assertNotNull(step);
+        assertNull(step.stepEntry);
+
+        ControlCallResult<Object> result = DynamicControl.executeStep(step);
+
+        assertTrue(result.successful(), () -> String.valueOf(result.error()));
+        assertNull(step.stepEntry);
     }
 
     @Test
@@ -120,6 +147,11 @@ public class DynamicControlApiChecks {
     @Test
     void fixedWaitHooksCanSuppressFrameworkPhraseDelays() {
         int[] waits = {0};
+        MappingContext context = MappingControl.custom(
+                "fixed wait hook",
+                MappingControl.nodeMap(MapConfigurations.MapType.OVERRIDE_MAP),
+                MappingControl.nodeMap(MapConfigurations.MapType.RUN_MAP)
+        );
 
         ControlCallResult<Object> result = ControlRuntime.withThreadHandler(
                 event -> {
@@ -129,12 +161,20 @@ public class DynamicControlApiChecks {
                     }
                     return ControlDecision.CONTINUE;
                 },
-                () -> DynamicControl.executeStep(", verify \"same\" equals \"same\"")
+                () -> DynamicControl.executeStep(
+                        ", save \"fixed-wait-hook\" as \"fixedWaitHookValue\"",
+                        context
+                )
         );
 
         assertTrue(result.successful(), () -> String.valueOf(result.error()));
         assertTrue(waits[0] > 0);
+        assertEquals(
+                "fixed-wait-hook",
+                MappingControl.resolveText(context, "<fixedWaitHookValue>").value()
+        );
     }
+
 
     @Test
     void canCreateAndRelateTemporaryStepsWithoutTouchingTheScenarioTree() {

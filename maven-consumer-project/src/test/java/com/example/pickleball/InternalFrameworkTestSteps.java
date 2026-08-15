@@ -13,6 +13,7 @@ import tools.dscode.common.mappings.MappingDataRefactorChecks;
 import tools.dscode.common.reporting.diagnostic.Diagnostic213CompletionChecks;
 import tools.dscode.common.reporting.diagnostic.DiagnosticReportingChecks;
 import tools.dscode.common.reporting.diagnostic.PickleballGuidanceChecks;
+import tools.dscode.common.reporting.diagnostic.ReportRetentionPolicy;
 import tools.dscode.common.util.datetime.BusinessTemporalDeltaChecks;
 import tools.dscode.common.util.datetime.BusinessTimePostModifierChecks;
 import tools.dscode.coredefinitions.ModularScenariosChecks;
@@ -44,11 +45,15 @@ public final class InternalFrameworkTestSteps {
 
     @Given("^RUN DIAGNOSTIC REPORTING JAVA TESTS$")
     public static void runDiagnosticReportingJavaTests() {
-        runAndAssert(
-                DiagnosticReportingChecks.class,
-                Diagnostic213CompletionChecks.class,
-                PickleballGuidanceChecks.class
-        );
+        try {
+            runAndAssert(
+                    DiagnosticReportingChecks.class,
+                    Diagnostic213CompletionChecks.class,
+                    PickleballGuidanceChecks.class
+            );
+        } finally {
+            ReportRetentionPolicy.clearThreadOverride();
+        }
     }
 
     @Given("^RUN DATA ELEMENT PHASE 1 JAVA TESTS$")

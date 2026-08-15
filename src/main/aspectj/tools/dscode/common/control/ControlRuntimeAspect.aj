@@ -26,6 +26,15 @@ public class ControlRuntimeAspect {
         return override == null ? joinPoint.proceed() : override;
     }
 
+    /** Suppresses raw runner stack-trace printing for failures intentionally returned by detached control calls. */
+    @Around("call(public void java.lang.Throwable.printStackTrace())"
+            + " && withincode(public Object io.cucumber.core.runner.StepExtension+.runAndGetReturnValue())")
+    public Object detachedFailureStackTrace(ProceedingJoinPoint joinPoint) throws Throwable {
+        return ControlExecutionScope.currentStepOverride() == null
+                ? joinPoint.proceed()
+                : null;
+    }
+
     @Before("execution(void io.cucumber.core.runner.CurrentScenarioState.startScenarioRun())")
     public void beforeScenario(JoinPoint joinPoint) {
         CurrentScenarioState state = (CurrentScenarioState) joinPoint.getThis();
@@ -462,7 +471,7 @@ public class ControlRuntimeAspect {
         );
     }
 
-    @Around("execution(public String tools.dscode.common.mappings.ParsingMap.resolveWholeText(String, boolean, String[]))")
+    @Around("execution(public String tools.dscode.common.mappings.ParsingMap.resolveWholeText(String, boolean, ..))")
     public Object resolveWholeText(ProceedingJoinPoint joinPoint) throws Throwable {
         ParsingMap parsingMap = (ParsingMap) joinPoint.getThis();
         Object[] args = joinPoint.getArgs();
@@ -522,7 +531,7 @@ public class ControlRuntimeAspect {
         return result;
     }
 
-    @Around("execution(public Object tools.dscode.common.mappings.ParsingMap.resolveWholeValue(String, boolean, String[]))")
+    @Around("execution(public Object tools.dscode.common.mappings.ParsingMap.resolveWholeValue(String, boolean, ..))")
     public Object resolveWholeValue(ProceedingJoinPoint joinPoint) throws Throwable {
         ParsingMap parsingMap = (ParsingMap) joinPoint.getThis();
         Object[] args = joinPoint.getArgs();

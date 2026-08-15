@@ -6,7 +6,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class ReportRetentionPolicy {
     public enum Mode { ALL, FAILED, NONE }
 
-    private static volatile Mode mode = Mode.ALL;
+    private static volatile Mode runMode = Mode.ALL;
+    private static final ThreadLocal<Mode> threadOverride = new ThreadLocal<>();
     private static final AtomicInteger passed = new AtomicInteger();
     private static final AtomicInteger failed = new AtomicInteger();
     private static final AtomicInteger interrupted = new AtomicInteger();
@@ -14,17 +15,32 @@ public final class ReportRetentionPolicy {
     private ReportRetentionPolicy() {
     }
 
-    public static void configure(String value) {
-        mode = parse(value);
+    /** Configures the process-wide mode for an actual Pickleball run. */
+    public static void configureRun(String value) {
+        runMode = parse(value);
+        threadOverride.remove();
         resetRun();
     }
 
+    /**
+     * Temporarily overrides retention on the current thread.
+     * Primarily useful for isolated checks and tools that must not mutate an active run.
+     */
+    public static void configure(String value) {
+        threadOverride.set(parse(value));
+    }
+
+    public static void clearThreadOverride() {
+        threadOverride.remove();
+    }
+
     public static Mode mode() {
-        return mode;
+        Mode override = threadOverride.get();
+        return override == null ? runMode : override;
     }
 
     public static String configuredValue() {
-        return mode.name().toLowerCase(Locale.ROOT);
+        return mode().name().toLowerCase(Locale.ROOT);
     }
 
     public static void resetRun() {
@@ -40,7 +56,7 @@ public final class ReportRetentionPolicy {
     }
 
     public static boolean keepScenarioDetails(boolean scenarioFailed, boolean scenarioInterrupted) {
-        return switch (mode) {
+        return switch (mode()) {
             case ALL -> true;
             case FAILED -> scenarioFailed || scenarioInterrupted;
             case NONE -> false;
@@ -52,7 +68,7 @@ public final class ReportRetentionPolicy {
     }
 
     public static boolean writeAutomaticRunFiles() {
-        return switch (mode) {
+        return switch (mode()) {
             case ALL -> true;
             case FAILED -> failed.get() > 0 || interrupted.get() > 0;
             case NONE -> false;
