@@ -2,8 +2,12 @@ package tools.dscode.studio.mcp;
 
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import tools.dscode.studio.build.ManagedMavenRunResult;
 import tools.dscode.studio.build.MavenBuildService;
 import tools.dscode.studio.build.MavenRunResult;
+import tools.dscode.studio.process.ManagedProcessService;
+import tools.dscode.studio.process.ManagedProcessSummary;
+import tools.dscode.studio.process.ProcessOutputChunk;
 import tools.dscode.studio.process.ProcessResult;
 import tools.dscode.studio.process.WorkspaceProcessService;
 import tools.dscode.studio.workspace.TextSearchMatch;
@@ -23,17 +27,20 @@ public final class StudioMcpTools {
     private final WorkspaceInfo workspace;
     private final WorkspaceFileService files;
     private final WorkspaceProcessService processes;
+    private final ManagedProcessService managedProcesses;
     private final MavenBuildService maven;
 
     public StudioMcpTools(
             WorkspaceInfo workspace,
             WorkspaceFileService files,
             WorkspaceProcessService processes,
+            ManagedProcessService managedProcesses,
             MavenBuildService maven
     ) {
         this.workspace = workspace;
         this.files = files;
         this.processes = processes;
+        this.managedProcesses = managedProcesses;
         this.maven = maven;
     }
 
@@ -127,6 +134,67 @@ public final class StudioMcpTools {
     }
 
     @Tool(
+            name = "process_start",
+            description = "Start a managed non-interactive process and return immediately with a Studio process id."
+    )
+    public ManagedProcessSummary startProcess(
+            @ToolParam(description = "Executable and arguments as an argv list.") List<String> command,
+            @ToolParam(description = "Workspace-relative working directory. Empty means the workspace root.", required = false)
+            String workingDirectory,
+            @ToolParam(description = "Timeout in seconds. Defaults to 120.", required = false)
+            Integer timeoutSeconds
+    ) {
+        return managedProcesses.start(command, workingDirectory, timeoutSeconds);
+    }
+
+    @Tool(
+            name = "process_list",
+            description = "List recent managed Studio processes newest first."
+    )
+    public List<ManagedProcessSummary> listProcesses(
+            @ToolParam(description = "Maximum runs to return. Defaults to 20; maximum 100.", required = false)
+            Integer limit
+    ) {
+        return managedProcesses.list(limit);
+    }
+
+    @Tool(
+            name = "process_status",
+            description = "Return current state and metadata for one managed Studio process."
+    )
+    public ManagedProcessSummary processStatus(
+            @ToolParam(description = "Studio process id returned by process_start or maven_start.") String id
+    ) {
+        return managedProcesses.status(id);
+    }
+
+    @Tool(
+            name = "process_output",
+            description = "Read incremental stdout/stderr for a managed process using independent output cursors."
+    )
+    public ProcessOutputChunk processOutput(
+            @ToolParam(description = "Studio process id.") String id,
+            @ToolParam(description = "Next stdout character offset. Defaults to 0.", required = false)
+            Long stdoutOffset,
+            @ToolParam(description = "Next stderr character offset. Defaults to 0.", required = false)
+            Long stderrOffset,
+            @ToolParam(description = "Maximum characters returned per stream. Defaults to 65536; maximum 262144.", required = false)
+            Integer maxChars
+    ) {
+        return managedProcesses.output(id, stdoutOffset, stderrOffset, maxChars);
+    }
+
+    @Tool(
+            name = "process_cancel",
+            description = "Cancel a running managed Studio process."
+    )
+    public ManagedProcessSummary cancelProcess(
+            @ToolParam(description = "Studio process id.") String id
+    ) {
+        return managedProcesses.cancel(id);
+    }
+
+    @Tool(
             name = "maven_run",
             description = "Run Maven 3.9.16 against the current Maven workspace using Studio's bundled Maven runtime. No host Maven installation is required."
     )
@@ -137,5 +205,18 @@ public final class StudioMcpTools {
             Integer timeoutSeconds
     ) {
         return maven.run(arguments, timeoutSeconds);
+    }
+
+    @Tool(
+            name = "maven_start",
+            description = "Start Maven 3.9.16 as a managed Studio process and return immediately with a process id."
+    )
+    public ManagedMavenRunResult startMaven(
+            @ToolParam(description = "Maven goals and CLI arguments, for example [\"test\"] or [\"-q\", \"test\"].")
+            List<String> arguments,
+            @ToolParam(description = "Timeout in seconds. Defaults to 600.", required = false)
+            Integer timeoutSeconds
+    ) {
+        return maven.start(arguments, timeoutSeconds);
     }
 }

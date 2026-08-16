@@ -35,7 +35,7 @@ pickleball-<version>.jar
     └── BOOT-INF/lib/       Studio-only Spring/Spring AI dependencies
 ```
 
-The outer launcher extracts the nested Studio JAR to a versioned cache under `~/.pickleball/studio` and starts it with the same JDK in a child JVM.
+The outer launcher extracts the nested Studio JAR to a versioned cache under `~/.pickleball/studio` and starts it with the same JDK in a child JVM. Cached Studio JAR names are content-addressed (`pickleball-studio-<sha256>.jar`) so a new build never needs to overwrite a JAR that another Studio process may still have open, including on Windows.
 
 This preserves one distributed Pickleball artifact while keeping the consumer/runtime and Studio application classpaths separate.
 
@@ -139,6 +139,45 @@ maven_run
 
 `process_run` accepts an argv list, optional workspace-relative working directory, and optional timeout. `maven_run` accepts Maven goals/options and an optional timeout; its default timeout is 600 seconds.
 
+## Phase 2D: managed process lifecycle and output
+
+Phase 2D adds `ManagedProcessService` on top of the workspace process layer. It is intended for the long-lived Studio server and future GUI integrations where builds or tools need to continue while the caller polls their state.
+
+Managed runs provide:
+
+- immediate start with a generated Studio process id;
+- states `RUNNING`, `SUCCEEDED`, `FAILED`, `CANCELLED`, and `TIMED_OUT`;
+- bounded in-memory history of the 100 most recent retained runs;
+- independent incremental stdout and stderr cursors;
+- bounded rolling output buffers with gap/truncation metadata when a caller falls behind;
+- explicit cancellation;
+- automatic termination of still-running owned children when the Studio application context shuts down.
+
+History and output are **session-scoped**. Phase 2D does not persist process/activity history across Studio restarts.
+
+The MCP server now exposes 13 tools. In addition to the previous tools, managed lifecycle adds:
+
+```text
+process_start
+process_list
+process_status
+process_output
+process_cancel
+maven_start
+```
+
+`process_start` uses the same workspace-bound argv execution rules as `process_run`. `maven_start` uses the same bundled Maven 3.9.16 runtime and command construction as `maven_run`, but returns immediately with a process id.
+
+A typical AI/client flow is:
+
+1. call `maven_start` or `process_start`;
+2. retain the returned process id;
+3. poll `process_status`;
+4. call `process_output` with the previous `nextStdoutOffset` / `nextStderrOffset`;
+5. call `process_cancel` if the investigation no longer needs the run.
+
+Managed lifecycle is intentionally exposed through the long-lived MCP server rather than as a standalone asynchronous CLI command. A one-shot CLI invocation would exit the owning Studio JVM and therefore cannot provide meaningful later status/output/cancellation. The existing CLI `exec` and `maven` commands remain synchronous.
+
 ## Validation
 
 Focused Studio validation:
@@ -148,7 +187,7 @@ Focused Studio validation:
 ./gradlew --rerun-tasks :pickleball-studio:verifyBundledStudio
 ```
 
-The Studio tests include a real child-JVM `java -version` process check and a Maven `--version` check using the bundled Maven runtime, so host Maven is not needed for the focused Maven bootstrap test.
+The Studio tests include real child-JVM process checks, managed incremental-output/cancellation checks, and synchronous plus managed Maven `--version` checks using the bundled Maven runtime, so host Maven is not needed for the focused Maven bootstrap tests.
 
 `verifyBundledStudio` checks both sides of the isolation contract:
 
@@ -162,11 +201,11 @@ After focused validation, run the normal root and Maven-consumer validation from
 
 ## Current boundaries
 
-Phase 2C does **not** yet implement:
+Phase 2D does **not** yet implement:
 
 - Gradle Tooling API build execution;
-- asynchronous process start/stop/status/history or activity persistence;
-- interactive terminal support;
+- persistent process/activity history across Studio restarts;
+- interactive terminal stdin/PTY support;
 - GUI editing/navigation;
 - Java/Gherkin syntax services beyond text/file operations;
 - Pickleball runtime IPC or live scenario/browser/mapping control.

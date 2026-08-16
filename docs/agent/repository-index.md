@@ -376,7 +376,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 
 ## Framework tests
 
-- _No matching files found._
+- `src/test/java/tools/dscode/studio/launcher/StudioLauncherTest.java`
 
 ## Control API module
 
@@ -405,7 +405,11 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioMcpTools.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioServer.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioWorkspaceStatus.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/process/ManagedProcessService.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/process/ManagedProcessSummary.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/process/ProcessOutputChunk.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/process/ProcessResult.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/process/ProcessState.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/process/WorkspaceProcessService.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/StudioApplication.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/TextSearchMatch.java`
@@ -417,6 +421,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceWriteResult.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/mcp/StudioMcpContextTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/mcp/StudioMcpToolsTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/process/ManagedProcessFixture.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/process/ManagedProcessServiceTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/process/WorkspaceProcessServiceTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/StudioApplicationTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/workspace/WorkspaceFileServiceTest.java`

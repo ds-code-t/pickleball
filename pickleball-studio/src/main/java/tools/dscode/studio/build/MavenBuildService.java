@@ -1,5 +1,7 @@
 package tools.dscode.studio.build;
 
+import tools.dscode.studio.process.ManagedProcessService;
+import tools.dscode.studio.process.ManagedProcessSummary;
 import tools.dscode.studio.process.ProcessResult;
 import tools.dscode.studio.process.WorkspaceProcessService;
 import tools.dscode.studio.workspace.WorkspaceInfo;
@@ -15,10 +17,19 @@ public final class MavenBuildService {
 
     private final WorkspaceInfo workspace;
     private final WorkspaceProcessService processes;
+    private final ManagedProcessService managedProcesses;
     private final MavenToolchainService toolchain;
 
     public MavenBuildService(WorkspaceInfo workspace, WorkspaceProcessService processes) {
-        this(workspace, processes, new MavenToolchainService());
+        this(workspace, processes, null, new MavenToolchainService());
+    }
+
+    public MavenBuildService(
+            WorkspaceInfo workspace,
+            WorkspaceProcessService processes,
+            ManagedProcessService managedProcesses
+    ) {
+        this(workspace, processes, managedProcesses, new MavenToolchainService());
     }
 
     MavenBuildService(
@@ -26,12 +37,48 @@ public final class MavenBuildService {
             WorkspaceProcessService processes,
             MavenToolchainService toolchain
     ) {
+        this(workspace, processes, null, toolchain);
+    }
+
+    MavenBuildService(
+            WorkspaceInfo workspace,
+            WorkspaceProcessService processes,
+            ManagedProcessService managedProcesses,
+            MavenToolchainService toolchain
+    ) {
         this.workspace = workspace;
         this.processes = processes;
+        this.managedProcesses = managedProcesses;
         this.toolchain = toolchain;
     }
 
     public MavenRunResult run(List<String> arguments, Integer timeoutSeconds) {
+        PreparedMaven prepared = prepare(arguments, timeoutSeconds);
+        ProcessResult result = processes.run(
+                prepared.command(),
+                Path.of("."),
+                prepared.timeoutSeconds(),
+                prepared.environment()
+        );
+        return new MavenRunResult(MavenToolchainService.MAVEN_VERSION, result);
+    }
+
+    public ManagedMavenRunResult start(List<String> arguments, Integer timeoutSeconds) {
+        if (managedProcesses == null) {
+            throw new IllegalStateException("Managed Maven execution requires ManagedProcessService");
+        }
+
+        PreparedMaven prepared = prepare(arguments, timeoutSeconds);
+        ManagedProcessSummary process = managedProcesses.start(
+                prepared.command(),
+                Path.of("."),
+                prepared.timeoutSeconds(),
+                prepared.environment()
+        );
+        return new ManagedMavenRunResult(MavenToolchainService.MAVEN_VERSION, process);
+    }
+
+    private PreparedMaven prepare(List<String> arguments, Integer timeoutSeconds) {
         if (!workspace.mavenProject()) {
             throw new IllegalArgumentException("Workspace is not a Maven project: " + workspace.root());
         }
@@ -41,14 +88,11 @@ public final class MavenBuildService {
 
         int timeout = timeoutSeconds == null ? DEFAULT_TIMEOUT_SECONDS : timeoutSeconds;
         MavenRuntime runtime = toolchain.prepare();
-        List<String> command = command(runtime, workspace.root(), arguments);
-        ProcessResult result = processes.run(
-                command,
-                Path.of("."),
+        return new PreparedMaven(
+                command(runtime, workspace.root(), arguments),
                 timeout,
                 Map.of("MAVEN_HOME", runtime.home().toString())
         );
-        return new MavenRunResult(MavenToolchainService.MAVEN_VERSION, result);
     }
 
     static List<String> command(MavenRuntime runtime, Path workspaceRoot, List<String> arguments) {
@@ -69,5 +113,12 @@ public final class MavenBuildService {
     private static Path javaExecutable() {
         String executable = System.getProperty("os.name", "").startsWith("Windows") ? "java.exe" : "java";
         return Path.of(System.getProperty("java.home"), "bin", executable);
+    }
+
+    private record PreparedMaven(
+            List<String> command,
+            int timeoutSeconds,
+            Map<String, String> environment
+    ) {
     }
 }

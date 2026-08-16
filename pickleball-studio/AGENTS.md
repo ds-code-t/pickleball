@@ -30,9 +30,11 @@ Keep these rules:
 
 ## Workspace and process services
 
-`WorkspaceService` owns opening/detecting a workspace. `WorkspaceFileService` owns generic tree, UTF-8 read/write, and text-search behavior. `WorkspaceProcessService` owns bounded, non-interactive child-process execution and output capture.
+`WorkspaceService` owns opening/detecting a workspace. `WorkspaceFileService` owns generic tree, UTF-8 read/write, and text-search behavior. `WorkspaceProcessService` owns workspace-bound child-process creation and synchronous execution. `ManagedProcessService` owns asynchronous lifecycle, bounded history, incremental output cursors, timeout, and cancellation for long-running Studio processes.
 
 Workspace paths must stay inside the opened workspace. Tree/search traversal must not follow symbolic links outside the workspace and should skip generated/heavy directories already defined by `WorkspaceFileService`. Process working directories must resolve inside the workspace.
+
+Managed process history is session-scoped and bounded. Output buffers must remain bounded; clients use returned stdout/stderr cursors and must honor gap/truncation metadata instead of assuming all historical output is retained. Studio shutdown must terminate child processes it still owns.
 
 Future CLI, GUI, MCP, build, and language adapters should reuse these services rather than building parallel file/process semantics.
 
@@ -46,12 +48,14 @@ Maven execution is non-interactive and uses `--batch-mode --no-transfer-progress
 
 ## MCP
 
-Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C adds process and Maven tools over the same service layer.
+Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C added one-shot process and Maven tools. Phase 2D adds managed process lifecycle tools over the same service layer.
 
 - Bind the Studio MCP server to loopback only.
 - Keep the per-launch endpoint token behavior unless a later authentication design explicitly replaces it.
 - Expose deterministic Studio capabilities, not autonomous AI policy.
-- Current MCP tools cover workspace status/tree/read/write/search plus one-shot process execution and bundled-Maven execution.
+- Keep synchronous `process_run` / `maven_run` for one-call use.
+- Managed runs use `process_start`, `process_list`, `process_status`, `process_output`, `process_cancel`, and `maven_start`.
+- Managed run ids and history belong to the running Studio server/JVM; do not imply persistence across Studio restarts.
 - MCP does not yet imply Pickleball runtime connectivity. Phase 3 must use an explicit Studio-JVM-to-consumer-test-JVM bridge.
 
 ## Current phase
@@ -60,8 +64,10 @@ Phase 2A established isolated packaging and workspace detection.
 
 Phase 2B added generic workspace file services and MCP exposure of those services.
 
-Phase 2C adds bounded one-shot process execution plus self-contained Maven 3.9.16 build/test execution through CLI and MCP.
+Phase 2C added bounded one-shot process execution plus self-contained Maven 3.9.16 build/test execution through CLI and MCP.
 
-Do not claim that Gradle Tooling API execution, asynchronous process lifecycle/history, interactive terminal support, GUI editing, syntax-aware Java/Gherkin navigation, or live Pickleball control is implemented until those later slices are added.
+Phase 2D adds session-scoped managed process lifecycle, bounded run history, incremental stdout/stderr output cursors, cancellation, and managed Maven starts for MCP and future Studio UI integrations.
+
+Do not claim that Gradle Tooling API execution, persistent run/activity history, interactive terminal input, GUI editing, syntax-aware Java/Gherkin navigation, or live Pickleball control is implemented until those later slices are added.
 
 See `docs/pickleball-studio.md`.

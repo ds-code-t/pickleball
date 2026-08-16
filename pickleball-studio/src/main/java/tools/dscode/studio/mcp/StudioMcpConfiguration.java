@@ -7,6 +7,7 @@ import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import tools.dscode.studio.build.MavenBuildService;
+import tools.dscode.studio.process.ManagedProcessService;
 import tools.dscode.studio.process.WorkspaceProcessService;
 import tools.dscode.studio.workspace.WorkspaceFileService;
 import tools.dscode.studio.workspace.WorkspaceInfo;
@@ -41,12 +42,18 @@ public class StudioMcpConfiguration {
         return new WorkspaceProcessService(workspaceInfo);
     }
 
+    @Bean(destroyMethod = "close")
+    ManagedProcessService managedProcessService(WorkspaceProcessService workspaceProcessService) {
+        return new ManagedProcessService(workspaceProcessService);
+    }
+
     @Bean
     MavenBuildService mavenBuildService(
             WorkspaceInfo workspaceInfo,
-            WorkspaceProcessService workspaceProcessService
+            WorkspaceProcessService workspaceProcessService,
+            ManagedProcessService managedProcessService
     ) {
-        return new MavenBuildService(workspaceInfo, workspaceProcessService);
+        return new MavenBuildService(workspaceInfo, workspaceProcessService, managedProcessService);
     }
 
     @Bean
@@ -54,12 +61,14 @@ public class StudioMcpConfiguration {
             WorkspaceInfo workspaceInfo,
             WorkspaceFileService workspaceFileService,
             WorkspaceProcessService workspaceProcessService,
+            ManagedProcessService managedProcessService,
             MavenBuildService mavenBuildService
     ) {
         return new StudioMcpTools(
                 workspaceInfo,
                 workspaceFileService,
                 workspaceProcessService,
+                managedProcessService,
                 mavenBuildService
         );
     }
