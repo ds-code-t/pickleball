@@ -33,6 +33,36 @@ class StudioApplicationTest {
     }
 
     @Test
+    void invalidServePortReturnsUsageErrorWithoutStartingServer() {
+        ByteArrayOutputStream error = new ByteArrayOutputStream();
+
+        int exitCode = StudioApplication.run(
+                new String[]{"serve", tempDir.toString(), "--port=not-a-number"},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(error, true, StandardCharsets.UTF_8)
+        );
+
+        String text = error.toString(StandardCharsets.UTF_8);
+        assertEquals(2, exitCode, text);
+        assertTrue(text.startsWith("Invalid Studio MCP port:"), text);
+    }
+
+    @Test
+    void invalidServeTokenReturnsUsageErrorWithoutStartingServer() {
+        ByteArrayOutputStream error = new ByteArrayOutputStream();
+
+        int exitCode = StudioApplication.run(
+                new String[]{"serve", tempDir.toString(), "--token=bad"},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(error, true, StandardCharsets.UTF_8)
+        );
+
+        String text = error.toString(StandardCharsets.UTF_8);
+        assertEquals(2, exitCode, text);
+        assertTrue(text.startsWith("Studio MCP token must contain"), text);
+    }
+
+    @Test
     void missingWorkspaceReturnsUsageError() {
         ByteArrayOutputStream error = new ByteArrayOutputStream();
 

@@ -1,5 +1,6 @@
 plugins {
-    id 'java-library'
+    id 'java'
+    id 'org.springframework.boot' version '4.1.0'
 }
 
 group = rootProject.group
@@ -14,8 +15,11 @@ java {
 }
 
 dependencies {
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.13.4'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.13.4'
+    implementation platform('org.springframework.boot:spring-boot-dependencies:4.1.0')
+    implementation platform('org.springframework.ai:spring-ai-bom:2.0.0')
+    implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -31,10 +35,14 @@ tasks.test {
 }
 
 tasks.jar {
+    enabled = false
+}
+
+tasks.named('bootJar') {
     archiveFileName.set('pickleball-studio.jar')
+    mainClass.set('tools.dscode.studio.StudioApplication')
     manifest {
         attributes(
-                'Main-Class': 'tools.dscode.studio.StudioApplication',
                 'Implementation-Title': 'Pickleball Studio',
                 'Implementation-Version': project.version.toString()
         )
@@ -45,7 +53,7 @@ def studioEntry = 'META-INF/pickleball/studio/pickleball-studio.jar'
 
 tasks.register('verifyBundledStudio') {
     group = 'verification'
-    description = 'Verifies that the normal Pickleball JAR contains the isolated Studio application.'
+    description = 'Verifies that the normal Pickleball JAR contains the isolated executable Studio application.'
     dependsOn rootProject.tasks.named('shadowJar')
 
     doLast {
@@ -66,11 +74,13 @@ tasks.register('verifyBundledStudio') {
             }
 
             def leakedStudioEntries = java.util.Collections.list(zip.entries())
-                    .collect { it.name }
-                    .findAll {
-                        it == 'tools/dscode/studio/StudioApplication.class' ||
-                                it.startsWith('tools/dscode/studio/workspace/')
+                    .findAll { entry ->
+                        !entry.isDirectory() &&
+                                entry.name.endsWith('.class') &&
+                                entry.name.startsWith('tools/dscode/studio/') &&
+                                !entry.name.startsWith('tools/dscode/studio/launcher/')
                     }
+                    .collect { it.name }
             if (!leakedStudioEntries.isEmpty()) {
                 throw new GradleException(
                         'Studio implementation leaked into the outer Pickleball classpath: ' +
@@ -94,12 +104,23 @@ tasks.register('verifyBundledStudio') {
             try {
                 nestedFile.bytes = nestedBytes
                 new java.util.jar.JarFile(nestedFile).withCloseable { nestedJar ->
-                    def studioMainClass = nestedJar.manifest?.mainAttributes?.getValue('Main-Class')
-                    if (studioMainClass != 'tools.dscode.studio.StudioApplication') {
+                    def manifest = nestedJar.manifest
+                    def studioMainClass = manifest?.mainAttributes?.getValue('Main-Class')
+                    def studioStartClass = manifest?.mainAttributes?.getValue('Start-Class')
+                    if (studioMainClass != 'org.springframework.boot.loader.launch.JarLauncher') {
                         throw new GradleException("Unexpected Studio Main-Class: ${studioMainClass}")
                     }
-                    if (nestedJar.getEntry('tools/dscode/studio/StudioApplication.class') == null) {
+                    if (studioStartClass != 'tools.dscode.studio.StudioApplication') {
+                        throw new GradleException("Unexpected Studio Start-Class: ${studioStartClass}")
+                    }
+                    if (nestedJar.getEntry('BOOT-INF/classes/tools/dscode/studio/StudioApplication.class') == null) {
                         throw new GradleException('Nested Studio JAR is missing StudioApplication.class')
+                    }
+                    def hasMcpStarter = java.util.Collections.list(nestedJar.entries()).any {
+                        it.name.startsWith('BOOT-INF/lib/spring-ai-starter-mcp-server-webmvc-')
+                    }
+                    if (!hasMcpStarter) {
+                        throw new GradleException('Nested Studio JAR is missing the Spring AI MCP server starter')
                     }
                 }
             } finally {

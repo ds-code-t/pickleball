@@ -32,6 +32,13 @@ The following components are licensed under the Apache License 2.0:
 - com.googlecode.aviator:aviator:5.4.3
 - com.ibm.jsonata4java:JSONata4Java:2.6.0
 
+Pickleball Studio additionally bundles Spring Boot and Spring AI components in
+its isolated nested executable JAR:
+
+- org.springframework.boot:spring-boot:4.1.0
+- org.springframework.boot:spring-boot-loader:4.1.0
+- org.springframework.ai:spring-ai-starter-mcp-server-webmvc:2.0.0
+
 License text:
 http://www.apache.org/licenses/LICENSE-2.0
 

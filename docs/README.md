@@ -36,7 +36,7 @@ When these docs are materialized from the Maven dependency with `DiagnosticCli e
 - [Execution configuration](configuration.md) — tags, feature/resource locations, browsers, named profiles, controlled `pkb_runvars`, canonical `pkb_run_profile`, ReportPortal aliases, parallelism, logging, reports, and local overrides.
 - [AI and automation run configuration](ai-run-configuration.md) — controlled `pkb_runvars`, inherited execution context, retained `pkb_run_profile`, `pkb_configpath`, protected values, and deterministic diagnostic reruns.
 - [Dynamic control API](dynamic-control-api.md) — optional retry-friendly dynamic Gherkin execution, isolated/scoped ParsingMap control, snapshots, value interception, and synchronous semantic hooks for controller tooling.
-- [Pickleball Studio](pickleball-studio.md) — isolated Studio application packaging, launcher, workspace foundation, and current Phase 2A boundaries.
+- [Pickleball Studio](pickleball-studio.md) — isolated Studio application, workspace file services, and the current Streamable-HTTP MCP foundation.
 - [Diagnostic lineage and metadata](diagnostic-lineage-metadata.md) — distinguish lineage annotations, execution/evidence RunVars, controls, and derived evidence.
 - [Diagnostic reporting](diagnostic-reporting.md) — sparse-first AI evidence, source provenance, step/capability metadata, trace evidence, screenshots/fingerprints, comparison, and retention.
 - [AI diagnostic reporting plan](ai-diagnostic-reporting-plan.md) — current sparse-first investigation and controlled-rerun architecture.

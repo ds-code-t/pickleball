@@ -14,6 +14,7 @@ Keep these rules:
 - Put project files, search, builds, processes, output, activity, MCP hosting, and GUI infrastructure in Studio.
 - Keep live scenario/browser/mapping execution inside Pickleball Core and connect it later through an explicit bridge.
 - GUI, CLI, MCP, and future Java integrations should call the same Studio services rather than reimplementing behavior.
+- MCP classes are adapters over Studio services. Do not put workspace/business behavior directly into MCP handlers.
 - AI policy belongs in the AI client. Studio exposes deterministic capabilities and evidence.
 
 ## Build and packaging
@@ -21,14 +22,36 @@ Keep these rules:
 - Use Java 21.
 - The repository wrapper currently targets Gradle 9.7.0.
 - The root artifact uses `com.gradleup.shadow` 9.6.1.
+- The nested Studio application uses Spring Boot 4.1.0 and Spring AI 2.0.0.
+- Package Studio with `bootJar` as `pickleball-studio.jar` so its dependencies remain under `BOOT-INF/lib` inside the isolated nested application.
 - Keep `pickleball-studio.jar` opaque at `META-INF/pickleball/studio/pickleball-studio.jar`; never unpack Studio implementation classes into the outer consumer runtime.
-- Keep ordinary Shadow duplicate handling first-entry-wins, while allowing `META-INF/services/**` duplicates through to `mergeServiceFiles()`.
+- Keep ordinary root Shadow duplicate handling first-entry-wins, while allowing `META-INF/services/**` duplicates through to `mergeServiceFiles()`.
 - Do not mix AspectJ version changes into Studio packaging changes unless the task explicitly requires both.
+
+## Workspace services
+
+`WorkspaceService` owns opening/detecting a workspace. `WorkspaceFileService` owns generic tree, UTF-8 read/write, and text-search behavior.
+
+Workspace paths must stay inside the opened workspace. Tree/search traversal must not follow symbolic links outside the workspace and should skip generated/heavy directories already defined by `WorkspaceFileService`.
+
+Future CLI, GUI, MCP, build, and language adapters should reuse these services rather than building parallel file semantics.
+
+## MCP
+
+Phase 2B uses Spring AI Streamable-HTTP through the WebMVC server starter.
+
+- Bind the Studio MCP server to loopback only.
+- Keep the per-launch endpoint token behavior unless a later authentication design explicitly replaces it.
+- Expose deterministic Studio capabilities, not autonomous AI policy.
+- Current MCP scope is workspace status/tree/read/write/search only.
+- MCP does not yet imply Pickleball runtime connectivity. Phase 3 must use an explicit Studio-JVM-to-consumer-test-JVM bridge.
 
 ## Current phase
 
-Phase 2A establishes only the isolated application/package boundary, launcher, generic workspace service, and modernized Gradle/Shadow packaging.
+Phase 2A established isolated packaging and workspace detection.
 
-Do not claim that MCP, GUI, Maven/Gradle execution, terminal support, or live Pickleball control is implemented until those later slices are added.
+Phase 2B adds generic workspace file services and MCP exposure of those services.
+
+Do not claim that Maven/Gradle execution, process/run history, terminal support, GUI editing, syntax-aware Java/Gherkin navigation, or live Pickleball control is implemented until those later slices are added.
 
 See `docs/pickleball-studio.md`.

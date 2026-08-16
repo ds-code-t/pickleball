@@ -1,24 +1,24 @@
 # Pickleball Studio
 
-Pickleball Studio is being built as an isolated Java development application that is physically bundled inside the normal `tools.dscode:pickleball` artifact.
+Pickleball Studio is an isolated Java development application physically bundled inside the normal `tools.dscode:pickleball` artifact.
 
-The consumer dependency remains unchanged. Studio does not run inside the consumer test JVM and its dependencies must not be added to the public Pickleball dependency graph.
+The consumer dependency remains unchanged. Studio does not run inside the consumer test JVM, and Studio dependencies are not published into the Pickleball consumer dependency graph.
 
 ## Build baseline
 
-The Studio packaging foundation targets:
+Studio currently targets:
 
 - Java 21;
 - Gradle 9.7.0 through the repository Gradle Wrapper;
-- Shadow 9.6.1 using the `com.gradleup.shadow` plugin ID;
-- Gradle Nexus Publish Plugin 2.0.0, retained until publishing validation demonstrates a reason to replace it;
-- AspectJ 1.9.24 for this build-modernization slice. AspectJ should be evaluated separately so bytecode-weaving changes are not mixed with the Gradle/Shadow migration.
+- Shadow 9.6.1 using the `com.gradleup.shadow` plugin ID for the outer Pickleball artifact;
+- Spring Boot 4.1.0 for the executable nested Studio application;
+- Spring AI 2.0.0 for MCP server integration;
+- Gradle Nexus Publish Plugin 2.0.0;
+- AspectJ 1.9.24 for Pickleball Core.
 
-Shadow 9 is important to the Studio distribution model because `ShadowJar.from(...)` now follows ordinary Gradle copy semantics. The nested Studio JAR is therefore copied into the outer Pickleball JAR without being unpacked into the consumer runtime classpath.
+The outer Pickleball JAR keeps the nested Studio JAR opaque. Studio's Spring and Spring AI dependencies are packaged inside the executable nested Studio JAR under `BOOT-INF/lib` and are loaded only by the Studio child JVM.
 
-The existing root Shadow behavior remains first-entry-wins for ordinary duplicates. `META-INF/services/**` is explicitly allowed through to `mergeServiceFiles()` so service-provider descriptors continue to merge correctly under Shadow 9. The build also uses Gradle's `Configuration.incoming.artifacts` API for resolved artifact discovery instead of the legacy `ResolvedConfiguration` view.
-
-## Phase 2A: standalone application boundary
+## Distribution and process boundary
 
 The published artifact has this conceptual layout:
 
@@ -27,48 +27,113 @@ pickleball-<version>.jar
 ├── normal Pickleball runtime
 ├── tools.dscode.studio.launcher.PickleballMain
 └── META-INF/pickleball/studio/pickleball-studio.jar
+    ├── Spring Boot launcher
+    ├── BOOT-INF/classes/   Studio implementation
+    └── BOOT-INF/lib/       Studio-only Spring/Spring AI dependencies
 ```
 
-The nested Studio JAR is treated as a separate application. The outer launcher extracts it to a versioned cache under `~/.pickleball/studio` and starts it with the same JDK in a child JVM.
+The outer launcher extracts the nested Studio JAR to a versioned cache under `~/.pickleball/studio` and starts it with the same JDK in a child JVM.
 
-This keeps the consumer/runtime and Studio runtime classpaths separate even though both are distributed in one artifact.
+This preserves one distributed Pickleball artifact while keeping the consumer/runtime and Studio application classpaths separate.
 
-Root-owned packaging is configured by `gradle/pickleball-studio.gradle`. The `pickleball-studio` module builds only the isolated application JAR; it does not mutate the published POM or contribute Studio dependencies to the consumer dependency graph.
+Root-owned packaging is configured by `gradle/pickleball-studio.gradle`. Studio dependencies are not added to the root runtime classpath or published Maven POM.
 
-## Launching the current foundation
+## Phase 2A: standalone application boundary
 
-Build the normal Pickleball artifact, then run:
+Phase 2A established:
+
+- the `pickleball-studio` module;
+- the nested application packaging boundary;
+- the outer launcher and child JVM;
+- generic workspace detection;
+- Gradle 9 / Shadow 9 packaging and verification.
+
+Workspace status remains available with:
 
 ```shell
 java -jar build/libs/pickleball-2.1.7.jar studio status .
 ```
 
-The current Studio application opens the requested workspace and reports whether it contains Maven, Gradle, and Git project markers.
+## Phase 2B: workspace files and MCP
 
-The cache location can be overridden for diagnostics or tests:
+Phase 2B adds a generic workspace file service and a Streamable-HTTP MCP adapter over the same service layer.
+
+The workspace file service supports:
+
+- deterministic directory-tree listing;
+- UTF-8 text-file reads;
+- UTF-8 text-file create/replace writes;
+- literal text search with case-sensitive or case-insensitive matching;
+- workspace-bound path resolution;
+- skipping generated/heavy directories such as `.git`, `.gradle`, `.idea`, `build`, `target`, `out`, and `node_modules` during tree/search traversal.
+
+The MCP adapter exposes these tools:
+
+```text
+workspace_status
+workspace_tree
+workspace_read_file
+workspace_write_file
+workspace_search_text
+```
+
+MCP is an adapter, not the internal application architecture. `StudioMcpTools` delegates to the same `WorkspaceService` and `WorkspaceFileService` that future CLI/GUI adapters should use.
+
+### Starting the MCP server
+
+Build the normal Pickleball artifact and run:
 
 ```shell
-java -Dpickleball.studio.cache=/path/to/cache -jar build/libs/pickleball-2.1.7.jar studio status .
+java -jar build/libs/pickleball-2.1.7.jar studio serve .
 ```
+
+Studio starts a Spring AI 2.0 Streamable-HTTP MCP server bound only to `127.0.0.1`. Port `0` is the default, so the OS chooses an available local port.
+
+The command prints the concrete endpoint, for example:
+
+```text
+Pickleball Studio MCP server ready
+Workspace: /path/to/project
+MCP endpoint: http://127.0.0.1:54321/mcp/<random-token>
+```
+
+A random URL-safe token is generated for each launch and embedded in the MCP endpoint path. This avoids exposing a predictable local file-control endpoint. The token is an endpoint discriminator, not a substitute for network authentication; the current server is intentionally loopback-only. A stable port/token may be supplied when a client configuration requires it:
+
+```shell
+java -jar build/libs/pickleball-2.1.7.jar studio serve . --port=19070 --token=my-local-studio-token
+```
+
+The configured token must contain 8-128 URL-safe letters, digits, `_`, or `-`.
+
+The MCP server advertises tool capability only for this phase; resources, prompts, and completion capabilities are disabled.
 
 ## Validation
 
-After the Gradle/Shadow migration, validate in this order:
+Focused Studio validation:
 
 ```shell
-./gradlew --version
-./gradlew --warning-mode all help
 ./gradlew --rerun-tasks :pickleball-studio:test
 ./gradlew --rerun-tasks :pickleball-studio:verifyBundledStudio
-./gradlew test publishToMavenLocal
 ```
 
-For consumer compatibility, then run the Maven consumer using the repository's normal validation command from root `AGENTS.md`.
+`verifyBundledStudio` checks both sides of the isolation contract:
 
-`verifyBundledStudio` checks both sides of the isolation contract: the nested Studio JAR must exist, and Studio implementation classes must not be unpacked into the outer Pickleball classpath.
+- the outer Pickleball JAR contains the opaque nested Studio JAR;
+- Studio implementation classes do not leak into the outer consumer runtime classpath;
+- the nested JAR is a Spring Boot executable JAR whose `Start-Class` is `StudioApplication`;
+- the nested JAR contains the Spring AI WebMVC MCP server starter.
+
+After focused validation, run the normal root and Maven-consumer validation from root `AGENTS.md`.
 
 ## Current boundaries
 
-Phase 2A does not yet implement Spring AI MCP hosting, GUI editing, Maven/Gradle execution from Studio, process/run history, terminal/output/activity views, or Pickleball runtime IPC/live controls.
+Phase 2B does **not** yet implement:
 
-Those capabilities should be layered on the Studio application without moving generic Studio infrastructure into Pickleball Core.
+- embedded Maven build execution;
+- Gradle Tooling API build execution;
+- process/run history or terminal/output management;
+- GUI editing/navigation;
+- Java/Gherkin syntax services beyond text/file operations;
+- Pickleball runtime IPC or live scenario/browser/mapping control.
+
+Those capabilities should continue to layer on the generic Studio service model. Live Pickleball control remains a later explicit bridge between the Studio JVM and the consumer test JVM.
