@@ -91,6 +91,9 @@ The following components are licensed under the MIT License:
 - io.cucumber:gherkin:35.1.0
 - io.cucumber:cucumber-junit-platform-engine:7.27.2
 
+Pickleball Studio source navigation also embeds `io.cucumber:gherkin:35.1.0` and
+`io.cucumber:messages:29.0.1` inside its isolated nested executable JAR.
+
 - io.github.classgraph:classgraph:4.8.184
 
 - xpathy:xpathy:3.0.0 (bundled manually as libs/xpathy-3.0.0.jar)

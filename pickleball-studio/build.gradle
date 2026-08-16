@@ -37,6 +37,11 @@ dependencies {
     // default and does not add Gradle dependencies to Pickleball consumers.
     implementation "org.gradle:gradle-tooling-api:${studioGradleToolingApiVersion}"
 
+    // Match Pickleball Core's current Gherkin parser/message protocol so Studio
+    // navigation parses the same feature grammar without depending on Core.
+    implementation 'io.cucumber:gherkin:35.1.0'
+    implementation 'io.cucumber:messages:29.0.1'
+
     // Keep Maven's own dependency graph separate from the Spring application
     // classpath. These jars are bundled as opaque Studio tool resources and
     // extracted to a private cache before Maven is started in a child JVM.
@@ -213,6 +218,12 @@ tasks.register('verifyBundledStudio') {
                     }
                     if (!hasGradleToolingApi) {
                         throw new GradleException('Nested Studio JAR is missing the Gradle Tooling API')
+                    }
+                    if (nestedJar.getEntry('BOOT-INF/lib/gherkin-35.1.0.jar') == null) {
+                        throw new GradleException('Nested Studio JAR is missing Gherkin 35.1.0')
+                    }
+                    if (nestedJar.getEntry('BOOT-INF/lib/messages-29.0.1.jar') == null) {
+                        throw new GradleException('Nested Studio JAR is missing Cucumber Messages 29.0.1')
                     }
                     def mavenIndex = "BOOT-INF/classes/META-INF/pickleball/studio/tools/maven/${studioMavenVersion}/classpath.txt"
                     if (nestedJar.getEntry(mavenIndex) == null) {

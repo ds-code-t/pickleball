@@ -407,6 +407,15 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleTaskInfo.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleToolingConnectionFactory.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleWorkspaceModel.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/GherkinSourceParser.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/JavaSourceParser.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceDiagnostic.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceLanguage.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceLocation.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceOutline.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceSymbol.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceSymbolKind.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/language/WorkspaceLanguageService.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioMcpConfiguration.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioMcpTools.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioServer.java`
@@ -426,6 +435,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceTextFile.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceWriteResult.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/gradle/GradleProjectModelServiceTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/language/WorkspaceLanguageServiceTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/mcp/StudioMcpContextTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/mcp/StudioMcpToolsTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/process/ManagedProcessFixture.java`

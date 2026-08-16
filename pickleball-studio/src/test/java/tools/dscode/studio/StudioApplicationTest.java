@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -132,4 +133,23 @@ class StudioApplicationTest {
         assertEquals(2, exitCode);
         assertTrue(error.toString(StandardCharsets.UTF_8).contains("not a Gradle project"));
     }
+    @Test
+    void outlinePrintsJavaDefinitions() throws Exception {
+        Path source = tempDir.resolve("Sample.java");
+        Files.writeString(source, "class Sample { void hello() {} }\n");
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+        int exitCode = StudioApplication.run(
+                new String[]{"outline", tempDir.toString(), "Sample.java"},
+                new PrintStream(output, true, StandardCharsets.UTF_8),
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8)
+        );
+
+        String text = output.toString(StandardCharsets.UTF_8);
+        assertEquals(0, exitCode, text);
+        assertTrue(text.contains("JAVA outline: Sample.java"), text);
+        assertTrue(text.contains("JAVA_CLASS Sample"), text);
+        assertTrue(text.contains("JAVA_METHOD Sample#hello()"), text);
+    }
+
 }

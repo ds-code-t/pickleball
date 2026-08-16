@@ -8,6 +8,7 @@ import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import tools.dscode.studio.build.GradleBuildService;
 import tools.dscode.studio.build.MavenBuildService;
 import tools.dscode.studio.gradle.GradleProjectModelService;
+import tools.dscode.studio.language.WorkspaceLanguageService;
 import tools.dscode.studio.process.ManagedProcessService;
 import tools.dscode.studio.process.WorkspaceProcessService;
 import tools.dscode.studio.workspace.WorkspaceFileService;
@@ -35,16 +36,18 @@ class StudioMcpToolsTest {
         Files.writeString(tempDir.resolve("README.md"), "Pickleball Studio\n");
         WorkspaceInfo info = new WorkspaceService().open(tempDir);
         WorkspaceProcessService processes = new WorkspaceProcessService(info);
+        WorkspaceFileService files = new WorkspaceFileService(info.root());
 
         try (ManagedProcessService managed = new ManagedProcessService(processes)) {
             StudioMcpTools tools = new StudioMcpTools(
                     info,
-                    new WorkspaceFileService(info.root()),
+                    files,
                     processes,
                     managed,
                     new MavenBuildService(info, processes, managed),
                     new GradleBuildService(info, processes, managed),
-                    new GradleProjectModelService(info)
+                    new GradleProjectModelService(info),
+                    new WorkspaceLanguageService(files)
             );
             ToolCallbackProvider provider = MethodToolCallbackProvider.builder().toolObjects(tools).build();
 
@@ -72,7 +75,10 @@ class StudioMcpToolsTest {
                             "gradle_run",
                             "gradle_start",
                             "gradle_model",
-                            "gradle_tasks"
+                            "gradle_tasks",
+                            "source_outline",
+                            "symbol_search",
+                            "symbol_definitions"
                     ),
                     callbacks.keySet()
             );
@@ -84,6 +90,11 @@ class StudioMcpToolsTest {
                     "{\"path\":\"notes/studio.txt\",\"content\":\"created through tool callback\"}"
             );
             assertEquals("created through tool callback", Files.readString(tempDir.resolve("notes/studio.txt")));
+
+            Files.writeString(tempDir.resolve("Sample.java"), "class Sample { void hello() {} }\n");
+            String outline = callbacks.get("source_outline").call("{\"path\":\"Sample.java\"}");
+            assertTrue(outline.contains("JAVA_CLASS"), outline);
+            assertTrue(outline.contains("JAVA_METHOD"), outline);
         }
     }
 }

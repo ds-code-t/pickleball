@@ -94,6 +94,27 @@ public final class WorkspaceFileService {
         return List.copyOf(matches);
     }
 
+    public List<String> findFilesBySuffix(
+            String relativePath,
+            List<String> suffixes,
+            int maxFiles
+    ) {
+        if (suffixes == null || suffixes.isEmpty()) {
+            throw new IllegalArgumentException("File suffixes must not be empty");
+        }
+        if (suffixes.stream().anyMatch(suffix -> suffix == null || suffix.isEmpty())) {
+            throw new IllegalArgumentException("File suffixes must not contain blank values");
+        }
+        if (maxFiles < 1) {
+            throw new IllegalArgumentException("maxFiles must be greater than zero");
+        }
+
+        Path start = resolveExisting(relativePath);
+        List<String> files = new ArrayList<>();
+        collectFilesBySuffix(start, List.copyOf(suffixes), maxFiles, files);
+        return List.copyOf(files);
+    }
+
     private void collectTree(
             Path directory,
             int depth,
@@ -171,6 +192,38 @@ public final class WorkspaceFileService {
             // Binary/non-UTF-8 file: not a text-search candidate.
         } catch (IOException error) {
             throw new IllegalStateException("Unable to search workspace file: " + display(path), error);
+        }
+    }
+
+    private void collectFilesBySuffix(
+            Path path,
+            List<String> suffixes,
+            int maxFiles,
+            List<String> files
+    ) {
+        if (files.size() >= maxFiles || Files.isSymbolicLink(path)) {
+            return;
+        }
+        if (Files.isDirectory(path)) {
+            if (shouldSkipDirectory(path) && !path.equals(realRoot)) {
+                return;
+            }
+            for (Path child : children(path)) {
+                collectFilesBySuffix(child, suffixes, maxFiles, files);
+                if (files.size() >= maxFiles) {
+                    return;
+                }
+            }
+            return;
+        }
+
+        if (!Files.isRegularFile(path)) {
+            return;
+        }
+
+        String name = path.getFileName().toString();
+        if (suffixes.stream().anyMatch(name::endsWith)) {
+            files.add(display(path));
         }
     }
 

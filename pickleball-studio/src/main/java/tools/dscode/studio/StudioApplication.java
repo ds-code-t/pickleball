@@ -7,9 +7,13 @@ import tools.dscode.studio.build.MavenRunResult;
 import tools.dscode.studio.gradle.GradleProjectInfo;
 import tools.dscode.studio.gradle.GradleProjectModelService;
 import tools.dscode.studio.gradle.GradleWorkspaceModel;
+import tools.dscode.studio.language.SourceOutline;
+import tools.dscode.studio.language.SourceSymbol;
+import tools.dscode.studio.language.WorkspaceLanguageService;
 import tools.dscode.studio.mcp.StudioServer;
 import tools.dscode.studio.process.ProcessResult;
 import tools.dscode.studio.process.WorkspaceProcessService;
+import tools.dscode.studio.workspace.WorkspaceFileService;
 import tools.dscode.studio.workspace.WorkspaceInfo;
 import tools.dscode.studio.workspace.WorkspaceService;
 
@@ -54,6 +58,9 @@ public final class StudioApplication {
         }
         if (args.length > 0 && "gradle-model".equalsIgnoreCase(args[0])) {
             return gradleModel(args, out, err);
+        }
+        if (args.length > 0 && "outline".equalsIgnoreCase(args[0])) {
+            return outline(args, out, err);
         }
 
         int workspaceIndex = args.length > 0 && "status".equalsIgnoreCase(args[0]) ? 1 : 0;
@@ -198,6 +205,42 @@ public final class StudioApplication {
         }
     }
 
+    private static int outline(String[] args, PrintStream out, PrintStream err) {
+        if (args.length != 3) {
+            err.println("Usage: pickleball studio outline <workspace> <source-file>");
+            return 2;
+        }
+
+        try {
+            WorkspaceInfo workspace = new WorkspaceService().open(Path.of(args[1]));
+            WorkspaceLanguageService language = new WorkspaceLanguageService(
+                    new WorkspaceFileService(workspace.root())
+            );
+            SourceOutline outline = language.outline(args[2]);
+
+            out.println(outline.language() + " outline: " + outline.path());
+            for (SourceSymbol symbol : outline.symbols()) {
+                out.println("  " + symbol.kind()
+                        + " " + symbol.qualifiedName()
+                        + " @" + symbol.location().line()
+                        + ":" + symbol.location().column());
+            }
+            outline.diagnostics().forEach(diagnostic ->
+                    err.println(diagnostic.severity() + ": "
+                            + (diagnostic.line() == null ? "" : diagnostic.line() + ":")
+                            + (diagnostic.column() == null ? "" : diagnostic.column() + " ")
+                            + diagnostic.message())
+            );
+            return outline.diagnostics().stream()
+                    .anyMatch(diagnostic -> "ERROR".equals(diagnostic.severity()))
+                    ? 1
+                    : 0;
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            err.println(error.getMessage());
+            return 2;
+        }
+    }
+
     private static void printProcessResult(ProcessResult result, PrintStream out, PrintStream err) {
         if (!result.stdout().isEmpty()) {
             out.print(result.stdout());
@@ -223,7 +266,8 @@ public final class StudioApplication {
                 || "exec".equalsIgnoreCase(argument)
                 || "maven".equalsIgnoreCase(argument)
                 || "gradle".equalsIgnoreCase(argument)
-                || "gradle-model".equalsIgnoreCase(argument);
+                || "gradle-model".equalsIgnoreCase(argument)
+                || "outline".equalsIgnoreCase(argument);
     }
 
     private static boolean isHelp(String argument) {
@@ -240,5 +284,6 @@ public final class StudioApplication {
         out.println("  pickleball studio maven <workspace> <goal-or-option> [args...]");
         out.println("  pickleball studio gradle <workspace> <task-or-option> [args...]");
         out.println("  pickleball studio gradle-model [workspace]");
+        out.println("  pickleball studio outline <workspace> <source-file>");
     }
 }

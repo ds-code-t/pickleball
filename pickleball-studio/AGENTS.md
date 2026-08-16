@@ -64,15 +64,26 @@ Phase 2F embeds the public Gradle Tooling API in the isolated Studio application
 - Tooling API model reads may use a Gradle daemon; do not describe them as `--no-daemon` wrapper executions.
 - Keep build execution (`GradleBuildService`) and project-model/navigation (`GradleProjectModelService`) as separate services.
 
+## Language navigation
+
+Phase 2G adds read-only Java/Gherkin definition navigation through `WorkspaceLanguageService`.
+
+- `JavaSourceParser` uses the Java 21 compiler tree API in parse-only mode. Do not turn source navigation into an implicit project compile, annotation-processing run, or code execution path.
+- `GherkinSourceParser` uses Cucumber Gherkin 35.1.0 and Messages 29.0.1 to stay aligned with the current Pickleball runtime grammar without depending on Pickleball Core.
+- Keep `.java` and `.feature` source parsing workspace-bound and reuse `WorkspaceFileService` traversal/skip semantics for workspace-wide symbol scans.
+- `source_outline`, `symbol_search`, and `symbol_definitions` are read-only adapters over the language service.
+- Definition navigation is not semantic reference resolution. Do not claim find-usages, rename/refactoring, Java type/classpath analysis, completion, or Gherkin-step-to-Java binding until those are implemented explicitly.
+
 ## MCP
 
-Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C added one-shot process and Maven tools. Phase 2D added managed process lifecycle tools. Phase 2E added synchronous and managed Gradle Wrapper execution. Phase 2F adds read-only Gradle Tooling API model/navigation tools.
+Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C added one-shot process and Maven tools. Phase 2D added managed process lifecycle tools. Phase 2E added synchronous and managed Gradle Wrapper execution. Phase 2F adds read-only Gradle Tooling API model/navigation tools. Phase 2G adds read-only Java/Gherkin source navigation tools.
 
 - Bind the Studio MCP server to loopback only.
 - Keep the per-launch endpoint token behavior unless a later authentication design explicitly replaces it.
 - Expose deterministic Studio capabilities, not autonomous AI policy.
 - Keep synchronous `process_run` / `maven_run` / `gradle_run` for one-call execution.
 - Gradle model/navigation tools are `gradle_model` and `gradle_tasks`; they must remain read-only adapters over `GradleProjectModelService`.
+- Source navigation tools are `source_outline`, `symbol_search`, and `symbol_definitions`; they must remain read-only adapters over `WorkspaceLanguageService`.
 - Managed runs use `process_start`, `process_list`, `process_status`, `process_output`, `process_cancel`, `maven_start`, and `gradle_start`.
 - Managed run ids and history belong to the running Studio server/JVM; do not imply persistence across Studio restarts.
 - MCP does not yet imply Pickleball runtime connectivity. Phase 3 must use an explicit Studio-JVM-to-consumer-test-JVM bridge.
@@ -91,6 +102,8 @@ Phase 2E adds project Gradle Wrapper execution through CLI and MCP, including ma
 
 Phase 2F adds Gradle Tooling API environment/project/source/task models for CLI, MCP, and future GUI navigation. Model reads follow the target build's project-specific distribution by default; when a build declares no Gradle version, Tooling API default behavior uses the client Tooling API version.
 
-Do not claim that full Gradle dependency/classpath import, persistent run/activity history, interactive terminal input, GUI editing, syntax-aware Java/Gherkin navigation, or live Pickleball control is implemented until those later slices are added.
+Phase 2G adds parse-only Java and Gherkin definition outlines, workspace symbol search, exact definition lookup, and syntax diagnostics for CLI, MCP, and future GUI navigation.
+
+Do not claim that full Gradle dependency/classpath import, persistent run/activity history, interactive terminal input, GUI editing, semantic Java reference/type analysis, Gherkin step binding, or live Pickleball control is implemented until those later slices are added.
 
 See `docs/pickleball-studio.md`.

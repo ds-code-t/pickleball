@@ -44,6 +44,22 @@ class WorkspaceFileServiceTest {
     }
 
     @Test
+    void findsFilesBySuffixDeterministicallyAndSkipsGeneratedDirectories() throws Exception {
+        Files.createDirectories(tempDir.resolve("features"));
+        Files.writeString(tempDir.resolve("A.java"), "class A {}\n");
+        Files.writeString(tempDir.resolve("features/b.feature"), "Feature: B\n");
+        Files.createDirectories(tempDir.resolve("build/generated"));
+        Files.writeString(tempDir.resolve("build/generated/Hidden.java"), "class Hidden {}\n");
+
+        WorkspaceFileService files = new WorkspaceFileService(tempDir);
+
+        assertEquals(
+                List.of("A.java", "features/b.feature"),
+                files.findFilesBySuffix("", List.of(".java", ".feature"), 10)
+        );
+    }
+
+    @Test
     void enforcesWorkspaceBoundary() {
         WorkspaceFileService files = new WorkspaceFileService(tempDir);
 
@@ -54,9 +70,12 @@ class WorkspaceFileServiceTest {
     @Test
     void honorsResultLimits() throws Exception {
         Files.writeString(tempDir.resolve("sample.txt"), "match\nmatch\nmatch\n");
+        Files.writeString(tempDir.resolve("A.java"), "class A {}\n");
+        Files.writeString(tempDir.resolve("B.java"), "class B {}\n");
         WorkspaceFileService files = new WorkspaceFileService(tempDir);
 
         assertEquals(2, files.searchText("match", "", true, 2).size());
         assertEquals(1, files.tree("", 5, 1).size());
+        assertEquals(1, files.findFilesBySuffix("", List.of(".java"), 1).size());
     }
 }

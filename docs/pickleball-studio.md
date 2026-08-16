@@ -16,10 +16,11 @@ Studio currently targets:
 - Apache Maven 3.9.16 for Studio-managed Maven execution;
 - project Gradle Wrappers for Studio-managed Gradle execution without a host Gradle installation;
 - Gradle Tooling API 9.6.1 for structured Gradle project/navigation models;
+- Cucumber Gherkin 35.1.0 with Messages 29.0.1 for feature-file syntax navigation aligned with the current Pickleball runtime;
 - Gradle Nexus Publish Plugin 2.0.0;
 - AspectJ 1.9.24 for Pickleball Core.
 
-The outer Pickleball JAR keeps the nested Studio JAR opaque. Studio's Spring, Spring AI, and Gradle Tooling API dependencies are packaged inside the executable nested Studio JAR under `BOOT-INF/lib` and are loaded only by the Studio child JVM.
+The outer Pickleball JAR keeps the nested Studio JAR opaque. Studio's Spring, Spring AI, Gradle Tooling API, and Gherkin navigation dependencies are packaged inside the executable nested Studio JAR under `BOOT-INF/lib` and are loaded only by the Studio child JVM.
 
 The Maven runtime is packaged separately inside Studio as opaque tool resources rather than merged into the Spring application classpath. Studio extracts that runtime to its private tool cache when Maven is first used and launches Maven in another child JVM. No host Maven installation is required.
 
@@ -34,7 +35,7 @@ pickleball-<version>.jar
 └── META-INF/pickleball/studio/pickleball-studio.jar
     ├── Spring Boot launcher
     ├── BOOT-INF/classes/   Studio implementation and opaque Studio tool resources
-    └── BOOT-INF/lib/       Studio-only Spring/Spring AI dependencies
+    └── BOOT-INF/lib/       Studio-only application/navigation dependencies
 ```
 
 The outer launcher extracts the nested Studio JAR to a versioned cache under `~/.pickleball/studio` and starts it with the same JDK in a child JVM. Cached Studio JAR names are content-addressed (`pickleball-studio-<sha256>.jar`) so a new build never needs to overwrite a JAR that another Studio process may still have open, including on Windows.
@@ -248,6 +249,33 @@ Tooling API model reads may start/use a Gradle daemon. This is different from Ph
 
 Phase 2F does not import full external dependency/classpath graphs. That can be added later if editor/navigation features require it.
 
+## Phase 2G: Java and Gherkin source navigation
+
+Phase 2G adds `WorkspaceLanguageService` for read-only source navigation over the opened workspace. It builds on the existing workspace-bound file traversal and keeps generated/heavy directories out of workspace-wide symbol scans.
+
+Java navigation uses the Java 21 compiler tree API in parse-only mode. It does not compile the source, run annotation processors, resolve a project classpath, or execute project code. Java outlines currently identify classes, interfaces, enums, records, annotation types, fields, constructors, and methods with source locations.
+
+Gherkin navigation uses Cucumber Gherkin 35.1.0 with Messages 29.0.1, matching the parser/message versions used by the current Pickleball runtime. It uses the Gherkin AST and dialect metadata rather than a Studio-specific keyword parser. Gherkin outlines identify features, rules, backgrounds, scenarios, scenario outlines, examples, and steps with source locations. Parser errors are returned as source diagnostics.
+
+The CLI can inspect one source file:
+
+```shell
+java -jar build/libs/pickleball-2.1.7.jar studio outline . path/to/Source.java
+java -jar build/libs/pickleball-2.1.7.jar studio outline . path/to/scenario.feature
+```
+
+MCP adds three tools, bringing the current tool count to 20:
+
+```text
+source_outline
+symbol_search
+symbol_definitions
+```
+
+`source_outline` parses one `.java` or `.feature` file and returns symbols plus syntax diagnostics. `symbol_search` performs case-insensitive workspace definition search with optional language/kind filters. `symbol_definitions` performs exact simple-name or qualified-name definition lookup. Workspace-wide scans are deterministic, result-limited, and use the same skipped-directory/symlink rules as the existing file service.
+
+This is definition/navigation support, not a language server. Phase 2G does not yet resolve Java references across a compile classpath, infer types, find usages, rename symbols, provide code completion, or bind Gherkin steps to Java step definitions. Those deeper semantic capabilities can layer on this source model later if the editor requires them.
+
 ## Validation
 
 Focused Studio validation:
@@ -257,7 +285,7 @@ Focused Studio validation:
 ./gradlew --rerun-tasks :pickleball-studio:verifyBundledStudio
 ```
 
-The Studio tests include real child-JVM process checks, managed incremental-output/cancellation and descendant-termination checks, synchronous plus managed Maven `--version` checks, cross-platform Gradle Wrapper fixture checks, and a Gradle Tooling API project/source/task model fixture. The Tooling API test uses the Gradle installation already running the repository test build, so it does not require a host Gradle installation or a separate distribution download.
+The Studio tests include real child-JVM process checks, managed incremental-output/cancellation and descendant-termination checks, synchronous plus managed Maven `--version` checks, cross-platform Gradle Wrapper fixture checks, a Gradle Tooling API project/source/task model fixture, and Java/Gherkin source-outline and workspace-symbol navigation fixtures. The Tooling API test uses the Gradle installation already running the repository test build, so it does not require a host Gradle installation or a separate distribution download.
 
 `verifyBundledStudio` checks both sides of the isolation contract:
 
@@ -266,19 +294,20 @@ The Studio tests include real child-JVM process checks, managed incremental-outp
 - the nested JAR is a Spring Boot executable JAR whose `Start-Class` is `StudioApplication`;
 - the nested JAR contains the Spring AI WebMVC MCP server starter;
 - the nested JAR contains Gradle Tooling API 9.6.1;
+- the nested JAR contains Gherkin 35.1.0 and Messages 29.0.1 for Studio source navigation;
 - the nested JAR contains the Studio-managed Maven runtime index and Maven embedder jar as opaque resources.
 
 After focused validation, run the normal root and Maven-consumer validation from root `AGENTS.md`.
 
 ## Current boundaries
 
-Phase 2F does **not** yet implement:
+Phase 2G does **not** yet implement:
 
 - full Gradle external dependency/classpath import;
 - persistent process/activity history across Studio restarts;
 - interactive terminal stdin/PTY support;
 - GUI editing/navigation;
-- Java/Gherkin syntax services beyond text/file operations;
+- full Java semantic/classpath reference resolution, usages, refactoring, or Gherkin-to-Java step binding;
 - Pickleball runtime IPC or live scenario/browser/mapping control.
 
 Those capabilities should continue to layer on the generic Studio service model. Live Pickleball control remains a later explicit bridge between the Studio JVM and the consumer test JVM.

@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Bean;
 import tools.dscode.studio.build.GradleBuildService;
 import tools.dscode.studio.build.MavenBuildService;
 import tools.dscode.studio.gradle.GradleProjectModelService;
+import tools.dscode.studio.language.WorkspaceLanguageService;
 import tools.dscode.studio.process.ManagedProcessService;
 import tools.dscode.studio.process.WorkspaceProcessService;
 import tools.dscode.studio.workspace.WorkspaceFileService;
@@ -42,6 +43,11 @@ public class StudioMcpConfiguration {
     @Bean
     WorkspaceProcessService workspaceProcessService(WorkspaceInfo workspaceInfo) {
         return new WorkspaceProcessService(workspaceInfo);
+    }
+
+    @Bean
+    WorkspaceLanguageService workspaceLanguageService(WorkspaceFileService workspaceFileService) {
+        return new WorkspaceLanguageService(workspaceFileService);
     }
 
     @Bean(destroyMethod = "close")
@@ -80,7 +86,8 @@ public class StudioMcpConfiguration {
             ManagedProcessService managedProcessService,
             MavenBuildService mavenBuildService,
             GradleBuildService gradleBuildService,
-            GradleProjectModelService gradleProjectModelService
+            GradleProjectModelService gradleProjectModelService,
+            WorkspaceLanguageService workspaceLanguageService
     ) {
         return new StudioMcpTools(
                 workspaceInfo,
@@ -89,7 +96,8 @@ public class StudioMcpConfiguration {
                 managedProcessService,
                 mavenBuildService,
                 gradleBuildService,
-                gradleProjectModelService
+                gradleProjectModelService,
+                workspaceLanguageService
         );
     }
 

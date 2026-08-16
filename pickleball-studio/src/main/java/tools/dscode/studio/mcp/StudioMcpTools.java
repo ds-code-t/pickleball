@@ -11,6 +11,9 @@ import tools.dscode.studio.build.MavenRunResult;
 import tools.dscode.studio.gradle.GradleProjectModelService;
 import tools.dscode.studio.gradle.GradleTaskInfo;
 import tools.dscode.studio.gradle.GradleWorkspaceModel;
+import tools.dscode.studio.language.SourceOutline;
+import tools.dscode.studio.language.SourceSymbol;
+import tools.dscode.studio.language.WorkspaceLanguageService;
 import tools.dscode.studio.process.ManagedProcessService;
 import tools.dscode.studio.process.ManagedProcessSummary;
 import tools.dscode.studio.process.ProcessOutputChunk;
@@ -37,6 +40,7 @@ public final class StudioMcpTools {
     private final MavenBuildService maven;
     private final GradleBuildService gradle;
     private final GradleProjectModelService gradleModel;
+    private final WorkspaceLanguageService language;
 
     public StudioMcpTools(
             WorkspaceInfo workspace,
@@ -45,7 +49,8 @@ public final class StudioMcpTools {
             ManagedProcessService managedProcesses,
             MavenBuildService maven,
             GradleBuildService gradle,
-            GradleProjectModelService gradleModel
+            GradleProjectModelService gradleModel,
+            WorkspaceLanguageService language
     ) {
         this.workspace = workspace;
         this.files = files;
@@ -54,6 +59,7 @@ public final class StudioMcpTools {
         this.maven = maven;
         this.gradle = gradle;
         this.gradleModel = gradleModel;
+        this.language = language;
     }
 
     @Tool(
@@ -276,4 +282,41 @@ public final class StudioMcpTools {
     ) {
         return gradleModel.tasks(projectPath);
     }
+
+    @Tool(
+            name = "source_outline",
+            description = "Parse one Java or Gherkin source file and return its definition outline plus syntax diagnostics."
+    )
+    public SourceOutline sourceOutline(
+            @ToolParam(description = "Workspace-relative .java or .feature file path.") String path
+    ) {
+        return language.outline(path);
+    }
+
+    @Tool(
+            name = "symbol_search",
+            description = "Search parsed Java and Gherkin definitions across the workspace. Generated/build directories are skipped."
+    )
+    public List<SourceSymbol> symbolSearch(
+            @ToolParam(description = "Case-insensitive text matched against symbol name, qualified name, or container.") String query,
+            @ToolParam(description = "Optional language filter: JAVA or GHERKIN.", required = false) String sourceLanguage,
+            @ToolParam(description = "Optional SourceSymbolKind names to include.", required = false) List<String> kinds,
+            @ToolParam(description = "Maximum returned symbols. Defaults to 100; maximum 500.", required = false) Integer maxResults
+    ) {
+        return language.searchSymbols(query, sourceLanguage, kinds, maxResults);
+    }
+
+    @Tool(
+            name = "symbol_definitions",
+            description = "Find exact Java or Gherkin definitions by simple or qualified symbol name."
+    )
+    public List<SourceSymbol> symbolDefinitions(
+            @ToolParam(description = "Exact simple or qualified symbol name.") String name,
+            @ToolParam(description = "Optional language filter: JAVA or GHERKIN.", required = false) String sourceLanguage,
+            @ToolParam(description = "Optional SourceSymbolKind names to include.", required = false) List<String> kinds,
+            @ToolParam(description = "Maximum returned definitions. Defaults to 100; maximum 500.", required = false) Integer maxResults
+    ) {
+        return language.findDefinitions(name, sourceLanguage, kinds, maxResults);
+    }
+
 }
