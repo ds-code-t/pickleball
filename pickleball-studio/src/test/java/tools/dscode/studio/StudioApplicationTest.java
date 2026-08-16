@@ -118,4 +118,18 @@ class StudioApplicationTest {
         assertEquals(2, exitCode);
         assertTrue(error.toString(StandardCharsets.UTF_8).contains("studio gradle"));
     }
+
+    @Test
+    void gradleModelRejectsNonGradleWorkspace() {
+        ByteArrayOutputStream error = new ByteArrayOutputStream();
+
+        int exitCode = StudioApplication.run(
+                new String[]{"gradle-model", tempDir.toString()},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(error, true, StandardCharsets.UTF_8)
+        );
+
+        assertEquals(2, exitCode);
+        assertTrue(error.toString(StandardCharsets.UTF_8).contains("not a Gradle project"));
+    }
 }

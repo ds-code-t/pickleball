@@ -6,8 +6,13 @@ plugins {
 group = rootProject.group
 version = rootProject.version
 
+def studioGradleToolingApiVersion = '9.6.1'
+
 repositories {
     mavenCentral()
+    maven {
+        url = uri('https://repo.gradle.org/gradle/libs-releases')
+    }
 }
 
 java {
@@ -26,6 +31,11 @@ dependencies {
     implementation platform('org.springframework.boot:spring-boot-dependencies:4.1.0')
     implementation platform('org.springframework.ai:spring-ai-bom:2.0.0')
     implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc'
+
+    // Studio embeds the public Gradle Tooling API for project model/navigation.
+    // The API follows each workspace's project-specific Gradle distribution by
+    // default and does not add Gradle dependencies to Pickleball consumers.
+    implementation "org.gradle:gradle-tooling-api:${studioGradleToolingApiVersion}"
 
     // Keep Maven's own dependency graph separate from the Spring application
     // classpath. These jars are bundled as opaque Studio tool resources and
@@ -91,6 +101,9 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.test {
     useJUnitPlatform()
+    if (gradle.gradleHomeDir != null) {
+        systemProperty 'pickleball.studio.test.gradle.home', gradle.gradleHomeDir.absolutePath
+    }
     testLogging {
         events 'failed'
         exceptionFormat = 'full'
@@ -194,6 +207,12 @@ tasks.register('verifyBundledStudio') {
                     }
                     if (!hasMcpStarter) {
                         throw new GradleException('Nested Studio JAR is missing the Spring AI MCP server starter')
+                    }
+                    def hasGradleToolingApi = java.util.Collections.list(nestedJar.entries()).any {
+                        it.name == "BOOT-INF/lib/gradle-tooling-api-${studioGradleToolingApiVersion}.jar"
+                    }
+                    if (!hasGradleToolingApi) {
+                        throw new GradleException('Nested Studio JAR is missing the Gradle Tooling API')
                     }
                     def mavenIndex = "BOOT-INF/classes/META-INF/pickleball/studio/tools/maven/${studioMavenVersion}/classpath.txt"
                     if (nestedJar.getEntry(mavenIndex) == null) {

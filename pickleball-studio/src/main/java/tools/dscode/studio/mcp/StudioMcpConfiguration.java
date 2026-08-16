@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import tools.dscode.studio.build.GradleBuildService;
 import tools.dscode.studio.build.MavenBuildService;
+import tools.dscode.studio.gradle.GradleProjectModelService;
 import tools.dscode.studio.process.ManagedProcessService;
 import tools.dscode.studio.process.WorkspaceProcessService;
 import tools.dscode.studio.workspace.WorkspaceFileService;
@@ -67,13 +68,19 @@ public class StudioMcpConfiguration {
     }
 
     @Bean
+    GradleProjectModelService gradleProjectModelService(WorkspaceInfo workspaceInfo) {
+        return new GradleProjectModelService(workspaceInfo);
+    }
+
+    @Bean
     StudioMcpTools studioMcpTools(
             WorkspaceInfo workspaceInfo,
             WorkspaceFileService workspaceFileService,
             WorkspaceProcessService workspaceProcessService,
             ManagedProcessService managedProcessService,
             MavenBuildService mavenBuildService,
-            GradleBuildService gradleBuildService
+            GradleBuildService gradleBuildService,
+            GradleProjectModelService gradleProjectModelService
     ) {
         return new StudioMcpTools(
                 workspaceInfo,
@@ -81,7 +88,8 @@ public class StudioMcpConfiguration {
                 workspaceProcessService,
                 managedProcessService,
                 mavenBuildService,
-                gradleBuildService
+                gradleBuildService,
+                gradleProjectModelService
         );
     }
 

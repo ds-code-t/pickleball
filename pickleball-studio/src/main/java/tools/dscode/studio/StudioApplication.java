@@ -4,6 +4,9 @@ import tools.dscode.studio.build.GradleBuildService;
 import tools.dscode.studio.build.GradleRunResult;
 import tools.dscode.studio.build.MavenBuildService;
 import tools.dscode.studio.build.MavenRunResult;
+import tools.dscode.studio.gradle.GradleProjectInfo;
+import tools.dscode.studio.gradle.GradleProjectModelService;
+import tools.dscode.studio.gradle.GradleWorkspaceModel;
 import tools.dscode.studio.mcp.StudioServer;
 import tools.dscode.studio.process.ProcessResult;
 import tools.dscode.studio.process.WorkspaceProcessService;
@@ -48,6 +51,9 @@ public final class StudioApplication {
         }
         if (args.length > 0 && "gradle".equalsIgnoreCase(args[0])) {
             return gradle(args, out, err);
+        }
+        if (args.length > 0 && "gradle-model".equalsIgnoreCase(args[0])) {
+            return gradleModel(args, out, err);
         }
 
         int workspaceIndex = args.length > 0 && "status".equalsIgnoreCase(args[0]) ? 1 : 0;
@@ -164,6 +170,34 @@ public final class StudioApplication {
         }
     }
 
+    private static int gradleModel(String[] args, PrintStream out, PrintStream err) {
+        if (args.length > 2) {
+            err.println("Usage: pickleball studio gradle-model [workspace]");
+            return 2;
+        }
+
+        Path requested = args.length == 2 ? Path.of(args[1]) : Path.of(".");
+        try {
+            WorkspaceInfo workspace = new WorkspaceService().open(requested);
+            GradleWorkspaceModel model = new GradleProjectModelService(workspace).model();
+
+            out.println("Gradle project model ready");
+            out.println("Gradle: " + model.gradleVersion());
+            out.println("Java: " + model.javaHome());
+            out.println("Projects:");
+            for (GradleProjectInfo project : model.projects()) {
+                out.println("  " + project.path()
+                        + " -> " + project.projectDirectory()
+                        + " (tasks=" + project.taskCount()
+                        + ", sources=" + project.sourceDirectories().size() + ")");
+            }
+            return 0;
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            err.println(error.getMessage());
+            return 2;
+        }
+    }
+
     private static void printProcessResult(ProcessResult result, PrintStream out, PrintStream err) {
         if (!result.stdout().isEmpty()) {
             out.print(result.stdout());
@@ -188,7 +222,8 @@ public final class StudioApplication {
                 || "status".equalsIgnoreCase(argument)
                 || "exec".equalsIgnoreCase(argument)
                 || "maven".equalsIgnoreCase(argument)
-                || "gradle".equalsIgnoreCase(argument);
+                || "gradle".equalsIgnoreCase(argument)
+                || "gradle-model".equalsIgnoreCase(argument);
     }
 
     private static boolean isHelp(String argument) {
@@ -204,5 +239,6 @@ public final class StudioApplication {
         out.println("  pickleball studio exec <workspace> <command> [args...]");
         out.println("  pickleball studio maven <workspace> <goal-or-option> [args...]");
         out.println("  pickleball studio gradle <workspace> <task-or-option> [args...]");
+        out.println("  pickleball studio gradle-model [workspace]");
     }
 }

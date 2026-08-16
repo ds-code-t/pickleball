@@ -15,10 +15,11 @@ Studio currently targets:
 - Spring AI 2.0.0 for MCP server integration;
 - Apache Maven 3.9.16 for Studio-managed Maven execution;
 - project Gradle Wrappers for Studio-managed Gradle execution without a host Gradle installation;
+- Gradle Tooling API 9.6.1 for structured Gradle project/navigation models;
 - Gradle Nexus Publish Plugin 2.0.0;
 - AspectJ 1.9.24 for Pickleball Core.
 
-The outer Pickleball JAR keeps the nested Studio JAR opaque. Studio's Spring and Spring AI dependencies are packaged inside the executable nested Studio JAR under `BOOT-INF/lib` and are loaded only by the Studio child JVM.
+The outer Pickleball JAR keeps the nested Studio JAR opaque. Studio's Spring, Spring AI, and Gradle Tooling API dependencies are packaged inside the executable nested Studio JAR under `BOOT-INF/lib` and are loaded only by the Studio child JVM.
 
 The Maven runtime is packaged separately inside Studio as opaque tool resources rather than merged into the Spring application classpath. Studio extracts that runtime to its private tool cache when Maven is first used and launches Maven in another child JVM. No host Maven installation is required.
 
@@ -207,7 +208,45 @@ gradle_start
 
 `gradle_run` is synchronous. `gradle_start` returns a managed process id that is consumed through the existing `process_status`, `process_output`, and `process_cancel` tools. Process cancellation now terminates owned descendant processes as well as the immediate wrapper process so Gradle/Java children are not intentionally left running.
 
-This phase is Gradle **build execution**, not Gradle Tooling API project-model/navigation support. Wrapperless Gradle projects are also outside the current contract.
+Phase 2E remains Gradle **build execution** through a checked-in Wrapper. Wrapperless `gradle_run` / `gradle_start` execution is still outside that build-runner contract; Phase 2F separately adds Tooling API model reads.
+
+## Phase 2F: Gradle Tooling API project/navigation models
+
+Phase 2F embeds Gradle Tooling API 9.6.1 inside the isolated Studio application and adds `GradleProjectModelService`. This is separate from `GradleBuildService`: Wrapper execution remains the build runner, while the Tooling API supplies structured, read-only project information for Studio, MCP, and future GUI navigation.
+
+The Tooling API is project-version aware. By default it uses the Gradle version configured by the target build, including its Wrapper configuration. If the target build declares no Gradle version, Gradle's Tooling API default is to use the Tooling API client's Gradle version. It does not require a host-installed `gradle`.
+
+Model reads expose:
+
+- the actual Gradle version selected for the target build;
+- the Java home and Gradle user home reported by the build environment;
+- deterministic project paths, names, descriptions, project directories, build directories, and build scripts;
+- task counts for project navigation;
+- production/test source directories;
+- production/test resource directories;
+- excluded directories and generated-source metadata;
+- deterministic task path/name/group/description/public metadata for a selected project.
+
+Source/resource navigation uses Gradle's `BasicIdeaProject` tooling model. Gradle documents that model as a fast preview model that does not resolve external dependencies from repositories, which keeps this phase focused on project/source navigation instead of dependency import.
+
+MCP adds two tools, bringing the current tool count to 17:
+
+```text
+gradle_model
+gradle_tasks
+```
+
+`gradle_model` returns the environment, project hierarchy, and source/resource roots. `gradle_tasks` accepts an optional Gradle project path such as `:` or `:app` and returns tasks for that project.
+
+A human-readable CLI model check is also available:
+
+```shell
+java -jar build/libs/pickleball-2.1.7.jar studio gradle-model .
+```
+
+Tooling API model reads may start/use a Gradle daemon. This is different from Phase 2E's wrapper execution, where Studio explicitly passes `--no-daemon --console=plain`.
+
+Phase 2F does not import full external dependency/classpath graphs. That can be added later if editor/navigation features require it.
 
 ## Validation
 
@@ -218,7 +257,7 @@ Focused Studio validation:
 ./gradlew --rerun-tasks :pickleball-studio:verifyBundledStudio
 ```
 
-The Studio tests include real child-JVM process checks, managed incremental-output/cancellation and descendant-termination checks, synchronous plus managed Maven `--version` checks, and cross-platform Gradle Wrapper fixture checks for synchronous/managed execution. The Gradle fixture tests do not require a host Gradle installation or network download.
+The Studio tests include real child-JVM process checks, managed incremental-output/cancellation and descendant-termination checks, synchronous plus managed Maven `--version` checks, cross-platform Gradle Wrapper fixture checks, and a Gradle Tooling API project/source/task model fixture. The Tooling API test uses the Gradle installation already running the repository test build, so it does not require a host Gradle installation or a separate distribution download.
 
 `verifyBundledStudio` checks both sides of the isolation contract:
 
@@ -226,15 +265,16 @@ The Studio tests include real child-JVM process checks, managed incremental-outp
 - Studio implementation classes do not leak into the outer consumer runtime classpath;
 - the nested JAR is a Spring Boot executable JAR whose `Start-Class` is `StudioApplication`;
 - the nested JAR contains the Spring AI WebMVC MCP server starter;
+- the nested JAR contains Gradle Tooling API 9.6.1;
 - the nested JAR contains the Studio-managed Maven runtime index and Maven embedder jar as opaque resources.
 
 After focused validation, run the normal root and Maven-consumer validation from root `AGENTS.md`.
 
 ## Current boundaries
 
-Phase 2E does **not** yet implement:
+Phase 2F does **not** yet implement:
 
-- Gradle Tooling API project-model/navigation support or wrapperless Gradle provisioning;
+- full Gradle external dependency/classpath import;
 - persistent process/activity history across Studio restarts;
 - interactive terminal stdin/PTY support;
 - GUI editing/navigation;

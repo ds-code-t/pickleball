@@ -401,6 +401,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `gradle/pickleball-studio.gradle`
 - `pickleball-studio/AGENTS.md`
 - `pickleball-studio/build.gradle`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleProjectInfo.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleProjectModelService.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleSourceDirectoryInfo.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleTaskInfo.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleToolingConnectionFactory.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleWorkspaceModel.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioMcpConfiguration.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioMcpTools.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioServer.java`
@@ -419,6 +425,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceService.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceTextFile.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceWriteResult.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/gradle/GradleProjectModelServiceTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/mcp/StudioMcpContextTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/mcp/StudioMcpToolsTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/process/ManagedProcessFixture.java`

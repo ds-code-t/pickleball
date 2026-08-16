@@ -38,6 +38,7 @@ its isolated nested executable JAR:
 - org.springframework.boot:spring-boot:4.1.0
 - org.springframework.boot:spring-boot-loader:4.1.0
 - org.springframework.ai:spring-ai-starter-mcp-server-webmvc:2.0.0
+- org.gradle:gradle-tooling-api:9.6.1
 
 Pickleball Studio also bundles the Apache Maven 3.9.16 distribution runtime
 as opaque build-tool resources used by its isolated Maven child process. Major

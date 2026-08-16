@@ -8,6 +8,9 @@ import tools.dscode.studio.build.ManagedGradleRunResult;
 import tools.dscode.studio.build.ManagedMavenRunResult;
 import tools.dscode.studio.build.MavenBuildService;
 import tools.dscode.studio.build.MavenRunResult;
+import tools.dscode.studio.gradle.GradleProjectModelService;
+import tools.dscode.studio.gradle.GradleTaskInfo;
+import tools.dscode.studio.gradle.GradleWorkspaceModel;
 import tools.dscode.studio.process.ManagedProcessService;
 import tools.dscode.studio.process.ManagedProcessSummary;
 import tools.dscode.studio.process.ProcessOutputChunk;
@@ -33,6 +36,7 @@ public final class StudioMcpTools {
     private final ManagedProcessService managedProcesses;
     private final MavenBuildService maven;
     private final GradleBuildService gradle;
+    private final GradleProjectModelService gradleModel;
 
     public StudioMcpTools(
             WorkspaceInfo workspace,
@@ -40,7 +44,8 @@ public final class StudioMcpTools {
             WorkspaceProcessService processes,
             ManagedProcessService managedProcesses,
             MavenBuildService maven,
-            GradleBuildService gradle
+            GradleBuildService gradle,
+            GradleProjectModelService gradleModel
     ) {
         this.workspace = workspace;
         this.files = files;
@@ -48,6 +53,7 @@ public final class StudioMcpTools {
         this.managedProcesses = managedProcesses;
         this.maven = maven;
         this.gradle = gradle;
+        this.gradleModel = gradleModel;
     }
 
     @Tool(
@@ -250,5 +256,24 @@ public final class StudioMcpTools {
             Integer timeoutSeconds
     ) {
         return gradle.start(arguments, timeoutSeconds);
+    }
+
+    @Tool(
+            name = "gradle_model",
+            description = "Read the Gradle Tooling API project model, including Gradle/JVM environment, project hierarchy, and source/resource roots without resolving external dependencies."
+    )
+    public GradleWorkspaceModel gradleModel() {
+        return gradleModel.model();
+    }
+
+    @Tool(
+            name = "gradle_tasks",
+            description = "List deterministic Gradle Tooling API task metadata for one project path. Empty project path means the root project."
+    )
+    public List<GradleTaskInfo> gradleTasks(
+            @ToolParam(description = "Gradle project path such as ':' or ':app'. Empty means ':'.", required = false)
+            String projectPath
+    ) {
+        return gradleModel.tasks(projectPath);
     }
 }

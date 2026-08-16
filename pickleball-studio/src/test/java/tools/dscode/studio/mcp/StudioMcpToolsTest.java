@@ -7,6 +7,7 @@ import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
 import tools.dscode.studio.build.GradleBuildService;
 import tools.dscode.studio.build.MavenBuildService;
+import tools.dscode.studio.gradle.GradleProjectModelService;
 import tools.dscode.studio.process.ManagedProcessService;
 import tools.dscode.studio.process.WorkspaceProcessService;
 import tools.dscode.studio.workspace.WorkspaceFileService;
@@ -42,7 +43,8 @@ class StudioMcpToolsTest {
                     processes,
                     managed,
                     new MavenBuildService(info, processes, managed),
-                    new GradleBuildService(info, processes, managed)
+                    new GradleBuildService(info, processes, managed),
+                    new GradleProjectModelService(info)
             );
             ToolCallbackProvider provider = MethodToolCallbackProvider.builder().toolObjects(tools).build();
 
@@ -68,7 +70,9 @@ class StudioMcpToolsTest {
                             "maven_run",
                             "maven_start",
                             "gradle_run",
-                            "gradle_start"
+                            "gradle_start",
+                            "gradle_model",
+                            "gradle_tasks"
                     ),
                     callbacks.keySet()
             );

@@ -46,24 +46,33 @@ Keep Maven's dependency graph separate from the Spring Boot/Spring AI applicatio
 
 Maven execution is non-interactive and uses `--batch-mode --no-transfer-progress` before caller-supplied arguments. It must work without a host Maven installation.
 
-## Gradle Wrapper execution
+## Gradle execution and project models
 
 Phase 2E runs Gradle projects through their checked-in Wrapper (`gradlew` / `gradlew.bat`). `GradleBuildService` uses the same synchronous and managed process services as Maven execution.
 
 - Do not require or invoke a host-installed `gradle`.
-- Require the platform-appropriate Wrapper script in the opened Gradle workspace.
-- Let the Wrapper select and provision the project-declared Gradle distribution; do not pin Studio to one Gradle version for consumer workspaces.
-- Set `JAVA_HOME` to the JDK running Studio and use `--no-daemon --console=plain` for Studio-managed invocations.
-- Keep Gradle Wrapper execution separate from future Gradle Tooling API model/navigation features.
+- Require the platform-appropriate Wrapper script for `gradle_run` / `gradle_start`.
+- Let the Wrapper select and provision the project-declared Gradle distribution; do not pin build execution to Studio's Tooling API version.
+- Set `JAVA_HOME` to the JDK running Studio and use `--no-daemon --console=plain` for Studio-managed wrapper invocations.
+
+Phase 2F embeds the public Gradle Tooling API in the isolated Studio application for project-model/navigation reads.
+
+- Keep Tooling API dependencies inside Studio's nested Boot JAR; never expose them through the Pickleball consumer dependency graph.
+- Use the Tooling API's default project-specific distribution selection. It is Wrapper-aware and may provision the declared Gradle distribution without a host Gradle installation.
+- `GradleProjectModelService` owns structured Gradle environment/project/source/task reads.
+- Use `BasicIdeaProject` for source/resource roots so model navigation does not intentionally resolve/download external dependencies.
+- Tooling API model reads may use a Gradle daemon; do not describe them as `--no-daemon` wrapper executions.
+- Keep build execution (`GradleBuildService`) and project-model/navigation (`GradleProjectModelService`) as separate services.
 
 ## MCP
 
-Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C added one-shot process and Maven tools. Phase 2D added managed process lifecycle tools. Phase 2E adds synchronous and managed Gradle Wrapper execution over the same service layer.
+Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C added one-shot process and Maven tools. Phase 2D added managed process lifecycle tools. Phase 2E added synchronous and managed Gradle Wrapper execution. Phase 2F adds read-only Gradle Tooling API model/navigation tools.
 
 - Bind the Studio MCP server to loopback only.
 - Keep the per-launch endpoint token behavior unless a later authentication design explicitly replaces it.
 - Expose deterministic Studio capabilities, not autonomous AI policy.
-- Keep synchronous `process_run` / `maven_run` / `gradle_run` for one-call use.
+- Keep synchronous `process_run` / `maven_run` / `gradle_run` for one-call execution.
+- Gradle model/navigation tools are `gradle_model` and `gradle_tasks`; they must remain read-only adapters over `GradleProjectModelService`.
 - Managed runs use `process_start`, `process_list`, `process_status`, `process_output`, `process_cancel`, `maven_start`, and `gradle_start`.
 - Managed run ids and history belong to the running Studio server/JVM; do not imply persistence across Studio restarts.
 - MCP does not yet imply Pickleball runtime connectivity. Phase 3 must use an explicit Studio-JVM-to-consumer-test-JVM bridge.
@@ -80,6 +89,8 @@ Phase 2D added session-scoped managed process lifecycle, bounded run history, in
 
 Phase 2E adds project Gradle Wrapper execution through CLI and MCP, including managed Gradle starts, while requiring no host Gradle installation.
 
-Do not claim that Gradle Tooling API model/navigation support, wrapperless Gradle provisioning, persistent run/activity history, interactive terminal input, GUI editing, syntax-aware Java/Gherkin navigation, or live Pickleball control is implemented until those later slices are added.
+Phase 2F adds Gradle Tooling API environment/project/source/task models for CLI, MCP, and future GUI navigation. Model reads follow the target build's project-specific distribution by default; when a build declares no Gradle version, Tooling API default behavior uses the client Tooling API version.
+
+Do not claim that full Gradle dependency/classpath import, persistent run/activity history, interactive terminal input, GUI editing, syntax-aware Java/Gherkin navigation, or live Pickleball control is implemented until those later slices are added.
 
 See `docs/pickleball-studio.md`.
