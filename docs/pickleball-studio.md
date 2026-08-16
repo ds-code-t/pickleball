@@ -17,6 +17,7 @@ Studio currently targets:
 - project Gradle Wrappers for Studio-managed Gradle execution without a host Gradle installation;
 - Gradle Tooling API 9.6.1 for structured Gradle project/navigation models;
 - Cucumber Gherkin 35.1.0 with Messages 29.0.1 for feature-file syntax navigation aligned with the current Pickleball runtime;
+- JDK Swing for the desktop workspace/editor UI, with no additional GUI dependency;
 - Gradle Nexus Publish Plugin 2.0.0;
 - AspectJ 1.9.24 for Pickleball Core.
 
@@ -276,6 +277,37 @@ symbol_definitions
 
 This is definition/navigation support, not a language server. Phase 2G does not yet resolve Java references across a compile classpath, infer types, find usages, rename symbols, provide code completion, or bind Gherkin steps to Java step definitions. Those deeper semantic capabilities can layer on this source model later if the editor requires them.
 
+## Phase 2H: desktop workspace and editor foundation
+
+Phase 2H adds the first graphical Pickleball Studio workspace. It is a JDK Swing adapter over the same services already used by CLI and MCP rather than a separate implementation of files, language parsing, or build execution.
+
+Launch it with:
+
+```shell
+java -jar build/libs/pickleball-2.1.7.jar studio ui .
+```
+
+The desktop foundation currently provides:
+
+- a workspace tree backed by `WorkspaceFileService`, including the same generated/heavy-directory and symbolic-link traversal rules as CLI/MCP;
+- tabbed UTF-8 text editing with dirty-state markers, save, reload, `Ctrl+S`, and `Ctrl+R`;
+- Java/Gherkin source outlines and syntax diagnostics backed by `WorkspaceLanguageService`;
+- workspace symbol search with navigation to the selected definition;
+- double-click navigation from the workspace tree, outline, and symbol results;
+- a managed test action that runs Gradle `test` through the project Wrapper for Gradle workspaces or Maven `test` through Studio's bundled Maven runtime for Maven workspaces;
+- incremental stdout/stderr display through `ManagedProcessService`;
+- cancellation of the active managed test run;
+- bounded desktop output so long-running builds do not grow the editor process indefinitely;
+- cleanup of managed child processes when the Studio window closes.
+
+The UI is launched through `StudioDesktopApplication`, while `StudioDesktopSession` is the reusable desktop-facing facade over workspace, language, build, and managed-process services. The Swing frame itself must not become a second source of file/build semantics.
+
+The first editor is intentionally plain text. Phase 2H does not add syntax highlighting, completion, semantic Java type/reference resolution, Gherkin-to-Java step binding, refactoring, persistent layout/session state, or an interactive PTY terminal.
+
+The source outline reflects the currently saved workspace file. Saving an editor refreshes its outline. Live parsing of unsaved editor buffers can be added later without changing the underlying source-navigation model.
+
+If a workspace is both Gradle- and Maven-detected, the desktop test action currently prefers Gradle build execution. Workspaces with neither build marker can still use file editing and source navigation, but the test action is disabled.
+
 ## Validation
 
 Focused Studio validation:
@@ -285,13 +317,14 @@ Focused Studio validation:
 ./gradlew --rerun-tasks :pickleball-studio:verifyBundledStudio
 ```
 
-The Studio tests include real child-JVM process checks, managed incremental-output/cancellation and descendant-termination checks, synchronous plus managed Maven `--version` checks, cross-platform Gradle Wrapper fixture checks, a Gradle Tooling API project/source/task model fixture, and Java/Gherkin source-outline and workspace-symbol navigation fixtures. The Tooling API test uses the Gradle installation already running the repository test build, so it does not require a host Gradle installation or a separate distribution download.
+The Studio tests include real child-JVM process checks, managed incremental-output/cancellation and descendant-termination checks, synchronous plus managed Maven `--version` checks, cross-platform Gradle Wrapper fixture checks, a Gradle Tooling API project/source/task model fixture, Java/Gherkin source-outline and workspace-symbol navigation fixtures, and non-headless-independent desktop-session/tree-model checks. The Tooling API test uses the Gradle installation already running the repository test build, so it does not require a host Gradle installation or a separate distribution download.
 
 `verifyBundledStudio` checks both sides of the isolation contract:
 
 - the outer Pickleball JAR contains the opaque nested Studio JAR;
 - Studio implementation classes do not leak into the outer consumer runtime classpath;
 - the nested JAR is a Spring Boot executable JAR whose `Start-Class` is `StudioApplication`;
+- the nested JAR contains the Swing desktop UI implementation;
 - the nested JAR contains the Spring AI WebMVC MCP server starter;
 - the nested JAR contains Gradle Tooling API 9.6.1;
 - the nested JAR contains Gherkin 35.1.0 and Messages 29.0.1 for Studio source navigation;
@@ -301,13 +334,13 @@ After focused validation, run the normal root and Maven-consumer validation from
 
 ## Current boundaries
 
-Phase 2G does **not** yet implement:
+Phase 2H does **not** yet implement:
 
+- syntax highlighting, code completion, editor refactoring, or live parsing of unsaved buffers;
 - full Gradle external dependency/classpath import;
-- persistent process/activity history across Studio restarts;
+- persistent process/activity history or desktop layout/session restoration across Studio restarts;
 - interactive terminal stdin/PTY support;
-- GUI editing/navigation;
-- full Java semantic/classpath reference resolution, usages, refactoring, or Gherkin-to-Java step binding;
+- full Java semantic/classpath reference resolution, usages, or Gherkin-to-Java step binding;
 - Pickleball runtime IPC or live scenario/browser/mapping control.
 
 Those capabilities should continue to layer on the generic Studio service model. Live Pickleball control remains a later explicit bridge between the Studio JVM and the consumer test JVM.

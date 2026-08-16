@@ -74,9 +74,23 @@ Phase 2G adds read-only Java/Gherkin definition navigation through `WorkspaceLan
 - `source_outline`, `symbol_search`, and `symbol_definitions` are read-only adapters over the language service.
 - Definition navigation is not semantic reference resolution. Do not claim find-usages, rename/refactoring, Java type/classpath analysis, completion, or Gherkin-step-to-Java binding until those are implemented explicitly.
 
+## Desktop UI
+
+Phase 2H adds the Swing desktop workspace/editor adapter.
+
+- `StudioDesktopSession` is the desktop-facing facade over existing workspace, language, build, and managed-process services.
+- `StudioFrame` and other Swing classes must remain UI adapters; do not duplicate workspace boundary checks, source parsing, build command construction, or process lifecycle logic in widgets.
+- Keep the desktop implementation JDK-only unless a later UI dependency is explicitly justified.
+- Workspace tree behavior must reuse `WorkspaceFileService` traversal and skip rules.
+- Java/Gherkin outline and symbol navigation must reuse `WorkspaceLanguageService`.
+- Gradle/Maven test actions must use managed build services and `ManagedProcessService`, including cancellation and shutdown cleanup.
+- Keep desktop output bounded.
+- The current editor is plain text. Do not claim syntax highlighting, completion, semantic Java resolution, Gherkin step binding, refactoring, persistent desktop session state, or an interactive PTY terminal until implemented explicitly.
+- Closing the UI may discard unsaved text only after explicit user confirmation.
+
 ## MCP
 
-Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C added one-shot process and Maven tools. Phase 2D added managed process lifecycle tools. Phase 2E added synchronous and managed Gradle Wrapper execution. Phase 2F adds read-only Gradle Tooling API model/navigation tools. Phase 2G adds read-only Java/Gherkin source navigation tools.
+Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C added one-shot process and Maven tools. Phase 2D added managed process lifecycle tools. Phase 2E added synchronous and managed Gradle Wrapper execution. Phase 2F adds read-only Gradle Tooling API model/navigation tools. Phase 2G adds read-only Java/Gherkin source navigation tools. Phase 2H adds a Swing desktop adapter over those same services; it does not change the 20-tool MCP contract.
 
 - Bind the Studio MCP server to loopback only.
 - Keep the per-launch endpoint token behavior unless a later authentication design explicitly replaces it.
@@ -104,6 +118,8 @@ Phase 2F adds Gradle Tooling API environment/project/source/task models for CLI,
 
 Phase 2G adds parse-only Java and Gherkin definition outlines, workspace symbol search, exact definition lookup, and syntax diagnostics for CLI, MCP, and future GUI navigation.
 
-Do not claim that full Gradle dependency/classpath import, persistent run/activity history, interactive terminal input, GUI editing, semantic Java reference/type analysis, Gherkin step binding, or live Pickleball control is implemented until those later slices are added.
+Phase 2H adds the first Swing workspace/editor UI with file editing, saved-source outline/symbol navigation, managed Gradle/Maven test execution, output, and cancellation.
+
+Do not claim that syntax highlighting/completion, live unsaved-buffer parsing, full Gradle dependency/classpath import, persistent run/activity or desktop session state, interactive terminal input, semantic Java reference/type analysis, Gherkin step binding, or live Pickleball control is implemented until those later slices are added.
 
 See `docs/pickleball-studio.md`.

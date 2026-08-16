@@ -152,4 +152,18 @@ class StudioApplicationTest {
         assertTrue(text.contains("JAVA_METHOD Sample#hello()"), text);
     }
 
+
+    @Test
+    void uiRejectsUnexpectedArgumentsBeforeOpeningDesktop() {
+        ByteArrayOutputStream error = new ByteArrayOutputStream();
+
+        int exitCode = StudioApplication.run(
+                new String[]{"ui", tempDir.toString(), "unexpected"},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(error, true, StandardCharsets.UTF_8)
+        );
+
+        assertEquals(2, exitCode);
+        assertTrue(error.toString(StandardCharsets.UTF_8).contains("studio ui"));
+    }
 }

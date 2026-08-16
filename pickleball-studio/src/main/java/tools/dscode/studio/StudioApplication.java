@@ -7,6 +7,7 @@ import tools.dscode.studio.build.MavenRunResult;
 import tools.dscode.studio.gradle.GradleProjectInfo;
 import tools.dscode.studio.gradle.GradleProjectModelService;
 import tools.dscode.studio.gradle.GradleWorkspaceModel;
+import tools.dscode.studio.gui.StudioDesktopApplication;
 import tools.dscode.studio.language.SourceOutline;
 import tools.dscode.studio.language.SourceSymbol;
 import tools.dscode.studio.language.WorkspaceLanguageService;
@@ -44,6 +45,9 @@ public final class StudioApplication {
             return 0;
         }
 
+        if (args.length > 0 && "ui".equalsIgnoreCase(args[0])) {
+            return ui(args, err);
+        }
         if (args.length > 0 && "serve".equalsIgnoreCase(args[0])) {
             return serve(args, out, err);
         }
@@ -66,6 +70,16 @@ public final class StudioApplication {
         int workspaceIndex = args.length > 0 && "status".equalsIgnoreCase(args[0]) ? 1 : 0;
         Path workspace = workspaceIndex < args.length ? Path.of(args[workspaceIndex]) : Path.of(".");
         return status(workspace, out, err);
+    }
+
+    private static int ui(String[] args, PrintStream err) {
+        if (args.length > 2) {
+            err.println("Usage: pickleball studio ui [workspace]");
+            return 2;
+        }
+
+        Path workspace = args.length == 2 ? Path.of(args[1]) : Path.of(".");
+        return StudioDesktopApplication.launch(workspace, err);
     }
 
     private static int status(Path workspace, PrintStream out, PrintStream err) {
@@ -261,7 +275,8 @@ public final class StudioApplication {
     }
 
     private static boolean isCommand(String argument) {
-        return "serve".equalsIgnoreCase(argument)
+        return "ui".equalsIgnoreCase(argument)
+                || "serve".equalsIgnoreCase(argument)
                 || "status".equalsIgnoreCase(argument)
                 || "exec".equalsIgnoreCase(argument)
                 || "maven".equalsIgnoreCase(argument)
@@ -278,6 +293,7 @@ public final class StudioApplication {
 
     private static void printUsage(PrintStream out) {
         out.println("Usage:");
+        out.println("  pickleball studio ui [workspace]");
         out.println("  pickleball studio status [workspace]");
         out.println("  pickleball studio serve [workspace] [--port=<port>] [--token=<token>]");
         out.println("  pickleball studio exec <workspace> <command> [args...]");

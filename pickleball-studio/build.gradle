@@ -207,6 +207,9 @@ tasks.register('verifyBundledStudio') {
                     if (nestedJar.getEntry('BOOT-INF/classes/tools/dscode/studio/StudioApplication.class') == null) {
                         throw new GradleException('Nested Studio JAR is missing StudioApplication.class')
                     }
+                    if (nestedJar.getEntry('BOOT-INF/classes/tools/dscode/studio/gui/StudioFrame.class') == null) {
+                        throw new GradleException('Nested Studio JAR is missing the desktop UI')
+                    }
                     def hasMcpStarter = java.util.Collections.list(nestedJar.entries()).any {
                         it.name.startsWith('BOOT-INF/lib/spring-ai-starter-mcp-server-webmvc-')
                     }

@@ -407,6 +407,12 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleTaskInfo.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleToolingConnectionFactory.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/gradle/GradleWorkspaceModel.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gui/EditorTab.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gui/StudioDesktopApplication.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gui/StudioDesktopSession.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gui/StudioFrame.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gui/WorkspaceTreeBuilder.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/gui/WorkspaceTreeItem.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/language/GherkinSourceParser.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/language/JavaSourceParser.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/language/SourceDiagnostic.java`
@@ -435,6 +441,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceTextFile.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceWriteResult.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/gradle/GradleProjectModelServiceTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/gui/StudioDesktopSessionTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/gui/WorkspaceTreeBuilderTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/language/WorkspaceLanguageServiceTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/mcp/StudioMcpContextTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/mcp/StudioMcpToolsTest.java`
