@@ -38,5 +38,7 @@ public final class PickleballMain {
         System.out.println("Usage:");
         System.out.println("  java -jar pickleball-<version>.jar studio status [workspace]");
         System.out.println("  java -jar pickleball-<version>.jar studio serve [workspace] [--port=<port>] [--token=<token>]");
+        System.out.println("  java -jar pickleball-<version>.jar studio exec <workspace> <command> [args...]");
+        System.out.println("  java -jar pickleball-<version>.jar studio maven <workspace> <goal-or-option> [args...]");
     }
 }

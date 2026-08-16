@@ -76,4 +76,32 @@ class StudioApplicationTest {
         assertEquals(2, exitCode, text);
         assertTrue(text.startsWith("Workspace directory does not exist:"), text);
     }
+
+    @Test
+    void execRequiresACommand() {
+        ByteArrayOutputStream error = new ByteArrayOutputStream();
+
+        int exitCode = StudioApplication.run(
+                new String[]{"exec", tempDir.toString()},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(error, true, StandardCharsets.UTF_8)
+        );
+
+        assertEquals(2, exitCode);
+        assertTrue(error.toString(StandardCharsets.UTF_8).contains("studio exec"));
+    }
+
+    @Test
+    void mavenRequiresArguments() {
+        ByteArrayOutputStream error = new ByteArrayOutputStream();
+
+        int exitCode = StudioApplication.run(
+                new String[]{"maven", tempDir.toString()},
+                new PrintStream(new ByteArrayOutputStream(), true, StandardCharsets.UTF_8),
+                new PrintStream(error, true, StandardCharsets.UTF_8)
+        );
+
+        assertEquals(2, exitCode);
+        assertTrue(error.toString(StandardCharsets.UTF_8).contains("studio maven"));
+    }
 }

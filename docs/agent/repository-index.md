@@ -405,6 +405,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioMcpTools.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioServer.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/mcp/StudioWorkspaceStatus.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/process/ProcessResult.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/process/WorkspaceProcessService.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/StudioApplication.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/TextSearchMatch.java`
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceEntry.java`
@@ -415,6 +417,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceWriteResult.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/mcp/StudioMcpContextTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/mcp/StudioMcpToolsTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/process/WorkspaceProcessServiceTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/StudioApplicationTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/workspace/WorkspaceFileServiceTest.java`
 - `pickleball-studio/src/test/java/tools/dscode/studio/workspace/WorkspaceServiceTest.java`

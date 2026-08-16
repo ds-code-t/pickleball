@@ -39,6 +39,24 @@ its isolated nested executable JAR:
 - org.springframework.boot:spring-boot-loader:4.1.0
 - org.springframework.ai:spring-ai-starter-mcp-server-webmvc:2.0.0
 
+Pickleball Studio also bundles the Apache Maven 3.9.16 distribution runtime
+as opaque build-tool resources used by its isolated Maven child process. Major
+direct Apache-licensed components include:
+
+- commons-cli:commons-cli:1.11.0
+- org.apache.maven:maven-compat:3.9.16
+- org.apache.maven:maven-core:3.9.16
+- org.apache.maven:maven-embedder:3.9.16
+- org.apache.maven:maven-slf4j-provider:3.9.16
+- org.apache.maven.resolver:maven-resolver-connector-basic:1.9.27
+- org.apache.maven.resolver:maven-resolver-transport-file:1.9.27
+- org.apache.maven.resolver:maven-resolver-transport-http:1.9.27
+- org.apache.maven.resolver:maven-resolver-transport-wagon:1.9.27
+- org.apache.maven.wagon:wagon-file:3.5.3
+- org.apache.maven.wagon:wagon-http:3.5.3
+- org.fusesource.jansi:jansi:2.4.3
+- org.slf4j:jcl-over-slf4j:1.7.36
+
 License text:
 http://www.apache.org/licenses/LICENSE-2.0
 
@@ -54,6 +72,7 @@ The following components are licensed under EPL-2.0:
 
 - org.aspectj:aspectjrt:1.9.24
 - org.aspectj:aspectjtools:1.9.24
+- org.eclipse.sisu:org.eclipse.sisu.plexus:1.0.0
 
 License text:
 https://www.eclipse.org/legal/epl-2.0/

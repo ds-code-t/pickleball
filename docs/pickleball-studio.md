@@ -13,10 +13,13 @@ Studio currently targets:
 - Shadow 9.6.1 using the `com.gradleup.shadow` plugin ID for the outer Pickleball artifact;
 - Spring Boot 4.1.0 for the executable nested Studio application;
 - Spring AI 2.0.0 for MCP server integration;
+- Apache Maven 3.9.16 for Studio-managed Maven execution;
 - Gradle Nexus Publish Plugin 2.0.0;
 - AspectJ 1.9.24 for Pickleball Core.
 
 The outer Pickleball JAR keeps the nested Studio JAR opaque. Studio's Spring and Spring AI dependencies are packaged inside the executable nested Studio JAR under `BOOT-INF/lib` and are loaded only by the Studio child JVM.
+
+The Maven runtime is packaged separately inside Studio as opaque tool resources rather than merged into the Spring application classpath. Studio extracts that runtime to its private tool cache when Maven is first used and launches Maven in another child JVM. No host Maven installation is required.
 
 ## Distribution and process boundary
 
@@ -28,7 +31,7 @@ pickleball-<version>.jar
 ├── tools.dscode.studio.launcher.PickleballMain
 └── META-INF/pickleball/studio/pickleball-studio.jar
     ├── Spring Boot launcher
-    ├── BOOT-INF/classes/   Studio implementation
+    ├── BOOT-INF/classes/   Studio implementation and opaque Studio tool resources
     └── BOOT-INF/lib/       Studio-only Spring/Spring AI dependencies
 ```
 
@@ -36,7 +39,7 @@ The outer launcher extracts the nested Studio JAR to a versioned cache under `~/
 
 This preserves one distributed Pickleball artifact while keeping the consumer/runtime and Studio application classpaths separate.
 
-Root-owned packaging is configured by `gradle/pickleball-studio.gradle`. Studio dependencies are not added to the root runtime classpath or published Maven POM.
+Root-owned packaging is configured by `gradle/pickleball-studio.gradle`. Studio dependencies and Studio-managed build-tool runtimes are not added to the root runtime classpath or published Maven POM.
 
 ## Phase 2A: standalone application boundary
 
@@ -56,18 +59,11 @@ java -jar build/libs/pickleball-2.1.7.jar studio status .
 
 ## Phase 2B: workspace files and MCP
 
-Phase 2B adds a generic workspace file service and a Streamable-HTTP MCP adapter over the same service layer.
+Phase 2B added a generic workspace file service and a Streamable-HTTP MCP adapter over the same service layer.
 
-The workspace file service supports:
+The workspace file service supports deterministic tree listing, UTF-8 reads/writes, literal text search, workspace-bound paths, and skipping generated/heavy directories during traversal.
 
-- deterministic directory-tree listing;
-- UTF-8 text-file reads;
-- UTF-8 text-file create/replace writes;
-- literal text search with case-sensitive or case-insensitive matching;
-- workspace-bound path resolution;
-- skipping generated/heavy directories such as `.git`, `.gradle`, `.idea`, `build`, `target`, `out`, and `node_modules` during tree/search traversal.
-
-The MCP adapter exposes these tools:
+The MCP adapter initially exposed:
 
 ```text
 workspace_status
@@ -77,7 +73,7 @@ workspace_write_file
 workspace_search_text
 ```
 
-MCP is an adapter, not the internal application architecture. `StudioMcpTools` delegates to the same `WorkspaceService` and `WorkspaceFileService` that future CLI/GUI adapters should use.
+MCP is an adapter, not the internal application architecture. `StudioMcpTools` delegates to ordinary Studio services that CLI, future GUI, and future Java integrations can reuse.
 
 ### Starting the MCP server
 
@@ -89,15 +85,7 @@ java -jar build/libs/pickleball-2.1.7.jar studio serve .
 
 Studio starts a Spring AI 2.0 Streamable-HTTP MCP server bound only to `127.0.0.1`. Port `0` is the default, so the OS chooses an available local port.
 
-The command prints the concrete endpoint, for example:
-
-```text
-Pickleball Studio MCP server ready
-Workspace: /path/to/project
-MCP endpoint: http://127.0.0.1:54321/mcp/<random-token>
-```
-
-A random URL-safe token is generated for each launch and embedded in the MCP endpoint path. This avoids exposing a predictable local file-control endpoint. The token is an endpoint discriminator, not a substitute for network authentication; the current server is intentionally loopback-only. A stable port/token may be supplied when a client configuration requires it:
+A random URL-safe token is generated for each launch and embedded in the MCP endpoint path. A stable port/token may be supplied when a client configuration requires it:
 
 ```shell
 java -jar build/libs/pickleball-2.1.7.jar studio serve . --port=19070 --token=my-local-studio-token
@@ -105,7 +93,51 @@ java -jar build/libs/pickleball-2.1.7.jar studio serve . --port=19070 --token=my
 
 The configured token must contain 8-128 URL-safe letters, digits, `_`, or `-`.
 
-The MCP server advertises tool capability only for this phase; resources, prompts, and completion capabilities are disabled.
+## Phase 2C: process and Maven execution
+
+Phase 2C adds `WorkspaceProcessService`, which runs one non-interactive child process with:
+
+- a workspace-bound working directory;
+- direct argv execution without implicit shell parsing;
+- a configurable timeout;
+- captured stdout and stderr;
+- a 2 MiB capture limit per output stream while continuing to drain the child process;
+- timeout and truncation metadata in `ProcessResult`.
+
+The CLI form is:
+
+```shell
+java -jar build/libs/pickleball-2.1.7.jar studio exec . java -version
+```
+
+This is one-shot process execution, not an interactive terminal and not yet an asynchronous process manager.
+
+### Self-contained Maven
+
+Studio bundles the runtime dependency graph of Apache Maven 3.9.16 as opaque tool resources. `MavenToolchainService` extracts the jars to:
+
+```text
+~/.pickleball/studio/tools/maven/3.9.16/
+```
+
+`MavenBuildService` then launches `org.apache.maven.cli.MavenCli` in a separate JVM using that isolated classpath. The Maven process inherits the user's normal Maven home/settings/local repository behavior and the current JDK, but does not require `mvn`, `mvn.cmd`, or a Maven installation on `PATH`.
+
+Studio prepends `--batch-mode --no-transfer-progress` and then passes caller-supplied Maven arguments unchanged.
+
+CLI example:
+
+```shell
+java -jar build/libs/pickleball-2.1.7.jar studio maven ./maven-consumer-project test
+```
+
+MCP now additionally exposes:
+
+```text
+process_run
+maven_run
+```
+
+`process_run` accepts an argv list, optional workspace-relative working directory, and optional timeout. `maven_run` accepts Maven goals/options and an optional timeout; its default timeout is 600 seconds.
 
 ## Validation
 
@@ -116,22 +148,25 @@ Focused Studio validation:
 ./gradlew --rerun-tasks :pickleball-studio:verifyBundledStudio
 ```
 
+The Studio tests include a real child-JVM `java -version` process check and a Maven `--version` check using the bundled Maven runtime, so host Maven is not needed for the focused Maven bootstrap test.
+
 `verifyBundledStudio` checks both sides of the isolation contract:
 
 - the outer Pickleball JAR contains the opaque nested Studio JAR;
 - Studio implementation classes do not leak into the outer consumer runtime classpath;
 - the nested JAR is a Spring Boot executable JAR whose `Start-Class` is `StudioApplication`;
-- the nested JAR contains the Spring AI WebMVC MCP server starter.
+- the nested JAR contains the Spring AI WebMVC MCP server starter;
+- the nested JAR contains the Studio-managed Maven runtime index and Maven embedder jar as opaque resources.
 
 After focused validation, run the normal root and Maven-consumer validation from root `AGENTS.md`.
 
 ## Current boundaries
 
-Phase 2B does **not** yet implement:
+Phase 2C does **not** yet implement:
 
-- embedded Maven build execution;
 - Gradle Tooling API build execution;
-- process/run history or terminal/output management;
+- asynchronous process start/stop/status/history or activity persistence;
+- interactive terminal support;
 - GUI editing/navigation;
 - Java/Gherkin syntax services beyond text/file operations;
 - Pickleball runtime IPC or live scenario/browser/mapping control.

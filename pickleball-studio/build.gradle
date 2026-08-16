@@ -14,12 +14,75 @@ java {
     toolchain { languageVersion = JavaLanguageVersion.of(21) }
 }
 
+configurations {
+    studioMavenRuntime {
+        canBeConsumed = false
+        canBeResolved = true
+        transitive = true
+    }
+}
+
 dependencies {
     implementation platform('org.springframework.boot:spring-boot-dependencies:4.1.0')
     implementation platform('org.springframework.ai:spring-ai-bom:2.0.0')
     implementation 'org.springframework.ai:spring-ai-starter-mcp-server-webmvc'
 
+    // Keep Maven's own dependency graph separate from the Spring application
+    // classpath. These jars are bundled as opaque Studio tool resources and
+    // extracted to a private cache before Maven is started in a child JVM.
+    studioMavenRuntime 'commons-cli:commons-cli:1.11.0'
+    studioMavenRuntime 'org.apache.maven:maven-compat:3.9.16'
+    studioMavenRuntime 'org.apache.maven:maven-core:3.9.16'
+    studioMavenRuntime 'org.apache.maven:maven-embedder:3.9.16'
+    studioMavenRuntime 'org.apache.maven:maven-slf4j-provider:3.9.16'
+    studioMavenRuntime 'org.apache.maven.resolver:maven-resolver-connector-basic:1.9.27'
+    studioMavenRuntime 'org.apache.maven.resolver:maven-resolver-transport-file:1.9.27'
+    studioMavenRuntime 'org.apache.maven.resolver:maven-resolver-transport-http:1.9.27'
+    studioMavenRuntime 'org.apache.maven.resolver:maven-resolver-transport-wagon:1.9.27'
+    studioMavenRuntime 'org.apache.maven.wagon:wagon-file:3.5.3'
+    studioMavenRuntime 'org.apache.maven.wagon:wagon-http:3.5.3'
+    studioMavenRuntime 'org.eclipse.sisu:org.eclipse.sisu.plexus:1.0.0'
+    studioMavenRuntime 'org.fusesource.jansi:jansi:2.4.3'
+    studioMavenRuntime 'org.slf4j:jcl-over-slf4j:1.7.36'
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+def studioMavenVersion = '3.9.16'
+def generatedMavenResources = layout.buildDirectory.dir('generated-resources/studio-maven-runtime')
+def generatedMavenLib = generatedMavenResources.map {
+    it.dir("META-INF/pickleball/studio/tools/maven/${studioMavenVersion}/lib")
+}
+def generatedMavenIndex = generatedMavenResources.map {
+    it.file("META-INF/pickleball/studio/tools/maven/${studioMavenVersion}/classpath.txt")
+}
+
+def stageStudioMavenRuntime = tasks.register('stageStudioMavenRuntime', Sync) {
+    into generatedMavenLib
+    from(configurations.studioMavenRuntime) {
+        include '*.jar'
+    }
+}
+
+def writeStudioMavenRuntimeIndex = tasks.register('writeStudioMavenRuntimeIndex') {
+    dependsOn stageStudioMavenRuntime
+    inputs.files(configurations.studioMavenRuntime)
+    outputs.file(generatedMavenIndex)
+
+    doLast {
+        File index = generatedMavenIndex.get().asFile
+        index.parentFile.mkdirs()
+        def names = configurations.studioMavenRuntime.files
+                .findAll { it.name.endsWith('.jar') }
+                .collect { it.name }
+                .sort()
+        index.setText(names.join('\n') + '\n', 'UTF-8')
+    }
+}
+
+sourceSets.main.resources.srcDir(generatedMavenResources)
+tasks.named('processResources') {
+    dependsOn writeStudioMavenRuntimeIndex
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -39,8 +102,18 @@ tasks.jar {
 }
 
 tasks.named('bootJar') {
+    dependsOn writeStudioMavenRuntimeIndex
+
     archiveFileName.set('pickleball-studio.jar')
     mainClass.set('tools.dscode.studio.StudioApplication')
+
+    // Generated Maven tool resources are available to tests through
+    // processResources. Copy them explicitly into the executable Boot JAR as
+    // application resources so the child Studio JVM can extract them later.
+    from(generatedMavenResources) {
+        into 'BOOT-INF/classes'
+    }
+
     manifest {
         attributes(
                 'Implementation-Title': 'Pickleball Studio',
@@ -121,6 +194,14 @@ tasks.register('verifyBundledStudio') {
                     }
                     if (!hasMcpStarter) {
                         throw new GradleException('Nested Studio JAR is missing the Spring AI MCP server starter')
+                    }
+                    def mavenIndex = "BOOT-INF/classes/META-INF/pickleball/studio/tools/maven/${studioMavenVersion}/classpath.txt"
+                    if (nestedJar.getEntry(mavenIndex) == null) {
+                        throw new GradleException('Nested Studio JAR is missing the bundled Maven runtime index')
+                    }
+                    def mavenEmbedder = "BOOT-INF/classes/META-INF/pickleball/studio/tools/maven/${studioMavenVersion}/lib/maven-embedder-${studioMavenVersion}.jar"
+                    if (nestedJar.getEntry(mavenEmbedder) == null) {
+                        throw new GradleException('Nested Studio JAR is missing the bundled Maven embedder runtime')
                     }
                 }
             } finally {

@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.context.annotation.Bean;
+import tools.dscode.studio.build.MavenBuildService;
+import tools.dscode.studio.process.WorkspaceProcessService;
 import tools.dscode.studio.workspace.WorkspaceFileService;
 import tools.dscode.studio.workspace.WorkspaceInfo;
 import tools.dscode.studio.workspace.WorkspaceService;
@@ -35,8 +37,31 @@ public class StudioMcpConfiguration {
     }
 
     @Bean
-    StudioMcpTools studioMcpTools(WorkspaceInfo workspaceInfo, WorkspaceFileService workspaceFileService) {
-        return new StudioMcpTools(workspaceInfo, workspaceFileService);
+    WorkspaceProcessService workspaceProcessService(WorkspaceInfo workspaceInfo) {
+        return new WorkspaceProcessService(workspaceInfo);
+    }
+
+    @Bean
+    MavenBuildService mavenBuildService(
+            WorkspaceInfo workspaceInfo,
+            WorkspaceProcessService workspaceProcessService
+    ) {
+        return new MavenBuildService(workspaceInfo, workspaceProcessService);
+    }
+
+    @Bean
+    StudioMcpTools studioMcpTools(
+            WorkspaceInfo workspaceInfo,
+            WorkspaceFileService workspaceFileService,
+            WorkspaceProcessService workspaceProcessService,
+            MavenBuildService mavenBuildService
+    ) {
+        return new StudioMcpTools(
+                workspaceInfo,
+                workspaceFileService,
+                workspaceProcessService,
+                mavenBuildService
+        );
     }
 
     @Bean

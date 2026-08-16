@@ -2,6 +2,10 @@ package tools.dscode.studio.mcp;
 
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import tools.dscode.studio.build.MavenBuildService;
+import tools.dscode.studio.build.MavenRunResult;
+import tools.dscode.studio.process.ProcessResult;
+import tools.dscode.studio.process.WorkspaceProcessService;
 import tools.dscode.studio.workspace.TextSearchMatch;
 import tools.dscode.studio.workspace.WorkspaceEntry;
 import tools.dscode.studio.workspace.WorkspaceFileService;
@@ -18,10 +22,19 @@ public final class StudioMcpTools {
 
     private final WorkspaceInfo workspace;
     private final WorkspaceFileService files;
+    private final WorkspaceProcessService processes;
+    private final MavenBuildService maven;
 
-    public StudioMcpTools(WorkspaceInfo workspace, WorkspaceFileService files) {
+    public StudioMcpTools(
+            WorkspaceInfo workspace,
+            WorkspaceFileService files,
+            WorkspaceProcessService processes,
+            MavenBuildService maven
+    ) {
         this.workspace = workspace;
         this.files = files;
+        this.processes = processes;
+        this.maven = maven;
     }
 
     @Tool(
@@ -97,5 +110,32 @@ public final class StudioMcpTools {
                 caseSensitive == null || caseSensitive,
                 maxResults == null ? DEFAULT_SEARCH_RESULTS : maxResults
         );
+    }
+
+    @Tool(
+            name = "process_run",
+            description = "Run one non-interactive process in the current workspace and return its exit code and captured output."
+    )
+    public ProcessResult runProcess(
+            @ToolParam(description = "Executable and arguments as an argv list.") List<String> command,
+            @ToolParam(description = "Workspace-relative working directory. Empty means the workspace root.", required = false)
+            String workingDirectory,
+            @ToolParam(description = "Timeout in seconds. Defaults to 120.", required = false)
+            Integer timeoutSeconds
+    ) {
+        return processes.run(command, workingDirectory, timeoutSeconds);
+    }
+
+    @Tool(
+            name = "maven_run",
+            description = "Run Maven 3.9.16 against the current Maven workspace using Studio's bundled Maven runtime. No host Maven installation is required."
+    )
+    public MavenRunResult runMaven(
+            @ToolParam(description = "Maven goals and CLI arguments, for example [\"test\"] or [\"-q\", \"test\"].")
+            List<String> arguments,
+            @ToolParam(description = "Timeout in seconds. Defaults to 600.", required = false)
+            Integer timeoutSeconds
+    ) {
+        return maven.run(arguments, timeoutSeconds);
     }
 }

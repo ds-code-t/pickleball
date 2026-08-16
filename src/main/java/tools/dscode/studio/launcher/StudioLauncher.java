@@ -3,6 +3,7 @@ package tools.dscode.studio.launcher;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -44,26 +45,43 @@ final class StudioLauncher {
                 Path.of(System.getProperty("user.home"), ".pickleball", "studio").toString()
         ));
         Path cacheDir = cacheRoot.resolve(version);
-        Path target = cacheDir.resolve("pickleball-studio.jar");
-        Files.createDirectories(cacheDir);
 
         InputStream bundledStudio = StudioLauncher.class.getResourceAsStream(STUDIO_RESOURCE);
         if (bundledStudio == null) {
             throw new IllegalStateException("Bundled Pickleball Studio application was not found.");
         }
 
-        Path temporary = Files.createTempFile(cacheDir, "pickleball-studio-", ".jar");
         try (InputStream source = bundledStudio) {
+            return cacheStudio(source, cacheDir);
+        }
+    }
+
+    static Path cacheStudio(InputStream source, Path cacheDir) throws IOException {
+        Files.createDirectories(cacheDir);
+
+        Path temporary = Files.createTempFile(cacheDir, "pickleball-studio-", ".jar");
+        boolean moved = false;
+        try {
             Files.copy(source, temporary, StandardCopyOption.REPLACE_EXISTING);
-        }
+            String digest = sha256(temporary);
+            Path target = cacheDir.resolve("pickleball-studio-" + digest + ".jar");
 
-        if (Files.isRegularFile(target) && sha256(target).equals(sha256(temporary))) {
-            Files.delete(temporary);
+            if (Files.isRegularFile(target)) {
+                return target;
+            }
+
+            try {
+                Files.move(temporary, target);
+                moved = true;
+            } catch (FileAlreadyExistsException race) {
+                return target;
+            }
             return target;
+        } finally {
+            if (!moved) {
+                Files.deleteIfExists(temporary);
+            }
         }
-
-        Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
-        return target;
     }
 
     private static String sha256(Path file) throws IOException {

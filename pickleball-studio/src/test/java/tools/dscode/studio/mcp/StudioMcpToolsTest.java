@@ -5,6 +5,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
+import tools.dscode.studio.build.MavenBuildService;
+import tools.dscode.studio.process.WorkspaceProcessService;
 import tools.dscode.studio.workspace.WorkspaceFileService;
 import tools.dscode.studio.workspace.WorkspaceInfo;
 import tools.dscode.studio.workspace.WorkspaceService;
@@ -26,10 +28,16 @@ class StudioMcpToolsTest {
     Path tempDir;
 
     @Test
-    void exposesWorkspaceToolsThroughSpringAiCallbacks() throws Exception {
+    void exposesWorkspaceAndExecutionToolsThroughSpringAiCallbacks() throws Exception {
         Files.writeString(tempDir.resolve("README.md"), "Pickleball Studio\n");
         WorkspaceInfo info = new WorkspaceService().open(tempDir);
-        StudioMcpTools tools = new StudioMcpTools(info, new WorkspaceFileService(info.root()));
+        WorkspaceProcessService processes = new WorkspaceProcessService(info);
+        StudioMcpTools tools = new StudioMcpTools(
+                info,
+                new WorkspaceFileService(info.root()),
+                processes,
+                new MavenBuildService(info, processes)
+        );
         ToolCallbackProvider provider = MethodToolCallbackProvider.builder().toolObjects(tools).build();
 
         Map<String, ToolCallback> callbacks = Arrays.stream(provider.getToolCallbacks())
@@ -44,7 +52,9 @@ class StudioMcpToolsTest {
                         "workspace_tree",
                         "workspace_read_file",
                         "workspace_write_file",
-                        "workspace_search_text"
+                        "workspace_search_text",
+                        "process_run",
+                        "maven_run"
                 ),
                 callbacks.keySet()
         );
