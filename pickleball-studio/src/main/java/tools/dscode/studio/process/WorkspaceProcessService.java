@@ -184,10 +184,20 @@ public final class WorkspaceProcessService {
         }
 
         void terminate() throws InterruptedException {
+            List<ProcessHandle> descendants = process.descendants().toList();
+            descendants.forEach(ProcessHandle::destroy);
             process.destroy();
+
             if (!process.waitFor(2, TimeUnit.SECONDS)) {
+                descendants.stream()
+                        .filter(ProcessHandle::isAlive)
+                        .forEach(ProcessHandle::destroyForcibly);
                 process.destroyForcibly();
                 process.waitFor();
+            } else {
+                descendants.stream()
+                        .filter(ProcessHandle::isAlive)
+                        .forEach(ProcessHandle::destroyForcibly);
             }
         }
 
@@ -196,6 +206,7 @@ public final class WorkspaceProcessService {
                 terminate();
             } catch (InterruptedException error) {
                 Thread.currentThread().interrupt();
+                process.descendants().forEach(ProcessHandle::destroyForcibly);
                 process.destroyForcibly();
             }
         }

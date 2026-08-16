@@ -34,7 +34,7 @@ Keep these rules:
 
 Workspace paths must stay inside the opened workspace. Tree/search traversal must not follow symbolic links outside the workspace and should skip generated/heavy directories already defined by `WorkspaceFileService`. Process working directories must resolve inside the workspace.
 
-Managed process history is session-scoped and bounded. Output buffers must remain bounded; clients use returned stdout/stderr cursors and must honor gap/truncation metadata instead of assuming all historical output is retained. Studio shutdown must terminate child processes it still owns.
+Managed process history is session-scoped and bounded. Output buffers must remain bounded; clients use returned stdout/stderr cursors and must honor gap/truncation metadata instead of assuming all historical output is retained. Studio shutdown and explicit cancellation must terminate child processes and owned descendants so wrapper/build children are not left running.
 
 Future CLI, GUI, MCP, build, and language adapters should reuse these services rather than building parallel file/process semantics.
 
@@ -46,15 +46,25 @@ Keep Maven's dependency graph separate from the Spring Boot/Spring AI applicatio
 
 Maven execution is non-interactive and uses `--batch-mode --no-transfer-progress` before caller-supplied arguments. It must work without a host Maven installation.
 
+## Gradle Wrapper execution
+
+Phase 2E runs Gradle projects through their checked-in Wrapper (`gradlew` / `gradlew.bat`). `GradleBuildService` uses the same synchronous and managed process services as Maven execution.
+
+- Do not require or invoke a host-installed `gradle`.
+- Require the platform-appropriate Wrapper script in the opened Gradle workspace.
+- Let the Wrapper select and provision the project-declared Gradle distribution; do not pin Studio to one Gradle version for consumer workspaces.
+- Set `JAVA_HOME` to the JDK running Studio and use `--no-daemon --console=plain` for Studio-managed invocations.
+- Keep Gradle Wrapper execution separate from future Gradle Tooling API model/navigation features.
+
 ## MCP
 
-Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C added one-shot process and Maven tools. Phase 2D adds managed process lifecycle tools over the same service layer.
+Phase 2B introduced Spring AI Streamable-HTTP through the WebMVC server starter. Phase 2C added one-shot process and Maven tools. Phase 2D added managed process lifecycle tools. Phase 2E adds synchronous and managed Gradle Wrapper execution over the same service layer.
 
 - Bind the Studio MCP server to loopback only.
 - Keep the per-launch endpoint token behavior unless a later authentication design explicitly replaces it.
 - Expose deterministic Studio capabilities, not autonomous AI policy.
-- Keep synchronous `process_run` / `maven_run` for one-call use.
-- Managed runs use `process_start`, `process_list`, `process_status`, `process_output`, `process_cancel`, and `maven_start`.
+- Keep synchronous `process_run` / `maven_run` / `gradle_run` for one-call use.
+- Managed runs use `process_start`, `process_list`, `process_status`, `process_output`, `process_cancel`, `maven_start`, and `gradle_start`.
 - Managed run ids and history belong to the running Studio server/JVM; do not imply persistence across Studio restarts.
 - MCP does not yet imply Pickleball runtime connectivity. Phase 3 must use an explicit Studio-JVM-to-consumer-test-JVM bridge.
 
@@ -66,8 +76,10 @@ Phase 2B added generic workspace file services and MCP exposure of those service
 
 Phase 2C added bounded one-shot process execution plus self-contained Maven 3.9.16 build/test execution through CLI and MCP.
 
-Phase 2D adds session-scoped managed process lifecycle, bounded run history, incremental stdout/stderr output cursors, cancellation, and managed Maven starts for MCP and future Studio UI integrations.
+Phase 2D added session-scoped managed process lifecycle, bounded run history, incremental stdout/stderr output cursors, cancellation, and managed Maven starts for MCP and future Studio UI integrations.
 
-Do not claim that Gradle Tooling API execution, persistent run/activity history, interactive terminal input, GUI editing, syntax-aware Java/Gherkin navigation, or live Pickleball control is implemented until those later slices are added.
+Phase 2E adds project Gradle Wrapper execution through CLI and MCP, including managed Gradle starts, while requiring no host Gradle installation.
+
+Do not claim that Gradle Tooling API model/navigation support, wrapperless Gradle provisioning, persistent run/activity history, interactive terminal input, GUI editing, syntax-aware Java/Gherkin navigation, or live Pickleball control is implemented until those later slices are added.
 
 See `docs/pickleball-studio.md`.

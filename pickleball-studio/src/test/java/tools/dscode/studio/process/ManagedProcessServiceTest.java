@@ -11,7 +11,6 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ManagedProcessServiceTest {
@@ -50,6 +49,20 @@ class ManagedProcessServiceTest {
 
             assertEquals(ProcessState.CANCELLED, cancelled.state());
             assertEquals(ProcessState.CANCELLED, waitForTerminal(managed, started.id()).state());
+        }
+    }
+
+    @Test
+    void cancellationTerminatesDescendantProcesses() throws Exception {
+        WorkspaceInfo workspace = new WorkspaceService().open(tempDir);
+        try (ManagedProcessService managed = new ManagedProcessService(new WorkspaceProcessService(workspace))) {
+            ManagedProcessSummary started = managed.start(javaCommand("spawn"), ".", 30);
+            ProcessOutputChunk output = waitForOutput(managed, started.id(), "child=");
+            long childPid = Long.parseLong(output.stdout().trim().substring("child=".length()));
+
+            managed.cancel(started.id());
+            assertEquals(ProcessState.CANCELLED, waitForTerminal(managed, started.id()).state());
+            waitForProcessExit(childPid);
         }
     }
 
@@ -99,6 +112,17 @@ class ManagedProcessServiceTest {
             Thread.sleep(20);
         }
         throw new AssertionError("Managed process did not finish");
+    }
+
+    private static void waitForProcessExit(long pid) throws Exception {
+        Instant deadline = Instant.now().plus(Duration.ofSeconds(5));
+        while (Instant.now().isBefore(deadline)) {
+            if (ProcessHandle.of(pid).isEmpty() || !ProcessHandle.of(pid).orElseThrow().isAlive()) {
+                return;
+            }
+            Thread.sleep(20);
+        }
+        throw new AssertionError("Descendant process remained alive after cancellation: " + pid);
     }
 
     private static List<String> javaCommand(String mode) {

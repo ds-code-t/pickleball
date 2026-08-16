@@ -14,6 +14,7 @@ Studio currently targets:
 - Spring Boot 4.1.0 for the executable nested Studio application;
 - Spring AI 2.0.0 for MCP server integration;
 - Apache Maven 3.9.16 for Studio-managed Maven execution;
+- project Gradle Wrappers for Studio-managed Gradle execution without a host Gradle installation;
 - Gradle Nexus Publish Plugin 2.0.0;
 - AspectJ 1.9.24 for Pickleball Core.
 
@@ -178,6 +179,36 @@ A typical AI/client flow is:
 
 Managed lifecycle is intentionally exposed through the long-lived MCP server rather than as a standalone asynchronous CLI command. A one-shot CLI invocation would exit the owning Studio JVM and therefore cannot provide meaningful later status/output/cancellation. The existing CLI `exec` and `maven` commands remain synchronous.
 
+## Phase 2E: Gradle Wrapper execution
+
+Phase 2E adds `GradleBuildService` for Gradle workspaces that contain the normal checked-in Gradle Wrapper. Studio does not invoke a host-installed `gradle`; it runs `gradlew` on Unix-like systems or `gradlew.bat` on Windows, so the workspace remains authoritative for the Gradle version. If the declared distribution is not already in the user's Gradle Wrapper cache, normal Wrapper behavior may download it.
+
+Studio-managed Gradle invocations:
+
+- run from the opened workspace root;
+- set `JAVA_HOME` to the JDK running Studio;
+- prepend `--no-daemon --console=plain` for deterministic non-interactive capture;
+- use the same 600-second default build timeout as managed Maven;
+- share the same bounded process output, history, timeout, and cancellation infrastructure;
+- require the platform-appropriate Wrapper script instead of falling back to a host Gradle installation.
+
+CLI example:
+
+```shell
+java -jar build/libs/pickleball-2.1.7.jar studio gradle . test
+```
+
+MCP adds two tools, bringing the current tool count to 15:
+
+```text
+gradle_run
+gradle_start
+```
+
+`gradle_run` is synchronous. `gradle_start` returns a managed process id that is consumed through the existing `process_status`, `process_output`, and `process_cancel` tools. Process cancellation now terminates owned descendant processes as well as the immediate wrapper process so Gradle/Java children are not intentionally left running.
+
+This phase is Gradle **build execution**, not Gradle Tooling API project-model/navigation support. Wrapperless Gradle projects are also outside the current contract.
+
 ## Validation
 
 Focused Studio validation:
@@ -187,7 +218,7 @@ Focused Studio validation:
 ./gradlew --rerun-tasks :pickleball-studio:verifyBundledStudio
 ```
 
-The Studio tests include real child-JVM process checks, managed incremental-output/cancellation checks, and synchronous plus managed Maven `--version` checks using the bundled Maven runtime, so host Maven is not needed for the focused Maven bootstrap tests.
+The Studio tests include real child-JVM process checks, managed incremental-output/cancellation and descendant-termination checks, synchronous plus managed Maven `--version` checks, and cross-platform Gradle Wrapper fixture checks for synchronous/managed execution. The Gradle fixture tests do not require a host Gradle installation or network download.
 
 `verifyBundledStudio` checks both sides of the isolation contract:
 
@@ -201,9 +232,9 @@ After focused validation, run the normal root and Maven-consumer validation from
 
 ## Current boundaries
 
-Phase 2D does **not** yet implement:
+Phase 2E does **not** yet implement:
 
-- Gradle Tooling API build execution;
+- Gradle Tooling API project-model/navigation support or wrapperless Gradle provisioning;
 - persistent process/activity history across Studio restarts;
 - interactive terminal stdin/PTY support;
 - GUI editing/navigation;

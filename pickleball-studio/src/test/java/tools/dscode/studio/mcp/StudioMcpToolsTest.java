@@ -5,6 +5,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.ai.tool.method.MethodToolCallbackProvider;
+import tools.dscode.studio.build.GradleBuildService;
 import tools.dscode.studio.build.MavenBuildService;
 import tools.dscode.studio.process.ManagedProcessService;
 import tools.dscode.studio.process.WorkspaceProcessService;
@@ -40,7 +41,8 @@ class StudioMcpToolsTest {
                     new WorkspaceFileService(info.root()),
                     processes,
                     managed,
-                    new MavenBuildService(info, processes, managed)
+                    new MavenBuildService(info, processes, managed),
+                    new GradleBuildService(info, processes, managed)
             );
             ToolCallbackProvider provider = MethodToolCallbackProvider.builder().toolObjects(tools).build();
 
@@ -64,7 +66,9 @@ class StudioMcpToolsTest {
                             "process_output",
                             "process_cancel",
                             "maven_run",
-                            "maven_start"
+                            "maven_start",
+                            "gradle_run",
+                            "gradle_start"
                     ),
                     callbacks.keySet()
             );

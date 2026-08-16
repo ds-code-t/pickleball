@@ -2,6 +2,9 @@ package tools.dscode.studio.mcp;
 
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import tools.dscode.studio.build.GradleBuildService;
+import tools.dscode.studio.build.GradleRunResult;
+import tools.dscode.studio.build.ManagedGradleRunResult;
 import tools.dscode.studio.build.ManagedMavenRunResult;
 import tools.dscode.studio.build.MavenBuildService;
 import tools.dscode.studio.build.MavenRunResult;
@@ -29,19 +32,22 @@ public final class StudioMcpTools {
     private final WorkspaceProcessService processes;
     private final ManagedProcessService managedProcesses;
     private final MavenBuildService maven;
+    private final GradleBuildService gradle;
 
     public StudioMcpTools(
             WorkspaceInfo workspace,
             WorkspaceFileService files,
             WorkspaceProcessService processes,
             ManagedProcessService managedProcesses,
-            MavenBuildService maven
+            MavenBuildService maven,
+            GradleBuildService gradle
     ) {
         this.workspace = workspace;
         this.files = files;
         this.processes = processes;
         this.managedProcesses = managedProcesses;
         this.maven = maven;
+        this.gradle = gradle;
     }
 
     @Tool(
@@ -163,7 +169,7 @@ public final class StudioMcpTools {
             description = "Return current state and metadata for one managed Studio process."
     )
     public ManagedProcessSummary processStatus(
-            @ToolParam(description = "Studio process id returned by process_start or maven_start.") String id
+            @ToolParam(description = "Studio process id returned by process_start, maven_start, or gradle_start.") String id
     ) {
         return managedProcesses.status(id);
     }
@@ -186,7 +192,7 @@ public final class StudioMcpTools {
 
     @Tool(
             name = "process_cancel",
-            description = "Cancel a running managed Studio process."
+            description = "Cancel a running managed Studio process and its owned descendant processes."
     )
     public ManagedProcessSummary cancelProcess(
             @ToolParam(description = "Studio process id.") String id
@@ -218,5 +224,31 @@ public final class StudioMcpTools {
             Integer timeoutSeconds
     ) {
         return maven.start(arguments, timeoutSeconds);
+    }
+
+    @Tool(
+            name = "gradle_run",
+            description = "Run the current Gradle workspace through its checked-in Gradle Wrapper. No host Gradle installation is required."
+    )
+    public GradleRunResult runGradle(
+            @ToolParam(description = "Gradle tasks and CLI arguments, for example [\"test\"] or [\"help\", \"--warning-mode=all\"].")
+            List<String> arguments,
+            @ToolParam(description = "Timeout in seconds. Defaults to 600.", required = false)
+            Integer timeoutSeconds
+    ) {
+        return gradle.run(arguments, timeoutSeconds);
+    }
+
+    @Tool(
+            name = "gradle_start",
+            description = "Start the current Gradle workspace through its checked-in Gradle Wrapper as a managed Studio process."
+    )
+    public ManagedGradleRunResult startGradle(
+            @ToolParam(description = "Gradle tasks and CLI arguments, for example [\"test\"] or [\"help\", \"--warning-mode=all\"].")
+            List<String> arguments,
+            @ToolParam(description = "Timeout in seconds. Defaults to 600.", required = false)
+            Integer timeoutSeconds
+    ) {
+        return gradle.start(arguments, timeoutSeconds);
     }
 }

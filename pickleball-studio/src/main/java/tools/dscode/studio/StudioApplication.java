@@ -1,5 +1,7 @@
 package tools.dscode.studio;
 
+import tools.dscode.studio.build.GradleBuildService;
+import tools.dscode.studio.build.GradleRunResult;
 import tools.dscode.studio.build.MavenBuildService;
 import tools.dscode.studio.build.MavenRunResult;
 import tools.dscode.studio.mcp.StudioServer;
@@ -43,6 +45,9 @@ public final class StudioApplication {
         }
         if (args.length > 0 && "maven".equalsIgnoreCase(args[0])) {
             return maven(args, out, err);
+        }
+        if (args.length > 0 && "gradle".equalsIgnoreCase(args[0])) {
+            return gradle(args, out, err);
         }
 
         int workspaceIndex = args.length > 0 && "status".equalsIgnoreCase(args[0]) ? 1 : 0;
@@ -140,6 +145,25 @@ public final class StudioApplication {
         }
     }
 
+    private static int gradle(String[] args, PrintStream out, PrintStream err) {
+        if (args.length < 3) {
+            err.println("Usage: pickleball studio gradle <workspace> <task-or-option> [args...]");
+            return 2;
+        }
+
+        try {
+            WorkspaceInfo workspace = new WorkspaceService().open(Path.of(args[1]));
+            WorkspaceProcessService processes = new WorkspaceProcessService(workspace);
+            List<String> gradleArguments = Arrays.asList(Arrays.copyOfRange(args, 2, args.length));
+            GradleRunResult result = new GradleBuildService(workspace, processes).run(gradleArguments, null);
+            printProcessResult(result.process(), out, err);
+            return exitCode(result.process());
+        } catch (IllegalArgumentException | IllegalStateException error) {
+            err.println(error.getMessage());
+            return 2;
+        }
+    }
+
     private static void printProcessResult(ProcessResult result, PrintStream out, PrintStream err) {
         if (!result.stdout().isEmpty()) {
             out.print(result.stdout());
@@ -163,7 +187,8 @@ public final class StudioApplication {
         return "serve".equalsIgnoreCase(argument)
                 || "status".equalsIgnoreCase(argument)
                 || "exec".equalsIgnoreCase(argument)
-                || "maven".equalsIgnoreCase(argument);
+                || "maven".equalsIgnoreCase(argument)
+                || "gradle".equalsIgnoreCase(argument);
     }
 
     private static boolean isHelp(String argument) {
@@ -178,5 +203,6 @@ public final class StudioApplication {
         out.println("  pickleball studio serve [workspace] [--port=<port>] [--token=<token>]");
         out.println("  pickleball studio exec <workspace> <command> [args...]");
         out.println("  pickleball studio maven <workspace> <goal-or-option> [args...]");
+        out.println("  pickleball studio gradle <workspace> <task-or-option> [args...]");
     }
 }
