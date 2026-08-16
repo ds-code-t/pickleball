@@ -47,6 +47,7 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `docs/key-parser-dsl.md`
 - `docs/mapping-and-templating.md`
 - `docs/nested-steps.md`
+- `docs/pickleball-studio.md`
 - `docs/README.md`
 - `docs/service-call-scenarios.md`
 
@@ -356,6 +357,8 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `src/main/java/tools/dscode/parallelutilities/Stagger.java`
 - `src/main/java/tools/dscode/pickleruntime/CucumberOptionResolver.java`
 - `src/main/java/tools/dscode/registry/GlobalRegistry.java`
+- `src/main/java/tools/dscode/studio/launcher/PickleballMain.java`
+- `src/main/java/tools/dscode/studio/launcher/StudioLauncher.java`
 - `src/main/java/tools/dscode/testengine/DynamicEngineDiscoveryRequest.java`
 - `src/main/java/tools/dscode/testengine/DynamicSuiteBootstrap.java`
 - `src/main/java/tools/dscode/testengine/DynamicSuiteConfigUtils.java`
@@ -392,6 +395,17 @@ This inventory helps coding agents discover relevant files. It does not replace 
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/OverrideScope.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ResolutionCandidate.java`
 - `pickleball-control-api/src/main/java/tools/dscode/control/api/ResolutionExplanation.java`
+
+## Pickleball Studio module
+
+- `gradle/pickleball-studio.gradle`
+- `pickleball-studio/AGENTS.md`
+- `pickleball-studio/build.gradle`
+- `pickleball-studio/src/main/java/tools/dscode/studio/StudioApplication.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceInfo.java`
+- `pickleball-studio/src/main/java/tools/dscode/studio/workspace/WorkspaceService.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/StudioApplicationTest.java`
+- `pickleball-studio/src/test/java/tools/dscode/studio/workspace/WorkspaceServiceTest.java`
 
 ## Maven consumer Java support
 

@@ -1,0 +1,85 @@
+package tools.dscode.studio.launcher;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.List;
+
+final class StudioLauncher {
+    private static final String STUDIO_RESOURCE = "/META-INF/pickleball/studio/pickleball-studio.jar";
+
+    private StudioLauncher() {
+    }
+
+    static int launch(String[] args) throws IOException, InterruptedException {
+        Path studioJar = extractStudio();
+        List<String> command = new ArrayList<>();
+        command.add(javaExecutable().toString());
+        command.add("-jar");
+        command.add(studioJar.toString());
+        command.addAll(List.of(args));
+
+        return new ProcessBuilder(command)
+                .inheritIO()
+                .start()
+                .waitFor();
+    }
+
+    private static Path extractStudio() throws IOException {
+        String version = StudioLauncher.class.getPackage().getImplementationVersion();
+        if (version == null || version.isBlank()) {
+            version = "dev";
+        }
+
+        Path cacheRoot = Path.of(System.getProperty(
+                "pickleball.studio.cache",
+                Path.of(System.getProperty("user.home"), ".pickleball", "studio").toString()
+        ));
+        Path cacheDir = cacheRoot.resolve(version);
+        Path target = cacheDir.resolve("pickleball-studio.jar");
+        Files.createDirectories(cacheDir);
+
+        InputStream bundledStudio = StudioLauncher.class.getResourceAsStream(STUDIO_RESOURCE);
+        if (bundledStudio == null) {
+            throw new IllegalStateException("Bundled Pickleball Studio application was not found.");
+        }
+
+        Path temporary = Files.createTempFile(cacheDir, "pickleball-studio-", ".jar");
+        try (InputStream source = bundledStudio) {
+            Files.copy(source, temporary, StandardCopyOption.REPLACE_EXISTING);
+        }
+
+        if (Files.isRegularFile(target) && sha256(target).equals(sha256(temporary))) {
+            Files.delete(temporary);
+            return target;
+        }
+
+        Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+        return target;
+    }
+
+    private static String sha256(Path file) throws IOException {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            try (InputStream input = new DigestInputStream(Files.newInputStream(file), digest)) {
+                input.transferTo(OutputStream.nullOutputStream());
+            }
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException("SHA-256 is unavailable", impossible);
+        }
+    }
+
+    private static Path javaExecutable() {
+        String executable = System.getProperty("os.name", "").startsWith("Windows") ? "java.exe" : "java";
+        return Path.of(System.getProperty("java.home"), "bin", executable);
+    }
+}

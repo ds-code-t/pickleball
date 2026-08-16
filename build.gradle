@@ -1,6 +1,6 @@
 plugins {
     id 'java-library'
-    id 'com.github.johnrengelman.shadow' version '8.1.1'
+    id 'com.gradleup.shadow' version '9.6.1'
     id 'maven-publish'
     id 'signing'
     id("io.github.gradle-nexus.publish-plugin") version "2.0.0"
@@ -8,7 +8,6 @@ plugins {
 
 group = 'tools.dscode'
 version = '2.1.7'
-
 
 repositories {
     mavenCentral()
@@ -39,31 +38,35 @@ java {
     withJavadocJar()
 }
 
-
-
 // Optional: make javadoc generation less fragile on modern JDKs
 tasks.withType(Javadoc).configureEach {
     options.addStringOption('Xdoclint:none', '-quiet')
     options.encoding = 'UTF-8'
 }
 
-/* 👇 Add this new block right after the java { } block */
 sourceSets {
     main { java { srcDirs = ['src/main/java', 'src/main/aspectj'] } }
     test { java { srcDirs += ['src/test/aspectj'] } }
 }
 
-
 configurations {
     // JARs we want to weave (allow transitives for type resolution)
     weaveLibs {
+        canBeConsumed = false
+        canBeResolved = true
         transitive = true
         exclude group: 'net.bytebuddy'
     }
     // AspectJ tool binaries (ajc)
-    ajcTools
+    ajcTools {
+        canBeConsumed = false
+        canBeResolved = true
+    }
     // AspectJ runtime (needed on compile & weave CP; also shaded)
-    ajcRuntime
+    ajcRuntime {
+        canBeConsumed = false
+        canBeResolved = true
+    }
 }
 
 dependencies {
@@ -78,8 +81,6 @@ dependencies {
         exclude group: "io.cucumber", module: "gherkin"
     }
 
-
-    // ✅ Change 2: update JUnit to what Cucumber 7.27.x expects
     api("org.junit.platform:junit-platform-suite-api:1.13.4")
     api("org.junit.platform:junit-platform-suite-engine:1.13.4")
     api("org.junit.platform:junit-platform-launcher:1.13.4")
@@ -116,20 +117,15 @@ dependencies {
     ajcRuntime "org.aspectj:aspectjrt:${aspectjVersion}"
 //    implementation "org.aspectj:aspectjrt:${aspectjVersion}" // shaded into pickleball
 
-// Declare weave targets.
-// ✅ publish these modules so their transitives come in normally for consumers
-// The woven bytecode is bundled into the shadow jar via from(wovenExpanded).
+    // Declare weave targets.
     toWeave.each { gav ->
         weaveLibs  "${gav.group}:${gav.name}:${gav.version}"
         api "${gav.group}:${gav.name}:${gav.version}"
-        testImplementation "${gav.group}:${gav.name}:${gav.version}" // only if your tests need it
+        testImplementation "${gav.group}:${gav.name}:${gav.version}"
     }
 
-
-// Align all io.cucumber modules in THIS build, and also share alignment intent with consumers (Gradle)
+    // Align all io.cucumber modules in THIS build, and also share alignment intent with consumers (Gradle)
     api(platform("io.cucumber:cucumber-bom:${cucumberVersion}"))
-
-
 
     // xpath and selenium
     implementation('org.seleniumhq.selenium:selenium-java') {
@@ -137,7 +133,6 @@ dependencies {
     }
 
     implementation files('libs/xpathy-3.0.0.jar')
-
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -156,8 +151,6 @@ tasks.register('ajcMain', JavaExec) {
     classpath = configurations.ajcTools
 
     def cp = files(sourceSets.main.compileClasspath, configurations.ajcRuntime).asPath
-
-    // 👇 Use ONLY what sourceSets already knows (includes aspectj dir)
     def allSourceRoots = sourceSets.main.java.srcDirs
             .collect { it.absolutePath }
             .join(File.pathSeparator)
@@ -176,11 +169,9 @@ tasks.named('compileJava').configure { enabled = false }
 // Make lifecycle compile depend on ajc
 tasks.named('classes') { dependsOn 'ajcMain' }
 
-// --- BINARY WEAVING OF DEPENDENCY JARS (unchanged in spirit) ---
-
+// --- BINARY WEAVING OF DEPENDENCY JARS ---
 def wovenDir = layout.buildDirectory.dir('woven')
 def wovenExpanded = layout.buildDirectory.dir('woven-expanded')
-
 def wovenJar = wovenDir.map { it.file("all-woven.jar") }
 
 tasks.register('weaveTargets', JavaExec) {
@@ -195,16 +186,14 @@ tasks.register('weaveTargets', JavaExec) {
     }
 
     def inpathFiles = provider {
-        def artifacts = configurations.weaveLibs
-                .resolvedConfiguration
-                .resolvedArtifacts
-
         def wanted = toWeave.collect {
             "${it.group}:${it.name}:${it.version}"
         } as Set
 
-        artifacts.findAll { ra ->
-            "${ra.moduleVersion.id.group}:${ra.name}:${ra.moduleVersion.id.version}" in wanted
+        configurations.weaveLibs.incoming.artifacts.artifacts.findAll { artifact ->
+            def component = artifact.id.componentIdentifier
+            component instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier &&
+                    "${component.group}:${component.module}:${component.version}" in wanted
         }.collect { it.file }
     }
 
@@ -212,7 +201,6 @@ tasks.register('weaveTargets', JavaExec) {
     classpath = configurations.ajcTools
 
     def classesDir = sourceSets.main.java.destinationDirectory.get().asFile
-
     def weaverClasspath = files(
             configurations.weaveLibs,
             configurations.ajcRuntime,
@@ -223,13 +211,9 @@ tasks.register('weaveTargets', JavaExec) {
             '-showWeaveInfo',
             '-verbose',
             '-Xlint:warning',
-
             '-inpath', files(inpathFiles).asPath,
-
             '-aspectpath', files(classesDir).asPath,
-
             '-classpath', weaverClasspath,
-
             '-outjar', wovenJar.get().asFile.absolutePath
     ]
 }
@@ -244,7 +228,6 @@ tasks.register('expandWoven') {
 
     doLast {
         def jar = wovenJar.get().asFile
-
         if (!jar.exists()) {
             throw new GradleException("Expected woven jar was not created: ${jar}")
         }
@@ -261,20 +244,22 @@ tasks.register('expandWoven') {
     }
 }
 
-
 def myLicense = file("LICENSE").canonicalFile
 def myNotice  = file("NOTICE").canonicalFile
 
 tasks.shadowJar {
     configurations = [project.configurations.ajcRuntime]
 
+    // Preserve the existing first-entry-wins behavior generally, but allow
+    // duplicate Java service descriptors through so Shadow can merge them.
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    filesMatching('META-INF/services/**') {
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
 
-    // Exclude LICENSE/NOTICE coming from dependency jars, but keep *your* project ones.
+    // Exclude LICENSE/NOTICE coming from dependency jars, but keep project ones.
     exclude { FileTreeElement e ->
         def p = e.path
-
-        // Match common license/notice paths that appear in dependency jars
         boolean looksLikeLicenseOrNotice =
                 p == 'LICENSE' ||
                         p == 'NOTICE' ||
@@ -287,62 +272,47 @@ tasks.shadowJar {
 
         if (!looksLikeLicenseOrNotice) return false
 
-        // Keep the project's own LICENSE/NOTICE (wherever you copy them)
         File src = e.file
         if (src != null && src.exists()) {
             def c = src.canonicalFile
             if (c == myLicense || c == myNotice) return false
         }
 
-        // Otherwise: it's from a dependency -> exclude it
         return true
     }
 
-    // Now you can safely add yours
     from("LICENSE") { into "META-INF" }
     from("NOTICE") { into "META-INF" }
     from("THIRD-PARTY-NOTICES.md") { into "META-INF" }
 
-    // use ajc output + woven deps
     dependsOn 'ajcMain', 'expandWoven', 'classes'
 
     archiveBaseName.set('pickleball')
     archiveVersion.set(project.version.toString())
-    archiveClassifier.set('') // publish as main artifact
+    archiveClassifier.set('')
 
-    // ✅ include classes AND resources (keeps META-INF/services/*)
     from(sourceSets.main.output) {
         includeEmptyDirs = false
     }
 
-
-    // Bundle local xpathy jar into the shaded jar (since Maven consumers can't resolve files(...) deps)
+    // Bundle local xpathy jar into the shaded jar.
     from({ zipTree(file("libs/xpathy-3.0.0.jar")) }) {
-        // keep signatures out (common for shaded jars)
         exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
-        // optional: avoid duplicate manifests
         exclude 'META-INF/MANIFEST.MF'
     }
 
     // put woven classes LAST so they overwrite any originals
     from(wovenExpanded)
 
-
-    // ✅ ensure service descriptors are merged for discovery
     mergeServiceFiles()
-
 
     exclude 'META-INF/*.SF', 'META-INF/*.RSA', 'META-INF/*.DSA'
     zip64 = true
-
-
 }
-
 
 // Disable the plain jar so only the shaded jar is produced/published
 tasks.jar { enabled = false }
 
-// Publish shaded artifact; POM massaging kept as-is
 publishing {
     repositories {
         maven {
@@ -357,12 +327,10 @@ publishing {
             artifactId = 'pickleball'
             version = project.version as String
 
-            // Publish the shaded jar as THE main artifact
             artifact(tasks.named("shadowJar")) {
                 builtBy tasks.named("shadowJar")
             }
 
-            // Also publish sources + javadoc jars (expected by Central)
             artifact(tasks.named("sourcesJar"))
             artifact(tasks.named("javadocJar"))
 
@@ -395,17 +363,13 @@ publishing {
 
             pom.withXml {
                 def pomNode = asNode()
-
-                // Ensure <dependencies> exists
                 def depsNodeList = pomNode.get('dependencies') as groovy.util.NodeList
                 def depsNode = (depsNodeList && depsNodeList.size() > 0)
                         ? (groovy.util.Node) depsNodeList[0]
                         : pomNode.appendNode('dependencies')
 
-                // Clear anything Gradle/Shadow inserted
                 depsNode.children().clear()
 
-                // These are bundled/woven into your shadow jar and must NOT be published
                 Set<String> bundledOrOverriddenGA = [
                         'org.aspectj:aspectjrt',
                         'io.cucumber:cucumber-bom',
@@ -418,45 +382,36 @@ publishing {
                         'io.cucumber:gherkin'
                 ] as Set
 
-                // Optional: keep special version text for selenium
-                def declaredVersionFor = { String g, String a ->
-                    def dep = (configurations.api.allDependencies + configurations.implementation.allDependencies)
-                            .find { it.group == g && it.name == a }
-                    return dep?.version
-                }
-
                 Set<String> added = new LinkedHashSet<>()
 
-                // Publish the FULL resolved runtime graph, minus bundled modules
-                configurations.runtimeClasspath
-                        .resolvedConfiguration
-                        .resolvedArtifacts
-                        .each { ra ->
+                configurations.runtimeClasspath.incoming.artifacts.artifacts.each { artifact ->
+                    def component = artifact.id.componentIdentifier
+                    if (!(component instanceof org.gradle.api.artifacts.component.ModuleComponentIdentifier)) {
+                        return
+                    }
 
-                            String g = ra.moduleVersion.id.group
-                            String a = ra.name
-                            String v = ra.moduleVersion.id.version
-                            String ga = "${g}:${a}"
+                    String g = component.group
+                    String a = component.module
+                    String v = component.version
+                    String ga = "${g}:${a}"
 
-                            if (!g || !a || !v) return
-                            if (bundledOrOverriddenGA.contains(ga)) return
-                            if (!added.add(ga)) return
+                    if (!g || !a || !v) return
+                    if (bundledOrOverriddenGA.contains(ga)) return
+                    if (!added.add(ga)) return
 
-                            def d = depsNode.appendNode('dependency')
-                            d.appendNode('groupId', g)
-                            d.appendNode('artifactId', a)
+                    def d = depsNode.appendNode('dependency')
+                    d.appendNode('groupId', g)
+                    d.appendNode('artifactId', a)
 
-                            // Preserve your selenium version range if desired
-                            if (ga == "org.seleniumhq.selenium:selenium-java") {
-                                d.appendNode('version', '[4.0,5.0)')
-                            } else {
-                                d.appendNode('version', v)
-                            }
+                    if (ga == "org.seleniumhq.selenium:selenium-java") {
+                        d.appendNode('version', '[4.0,5.0)')
+                    } else {
+                        d.appendNode('version', v)
+                    }
 
-                            d.appendNode('scope', 'compile')
-                        }
+                    d.appendNode('scope', 'compile')
+                }
 
-                // Preserve the exclusions on cucumber-junit-platform-engine as an extra safeguard
                 def engineDep = depsNode.children().find {
                     it instanceof groovy.util.Node &&
                             it.get('groupId')?.text() == 'io.cucumber' &&
@@ -481,8 +436,6 @@ publishing {
                     }
                 }
             }
-
-
         }
     }
 }
@@ -492,27 +445,29 @@ apply plugin: 'idea'
 // Ensure woven jar exists when IDEA syncs
 tasks.named('ideaModule') { dependsOn 'weaveTargets' }
 
-configurations { wovenInsight }
+configurations {
+    wovenInsight {
+        canBeConsumed = false
+        canBeResolved = true
+    }
+}
 
 dependencies {
-    // Put your woven classes into an IDE-only configuration
-    wovenInsight files("$buildDir/woven/all-woven.jar")
+    // Put woven classes into an IDE-only configuration.
+    wovenInsight files(layout.buildDirectory.file('woven/all-woven.jar'))
 }
 
 idea {
     module {
-        // Make sure the AspectJ folder stays a source root in IDEA
         sourceDirs += file('src/main/aspectj')
 
-        // ▶ Add woven classes to IDE classpath for code insight
         scopes.COMPILE.plus += [configurations.wovenInsight]
         scopes.RUNTIME.plus += [configurations.wovenInsight]
-        scopes.TEST.plus    += [configurations.wovenInsight]   // ✅ add this
+        scopes.TEST.plus    += [configurations.wovenInsight]
 
-        // ▶ Remove the *unwoven* jars from IDE classpath (build remains unchanged)
         scopes.COMPILE.minus += [configurations.weaveLibs]
         scopes.RUNTIME.minus += [configurations.weaveLibs]
-        scopes.TEST.minus    += [configurations.weaveLibs]     // ✅ add this
+        scopes.TEST.minus    += [configurations.weaveLibs]
     }
 }
 
@@ -530,8 +485,7 @@ nexusPublishing {
 
 def requested = gradle.startParameter.taskNames*.toLowerCase()
 
-def isMavenLocalPublish =
-        requested.any { it.contains("publishtomavenlocal") }
+def isMavenLocalPublish = requested.any { it.contains("publishtomavenlocal") }
 
 def isStagingPublish =
         requested.any { it.contains("publishmavenpublicationtostagingrepository") } ||
@@ -543,7 +497,7 @@ def isStagingPublish =
 def signingIsRequired = isStagingPublish && !isMavenLocalPublish
 
 signing {
-    required { signingIsRequired }
+    required = { signingIsRequired }
 
     def key  = (findProperty("signingKey") ?: System.getenv("SIGNING_KEY"))?.toString()
     def pass = (findProperty("signingPassword") ?: System.getenv("SIGNING_PASSWORD"))?.toString()
@@ -599,7 +553,6 @@ tasks.register("generateCentralChecksums") {
     }
 }
 
-
 tasks.register("centralBundleZip", Zip) {
     group = "publishing"
     description = "Create a Sonatype Central upload bundle zip from the local staging repository output."
@@ -624,17 +577,15 @@ tasks.withType(Sign).configureEach {
     onlyIf { !isMavenLocalPublish }
 }
 
-
 tasks.test {
     useJUnitPlatform {
         includeEngines("junit-jupiter")
     }
-    dependsOn("expandWoven") // expandWoven already dependsOn weaveTargets
+    dependsOn("expandWoven")
 
     // Put woven classes FIRST so they beat the unwoven dependency jars
     classpath = files(wovenExpanded) + classpath
 }
-
 
 configurations.named("testRuntimeClasspath") {
     exclude group: "io.cucumber", module: "cucumber-core"

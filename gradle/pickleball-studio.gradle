@@ -1,0 +1,28 @@
+// Pickleball Studio is built as an isolated nested application and bundled into
+// the normal Pickleball artifact without adding Studio dependencies to the
+// consumer runtime classpath or published Maven dependency graph.
+//
+// Shadow 9 aligns ShadowJar.from(...) with Gradle CopySpec semantics, so the
+// Studio application JAR can be copied as one opaque nested JAR instead of
+// being expanded into the outer Pickleball classpath.
+def studioProject = project(':pickleball-studio')
+def studioJarFile = studioProject.layout.buildDirectory.file('libs/pickleball-studio.jar')
+def studioDestination = 'META-INF/pickleball/studio'
+
+pluginManager.withPlugin('com.gradleup.shadow') {
+    tasks.named('shadowJar').configure {
+        dependsOn ':pickleball-studio:jar'
+
+        from(studioJarFile) {
+            into studioDestination
+        }
+
+        manifest {
+            attributes(
+                    'Main-Class': 'tools.dscode.studio.launcher.PickleballMain',
+                    'Implementation-Title': 'Pickleball',
+                    'Implementation-Version': project.version.toString()
+            )
+        }
+    }
+}

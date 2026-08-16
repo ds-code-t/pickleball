@@ -1,0 +1,40 @@
+package tools.dscode.studio.launcher;
+
+import java.util.Arrays;
+
+public final class PickleballMain {
+    private PickleballMain() {
+    }
+
+    public static void main(String[] args) throws Exception {
+        int exitCode = run(args);
+        if (exitCode != 0) {
+            System.exit(exitCode);
+        }
+    }
+
+    static int run(String[] args) throws Exception {
+        if (args.length == 0 || isHelp(args[0])) {
+            printUsage();
+            return 0;
+        }
+
+        if ("studio".equalsIgnoreCase(args[0])) {
+            return StudioLauncher.launch(Arrays.copyOfRange(args, 1, args.length));
+        }
+
+        System.err.println("Unknown Pickleball command: " + args[0]);
+        printUsage();
+        return 2;
+    }
+
+    private static boolean isHelp(String argument) {
+        return "help".equalsIgnoreCase(argument)
+                || "--help".equalsIgnoreCase(argument)
+                || "-h".equalsIgnoreCase(argument);
+    }
+
+    private static void printUsage() {
+        System.out.println("Usage: java -jar pickleball-<version>.jar studio [status] [workspace]");
+    }
+}

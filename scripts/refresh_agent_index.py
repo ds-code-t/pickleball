@@ -53,6 +53,13 @@ GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "pickleball-control-api/src/main/**/*",
         "pickleball-control-api/src/test/**/*",
     )),
+    ("Pickleball Studio module", (
+        "gradle/pickleball-studio.gradle",
+        "pickleball-studio/AGENTS.md",
+        "pickleball-studio/build.gradle",
+        "pickleball-studio/src/main/**/*",
+        "pickleball-studio/src/test/**/*",
+    )),
     ("Maven consumer Java support", (
         "maven-consumer-project/src/test/java/**/*.java",
     )),
